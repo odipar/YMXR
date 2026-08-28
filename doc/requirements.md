@@ -44,20 +44,31 @@ format produces.
 - **R3.5** YMX 0.8.3 states the two together. Holding them apart is what
   this redesign is for.
 
-ST4 and the 68000 bind Layer 0. Layer 1 does not lift them.
+## R4. Layer 0's constraints
 
-- **R3.6** One ring size, `N`, for every stream. A consumer holds one ring
-  of `N` bytes for each stream it reads.
-- **R3.7** The 68000 bounds `N`. A stream's ring is reached through a
+Layer 0 states five parameters:
+
+| | |
+|---|---|
+| `S` | how many streams the file holds |
+| `O` | how many values each stream carries |
+| `N` | the ring size in bytes |
+| `C` | how many values one refill decodes |
+| the unit | ST4's unit size in bytes |
+
+ST4 and the 68000 bind them. Layer 1 does not lift these.
+
+- **R4.1** One `N` for every stream. A consumer holds one ring of `N` bytes
+  for each stream it reads.
+- **R4.2** The 68000 bounds `N`. A stream's ring is reached through a
   displacement assembled into the player, and the largest of those fits a
   signed 16-bit displacement.
-- **R3.8** A back-reference reaches no further than `N` bytes, so a stream
+- **R4.3** A back-reference reaches no further than `N` bytes, so a stream
   decodes inside its own ring.
-- **R3.9** `C`, the values one refill decodes, divides `N`, and `N` is at
-  least `2C`.
-- **R3.10** `C` covers the longest list of streams a consumer of a file
+- **R4.4** `C` divides `N`, and `N` is at least `2C`.
+- **R4.5** `C` covers the longest list of streams a consumer of a file
   reads.
-- **R3.11** ST4's unit size is 1, 2 or 4. Above 1, `C` and the frame count
-  are multiples of it.
-- **R3.12** A section begins on a long boundary, and so does each stream
+- **R4.6** The unit size is 1, 2 or 4. Above 1, `C` and `O` are multiples of
+  it.
+- **R4.7** A section begins on a long boundary, and so does each stream
   inside it.
