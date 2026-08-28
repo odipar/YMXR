@@ -45,22 +45,27 @@ format produces.
 
 ## R4. Layer 0's constraints
 
-Layer 0 states five parameters:
+Layer 0 states four parameters:
 
 | | |
 |---|---|
 | `S` | how many streams the file holds |
 | `O` | how many values each stream carries |
 | `N` | the buffer size in bytes |
-| `C` | how many values one refill decodes |
 | `K` | ST4's unit size in bytes: 1, 2 or 4 |
 
 - **R4.1** The streams line up. Value `k` of one stream and value `k` of
   another belong together, and every stream carries `O` values.
 - **R4.2** A consumer reads one value from each stream per call.
-- **R4.3** A consumer's memory is bounded, and the file states the bound.
-- **R4.4** A consumer reaches any stream's buffer at a fixed cost.
-- **R4.5** A refill decodes a fixed count of values from one stream, so
-  no stream falls behind another. Decoding that count has variance.
+- **R4.3** A stream never runs dry, and a refill never lands on a value not
+  yet read.
+- **R4.4** A consumer's memory is bounded, and the file states the bound.
+- **R4.5** A consumer reaches any stream's buffer at a fixed cost.
 - **R4.6** A stream decodes from its own buffer alone.
-- **R4.7** ST4's unit model applies unchanged, at every `K`.
+- **R4.7** ST4's unit model applies unchanged.
+
+**What ST4 leaves room for.** A back-reference reaches 32512 bytes, so a
+buffer past that holds history no match can name. One operation runs to
+65535 units, and a call's budget is counted in units and held in a word, so
+a call decodes at most 65535 of them. A refill is smaller than the buffer it
+lands in, or R4.3 has nothing to hold.
