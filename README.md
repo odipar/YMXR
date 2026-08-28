@@ -3,9 +3,10 @@
 YMXR is a redesign of the [YMX](https://github.com/odipar/YMX) encoding,
 before 1.0 freezes it.
 
-The container, the streaming model and the ST4 compression are settled and
-carry over. What this repository works on is the encoding: what the streams
-hold, what an action is, and where an operand comes from.
+ST4 and the streaming model carry over. What this repository works on is
+Layer 1: what the streams hold, how a consumer reads them, and the line
+between that and the container, which YMX 0.8.3 states together
+(doc/requirements.md, R3).
 
 [doc/requirements.md](doc/requirements.md) comes first. Nothing else is
 written until it says what the encoding has to do.

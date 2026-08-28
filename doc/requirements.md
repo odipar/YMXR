@@ -29,3 +29,15 @@ format produces.
   player does not check.
 - **R2.4** The converter resolves what a source carries and writes the
   outcome down. The player reads it and compares nothing.
+
+## R3. Two layers
+
+- **R3.1** Layer 0 is a container: `S` streams, each packed by ST4, each
+  delivering one value a frame.
+- **R3.2** Layer 0 states nothing about what a stream holds. At Layer 0 a
+  stream is an index and a sequence of bytes.
+- **R3.3** Layer 1 is what the streams hold, and how a consumer reads them.
+- **R3.4** The two are stated apart. A change at Layer 1 leaves Layer 0 as
+  it is.
+- **R3.5** YMX 0.8.3 states the two together. Holding them apart is what
+  this redesign is for.
