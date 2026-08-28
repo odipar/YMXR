@@ -44,6 +44,9 @@ final class HouseStyleTest {
             // is taken of it, and its specification states what it states
             "it ruled",
             "it measured",
+            // a format does not answer a constraint: a choice is what
+            // it was, and the constraint is what bound it
+            "answered",
             // "consumer" is a role the specification defines, as "caller"
             // and "owner" are roles: only the verb is struck
             "consume ",

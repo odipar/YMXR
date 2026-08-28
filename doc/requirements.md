@@ -52,23 +52,35 @@ Layer 0 states five parameters:
 |---|---|
 | `S` | how many streams the file holds |
 | `O` | how many values each stream carries |
-| `N` | the ring size in bytes |
+| `N` | the buffer size in bytes |
 | `C` | how many values one refill decodes |
-| the unit | ST4's unit size in bytes |
+| `K` | ST4's unit size in bytes: 1, 2 or 4 |
 
-ST4 and the 68000 bind them. Layer 1 does not lift these.
+- **R4.1** The streams line up. Value `k` of each stream belongs to frame
+  `k`, and every stream carries `O` values.
+- **R4.2** A consumer reads one value from each stream per call.
+- **R4.3** A consumer's memory is bounded, and the file states the bound.
+- **R4.4** A consumer reaches any stream's buffer at a fixed cost.
+- **R4.5** Every refill call does the same work.
+- **R4.6** A stream decodes from its own buffer alone.
+- **R4.7** ST4's unit model applies unchanged, at every `K`.
 
-- **R4.1** One `N` for every stream. A consumer holds one ring of `N` bytes
-  for each stream it reads.
-- **R4.2** The 68000 bounds `N`. A stream's ring is reached through a
-  displacement assembled into the player, and the largest of those fits a
-  signed 16-bit displacement.
-- **R4.3** A back-reference reaches no further than `N` bytes, so a stream
-  decodes inside its own ring.
-- **R4.4** `C` divides `N`, and `N` is at least `2C`.
-- **R4.5** `C` covers the longest list of streams a consumer of a file
-  reads.
-- **R4.6** The unit size is 1, 2 or 4. Above 1, `C` and `O` are multiples of
-  it.
-- **R4.7** A section begins on a long boundary, and so does each stream
-  inside it.
+**ST4's limits.** These bind any format packed by it, and are stated in
+ST4's own documentation rather than here.
+
+| | |
+|---|---|
+| `K` | 1, 2 or 4 bytes |
+| alignment | a container and each of its four streams begins on a long boundary |
+| an operation | no more than 65535 units |
+| a back-reference | no further than 32512 bytes |
+
+**In YMX 0.8.3.** Evidence of one set of choices and what they cost, not
+rules this format follows (R3.5).
+
+| | |
+|---|---|
+| R4.3, R4.4 | one `N` for every stream, each buffer a ring reached through a displacement assembled into the player. `k` times `N` fits a signed 16-bit displacement, which caps `N` at 2520 |
+| R4.5 | `C` divides `N`, `N` is at least `2C`, and `C` covers the longest list of streams a consumer reads |
+| R4.6 | a back-reference bounded by `N`, tighter than ST4's own 32512 |
+| R4.7 | `C` and `O` are multiples of `K` where `K` is above 1 |
