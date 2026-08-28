@@ -61,7 +61,9 @@ Layer 0 states five parameters:
 - **R4.2** A consumer reads one value from each stream per call.
 - **R4.3** A consumer's memory is bounded, and the file states the bound.
 - **R4.4** A consumer reaches any stream's buffer at a fixed cost.
-- **R4.5** Every refill call does the same work.
+- **R4.5** A refill decodes a fixed count of values from one stream, so
+  no stream falls behind another. What that costs varies with the
+  operations the stream holds.
 - **R4.6** A stream decodes from its own buffer alone.
 - **R4.7** ST4's unit model applies unchanged, at every `K`.
 
