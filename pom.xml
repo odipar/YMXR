@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.ymx</groupId>
-    <artifactId>ymx-redesign</artifactId>
+    <artifactId>ymxr</artifactId>
     <version>0.1-SNAPSHOT</version>
 
     <properties>

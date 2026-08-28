@@ -1,7 +1,7 @@
-# YMX-redesign
+# YMXR
 
-A redesign of the [YMX](https://github.com/odipar/YMX) encoding, before
-1.0 freezes it.
+YMXR is a redesign of the [YMX](https://github.com/odipar/YMX) encoding,
+before 1.0 freezes it.
 
 The container, the streaming model and the ST4 compression are settled and
 carry over. What this repository works on is the encoding: what the streams

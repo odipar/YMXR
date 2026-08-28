@@ -1,3 +1,3 @@
-module github.com/odipar/ymx-redesign
+module github.com/odipar/ymxr
 
 go 1.26
