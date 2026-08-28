@@ -35,8 +35,7 @@ format produces.
 
 ## R3. Two layers
 
-- **R3.1** Layer 0 is a container: `S` streams, each packed by ST4, each
-  delivering one value a frame.
+- **R3.1** Layer 0 is a container: `S` streams, each packed by ST4.
 - **R3.2** At Layer 0 a stream is an index and a sequence of bytes. Layer 0
   states nothing about what those bytes hold.
 - **R3.3** Layer 1 is what the streams hold, and how a consumer reads them.
@@ -56,14 +55,13 @@ Layer 0 states five parameters:
 | `C` | how many values one refill decodes |
 | `K` | ST4's unit size in bytes: 1, 2 or 4 |
 
-- **R4.1** The streams line up. Value `k` of each stream belongs to frame
-  `k`, and every stream carries `O` values.
+- **R4.1** The streams line up. Value `k` of one stream and value `k` of
+  another belong together, and every stream carries `O` values.
 - **R4.2** A consumer reads one value from each stream per call.
 - **R4.3** A consumer's memory is bounded, and the file states the bound.
 - **R4.4** A consumer reaches any stream's buffer at a fixed cost.
 - **R4.5** A refill decodes a fixed count of values from one stream, so
-  no stream falls behind another. What that costs varies with the
-  operations the stream holds.
+  no stream falls behind another. Decoding that count has variance.
 - **R4.6** A stream decodes from its own buffer alone.
 - **R4.7** ST4's unit model applies unchanged, at every `K`.
 
