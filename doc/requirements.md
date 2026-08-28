@@ -1,23 +1,22 @@
 # What the encoding has to do
 
-This document and the specification that follows it state the format. YMX
-0.8.3 is not authoritative here: where it is named, it is named for a
-measurement or a cost, not for a rule.
+The format is what these documents state. YMX 0.8.3 is not authoritative
+here: it appears as a measurement or a cost, never as a rule.
 
-## R1. The house style holds, and a test holds it
+## R1. The house style, held by a test
 
-The specification is the deliverable. How it is written comes before what it
-describes.
+The specification is what this repository produces. How it is written comes
+before what it describes.
 
 - **R1.1** `AGENTS.md` states the rules, for every document, code comment
   and commit message.
-- **R1.2** A test reads every document in the tree against the phrases
-  struck in review, and names the file and line of each hit.
-- **R1.3** The test finds the documents rather than listing them, so a
-  document added to the tree is held without being added to anything.
-- **R1.4** A phrase struck in review joins the list in the change that
-  strikes it. One that is right in a new context comes off the list in the
-  change that uses it.
+- **R1.2** A test reads every document against a list of phrases struck in
+  review, and names the file and line of each hit.
+- **R1.3** The test walks the tree for documents. A document is held because
+  it is there, not because someone listed it.
+- **R1.4** Striking a phrase adds it to the list, in the same change.
+- **R1.5** Using a struck phrase again removes it from the list, in the same
+  change.
 
 ## R2. The operational shape is YMX 0.8.3's
 
@@ -28,8 +27,8 @@ format produces.
   registers and programming the MFP's timers.
 - **R2.2** A converter that reads a YM5 or YM6 source and writes this
   format.
-- **R2.3** Three consumers: a reader gives the values a frame writes, a
-  player drives the chip, a checker reads a file back against the rules a
+- **R2.3** Three consumers. A reader gives the values a frame writes. A
+  player drives the chip. A checker reads a file back against the rules a
   player does not check.
 - **R2.4** The converter resolves what a source carries and writes the
   outcome down. The player reads it and compares nothing.
@@ -38,10 +37,27 @@ format produces.
 
 - **R3.1** Layer 0 is a container: `S` streams, each packed by ST4, each
   delivering one value a frame.
-- **R3.2** Layer 0 states nothing about what a stream holds. At Layer 0 a
-  stream is an index and a sequence of bytes.
+- **R3.2** At Layer 0 a stream is an index and a sequence of bytes. Layer 0
+  states nothing about what those bytes hold.
 - **R3.3** Layer 1 is what the streams hold, and how a consumer reads them.
-- **R3.4** The two are stated apart. A change at Layer 1 leaves Layer 0 as
-  it is.
+- **R3.4** A change at Layer 1 leaves Layer 0 as it is.
 - **R3.5** YMX 0.8.3 states the two together. Holding them apart is what
   this redesign is for.
+
+ST4 and the 68000 bind Layer 0. Layer 1 does not lift them.
+
+- **R3.6** One ring size, `N`, for every stream. A consumer holds one ring
+  of `N` bytes for each stream it reads.
+- **R3.7** The 68000 bounds `N`. A stream's ring is reached through a
+  displacement assembled into the player, and the largest of those fits a
+  signed 16-bit displacement.
+- **R3.8** A back-reference reaches no further than `N` bytes, so a stream
+  decodes inside its own ring.
+- **R3.9** `C`, the values one refill decodes, divides `N`, and `N` is at
+  least `2C`.
+- **R3.10** `C` covers the longest list of streams a consumer of a file
+  reads.
+- **R3.11** ST4's unit size is 1, 2 or 4. Above 1, `C` and the frame count
+  are multiples of it.
+- **R3.12** A section begins on a long boundary, and so does each stream
+  inside it.
