@@ -40,6 +40,10 @@ final class HouseStyleTest {
             "imply ",
             "can be told",
             "roles stand",
+            // a format does not rule, and does not measure: a measurement
+            // is taken of it, and its specification states what it states
+            "it ruled",
+            "it measured",
             // "consumer" is a role the specification defines, as "caller"
             // and "owner" are roles: only the verb is struck
             "consume ",

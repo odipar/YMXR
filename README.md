@@ -1,9 +1,9 @@
 # YMXR
 
 YMXR is a redesign of the [YMX](https://github.com/odipar/YMX) encoding,
-before 1.0 freezes it. YMXR states the format; YMX does not. Where the two
-differ, this repository holds. YMX is a prior encoding: what it measured
-stands as a measurement, and what it ruled is not inherited.
+before 1.0 freezes it. YMXR states the format; YMX does not. YMX is a
+prior encoding: what was measured of it remains measured, and what its
+specification states, it states for YMX.
 
 ST4 and the streaming model carry over. What this repository works on is
 Layer 1: what the streams hold, how a consumer reads them, and the line
