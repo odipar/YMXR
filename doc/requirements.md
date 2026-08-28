@@ -51,7 +51,7 @@ Layer 0 states four parameters:
 |---|---|
 | `S` | how many streams the file holds |
 | `O` | how many values each stream carries |
-| `N` | the buffer size in bytes. ST4 reaches 32512 bytes back, so a buffer past that holds history no match names |
+| `N` | the buffer size in bytes |
 | `K` | ST4's unit size in bytes: 1, 2 or 4 |
 
 - **R4.1** The streams line up. Value `k` of one stream and value `k` of
@@ -61,6 +61,8 @@ Layer 0 states four parameters:
   yet read, so a refill is smaller than the buffer it lands in.
 - **R4.4** A consumer's memory is bounded, and the file states the bound.
 - **R4.5** A consumer reaches any stream's buffer at a fixed cost.
-- **R4.6** A stream decodes from its own buffer alone.
+- **R4.6** A stream decodes from its own buffer alone, so a back-reference
+  reaches no further than `N`. ST4 reaches no further than 32512 bytes, and
+  an `N` past that buys no reach.
 - **R4.7** ST4's unit model applies unchanged: one operation runs to 65535
   units, and a call's budget is a word of them.
