@@ -1,5 +1,9 @@
 # What the encoding has to do
 
+This document and the specification that follows it state the format. YMX
+0.8.3 holds no authority here: where it is named, it is named as evidence of
+what an encoding did and what that cost, not as a rule this format follows.
+
 ## R1. The house style holds, and a test holds it
 
 The specification is the deliverable. How it is written comes before what it
