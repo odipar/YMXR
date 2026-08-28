@@ -74,6 +74,7 @@ ST4's own documentation rather than here.
 | alignment | a container and each of its four streams begins on a long boundary |
 | an operation | no more than 65535 units |
 | a back-reference | no further than 32512 bytes |
+| a decode | a whole number of units: an output size and a call's budget are multiples of `K` |
 
 **In YMX 0.8.3.** Evidence of one set of choices and what they cost, not
 rules this format follows (R3.5).
@@ -83,4 +84,3 @@ rules this format follows (R3.5).
 | R4.3, R4.4 | one `N` for every stream, each buffer a ring reached through a displacement assembled into the player. `k` times `N` fits a signed 16-bit displacement, which caps `N` at 2520 |
 | R4.5 | `C` divides `N`, `N` is at least `2C`, and `C` covers the longest list of streams a consumer reads |
 | R4.6 | a back-reference bounded by `N`, tighter than ST4's own 32512 |
-| R4.7 | `C` and `O` are multiples of `K` where `K` is above 1 |
