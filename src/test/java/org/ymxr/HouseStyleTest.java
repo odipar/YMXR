@@ -54,6 +54,8 @@ final class HouseStyleTest {
             "sits in",
             "stand apart",
             // a rule justified by quoting a speaking thing
+            "spells out",
+            "spell out",
             "because it says",
             "says it",
             "says so",
