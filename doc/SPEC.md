@@ -41,25 +41,23 @@ leaves 12 to 17 unset for its whole length.
 
 ### 1.1 The set bit
 
-Bit 7 of a column's first byte says whether the row sets it. A column is
-most significant byte first, so that one rule is the top bit at every
-width: bit 7 of a byte and bit 15 of a word. A player reads a column's
-first byte, takes the column if that bit is 1, and leaves the rest alone.
+Bit 7 of a column's first byte is its set bit, the flag for the column's
+value (R3.6). A column is most significant byte first, so that one rule is
+the top bit at every width: bit 7 of a byte and bit 15 of a word. At 1 a
+player takes the value; at 0 it does not interpret the value's bits, and
+they may hold anything.
+
+The set bit flags the value, not the column. A bit a column holds beside
+its value is read on every row, set bit or no: bit 6 of the envelope
+shape, which settles what a zero in the envelope period means (1.6, 1.7).
 
 One column has no bit to spare, and reserves a value instead. The envelope
 period fills its word, so 0 says the row does not set it (1.7).
 
-Bit 6 of the envelope shape is the one bit this rule does not govern. A
-zero in column 9 leaves open whether the row sets the period to 0 or does
-not set it, and bit 6 settles which (1.7). So a player reads bit 6 on every
-row, set bit or no.
-
-One column gathering all eighteen bits would gather eighteen reasons to
-move, and the sum of them moves on nearly every row. A bit held beside its
-own value moves only when that value's use does, and compresses with it.
-
-Where the top bit is 0 the column's other bits are undefined, and a player
-reads none of them (R3.6).
+One column gathering all eighteen set bits would gather eighteen reasons
+to move, and the sum of them moves on nearly every row. A bit held beside
+its own value moves only when that value's use does, and compresses with
+it.
 
 ### 1.2 Tone period
 
@@ -110,8 +108,8 @@ nothing about the value having changed.
 "Do not write" is the clear set bit, so no value of this column is
 reserved for it. While an effect writes R13, a row leaves this column unset.
 
-Bit 7 does not govern bit 6. A player reads bit 6 on every row, and a row
-may say the period is 0 without writing R13.
+Bit 6 is beside this column's value, not part of it (R3.5), so a player
+reads it on every row. A row may say the period is 0 without writing R13.
 
 ### 1.7 Envelope period
 
@@ -307,10 +305,10 @@ logarithmic index and not a recording's linear amplitude (R5.3).
 ## 4. The frame
 
 A player calls `nextRow` once a frame for every table the tune runs, and
-writes the columns the row sets (1.1). The bytes of a column the row leaves
-unset are not a player's to read - bit 6 of column 8 is the one exception
-(1.6) - and a player that needs a value on a later row keeps it (R4.6)
-rather than looking for it there.
+writes the columns the row sets (1.1). A value the row does not set is not
+interpreted, and a player that needs one on a later row keeps it (R4.6)
+rather than looking for it in the buffer. Bit 6 of column 8 is beside its
+column's value, and read on every row (1.1).
 
 The writes happen in this order.
 

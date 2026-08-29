@@ -85,19 +85,19 @@ one.
 - **R3.3** A player works nothing out while a tune plays. Every choice is
   compiled into the data, which costs columns, and a column is cheap.
 - **R3.4** At most 32 columns.
-- **R3.5** A column holds one thing. A register's value comes from one
-  column, a column names its own target, and a column 2 or 4 bytes wide
-  holds values that are one thing: a period's two halves, or a timer's
-  prescaler and count.
-- **R3.6** A column's top bit says whether the row sets it. Where it is 0
-  the column's other bits are undefined, and a player does not read them.
-  A row may set a column to the value it already held: the bit marks what
-  to take, not what changed.
+- **R3.5** A column holds one value. A register's value comes from one
+  column, a column names its own target, and a value of 2 or 4 bytes is
+  one thing: a period's two halves, or a timer's prescaler and count.
+- **R3.6** Most columns carry a set bit, their top bit: 1 sets the value,
+  0 does not, and a value not set is not read - its bits may hold
+  anything. Some columns carry a bit for another column, to save a byte,
+  and such a bit is read on every row. A row may set a value the register
+  already holds: the bit marks what to take, not what changed.
 - **R3.7** Each column holds its own bit. One column holding all of them
   would move for every reason any column moves, where a bit beside its own
   value moves with that value and packs with it. A column whose value fills
-  its width reserves a value for the same purpose, and names any bit a top
-  bit does not govern.
+  its width reserves a value for the same purpose, and names the bits it
+  holds beside its value.
 
 ## R4. The player
 
@@ -114,7 +114,7 @@ one.
   what the timers take counted apart. R4.4 spends the average; a demo
   budgets for the worst frame, and it does not move.
 - **R4.6** A player keeps what it needs of a value it took. The row buffer
-  is not that store: R3.6 leaves an unset column undefined.
+  is not that store: R3.6 leaves an unset value uninterpreted.
 
 ## R5. Outside the DTX table
 
