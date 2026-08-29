@@ -1,7 +1,8 @@
 # terminology
 
-The terms every other document in this repository uses, and no second word
-for a thing that has one (requirements.md, R0.6 to R0.8).
+The machine's terms, and no second word for a thing that has one
+(requirements.md, R0.6 to R0.9). [glossary.md](glossary.md) lists every term
+this repository uses and names where each is explained.
 
 The two chips come from YMX 0.8.3. They describe the machine rather than a
 format, so nothing in them depends on how a tune is stored. The terms for
