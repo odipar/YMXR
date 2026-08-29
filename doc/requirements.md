@@ -30,6 +30,9 @@ says nothing about how a row is stored, packed or unpacked.
 The two meet at one function and nowhere else. DTX fills a row buffer, and
 YMXR reads it.
 
+YMXR takes the name YMX when it is done. Every requirement here is a
+requirement of that format.
+
 ## R1. What DTX gives
 
 DTX's specification defines these. They are recorded here because YMXR is
