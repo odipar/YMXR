@@ -49,9 +49,10 @@ final class HouseStyleTest {
             "answered",
             // a specification defines; a tune and a build carry, and keep
             // the verb for what a thing holds
-            "specification carries",
+            "carries",
             // a column holds a value; nothing sits anywhere
             "sits in",
+            "takes the machine with it",
             // "consumer" is a role the specification defines, as "caller"
             // and "owner" are roles: only the verb is struck
             "consume ",
@@ -114,7 +115,7 @@ final class HouseStyleTest {
     }
 
     @Test
-    void everyDocumentCarriesNoStruckPhrase() throws IOException {
+    void noDocumentHasAStruckPhrase() throws IOException {
         List<Path> documents = documents();
         assertTrue(!documents.isEmpty(), "no document was found to hold");
         List<String> hits = new ArrayList<>();
@@ -125,7 +126,7 @@ final class HouseStyleTest {
                 for (String struck : STRUCK) {
                     if (line.contains(struck)) {
                         hits.add(document + ":" + (at + 1)
-                                + " carries \"" + struck + '"');
+                                + " has \"" + struck + '"');
                     }
                 }
             }
