@@ -5,18 +5,18 @@ called DTX.
 
 **DTX** takes a table of rows and columns, compiles it into a binary, and
 gives a caller one row at a time through a single function, `nextRow`. It
-states nothing about what a column holds. DTX is a repository of its own.
+says nothing about what a column holds. DTX is a repository of its own.
 
 **YMXR** says what sits in the columns: which one drives a sound register,
 which drives a timer, and what a sample table holds. Its player calls
 `nextRow` once a frame and turns the row it gets into writes to the YM2149
-and the MFP. Nothing here states how a row is stored or unpacked, and
+and the MFP. Nothing here says how a row is stored or unpacked, and
 nothing in DTX knows a sound chip exists.
 
 [doc/requirements.md](doc/requirements.md) comes first. Nothing else is
 written until it says what YMXR has to do.
 
-The shape follows [YMX](https://github.com/odipar/YMX), which stated the
+The shape follows [YMX](https://github.com/odipar/YMX), which held the
 table and the columns together: Java is the source of truth, Go and C#
 follow it byte for byte, the 68000 player is under `68k/`, and the harnesses
 under `ymx/` hold the three trees to each other.

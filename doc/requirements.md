@@ -2,13 +2,13 @@
 
 **DTX** is a data engine, and a repository of its own. It takes a table of
 `R` rows and `C` columns, compiles it into a binary, and gives a caller one
-row at a time through a single function. It states nothing about what a
+row at a time through a single function. It says nothing about what a
 column holds, and nothing about the machine a caller runs on.
 
 **YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
 and timers are set to, and its player turns each row into writes to them.
-YMXR states what sits in the columns and how a column reaches the hardware.
-It states nothing about how a row is stored, packed or unpacked.
+YMXR defines what sits in the columns and how a column reaches the
+hardware. It says nothing about how a row is stored, packed or unpacked.
 
 The two meet at one function and nowhere else. DTX fills a row buffer, and
 YMXR reads it.
@@ -18,7 +18,7 @@ YMXR reads it.
 The specification is what this repository produces. How it is written comes
 before what it describes.
 
-- **R1.1** `AGENTS.md` states the rules, for every document, code comment
+- **R1.1** `AGENTS.md` gives the rules, for every document, code comment
   and commit message.
 - **R1.2** A test reads every document against a list of phrases struck in
   review, and names the file and line of each hit.
@@ -30,8 +30,9 @@ before what it describes.
 
 ## R2. What DTX gives
 
-DTX's to state, not this repository's. Recorded here because YMXR is written
-against it.
+DTX's specification carries these. They are recorded here because YMXR is
+written against them, and they change in that repository rather than this
+one.
 
 - **R2.1** The input is a table of `R` rows and `C` columns, in column-major
   order. A column is 1, 2 or 4 bytes wide, and metadata describes the
@@ -46,9 +47,9 @@ against it.
   done, so the rows run without end.
 - **R2.6** A build is compiled for memory, for speed, or for both. Which one
   a player carries is a build choice.
-- **R2.7** DTX states nothing about what a column holds.
+- **R2.7** DTX says nothing about what a column holds.
 
-## R3. What YMXR states
+## R3. What YMXR defines
 
 - **R3.1** What sits in each column.
 - **R3.2** How a column reaches the YM2149 and the MFP.
