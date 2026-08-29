@@ -7,9 +7,7 @@ read. `ymx/parity.sh` in that repository names the path.
 
 ---
 
-## Measured
-
-### The schema fits in 32 columns
+## The schema fits in 32 columns
 
 R3.4 caps a table at 32 columns and R3.1 has the schema cover the YM2149's
 and the MFP's registers and the effects a tune drives them with. Whether
@@ -46,7 +44,30 @@ Two figures bound how little of the table moves. 448 of the 543 tunes hold
 one envelope period from start to end, and 117 hold one noise period
 throughout. R4.4 spends the average, and the average is small.
 
-### What the columns pack to
+---
+
+## Where the envelope period's set bit lives
+
+Every column's set bit is its own top bit (R3.6, R3.7). The envelope
+period's divider fills its word and leaves no bit beside it, and the three
+homes the bit could take were measured rather than argued. `ym/measure.py`
+reads the figures back.
+
+| candidate | the figure | what it said |
+|---|---|---|
+| a bit in the envelope shape | hosting it raises the shape column's value changes from 24,099 to 85,072 | the column would move for the period's sake more than for its own |
+| a 4-byte column | two bytes of zero a row, packing to nothing | every row widens for one bit |
+| the value 0, reserved | 2,312,208 corpus frames hold period 0, all but 211 with no voice following the envelope | the reserved value and the common case agree |
+
+The reserved value won. Period 0 and period 1 are one pitch, 7,812.5 Hz,
+the divider treating 0 as 1, so a tune that needs the pitch writes 1. The
+211 frames, in 8 tunes, that sound period 0 with a voice following stay
+reachable through bit 6 of the shape, which moves in almost no row
+(SPEC 1.6, 1.7).
+
+---
+
+## What the columns pack to
 
 The schema is only worth its 30 bytes a row if the columns pack well, so
 every corpus tune was converted into them and every column packed with ST4
@@ -58,6 +79,7 @@ reads these figures back; the packer is built from YMX's `go/cmd/st4`.
 | raw rows, 543 tunes, 3,789,212 frames | 113,676,360 | 30.00 | |
 | ST4, the 18 columns each their own stream | 1,602,170 | 0.42 | 71.0x |
 | the same with one ST4 container a stream | 1,819,618 | 0.48 | 62.5x |
+| the columns with references held to 960 bytes | 2,572,859 | 0.68 | 44.2x |
 
 The containers cost 217,448 bytes over 9,774 streams, so a build wrapping
 the whole table in one container keeps most of that.
@@ -72,6 +94,15 @@ zlib over the same columns gives 0.57x, so the halving is the schema's
 rather than one packer's. ST4's payload beats zlib's on every run, which a
 packer a 68000 can decode had no need to do.
 
+Those figures let ST4 reach back 32,512 bytes, its limit, which models a
+build that unpacks once into memory. A streaming player decodes into a
+ring, and 960 bytes a stream is YMX 0.7's default. With references held to
+960 bytes (`ST4_RING=960`), the 41 tunes pack to 331,315 bytes and the
+ratio is 0.81x: a quarter of the schema's advantage is repetition further
+back than a ring reaches, which on a 2-byte column is about ten seconds.
+Under the ring the tone periods grow to 76% of the packed bytes, so the
+repetition the ring loses is mostly theirs.
+
 The three tone periods take 70% of the packed bytes. The four effect
 columns and their rates take 5.5%, and the envelope shape 0.5%.
 
@@ -80,17 +111,13 @@ a column may hold anything there (R3.6), and filling with zero packs
 smaller than repeating the last value, 23,589 against 24,518 bytes of zlib
 over twelve tunes. `ym/convert.py` zero-fills.
 
-### What the count does not settle
-
-This measured whether a covering set fits, not which set. Which column
-holds what, and in what order, is SPEC.md's.
-
 ---
 
 ## Changed
 
-Three requirements come from the check over that column set. Each names a
-way a column set can fit in 32 and still be wrong.
+Three requirements come from the check over the first column set, drawn
+before SPEC.md held one. Each names a way a set can fit in 32 and still be
+wrong.
 
 - **R3.5**, a column holding one thing, which two findings reached. The
   first read that a column's meaning may not depend on another's, and would
