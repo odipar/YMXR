@@ -52,6 +52,13 @@ final class HouseStyleTest {
             "carries",
             // a column holds a value; nothing sits anywhere
             "sits in",
+            "stand apart",
+            // a rule justified by quoting a speaking thing
+            "because it says",
+            "says it",
+            "says so",
+            "says what to take",
+            "set-ness",
             "takes the machine with it",
             // "consumer" is a role the specification defines, as "caller"
             // and "owner" are roles: only the verb is struck

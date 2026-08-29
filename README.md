@@ -3,7 +3,7 @@
 YMXR is a chiptune format for the Atari ST, and one use of a data engine
 called DTX.
 
-It takes the name YMX when it is done. Until then the two stand apart:
+It takes the name YMX when it is done. Until then,
 [YMX](https://github.com/odipar/YMX) is what plays today, and YMXR is what
 replaces it.
 
