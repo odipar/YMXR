@@ -26,10 +26,11 @@ same change (requirements.md, R0.6 to R0.8).
 | noise generator | A shift register producing a random-sounding bit pattern. One feeds all three voices. | terminology.md, the sound chip |
 | noise period | R6, five bits, 1 to 31. How bright the noise is, not how loud. | terminology.md, the sound chip |
 | period | How long a generator takes per cycle. Bigger period, lower pitch. | terminology.md, the sound chip |
-| player | Calls `nextRow` once a frame and writes the row to the YM2149 and the MFP. | requirements.md R4 |
+| player | Calls `nextRow` for every table each frame and writes the rows to the YM2149 and the MFP. | requirements.md R4 |
 | prescaler | The MFP's first divisor: 4, 10, 16, 50, 64, 100 or 200. | terminology.md, the timers |
 | `R` | The table's row count. | requirements.md R1.1 |
 | rate | How often a tick comes. | terminology.md, rates |
+| reader | Reads a tune and reports what it holds, writing to no chip. The conformance kit is written against one. | requirements.md R2.4 |
 | register | One byte of YM2149 state. Sixteen of them: fourteen steer the sound, two are I/O ports. | terminology.md, the sound chip |
 | row | `C` columns of data, given by DTX, with nothing in it about what any of it is for. | terminology.md, row and frame |
 | row buffer | What `nextRow` fills: the bitmap, then `col0` through `col(C-1)`. | requirements.md R1.4 |
