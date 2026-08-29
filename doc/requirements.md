@@ -1,7 +1,8 @@
-# What the encoding has to do
+# What YMXR has to do
 
-The format is what these documents state. YMX 0.8.3 is not authoritative
-here: it appears as a measurement or a cost, never as a rule.
+YMXR states what sits in the columns of a table, and how those columns reach
+the YM2149 and the MFP. The table, its packing and the engine that reads it
+are DTX's, specified and built in a repository of its own.
 
 ## R1. The house style, held by a test
 
@@ -18,51 +19,38 @@ before what it describes.
 - **R1.5** Using a struck phrase again removes it from the list, in the same
   change.
 
-## R2. The operational shape is YMX 0.8.3's
+## R2. What DTX gives
 
-The parts carry over, and what each does. Nothing here states what this
-format produces.
+DTX's to state, not this repository's. Recorded here because YMXR is written
+against it.
 
-- **R2.1** A 68000 player, called once a frame, writing the YM2149's sound
-  registers and programming the MFP's timers.
-- **R2.2** A converter that reads a YM5 or YM6 source and writes this
-  format.
-- **R2.3** Three consumers. A reader gives the values a frame writes. A
-  player drives the chip. A checker reads a file back against the rules a
-  player does not check.
-- **R2.4** The converter resolves what a source carries and writes the
-  outcome down. The player reads it and compares nothing.
+- **R2.1** The input is a table of `R` rows and `C` columns, in column-major
+  order. A column is 1, 2 or 4 bytes wide, and metadata describes the
+  columns.
+- **R2.2** A compile step turns that input into a binary with an ABI.
+- **R2.3** The ABI is one function, `nextRow`, taking a pointer to a mutable
+  row buffer.
+- **R2.4** The row buffer holds a bitmap of the columns that differ from the
+  previous row, then the columns themselves, `col0` through `col(C-1)`.
+- **R2.5** A build may repeat to an earlier row `RR` once the last row is
+  done, so the rows run without end.
+- **R2.6** A build is compiled for memory, for speed, or for both. Which one
+  a player carries is a build choice.
+- **R2.7** DTX states nothing about what a column holds.
 
-## R3. Two layers
+## R3. What YMXR states
 
-- **R3.1** Layer 0 is a container: `S` streams, each packed by ST4.
-- **R3.2** At Layer 0 a stream is an index and a sequence of bytes. Layer 0
-  states nothing about what those bytes hold.
-- **R3.3** Layer 1 is what the streams hold, and how a consumer reads them.
-- **R3.4** A change at Layer 1 leaves Layer 0 as it is.
-- **R3.5** YMX 0.8.3 states the two together. Holding them apart is what
-  this redesign is for.
+- **R3.1** What sits in each column.
+- **R3.2** How a column reaches the YM2149 and the MFP.
+- **R3.3** The sample and wave tables a tune carries, which DTX does not
+  hold.
+- **R3.4** Nothing about the table's packing, its engine, or its ABI.
 
-## R4. Layer 0's constraints
+## R4. The player
 
-Layer 0 states four parameters:
-
-| | |
-|---|---|
-| `S` | how many streams the file holds |
-| `O` | how many values each stream carries |
-| `N` | the buffer size in bytes |
-| `K` | ST4's unit size in bytes: 1, 2 or 4 |
-
-- **R4.1** The streams line up. Value `k` of one stream and value `k` of
-  another belong together, and every stream carries `O` values.
-- **R4.2** A consumer reads one value from each stream per call.
-- **R4.3** A stream never runs dry, and a refill never lands on a value not
-  yet read, so a refill is smaller than the buffer it lands in.
-- **R4.4** A consumer's memory is bounded, and the file states the bound.
-- **R4.5** A consumer reaches any stream's buffer at a fixed cost.
-- **R4.6** A stream decodes from its own buffer alone, so a back-reference
-  reaches no further than `N`. ST4 reaches no further than 32512 bytes, and
-  an `N` past that buys no reach.
-- **R4.7** ST4's unit model applies unchanged: one operation runs to 65535
-  units, and a call's budget is a word of them.
+- **R4.1** A player calls `nextRow` once a frame and writes what the row
+  gives to the YM2149 and the MFP.
+- **R4.2** The bitmap is what a player reads first. A column that did not
+  change costs nothing.
+- **R4.3** The mapping is the player's work for the frame. What a row means
+  is settled when the table is written, not while it plays.

@@ -1,21 +1,24 @@
 # YMXR
 
-YMXR is a redesign of the [YMX](https://github.com/odipar/YMX) encoding,
-before 1.0 freezes it. YMXR states the format; YMX does not. YMX is a
-prior encoding: what was measured of it remains measured, and what its
-specification states, it states for YMX.
+YMXR states what sits in the columns of a table, and how those columns reach
+the YM2149 and the MFP of an Atari ST.
 
-ST4 and the streaming model carry over. What this repository works on is
-Layer 1: what the streams hold, how a consumer reads them, and the line
-between that and the container, which YMX 0.8.3 states together
-(doc/requirements.md, R3).
+The table is not YMXR's. Its rows, its packing, and the engine that hands a
+player one row at a time are DTX's, in a repository of its own. YMXR is
+written against one function of DTX's ABI, `nextRow`, and states nothing
+about how a row is stored or unpacked.
+
+What is left is the part a chiptune format is for: which column drives which
+register, which drives a timer, what a sample table holds, and how little a
+player has to do between a row arriving and the chip hearing it.
 
 [doc/requirements.md](doc/requirements.md) comes first. Nothing else is
-written until it says what the encoding has to do.
+written until it says what YMXR has to do.
 
-The shape mirrors YMX: Java is the source of truth, Go and C# follow it byte
-for byte, the 68000 player is under `68k/`, and the harnesses under `ymx/`
-hold the three trees to each other.
+The shape follows [YMX](https://github.com/odipar/YMX), which stated the
+table and the columns together: Java is the source of truth, Go and C#
+follow it byte for byte, the 68000 player is under `68k/`, and the harnesses
+under `ymx/` hold the three trees to each other.
 
 | | |
 |---|---|
