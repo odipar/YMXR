@@ -11,19 +11,19 @@ built from YMX's `go/cmd/st4`, with
 back-references held to 960 bytes (`ST4_RING=960`): a streaming player
 decodes into a ring, and 960 bytes a stream is YMX 0.7's default.
 
-The figures measure the schema as it stood before an effect's source and
-target took columns of their own (SPEC 1.8, 1.9). `ym/convert.py` follows
-that earlier revision, and the figures move when it is brought forward.
-
 ---
 
 ## Everything fits
 
 Every readable tune converts whole: 411 YM5! files and 132 YM6!, whose
 effect slots encode differently. The fourteen sound registers cross at
-their own widths, the two effect slots land in two of the schema's four
-effects, and the largest sample number a tune names is 31, against the 127
-a source number spans (SPEC 1.8). A row that does not set a value
+their own widths, and the two effect slots land in two of the schema's
+four effects.
+
+Two ceilings the schema sets, against what the corpus asks of them. A
+source number is a byte, so 255 sources, and the most any tune needs is
+16. A source holds at most 32,768 rows, and the longest the corpus plays
+is a digidrum of a few thousand. A row that does not set a value
 zero-fills it (R3.6).
 
 ---
@@ -52,7 +52,10 @@ headers and sample tables and the column side does not, so the ratio
 flatters the columns by that margin.
 
 The three tone periods take 76% of the packed bytes, the sum of their
-three rows.
+three rows. The four effects and their rates take 4.2%, and the envelope
+shape 0.3%. Where a tune runs no effect at all, its four effect columns
+and four rate columns pack to 4,708 bytes each over the corpus, which is
+the floor a column of zeros costs.
 
 ---
 

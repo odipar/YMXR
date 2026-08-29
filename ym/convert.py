@@ -15,7 +15,8 @@ import measure as M
 # doc/SPEC.md section 1: width in bytes, one entry a column
 WIDTH = [2,1, 2,1, 2,1, 1, 1, 1, 2] + [2,2]*4
 NAMES = ["toneA","volA","toneB","volB","toneC","volC","mix","noise",
-         "envshape","envperiod"] + [f"{w}{i}" for i in range(4) for w in ("fx","rate")]
+         "envshape","envperiod"] + [f"{w}{i}" for i in range(4)
+                                    for w in ("effect", "rate")]
 ROW = sum(WIDTH)
 
 # YM6 code nibble, type in bits 7-6 (YMX YmEffects.java) -> source number
@@ -49,11 +50,17 @@ def effect_slots(r, ym6):
         out.append((kind, target, r[8 + voice] & 0x1F, pre, cnt))
     return out
 
-def rows(nf, g, ym6):
+def rows(nf, g, ym6, census=None):
     """The 18 column streams for one tune. An unset value is zero-filled:
-    R3.6 does not read it, and zero packs smallest of the fills tried."""
+    R3.6 does not read it, and zero packs smallest of the fills tried.
+
+    An effect column holds a target and a source number (SPEC 1.8). A YM
+    dump names an effect by kind and by a value out of a volume register,
+    so each distinct pair becomes a source of the tune's own, numbered
+    from 1 as it is first met."""
     cols = [bytearray() for _ in WIDTH]
     prev = [None] * len(WIDTH)
+    sources = {}
     for f in range(nf):
         r = [g(i, f) for i in range(16)]
         fx = effect_slots(r, ym6)
@@ -68,7 +75,11 @@ def rows(nf, g, ym6):
         v[8] = (r[13] & 15) if r[13] != 0xFF else None
         v[9] = (r[12] << 8) | r[11]
         for i, (kind, target, data, pre, cnt) in enumerate(fx):
-            v[10 + 2*i] = (kind << 12) | (target << 8) | data if kind else 0
+            if kind:
+                number = sources.setdefault((kind, data), len(sources) + 1)
+                v[10 + 2*i] = (target << 8) | (number & 0xFF)
+            else:
+                v[10 + 2*i] = 0
             # the dump's prescaler select is 1 to 7; SPEC 1.9's code is 0 to 6
             v[11 + 2*i] = (((pre - 1) & 7) << 8) | (cnt & 0xFF) if kind else 0
 
@@ -91,6 +102,8 @@ def rows(nf, g, ym6):
             prev[c] = v[c]
         for c, w in enumerate(WIDTH):
             cols[c] += out[c].to_bytes(w, "big")
+    if census is not None:
+        census.append(len(sources))
     return cols
 
 def rows_env_plain(nf, g):
@@ -119,9 +132,9 @@ def st4(data, unit, work):
         raise SystemExit(f"st4 did not run: {r.stderr.decode()[:200]}")
     return int(m.group(2)), os.path.getsize(dst)
 
-def tune(nf, g, ym6, work, per=None):
+def tune(nf, g, ym6, work, per=None, census=None):
     pay = whole = 0
-    for c, col in enumerate(rows(nf, g, ym6)):
+    for c, col in enumerate(rows(nf, g, ym6, census)):
         p, w = st4(col, WIDTH[c], work)
         if per is not None: per[c] += p
         pay += p; whole += w
@@ -176,13 +189,14 @@ def main():
             print(f"  largest sample number a tune names: {max_sample}")
         else:
             per = [0] * len(WIDTH)
+            census = []
             tf = pay = whole = n = 0
             for name in sorted(f for f in os.listdir(M.CORPUS)
                                if f.lower().endswith(".ym")):
                 got = load(os.path.join(M.CORPUS, name), tmp)
                 if not got: continue
                 nf, g, ym6 = got
-                p, w = tune(nf, g, ym6, work, per)
+                p, w = tune(nf, g, ym6, work, per, census)
                 n += 1; tf += nf; pay += p; whole += w
             print(f"{n} tunes, {tf:,} frames")
             print(f"  raw rows        {ROW*tf:>12,}   {ROW:.2f} bytes a frame")
@@ -190,6 +204,8 @@ def main():
             print(f"  with containers {whole:>12,}   {whole/tf:5.2f}   {ROW*tf/whole:5.1f}x")
             for c, nm in enumerate(NAMES):
                 print(f"  {c:2} {nm:10} {WIDTH[c]}B  {per[c]:>9,}  {100.0*per[c]/pay:5.1f}%")
+            print(f"  sources a tune needs: most {max(census)}, "
+                  f"{sum(1 for x in census if x > 255)} tunes over 255")
     finally:
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(tmp, ignore_errors=True)
