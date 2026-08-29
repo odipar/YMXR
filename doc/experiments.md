@@ -30,8 +30,8 @@ zero-fills it (R3.6).
 | ST4, each column its own stream | 2,572,859 | 0.68 | 44.2x |
 | the same with one ST4 container a stream | 2,790,188 | 0.74 | 40.7x |
 
-The gain over YMX 0.7: the 41 tunes it ships with both files, under one
-packer and one 960-byte ring.
+The gain over YMX 0.7, on the 41 tunes it ships with both files and their
+390,593 frames, under one packer and one 960-byte ring.
 
 | | bytes | a frame | of YMX 0.7 |
 |---|---|---|---|
