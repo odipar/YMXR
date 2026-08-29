@@ -56,16 +56,14 @@ one.
   `nextRow` sets the bitmap on the call that fills the buffer.
 - **R1.5** A build may repeat to an earlier row `RR` once the last row is
   done, so the rows run without end.
-- **R1.6** A build is compiled for memory, for speed, or for both. Which one
-  a player carries is a build choice.
+- **R1.6** A build is compiled for memory, for speed, or for both.
 - **R1.7** DTX says nothing about what a column holds.
 
 ## R2. What YMXR defines
 
 - **R2.1** What each column holds.
 - **R2.2** How a column reaches the YM2149 and the MFP.
-- **R2.3** The sample and wave tables a tune carries, which DTX does not
-  hold.
+- **R2.3** A tune's sample and wave tables, which DTX does not hold.
 - **R2.4** Nothing about the table's packing, its engine, or its ABI.
 
 ## R3. The schema

@@ -1,11 +1,11 @@
 # terminology
 
-The terms every other document in this repository uses, and for which no
-second word is used (requirements.md, R0.6 to R0.8).
+The terms every other document in this repository uses, and no second word
+for a thing that has one (requirements.md, R0.6 to R0.8).
 
-The two chips are ported from YMX 0.8.3, which got them right and where
-nothing depends on how a tune is stored. What sits on top of them is this
-repository's to name, and is written as the schema settles.
+The two chips come from YMX 0.8.3. They describe the machine rather than a
+format, so nothing in them depends on how a tune is stored. The terms for
+what runs on them are written here as the schema settles.
 
 ---
 
@@ -29,6 +29,11 @@ holds its value until written again.
 | R11, R12 | 8 + 8 | **envelope period**, fine and coarse: a 16-bit divider, coarse as a pitch |
 | R13 | 4 | **envelope shape** |
 | R14, R15 | 8 each | the two I/O ports. Not sound |
+
+**Two bits of R7 are not sound.** Bits 7 and 6 set the direction of the two
+I/O ports, which on an ST serve the floppy selects, the serial line and the
+printer. A player MUST NOT change them: a write to R7 leaves the host's
+two bits unchanged.
 
 A **signal** is a series of values with a rate: a square wave, a run of
 noise, a sample. Five **generators** make them:
@@ -102,7 +107,7 @@ timer divides it twice: by a **prescaler**, one of 4, 10, 16, 50, 64, 100 or
     rate = 2,457,600 / (prescaler x timer count)
 
 The timer counts down at the divided speed and raises an interrupt at zero.
-That interrupt is the **tick**. Both divisors are divisors; a generator's
+That interrupt is the **tick**. Both numbers are divisors, and a generator's
 counter is a different thing.
 
 The slowest rate is 48 a second and the fastest 614,400. Above about 25,600
@@ -112,23 +117,42 @@ samples, mostly between 5,000 and 6,100 a second.
 
 ---
 
-## Two clocks
+## Row and frame
 
-A tune is stepped at one rate and its effects run at another.
+A **row** is data. `C` columns of it, given by DTX, one value a column, and
+nothing in it about what any of it is for.
 
-The **frame** is one call to the player, usually 50 a second, and it is the
-rate a tune's own values move at: a note changes on a frame, not between
-two.
+A **frame** is that row read as music: one step of the tune. It is what a
+tracker put there, and what a player turns into writes to the two chips.
 
-A **tick** is one step of a timer, from 48 to 25,600 a second in practice.
-An effect lives here. Everything that makes an ST sound like an ST is a
-register written faster than a frame.
+One row is one frame. They are the same thing from either end, and each word
+names the end it comes from. A document about storing, packing or handing
+over values says row. A document about a tune, a note or a chip says frame.
+DTX has only rows. A tracker and a player have only frames.
+
+---
+
+## Ticks
+
+A **tick** is one chance to write a register. Everything that reaches either
+chip is written on a tick, and ticks come from two places.
+
+One clock ticks at a fixed rate, usually 50 a second. On each of its ticks
+the player takes the next row, and the tune advances one frame.
+
+The rest are the MFP's timers, and run from 48 to 25,600 a second in
+practice. An effect runs on these.
+
+Any tick may write any register. A note usually changes as the tune
+advances, because that is where a tracker puts it. A timer's tick changing
+one is allowed but uncommon.
 
 ---
 
 ## Rates
 
-An effect runs at a rate, and a rate comes from one of two places.
+A tick's rate is fixed or it moves, and where it comes from decides which.
+The frame's is fixed by the host. The rest come from one of two places.
 
 A sample's rate is the recording's own. Nothing else sets it, and a note
 under it does not move it. A square chopping a voice takes its rate from the
@@ -139,12 +163,4 @@ That difference decides when a rate may change. A rate the effect owns is
 settled when the effect starts. A rate taken from a note is renewed as often
 as the note may move, which is every frame.
 
-The schema names these two, and this document takes the names from it.
-
----
-
-## Open
-
-- **Row against frame.** DTX gives rows and a player is called once a frame,
-  one for one. Which word this repository uses for the other's sake is not
-  settled, and R0.7 asks that only one of them be used for a thing.
+The terms for these two come from the schema.
