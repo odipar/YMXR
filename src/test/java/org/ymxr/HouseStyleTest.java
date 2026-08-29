@@ -47,6 +47,9 @@ final class HouseStyleTest {
             // a format does not answer a constraint: a choice is what
             // it was, and the constraint is what bound it
             "answered",
+            // a specification defines; a tune and a build carry, and keep
+            // the verb for what a thing holds
+            "specification carries",
             // "consumer" is a role the specification defines, as "caller"
             // and "owner" are roles: only the verb is struck
             "consume ",

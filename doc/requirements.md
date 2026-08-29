@@ -32,7 +32,7 @@ YMXR reads it.
 
 ## R1. What DTX gives
 
-DTX's specification carries these. They are recorded here because YMXR is
+DTX's specification defines these. They are recorded here because YMXR is
 written against them, and they change in that repository rather than this
 one.
 
