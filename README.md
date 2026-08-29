@@ -1,16 +1,17 @@
 # YMXR
 
-YMXR states what sits in the columns of a table, and how those columns reach
-the YM2149 and the MFP of an Atari ST.
+YMXR is a chiptune format for the Atari ST, and one use of a data engine
+called DTX.
 
-The table is not YMXR's. Its rows, its packing, and the engine that hands a
-player one row at a time are DTX's, in a repository of its own. YMXR is
-written against one function of DTX's ABI, `nextRow`, and states nothing
-about how a row is stored or unpacked.
+**DTX** takes a table of rows and columns, compiles it into a binary, and
+gives a caller one row at a time through a single function, `nextRow`. It
+states nothing about what a column holds. DTX is a repository of its own.
 
-What is left is the part a chiptune format is for: which column drives which
-register, which drives a timer, what a sample table holds, and how little a
-player has to do between a row arriving and the chip hearing it.
+**YMXR** says what sits in the columns: which one drives a sound register,
+which drives a timer, and what a sample table holds. Its player calls
+`nextRow` once a frame and turns the row it gets into writes to the YM2149
+and the MFP. Nothing here states how a row is stored or unpacked, and
+nothing in DTX knows a sound chip exists.
 
 [doc/requirements.md](doc/requirements.md) comes first. Nothing else is
 written until it says what YMXR has to do.

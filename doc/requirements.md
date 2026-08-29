@@ -1,8 +1,17 @@
 # What YMXR has to do
 
-YMXR states what sits in the columns of a table, and how those columns reach
-the YM2149 and the MFP. The table, its packing and the engine that reads it
-are DTX's, specified and built in a repository of its own.
+**DTX** is a data engine, and a repository of its own. It takes a table of
+`R` rows and `C` columns, compiles it into a binary, and gives a caller one
+row at a time through a single function. It states nothing about what a
+column holds, and nothing about the machine a caller runs on.
+
+**YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
+and timers are set to, and its player turns each row into writes to them.
+YMXR states what sits in the columns and how a column reaches the hardware.
+It states nothing about how a row is stored, packed or unpacked.
+
+The two meet at one function and nowhere else. DTX fills a row buffer, and
+YMXR reads it.
 
 ## R1. The house style, held by a test
 
