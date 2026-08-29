@@ -7,7 +7,7 @@ called DTX.
 gives a caller one row at a time through a single function, `nextRow`. It
 says nothing about what a column holds. DTX is a repository of its own.
 
-**YMXR** says what sits in the columns: which one drives a sound register,
+**YMXR** says what a column holds: which one drives a sound register,
 which drives a timer, and what a sample table holds. Its player calls
 `nextRow` once a frame and turns the row it gets into writes to the YM2149
 and the MFP. Nothing here says how a row is stored or unpacked, and

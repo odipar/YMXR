@@ -24,8 +24,8 @@ column holds.
 
 **YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
 and timers are set to, and its player turns each row into writes to them.
-YMXR defines what sits in the columns and how a column reaches the
-hardware. It says nothing about how a row is stored, packed or unpacked.
+YMXR defines what a column holds, and how it reaches the hardware. It
+says nothing about how a row is stored, packed or unpacked.
 
 The two meet at one function and nowhere else. DTX fills a row buffer, and
 YMXR reads it.
@@ -53,7 +53,7 @@ one.
 
 ## R2. What YMXR defines
 
-- **R2.1** What sits in each column.
+- **R2.1** What each column holds.
 - **R2.2** How a column reaches the YM2149 and the MFP.
 - **R2.3** The sample and wave tables a tune carries, which DTX does not
   hold.

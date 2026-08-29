@@ -50,6 +50,8 @@ final class HouseStyleTest {
             // a specification defines; a tune and a build carry, and keep
             // the verb for what a thing holds
             "specification carries",
+            // a column holds a value; nothing sits anywhere
+            "sits in",
             // "consumer" is a role the specification defines, as "caller"
             // and "owner" are roles: only the verb is struck
             "consume ",
