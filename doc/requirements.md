@@ -39,8 +39,9 @@ says nothing about how a row is stored, packed or unpacked.
 The two meet at one function and nowhere else. DTX fills a row buffer, and
 YMXR reads it.
 
-YMXR takes the name YMX when it is done. Every requirement here is a
-requirement of that format.
+YMXR takes the name YMX when it is done. R1 to R6 are requirements of that
+format, and bind anyone who writes or plays a tune. R0 binds this
+repository.
 
 ## R1. What DTX gives
 
@@ -67,7 +68,10 @@ one.
 - **R2.1** What each column holds.
 - **R2.2** How a column reaches the YM2149 and the MFP.
 - **R2.3** A tune's sample and wave tables, which DTX does not hold.
-- **R2.4** Nothing about the table's packing, its engine, or its ABI.
+- **R2.4** The two roles that read a tune: a player, which writes to the
+  two chips as it goes, and a reader, which reports what a tune holds and
+  writes to no chip.
+- **R2.5** Nothing about the table's packing, its engine, or its ABI.
 
 ## R3. The schema
 
@@ -82,11 +86,18 @@ one.
 - **R3.4** R3.3 costs columns, and a column is cheap under DTX.
 - **R3.5** At most 32 columns, so the bitmap is one long and a 68000 holds
   it in a register.
+- **R3.6** A column 2 or 4 bytes wide holds values that are one thing: a
+  period's two halves, or a timer's prescaler and count. Width says what
+  belongs together and not what packs well, since correlation across
+  columns is what the compile step resolves.
+- **R3.7** R3.1's coverage is measured against the 543-tune collection YMX
+  0.8.3 was measured on. An effect no tune in it plays is outside R3.1
+  until a change puts it in.
 
 ## R4. The player
 
-- **R4.1** A player calls `nextRow` once a frame and writes what the row
-  gives to the YM2149 and the MFP.
+- **R4.1** A player calls `nextRow` once a frame for every table the tune
+  runs, and writes what the rows give to the YM2149 and the MFP.
 - **R4.2** The bitmap is what a player reads first. A column that did not
   change costs nothing.
 - **R4.3** The mapping is the player's work for the frame.
@@ -96,3 +107,35 @@ one.
   cover over every shape it produces. That is the call's own work, with
   what the timers take counted apart. R4.4 spends the average; the worst
   frame is what a demo budgets for, and it does not move.
+
+## R5. The tables
+
+R3 sits behind R2.1 and R4 behind R2.2. This sits behind R2.3.
+
+- **R5.1** A tune holds its sample and wave tables outside the DTX table.
+  Their values are read at a tick's rate rather than a row's, so a row that
+  did not change still feeds them.
+- **R5.2** A column selects which table a voice plays, and at what rate.
+- **R5.3** A table holds what the registers take. A recording is linear
+  amplitudes and a volume register takes a logarithmic index, so the
+  conversion is the producer's work under R3.3.
+- **R5.4** The tables are the tune's. A player holds none of its own.
+- **R5.5** How many tables a tune holds, how large one is, and what an
+  entry holds are SPEC.md's.
+
+## R6. Version and extension
+
+- **R6.1** A tune states the version it was written for. Where it states
+  it, and what a player does with a version it was not built for, are
+  SPEC.md's.
+- **R6.2** A column's meaning holds once assigned. A later version assigns
+  a column this one leaves unassigned, and redefines none.
+- **R6.3** R3.5's ceiling of 32 holds at this version and at every later
+  one.
+- **R6.4** A schema outgrowing 32 columns runs a second DTX table beside
+  the first, one `nextRow` a table a frame. The ceiling is one table's, so
+  the bitmap stays one long.
+- **R6.5** Columns are split evenly across the tables a tune runs. A schema
+  of 33 columns is 16 and 17, not 32 and 1, so no call spends a whole
+  `nextRow` on one value.
+- **R6.6** R4.5's worst frame counts every table a tune runs.
