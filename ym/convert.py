@@ -4,6 +4,7 @@ Usage: convert.py pairs    - the tunes with a .ymx beside them, against it
        convert.py corpus   - every corpus tune, per-column breakdown
        convert.py envelope - the envelope columns, the reserved-0 design
                              against a plain 4-byte period column
+       convert.py frame    - what a frame procedure has to do, per frame
 
 The corpus comes from YM_CORPUS (measure.py). The st4 packer comes from ST4,
 or from the path, and is built from YMX's go/cmd/st4.
@@ -120,6 +121,40 @@ def rows_env_plain(nf, g):
         prev_shape, prev_period = shape, period
     return shape_col, period_col
 
+# What one set column costs the frame procedure, in writes (SPEC section 4).
+# A tone period and the envelope period reach two registers; the rest one.
+# A rate reaches its timer's control and data registers.
+YM_WRITES = {0: 2, 2: 2, 4: 2, 1: 1, 3: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 2}
+MFP_WRITES = {11: 2, 13: 2, 15: 2, 17: 2}
+EFFECTS = (10, 12, 14, 16)
+
+def frame_work(nf, g, ym6):
+    """Per frame: (columns set, YM register writes, MFP writes, effects
+    started or stopped). Read from the columns the converter writes, so it
+    is the same rows the packing figures measure."""
+    cols = rows(nf, g, ym6)
+    at = [0] * len(WIDTH)
+    out = []
+    for f in range(nf):
+        set_columns = ym = mfp = fx = 0
+        for c, w in enumerate(WIDTH):
+            v = int.from_bytes(cols[c][f * w:(f + 1) * w], "big")
+            if c == 9:
+                on = v != 0                      # the reserved 0 (1.7)
+            elif w == 1:
+                on = bool(v & 0x80)
+            else:
+                on = bool(v & 0x8000)
+            if not on:
+                continue
+            set_columns += 1
+            ym += YM_WRITES.get(c, 0)
+            mfp += MFP_WRITES.get(c, 0)
+            if c in EFFECTS:
+                fx += 1
+        out.append((set_columns, ym, mfp, fx))
+    return out
+
 def st4(data, unit, work):
     src, dst = os.path.join(work, "s.bin"), os.path.join(work, "s.st4")
     open(src, "wb").write(bytes(data))
@@ -187,6 +222,43 @@ def main():
             print(f"  envelope columns, a plain 4-byte period           {plain:>9,}")
             print(f"  the reserved value saves                          {plain - reserved:>9,}")
             print(f"  largest sample number a tune names: {max_sample}")
+        elif mode == "frame":
+            import collections
+            hist = collections.Counter()
+            worst = (0, 0, 0, 0)
+            worst_tune = ""
+            frames = tunes = 0
+            totals = [0, 0, 0, 0]
+            for name in sorted(f for f in os.listdir(M.CORPUS)
+                               if f.lower().endswith(".ym")):
+                got = load(os.path.join(M.CORPUS, name), tmp)
+                if not got: continue
+                nf, g, ym6 = got
+                tunes += 1
+                for row in frame_work(nf, g, ym6):
+                    frames += 1
+                    hist[row[1] + row[2]] += 1
+                    for i in range(4): totals[i] += row[i]
+                    if row[1] + row[2] > worst[1] + worst[2]:
+                        worst, worst_tune = row, name
+            print(f"{tunes} tunes, {frames:,} frames")
+            print(f"  a frame sets {totals[0]/frames:5.2f} columns on average,"
+                  f" of 18")
+            print(f"  and makes {totals[1]/frames:5.2f} YM register writes,"
+                  f" {totals[2]/frames:4.2f} MFP writes,"
+                  f" {totals[3]/frames:5.3f} effect starts or stops")
+            run = 0
+            for writes in sorted(hist):
+                run += hist[writes]
+                if run >= frames * 0.99:
+                    print(f"  p99: {writes} register writes a frame")
+                    break
+            print(f"  the worst frame: {worst[0]} columns, {worst[1]} YM"
+                  f" writes, {worst[2]} MFP writes, {worst[3]} effects"
+                  f"  ({worst_tune})")
+            most = max(hist)
+            print(f"  the most any frame writes: {most} registers,"
+                  f" in {hist[most]:,} frames")
         else:
             per = [0] * len(WIDTH)
             census = []

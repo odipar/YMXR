@@ -1,7 +1,7 @@
 # experiments
 
-One experiment: the corpus through the specification, and what it packs
-to.
+One experiment: the corpus through the specification, what it packs to,
+and what a frame costs.
 
 The corpus is the 544 YM files YMX 0.8.3 is tested against, 543 of which
 read. `ymx/parity.sh` in that repository names the path, and `YM_CORPUS`
@@ -56,6 +56,37 @@ three rows. The four effects and their rates take 4.2%, and the envelope
 shape 0.3%. Where a tune runs no effect at all, its four effect columns
 and four rate columns pack to 4,708 bytes each over the corpus, which is
 the floor a column of zeros costs.
+
+---
+
+## What a frame costs
+
+R4.5 budgets the worst frame at what 13 scanlines cover, and until now
+that was the one figure here nobody had measured. `ym/convert.py frame`
+counts, for every frame of every tune, the columns a row sets and the
+register writes the frame procedure of section 4 makes for them.
+
+| | columns set, of 18 | YM writes | MFP writes |
+|---|---|---|---|
+| the average frame | 3.41 | 5.40 | 0.07 |
+| the 99th frame in a hundred | | 11 together | |
+| the worst frame in the corpus | 18 | 14 | 8 |
+
+The worst frame is `5th Gear 1 title`, which sets every column: all
+fourteen sound registers, all four rates, all four effects. Fourteen is
+the ceiling for any format at all, since the chip holds fourteen sound
+registers, so no encoding writes more.
+
+One PAL frame is 160,256 cycles and one scanline 512, so R4.5's 13
+scanlines are 6,656. Two byte writes reach a YM register, and at a
+generous 32 cycles for the pair the worst frame's 22 register writes are
+about 700 cycles, with another 220 to test eighteen set bits: near 920
+cycles, under two scanlines.
+
+That is the frame procedure's own work and not the whole call. What
+`nextRow` costs is DTX's, and unmeasured until DTX exists - so what this
+settles is which side of R4.5 the budget will be spent on. Seven eighths
+of it is still to play for.
 
 ---
 
