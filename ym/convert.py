@@ -19,6 +19,7 @@ ROW = sum(WIDTH)
 # YM6 code nibble, type in bits 7-6 (YMX YmEffects.java) -> source number
 YM_KIND = {0x00: 1, 0x40: 2, 0x80: 3, 0xC0: 4}
 ST4 = os.environ.get("ST4", "st4")
+RING = int(os.environ.get("ST4_RING", "0"))   # bytes; 0 leaves st4's default
 PACKED = re.compile(rb"Packed (\d+) bytes into (\d+)")
 
 def rows(nf, g):
@@ -76,7 +77,10 @@ def rows(nf, g):
 def st4(data, unit, work):
     src, dst = os.path.join(work, "s.bin"), os.path.join(work, "s.st4")
     open(src, "wb").write(bytes(data))
-    r = subprocess.run([ST4, "-f", f"-k{unit}", src, dst], capture_output=True)
+    args = [ST4, "-f", f"-k{unit}"]
+    if RING:
+        args.append(f"-m{RING // unit}")
+    r = subprocess.run(args + [src, dst], capture_output=True)
     m = PACKED.search(r.stdout)
     if not m:
         raise SystemExit(f"st4 did not run: {r.stderr.decode()[:200]}")
