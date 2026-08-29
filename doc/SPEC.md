@@ -58,8 +58,8 @@ One column gathering all eighteen bits would gather eighteen reasons to
 move, and the sum of them moves on nearly every row. A bit held beside its
 own value moves only when that value's use does, and compresses with it.
 
-The bits below the top bit hold nothing when the top bit is clear, and a
-player reads none of them (R3.6).
+Where the top bit is 0 the column's other bits are undefined, and a player
+reads none of them (R3.6).
 
 ### 1.2 Tone period
 

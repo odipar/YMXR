@@ -37,7 +37,7 @@ same change (requirements.md, R0.6 to R0.8).
 | `RR` | The row a build repeats to once the last row is done. | requirements.md R1.5 |
 | sample | A recording played through a voice's volume register. Its rate is the recording's own. | terminology.md, the sound chip |
 | schema | What each column holds: an abstraction over the ST's effects rather than one tracker's arrangement of them. | requirements.md R3 |
-| set bit | A column's top bit. It is 1 where the row sets that column, and the bits under a 0 hold nothing. A column with no bit to spare reserves a value instead. | requirements.md R3.6, R3.7 |
+| set bit | A column's top bit. It is 1 where the row sets that column; at 0 the column's other bits are undefined. A column with no bit to spare reserves a value instead. | requirements.md R3.6, R3.7 |
 | signal | A series of values with a rate: a square wave, a run of noise, a sample. | terminology.md, the sound chip |
 | source | One of 8 numbers for where an effect's values come from. Section 2.2 says what each supplies. | SPEC.md 1.8, 2.2 |
 | table | DTX's input: `R` rows and `C` columns, with metadata describing the columns. | requirements.md R1.1 |
