@@ -50,8 +50,10 @@ written against them, and they change in that repository rather than this
 one.
 
 - **R1.1** The input is a table of `R` rows and `C` columns, in column-major
-  order. A column is 1, 2 or 4 bytes wide, and metadata describes the
-  columns. A row sets a column or leaves it unset.
+  order, with metadata giving `R`, `C`, `RR` and each column's width of 1,
+  2 or 4 bytes. A compile step reads the metadata before it chooses how to
+  hold the rows, and a build that did not know a column's width could not
+  pack it. A row sets a column or leaves it unset.
 - **R1.2** A compile step turns that input into a binary with an ABI.
 - **R1.3** The ABI is one function, `nextRow`, taking a pointer to a mutable
   row buffer.
@@ -60,12 +62,15 @@ one.
   done, so the rows run without end.
 - **R1.6** A build is compiled for memory, for speed, or for both.
 - **R1.7** DTX says nothing about what a column holds.
+- **R1.8** A build holds its rows or works them out. The ABI is one
+  function, and what is behind it is the build's: a table yields rows, and
+  says nothing about where they come from.
 
 ## R2. What YMXR defines
 
 - **R2.1** What each column holds.
 - **R2.2** How a column reaches the YM2149 and the MFP.
-- **R2.3** A tune's sample and wave tables, and the values fixed for a
+- **R2.3** A tune's sources and their index, and the values fixed for a
   whole tune, neither of which DTX holds.
 - **R2.4** The two roles that read a tune: a player, which writes to the
   two chips as it goes, and a reader, which reports what a tune holds and
@@ -77,7 +82,7 @@ one.
 - **R3.1** The schema covers the YM2149's and the MFP's registers, and the
   effects an ST tune drives them with: SID voices, sync buzzers, samples,
   waveforms, and the others in common use. Coverage is measured against the
-  543-tune collection YMX 0.8.3 was measured on, and an effect no tune in
+  543-tune corpus YMX 0.8.3 was measured on, and an effect no tune in
   it plays is outside the schema until a change puts it in.
 - **R3.2** The schema is an abstraction over those effects rather than one
   tracker's arrangement of them. It is the ubiquitous language trackers map
@@ -96,16 +101,19 @@ one.
 - **R3.7** Each column holds its own bit. One column holding all of them
   would move for every reason any column moves, where a bit beside its own
   value moves with that value and packs with it. A column whose value fills
-  its width reserves a value for the same purpose, and names the bits it
-  holds beside its value.
+  its width reserves a value for the same purpose, and where the reserved
+  value needs a qualifying bit, another column holds it (R3.6).
 
 ## R4. The player
 
-- **R4.1** A player calls `nextRow` once a frame for every table the tune
-  runs, and writes what the rows give to the YM2149 and the MFP.
-- **R4.2** A column whose top bit is clear costs a player that bit and
+- **R4.1** A player runs one method at two rates: a clock advances a table
+  one row and a procedure writes that row. The frame clock advances the
+  tune's table, through `nextRow` once a frame for every table it runs, and
+  a timer advances a source of its own.
+- **R4.2** A column the row does not set costs a player the test and
   nothing more.
-- **R4.3** The mapping is the player's work for the frame.
+- **R4.3** The mapping is the player's work: the frame's procedure for a
+  row of the tune's table, a target's for a row of a source.
 - **R4.4** A frame costs the call and what the row
   sets. It does not grow with the count of columns. R3.6 puts what a row
   sets in the writer's hands, and the frame's cost with it.
@@ -121,18 +129,17 @@ one.
 R3 sits behind R2.1 and R4 behind R2.2. This sits behind R2.3, and lists
 what a tune needs that no row gives.
 
-- **R5.1** A tune holds its sample and wave tables outside the DTX table.
-  Their values are read at a tick's rate rather than a row's, so a row that
-  did not change still feeds them.
-- **R5.2** A column selects which sample or wave a voice plays, and at
-  what rate.
-- **R5.3** A table holds what the registers take. A recording is linear
-  amplitudes and a volume register takes a logarithmic index, so the
-  conversion is the writer's work under R3.3.
-- **R5.4** The sample and wave tables are the tune's. A player holds none
-  of its own.
-- **R5.5** How many tables a tune holds, how large one is, and what an
-  entry holds are SPEC.md's.
+- **R5.1** A tune holds its sources outside the DTX table. Their rows are
+  read at a tick's rate rather than a row's, so a row that did not change
+  still feeds them.
+- **R5.2** Which source plays, on which target, and at what rate, comes
+  from the columns.
+- **R5.3** A source's rows hold what the register its target writes takes.
+  A recording is linear amplitudes and a volume register takes a
+  logarithmic level, so the conversion is the writer's work under R3.3.
+- **R5.4** The sources are the tune's. A player holds none of its own.
+- **R5.5** How many sources a tune holds, how large one is, and what an
+  index entry holds are SPEC.md's.
 - **R5.6** A value fixed for a whole tune is not a column. It would set a
   column once and hold it for every row after it.
 - **R5.7** How often a player is called, and which timers it claims before

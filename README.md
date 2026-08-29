@@ -11,11 +11,12 @@ replaces it.
 gives a caller one row at a time through a single function, `nextRow`. It
 says nothing about what a column holds. DTX is a repository of its own.
 
-**YMXR** says what a column holds: which one drives a sound register,
-which drives a timer, and what a sample table holds. Its player calls
-`nextRow` once a frame and turns the row it gets into writes to the YM2149
-and the MFP. Nothing here says how a row is stored or unpacked, and
-nothing in DTX knows a sound chip exists.
+**YMXR** says what a column holds, and what a player does with it. One
+method serves the whole of that: a clock advances a table one row, and a
+procedure writes that row to the chips. The tune's clock advances the tune's
+table, and a timer advances a table of its own at an effect's rate.
+Nothing here says how a row is stored or unpacked, and nothing in DTX knows
+a sound chip exists.
 
 [doc/requirements.md](doc/requirements.md) comes first. Nothing else is
 written until it says what YMXR has to do.
