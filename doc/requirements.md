@@ -32,6 +32,7 @@ against it.
   row buffer.
 - **R2.4** The row buffer holds a bitmap of the columns that differ from the
   previous row, then the columns themselves, `col0` through `col(C-1)`.
+  `nextRow` sets the bitmap on the call that fills the buffer.
 - **R2.5** A build may repeat to an earlier row `RR` once the last row is
   done, so the rows run without end.
 - **R2.6** A build is compiled for memory, for speed, or for both. Which one
@@ -54,3 +55,5 @@ against it.
   change costs nothing.
 - **R4.3** The mapping is the player's work for the frame. What a row means
   is settled when the table is written, not while it plays.
+- **R4.4** A frame costs what its row changed. There is no fixed cost per
+  frame, and none is wanted.
