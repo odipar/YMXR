@@ -64,9 +64,9 @@ one.
 
 ## R3. The schema
 
-- **R3.1** The schema covers the YM2149's registers, and the effects an ST
-  tune drives them with: SID voices, sync buzzers, samples, waveforms,
-  and the others in common use.
+- **R3.1** The schema covers the YM2149's and the MFP's registers, and the
+  effects an ST tune drives them with: SID voices, sync buzzers, samples,
+  waveforms, and the others in common use.
 - **R3.2** The schema is an abstraction over those effects rather than one
   tracker's arrangement of them. It is the Ubiquitous language trackers
   map onto.
