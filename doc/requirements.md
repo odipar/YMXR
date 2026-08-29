@@ -20,7 +20,7 @@ before what it describes.
 **DTX** is a data engine, and a repository of its own. It takes a table of
 `R` rows and `C` columns, compiles it into a binary, and gives a caller one
 row at a time through a single function. It says nothing about what a
-column holds, and nothing about the machine a caller runs on.
+column holds.
 
 **YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
 and timers are set to, and its player turns each row into writes to them.
