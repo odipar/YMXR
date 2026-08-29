@@ -73,7 +73,8 @@ one.
 - **R3.3** A player works nothing out while a tune plays. Every choice is
   compiled into the data.
 - **R3.4** R3.3 costs columns, and a column is cheap under DTX.
-- **R3.5** At most 32 columns.
+- **R3.5** At most 32 columns, so the bitmap is one long and a 68000 holds
+  it in a register.
 
 ## R4. The player
 
