@@ -24,23 +24,39 @@ ST4 = os.environ.get("ST4", "st4")
 RING = int(os.environ.get("ST4_RING", "0"))   # bytes; 0 leaves st4's default
 PACKED = re.compile(rb"Packed (\d+) bytes into (\d+)")
 
-def rows(nf, g):
-    """The 18 column streams for one tune. An unset column is zero-filled:
-    R3.6 leaves its bytes undefined, and zero packs best (experiments.md)."""
+def load(path, tmp):
+    """(nf, get, ym6) for one corpus file, or None."""
+    d = M.payload(path, tmp)
+    got = M.regs(d) if d else None
+    if not got:
+        return None
+    nf, g = got
+    return nf, g, d[:4] == b"YM6!"
+
+def effect_slots(r, ym6):
+    """The two YM effect slots of one frame. YM6 gives each slot a kind in
+    the code's bits 7-6; YM5 has no kind bits, its first slot is a SID
+    voice and its second a digidrum (YMX, YmEffects.java)."""
+    out = []
+    for slot, (code_r, pre_r, cnt_r) in enumerate(((1, 6, 14), (3, 8, 15))):
+        code = r[code_r] & 0xF0
+        voice = ((code >> 4) & 3) - 1
+        pre, cnt = r[pre_r] >> 5, r[cnt_r]
+        if voice < 0 or pre == 0 or cnt == 0:
+            out.append((0, 0, 0, 0, 0)); continue
+        kind = YM_KIND[code & 0xC0] if ym6 else (1 if slot == 0 else 2)
+        target = 13 if kind == 4 else 8 + voice
+        out.append((kind, target, r[8 + voice] & 0x1F, pre, cnt))
+    return out
+
+def rows(nf, g, ym6):
+    """The 18 column streams for one tune. An unset value is zero-filled:
+    R3.6 does not read it, and zero packs smallest of the fills tried."""
     cols = [bytearray() for _ in WIDTH]
     prev = [None] * len(WIDTH)
     for f in range(nf):
         r = [g(i, f) for i in range(16)]
-        fx = []
-        for slot, (code_r, pre_r, cnt_r) in enumerate(((1, 6, 14), (3, 8, 15))):
-            code = r[code_r] & 0xF0
-            voice = ((code >> 4) & 3) - 1
-            pre, cnt = r[pre_r] >> 5, r[cnt_r]
-            if voice < 0 or pre == 0 or cnt == 0:
-                fx.append((0, 0, 0, 0, 0)); continue
-            kind = YM_KIND[code & 0xC0]
-            target = 13 if kind == 4 else 8 + voice
-            fx.append((kind, target, r[8 + voice] & 0x1F, pre, cnt))
+        fx = effect_slots(r, ym6)
         owned = {t for k, t, _, _, _ in fx if k}
 
         v = [0] * len(WIDTH)
@@ -53,7 +69,8 @@ def rows(nf, g):
         v[9] = (r[12] << 8) | r[11]
         for i, (kind, target, data, pre, cnt) in enumerate(fx):
             v[10 + 2*i] = (kind << 12) | (target << 8) | data if kind else 0
-            v[11 + 2*i] = ((pre & 7) << 8) | (cnt & 0xFF) if kind else 0
+            # the dump's prescaler select is 1 to 7; SPEC 1.9's code is 0 to 6
+            v[11 + 2*i] = (((pre - 1) & 7) << 8) | (cnt & 0xFF) if kind else 0
 
         out = [0] * len(WIDTH)
         for c in range(len(WIDTH)):
@@ -102,9 +119,9 @@ def st4(data, unit, work):
         raise SystemExit(f"st4 did not run: {r.stderr.decode()[:200]}")
     return int(m.group(2)), os.path.getsize(dst)
 
-def tune(nf, g, work, per=None):
+def tune(nf, g, ym6, work, per=None):
     pay = whole = 0
-    for c, col in enumerate(rows(nf, g)):
+    for c, col in enumerate(rows(nf, g, ym6)):
         p, w = st4(col, WIDTH[c], work)
         if per is not None: per[c] += p
         pay += p; whole += w
@@ -123,10 +140,10 @@ def main():
                 if not f.endswith(".ymx"): continue
                 ym = os.path.join(D, f[:-4] + ".ym")
                 if not os.path.exists(ym): continue
-                got = M.regs(M.payload(ym, tmp) or b"")
+                got = load(ym, tmp)
                 if not got: continue
-                nf, g = got
-                pay, whole = tune(nf, g, work)
+                nf, g, ym6 = got
+                pay, whole = tune(nf, g, ym6, work)
                 n += 1; tf += nf
                 to += os.path.getsize(os.path.join(D, f)); tp += pay; tw += whole
             print(f"{n} tunes, {tf:,} frames")
@@ -138,21 +155,20 @@ def main():
             max_sample = tunes = frames = 0
             for name in sorted(f for f in os.listdir(M.CORPUS)
                                if f.lower().endswith(".ym")):
-                got = M.regs(M.payload(os.path.join(M.CORPUS, name), tmp) or b"")
+                got = load(os.path.join(M.CORPUS, name), tmp)
                 if not got: continue
-                nf, g = got
+                nf, g, ym6 = got
                 tunes += 1; frames += nf
-                cols = rows(nf, g)
+                cols = rows(nf, g, ym6)
                 for c in (8, 9):
                     reserved += st4(cols[c], WIDTH[c], work)[0]
                 sh, pe = rows_env_plain(nf, g)
                 plain += st4(sh, 1, work)[0] + st4(pe, 4, work)[0]
                 for f in range(nf):
-                    for code_r, vol in ((1, None), (3, None)):
-                        code = g(code_r, f) & 0xF0
-                        voice = ((code >> 4) & 3) - 1
-                        if voice >= 0 and (code & 0xC0) == 0x40:
-                            max_sample = max(max_sample, g(8 + voice, f) & 0x1F)
+                    r = [g(i, f) for i in range(16)]
+                    for kind, target, data, pre, cnt in effect_slots(r, ym6):
+                        if kind == 2:
+                            max_sample = max(max_sample, data)
             print(f"{tunes} tunes, {frames:,} frames, ring {RING or 'unlimited'}")
             print(f"  envelope columns, 0 reserved and the shape's bit  {reserved:>9,}")
             print(f"  envelope columns, a plain 4-byte period           {plain:>9,}")
@@ -163,10 +179,10 @@ def main():
             tf = pay = whole = n = 0
             for name in sorted(f for f in os.listdir(M.CORPUS)
                                if f.lower().endswith(".ym")):
-                got = M.regs(M.payload(os.path.join(M.CORPUS, name), tmp) or b"")
+                got = load(os.path.join(M.CORPUS, name), tmp)
                 if not got: continue
-                nf, g = got
-                p, w = tune(nf, g, work, per)
+                nf, g, ym6 = got
+                p, w = tune(nf, g, ym6, work, per)
                 n += 1; tf += nf; pay += p; whole += w
             print(f"{n} tunes, {tf:,} frames")
             print(f"  raw rows        {ROW*tf:>12,}   {ROW:.2f} bytes a frame")
