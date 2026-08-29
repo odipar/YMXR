@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  * flourish - and this test holds the phrases struck in review under them.
  * Each entry is one struck phrase or the stem of one; a hit names the file
  * and line. A phrase that is legitimate in a new context comes off the list
- * in the same change that uses it, so the exception is deliberate.
+ * in the same change that uses it.
  *
  * <p>The documents are found rather than listed. A list is a place a new
  * document is not, and the one that reached review unchecked was the one
