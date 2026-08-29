@@ -29,7 +29,8 @@ under `ymx/` hold the three trees to each other.
 |---|---|
 | [doc/requirements.md](doc/requirements.md) | what the encoding has to do |
 | [doc/SPEC.md](doc/SPEC.md) | the format specification |
-| [doc/terminology.md](doc/terminology.md) | the vocabulary the rest use |
+| [doc/glossary.md](doc/glossary.md) | every term, one line each |
+| [doc/terminology.md](doc/terminology.md) | the machine, and the terms for it |
 | [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |
 | [doc/performance.md](doc/performance.md) | what a play call costs, in cycles |
 | [doc/experiments.md](doc/experiments.md) | ideas measured, and what the measurements said |
