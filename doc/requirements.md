@@ -68,7 +68,7 @@ one.
   effects an ST tune drives them with: SID voices, sync buzzers, samples,
   waveforms, and the others in common use.
 - **R3.2** The schema is an abstraction over those effects rather than one
-  tracker's arrangement of them. It is the Ubiquitous language trackers
+  tracker's arrangement of them. It is the ubiquitous language trackers
   map onto.
 - **R3.3** A player works nothing out while a tune plays. Every choice is
   compiled into the data.
