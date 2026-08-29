@@ -97,9 +97,12 @@ restart it.
 ## The timers
 
 The **MFP** (MC68901) has four timers, A to D. All four are reachable, and
-Timer C costs more than the others: it is the operating system's 200 Hz
+two cost more than the others. Timer C is the operating system's 200 Hz
 clock, so a tune that takes it stops that clock and cannot be hosted from a
-Timer C hook.
+Timer C hook. Timer B counts the display's lines, which is the timer a demo
+uses for its own raster work.
+
+So a tune takes A and D first, then B, and C last of all.
 
 The MFP's own clock runs at 2,457,600 a second, unrelated to the YM2149's. A
 timer divides it twice: by a **prescaler**, one of 4, 10, 16, 50, 64, 100 or
@@ -152,7 +155,7 @@ one is allowed but uncommon.
 
 ## Rates
 
-A tick's rate is fixed or it moves, and where it comes from decides which.
+A tick's rate is fixed or it moves, and where it comes from says which.
 The frame's is fixed by the host. The rest come from one of two places.
 
 A sample's rate is the recording's own. Nothing else sets it, and a note
@@ -160,7 +163,7 @@ under it does not move it. A square chopping a voice takes its rate from the
 note playing instead, and the two hold in ratio or the pitch moves with
 every note.
 
-That difference decides when a rate may change. A rate the effect owns is
+That difference fixes when a rate may change. A rate the effect owns is
 settled when the effect starts. A rate taken from a note is renewed as often
 as the note may move, which is every frame.
 

@@ -63,3 +63,4 @@ ymx/test/YMXTEST.PRG
 # The play scripts build <stem>-n<ring>-c<chunk>[-k<unit>]/ beside the tune
 *-n[0-9]*-c[0-9]*/
 dist/
+__pycache__/
