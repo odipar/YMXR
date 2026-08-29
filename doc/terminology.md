@@ -116,40 +116,66 @@ counter is a different thing.
 
 The slowest rate is 48 a second and the fastest 614,400. Above about 25,600
 the interrupt alone takes a quarter of an 8 MHz 68000, which is the
-practical ceiling. For scale, 69 tunes of the 543-tune collection play
+practical ceiling. For scale, 69 tunes of the 543-tune corpus play
 samples, mostly between 5,000 and 6,100 a second.
 
 ---
 
-## Row and frame
+## Tables, rows and procedures
 
-A **row** is data. `C` columns of it, given by DTX, one value a column, and
-nothing in it about what any of it is for.
+A **table** yields rows: `R` of them, `C` columns wide, a column 1, 2 or 4
+bytes, and a row `RR` it repeats to once the last row is done. A **row** is
+one step of one: `C` values, and nothing in it about what any of them is
+for.
 
-A **frame** is that row read as music: one step of the tune. It is what a
-tracker put there, and what a player turns into writes to the two chips.
+**Yielding** is one row at a time, in order, and only when asked. A clock
+asks, and the **caller** it asks for holds its own place in the table: the
+first ask gives row 0, the next row 1, and the ask after row `R` minus one
+gives row `RR`, or nothing where the table does not repeat. Two callers of
+one table hold two places, and neither moves the other's.
 
-One row is one frame. They are the same thing from either end, and each word
-names the end it comes from. A document about storing, packing or handing
-over values says row. A document about a tune, a note or a chip says frame.
-DTX has only rows. A tracker and a player have only frames.
+`R` counts the rows a table holds, not the rows it yields. One that
+repeats yields them without end, and two rows alternating a level and zero
+yield a square wave for as long as anything asks.
+
+`R`, `C`, `RR` and the column widths are a table's **metadata**. They
+describe it without holding any of it, and they are what a compiler reads
+to choose how to hold the rows.
+
+A table yields rows and is nothing more than that. Whether a row was
+stored and is read back, or is worked out when it is asked for, belongs to
+the thing that yields it: the square wave above needs no storage at all,
+and thirty thousand rows are a recording.
+
+A **procedure** takes a row and writes it to the chips.
+
+The two make one method, and everything a player does is that method: a
+clock advances a table one row and calls a procedure with that row. What
+differs between one use and another is the table, the clock and the
+procedure.
 
 ---
 
-## Ticks
+## Frames and ticks
 
-A **tick** is one chance to write a register. Everything that reaches either
-chip is written on a tick, and ticks come from two places.
+Two clocks turn the method, and each turn has its own name.
 
-One clock ticks at a fixed rate, usually 50 a second. On each of its ticks
-the player takes the next row, and the tune advances one frame.
+A tune's own clock runs at a fixed rate, usually 50 a second. Its table is
+the tune's, its procedure writes the whole row to the chips, and one turn
+is a **frame**: one step of the tune, what a tracker put there.
 
-The rest are the MFP's timers, and run from 48 to 25,600 a second in
-practice. An effect runs on these.
+The MFP's timers run from 48 to 25,600 a second in practice. Each has a
+table of its own and a procedure that writes one register, and one turn is
+a **tick**. An effect is a timer running a table on a register.
 
-Any tick may write any register. A note usually changes as the tune
-advances, because that is where a tracker puts it. A timer's tick changing
-one is allowed but uncommon.
+A row is data and a frame is that row read as music. They are the same
+thing from either end, and each word names the end it comes from. A
+document about storing, packing or handing over values says row. A
+document about a tune, a note or a chip says frame.
+
+A frame or a tick may write any register. A note usually changes as the
+tune advances, because that is where a tracker puts it. A tick changing one
+is allowed but uncommon.
 
 ---
 
