@@ -1,7 +1,9 @@
 """A YM dump into the schema's columns, and what each column packs to.
 
-Usage: convert.py pairs   - the tunes with a .ymx beside them, against it
-       convert.py corpus  - every corpus tune, per-column breakdown
+Usage: convert.py pairs    - the tunes with a .ymx beside them, against it
+       convert.py corpus   - every corpus tune, per-column breakdown
+       convert.py envelope - the envelope columns, the reserved-0 design
+                             against a plain 4-byte period column
 
 The corpus comes from YM_CORPUS (measure.py). The st4 packer comes from ST4,
 or from the path, and is built from YMX's go/cmd/st4.
@@ -74,6 +76,20 @@ def rows(nf, g):
             cols[c] += out[c].to_bytes(w, "big")
     return cols
 
+def rows_env_plain(nf, g):
+    """The envelope columns under the plain design: the shape without the
+    period's bit, and a 4-byte period whose bit 31 is its set bit."""
+    shape_col, period_col = bytearray(), bytearray()
+    prev_shape, prev_period = None, None
+    for f in range(nf):
+        r13 = g(13, f)
+        shape = (r13 & 15) if r13 != 0xFF else None
+        period = (g(12, f) << 8) | g(11, f)
+        shape_col += ((0x80 | shape) if shape is not None else 0).to_bytes(1, "big")
+        period_col += ((0x80000000 | period) if period != prev_period else 0).to_bytes(4, "big")
+        prev_shape, prev_period = shape, period
+    return shape_col, period_col
+
 def st4(data, unit, work):
     src, dst = os.path.join(work, "s.bin"), os.path.join(work, "s.st4")
     open(src, "wb").write(bytes(data))
@@ -117,6 +133,31 @@ def main():
             print(f"  YMX 0.7 files      {to:>10,}   {to/tf:5.2f} bytes a frame")
             print(f"  columns, ST4       {tp:>10,}   {tp/tf:5.2f}   {tp/to:.2f}x")
             print(f"  with containers    {tw:>10,}   {tw/tf:5.2f}   {tw/to:.2f}x")
+        elif mode == "envelope":
+            reserved = plain = 0
+            max_sample = tunes = frames = 0
+            for name in sorted(f for f in os.listdir(M.CORPUS)
+                               if f.lower().endswith(".ym")):
+                got = M.regs(M.payload(os.path.join(M.CORPUS, name), tmp) or b"")
+                if not got: continue
+                nf, g = got
+                tunes += 1; frames += nf
+                cols = rows(nf, g)
+                for c in (8, 9):
+                    reserved += st4(cols[c], WIDTH[c], work)[0]
+                sh, pe = rows_env_plain(nf, g)
+                plain += st4(sh, 1, work)[0] + st4(pe, 4, work)[0]
+                for f in range(nf):
+                    for code_r, vol in ((1, None), (3, None)):
+                        code = g(code_r, f) & 0xF0
+                        voice = ((code >> 4) & 3) - 1
+                        if voice >= 0 and (code & 0xC0) == 0x40:
+                            max_sample = max(max_sample, g(8 + voice, f) & 0x1F)
+            print(f"{tunes} tunes, {frames:,} frames, ring {RING or 'unlimited'}")
+            print(f"  envelope columns, 0 reserved and the shape's bit  {reserved:>9,}")
+            print(f"  envelope columns, a plain 4-byte period           {plain:>9,}")
+            print(f"  the reserved value saves                          {plain - reserved:>9,}")
+            print(f"  largest sample number a tune names: {max_sample}")
         else:
             per = [0] * len(WIDTH)
             tf = pay = whole = n = 0
