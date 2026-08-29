@@ -1,18 +1,5 @@
 # What YMXR has to do
 
-**DTX** is a data engine, and a repository of its own. It takes a table of
-`R` rows and `C` columns, compiles it into a binary, and gives a caller one
-row at a time through a single function. It says nothing about what a
-column holds, and nothing about the machine a caller runs on.
-
-**YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
-and timers are set to, and its player turns each row into writes to them.
-YMXR defines what sits in the columns and how a column reaches the
-hardware. It says nothing about how a row is stored, packed or unpacked.
-
-The two meet at one function and nowhere else. DTX fills a row buffer, and
-YMXR reads it.
-
 ## R0. The house style, held by a test
 
 The specification is what this repository produces. How it is written comes
@@ -27,6 +14,21 @@ before what it describes.
 - **R0.4** Striking a phrase adds it to the list, in the same change.
 - **R0.5** Using a struck phrase again removes it from the list, in the same
   change.
+
+## DTX and YMXR
+
+**DTX** is a data engine, and a repository of its own. It takes a table of
+`R` rows and `C` columns, compiles it into a binary, and gives a caller one
+row at a time through a single function. It says nothing about what a
+column holds, and nothing about the machine a caller runs on.
+
+**YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
+and timers are set to, and its player turns each row into writes to them.
+YMXR defines what sits in the columns and how a column reaches the
+hardware. It says nothing about how a row is stored, packed or unpacked.
+
+The two meet at one function and nowhere else. DTX fills a row buffer, and
+YMXR reads it.
 
 ## R1. What DTX gives
 
