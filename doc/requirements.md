@@ -62,17 +62,28 @@ one.
   hold.
 - **R2.4** Nothing about the table's packing, its engine, or its ABI.
 
-## R3. The player
+## R3. The schema
 
-- **R3.1** A player calls `nextRow` once a frame and writes what the row
+- **R3.1** The schema covers the effects an ST tune uses: SID voices, sync
+  buzzers, samples, waveforms, and the others in common use.
+- **R3.2** The schema is an abstraction over those effects rather than one
+  tracker's arrangement of them, so that trackers map onto it in one
+  language.
+- **R3.3** A player works nothing out while a tune plays. Every choice is
+  compiled into the data.
+- **R3.4** R3.3 costs columns, and a column is cheap under DTX.
+- **R3.5** At most 32 columns.
+
+## R4. The player
+
+- **R4.1** A player calls `nextRow` once a frame and writes what the row
   gives to the YM2149 and the MFP.
-- **R3.2** The bitmap is what a player reads first. A column that did not
+- **R4.2** The bitmap is what a player reads first. A column that did not
   change costs nothing.
-- **R3.3** The mapping is the player's work for the frame. What a row means
-  is settled when the table is written, not while it plays.
-- **R3.4** A frame costs what its row changed. There is no fixed cost per
+- **R4.3** The mapping is the player's work for the frame.
+- **R4.4** A frame costs what its row changed. There is no fixed cost per
   frame, and none is wanted.
-- **R3.5** The worst frame stays near YMX 0.8.3's, which 13 scanlines
+- **R4.5** The worst frame stays near YMX 0.8.3's, which 13 scanlines
   cover over every shape it produces. That is the call's own work, with
-  what the timers take counted apart. R3.4 spends the average; the worst
+  what the timers take counted apart. R4.4 spends the average; the worst
   frame is what a demo budgets for, and it does not move.
