@@ -238,8 +238,8 @@ own onto these (R3.2).
 |---|---|---|
 | 0 | nothing, and the timer runs no effect | unused |
 | 1 | a toggle: the level, then zero, alternating | bits 3 to 0, the level |
-| 2 | a sample, byte after byte, stopping at its end | the sample number |
-| 3 | a wave's cycle, over and over | the wave number |
+| 2 | a sample's bytes, one a tick; its index entry ends it (3.1) | the sample number |
+| 3 | a wave's bytes, the same, through the wave index | the wave number |
 | 4 | a retrigger: one shape written again | bits 3 to 0, the shape |
 | 5 to 7 | unassigned | |
 
@@ -267,15 +267,40 @@ A tune states these once. None is a column (R5.6).
 |---|---|---|
 | frame rate | 2 | how often the player is called, in Hz |
 | effects used | 1 | bits 3 to 0: which of the four effect columns the tune ever sets, so a player claims those timers before the first row |
-| sample table | | the samples a source names |
-| wave table | | the cycles a source names |
+| the sample index | 6 an entry | one entry a sample, in sample-number order |
+| the wave index | 6 an entry | one entry a wave, in wave-number order |
+| the samples | | the bytes the sample index addresses |
+| the waves | | the bytes the wave index addresses |
 
 A player reads one row at a time (R1.3), so it cannot find which timers to
 claim by reading ahead. That is why the effects a tune runs are stated here.
 
+### 3.1 The indexes
+
+An effect's data byte gives a sample or wave number, and the entry at that
+number gives where the bytes are and what the last one does:
+
+| offset | bytes | gives |
+|---|---|---|
+| 0 | 4 | the offset of the first byte, from the start of the samples or of the waves |
+| 4 | 2 | bit 15 the repeat; bits 14 to 0 the length minus one |
+
+A start resolves the number through the index once, and the ticks read
+bytes from there on; nothing is looked up while the effect runs (R3.3).
+
+A sample or a wave holds at most 32,768 bytes. The length field spans
+exactly that, and a signed 16-bit offset on a 68000 reaches every byte of
+one from its start.
+
+The repeat is what the last byte does. At 1 the next tick starts over at
+the first byte; at 0 the supply ends. A repeating wave is a timbre and one
+played once is a run - a decay drawn by hand, say - and a sample divides
+the same way: a drum plays once, a loop starts over.
+
+### 3.2 The bytes
+
 A sample and a wave hold what a volume register takes, which is a
-logarithmic index and not a recording's linear amplitude (R5.3). How a
-table is laid out is not yet written.
+logarithmic index and not a recording's linear amplitude (R5.3).
 
 ---
 
@@ -335,14 +360,14 @@ once and tests nothing.
 
 ## 7. Not yet written
 
-The sample and wave tables of section 3, and how many of each a tune may
-hold.
+How many samples and waves a tune may hold, and where in a tune the
+indexes and their bytes are placed.
 
 Where a tune states the version it was written for, and what a player does
 with a version it was not built for (R6.1).
 
-What follows a sample's last byte: whether the timer stops, and what the
-register then holds. Section 2.2 ends the supply, and no rule ends the
-effect but a row.
+What follows the last byte of a sample or wave that does not repeat:
+whether the timer stops, and what the register then holds. The entry ends
+the supply (3.1), and no rule ends the effect but a row.
 
 What a reader reports.
