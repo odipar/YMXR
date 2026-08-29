@@ -58,5 +58,6 @@ against it.
 - **R4.4** A frame costs what its row changed. There is no fixed cost per
   frame, and none is wanted.
 - **R4.5** The worst frame stays near YMX 0.8.3's, which 13 scanlines
-  cover over every shape it produces. R4.4 spends the average; the worst
+  cover over every shape it produces. That is the call's own work, with
+  what the timers take counted apart. R4.4 spends the average; the worst
   frame is what a demo budgets for, and it does not move.
