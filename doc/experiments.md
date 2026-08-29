@@ -30,11 +30,17 @@ zero-fills it (R3.6).
 | ST4, each column its own stream | 2,572,859 | 0.68 | 44.2x |
 | the same with one ST4 container a stream | 2,790,188 | 0.74 | 40.7x |
 
-Against the format it replaces, on the 41 tunes YMX 0.8.3 ships with both
-files: the `.ymx` files hold 410,852 bytes and the packed columns
-331,315, which is 0.81x, or 0.85 bytes a frame against 1.05. The `.ymx`
-side counts its headers and sample tables and the column side does not,
-so the ratio flatters the columns by that margin.
+The gain over YMX 0.7: the 41 tunes it ships with both files, under one
+packer and one 960-byte ring.
+
+| | bytes | a frame | of YMX 0.7 |
+|---|---|---|---|
+| YMX 0.7, the `.ymx` files | 410,852 | 1.05 | 1.00x |
+| YMXR, the packed columns | 331,315 | 0.85 | 0.81x |
+
+YMXR holds the same music in 19% fewer bytes. The `.ymx` side counts its
+headers and sample tables and the column side does not, so the ratio
+flatters the columns by that margin.
 
 The three tone periods take 76% of the packed bytes.
 
