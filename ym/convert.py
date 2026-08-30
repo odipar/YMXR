@@ -5,6 +5,8 @@ Usage: convert.py pairs    - the tunes with a .ymx beside them, against it
        convert.py envelope - the envelope columns, the reserved-0 design
                              against a plain 4-byte period column
        convert.py frame    - what a frame procedure has to do, per frame
+       convert.py dtx2     - one ST4 unit for every column, as DTX2 asks,
+                             at each of the three units, whole DTX2 files
 
 The corpus comes from YM_CORPUS (measure.py). The st4 packer comes from ST4,
 or from the path, and is built from YMX's go/cmd/st4.
@@ -24,6 +26,9 @@ ROW = sum(WIDTH)
 YM_KIND = {0x00: 1, 0x40: 2, 0x80: 3, 0xC0: 4}
 ST4 = os.environ.get("ST4", "st4")
 RING = int(os.environ.get("ST4_RING", "0"))   # bytes; 0 leaves st4's default
+# One unit for every column of a payload (DTX, R5.2). 0 packs each column
+# at its own width instead, which DTX2 does not admit.
+UNIT = int(os.environ.get("ST4_UNIT", "0"))
 PACKED = re.compile(rb"Packed (\d+) bytes into (\d+)")
 
 def load(path, tmp):
@@ -167,10 +172,44 @@ def st4(data, unit, work):
         raise SystemExit(f"st4 did not run: {r.stderr.decode()[:200]}")
     return int(m.group(2)), os.path.getsize(dst)
 
+# DTX SPEC.md 1 and 2.3: the header is 14 plus `C` rounded up to a long,
+# and a DTX2 payload opens with `N`, `k`, a zero byte and an offset a
+# column, then the data sets, each beginning on a long.
+def dtx_header(columns):
+    return -(-(14 + columns) // 4) * 4
+
+def dtx2_file(sizes):
+    at = 4 + 4 * len(sizes)
+    for w in sizes:
+        at = -(-at // 4) * 4 + w
+    return dtx_header(len(sizes)) + at
+
+def padded(cols, nf, k):
+    """R rows up to a multiple of k (DTX R5.6), the last frame repeated."""
+    if nf % k == 0:
+        return cols, nf
+    more = k - nf % k
+    out = []
+    for c, col in enumerate(cols):
+        w = WIDTH[c]
+        out.append(col + col[-w:] * more)
+    return out, nf + more
+
+def tune_at(nf, g, ym6, work, k, per=None):
+    """One tune as a DTX2 file with every column packed at unit k."""
+    cols, rn = padded(list(rows(nf, g, ym6)), nf, k)
+    sizes = []
+    for c, col in enumerate(cols):
+        p, w = st4(col, k, work)
+        if per is not None:
+            per[c] += p
+        sizes.append(w)
+    return dtx2_file(sizes), rn
+
 def tune(nf, g, ym6, work, per=None, census=None):
     pay = whole = 0
     for c, col in enumerate(rows(nf, g, ym6, census)):
-        p, w = st4(col, WIDTH[c], work)
+        p, w = st4(col, UNIT or WIDTH[c], work)
         if per is not None: per[c] += p
         pay += p; whole += w
     return pay, whole
@@ -208,10 +247,12 @@ def main():
                 nf, g, ym6 = got
                 tunes += 1; frames += nf
                 cols = rows(nf, g, ym6)
+                # one unit for every column of a payload (DTX, R5.2), and
+                # k = 1 is what the corpus packs smallest at
                 for c in (8, 9):
-                    reserved += st4(cols[c], WIDTH[c], work)[0]
+                    reserved += st4(cols[c], 1, work)[0]
                 sh, pe = rows_env_plain(nf, g)
-                plain += st4(sh, 1, work)[0] + st4(pe, 4, work)[0]
+                plain += st4(sh, 1, work)[0] + st4(pe, 1, work)[0]
                 for f in range(nf):
                     r = [g(i, f) for i in range(16)]
                     for kind, target, data, pre, cnt in effect_slots(r, ym6):
@@ -222,6 +263,60 @@ def main():
             print(f"  envelope columns, a plain 4-byte period           {plain:>9,}")
             print(f"  the reserved value saves                          {plain - reserved:>9,}")
             print(f"  largest sample number a tune names: {max_sample}")
+        elif mode == "dtx2":
+            D = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "..", "YMX", "ym", "test")
+            D = os.environ.get("YMX_PAIRS", os.path.normpath(D))
+            pairs = []
+            for f in sorted(os.listdir(D)):
+                if not f.endswith(".ymx"): continue
+                ym = os.path.join(D, f[:-4] + ".ym")
+                if os.path.exists(ym):
+                    pairs.append((ym, os.path.join(D, f)))
+            print(f"ring {RING or 'unlimited'} bytes, {len(WIDTH)} columns,"
+                  f" DTX header {dtx_header(len(WIDTH))} bytes")
+            print()
+            print(f"{len(pairs)} tunes with a .ymx beside them")
+            base = mixed = frames = 0
+            for ym, ymx in pairs:
+                got = load(ym, tmp)
+                if not got: continue
+                nf, g, ym6 = got
+                frames += nf
+                base += os.path.getsize(ymx)
+                sizes = [st4(col, WIDTH[c], work)[1]
+                         for c, col in enumerate(rows(nf, g, ym6))]
+                mixed += dtx2_file(sizes)
+            print(f"  YMX 0.7 files            {base:>10,}"
+                  f"   {base/frames:5.2f} bytes a frame")
+            print(f"  a unit a column          {mixed:>10,}"
+                  f"   {mixed/frames:5.2f}   {mixed/base:.2f}x   (DTX2 forbids)")
+            for k in (1, 2, 4):
+                tot = pad = 0
+                for ym, ymx in pairs:
+                    got = load(ym, tmp)
+                    if not got: continue
+                    nf, g, ym6 = got
+                    size, rn = tune_at(nf, g, ym6, work, k)
+                    tot += size; pad += rn - nf
+                print(f"  one unit k={k}             {tot:>10,}"
+                      f"   {tot/frames:5.2f}   {tot/base:.2f}x"
+                      f"   {pad} padded frames")
+            print()
+            names = sorted(f for f in os.listdir(M.CORPUS)
+                           if f.lower().endswith(".ym"))
+            for k in (1, 2, 4):
+                tot = tf = pad = short = n = 0
+                for name in names:
+                    got = load(os.path.join(M.CORPUS, name), tmp)
+                    if not got: continue
+                    nf, g, ym6 = got
+                    size, rn = tune_at(nf, g, ym6, work, k)
+                    n += 1; tf += nf; tot += size; pad += rn - nf
+                    short += 1 if rn != nf else 0
+                print(f"  corpus, one unit k={k}: {n} tunes, {tf:,} frames,"
+                      f" {tot:,} bytes, {tot/tf:5.2f} a frame,"
+                      f" {short} tunes padded by {pad} frames")
         elif mode == "frame":
             import collections
             hist = collections.Counter()
