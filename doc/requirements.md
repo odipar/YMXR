@@ -15,14 +15,17 @@ before what it describes, and what things are called comes before both.
 - **R0.5** Using a struck phrase again removes it from the list, in the same
   change.
 - **R0.6** [glossary.md](glossary.md) lists every term and names the
-  document that explains it. The terms are the ubiquitous language of
-  R3.2.
+  document that explains it. The terms are this repository's ubiquitous
+  language.
 - **R0.7** Every document, comment and name in this repository uses those
   terms, and no second word for a thing that has one.
 - **R0.8** A term that changes in the glossary changes everywhere in the
   same change.
 - **R0.9** A test reads terminology.md and fails when a term it explains
   has no glossary entry.
+- **R0.10** A test reads the documents for what can be recomputed or
+  followed: the figures, the citations, the links, the glossary's order,
+  the one wrap width.
 
 ## DTX and YMXR
 
