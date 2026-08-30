@@ -128,24 +128,19 @@ bytes, and a row `RR` it repeats to once the last row is done. A **row** is
 one step of one: `C` values, and nothing in it about what any of them is
 for.
 
-**Yielding** is one row at a time, in order, and only when asked. A clock
-asks, and the **caller** it asks for holds its own place in the table: the
-first ask gives row 0, the next row 1, and the ask after row `R` minus one
-gives row `RR`, or nothing where the table does not repeat. Two callers of
-one table hold two places, and neither moves the other's.
+**Yielding** is one row at a time and in order. A clock advances to a next
+row, and holds its own place in the table: the first advance gives row 0,
+the next row 1, and the advance after row `R` minus one gives row `RR`, or
+nothing where the table does not repeat. Two clocks on one table hold two
+places, and neither moves the other's.
 
 `R` counts the rows a table holds, not the rows it yields. One that
 repeats yields them without end, and two rows alternating a level and zero
 yield a square wave for as long as anything asks.
 
 `R`, `C`, `RR` and the column widths are a table's **metadata**. They
-describe it without holding any of it, and they are what a compiler reads
-to choose how to hold the rows.
-
-A table yields rows and is nothing more than that. Whether a row was
-stored and is read back, or is worked out when it is asked for, belongs to
-the thing that yields it: the square wave above needs no storage at all,
-and thirty thousand rows are a recording.
+describe it without holding any of it. How the rows are laid out under
+them, row by row or column by column, is the format's (R1.2).
 
 A **procedure** takes a row and writes it to the chips.
 
