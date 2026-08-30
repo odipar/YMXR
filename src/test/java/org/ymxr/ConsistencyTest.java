@@ -216,19 +216,81 @@ final class ConsistencyTest {
         assertTrue(broken.isEmpty(), () -> String.join("\n", broken));
     }
 
+    /**
+     * The tone periods' share against the three the same sentence gives.
+     * Prose again, so the table check above does not reach it.
+     */
+    @Test
+    void theToneShareIsTheSumOfTheThreeItStates() throws IOException {
+        Matcher share = Pattern.compile("take (\\d+\\.\\d)%, (\\d+\\.\\d)% and"
+                + "\\s+(\\d+\\.\\d)% of the packed bytes,\\s+(\\d+\\.\\d)%"
+                + " between them").matcher(read(EXP));
+        assertTrue(share.find(), "experiments.md gives no tone shares");
+        double sum = 0;
+        for (int i = 1; i <= 3; i++) {
+            sum += Double.parseDouble(share.group(i));
+        }
+        double said = Double.parseDouble(share.group(4));
+        double got = Math.round(sum * 10.0) / 10.0;
+        assertTrue(Math.abs(got - said) < 0.05, () -> "the three shares make "
+                + got + "%, and the sentence says " + said + '%');
+    }
+
+    /**
+     * The envelope saving against the two figures the same sentence gives,
+     * and against what the corpus packs to. The figures are prose rather
+     * than a table row, so the check above does not reach them.
+     */
+    @Test
+    void theEnvelopeSavingIsTheDifferenceItStates() throws IOException {
+        String experiments = read(EXP);
+        Matcher both = Pattern.compile("cost\\s+([\\d,]+) bytes as\\s+SPEC\\.md"
+                + " has them, and ([\\d,]+) under").matcher(experiments);
+        assertTrue(both.find(), "experiments.md gives no envelope pair");
+        Matcher saved = Pattern.compile("saves ([\\d,]+) bytes, (\\d+)% of the"
+                + "\\s+([\\d,]+) the corpus").matcher(experiments);
+        assertTrue(saved.find(), "experiments.md gives no envelope saving");
+        long mine = number(both.group(1));
+        long other = number(both.group(2));
+        long says = number(saved.group(1));
+        assertTrue(other - mine == says, () -> "the saving is stated as "
+                + says + ", and " + other + " less " + mine + " is "
+                + (other - mine));
+        long whole = number(saved.group(3));
+        long percent = Math.round(says * 100.0 / whole);
+        assertTrue(Long.parseLong(saved.group(2)) == percent,
+                () -> "the saving is stated as " + saved.group(2) + "% and is "
+                        + percent + "% of " + whole);
+        assertTrue(experiments.contains("| " + string(whole) + " | 0.72 |"),
+                string(whole) + " is not what the packing table gives");
+    }
+
+    private static long number(String said) {
+        return Long.parseLong(said.replace(",", ""));
+    }
+
+    private static String string(long value) {
+        return String.format(java.util.Locale.ROOT, "%,d", value);
+    }
+
     @Test
     void everyFigureInExperimentsRecomputes() throws IOException {
         Pattern frames = Pattern.compile("([\\d,]+) frames");
         Pattern rowOf = Pattern.compile(
                 "^\\| ([^|]+) \\| ([\\d,]+) \\| (\\d+\\.\\d\\d) \\|([^|]*)\\|$");
+        Pattern heading = Pattern.compile("^\\| \\| bytes \\| a frame \\| (.+) \\|$");
         Pattern againstRaw = Pattern.compile("(\\d+\\.\\d)x");
+        Pattern againstFirst = Pattern.compile("(\\d+\\.\\d\\d)x");
 
         // A table's per-frame column is read against the frame count nearest
         // above it: the corpus tables count all 543 tunes, the gain table the
         // 41 with a .ymx beside them.
         long over = 0;
         long raw = 0;
+        long first = 0;
+        String against = "";
         int checked = 0;
+        int ratios = 0;
         List<String> wrong = new ArrayList<>();
         List<String> lines = Files.readAllLines(EXP);
         for (int at = 0; at < lines.size(); at++) {
@@ -240,6 +302,12 @@ final class ConsistencyTest {
                     raw = 0;
                 }
             }
+            Matcher head = heading.matcher(line);
+            if (head.find()) {
+                against = head.group(1).trim();
+                first = 0;
+                continue;
+            }
             Matcher row = rowOf.matcher(line);
             if (!row.find() || over == 0) {
                 continue;
@@ -250,6 +318,9 @@ final class ConsistencyTest {
             if (label.startsWith("raw rows")) {
                 raw = bytes;
             }
+            if (first == 0) {
+                first = bytes;
+            }
             checked++;
             double got = Math.round(bytes * 100.0 / over) / 100.0;
             if (Math.abs(got - said) > 0.005) {
@@ -257,20 +328,40 @@ final class ConsistencyTest {
                         + " over " + over + " frames is " + got
                         + " a frame, not " + said);
             }
-            Matcher a = againstRaw.matcher(row.group(4));
-            if (a.find() && raw > 0) {
-                double saidRatio = Double.parseDouble(a.group(1));
-                double gotRatio = Math.round(raw * 10.0 / bytes) / 10.0;
-                if (Math.abs(gotRatio - saidRatio) > 0.05) {
-                    wrong.add(EXP + ":" + (at + 1) + " " + label + ": " + raw
-                            + " over " + bytes + " is " + gotRatio + "x, not "
-                            + saidRatio + 'x');
+            // "against raw" divides the raw rows by the row; every other
+            // ratio column divides the row by the table's first row
+            if (against.equals("against raw")) {
+                Matcher a = againstRaw.matcher(row.group(4));
+                if (a.find() && raw > 0) {
+                    ratios++;
+                    double saidRatio = Double.parseDouble(a.group(1));
+                    double gotRatio = Math.round(raw * 10.0 / bytes) / 10.0;
+                    if (Math.abs(gotRatio - saidRatio) > 0.05) {
+                        wrong.add(EXP + ":" + (at + 1) + " " + label + ": "
+                                + raw + " over " + bytes + " is " + gotRatio
+                                + "x, not " + saidRatio + 'x');
+                    }
+                }
+            } else {
+                Matcher a = againstFirst.matcher(row.group(4));
+                if (a.find() && first > 0) {
+                    ratios++;
+                    double saidRatio = Double.parseDouble(a.group(1));
+                    double gotRatio = Math.round(bytes * 100.0 / first) / 100.0;
+                    if (Math.abs(gotRatio - saidRatio) > 0.005) {
+                        wrong.add(EXP + ":" + (at + 1) + " " + label + ": "
+                                + bytes + " over " + first + " is " + gotRatio
+                                + "x, not " + saidRatio + 'x');
+                    }
                 }
             }
         }
         int seen = checked;
+        int held = ratios;
         assertTrue(seen >= 5, () -> "only " + seen
                 + " figures parsed; the check is asleep");
+        assertTrue(held >= 4, () -> "only " + held
+                + " ratios parsed; the check is half asleep");
         assertTrue(wrong.isEmpty(), () -> String.join("\n", wrong));
     }
 
