@@ -9,8 +9,8 @@ replaces it.
 
 **DTX** is a data format: a table of rows and columns, where a column is
 1, 2 or 4 bytes wide and the rows repeat at a row of the table's choosing.
-It says nothing about what a column holds, and it holds no code. DTX is a
-repository of its own.
+It says nothing about what a column holds. DTX is a repository of its own,
+and holds the readers of the format as this one holds a player.
 
 **YMXR** says what a column holds, and what a player does with it. One
 method serves the whole of that: a clock advances a table one row, and a

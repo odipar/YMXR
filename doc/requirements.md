@@ -27,8 +27,9 @@ before what it describes, and what things are called comes before both.
 ## DTX and YMXR
 
 **DTX** is a data format, and a repository of its own. It holds a table of
-`R` rows and `C` columns, and says nothing about what a column holds. It is
-data and no more: there is no compile step and no code in it.
+`R` rows and `C` columns, and says nothing about what a column holds. The
+table is data: a compile step or a calling convention is a reader's, not
+the format's.
 
 **YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
 and timers are set to, and its player turns each row into writes to them.
