@@ -1,15 +1,16 @@
 # YMXR
 
-YMXR is a chiptune format for the Atari ST, and one use of a data engine
+YMXR is a chiptune format for the Atari ST, and one use of a data format
 called DTX.
 
 It takes the name YMX when it is done. Until then,
 [YMX](https://github.com/odipar/YMX) is what plays today, and YMXR is what
 replaces it.
 
-**DTX** takes a table of rows and columns, compiles it into a binary, and
-gives a caller one row at a time through a single function, `nextRow`. It
-says nothing about what a column holds. DTX is a repository of its own.
+**DTX** is a data format: a table of rows and columns, where a column is
+1, 2 or 4 bytes wide and the rows repeat at a row of the table's choosing.
+It says nothing about what a column holds, and it holds no code. DTX is a
+repository of its own.
 
 **YMXR** says what a column holds, and what a player does with it. One
 method serves the whole of that: a clock advances a table one row, and a

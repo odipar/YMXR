@@ -83,10 +83,10 @@ generous 32 cycles for the pair the worst frame's 22 register writes are
 about 700 cycles, with another 220 to test eighteen set bits: near 920
 cycles, under two scanlines.
 
-That is the frame procedure's own work and not the whole call. What
-`nextRow` costs is DTX's, and unmeasured until DTX exists - so what this
-settles is which side of R4.5 the budget will be spent on. Seven eighths
-of it is still to play for.
+That is the frame procedure's own work and not the whole frame. What
+reading a row out of the table costs is DTX's, and unmeasured until DTX
+exists, so what this settles is which side of R4.5 the budget will be
+spent on. Seven eighths of it is still to play for.
 
 ---
 

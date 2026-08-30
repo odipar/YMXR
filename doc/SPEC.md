@@ -264,7 +264,7 @@ more than one target. How an entry describes either is not yet written
 A tune holds its sources and an index of them (3.1), and an effect column
 names one. Source 0 names none.
 
-Two effects may name one source. Each is a caller of it and holds its own
+Two effects may name one source. Each timer advancing it holds its own
 place, so one starting or stopping leaves the other where it was.
 
 The shapes a tune uses are shapes, not kinds the format names. One row
@@ -365,11 +365,11 @@ else. A source has the DTX table's shape - `R` rows, `C` columns, a repeat
 at `RR` (2.2, R1.1) - and a target does what the procedure below does, for
 one register rather than twenty-two columns.
 
-A player calls `nextRow` once a frame for every table the tune runs, and
-writes the columns the row sets (1.1). A value the row does not set is not
-interpreted, and a player that needs one on a later row keeps it (R4.6)
-rather than looking for it in the buffer. Bit 6 of column 8 is beside its
-column's value, and read on every row (1.1).
+A player advances the tune's table one row a frame, for every table the
+tune runs, and writes the columns that row sets (1.1). A value the row does
+not set is not interpreted, and a player that needs one on a later row
+keeps it (R4.6) rather than looking for it in the buffer. Bit 6 of column 8
+is beside its column's value, and read on every row (1.1).
 
 The effects go first, then the registers.
 

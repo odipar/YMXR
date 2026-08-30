@@ -26,18 +26,17 @@ before what it describes, and what things are called comes before both.
 
 ## DTX and YMXR
 
-**DTX** is a data engine, and a repository of its own. It takes a table of
-`R` rows and `C` columns, compiles it into a binary, and gives a caller one
-row at a time through a single function. It says nothing about what a
-column holds.
+**DTX** is a data format, and a repository of its own. It holds a table of
+`R` rows and `C` columns, and says nothing about what a column holds. It is
+data and no more: there is no compile step and no code in it.
 
 **YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
 and timers are set to, and its player turns each row into writes to them.
 YMXR defines what a column holds, and how it reaches the hardware. It
 says nothing about how a row is stored, packed or unpacked.
 
-The two meet at one function and nowhere else. DTX fills a row buffer, and
-YMXR reads it.
+The two meet at the table and nowhere else. DTX gives it a shape, and YMXR
+says what its columns hold.
 
 YMXR takes the name YMX when it is done. R1 to R6 are requirements of that
 format, and bind anyone who writes or plays a tune. R0 binds this
@@ -49,22 +48,13 @@ DTX's specification defines these. They are recorded here because YMXR is
 written against them, and they change in that repository rather than this
 one.
 
-- **R1.1** The input is a table of `R` rows and `C` columns, in column-major
-  order, with metadata giving `R`, `C`, `RR` and each column's width of 1,
-  2 or 4 bytes. A compile step reads the metadata before it chooses how to
-  hold the rows, and a build that did not know a column's width could not
-  pack it. A row sets a column or leaves it unset.
-- **R1.2** A compile step turns that input into a binary with an ABI.
-- **R1.3** The ABI is one function, `nextRow`, taking a pointer to a mutable
-  row buffer.
-- **R1.4** The row buffer holds the columns, `col0` through `col(C-1)`.
-- **R1.5** A build may repeat to an earlier row `RR` once the last row is
-  done, so the rows run without end.
-- **R1.6** A build is compiled for memory, for speed, or for both.
-- **R1.7** DTX says nothing about what a column holds.
-- **R1.8** A build holds its rows or works them out. The ABI is one
-  function, and what is behind it is the build's: a table yields rows, and
-  says nothing about where they come from.
+- **R1.1** A tune's data is a table: `R` rows and `C` columns, a column 1,
+  2 or 4 bytes wide, and a row `RR` it repeats to once the last row is
+  done. Those four are its metadata.
+- **R1.2** How the table is laid out, row by row or column by column, and
+  how a row is read from it, are the format's and stated in that
+  repository.
+- **R1.3** DTX says nothing about what a column holds.
 
 ## R2. What YMXR defines
 
@@ -75,7 +65,7 @@ one.
 - **R2.4** The two roles that read a tune: a player, which writes to the
   two chips as it goes, and a reader, which reports what a tune holds and
   writes to no chip.
-- **R2.5** Nothing about the table's packing, its engine, or its ABI.
+- **R2.5** Nothing about the table's layout or its packing.
 
 ## R3. The schema
 
@@ -108,21 +98,21 @@ one.
 
 - **R4.1** A player runs one method at two rates: a clock advances a table
   one row and a procedure writes that row. The frame clock advances the
-  tune's table, through `nextRow` once a frame for every table it runs, and
-  a timer advances a source of its own.
+  tune's table, once a frame for every table it runs, and a timer advances
+  a source of its own.
 - **R4.2** A column the row does not set costs a player the test and
   nothing more.
 - **R4.3** The mapping is the player's work: the frame's procedure for a
   row of the tune's table, a target's for a row of a source.
-- **R4.4** A frame costs the call and what the row
-  sets. It does not grow with the count of columns. R3.6 puts what a row
-  sets in the writer's hands, and the frame's cost with it.
+- **R4.4** A frame costs the row it reads and what that row sets. It does
+  not grow with the count of columns. R3.6 puts what a row sets in the
+  writer's hands, and the frame's cost with it.
 - **R4.5** The worst frame stays near YMX 0.8.3's, which 13 scanlines
   cover over every shape it produces. That is the call's own work, with
   what the timers take counted apart. R4.4 spends the average; a demo
   budgets for the worst frame, and it does not move.
-- **R4.6** A player keeps what it needs of a value it took. The row buffer
-  is not that store: R3.6 leaves an unset value uninterpreted.
+- **R4.6** A player keeps what it needs of a value it took. The row is not
+  that store: R3.6 leaves an unset value uninterpreted.
 
 ## R5. Outside the DTX table
 
@@ -143,8 +133,8 @@ what a tune needs that no row gives.
 - **R5.6** A value fixed for a whole tune is not a column. It would set a
   column once and hold it for every row after it.
 - **R5.7** How often a player is called, and which timers it claims before
-  the first row, are the tune's. A player reads one row at a time (R1.3),
-  so it finds neither by reading ahead.
+  the first row, are the tune's. A player reads one row at a time, so it
+  finds neither by reading ahead.
 
 ## R6. Version and extension
 
@@ -157,8 +147,8 @@ what a tune needs that no row gives.
 - **R6.3** R3.4's ceiling of 32 holds at this version and at every later
   one.
 - **R6.4** A schema outgrowing 32 columns runs a second DTX table beside
-  the first, one `nextRow` a table a frame. The ceiling is one table's.
+  the first, a row of each a frame. The ceiling is one table's.
 - **R6.5** Columns are split evenly across the tables a tune runs. A schema
-  of 33 columns is 16 and 17, not 32 and 1, so no call spends a whole
-  `nextRow` on one value.
+  of 33 columns is 16 and 17, not 32 and 1, so no table is read for the
+  sake of one value.
 - **R6.6** R4.5's worst frame counts every table a tune runs.
