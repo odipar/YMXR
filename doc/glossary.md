@@ -10,7 +10,7 @@ same change (requirements.md, R0.6 to R0.8).
 | column | One field of a row, 1, 2 or 4 bytes wide. | requirements.md R1.1 |
 | corpus | The 544 YM files YMX 0.8.3 is tested against, 543 of which read. Every figure here is measured over it. | experiments.md |
 | DAC | The YM2149's ladder of output levels, close to logarithmic: about 3 dB a step, spanning about 54 dB. | terminology.md, the sound chip |
-| DTX | The data format: a table of `R` rows and `C` columns, and no code. A repository of its own. | README.md |
+| DTX | The data format: a table of `R` rows and `C` columns. What a column holds is YMXR's to say. A repository of its own. | README.md |
 | effect | A source connected to a target on one timer, at the rate its rate column gives. Two columns give it: the connection and the rate. What the scene names: a two-row source on a volume register is a SID voice, a long one is a digidrum, a one-row source on R13 is a sync buzzer. | SPEC.md 1.8, 1.9 |
 | envelope generator | A counter walking one of sixteen shapes. | terminology.md, the sound chip |
 | envelope period | R11 and R12, a 16-bit divider. Run fast, the sweep is a pitch. | terminology.md, the sound chip |
