@@ -32,9 +32,10 @@
 ; touched. The MFP is taken in software end-of-interrupt mode, as TOS
 ; leaves it, and the vectors are the 68000's at zero.
 ;
-; The player patches itself: the row's displacements at init, and the tick
-; handlers' operands at every start. It runs from RAM, and one loaded copy
-; serves one workspace.
+; The player patches itself: the row's displacements and the branches
+; over the effects the tune does not run at init, and the tick handlers'
+; operands at every start. It runs from RAM, and one loaded copy serves
+; one workspace.
 
 YMXR_MAGIC      equ     $594D5852       ; YMXR
 YMXR_VERSION    equ     $0001
@@ -113,25 +114,27 @@ c\{col}:
                 move.b  $7FFF(a1),d2
                 .endm
 
-; A column with a set bit, to its register: the select in d1's high byte,
-; the column read into its low byte, and one movep for the pair.
+; A column with a set bit, to its register: the column read, and where
+; it is set the select put above it and one movep for the pair.
                 .macro  WRITE   col,select
-                move.w  #\select,d1
                 READ    \col
                 bpl.s   .no\~
-                movep.w d1,(a2)
+                move.w  #\select,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
 .no\~:
                 .endm
 
 ; A column that fills its byte, reserving 0: written where it is not 0,
 ; or where the bit beside it, in d2, says 0 is the value.
                 .macro  RESERVED col,bit,select
-                move.w  #\select,d1
                 READ    \col
                 bne.s   .go\~
                 btst    #\bit,d2
                 beq.s   .no\~
-.go\~:          movep.w d1,(a2)
+.go\~:          move.w  #\select,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
 .no\~:
                 .endm
 
@@ -139,12 +142,13 @@ c\{col}:
 ; value, then the fine column against it.
                 .macro  TONE    fine,coarse,fsel,csel
                 READ2   \coarse
-                move.w  #\fsel,d1
                 READ    \fine
                 bne.s   .go\~
                 btst    #6,d2
                 beq.s   .nf\~
-.go\~:          movep.w d1,(a2)
+.go\~:          move.w  #\fsel,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
 .nf\~:          tst.b   d2
                 bpl.s   .nc\~
                 move.w  #\csel,d1
@@ -156,7 +160,9 @@ c\{col}:
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset.
                 .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,keep,shift,tick
-                READ2   \cc
+\{tick}_over:
+                bra.w   \{tick}_done             ; two nops where the tune
+                READ2   \cc                     ; runs this effect (init)
                 tst.b   d2                      ; the timer's reset stops the
                 bpl.s   .kept\~                 ; timer before the source is
                 btst    #6,d2                   ; switched, so no tick of the
@@ -224,6 +230,17 @@ c\{col}:
                 lea     \tick(pc),a5          ; the place's reset
                 move.l  \fx+FX_FIRST(a6),TICK_PTR(a5)
 .done\~:
+\{tick}_done:
+                .endm
+
+; The branch over an effect's columns made two nops where the tune runs
+; the effect.
+                .macro  RUNS    i,over
+                btst    #\i,WS_EFFECTS(a6)
+                beq.s   .no\~
+                lea     \over(pc),a3
+                move.l  #$4E714E71,(a3)
+.no\~:
                 .endm
 
 ; One timer claimed, where the tune runs its effect: stopped, aimed at
@@ -333,6 +350,14 @@ YMXR_init:
 .clear:         clr.l   (a0)+
                 dbra    d0,.clear
 
+; The effects the tune runs are read every row; the others are jumped
+; over, the branch at each macro's head standing where the tune does not
+; run its effect.
+                RUNS    0,ymxr_tick0_over
+                RUNS    1,ymxr_tick1_over
+                RUNS    2,ymxr_tick2_over
+                RUNS    3,ymxr_tick3_over
+
 ; The timers the tune runs, claimed. The others stand as they are.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
@@ -423,11 +448,12 @@ ymxr_frame:
                 WRITE   _9,$0900
                 WRITE   _10,$0A00
 ; 7: the mixer, with the host's port directions.
-                move.w  #$0700,d1
                 READ    _7
                 bpl.s   .no7
                 or.b    #YM_PORTS,d1
-                movep.w d1,(a2)
+                move.w  #$0700,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
 .no7:
 ; 8: the shape, read above into d2.
                 tst.b   d2
