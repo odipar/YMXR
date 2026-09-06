@@ -1,6 +1,9 @@
-; YMXR_prg.S - a TOS program around the player, for a run under Hatari:
-; the machine taken over, the tune played on the VBL for FRAMES frames,
-; the player stopped and the machine handed back.
+; YMXR_prg.S - a TOS program around the player: the machine taken over,
+; the tune played on the VBL, the player stopped and the machine handed
+; back. Built as it stands it plays FRAMES frames for a run under Hatari,
+; painting the background red around each call; built with PLAYING
+; defined (rmac -dPLAYING) it paints nothing and plays until a key is
+; pressed, or the tune has played once.
 ;
 ; The player and the tune are taken in as YMXR.bin and TUNE.YMXR from the
 ; include path, and the text address is printed first, so that a trace of
@@ -74,8 +77,21 @@ play:
                 lea     vbl(pc),a0
                 move.l  a0,VBL.w
                 move.w  #$2300,sr
+                .if ^^defined PLAYING
+; The keyboard's ACIA, read directly: its interrupt is off with the MFP's
+; others, so a byte waits in it. A key pressed is a scan code with bit 7
+; clear; a key released has it set and does not stop the tune.
+.wait:          btst    #0,$FFFFFC00.w
+                beq.s   .played
+                move.b  $FFFFFC02.w,d0
+                bpl.s   .stop
+.played:        tst.w   frames_left
+                bne.s   .wait
+.stop:
+                .else
 .wait:          tst.w   frames_left
                 bne.s   .wait
+                .endif
                 move.w  #$2700,sr
                 lea     workspace,a0
                 jsr     player+8
@@ -96,13 +112,21 @@ play:
                 move.w  (sp)+,sr
                 rts
 
-; The VBL: one call a frame, FRAMES times. The background is red while
-; the call runs and yellow at its end, which a trace of the palette
-; writes turns into the call's cycles, as YMX's cost.py reads them.
+; The VBL: one call a frame, FRAMES times, or until the tune has played
+; once with PLAYING. The background is red while the call runs and yellow
+; at its end, which a trace of the palette writes turns into the call's
+; cycles, as YMX's cost.py reads them; a program that plays paints nothing.
 vbl:
                 movem.l d0-d7/a0-a6,-(sp)
                 tst.w   frames_left
                 beq.s   .done
+                .if ^^defined PLAYING
+                lea     workspace,a0
+                jsr     player+4
+                tst.l   d0
+                bpl.s   .done
+                clr.w   frames_left             ; the tune has played once
+                .else
                 move.w  $FFFF8240.w,-(sp)
                 move.w  #$700,$FFFF8240.w
                 lea     workspace,a0
@@ -110,11 +134,16 @@ vbl:
                 move.w  #$770,$FFFF8240.w
                 move.w  (sp)+,$FFFF8240.w
                 subq.w  #1,frames_left
+                .endif
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rte
 
 text:           dc.b    "YMXR at $"
-hex:            dc.b    "00000000",13,10,0
+hex:            dc.b    "00000000",13,10
+                .if ^^defined PLAYING
+                dc.b    "a key stops the tune",13,10
+                .endif
+                dc.b    0
 digits:         dc.b    "0123456789ABCDEF"
                 .even
 player:         .incbin "YMXR.bin"

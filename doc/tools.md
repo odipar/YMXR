@@ -105,6 +105,23 @@ the player saves and restores no vector, timer control or interrupt
 enable, and touches no timer the tune does not run. The header of the
 source gives the contract in full.
 
+## A program that plays
+
+```
+rmac -m68000 -fr -o WORK/YMXR.bin 68k/YMXR.S
+bin/ym-to-ymxr tune.ym WORK/TUNE.YMXR
+rmac -m68000 -p -dPLAYING -iWORK -o WORK/TUNE.PRG 68k/YMXR_prg.S
+```
+
+`68k/YMXR_prg.S` is a TOS program around the player: it takes the
+machine over under Supexec, saving the vectors and the timers' registers
+it touches, plays the tune it takes in as `TUNE.YMXR` on the VBL, stops
+the player and hands the machine back. Built with `PLAYING` defined it
+plays until a key is pressed, or the tune has played once, and prints
+the player's address and that a key stops the tune; built without, it
+plays 2,000 frames painting the background around each call, which is
+the build the rig runs under Hatari (The rigs).
+
 ## The rigs
 
 `68k/test/emu/test_ymxr.py` plays every tune under `ym/test`, or the
