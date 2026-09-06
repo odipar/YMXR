@@ -40,6 +40,7 @@
 YMXR_MAGIC      equ     $594D5852       ; YMXR
 YMXR_VERSION    equ     $0001
 YMXR_COLUMNS    equ     30
+YMXR_SITES      equ     18              ; the other read sites (ymxr_sites)
 
 ; The tune file (SPEC.md 3.3).
 TF_VERSION      equ     4
@@ -114,6 +115,29 @@ c\{col}:
                 move.b  $7FFF(a1),d2
                 .endm
 
+; A second read of a column, or a column ored into d1, at a site of its
+; own that init patches from the table of sites (ymxr_sites).
+                .macro  QREAD   col
+q\{col}:
+                move.b  $7FFF(a1),d1
+                .endm
+
+                .macro  QOR     col
+q\{col}:
+                or.b    $7FFF(a1),d1
+                .endm
+
+; A column that fills its byte, on the row where the column beside it is
+; 0: written where it is not 0, and nothing else to test.
+                .macro  PLAIN   col,select
+                QREAD   \col
+                beq.s   .no\~
+                move.w  #\select,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
+.no\~:
+                .endm
+
 ; A column with a set bit, to its register: the column read, and where
 ; it is set the select put above it and one movep for the pair.
                 .macro  WRITE   col,select
@@ -144,6 +168,8 @@ c\{col}:
                 READ2   \coarse
                 READ    \fine
                 bne.s   .go\~
+                tst.b   d2                      ; a coarse column of 0 has no
+                beq.s   .nc\~                   ; set bit and no bit beside
                 btst    #6,d2
                 beq.s   .nf\~
 .go\~:          move.w  #\fsel,d0
@@ -162,7 +188,17 @@ c\{col}:
                 .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,keep,shift,tick
 \{tick}_over:
                 bra.w   \{tick}_done             ; two nops where the tune
-                READ2   \cc                     ; runs this effect (init)
+                QREAD   \ct                     ; runs this effect (init)
+                QOR     \cs                     ; the three set bits at once
+                QOR     \cc
+                bmi.s   \{tick}_some
+                QREAD   \cn                     ; the count alone, or nothing
+                beq.w   \{tick}_done
+                move.b  d1,\data.w              ; the count, the timer running on
+                move.b  d1,\fx+FX_COUNT(a6)
+                bra.w   \{tick}_done
+\{tick}_some:
+                READ2   \cc
                 tst.b   d2                      ; the timer's reset stops the
                 bpl.s   .kept\~                 ; timer before the source is
                 btst    #6,d2                   ; switched, so no tick of the
@@ -332,6 +368,13 @@ YMXR_init:
                 move.w  d1,(a4,d4.w)
                 add.w   d3,d1
                 dbra    d2,.patch
+                lea     ymxr_sites(pc),a3
+                moveq   #YMXR_SITES-1,d2
+.site:          move.w  (a3)+,d4
+                move.w  (a3)+,d0
+                mulu.w  d3,d0
+                move.w  d0,(a4,d4.w)
+                dbra    d2,.site
 
 ; The tick handlers: each one's step and loop operands name its own
 ; cells, and its place is parked on a marker until a start.
@@ -406,28 +449,16 @@ YMXR_play:
                 move.l  a6,-(sp)
                 movea.l a0,a6
                 tst.l   WS_ROWS(a6)
-                beq     .over
+                beq     ymxr_over
                 lea     WS_STATE(a6),a0
                 movea.l WS_IMAGE(a6),a2
                 jsr     IM_ADVANCE(a2)          ; a1 the row
                 lea     YM_SELECT.w,a2
-                bsr     ymxr_frame
-                subq.l  #1,WS_ROWS(a6)
-                bne.s   .played
-                move.l  WS_R(a6),d0             ; the last row: the loop's
-                sub.l   WS_RR(a6),d0            ; rows, or none
-                move.l  d0,WS_ROWS(a6)
-.played:        moveq   #0,d0
-                movea.l (sp)+,a6
-                rts
-.over:          moveq   #-1,d0
-                movea.l (sp)+,a6
-                rts
 
 ; ---------------------------------------------------------------- frame
 
-; The frame procedure (SPEC.md 4): a1 the row, a2 the chip's select
-; register, a6 the workspace.
+; The frame procedure (SPEC.md 4), inline in the call: a1 the row, a2 the
+; chip's select register, a6 the workspace.
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
                 EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$F0,0,ymxr_tick0
@@ -438,11 +469,18 @@ ymxr_frame:
                 TONE    _0,_1,$0000,$0100
                 TONE    _2,_3,$0200,$0300
                 TONE    _4,_5,$0400,$0500
-; 5: the noise period, and the envelope period beside the shape's bits.
-                READ2   _13
+; 5: the noise period, and the envelope period beside the shape's bits:
+;    where the shape column is 0, no bit beside is set, and a period byte
+;    is written where it is not 0 and nothing else is tested.
                 WRITE   _6,$0600
+                READ2   _13
+                beq.s   ymxr_plain
                 RESERVED _11,6,$0B00
                 RESERVED _12,5,$0C00
+                bra.s   ymxr_volumes
+ymxr_plain:     PLAIN   _11,$0B00
+                PLAIN   _12,$0C00
+ymxr_volumes:
 ; 6: the volumes.
                 WRITE   _8,$0800
                 WRITE   _9,$0900
@@ -457,11 +495,22 @@ ymxr_frame:
 .no7:
 ; 8: the shape, read above into d2.
                 tst.b   d2
-                bpl.s   .no13
+                bpl.s   ymxr_played
                 move.w  #$0D00,d1
                 move.b  d2,d1
                 movep.w d1,(a2)
-.no13:          rts
+ymxr_played:
+                subq.l  #1,WS_ROWS(a6)
+                bne.s   ymxr_return
+                move.l  WS_R(a6),d0             ; the last row: the loop's
+                sub.l   WS_RR(a6),d0            ; rows, or none
+                move.l  d0,WS_ROWS(a6)
+ymxr_return:    moveq   #0,d0
+                movea.l (sp)+,a6
+                rts
+ymxr_over:      moveq   #-1,d0
+                movea.l (sp)+,a6
+                rts
 
 ; The reads' displacement words, one a column, in column order.
 ymxr_reads:
@@ -475,6 +524,19 @@ ymxr_reads:
                 dc.w    c_21-ymxr_frame+2,c_22-ymxr_frame+2,c_23-ymxr_frame+2
                 dc.w    c_24-ymxr_frame+2,c_25-ymxr_frame+2,c_26-ymxr_frame+2
                 dc.w    c_27-ymxr_frame+2,c_28-ymxr_frame+2,c_29-ymxr_frame+2
+
+; The other sites a column is read at, each with its column: the effects'
+; one-pass tests, and the envelope period's plain path.
+ymxr_sites:
+                dc.w    q_14-ymxr_frame+2,14,q_15-ymxr_frame+2,15
+                dc.w    q_16-ymxr_frame+2,16,q_17-ymxr_frame+2,17
+                dc.w    q_18-ymxr_frame+2,18,q_19-ymxr_frame+2,19
+                dc.w    q_20-ymxr_frame+2,20,q_21-ymxr_frame+2,21
+                dc.w    q_22-ymxr_frame+2,22,q_23-ymxr_frame+2,23
+                dc.w    q_24-ymxr_frame+2,24,q_25-ymxr_frame+2,25
+                dc.w    q_26-ymxr_frame+2,26,q_27-ymxr_frame+2,27
+                dc.w    q_28-ymxr_frame+2,28,q_29-ymxr_frame+2,29
+                dc.w    q_11-ymxr_frame+2,11,q_12-ymxr_frame+2,12
 
 ; ---------------------------------------------------------------- ticks
 
