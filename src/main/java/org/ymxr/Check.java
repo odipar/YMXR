@@ -219,7 +219,7 @@ final class Check {
             }
         }
         int others = results.size() - dumps;
-        System.out.println(dumps + " dumps, " + failed + " wrong"
+        System.out.println(dumps + (dumps == 1 ? " dump, " : " dumps, ") + failed + " wrong"
                 + (others == 0 ? "" : ", " + others + (others == 1 ? " file" : " files")
                 + " not a dump"));
         System.exit(failed == 0 ? 0 : 1);
