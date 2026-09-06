@@ -23,7 +23,7 @@ run, the repeat row and the bytes written, then its notes: effects
 dropped, rows padded, and a ring other than the one asked for.
 
 A table packs at unit 2: unit 1 packs the corpus to 0.69 bytes a frame
-against 0.81, and costs the play call a sixth more on average
+against 0.81, and costs the play call about a seventh more on average
 (performance.md), and `-k1` asks for it. A table that repeats packs at a
 period of thirty rows, the column count and the smallest DTX allows,
 since a refill decodes a period's rows of one column at once and the

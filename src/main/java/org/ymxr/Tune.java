@@ -100,8 +100,12 @@ final class Tune {
             report.note(before + " silent rows before the repeat row and " + after
                     + " after the last, so that a period of " + Columns.C + " divides the loop");
         } else if (after > 0) {
-            report.note(after + " silent rows after the last, so that the rows divide by the"
-                    + " unit of " + unit + " and reach " + Columns.C);
+            int toC = Math.max(0, Columns.C - frames);
+            String why = toC == 0 ? "divide by the unit of " + unit
+                    : after == toC ? "reach " + Columns.C
+                    : "reach " + Columns.C + " and divide by the unit of " + unit;
+            report.note(after + " silent " + (after == 1 ? "row" : "rows")
+                    + " after the last, so that the rows " + why);
         }
         if (at != ring) {
             report.note("the ring is " + at + " bytes: a multiple of the period, under the loop");

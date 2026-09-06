@@ -25,9 +25,10 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 A table packs at unit 2 and a period of thirty rows, the column count,
 so a refill is fifteen units of two bytes and one comes every row
 (tools.md, Convert). What those units cost depends on how the column
-packed: a run of long matches costs a few cycles a unit and a run of
-short operations, each a length and an offset read bit by bit, over a
-hundred each, which is the spread between the tunes' averages. Unit 1
+packed: a run of long matches costs 12 cycles a unit to copy and a run
+of short operations, each a length and an offset read bit by bit, 175
+to 220 an operation to parse, which is the spread between the tunes'
+averages. Unit 1
 packs the corpus to 0.69 bytes a frame against 0.81 (experiments.md) and
 costs more to decode: on Turrican - world 4-3 the advance 1,130 on
 average and 4,448 at most against 880 and 4,132, and the play call 1,874
@@ -47,8 +48,9 @@ period and the envelope period branch on a zero byte before the bit
 beside it; a column's select is formed only where the column is set;
 and the frame stands inline in the call.
 
-The costliest frame of a tune is its heaviest refill: the column and
-the period whose thirty bytes packed as the most operations. A table
+The costliest frame of a tune is its heaviest refill, or a frame
+within a few hundred cycles of it: the column and the period whose
+fifteen units packed as the most operations. A table
 that repeats puts each column's decoder back to what it was at the
 loop's first row at that column's own refill, one column a row over the
 period after the pass's end, so no row takes more than one decoder's
@@ -82,13 +84,16 @@ Fourteen tests and a few writes cost what fourteen writes cost, which
 YMX's own measurement found and its design took; the effects' columns
 and the entry are what the schema adds. DTX's advance spends about 450
 cycles a refill outside the decoder, loading and storing the decoder's
-eight registers and stepping to the next, and about 430 on average
-inside it for fifteen units, where YMX's refill decodes sixty-four
-bytes at the same unit for about 950 in all: a refill a row, half the
-size of YMX's every second row, costs less on average. The worst frame
-is the heaviest fifteen-unit refill, 4,132 of the 4,794 on Turrican -
-world 4-3, against YMX's heaviest sixty-four-byte group, and that is
-the decoder's spread and not either player's.
+eight registers and stepping to the next, and about 430 inside it for
+fifteen units on Turrican - world 4-3: 880 a row, where YMX refills one
+stream of sixty-four bytes at the same unit on nineteen to twenty-five
+rows in thirty-two, about 950 each, 560 to 740 a row. So YMXR's refill
+costs more a row, and its frame procedure less on the rows that set few
+columns, 744 on average on that tune against YMX's 908, and the average
+lands a fourteenth under. The worst frame is the heaviest fifteen-unit
+refill, 4,132 of the 4,794 on Turrican - world 4-3, against YMX's
+heaviest sixty-four-byte group, and that is the decoder's spread and
+not either player's.
 
 ## What can be done
 
