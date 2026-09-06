@@ -51,8 +51,10 @@ def main():
     tunes_env_fixed = tunes_noise_fixed = 0
     p0_frames = p0_live = 0         # envelope period 0; and with a voice following
     p0_tunes = set()
-    churn_host = churn_own = 0      # shape-column value changes, hosting the
-                                    # period's set bit against not
+    churn_own = churn_beside = churn_host = 0   # shape-column value changes:
+        # its own; with the bits beside the period bytes (SPEC 1.7); and
+        # hosting a set bit for each period byte instead
+    fine_zero = [0, 0, 0]           # tone fine byte moved to 0: the coarse column's bit 6
 
     for name in files:
         d = payload(os.path.join(CORPUS, name), tmp)
@@ -66,7 +68,7 @@ def main():
         env_period_moved = noise_moved = False
         last_shape = None
         held = 0
-        prev_host = prev_own = None
+        prev_own = prev_beside = prev_host = None
         for f in range(nf):
             if f:
                 for v, (lo, hi) in enumerate(((0, 1), (2, 3), (4, 5))):
@@ -91,17 +93,24 @@ def main():
                     p0_live += 1
                     p0_tunes.add(name)
             if f:
-                moved = (g(11, f) != g(11, f - 1)) or (g(12, f) != g(12, f - 1))
+                fine_moved = g(11, f) != g(11, f - 1)
+                coarse_moved = g(12, f) != g(12, f - 1)
                 if g(13, f) != 0xFF:
                     held = g(13, f) & 0x0F
-                wrote = g(13, f) != 0xFF
-                host = (0x80 if wrote else 0) | (0x40 if moved else 0) | held
-                own = (0x80 if wrote else 0) | held
-                if prev_host is not None and host != prev_host:
-                    churn_host += 1
+                own = (0x80 if g(13, f) != 0xFF else 0) | held
+                beside = own | (0x40 if fine_moved and g(11, f) == 0 else 0) \
+                             | (0x20 if coarse_moved and g(12, f) == 0 else 0)
+                host = own | (0x40 if fine_moved else 0) | (0x20 if coarse_moved else 0)
                 if prev_own is not None and own != prev_own:
                     churn_own += 1
-                prev_host, prev_own = host, own
+                if prev_beside is not None and beside != prev_beside:
+                    churn_beside += 1
+                if prev_host is not None and host != prev_host:
+                    churn_host += 1
+                prev_own, prev_beside, prev_host = own, beside, host
+                for v, lo in enumerate((0, 2, 4)):
+                    if g(lo, f) == 0 and g(lo, f - 1) != 0:
+                        fine_zero[v] += 1
             shape = g(13, f)
             if shape != 0xFF:
                 env_writes += 1
@@ -123,8 +132,10 @@ def main():
     print(f"tunes with one noise period throughout     {tunes_noise_fixed} of {read}")
     print(f"envelope period 0 frames  {p0_frames:,}; with a voice following"
           f" {p0_live} ({len(p0_tunes)} tunes)")
-    print(f"shape column value changes  hosting the period's set bit {churn_host:,},"
-          f" its own {churn_own:,}, extra {churn_host - churn_own:,}")
+    print(f"shape column value changes  its own {churn_own:,}; with the bits beside"
+          f" the period bytes {churn_beside:,}; hosting their set bits {churn_host:,}")
+    print(f"tone fine byte moved to 0  A {fine_zero[0]:,}  B {fine_zero[1]:,}"
+          f"  C {fine_zero[2]:,} frames")
 
 
 if __name__ == "__main__":
