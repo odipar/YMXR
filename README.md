@@ -23,10 +23,34 @@ a sound chip exists.
 [doc/requirements.md](doc/requirements.md) comes first. Nothing else is
 written until it says what YMXR has to do.
 
-The shape follows [YMX](https://github.com/odipar/YMX), which held the
-table and the columns together: Java is the source of truth, Go and C#
-follow it byte for byte, the 68000 player is under `68k/`, and the harnesses
-under `ymx/` hold the three trees to each other.
+## What's here
+
+| | |
+|---|---|
+| `doc/` | the specification, the requirements it is written against, and the rest |
+| `src/main/java/org/ymxr/` | the converter: a YM5!/YM6! dump into a tune file, on DTX's Java library |
+| `68k/YMXR.S` | the player, and `68k/YMXR_prg.S` a program around it for Hatari |
+| `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
+| `ym/` | the measurements behind the figures, and `ym/test` seven tunes the tests run on |
+| `bin/` | the converter, run out of a build |
+
+A tune converts and plays like this:
+
+```bash
+bin/ym-to-ymxr tune.ym tune.ymxr
+python3 68k/test/emu/test_ymxr.py tune.ym
+```
+
+The shape follows [YMX](https://github.com/odipar/YMX): Java is the
+source of truth, and the Go and C# trees are to follow it byte for byte.
+
+## Tests
+
+| what runs | what it checks |
+|---|---|
+| `mvn test` | the documents against themselves and the house style, and every tune under `ym/test` converted, read back and replayed against its dump |
+| `68k/test/emu/test_ymxr.py` | the player on an emulated 68000: every frame's writes, the timers' programming and every tick against the specification's model |
+| the same, `-hatari` | the player on a real MFP under Hatari, the trace of its writes against that model |
 
 | | |
 |---|---|
