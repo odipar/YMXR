@@ -35,9 +35,9 @@ how many. A tune that plays once is padded to thirty rows at least and
 to a multiple of the unit, since DTX asks that a column's bytes divide
 by it. The ring is shorter than the loop, so that the loop is
 replayed at the wrap: a loop the ring holds is read wrong past the wrap
-by DTX 0.4.0's reader, which `68k/test/emu/test_ymxr.py` found. The
-reader on DTX's `lean-advance` branch reads such a loop right, and the
-rule stays until the converter is measured without it.
+by DTX 0.4.0's reader, which `68k/test/emu/test_ymxr.py` found. DTX
+0.5.0's reader reads such a loop right, and the rule stays until the
+converter is measured without it.
 
 What the converter does with a dump's effects: a SID voice is a source of
 two rows, its level and 0; a sync buzzer one row, its shape; a digidrum
@@ -50,10 +50,10 @@ state. `ConversionTest` replays every tune under `ym/test` against its
 dump.
 
 The tool runs out of `target/classes`, and builds first where a source or
-the pom is newer than the last build. Java 23 and Maven, and DTX
-0.5-SNAPSHOT in the local Maven repository: `mvn install` on DTX's main
-at or past the reader that walks its decoder states, which this player's
-frame figures (performance.md) are measured against.
+the pom is newer than the last build. Java 23 and Maven, and DTX 0.5.0 in
+the local Maven repository: `mvn install` at DTX's `v0.5.0` tag, whose
+reader this player's frame figures (performance.md) are measured
+against.
 
 ## The player
 
