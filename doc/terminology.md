@@ -114,6 +114,16 @@ The timer counts down at the divided speed and raises an interrupt at zero.
 That interrupt is the **tick**. Both numbers are divisors, and a generator's
 counter is a different thing.
 
+A timer has two registers. Its **timer control register** holds the
+prescaler select in three bits: 1 for 4, 2 for 10, 3 for 16, 4 for 50, 5
+for 64, 6 for 100, 7 for 200, and 0 stops the timer. Timers A and B have
+one each, the select in bits 2 to 0; bits 4 and 3 pick an output's reset
+and modes no tune uses, and are zero. C and D share one, C in bits 6 to 4
+and D in bits 2 to 0. Its **timer data register** holds the timer count.
+A count written while the timer runs is taken when the running count
+reaches zero; one written while it is stopped is taken at once, and the
+select that follows starts the timer from it.
+
 The slowest rate is 48 a second and the fastest 614,400. Above about 25,600
 the interrupt alone takes a quarter of an 8 MHz 68000, which is the
 practical ceiling. For scale, 69 tunes of the 543-tune corpus play
@@ -123,10 +133,10 @@ samples, mostly between 5,000 and 6,100 a second.
 
 ## Tables, rows and procedures
 
-A **table** yields rows: `R` of them, `C` columns wide, a column 1, 2 or 4
-bytes, and a row `RR` it repeats to once the last row is done. A **row** is
-one step of one: `C` values, and nothing in it about what any of them is
-for.
+A **table** yields rows: `R` of them, `C` columns wide, every value **`W`**
+bytes, 1, 2 or 4, and a row `RR` it repeats to once the last row is done.
+A **row** is one step of one: `C` values, and nothing in it about what any
+of them is for.
 
 **Yielding** is one row at a time and in order. A clock advances to a next
 row, and holds its own place in the table: the first advance gives row 0,
@@ -138,9 +148,11 @@ places, and neither moves the other's.
 repeats yields them without end, and two rows alternating a level and zero
 yield a square wave for as long as anything asks.
 
-`R`, `C`, `RR` and the column widths are a table's **metadata**. They
-describe it without holding any of it. How the rows are laid out under
-them, row by row or column by column, is the format's (R1.2).
+`R`, `C`, `RR` and `W` are a table's **metadata**. They describe it
+without holding any of it. `W` is the table's and not a column's: every
+value takes 1, 2 or 4 bytes, and one table takes one of the three. How
+the rows are laid out under them, row by row or column by column, is the
+format's (R1.2).
 
 A **procedure** takes a row and writes it to the chips.
 

@@ -1,68 +1,107 @@
 # The YMXR format
 
 A working draft. It fixes a column set so the rest can be written against
-something. Every number here moves until DTX exists and a reader reads a
-tune back.
+something. Every number here moves until a reader reads a tune back.
 
-A tune is a DTX table and the values that sit outside it. The table holds
-18 columns of the 32 R3.4 allows, and 30 bytes a row.
+A tune is a DTX table and the values outside it. Every value of a DTX
+table takes the one width the table gives (R1.1), and this table's is a
+byte, what one register takes. It holds 30 columns of the 32 R3.4 allows,
+each one byte, so a row is 30 bytes.
 
 ---
 
 ## 1. The columns
 
-A column of 2 or 4 bytes is most significant byte first. A bit an entry
+Columns 0 to 13 reach R0 to R13, one a register, in the chip's numbering.
+Columns 14 to 29 are the four effects, four columns each. A bit an entry
 does not name is written as zero and read as nothing (R6.2).
 
-| column | bytes | holds |
-|---|---|---|
-| 0 | 2 | voice A tone period |
-| 1 | 1 | voice A volume |
-| 2 | 2 | voice B tone period |
-| 3 | 1 | voice B volume |
-| 4 | 2 | voice C tone period |
-| 5 | 1 | voice C volume |
-| 6 | 1 | mixing |
-| 7 | 1 | noise period |
-| 8 | 1 | envelope shape |
-| 9 | 2 | envelope period |
-| 10 | 2 | effect 0 |
-| 11 | 2 | effect 0 rate |
-| 12 to 13 | 4 | effect 1, the two above in the same order |
-| 14 to 15 | 4 | effect 2, the same |
-| 16 to 17 | 4 | effect 3, the same |
+| column | holds |
+|---|---|
+| 0 | R0, voice A tone period, fine |
+| 1 | R1, voice A tone period, coarse |
+| 2 | R2, voice B tone period, fine |
+| 3 | R3, voice B tone period, coarse |
+| 4 | R4, voice C tone period, fine |
+| 5 | R5, voice C tone period, coarse |
+| 6 | R6, noise period |
+| 7 | R7, mixing |
+| 8 | R8, voice A volume |
+| 9 | R9, voice B volume |
+| 10 | R10, voice C volume |
+| 11 | R11, envelope period, fine |
+| 12 | R12, envelope period, coarse |
+| 13 | R13, envelope shape |
+| 14 | effect 0 target |
+| 15 | effect 0 source |
+| 16 | effect 0 timer control, Timer A's control register |
+| 17 | effect 0 timer count, Timer A's data register |
+| 18 to 21 | effect 1, the four above in the same order, on Timer D |
+| 22 to 25 | effect 2, the same, on Timer B |
+| 26 to 29 | effect 3, the same, on Timer C |
 
 An effect is the schema's and a timer is the machine's. Section 2.3 says
-which runs which. A tune running one effect sets columns 10 and 11 and
-leaves 12 to 17 unset for its whole length.
+which runs which. A tune running one effect sets columns 14 to 17 and
+leaves 18 to 29 unset for its whole length.
 
 ### 1.1 The set bit
 
-Bit 7 of a column's first byte is its set bit, the flag for the column's
-value (R3.6). A column is most significant byte first, so that one rule is
-the top bit at every width: bit 7 of a byte and bit 15 of a word. At 1 a
-player takes the value; at 0 it does not interpret the value's bits, and
-they may hold anything.
+Bit 7 of a column is its set bit, the flag for the column's value (R3.6).
+At 1 a player takes the value; at 0 it does not interpret the value's
+bits, and they may hold anything.
 
-The set bit flags the value, not the column. One bit in the schema sits
-beside a value rather than in it, and is read on every row, set bit or no:
-bit 6 of the envelope shape, which settles what a zero in the envelope
-period means (1.6, 1.7). Every other bit a column holds is part of its
-value, read only where the row sets it.
+Nine columns have no bit to spare, because what they reach takes the whole
+byte: the three tone periods' fine columns, the two envelope period
+columns and the four timer counts. Each reserves 0 for the row that does
+not set it (R3.7). For five of them a bit of the column beside it, read on
+every row, keeps 0 reachable as a value:
 
-One column has no bit to spare, and reserves a value instead. The envelope
-period fills its word, so 0 says the row does not set it (1.7).
+| column | its 0 is a value where |
+|---|---|
+| 0 | bit 6 of column 1 is 1 |
+| 2 | bit 6 of column 3 is 1 |
+| 4 | bit 6 of column 5 is 1 |
+| 11 | bit 6 of column 13 is 1 |
+| 12 | bit 5 of column 13 is 1 |
 
-One column gathering all seventeen set bits would gather seventeen
+A player reads such a column and its bit together:
+
+| the column | the bit | the row |
+|---|---|---|
+| not 0 | 0 or 1 | sets the register to the column's value |
+| 0 | 0 | does not set it, and the register is not written |
+| 0 | 1 | sets it to 0 |
+
+The four timer counts have no such bit, and a count of 0, which the MFP
+reads as 256, is not reachable (1.9).
+
+The set bit flags the value, not the column. The five bits above are
+beside another column's value rather than in their own, and are read on
+every row, set bit or no (R3.6). Every other bit a column holds is part of
+its value, read only where the row sets it.
+
+One column gathering all twenty-one set bits would gather twenty-one
 reasons to move, and the sum of them moves on nearly every row. A bit held
 beside its own value moves only when that value's use does, and compresses
-with it.
+with it. A reserved 0 does the same for a column that fills its byte: the
+column is 0 where the row leaves it, and the bit beside it moves only
+where a tune sets the register to 0.
 
 ### 1.2 Tone period
 
-Bit 15 is the set bit. Bits 11 to 0 give the voice's divider: bits 7 to 0
-reach R0, R2 or R4, and bits 11 to 8 reach R1, R3 or R5. Bits 14 to 12 are
-zero.
+Two columns a voice, one a register. The fine column is the divider's bits
+7 to 0, the byte R0, R2 or R4 takes. It fills its byte, so 0 says the row
+does not set it, and bit 6 of the coarse column says the row sets it to 0
+(1.1).
+
+The coarse column: bit 7 is the set bit, bit 6 says the fine column's 0 is
+a value, and bits 3 to 0 are the divider's bits 11 to 8, which reach R1,
+R3 or R5. Bits 5 and 4 are zero.
+
+A period whose low byte is 0 sets the fine column to 0 and bit 6 of the
+coarse column to 1 on the same row. Bit 6 is beside the coarse column's
+value, not part of it (R3.5), so a player reads it on every row, and a row
+may say the fine byte is 0 without setting the coarse.
 
 ### 1.3 Volume
 
@@ -90,10 +129,11 @@ Bit 7 is the set bit. Bits 4 to 0 reach R6. Bits 6 and 5 are zero.
 | bits | gives |
 |---|---|
 | 7 | the set bit of this column |
-| 6 | the envelope period is 0 (1.7) |
+| 6 | column 11's 0 is a value: the envelope period's fine byte is 0 (1.7) |
+| 5 | column 12's 0 is a value: its coarse byte is 0 (1.7) |
 | 3 to 0 | the shape, which reaches R13 |
 
-Bits 5 and 4 are zero.
+Bit 4 is zero.
 
 A row sets this column to write R13, and any write to R13 restarts the
 envelope. A row that leaves it unset writes nothing, and the envelope runs
@@ -107,26 +147,30 @@ nothing about the value having changed.
 "Do not write" is the clear set bit, so no value of this column is
 reserved for it. While an effect writes R13, a row leaves this column unset.
 
-Bit 6 is beside this column's value, not part of it (R3.5), so a player
-reads it on every row. A row may say the period is 0 without writing R13.
+Bits 6 and 5 are beside this column's value, not part of it (R3.5), so a
+player reads them on every row. A row may say a period byte is 0 without
+writing R13.
 
 ### 1.7 Envelope period
 
-Bits 15 to 0 give the envelope generator's divider: bits 7 to 0 reach R11
-and bits 15 to 8 reach R12.
+Two columns, one a register. Column 11 is the divider's bits 7 to 0, the
+byte R11 takes, and column 12 its bits 15 to 8, the byte R12 takes. Each
+fills its byte, so 0 says the row does not set it, and a bit of column 13
+says the row sets it to 0: bit 6 for column 11 and bit 5 for column 12
+(1.1).
 
-A zero in this column does not set the period, or sets it to 0. Bit 6 of
-column 8 settles which.
-
-| column 9 | column 8 bit 6 | the row |
+| column 11 | column 13 bit 6 | the row |
 |---|---|---|
-| not 0 | 0 or 1 | sets the period to the column's value |
-| 0 | 0 | does not set the period, and R11 and R12 are not written |
-| 0 | 1 | sets the period to 0 |
+| not 0 | 0 or 1 | sets R11 to the column's value |
+| 0 | 0 | does not set it, and R11 is not written |
+| 0 | 1 | sets R11 to 0 |
 
-This column has no set bit. The divider fills the word and leaves no bit
-beside it, so a reserved value does that work: a player reads the word and
-writes where it is not zero, which costs the same test as a bit would.
+Column 12 and bit 5 read the same way for R12.
+
+Neither column has a set bit. The divider fills both bytes and leaves no
+bit beside them, so a reserved value does that work: a player reads the
+byte and writes where it is not zero, which costs the same test as a bit
+would.
 
 **What 0 sounds like.** The envelope's rate is 2,000,000 divided by 256
 times the period, so period 1 sounds at 7,812.5 Hz, the fastest sweep the
@@ -134,50 +178,61 @@ generator has. The divider treats 0 as 1, so 0 sounds at 7,812.5 Hz as
 well. The two values are one pitch, which makes 0 the value to reserve: a
 tune that needs the pitch writes 1 and loses nothing.
 
-**Why bit 6 exists anyway.** Period 0 is a state the chip can hold, and a
-tune converted from a register dump should convert without approximation.
-Bit 6 keeps the case reachable at the cost of one bit that is 1 in almost
-no row: across the 543 tunes, 211 frames of 3,789,212 hold period 0 with a
-voice taking its level from the envelope, in 8 tunes.
+**Why the bits exist anyway.** Period 0 is a state the chip can hold, and
+a tune converted from a register dump should convert without
+approximation. The two bits keep it reachable, and every period with a
+zero byte with it: 1 to 255 have a zero coarse byte, 256 and its multiples
+a zero fine byte. Period 0 itself is sounded in almost no row: across the
+543 tunes, 211 frames of 3,789,212 hold it with a voice taking its level
+from the envelope, in 8 tunes.
 
 **What the corpus says about the reserved value.** 2,312,208 of the
 corpus's frames hold period 0, and all but the 211 above hold it with no
 voice following the envelope. There the registers are untouched, which is
-what "the row does not set this column" says, so the reserved value and the
-common case agree.
+what "the row does not set these columns" says, so the reserved value and
+the common case agree.
 
-**Why the bit is not the whole answer.** Two bits qualifying the period
-here, saying not set against set against zero, would move whenever the
-period moved between set and unset: 60,973 changes on a column that has
-24,099 of its own. Bit 6 moves only when a tune sounds period 0, which is
-211 frames. `ym/measure.py` reads all four figures back.
+**Why the bits are not the whole answer.** A set bit for a period byte
+held here, saying not set against set, would move whenever the byte moved
+between set and unset. Measured with the period as one column of two
+bytes, that is 60,973 changes on a column that has 24,099 of its own. A
+bit beside moves only where a row sets a byte to 0. `ym/measure.py` reads
+the figures back, over the period as one column.
 
 ### 1.8 Effect
 
-| bits | gives |
-|---|---|
-| 15 | the set bit |
-| 14 to 8 | the target, 0 to 127, an index into 2.1's procedures |
-| 7 to 0 | the source, 0 to 255, an index into the tune's source index (3.1) |
+Two columns: the target, and the source.
 
-The column is the connection: a source, a target, and the timer this
-effect runs on (2.3). A row setting it connects the three, and the rate
-column beside it says how fast the timer turns them (1.9). Source 0 names
-no source, and a row setting it stops what the timer ran.
+The target column: bit 7 is the set bit, and bits 6 to 0 give the target,
+0 to 127, an index into 2.1's procedures.
 
-The first byte holds the set bit and the target, the second the source
-whole.
+The source column: bit 7 is the set bit, and bits 6 to 0 give the source,
+0 to 127, an index into the tune's source index (3.1). Source 0 names no
+source.
 
-Nothing else is in this column. A source's values are its own rows (2.2),
-so a level or a shape is a source rather than an operand, and two levels
-are two sources.
+The two columns and the timer this effect runs on (2.3) are the
+connection. A row setting the source column connects the three: the timer
+runs the source it names on the target the player holds for this effect,
+at the rate the two columns beside them give (1.9). The row places the
+source at its first row and starts a stopped timer through bits 5 and 6
+of the control column (1.9, section 6). A row setting source 0 stops the
+timer.
 
-A row sets this column to start what it names. A row that starts the same
-effect a second time sets the value it already held, which is what R3.6
-allows.
+The target the player holds is the one the row's target column gives, or
+where the row leaves that column unset, the last one it took (R4.6). A
+row setting the target column alone changes nothing until a source
+starts.
 
-A player resolves both bytes when a source starts, and not again while it
-runs.
+Nothing else is in these columns. A source's values are its own rows
+(2.2), so a level or a shape is a source rather than an operand, and two
+levels are two sources.
+
+A row may set the source column to the value it already holds, which is
+what R3.6 allows: the source is resolved again, and bit 5 places it at
+its first row as on any start.
+
+A player resolves the source and the target when the source column is
+set, and not again while the source runs.
 
 A timer runs one effect, and holds one at a time. The schema has four
 effects and the MFP has four timers, so four sound at once and there is no
@@ -189,36 +244,62 @@ timers runs its own effect.
 
 ### 1.9 Effect rate
 
+Two columns, one a register of the timer this effect runs on (2.3): the
+control column and the count column. Each is laid out as its register is,
+so a player masks its own bits off and writes the rest.
+
+The count column is the timer count, bits 7 to 0, the byte the timer's
+data register takes. It fills its byte, so 0 says the row does not set
+it. The MFP reads a count of 0 as 256, and the schema does not reach that
+count; a later version may assign a bit for it (R6.2).
+
+The control column:
+
 | bits | gives |
 |---|---|
-| 15 | the set bit |
-| 14 | how the timer takes the rate |
-| 10 to 8 | the prescaler: 0 for 4, 1 for 10, 2 for 16, 3 for 50, 4 for 64, 5 for 100, 6 for 200 |
-| 7 to 0 | the count, 0 read as 256 |
+| 7 | the set bit |
+| 6 | the timer's reset: the player stops it, writes the count and starts it |
+| 5 | the place's reset: the timer's place in its source returns to the first row, which the next tick takes |
+| 4, 3 | zero: the register's own bits, which pick an output's reset and modes no tune uses |
+| 2 to 0 | the prescaler select as the register takes it: 1 for 4, 2 for 10, 3 for 16, 4 for 50, 5 for 64, 6 for 100, 7 for 200 |
 
-The first byte holds the set bit, the rate's manner and the prescaler; the
-second holds the count whole.
+Bits 4 to 0 are the register's, and a player writes them as the column
+holds them; bits 7 to 5 are the player's, part of the column's value and
+read where the row sets it. Select 0 stops a timer, which a row does
+through the source column (1.8), so 0 is unassigned here (R6.2).
+
+Timers C and D share a control register, C in bits 6 to 4 and D in bits 2
+to 0. The player moves Timer C's select up by four, and writes its
+timer's three bits leaving the other timer's as they are, as the frame's
+write to R7 leaves the host's two (section 4).
 
 The rate is 2,457,600 divided by the prescaler times the count.
 
-Each rate column belongs to one effect, and 2.3 fixes the timer that effect
-runs on, so the control and data registers a rate reaches are settled
-before a tune plays (R3.5).
+Each rate column belongs to one effect, and 2.3 fixes the timer that
+effect runs on, so the two registers a rate reaches are settled before a
+tune plays (R3.5).
 
-Bit 14 says what a player does with a rate this column gives while an
-effect already runs. At 0 the player writes the count, and the running
-period ends at the length it began with, which moves the pitch without a
-break. At 1 the player stops the timer, writes the rate and starts it, so
-the period begins again and the source begins its cycle. A note that bends
-takes 0 and a note that is struck takes 1.
+A player writes each column where the row sets it (section 4): the count
+to the data register, the select to the control register, and the timer
+runs on. A count written while the timer runs is taken when the running
+count reaches zero, which moves the pitch without a break; a select
+written while it runs changes the prescaler under the running count.
 
-A row restarts an effect by setting its effect column, not this one. A row
-that leaves this column unset leaves the timer running at the rate it has.
+Bit 6 puts a stop before those writes and a start after them: the player
+writes select 0, then the count, then the select, so the timer begins a
+whole period at the count. The count and the select it writes are the
+row's, or where the row leaves a column unset, the ones the player keeps
+(R4.6). A stopped timer is started this way, on the row that starts its
+effect (section 6).
 
-A start reads the rate the player last took for that timer, which the
-player keeps (R4.6).
+Bit 5 returns the timer's place in its source to the first row, and the
+next tick takes it. Without the bit the source runs on from where it is,
+through a change of rate. A note that bends sets the count column; a note
+that is struck sets bits 6 and 5 with it; a drum struck again at the rate
+it has sets bit 5 alone.
 
-Bits 13, 12 and 11, and prescaler code 7, are unassigned (R6.2).
+A row that leaves a rate column unset leaves the timer running at the
+rate it has.
 
 ---
 
@@ -250,16 +331,16 @@ A later version may name procedures that reach the MFP's own registers
 
 ### 2.2 The sources
 
-A source is a table: `R` rows and `C` columns, a column 1, 2 or 4 bytes
-wide, and a row `RR` it repeats to once the last row is done. That is the
+A source is a table: `R` rows and `C` columns, every value `W` bytes, 1, 2
+or 4, and a row `RR` it repeats to once the last row is done. That is the
 shape DTX's own table has (R1.1), one layer down. At every tick the source
 advances one row, and its target takes that row.
 
-Typically a source is one column, one byte wide, which is what 2.1's
-procedures take. A wider column serves a procedure taking more than a byte,
-a tone period being twelve bits, and more columns serve a source driving
-more than one target. How an entry describes either is not yet written
-(section 7).
+Typically a source is one column of one byte, which is what 2.1's
+procedures take. A source of two byte values serves a procedure taking a
+word, a tone period being twelve bits, and more columns serve a source
+driving more than one target. How an entry describes either is not yet
+written (section 7).
 
 A tune holds its sources and an index of them (3.1), and an effect column
 names one. Source 0 names none.
@@ -312,8 +393,8 @@ claim by reading ahead. That is why the effects a tune runs are stated here.
 
 ### 3.1 The source index
 
-An effect column's source byte gives a source number, and the entry at
-that number gives where its rows are, how many, and what the last one
+An effect's source column gives a source number, 1 to 127, and the entry
+at that number gives where its rows are, how many, and what the last one
 does:
 
 | offset | bytes | gives |
@@ -323,8 +404,8 @@ does:
 | 6 | 2 | bit 15 the repeat; bits 14 to 0 `RR`, the row it repeats to |
 
 An entry is a source's metadata: the `R` and `RR` a table's metadata gives
-(R1.1), with `C` and the column width the typical ones until section 7
-says how an entry gives others.
+(R1.1), with `C` and `W` the typical ones until section 7 says how an
+entry gives others.
 
 Source 0 has no entry. The index runs from source 1.
 
@@ -363,26 +444,34 @@ timer advances a source and calls its target, which writes one register
 They differ in the table, the clock and the procedure, and in nothing
 else. A source has the DTX table's shape - `R` rows, `C` columns, a repeat
 at `RR` (2.2, R1.1) - and a target does what the procedure below does, for
-one register rather than twenty-two columns.
+one register rather than thirty columns.
 
 A player advances the tune's table one row a frame, for every table the
 tune runs, and writes the columns that row sets (1.1). A value the row does
 not set is not interpreted, and a player that needs one on a later row
-keeps it (R4.6) rather than looking for it in the buffer. Bit 6 of column 8
-is beside its column's value, and read on every row (1.1).
+keeps it (R4.6) rather than looking for it in the buffer. The five bits
+1.1 lists are beside their columns' values, and read on every row.
 
 The effects go first, then the registers.
 
-1. Columns 11, 13, 15 and 17, the rates, each to the timer its effect runs
-   on.
-2. Columns 10, 12, 14 and 16, the effects. A source of 0 stops what the
-   timer ran. Any other source stops it and starts what the column gives.
-3. Columns 0, 2 and 4, the tone periods, to R0 to R5.
-4. Column 7 to R6, and column 9 to R11 and R12, as 1.7's table reads it.
-5. Columns 1, 3 and 5, the volumes, to R8, R9 and R10.
-6. Column 6 to R7. The player writes bits 5 to 0 of the column with R7's
+1. Columns 14, 18, 22 and 26, the targets. The player keeps the value for
+   the effect's next start, and writes nothing.
+2. Columns 15, 19, 23 and 27, the sources, each on its timer (2.3). A
+   source of 0 stops the timer: select 0 to its control register. Any
+   other is resolved through the index (3.1) on the target the player
+   keeps, and is what the timer's ticks advance from here on.
+3. Columns 16, 20, 24 and 28, the controls, each with the count column
+   beside it, to its timer's two registers as 1.9 gives: with bit 6,
+   select 0 first; then the count, where the row sets it or bit 6 is set;
+   then the select, where the row sets it or bit 6 is set; and the
+   timer's place to its source's first row where bit 5 is set.
+4. Columns 0 to 5, the tone periods, to R0 to R5.
+5. Column 6 to R6, and columns 11 and 12 to R11 and R12, as 1.7's table
+   reads them.
+6. Columns 8, 9 and 10, the volumes, to R8, R9 and R10.
+7. Column 7 to R7. The player writes bits 5 to 0 of the column with R7's
    bits 7 and 6 as the host holds them, which it does not change.
-7. Column 8 to R13. Any write to R13 restarts the envelope.
+8. Column 13 to R13. Any write to R13 restarts the envelope.
 
 The effects stop before the registers are written, and that order is what
 makes a restore hold. The row that stops an effect sets its register's
@@ -391,9 +480,9 @@ still running would write over it. A start needs no such order, because
 the row that starts an effect leaves that register's column unset
 (section 6).
 
-Steps 3 to 7 write where the row sets, each to registers the column itself
-fixes, and none of them reads an index. One test crosses columns: a zero
-in column 9 sends the player to bit 6 of column 8 (1.7). Step 2 is the
+Steps 4 to 8 write where the row sets, each to registers the column itself
+fixes, and none of them reads an index. Five tests cross columns: a zero
+in a column 1.1 lists sends the player to the bit beside it. Step 2 is the
 only step that reads the source index, and it reads it to start an effect,
 not to place a value.
 
@@ -418,19 +507,25 @@ These rules bind the writer. They are why a player writes a marked column
 once and tests nothing.
 
 1. While an effect owns a register, a row leaves that register's column
-   unset. A player writing steps 3 to 7 then needs no test: the row does
+   unset. A player writing steps 4 to 8 then needs no test: the row does
    not set the column.
 2. An effect a row starts is one the tune states in section 3.
 3. A source and a target a column names are ones section 2 defines.
 4. Where two timers name one register, their writes are the writer's to
    order. A player writes what each tick gives it.
+5. A row that sets the source column to a source sets bit 5 of the
+   control column with it, and bit 6 where the timer is stopped (1.9).
+   The place goes to the first row and the timer starts for those bits
+   alone.
+6. A row sets a rate column (1.9) on the row that starts its effect, or
+   while the effect runs. A select written to a timer with no effect on it
+   starts the timer with nothing to run.
 
 ---
 
 ## 7. Not yet written
 
-How many sources a tune may hold, and where in a tune the index and the
-rows are placed.
+Where in a tune the index and the rows are placed.
 
 Where a tune states the version it was written for, and what a player does
 with a version it was not built for (R6.1).
@@ -439,7 +534,7 @@ What follows the last row of a source that does not repeat: whether the
 timer stops, and what the register then holds. The entry ends the rows
 (3.1), and no rule ends the effect but a row of the DTX table.
 
-How an entry describes a source of more than one column, or of a column
-wider than a byte (2.2).
+How an entry describes a source of more than one column, or of a width
+other than a byte (2.2).
 
 What a reader reports.

@@ -40,18 +40,18 @@ final class ConsistencyTest {
         return Files.readString(p);
     }
 
-    /** The rows of the column table, as (index count, bytes) pairs. */
-    private static List<int[]> columnTable(String spec) {
-        int at = spec.indexOf("| column | bytes | holds |");
+    /** The rows of the column table: first index, last index, what it holds. */
+    private static List<Object[]> columnTable(String spec) {
+        int at = spec.indexOf("| column | holds |");
         assertTrue(at >= 0, "SPEC.md has no column table");
         String block = spec.substring(at, spec.indexOf("\n\n", at));
-        Matcher m = Pattern.compile("^\\| (\\d+)(?: to (\\d+))? \\| (\\d+) \\|",
+        Matcher m = Pattern.compile("^\\| (\\d+)(?: to (\\d+))? \\| ([^|]+) \\|$",
                 Pattern.MULTILINE).matcher(block);
-        List<int[]> rows = new ArrayList<>();
+        List<Object[]> rows = new ArrayList<>();
         while (m.find()) {
             int first = Integer.parseInt(m.group(1));
             int last = m.group(2) == null ? first : Integer.parseInt(m.group(2));
-            rows.add(new int[] {first, last, Integer.parseInt(m.group(3))});
+            rows.add(new Object[] {first, last, m.group(3).trim()});
         }
         return rows;
     }
@@ -59,33 +59,39 @@ final class ConsistencyTest {
     @Test
     void theColumnTableAddsUpToWhatTheProseClaims() throws IOException {
         String spec = read(SPEC);
-        List<int[]> rows = columnTable(spec);
+        List<Object[]> rows = columnTable(spec);
         int columns = 0;
-        int bytes = 0;
         int next = 0;
         List<String> gaps = new ArrayList<>();
-        for (int[] r : rows) {
-            if (r[0] != next) {
-                gaps.add("column " + next + " is where " + r[0] + " stands");
+        List<String> astray = new ArrayList<>();
+        for (Object[] r : rows) {
+            int first = (Integer) r[0];
+            int last = (Integer) r[1];
+            if (first != next) {
+                gaps.add("column " + next + " is where " + first + " stands");
             }
-            next = r[1] + 1;
-            columns += r[1] - r[0] + 1;
-            bytes += r[2];
+            // columns 0 to 13 reach R0 to R13, one a register
+            if (first <= 13 && !((String) r[2]).startsWith("R" + first + ",")) {
+                astray.add("column " + first + " holds " + r[2]);
+            }
+            next = last + 1;
+            columns += last - first + 1;
         }
         assertTrue(gaps.isEmpty(), () -> "the column indices break: " + gaps);
+        assertTrue(astray.isEmpty(), () -> "a register column is not its"
+                + " register: " + astray);
 
-        Matcher m = Pattern.compile(
-                "(\\d+) columns of the 32 R\\d+\\.\\d+ allows, and (\\d+) bytes")
-                .matcher(spec);
+        // the claim wraps where it wraps, so every space may be a line break
+        String claim = "(\\d+) columns of the 32 R\\d+\\.\\d+ allows, each one"
+                + " byte, so a row is (\\d+) bytes";
+        Matcher m = Pattern.compile(claim.replace(" ", "\\s+")).matcher(spec);
         assertTrue(m.find(), "SPEC.md does not state its column and byte count");
         int saidColumns = Integer.parseInt(m.group(1));
         int saidBytes = Integer.parseInt(m.group(2));
         int c = columns;
-        int b = bytes;
-        assertTrue(saidColumns == c && saidBytes == b,
-                () -> "the table holds " + c + " columns and " + b
-                        + " bytes; the prose says " + saidColumns + " and "
-                        + saidBytes);
+        assertTrue(saidColumns == c && saidBytes == c,
+                () -> "the table holds " + c + " columns of one byte; the prose"
+                        + " says " + saidColumns + " and " + saidBytes);
     }
 
     @Test

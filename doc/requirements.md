@@ -48,12 +48,12 @@ repository.
 
 ## R1. What DTX gives
 
-DTX's specification defines these. They are recorded here because YMXR is
-written against them, and they change in that repository rather than this
-one.
+DTX's specification defines these, and 0.4.0 is the release this
+repository reads them from. They are recorded here because YMXR is written
+against them, and they change in that repository rather than this one.
 
-- **R1.1** A tune's data is a table: `R` rows and `C` columns, a column 1,
-  2 or 4 bytes wide, and a row `RR` it repeats to once the last row is
+- **R1.1** A tune's data is a table: `R` rows and `C` columns, every value
+  `W` bytes, 1, 2 or 4, and a row `RR` it repeats to once the last row is
   done. Those four are its metadata.
 - **R1.2** How the table is laid out, row by row or column by column, and
   how a row is read from it, are the format's and stated in that
@@ -84,14 +84,16 @@ one.
 - **R3.3** A player works nothing out while a tune plays. Every choice is
   compiled into the data, which costs columns, and a column is cheap.
 - **R3.4** At most 32 columns.
-- **R3.5** A column holds one value. A register's value comes from one
-  column, a column names its own target, and a value of 2 or 4 bytes is
-  one thing: a period's two halves, or a timer's prescaler and count.
+- **R3.5** A column holds one value, and every column is one byte: a
+  table's values take one width (R1.1), and a byte is what a register
+  takes. A register's value comes from one column, a column names its own
+  target, and a value wider than a byte is a column a byte: a period's two
+  halves, a timer's prescaler and its count.
 - **R3.6** Most columns carry a set bit, their top bit: 1 sets the value,
   0 does not, and a value not set is not read - its bits may hold
-  anything. Some columns carry a bit for another column, to save a byte,
-  and such a bit is read on every row. A row may set a value the register
-  already holds: the bit marks what to take, not what changed.
+  anything. Some columns carry a bit for another column, and such a bit
+  is read on every row. A row may set a value the register already holds:
+  the bit marks what to take, not what changed.
 - **R3.7** Each column holds its own bit. One column holding all of them
   would move for every reason any column moves, where a bit beside its own
   value moves with that value and packs with it. A column whose value fills
