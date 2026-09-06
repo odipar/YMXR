@@ -56,15 +56,15 @@ final class ConformanceTest {
             Fixture.of("chambers", "Chambers of Shaolin 5 - you blew it!.ym", "",
                     "no effect; R13 once, with both envelope-period-0 bits beside it; a YM6 dump"),
             Fixture.of("circus", "Circus Attractions  2.ym", "",
-                    "four frames padded to ninety: rows that set nothing; a YM5 dump"),
+                    "four frames, fewer than a period; a YM5 dump"),
             Fixture.of("plays-once", "Circus Attractions  2.ym", "-r",
-                    "a table of one period whose RR is R: the frame after the last row reports -1"),
+                    "four frames whose RR is R: the frame after the last row reports -1"),
             Fixture.of("turrican", "Turrican - world 4-3.ym", "",
-                    "three drums on Timer D, each ending by its marker; RR at 180 with twenty silent rows before it; R13 restated"),
+                    "three drums on Timer D, each ending by its marker; RR at 160, a loop longer than the ring replayed at its exact rows; R13 restated"),
             Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "",
-                    "a loop of one row padded to ninety, touching no effect; six drums before it, the last stopped by a row"),
+                    "a loop of one row, RR at 177, odd, so the table packs at unit 1; six drums before it, the last stopped by a row"),
             Fixture.of("synergy", "Synergy Credits.ym", "",
-                    "nine SIDs on Timers A and D at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it"),
+                    "nine SIDs on Timers A and D at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so the table packs at unit 1"),
             Fixture.of("preempt", "Digidrum preempt, built.ym", "",
                     "a drum starting on the voice a SID runs on stops the SID first, and the SID starts again when the drum ends; R8 passed between them with its column unset"),
             Fixture.of("retune", "Retrigger retune, built.ym", "",
@@ -85,7 +85,7 @@ final class ConformanceTest {
             byte[] file = it.file().clone();
             file[4] = 0;
             file[5] = 2;
-            return new Tune.Written(file, it.repeat(), it.before(), it.after());
+            return new Tune.Written(file, it.repeat());
         } catch (IOException failed) {
             throw new IllegalStateException(failed);
         }

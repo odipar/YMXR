@@ -13,31 +13,29 @@ bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r]
 
 | flag | gives |
 |---|---|
-| `-kK` | the unit the table packs at, 2 by default |
+| `-kK` | the unit the table packs at, 2 by default, and 1 where the repeat row or the row count does not divide by it |
 | `-mN` | the ring a column unpacks through, in bytes, 960 by default and at most 1129: the player reaches column 29 through a 16-bit displacement |
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
 
 The first file is unpacked where it is an LHA archive, as distributed
 `.ym` files are. The tool prints the frames, the sources, the effects
 run, the repeat row and the bytes written, then its notes: effects
-dropped, rows padded, and a ring other than the one asked for.
+dropped, a unit other than the one asked for, and a ring other than the
+one asked for.
 
-A table packs at unit 2: unit 1 packs the corpus to 0.69 bytes a frame
-against 0.81, and costs the play call about a seventh more on average
-(performance.md), and `-k1` asks for it. A table that repeats packs at a
-period of thirty rows, the column count and the smallest DTX allows,
-since a refill decodes a period's rows of one column at once and the
-period is what a refill costs (performance.md).
-DTX asks that the repeat row and the loop's rows divide by the period, so
-silent rows pad the repeat row up to a multiple of thirty and the loop
-up to a multiple of thirty of three periods or more, and the tool says
-how many. A tune that plays once is padded to thirty rows at least and
-to a multiple of the unit, since DTX asks that a column's bytes divide
-by it. The ring is shorter than the loop, so that the loop is
-replayed at the wrap: a loop the ring holds is read wrong past the wrap
-by DTX 0.4.0's reader, which `68k/test/emu/test_ymxr.py` found. DTX
-0.5.0's reader reads such a loop right, and the rule stays until the
-converter is measured without it.
+The table is the dump's frames row for row: the row it repeats to is
+the dump's loop frame, its rows are the dump's, and no row is added
+anywhere. A table packs at unit 2: unit 1 packs the corpus to 0.69 bytes
+a frame against 0.81, and costs the play call about a seventh more on
+average (performance.md), and `-k1` asks for it. A column's bytes and
+its loop begin on a unit (DTX's R5.6 and R5.11), so a tune whose row
+count or repeat row is odd packs at unit 1, which the tool notes. The
+table packs at a period of thirty rows, the column count and the
+smallest DTX allows, since a refill decodes a period's rows of one
+column at once and the period is what a refill costs (performance.md);
+the ring is the multiple of thirty nearest the one asked for, at least
+sixty and at most 1,110. A loop longer than the ring is replayed at its
+exact rows by DTX's reader, at any period.
 
 What the converter does with a dump's effects: a SID voice is a source of two
 rows, its level and 0; a sync buzzer one row, its shape; a digidrum the
@@ -50,8 +48,9 @@ lands on a known state. `ConversionTest` replays every tune under `ym/test`
 against its dump.
 
 The tool runs out of `target/classes`, and builds first where a source or
-the pom is newer than the last build. Java 23 and Maven, and DTX 0.5.0 in
-the local Maven repository: `mvn install` at DTX's `v0.5.0` tag, whose
+the pom is newer than the last build. Java 23 and Maven, and DTX
+0.6-SNAPSHOT in the local Maven repository: `mvn install` on DTX's main
+past the reader that turns a replayed pass at its exact row, whose
 reader this player's frame figures (performance.md) are measured
 against.
 

@@ -1,7 +1,7 @@
 # conformance
 
 The kit is 11 tunes, and what a reader of SPEC.md reports of each:
-18,851 entries between them, a line of record each. It exists to test
+18,276 entries between them, a line of record each. It exists to test
 [SPEC.md](../SPEC.md) rather than the code: hand it to someone who has
 never seen this repository, and see whether the document alone is enough
 to read the tunes.
@@ -56,11 +56,11 @@ No run has been measured yet.
 | tune | what it reaches |
 |---|---|
 | `chambers` | no effect; R13 written once, with both envelope-period-0 bits beside it |
-| `circus` | four frames padded to ninety: rows that set nothing |
-| `plays-once` | a table whose `RR` is `R`: the frame after the last row reports -1 |
-| `turrican` | three drums on Timer D, each ending by its marker; `RR` at 180 with silent rows before it; R13 restated |
-| `turrican-2` | a loop of one row padded to ninety, touching no effect; six drums before it, the last stopped by a row |
-| `synergy` | nine SIDs on two timers at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it |
+| `circus` | four frames, fewer than a period |
+| `plays-once` | four frames whose `RR` is `R`: the frame after the last row reports -1 |
+| `turrican` | three drums on Timer D, each ending by its marker; `RR` at 160, a loop longer than the ring replayed at its exact rows; R13 restated |
+| `turrican-2` | a loop of one row from an odd `RR`, so the table packs at unit 1; six drums before it, the last stopped by a row |
+| `synergy` | nine SIDs on two timers at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; an odd row count, so the table packs at unit 1 |
 | `preempt` | a drum starting on the voice a SID runs on stops the SID first; R8 passed between them with its column unset, written by ticks alone |
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |
 | `fine-zero` | a tone fine byte moving to 0 on each voice, with and without the coarse set bit |

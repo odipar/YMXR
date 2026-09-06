@@ -35,8 +35,7 @@ final class Check {
      * What is wrong with the dump's conversion at the tool's flags, or
      * nothing where every frame replays to the dump: the tune's rows are
      * stepped through one pass and the loop once, as the kit's record runs
-     * (SPEC.md 7), a row of the dump's held to its frame and a silent row
-     * to nothing set.
+     * (SPEC.md 7), each row held to its frame of the dump.
      */
     static List<String> of(YmDump.Song song, List<String> flags) {
         List<String> wrong = new ArrayList<>();
@@ -49,7 +48,7 @@ final class Check {
         if (tune.frameRate() != song.playerHz()) {
             wrong.add("the frame rate is " + tune.frameRate() + ", not " + song.playerHz());
         }
-        int rows = song.frames() + written.before() + written.after();
+        int rows = song.frames();
         if (tune.table().rows() != rows) {
             wrong.add("the table has " + tune.table().rows() + " rows, not " + rows);
         }
@@ -81,12 +80,6 @@ final class Check {
         if (!wrong.isEmpty()) {
             return wrong;
         }
-        // the dump's frame each row holds, and -1 for a silent row
-        int[] frameOf = new int[rows];
-        java.util.Arrays.fill(frameOf, -1);
-        for (int f = 0; f < song.frames(); f++) {
-            frameOf[f < repeat ? f : f + written.before()] = f;
-        }
         Replay model = new Replay(tune.table());
         int[] drumEnd = {-1, -1};
         int calls = Trace.calls(tune.table());
@@ -96,20 +89,7 @@ final class Check {
                 break;                              // a tune that plays once has played
             }
             model.step();
-            int f = frameOf[r];
-            if (f < 0) {
-                for (int c = 0; c < 14; c++) {
-                    if (model.written[c] >= 0) {
-                        wrong.add("row " + r + ": a silent row writes R" + c);
-                    }
-                }
-                for (int i = 0; i < 4; i++) {
-                    if (model.effect[i].touched()) {
-                        wrong.add("row " + r + ": a silent row sets effect " + i);
-                    }
-                }
-                continue;
-            }
+            int f = r;
             int[] dump = Columns.registers(song, f);
             Effects.Slot[] slots = Effects.of(song, f);
             int owned = 0;

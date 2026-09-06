@@ -41,15 +41,15 @@ and what a reader does with one that does is checked by nothing here.
 
 | file | lines to produce |
 |---|---:|
-| `chambers.ymxr` | 1,021 |
-| `circus.ymxr` | 181 |
-| `plays-once.ymxr` | 32 |
-| `turrican.ymxr` | 3,721 |
-| `turrican-2.ymxr` | 361 |
-| `synergy.ymxr` | 10,801 |
-| `preempt.ymxr` | 841 |
+| `chambers.ymxr` | 1,001 |
+| `circus.ymxr` | 9 |
+| `plays-once.ymxr` | 6 |
+| `turrican.ymxr` | 3,681 |
+| `turrican-2.ymxr` | 180 |
+| `synergy.ymxr` | 10,755 |
+| `preempt.ymxr` | 801 |
 | `retune.ymxr` | 1,201 |
-| `fine-zero.ymxr` | 481 |
+| `fine-zero.ymxr` | 431 |
 | `four-timers.ymxr` | 211 |
 | `wrong-version.ymxr` | 0 |
 
