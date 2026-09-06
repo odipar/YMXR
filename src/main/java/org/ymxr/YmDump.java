@@ -62,6 +62,15 @@ public final class YmDump {
         this.data = data;
     }
 
+    /** Whether {@code data}, unpacked, opens as a YM5! or YM6! dump. */
+    static boolean isDump(byte[] data) {
+        if (data.length < 4) {
+            return false;
+        }
+        String format = new String(data, 0, 4, java.nio.charset.StandardCharsets.ISO_8859_1);
+        return format.equals("YM5!") || format.equals("YM6!");
+    }
+
     public static Song read(byte[] data) {
         if (Lha.isArchive(data)) {
             try {
