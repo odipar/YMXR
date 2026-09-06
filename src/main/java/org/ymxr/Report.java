@@ -8,6 +8,9 @@ final class Report {
 
     private final List<String> notes = new ArrayList<>();
 
+    /** Frames on which a drum on a voice kept a SID there from running. */
+    int preempted;
+
     int sinus;
     int missingDrums;
     int overflow;
@@ -33,6 +36,9 @@ final class Report {
         }
         if (cutAtRepeat > 0) {
             out.add(cutAtRepeat + " digidrums stopped at the row the tune repeats to");
+        }
+        if (preempted > 0) {
+            out.add(preempted + " frames on which a drum kept a SID from running on its voice");
         }
         return out;
     }

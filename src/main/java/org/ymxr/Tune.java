@@ -53,11 +53,9 @@ final class Tune {
      *  displacement. */
     static final int MAX_RING = 32767 / (Columns.C - 1);
 
-    /** A tune file written, and the rows it holds beyond the dump's frames:
-     *  {@code before} silent rows put in ahead of the row the tune repeats
-     *  to, and {@code after} appended, where DTX's period or its unit asked
-     *  for them. */
-    record Written(byte[] file, int repeat, int before, int after) {
+    /** A tune file written: the file, and the row it repeats to, `R` where
+     *  it plays once. */
+    record Written(byte[] file, int repeat) {
     }
 
     private Tune() {
@@ -66,50 +64,31 @@ final class Tune {
     /** The file: its table packed at `unit` through a ring of `ring` bytes,
      *  packaged with DTX's reader.
      *
-     *  <p>A DTX2 image refills one column a row, `P` bytes of it at once
-     *  over a period `P` of at least `C` rows, so the period is what a
-     *  refill costs. A table that repeats over more rows than the ring
-     *  holds is replayed at the wrap, and DTX asks that its repeat row and
-     *  its loop's rows divide by `P`; a loop the ring holds is looped in
-     *  the ring instead, which DTX 0.4.0's reader gets wrong past the
-     *  wrap. So a table that repeats packs at a period of `C`, the
-     *  smallest, with silent rows padding the repeat row and the loop up to
-     *  multiples of `C`, the loop to three periods at least, and at a ring
-     *  shorter than the loop, the multiple of `C` nearest the one asked
-     *  for. A table that plays once takes `C` rows at least, and a
-     *  multiple of the unit, since a column's bytes divide by it (DTX's
-     *  R5.6). */
+     *  <p>The table is the dump's frames row for row, the row it repeats
+     *  to the dump's loop frame, and no row is added anywhere. A column's
+     *  bytes and its loop begin on a unit (DTX's R5.6 and R5.11), so a
+     *  tune whose row count or repeat row does not divide by the unit
+     *  asked for packs at unit 1. The table packs at a period of `C`
+     *  rows, the smallest DTX allows, since a refill decodes a period's
+     *  rows of one column at once and the period is what a refill costs;
+     *  the ring is a multiple of `C` for that, the one nearest what was
+     *  asked for within what the player reaches. A loop longer than the
+     *  ring is replayed at its exact rows by DTX's reader. */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          Report report) {
         int frames = columns.column[0].length;
         int repeat = columns.repeat;
-        int before = 0;
-        int after = Math.max(0, Columns.C - frames);
-        int at = ring;
-        if (repeat < frames) {
-            before = (Columns.C - repeat % Columns.C) % Columns.C;
-            int loop = frames + after - repeat;
-            after += (Columns.C - loop % Columns.C) % Columns.C;
-            after += Math.max(0, 3 * Columns.C - (frames + after - repeat));
-            at = ringFor(frames + after - repeat, ring);
-        } else {
-            after += (unit - (frames + after) % unit) % unit;
+        if (unit > 1 && (frames % unit != 0 || (repeat < frames && repeat % unit != 0))) {
+            report.note("packed at unit 1: " + (frames % unit != 0 ? "the row count " + frames
+                    : "the repeat row " + repeat) + " does not divide by " + unit);
+            unit = 1;
         }
-        byte[] image = image(columns.column, frames, repeat, before, after, unit, at);
-        if (repeat < frames && (before > 0 || after > 0)) {
-            report.note(before + " silent rows before the repeat row and " + after
-                    + " after the last, so that a period of " + Columns.C + " divides the loop");
-        } else if (after > 0) {
-            int toC = Math.max(0, Columns.C - frames);
-            String why = toC == 0 ? "divide by the unit of " + unit
-                    : after == toC ? "reach " + Columns.C
-                    : "reach " + Columns.C + " and divide by the unit of " + unit;
-            report.note(after + " silent " + (after == 1 ? "row" : "rows")
-                    + " after the last, so that the rows " + why);
-        }
+        int at = ringOf(ring);
         if (at != ring) {
-            report.note("the ring is " + at + " bytes: a multiple of the period, under the loop");
+            report.note("the ring is " + at + " bytes: a multiple of the period within the"
+                    + " player's reach");
         }
+        byte[] image = image(columns.column, frames, repeat, unit, at);
         List<Sources.Source> all = sources.all();
         byte[][] tables = new byte[all.size()][];
         for (int i = 0; i < tables.length; i++) {
@@ -140,30 +119,21 @@ final class Tune {
         for (int i = 0; i < tables.length; i++) {
             System.arraycopy(tables[i], 0, file, sourceAt[i], tables[i].length);
         }
-        return new Written(file, repeat < frames ? repeat + before : frames + before + after,
-                before, after);
+        return new Written(file, repeat < frames ? repeat : frames);
     }
 
-    /** The image of the columns with the pads in, packed and packaged. */
-    private static byte[] image(byte[][] column, int frames, int repeat, int before, int after,
-                                int unit, int ring) {
-        int rows = frames + before + after;
-        byte[][] padded = new byte[Columns.C][rows];
-        for (int c = 0; c < Columns.C; c++) {
-            System.arraycopy(column[c], 0, padded[c], 0, repeat);
-            System.arraycopy(column[c], repeat, padded[c], repeat + before, frames - repeat);
-        }
-        int rr = repeat < frames ? repeat + before : rows;
-        Table table = Table.of(rows, rr, 1, padded);
+    /** The image of the columns, packed and packaged. */
+    private static byte[] image(byte[][] column, int frames, int repeat, int unit, int ring) {
+        int rr = repeat < frames ? repeat : frames;
+        Table table = Table.of(frames, rr, 1, column);
         return Packager.image(Dtx2.write(table, new St4(), unit, ring));
     }
 
-    /** The ring for a loop of `loop` rows, a multiple of `C`: the multiple
-     *  of `C` nearest `ring`, at least two periods and under the loop. */
-    static int ringFor(int loop, int ring) {
-        int most = Math.min(MAX_RING, loop - 1) / Columns.C * Columns.C;
+    /** The ring the table packs through: the multiple of `C` nearest `ring`,
+     *  at least two periods and at most what the player reaches. */
+    static int ringOf(int ring) {
         int nearest = Math.round((float) ring / Columns.C) * Columns.C;
-        return Math.max(2 * Columns.C, Math.min(most, nearest));
+        return Math.max(2 * Columns.C, Math.min(MAX_RING / Columns.C * Columns.C, nearest));
     }
 
     static int align(int at) {

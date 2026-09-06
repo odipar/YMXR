@@ -48,9 +48,9 @@ each data set on a long.
 R5.6). At `k` = 2, 148 of the 543 tunes need one frame added to divide; at
 `k` = 4, 250 tunes need 508 frames between them, and the packing is worse
 besides. The converter packs at `k` = 2 (tools.md): `k` = 1 costs the
-play call about a seventh more on average (performance.md), and a table
-that repeats is padded to a period of thirty rows, which 2 divides, so
-the unit adds no frame there.
+play call about a seventh more on average (performance.md). No frame is
+added: a tune whose row count or repeat row is odd packs at `k` = 1
+instead.
 
 The gain over YMX, on the 42 tunes it ships with both files and their
 391,193 frames. The `.ymx` files are YMX 0.10.1's, format 0.9, every one
@@ -69,7 +69,7 @@ YMXR holds the same music in 8% fewer bytes at `k` = 2, the unit the
 converter packs at (tools.md), and in 21% fewer at `k` = 1. Both sides
 are whole files, but a `.ymx` holds its sample tables and a DTX2 file
 holds no sources yet, since where a tune places them is not written
-(SPEC 7). That margin flatters the DTX2 side.
+(SPEC 8). That margin flatters the DTX2 side.
 
 At `k` = 1, the three tone periods, fine and coarse together, take 21.9%,
 18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen

@@ -28,18 +28,27 @@ final class Check {
     /** What is wrong with the dump's conversion at the tool's defaults, or
      *  nothing where every frame replays to the dump. */
     static List<String> of(YmDump.Song song) {
+        return of(song, List.of());
+    }
+
+    /**
+     * What is wrong with the dump's conversion at the tool's flags, or
+     * nothing where every frame replays to the dump: the tune's rows are
+     * stepped through one pass and the loop once, as the kit's record runs
+     * (SPEC.md 7), each row held to its frame of the dump.
+     */
+    static List<String> of(YmDump.Song song, List<String> flags) {
         List<String> wrong = new ArrayList<>();
         Report report = new Report();
-        int repeat = (int) Math.min(song.loopFrame(), song.frames());
-        Sources sources = new Sources(song);
-        Columns columns = new Columns(song, sources, repeat, report);
-        Tune.Written written = Tune.write(columns, sources, song.playerHz(), YmToYmxr.UNIT,
-                Tune.RING, report);
+        YmToYmxr.Converted converted = YmToYmxr.convert(song, flags, report);
+        Sources sources = converted.sources();
+        Tune.Written written = converted.written();
+        int repeat = converted.repeat();
         TuneFile tune = TuneFile.read(written.file());
         if (tune.frameRate() != song.playerHz()) {
             wrong.add("the frame rate is " + tune.frameRate() + ", not " + song.playerHz());
         }
-        int rows = song.frames() + written.before() + written.after();
+        int rows = song.frames();
         if (tune.table().rows() != rows) {
             wrong.add("the table has " + tune.table().rows() + " rows, not " + rows);
         }
@@ -73,13 +82,14 @@ final class Check {
         }
         Replay model = new Replay(tune.table());
         int[] drumEnd = {-1, -1};
-        for (int f = 0; f < song.frames() && wrong.size() < MOST; f++) {
-            if (f == repeat && repeat > 0) {
-                for (int pad = 0; pad < written.before(); pad++) {
-                    model.step();
-                }
+        int calls = Trace.calls(tune.table());
+        for (int call = 0; call < calls && wrong.size() < MOST; call++) {
+            int r = model.row();
+            if (r == rows) {
+                break;                              // a tune that plays once has played
             }
             model.step();
+            int f = r;
             int[] dump = Columns.registers(song, f);
             Effects.Slot[] slots = Effects.of(song, f);
             int owned = 0;
@@ -87,7 +97,19 @@ final class Check {
             for (int i = 0; i < 2; i++) {
                 Replay.Effect e = model.effect[i];
                 Effects.Slot slot = slots[i];
-                if (slot.on() && sources.number(slot, new Report()) != 0) {
+                // A drum on a voice preempts a SID there: while the other
+                // effect runs a drum on this slot's voice, the SID the dump
+                // flags runs nothing.
+                Replay.Effect o = model.effect[1 - i];
+                boolean preempted = slot.on() && slot.kind() == Effects.SID && o.source() != 0
+                        && sources.get(o.source()).kind() == Effects.DRUM
+                        && o.target() == slot.target();
+                if (preempted) {
+                    if (e.source() != 0) {
+                        wrong.add(f + ": effect " + i + " runs source " + e.source()
+                                + " under a drum on its voice");
+                    }
+                } else if (slot.on() && sources.number(slot, new Report()) != 0) {
                     if (e.source() == 0) {
                         wrong.add(f + ": effect " + i + " runs nothing where the dump flags kind "
                                 + slot.kind());
@@ -104,14 +126,14 @@ final class Check {
                             if (!e.started()) {
                                 wrong.add(f + ": the drum is not started");
                             }
-                            drumEnd[i] = f + Columns.duration(s.rows().length, slot.select(),
+                            drumEnd[i] = r + Columns.duration(s.rows().length, slot.select(),
                                     slot.count(), song.playerHz());
                         }
                     }
                 } else if (e.source() != 0) {
                     Sources.Source s = sources.get(e.source());
                     boolean drum = s.kind() == Effects.DRUM;
-                    if (!drum || f >= drumEnd[i]) {
+                    if (!drum || r >= drumEnd[i]) {
                         wrong.add(f + ": effect " + i + " runs source " + e.source()
                                 + " where the dump flags nothing");
                     }
@@ -144,9 +166,9 @@ final class Check {
     record Result(Path file, boolean dump, List<String> wrong) {
     }
 
-    /** The file at {@code path}, checked; a dump the converter refuses is
-     *  one line saying why. */
-    static Result of(Path path) {
+    /** The file at {@code path}, checked at the tool's flags; a dump the
+     *  converter rejects is one line saying why. */
+    static Result of(Path path, List<String> flags) {
         byte[] data;
         try {
             data = Files.readAllBytes(path);
@@ -165,7 +187,7 @@ final class Check {
             return new Result(path, false, List.of());
         }
         try {
-            return new Result(path, true, of(YmDump.read(data)));
+            return new Result(path, true, of(YmDump.read(data), flags));
         } catch (RuntimeException failed) {
             return new Result(path, true, List.of("the converter refuses it: "
                     + failed.getMessage()));
@@ -190,16 +212,23 @@ final class Check {
     }
 
     /**
-     * {@code ymxr-check DUMP|DIR ...}: one line a file, the wrong frames
-     * under a tune that fails, and an exit of 1 where any does. A file that
-     * is not a YM5!/YM6! dump is said and not counted.
+     * {@code ymxr-check [-kK] [-mN] [-rRR | -r] DUMP|DIR ...}: one line a
+     * file, the wrong frames under a tune that fails, and an exit of 1
+     * where any does; the flags are the converter's. A file that is not a
+     * YM5!/YM6! dump is said and not counted.
      */
     public static void main(String[] args) throws IOException {
-        if (args.length == 0) {
-            System.err.println("ymxr-check DUMP|DIR ...");
+        List<String> flags = new ArrayList<>();
+        List<String> named = new ArrayList<>();
+        for (String arg : args) {
+            (arg.startsWith("-") ? flags : named).add(arg);
+        }
+        if (named.isEmpty()) {
+            System.err.println("ymxr-check [-kK] [-mN] [-rRR | -r] DUMP|DIR ...");
             System.exit(2);
         }
-        List<Result> results = dumps(args).parallelStream().map(Check::of).toList();
+        List<Result> results = dumps(named.toArray(new String[0])).parallelStream()
+                .map(path -> of(path, flags)).toList();
         int dumps = 0;
         int failed = 0;
         for (Result result : results) {

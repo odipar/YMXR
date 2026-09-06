@@ -300,7 +300,7 @@ Bit 5 returns the timer's place in its source to the first row, and the
 next tick takes it. Without the bit the source runs on from where it is,
 through a change of rate. A note that bends sets the count column; a note
 that is struck sets bits 6 and 5 with it; a drum struck again at the rate
-it has sets bit 5 alone.
+it has sets bit 5 with the select it has.
 
 A row that leaves a rate column unset leaves the timer running at the
 rate it has.
@@ -350,7 +350,7 @@ Typically a source is one column of one byte, which is what 2.1's
 procedures take. A source of two byte values serves a procedure taking a
 word, a tone period being twelve bits, and more columns serve a source
 driving more than one target. How an entry describes either is not yet
-written (section 7).
+written (section 8).
 
 A tune holds its sources and an index of them (3.1), and an effect column
 names one. Source 0 names none.
@@ -408,8 +408,9 @@ Section 3.3 gives the bytes.
 An effect's source column gives a source number, 1 to 127, and the index's
 entry at that number gives where the source's table stands. A source is a
 DTX1 table (DTX, SPEC.md 2.2): one column of one-byte values, its rows
-from the table's sixteenth byte, and its header giving `R` and `RR`
-(R1.1), `RR` equal to `R` where the source does not repeat, as DTX has it.
+from byte 16 of the table, and its header giving `R` at bytes 4 to
+7 and `RR` at bytes 10 to 13, each most significant byte first (R1.1),
+`RR` equal to `R` where the source does not repeat, as DTX has it.
 
 Source 0 has no entry. The index runs from source 1.
 
@@ -514,6 +515,11 @@ still running would write over it. A start needs no such order, because
 the row that starts an effect leaves that register's column unset
 (section 6).
 
+A table whose `RR` is `R` has no row after its last (3.1). The frame
+after the one that took the last row takes no row, writes nothing and
+reports -1, and so does every frame after it; every other frame reports
+0, which a player gives its caller (R2.4).
+
 Steps 4 to 8 write where the row sets, each to registers the column itself
 fixes, and none of them reads an index. Five tests cross columns: a zero
 in a column 1.1 lists sends the player to the bit beside it. Step 2 is the
@@ -544,27 +550,92 @@ once and tests nothing.
 1. While an effect runs on a volume register, a row leaves that
    register's column unset. A player writing steps 4 to 8 then needs no
    test: the row does not set the column. An effect on R13 holds nothing
-   against the row (1.6).
-2. An effect a row starts is one the tune states in section 3.
-3. A source and a target a column names are ones section 2 defines.
+   against the row (1.6). Where the row that stops one effect starts
+   another on the same register, the column stays unset: the register is
+   the second effect's from that row.
+2. An effect a row starts is one the tune states in section 3, and a row
+   sets no column of an effect the tune does not state.
+3. A source and a target a column names are ones section 2 defines, and
+   a row that starts an effect for the first time has set its target
+   column, on that row or before.
 4. Where two timers name one register, their writes are the writer's to
    order. A player writes what each tick gives it.
 5. A row that sets the source column to a source sets bit 5 of the
    control column with it, and bit 6 where the timer is stopped (1.9).
    The place goes to the first row and the timer starts for those bits
-   alone.
+   alone. A row that sets the source column to 0 leaves the control and
+   count columns unset.
 6. A row sets a rate column (1.9) on the row that starts its effect, or
-   while the effect runs. A select written to a timer with no effect on it
-   starts the timer with nothing to run.
+   while the effect runs, and not before its first start. A select
+   written to a timer with no effect on it starts the timer with nothing
+   to run.
 
 ---
 
-## 7. Not yet written
+## 7. What a reader reports
+
+A reader is the role R2.4 gives beside the player: it reads a tune and
+reports what it holds, and writes to no chip. It reports what the tune
+states once, then what the frame procedure does, one entry a frame in
+order and one for the frame after the last row, and nothing of what a
+timer writes between frames (section 5): a tick's rate is the machine's,
+and a reader has no machine. Of a tune whose version is not $0001 it
+reports nothing (3.3, R6.1).
+
+The report is lines of JSON, one entry a line. A line has no space in
+it, its integers in decimal, its names in the order given here, and
+`true` and `false` as JSON has them; the line ends with a line feed. The
+first line gives what the tune states once, and each line after it one
+frame:
+
+    {"rate":50,"effects":2,"sources":[{"rows":[13,128],"repeat":0}]}
+    {"result":0,"w":{"0":251,"1":4,"7":49},"e":{"1":{"target":10,"source":1,"select":1,"count":122,"timer":true,"place":true}}}
+    {"result":0,"w":{},"e":{}}
+    {"result":-1}
+
+- `rate` is the frame rate and `effects` the effects used, as the file
+  states them (3.3), and `sources` the sources in the index's order, 1
+  upward, each its rows as the table holds them, the marker in the last
+  row's bit 7 (3.2), and the row it repeats to, `R` where it does not
+  (3.1).
+- `result` is what the frame reports (section 4): 0, or -1 for the frame
+  after the last row of a tune whose `RR` is `R`. That entry holds
+  `result` alone, and the record ends with it.
+- `w` holds the YM2149 registers steps 4 to 8 write, by number in
+  ascending numeric order, `"2"` before `"10"`, and only those: a
+  register the row does not set is absent, and a row that sets nothing
+  gives `{}`. For a column with a set bit the value is bits 6 to 0
+  masked to the register's bits: four for R1, R3, R5 and R13, five for
+  R6, R8, R9 and R10, and six for R7, whose bits 7 and 6 are the host's
+  (step 7) and are not reported. For a column that fills its byte the
+  value is the byte where it is not 0, and 0 where the byte is 0 and the
+  bit beside it is set (1.1); a fine byte 0 with the coarse column's bit
+  6 set and its set bit clear writes R0 and not R1 (1.2).
+- `e` holds the effects the row set a column of, by number 0 to 3 in
+  ascending order: an effect whose target, source or control column has
+  bit 7, or whose count column is not 0 (1.1, 1.9). A row that sets none
+  gives `{}`. Each effect gives its state after steps 1 to 3, in this
+  order: `target` as the player holds it after step 1, 0 to 127 as the
+  column holds it, and 0 before a row sets it; `source`, the number the
+  last row set, 0 to 127, whether or not its ticks have reached the
+  marker (section 5); `select`, the column's three bits, and `count`,
+  as the player keeps them (1.9): 0 before a row sets them, and kept
+  through a stop after; `timer`, bit 6 of the row's control column where
+  that column is set, and `place`, bit 5 the same, false where the
+  column is not set.
+
+The record of a tune is its first line and the entries of its frames from
+the first, as many as are asked of the reader: one pass and the loop
+once is `R` plus `R` minus `RR` frames for a tune that repeats, with `R`
+and `RR` the table's, and the pass and the frame after it `R` plus 1 for
+one that does not.
+
+---
+
+## 8. Not yet written
 
 What a player does with a tune of a version it was not built for beyond
 rejecting it (R6.1).
 
 How a target takes a row of a DTX1 table of more than one column, or of
 another width (2.2).
-
-What a reader reports.

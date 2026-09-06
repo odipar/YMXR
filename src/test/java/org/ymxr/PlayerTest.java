@@ -52,14 +52,14 @@ final class PlayerTest {
     }
 
     @Test
-    void theRingKeepsTheLoopOutOfIt() {
-        // a loop of 510 rows: the ring nearest 960 under it, a multiple of 30
-        assertEquals(480, Tune.ringFor(510, Tune.RING));
-        // a long loop: the ring asked for
-        assertEquals(960, Tune.ringFor(1770, Tune.RING));
-        // the shortest loop, three periods: two periods of ring
-        assertEquals(60, Tune.ringFor(90, Tune.RING));
+    void theRingIsAMultipleOfThePeriodWithinReach() {
+        // the ring asked for, a multiple of 30 already
+        assertEquals(960, Tune.ringOf(960));
+        // the nearest multiple of 30
+        assertEquals(90, Tune.ringOf(100));
+        // two periods at least
+        assertEquals(60, Tune.ringOf(30));
         // the widest ring the player reads
-        assertEquals(1110, Tune.ringFor(5400, 4000));
+        assertEquals(1110, Tune.ringOf(4000));
     }
 }

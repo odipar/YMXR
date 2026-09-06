@@ -41,10 +41,10 @@ final class ConversionTest {
     }
 
     @Test
-    void aTuneThatPlaysOnceIsPaddedToTheUnit() throws IOException {
+    void anOddRowCountPacksAtUnitOne() throws IOException {
         // Thirty-one frames of a dump that repeats, cut to a tune that plays
         // once: a column of 31 bytes does not divide by a unit of 2 (DTX's
-        // R5.6), so one silent row follows the last.
+        // R5.6), so the table packs at unit 1, and no row is added.
         YmDump.Song whole = YmDump.read(Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym")));
         int frames = 31;
         byte[][] registers = new byte[whole.registers().length][];
@@ -58,13 +58,12 @@ final class ConversionTest {
         Sources sources = new Sources(song);
         Columns columns = new Columns(song, sources, frames, report);
         Tune.Written written = Tune.write(columns, sources, song.playerHz(), 2, Tune.RING, report);
-        assertEquals(0, written.before());
-        assertEquals(1, written.after(), "one silent row makes 32 rows, a multiple of the unit");
         TuneFile tune = TuneFile.read(written.file());
-        assertEquals(32, tune.table().rows());
-        assertEquals(32, tune.table().repeat(), "a tune that plays once repeats at its row count");
-        assertTrue(report.notes().stream().anyMatch(n -> n.contains("divide by the unit")),
-                "the tool says why the row was added: " + report.notes());
+        assertEquals(31, tune.table().rows(), "the rows are the frames");
+        assertEquals(31, tune.table().repeat(), "a tune that plays once repeats at its row count");
+        assertEquals(1, tune.image()[Tune.FORMAT_AT + 18] & 0xFF, "the image's unit");
+        assertTrue(report.notes().stream().anyMatch(n -> n.contains("packed at unit 1")),
+                "the tool says why: " + report.notes());
     }
 
     @Test

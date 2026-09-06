@@ -11,15 +11,24 @@ import org.dtx.Table;
  * <p>A register the model has not seen set is -1. The effects' ticks are
  * not modelled: a running effect's source, target and rate are what the
  * rows gave, and its place is not followed.
+ *
+ * <p>What the last step wrote stands beside the state: {@code written}
+ * gives each register's value where the row wrote it and -1 where not,
+ * and each effect says whether the row touched it and which control bits
+ * the row set. That is what a reader reports (SPEC.md 7).
  */
 final class Replay {
 
-    /** What one effect runs after a row: source 0 where it runs nothing. */
-    record Effect(int target, int source, int select, int count, boolean started) {
-        static final Effect NONE = new Effect(0, 0, 0, 0, false);
+    /** What one effect runs after a row: source 0 where it runs nothing.
+     *  {@code touched} says the row set one of its columns, {@code timer}
+     *  that the row's control column had bit 6 and {@code place} bit 5. */
+    record Effect(int target, int source, int select, int count, boolean started,
+                  boolean touched, boolean timer, boolean place) {
+        static final Effect NONE = new Effect(0, 0, 0, 0, false, false, false, false);
     }
 
     final int[] registers = new int[14];
+    final int[] written = new int[14];
     final Effect[] effect = new Effect[4];
     boolean envelopeWritten;
     private final Table table;
@@ -61,24 +70,33 @@ final class Replay {
             if ((r[t + 3] & 0xFF) != 0) {
                 count = r[t + 3] & 0xFF;
             }
+            boolean timer = false;
+            boolean place = false;
             if ((r[t + 2] & 0x80) != 0) {
                 select = r[t + 2] & 7;
+                timer = (r[t + 2] & 0x40) != 0;
+                place = (r[t + 2] & 0x20) != 0;
             }
-            effect[i] = new Effect(target, source, select, count, started);
+            boolean touched = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0;
+            effect[i] = new Effect(target, source, select, count, started, touched, timer, place);
         }
         envelopeWritten = false;
+        Arrays.fill(written, -1);
         for (int c = 0; c < 13; c++) {
             if (Columns.BESIDE_COLUMN[c] >= 0) {
                 boolean zero = (r[Columns.BESIDE_COLUMN[c]] & Columns.BESIDE_BIT[c]) != 0;
                 if (r[c] != 0 || zero) {
                     registers[c] = r[c] & 0xFF;
+                    written[c] = registers[c];
                 }
             } else if ((r[c] & 0x80) != 0) {
                 registers[c] = r[c] & Columns.MASK[c];
+                written[c] = registers[c];
             }
         }
         if ((r[13] & 0x80) != 0) {
             registers[13] = r[13] & 0x0F;
+            written[13] = registers[13];
             envelopeWritten = true;
         }
     }
