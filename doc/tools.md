@@ -55,6 +55,23 @@ the local Maven repository: `mvn install` at DTX's `v0.5.0` tag, whose
 reader this player's frame figures (performance.md) are measured
 against.
 
+## Check
+
+```
+bin/ymxr-check DUMP|DIR ...
+```
+
+Every dump named, and every `.ym` under a directory named, converted at
+the tool's defaults and replayed against itself: the tune file's table
+stepped frame by frame by the reader in `Replay`, every frame's registers
+held to the dump's but those an effect owns, and every effect's source,
+target, rate and count held to what the dump flags. One line a tune, the
+first twenty wrong frames under a tune that fails, and an exit of 1 where
+any does; a file that is not a YM5!/YM6! dump is said and not counted.
+`ConversionTest` runs the same check on the tunes under `ym/test`, and
+the corpus (Measure, `YM_CORPUS`) runs through it whole in about seventy
+seconds: 543 dumps replay to their dumps, and one file is not a dump.
+
 ## The player
 
 `68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,428 bytes. Its
