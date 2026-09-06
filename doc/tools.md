@@ -42,9 +42,11 @@ to sets every register and every effect, so the wrap lands on a known
 state. `ConversionTest` replays every tune under `ym/test` against its
 dump.
 
-The tool runs out of `target/classes`, and builds first where a source is
-newer than the last build. Java 23 and Maven, and DTX 0.4.0 in the local
-Maven repository: `mvn install` at DTX's `v0.4.0` tag.
+The tool runs out of `target/classes`, and builds first where a source or
+the pom is newer than the last build. Java 23 and Maven, and DTX
+0.5-SNAPSHOT in the local Maven repository: `mvn install` on DTX's main
+at or past the reader that walks its decoder states, which this player's
+frame figures (performance.md) are measured against.
 
 ## The player
 
