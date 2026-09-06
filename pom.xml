@@ -29,7 +29,7 @@
                  the converter packages them with (doc/requirements.md, R1) -->
             <groupId>org.dtx</groupId>
             <artifactId>dtx</artifactId>
-            <version>0.5-SNAPSHOT</version>
+            <version>0.5.0</version>
         </dependency>
         <dependency>
             <groupId>org.jspecify</groupId>
