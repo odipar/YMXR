@@ -1,0 +1,12 @@
+#!/bin/sh
+# A YM5!/YM6! dump into a tune file, run out of target/classes; builds
+# first where a source is newer than the last build. doc/tools.md, Convert.
+set -e
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+classes=$root/target/classes
+built=$classes/.built
+if [ ! -f "$built" ] || [ -n "$(find "$root/src/main/java" -newer "$built" -print -quit 2>/dev/null)" ]; then
+    (cd "$root" && mvn -q compile dependency:build-classpath -Dmdep.outputFile=target/classpath >/dev/null)
+    : > "$built"
+fi
+exec java -ea -cp "$classes:$(cat "$root/target/classpath")" org.ymxr.YmToYmxr "$@"
