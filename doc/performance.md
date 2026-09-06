@@ -20,7 +20,7 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Retrigger retune, built | 1200 | 1869 | 3954 | 1113 | 3162 |
 | Synergy Credits | 10800 | 2320 | 6600 | 1210 | 5326 |
 | Turrican - world 4-3 | 3720 | 1874 | 5110 | 1130 | 4448 |
-| Turrican 2 - world completed 1 | 360 | 2018 | 5748 | 1366 | 5060 |
+| Turrican 2 - world completed 1 | 360 | 2018 | 5748 | 1367 | 5060 |
 
 A table packs at a period of thirty rows, the column count, so a refill
 is thirty bytes and one comes every row (tools.md, Convert). What those
