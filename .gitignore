@@ -64,3 +64,5 @@ ymx/test/YMXTEST.PRG
 *-n[0-9]*-c[0-9]*/
 dist/
 __pycache__/
+/doc/conformance/SOURCES.generated.md
+/doc/conformance/MANIFEST.generated.txt

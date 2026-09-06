@@ -1,0 +1,13 @@
+#!/bin/sh
+# What a reader reports of a tune file, one line a play call, run out of
+# target/classes; builds first where a source or the pom is newer than the
+# last build. doc/tools.md, Trace.
+set -e
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+classes=$root/target/classes
+built=$classes/.built
+if [ ! -f "$built" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" -newer "$built" -print -quit 2>/dev/null)" ]; then
+    (cd "$root" && mvn -q compile dependency:build-classpath -Dmdep.outputFile=target/classpath >/dev/null)
+    : > "$built"
+fi
+exec java -ea -cp "$classes:$(cat "$root/target/classpath")" org.ymxr.Trace "$@"

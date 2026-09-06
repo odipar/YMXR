@@ -1,0 +1,232 @@
+package org.ymxr;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The conformance kit is what the converter gives: every tune under
+ * {@code doc/conformance/tunes} is the dump its SOURCES.md row names,
+ * converted with the row's options, or the tune its builder builds, and
+ * every reference is what the reader reports of it (SPEC.md 7). This
+ * makes each again and compares, so a change to the converter or the
+ * reader that moved a byte of the kit fails here, and writes what is
+ * missing beside the kit for the writer to take.
+ */
+final class ConformanceTest {
+
+    static final Path KIT = Path.of("doc", "conformance");
+    static final Path TUNES = KIT.resolve("tunes");
+
+    /** One tune of the kit: the dump under {@code ym/test} it comes from
+     *  and the options, or the builder that builds it. */
+    record Fixture(String name, @Nullable String dump, List<String> options,
+                   @Nullable Supplier<Tune.Written> built, String exercises) {
+
+        static Fixture of(String name, String dump, String options, String exercises) {
+            return new Fixture(name, dump, options.isEmpty() ? List.of() : List.of(options.split(" ")),
+                    null, exercises);
+        }
+
+        static Fixture built(String name, Supplier<Tune.Written> built, String exercises) {
+            return new Fixture(name, null, List.of(), built, exercises);
+        }
+    }
+
+    /** SOURCES.md's rows, one a tune. */
+    static final List<Fixture> FIXTURES = List.of(
+            Fixture.of("chambers", "Chambers of Shaolin 5 - you blew it!.ym", "",
+                    "no effect; R13 once, with both envelope-period-0 bits beside it; a YM6 dump"),
+            Fixture.of("circus", "Circus Attractions  2.ym", "",
+                    "four frames padded to ninety: rows that set nothing; a YM5 dump"),
+            Fixture.of("plays-once", "Circus Attractions  2.ym", "-r",
+                    "a table of one period whose RR is R: the frame after the last row reports -1"),
+            Fixture.of("turrican", "Turrican - world 4-3.ym", "",
+                    "three drums on Timer D, each ending by its marker; RR at 180 with twenty silent rows before it; R13 restated"),
+            Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "",
+                    "a loop of one row padded to ninety; a drum running into the wrap"),
+            Fixture.of("synergy", "Synergy Credits.ym", "",
+                    "nine SIDs on Timers A and D at once, one source named by both; select-only and count-only changes; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it"),
+            Fixture.of("preempt", "Digidrum preempt, built.ym", "",
+                    "a drum starting on the voice a SID runs on stops the SID first, and the SID starts again when the drum ends; R8 passed between them with its column unset"),
+            Fixture.of("retune", "Retrigger retune, built.ym", "",
+                    "a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7; stopped at the wrap alone"),
+            Fixture.of("fine-zero", "Big - Samantha Fox Strip Poker 6.ym", "",
+                    "a tone fine byte moving to 0: on voice A without the coarse set bit, on B and C with it"),
+            Fixture.built("four-timers", BuiltTunes::fourTimers,
+                    "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump gives: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and taken at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with nothing running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
+            Fixture.built("wrong-version", () -> wrongVersion(),
+                    "chambers with the version word $0002: a reader reports nothing of it"));
+
+    /** chambers with another version in its header: what a reader reports
+     *  nothing of (R6.1). */
+    static Tune.Written wrongVersion() {
+        try {
+            byte[] dump = Files.readAllBytes(Path.of("ym", "test", "Chambers of Shaolin 5 - you blew it!.ym"));
+            Tune.Written it = YmToYmxr.convert(dump, List.of(), new Report()).written();
+            byte[] file = it.file().clone();
+            file[4] = 0;
+            file[5] = 2;
+            return new Tune.Written(file, it.repeat(), it.before(), it.after());
+        } catch (IOException failed) {
+            throw new IllegalStateException(failed);
+        }
+    }
+
+    /** The tune a fixture gives: converted from its dump, or built. */
+    static Tune.Written make(Fixture f) throws IOException {
+        if (f.built() != null) {
+            return f.built().get();
+        }
+        byte[] dump = Files.readAllBytes(Path.of("ym", "test", f.dump()));
+        return YmToYmxr.convert(dump, f.options(), new Report()).written();
+    }
+
+    /** The dump's own header name and author, the only attribution the
+     *  file carries, or what a built tune says of itself. */
+    static String credit(Fixture f) throws IOException {
+        if (f.built() != null) {
+            return "built";
+        }
+        YmDump.Song song = YmDump.read(Files.readAllBytes(Path.of("ym", "test", f.dump())));
+        return song.name() + ", " + song.author();
+    }
+
+    /** The reference: the reader's record of the tune, the kit's count of frames. */
+    static byte[] reference(byte[] tune) {
+        return Trace.record(tune, -1);
+    }
+
+    /** The table's rows as DTX0 lays them out: row 0 to R minus one, each
+     *  its thirty columns in order (DTX, SPEC.md 2.1); what a reader takes
+     *  the rows from, since the image's packing is DTX's and not this
+     *  specification's. Empty for a file of another version. */
+    static byte[] rows(byte[] tune) {
+        org.dtx.Table table;
+        try {
+            table = TuneFile.read(tune).table();
+        } catch (IllegalArgumentException another) {
+            return new byte[0];
+        }
+        byte[] out = new byte[table.rows() * Columns.C];
+        for (int r = 0; r < table.rows(); r++) {
+            for (int c = 0; c < Columns.C; c++) {
+                out[r * Columns.C + c] = table.column(c)[r];
+            }
+        }
+        return out;
+    }
+
+    static String sha256(byte[] bytes) {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    /** SOURCES.md's row for a fixture. */
+    static String row(Fixture f, byte[] tune) throws IOException {
+        String from = f.built() != null ? "built" : "`" + f.dump() + "`";
+        String options = f.options().isEmpty() ? "none" : "`" + String.join(" ", f.options()) + "`";
+        return "| `" + f.name() + "` | " + from + " | " + credit(f) + " | " + options + " | "
+                + tune.length + " | " + sha256(tune).substring(0, 16) + " | " + f.exercises() + " |";
+    }
+
+    /** MANIFEST.txt's three lines for a fixture: the tune, its rows, and
+     *  the reference, which is not in the kit. */
+    static String manifest(Fixture f, byte[] tune, byte[] rows, byte[] reference) {
+        long lines = reference.length == 0 ? 0
+                : new String(reference, StandardCharsets.US_ASCII).lines().count();
+        return sha256(tune) + "  " + tune.length + "  tunes/" + f.name() + ".ymxr\n"
+                + sha256(rows) + "  " + rows.length + "  tunes/" + f.name() + ".rows\n"
+                + sha256(reference) + "  " + lines + "  " + f.name() + ".jsonl";
+    }
+
+    @Test
+    void everyTuneIsWhatItsRowGives() throws IOException {
+        List<String> missing = new ArrayList<>();
+        List<String> rows = new ArrayList<>();
+        String sources = Files.readString(KIT.resolve("SOURCES.md"));
+        for (Fixture f : FIXTURES) {
+            byte[] tune = make(f).file();
+            Path at = TUNES.resolve(f.name() + ".ymxr");
+            if (!Files.exists(at)) {
+                Files.write(at, tune);
+                missing.add(at + " written");
+            } else {
+                assertArrayEquals(Files.readAllBytes(at), tune,
+                        at + " is not what its SOURCES.md row gives");
+            }
+            Path rowsAt = TUNES.resolve(f.name() + ".rows");
+            if (!Files.exists(rowsAt)) {
+                Files.write(rowsAt, rows(tune));
+                missing.add(rowsAt + " written");
+            } else {
+                assertArrayEquals(Files.readAllBytes(rowsAt), rows(tune),
+                        rowsAt + " is not the table's rows");
+            }
+            String row = row(f, tune);
+            rows.add(row);
+            if (!sources.contains(row)) {
+                missing.add("SOURCES.md lacks the row for " + f.name());
+            }
+        }
+        if (!missing.isEmpty()) {
+            Files.writeString(KIT.resolve("SOURCES.generated.md"), String.join("\n", rows) + "\n");
+        }
+        assertTrue(missing.isEmpty(), () -> String.join("\n", missing)
+                + "\nSOURCES.generated.md holds every row; take the rows into SOURCES.md");
+    }
+
+    @Test
+    void everyReferenceIsInTheManifest() throws IOException {
+        StringBuilder want = new StringBuilder("# sha256  bytes or entries  file\n");
+        for (Fixture f : FIXTURES) {
+            byte[] tune = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));
+            want.append(manifest(f, tune, rows(tune), reference(tune))).append('\n');
+        }
+        Path at = KIT.resolve("MANIFEST.txt");
+        String have = Files.exists(at) ? Files.readString(at) : "";
+        if (!have.equals(want.toString())) {
+            Files.writeString(KIT.resolve("MANIFEST.generated.txt"), want.toString());
+        }
+        assertEquals(want.toString(), have,
+                "MANIFEST.txt is not what the tunes and the reader give; MANIFEST.generated.txt is");
+    }
+
+    @Test
+    void theReadmeCountsTheKit() throws IOException {
+        String readme = Files.readString(KIT.resolve("README.md"));
+        Matcher tunes = Pattern.compile("(\\d+) tunes").matcher(readme);
+        assertTrue(tunes.find(), "README.md does not count the tunes");
+        assertEquals(FIXTURES.size(), Integer.parseInt(tunes.group(1)), "README.md's tune count");
+        long entries = 0;
+        for (Fixture f : FIXTURES) {
+            byte[] record = reference(Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr")));
+            entries += record.length == 0 ? 0
+                    : new String(record, StandardCharsets.US_ASCII).lines().count();
+        }
+        Matcher count = Pattern.compile("([\\d,]+) entries").matcher(readme);
+        assertTrue(count.find(), "README.md does not count the entries");
+        assertEquals(entries, Long.parseLong(count.group(1).replace(",", "")), "README.md's entry count");
+    }
+}

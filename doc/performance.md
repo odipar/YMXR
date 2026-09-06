@@ -1,6 +1,6 @@
 # performance
 
-What a play call costs, in cycles, measured on the seven tunes under
+What a play call costs, in cycles, measured on the eight tunes under
 `ym/test` by the rig's cycle counter (tools.md, the rigs): the 68000's own
 cycles, with no wait state, over every frame of a tune played through its
 wrap once. A tick handler's cost is its own instructions, from its vector
@@ -14,10 +14,11 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
+| Big - Samantha Fox Strip Poker 6 | 480 | 1504 | 3400 | 950 | 2814 |
 | Chambers of Shaolin 5 - you blew it! | 1020 | 1550 | 3470 | 941 | 2842 |
 | Circus Attractions 2 | 180 | 1696 | 3424 | 1149 | 2838 |
-| Digidrum preempt, built | 840 | 1811 | 3582 | 900 | 2868 |
-| Retrigger retune, built | 1200 | 1622 | 3680 | 867 | 2888 |
+| Digidrum preempt, built | 840 | 1773 | 3582 | 903 | 2868 |
+| Retrigger retune, built | 1200 | 1623 | 3680 | 867 | 2888 |
 | Synergy Credits | 10800 | 2048 | 4746 | 939 | 3080 |
 | Turrican - world 4-3 | 3720 | 1624 | 4794 | 880 | 4132 |
 | Turrican 2 - world completed 1 | 360 | 1749 | 4434 | 1098 | 3716 |

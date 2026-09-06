@@ -17,8 +17,8 @@ import java.util.Arrays;
  * write to R13 restarting the envelope beside its ticks, as the reference
  * player has it.
  *
- * <p>The row the tune repeats to sets every register and every effect, so
- * the wrap lands on a known state whatever the last row left.
+ * <p>The row the tune repeats to sets every register but R13 and every
+ * effect, so the wrap lands on a known state whatever the last row left.
  */
 final class Columns {
 
@@ -52,6 +52,15 @@ final class Columns {
     /** Bits 3 to 0: the effects the tune ever runs. */
     final int effects;
 
+    /** Columns given whole, {@code column[c][frame]}, for a tune built
+     *  rather than converted: the row it repeats to, or the frame count
+     *  where it plays once, and the effects it runs. */
+    Columns(byte[][] column, int repeat, int effects) {
+        this.column = column;
+        this.repeat = repeat;
+        this.effects = effects;
+    }
+
     Columns(YmDump.Song song, Sources sources, int repeat, Report report) {
         int frames = song.frames();
         this.repeat = repeat;
@@ -64,25 +73,61 @@ final class Columns {
         int[] selectHeld = {0, 0};
         int[] countHeld = {0, 0};
         int[] drumEnd = {-1, -1};
+        boolean[] stopAtRepeat = {false, false};
         int used = 0;
         for (int f = 0; f < frames; f++) {
-            boolean keyframe = f == repeat && f > 0;
+            // The row the tune repeats to sets every register but R13 and
+            // every effect, so the wrap lands on a known state: row 0 too,
+            // where the tune repeats to it.
+            boolean keyframe = f == repeat;
             if (keyframe) {
                 Arrays.fill(held, -1);
+                Arrays.fill(targetHeld, -1);
+                for (int i = 0; i < 2; i++) {
+                    stopAtRepeat[i] = running[i].on();
+                }
             }
             int[] reg = registers(song, f);
-            Effects.Slot[] slots = Effects.of(song, f);
+            Effects.Slot[] slot = Effects.of(song, f).clone();
+            int[] number = new int[2];
+            // The drums' numbers first: a drum on a voice preempts a SID
+            // there, so a SID the dump flags on a voice where the other
+            // slot's drum runs, or starts in this frame, is not started. At
+            // the repeat row a running drum is cut and the SID starts.
+            for (int i = 0; i < 2; i++) {
+                if (slot[i].on() && slot[i].kind() == Effects.DRUM) {
+                    number[i] = sources.number(slot[i], report);
+                    if (number[i] == 0) {
+                        slot[i] = Effects.Slot.EMPTY;
+                    }
+                }
+            }
+            for (int i = 0; i < 2; i++) {
+                if (!slot[i].on() || slot[i].kind() == Effects.DRUM) {
+                    continue;
+                }
+                int other = 1 - i;
+                boolean drumRuns = running[other].kind() == Effects.DRUM
+                        && running[other].voice() == slot[i].voice() && f < drumEnd[other]
+                        && !keyframe;
+                boolean drumStarts = slot[other].on() && slot[other].kind() == Effects.DRUM
+                        && slot[other].voice() == slot[i].voice();
+                if (slot[i].kind() == Effects.SID && (drumRuns || drumStarts)) {
+                    slot[i] = Effects.Slot.EMPTY;
+                    report.preempted++;
+                    continue;
+                }
+                number[i] = sources.number(slot[i], report);
+                if (number[i] == 0) {
+                    slot[i] = Effects.Slot.EMPTY;
+                }
+            }
             byte[] out = new byte[C];
             int owned = 0;
             for (int i = 0; i < 2; i++) {
                 int t = EFFECT + 4 * i;
-                Effects.Slot slot = slots[i];
-                int number = slot.on() ? sources.number(slot, report) : 0;
-                if (number == 0) {
-                    slot = Effects.Slot.EMPTY;
-                }
                 boolean drum = running[i].kind() == Effects.DRUM;
-                if (!slot.on()) {
+                if (!slot[i].on()) {
                     if (keyframe && drum && f < drumEnd[i]) {
                         report.cutAtRepeat++;
                     }
@@ -93,35 +138,35 @@ final class Columns {
                         running[i] = Effects.Slot.EMPTY;
                     }
                 } else {
-                    boolean starting = keyframe || slot.kind() == Effects.DRUM
-                            || running[i].kind() != slot.kind()
-                            || running[i].target() != slot.target()
-                            || runningNumber[i] != number;
-                    if (slot.target() != targetHeld[i]) {
-                        out[t] = (byte) (0x80 | slot.target());
-                        targetHeld[i] = slot.target();
+                    boolean starting = keyframe || slot[i].kind() == Effects.DRUM
+                            || running[i].kind() != slot[i].kind()
+                            || running[i].target() != slot[i].target()
+                            || runningNumber[i] != number[i];
+                    if (slot[i].target() != targetHeld[i]) {
+                        out[t] = (byte) (0x80 | slot[i].target());
+                        targetHeld[i] = slot[i].target();
                     }
                     if (starting) {
-                        out[t + 1] = (byte) (0x80 | number);
-                        out[t + 2] = (byte) (0x80 | TIMER_RESET | PLACE_RESET | slot.select());
-                        out[t + 3] = (byte) slot.count();
-                        running[i] = slot;
-                        runningNumber[i] = number;
+                        out[t + 1] = (byte) (0x80 | number[i]);
+                        out[t + 2] = (byte) (0x80 | TIMER_RESET | PLACE_RESET | slot[i].select());
+                        out[t + 3] = (byte) slot[i].count();
+                        running[i] = slot[i];
+                        runningNumber[i] = number[i];
                         used |= 1 << i;
-                        if (slot.kind() == Effects.DRUM) {
-                            drumEnd[i] = f + duration(sources.get(number).rows().length,
-                                    slot.select(), slot.count(), song.playerHz());
+                        if (slot[i].kind() == Effects.DRUM) {
+                            drumEnd[i] = f + duration(sources.get(number[i]).rows().length,
+                                    slot[i].select(), slot[i].count(), song.playerHz());
                         }
                     } else {
-                        if (slot.select() != selectHeld[i]) {
-                            out[t + 2] = (byte) (0x80 | slot.select());
+                        if (slot[i].select() != selectHeld[i]) {
+                            out[t + 2] = (byte) (0x80 | slot[i].select());
                         }
-                        if (slot.count() != countHeld[i]) {
-                            out[t + 3] = (byte) slot.count();
+                        if (slot[i].count() != countHeld[i]) {
+                            out[t + 3] = (byte) slot[i].count();
                         }
                     }
-                    selectHeld[i] = slot.select();
-                    countHeld[i] = slot.count();
+                    selectHeld[i] = slot[i].select();
+                    countHeld[i] = slot[i].count();
                 }
                 if (running[i].kind() == Effects.SID || running[i].kind() == Effects.DRUM) {
                     owned |= 1 << running[i].target();
@@ -151,6 +196,19 @@ final class Columns {
             }
             for (int c = 0; c < C; c++) {
                 column[c][f] = out[c];
+            }
+        }
+        // The keyframe's stop is for an effect that ran up to the repeat
+        // row, or runs into the wrap, so that the wrap lands on a known
+        // state; an effect that did neither, or that the tune never runs,
+        // keeps its columns unset there.
+        if (repeat < frames) {
+            for (int i = 0; i < 2; i++) {
+                int t = EFFECT + 4 * i;
+                boolean stopped = (column[t + 1][repeat] & 0xFF) == 0x80;
+                if (stopped && !stopAtRepeat[i] && !running[i].on()) {
+                    column[t + 1][repeat] = 0;
+                }
             }
         }
         effects = used;

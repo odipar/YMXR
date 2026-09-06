@@ -69,8 +69,22 @@ target, rate and count held to what the dump flags. One line a tune, the
 first twenty wrong frames under a tune that fails, and an exit of 1 where
 any does; a file that is not a YM5!/YM6! dump is said and not counted.
 `ConversionTest` runs the same check on the tunes under `ym/test`, and
-the corpus (Measure, `YM_CORPUS`) runs through it whole in about seventy
-seconds: 543 dumps replay to their dumps, and one file is not a dump.
+the corpus (Measure, `YM_CORPUS`) runs through it whole in about three
+minutes: 543 dumps replay to their dumps, and one file is not a dump.
+The check steps one pass and the loop once, as a reader's record runs.
+
+## Trace
+
+```
+bin/ymxr-trace TUNE [LINES]
+```
+
+What a reader reports of a tune file (SPEC.md 7), on standard output:
+the first line what the tune states once, then one line a frame, `LINES`
+of them in all or the count the kit takes of the tune, one pass and the
+loop once, or the pass and the frame that reports its end. Of a file of
+another version it prints nothing. The conformance kit's references are
+what this gives (doc/conformance/README.md).
 
 ## The player
 
@@ -103,7 +117,12 @@ the row its place stands on.
 python3 68k/test/emu/test_ymxr.py [tune.ym ...]
 python3 68k/test/emu/test_ymxr.py -cycles [tunes]
 python3 68k/test/emu/test_ymxr.py -hatari [tunes]
+python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
 ```
+
+A tune named as a `.ymxr` file plays as it stands, without the
+converter. A tune whose `RR` is `R` is played one frame past its last
+row, where the call reports -1 and writes nothing.
 
 Under unicorn, which raises no interrupt, the rig models the four timers
 and fires every tick by hand at the time the model gives. `-cycles` counts
@@ -118,7 +137,12 @@ counted against the rates the trace shows the timers programmed at. The
 stub paints the background red around each call, so a run traced with
 `--trace video_color` reads back through YMX's `ymx/test/cost.py` as
 the call's cycles on a cycle-exact machine (performance.md, Against
-YMX).
+YMX). `-kit` plays the conformance kit's tunes, or the tune files named,
+and holds each frame the player makes to the reader's record of it
+through `bin/ymxr-trace`, and the record's first line to the tune's
+header, so the player, the rig's model and the reader agree line by
+line; a tune of another version is one init rejects and the
+reader reports nothing of.
 
 | variable | gives |
 |---|---|

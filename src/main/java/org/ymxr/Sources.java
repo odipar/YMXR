@@ -33,6 +33,13 @@ final class Sources {
     private final Map<Integer, Integer> numbers = new HashMap<>();
     private final byte[][] drums;
 
+    /** Sources given whole, numbered 1 upward in the order given: what a
+     *  tune built rather than converted holds. */
+    Sources(List<Source> given) {
+        list.addAll(given);
+        drums = new byte[0][];
+    }
+
     /** The song's digidrums as 4-bit levels: the high nibble of an 8-bit
      *  sample, or the byte as it stands where the file holds 4-bit values. */
     Sources(YmDump.Song song) {

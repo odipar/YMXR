@@ -31,8 +31,8 @@ written until it says what YMXR has to do.
 | `src/main/java/org/ymxr/` | the converter: a YM5!/YM6! dump into a tune file, on DTX's Java library |
 | `68k/YMXR.S` | the player, and `68k/YMXR_prg.S` a program around it for Hatari |
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
-| `ym/` | the measurements behind the figures, and `ym/test` seven tunes the tests run on |
-| `bin/` | the converter, run out of a build |
+| `ym/` | the measurements behind the figures, and `ym/test` eight tunes the tests run on |
+| `bin/` | the converter, the check and the trace, run out of a build |
 
 A tune converts and plays like this:
 
@@ -41,6 +41,10 @@ bin/ym-to-ymxr tune.ym tune.ymxr
 python3 68k/test/emu/test_ymxr.py tune.ym
 ```
 
+`bin/ymxr-check` replays a dump against the tune it converts to, and
+`bin/ymxr-trace` prints what a reader reports of a tune file (SPEC.md 7),
+which the conformance kit's references are.
+
 The shape follows [YMX](https://github.com/odipar/YMX): Java is the
 source of truth, and the Go and C# trees are to follow it byte for byte.
 
@@ -48,9 +52,10 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 
 | what runs | what it checks |
 |---|---|
-| `mvn test` | the documents against themselves and the house style, and every tune under `ym/test` converted, read back and replayed against its dump |
+| `mvn test` | the documents against themselves and the house style, every tune under `ym/test` converted, read back and replayed against its dump, and the conformance kit converted again and compared byte for byte |
 | `68k/test/emu/test_ymxr.py` | the player on an emulated 68000: every frame's writes, the timers' programming and every tick against the specification's model |
 | the same, `-hatari` | the player on a real MFP under Hatari, the trace of its writes against that model |
+| the same, `-kit` | the conformance kit's tunes on the player, each frame held to the reader's record |
 
 | | |
 |---|---|

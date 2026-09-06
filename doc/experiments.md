@@ -69,7 +69,7 @@ YMXR holds the same music in 8% fewer bytes at `k` = 2, the unit the
 converter packs at (tools.md), and in 21% fewer at `k` = 1. Both sides
 are whole files, but a `.ymx` holds its sample tables and a DTX2 file
 holds no sources yet, since where a tune places them is not written
-(SPEC 7). That margin flatters the DTX2 side.
+(SPEC 8). That margin flatters the DTX2 side.
 
 At `k` = 1, the three tone periods, fine and coarse together, take 21.9%,
 18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen

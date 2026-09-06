@@ -26,7 +26,7 @@ converter under bin/. DTX's rig, at DTX_REPO/68k/test/emu, counts the
 cycles where it is found; hatari (HATARI) with a TOS image (TOS) plays
 the tune on a real MFP.
 """
-import os
+import json, os
 import re
 import struct
 import subprocess
@@ -121,13 +121,48 @@ def assemble():
 
 
 def convert(ym, work):
-    """A tune file out of a YM dump, through the converter."""
+    """A tune file out of a YM dump, through the converter; a tune file
+    named as it stands."""
+    if ym.endswith(".ymxr"):
+        return open(ym, "rb").read(), ""
     out = os.path.join(work, "tune.ymxr")
     flags = os.environ.get("YMXR_FLAGS", "").split()
     r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr"), ym, out] + flags,
                        capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     return open(out, "rb").read(), r.stdout.decode().strip()
+
+
+def trace(file, work, calls):
+    """What the Java reader reports of a tune file, one entry a call
+    (SPEC.md 7), through bin/ymxr-trace."""
+    path = os.path.join(work, "traced.ymxr")
+    open(path, "wb").write(file)
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-trace"), path, str(calls)],
+                       capture_output=True)
+    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
+    return [json.loads(line) for line in r.stdout.decode().splitlines() if line]
+
+
+def entry(model, writes):
+    """The reader's entry for a frame the model just stepped: the writes
+    the chip takes, and the effects the row touched."""
+    w = {}
+    for reg, value in taken(writes):
+        # R7's two host bits are no tune's: the reader gives bits 5 to 0
+        w[str(reg)] = value & 0x3F if reg == 7 else value
+    e = {}
+    for i in range(4):
+        fx = model.fx[i]
+        if not fx["touched"]:
+            continue
+        one = {"target": fx["target"], "source": fx["source"]}
+        one["select"] = fx["select"]
+        one["count"] = fx["count"]
+        one["timer"] = fx["restart"]
+        one["place"] = fx["reset_place"]
+        e[str(i)] = one
+    return {"result": 0, "w": w, "e": e}
 
 
 def long_at(d, at):
@@ -178,7 +213,9 @@ class Model:
     def __init__(self, tune):
         self.tune = tune
         self.row = 0
-        self.fx = [dict(target=0, source=0, select=0, count=0, place=None,
+        # target is what the player holds after step 1, and using the
+        # target the running effect writes: the one held at its start
+        self.fx = [dict(target=0, using=0, source=0, select=0, count=0, place=None,
                         running=False) for _ in range(4)]
 
     def frame(self):
@@ -195,6 +232,7 @@ class Model:
                 fx["target"] = r[t] & 0x7F
             fx["restart"] = False
             fx["reset_place"] = False
+            fx["touched"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
             if r[t + 1] & 0x80:
                 source = r[t + 1] & 0x7F
                 fx["source"] = source
@@ -204,6 +242,7 @@ class Model:
                 else:
                     at, R, RR, rows = self.tune.sources[source]
                     fx["place"] = 0
+                    fx["using"] = fx["target"]
             if r[t + 2] & 0x80:
                 if r[t + 2] & 0x40:
                     fx["restart"] = True
@@ -242,7 +281,7 @@ class Model:
         fx = self.fx[i]
         at, R, RR, rows = self.tune.sources[fx["source"]]
         value = rows[fx["place"]]
-        write = (fx["target"], value)
+        write = (fx["using"], value)
         if value & 0x80:
             if RR < R:
                 fx["place"] = RR
@@ -454,7 +493,10 @@ class Timers:
         return n
 
 
-def check(ym, code, symbols, cycles=None):
+def check(ym, code, symbols, cycles=None, kit=False):
+    """The tune on the player, held to the model frame by frame and tick
+    by tick; with kit, each frame is held to the reader's entry as well,
+    and a tune that plays once to the call that reports its end."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
     tune = Tune(file, work)
@@ -465,8 +507,16 @@ def check(ym, code, symbols, cycles=None):
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
     workspace = WORK + 0x100
+    if tune.version != 1:
+        assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
+            "init took a tune of version %d" % tune.version
+        if kit:
+            assert trace(file, work, 1) == [], "the reader reports something of version %d" % tune.version
+        return 0, 0, [], {}, (0, tune.R, tune.RR, [])
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
-    assert m.byte(MFP + 0x1D) & 0x70 == 0x50, "init moved Timer C's nibble"
+    # Timer C's nibble is the host's 200 Hz clock, kept unless effect 3 runs
+    nibble = 0 if tune.effects & 8 else 0x50
+    assert m.byte(MFP + 0x1D) & 0x70 == nibble, "init moved Timer C's nibble"
     timers.apply(m.mfp)
     for i in range(4):
         if tune.effects & 1 << i:
@@ -478,7 +528,15 @@ def check(ym, code, symbols, cycles=None):
     costliest = [0]
     advance = []
     clocks = MFP_CLOCK / tune.rate
-    frames = min(tune.R + tune.R - tune.RR, 4 * tune.R)     # through the wrap once
+    once = tune.RR == tune.R
+    frames = tune.R + 1 if once else min(tune.R + tune.R - tune.RR, 4 * tune.R)
+    entries = trace(file, work, frames) if kit else None
+    if kit:
+        assert len(entries) == frames + 1, "the reader gives %d lines, not %d" % (len(entries), frames + 1)
+        first = {"rate": tune.rate, "effects": tune.effects,
+                 "sources": [{"rows": rows, "repeat": rr} for _, r_, rr, rows in tune.sources[1:]]}
+        assert entries[0] == first, "the reader's first line is %s, the tune states %s" % (entries[0], first)
+        entries = entries[1:]
     cost = []
     for f in range(frames):
         if cycles:
@@ -492,9 +550,20 @@ def check(ym, code, symbols, cycles=None):
             advance.append(cycles.image - image_before)
             if cost[-1] == max(cost):
                 costliest[0] = f
+        if once and f == tune.R:
+            # the call after the last row: the end reported, nothing written
+            assert d0 & 0xFFFFFFFF == 0xFFFFFFFF, \
+                "play gave %d after the last row of a tune that plays once" % d0
+            assert not m.psg, "the call after the last row wrote %s" % m.psg
+            if kit:
+                assert entries[f] == {"result": -1}, "the reader's last entry is %s" % entries[f]
+            break
         assert d0 == 0, "play gave %d at frame %d" % (d0, f)
         want = model.frame()
         assert taken(m.psg) == taken(want), "frame %d writes %s, not %s" % (f, m.psg, want)
+        if kit:
+            assert entries[f] == entry(model, want), "frame %d: the reader reports %s, the player %s" % (
+                f, entries[f], entry(model, want))
         restarts = list(timers.restarts)
         timers.apply(m.mfp)
         for i in range(4):
@@ -512,7 +581,7 @@ def check(ym, code, symbols, cycles=None):
             if place is not None and fx["running"]:
                 at = CODE + symbols["ymxr_tick%d" % i]
                 assert m.long(at + TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.long(at + TICK_PTR), place)
-                assert m.byte(at + TICK_SEL) == fx["target"], "frame %d: effect %d's handler selects R%d" % (f, i, m.byte(at + TICK_SEL))
+                assert m.byte(at + TICK_SEL) == fx["using"], "frame %d: effect %d's handler selects R%d, not R%d" % (f, i, m.byte(at + TICK_SEL), fx["using"])
         for i in timers.due(clocks):
             fx = model.fx[i]
             assert fx["running"], "frame %d: a tick of effect %d with nothing running" % (f, i)
@@ -537,7 +606,7 @@ def check(ym, code, symbols, cycles=None):
     for i in range(4):
         if tune.effects & 1 << i:
             assert timers.mode[i] == 0 or i == 3, "stop left effect %d's timer running" % i
-    assert m.byte(MFP + 0x1D) & 0x70 == 0x50, "stop moved Timer C's nibble"
+    assert m.byte(MFP + 0x1D) & 0x70 == nibble, "stop moved Timer C's nibble"
     return frames, ticks, cost, tick_cost, (costliest[0], tune.R, tune.RR, advance)
 
 
@@ -695,9 +764,15 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     count = "-cycles" in sys.argv
     real = "-hatari" in sys.argv
-    tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
-                           for f in os.listdir(os.path.join(ROOT, "ym", "test"))
-                           if f.endswith(".ym"))
+    kit = "-kit" in sys.argv
+    if kit:
+        where = os.path.join(ROOT, "doc", "conformance", "tunes")
+        tunes = args or sorted(os.path.join(where, f) for f in os.listdir(where)
+                               if f.endswith(".ymxr"))
+    else:
+        tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
+                               for f in os.listdir(os.path.join(ROOT, "ym", "test"))
+                               if f.endswith(".ym"))
     code, symbols = assemble()
     print("the player: %d bytes" % len(code))
     cycles_of = None
@@ -713,8 +788,10 @@ def main():
             print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
             continue
         frames, ticks, cost, tick_cost, where = check(ym, code, symbols,
-                                                      cycles_of and CyclesOn(cycles_of))
+                                                      cycles_of and CyclesOn(cycles_of), kit)
         line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
+        if kit:
+            line += ", the player's frames are the reader's entries"
         if cost:
             average = int(sum(cost) / len(cost))
             adv = where[3]
