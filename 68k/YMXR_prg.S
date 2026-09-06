@@ -79,11 +79,29 @@ play:
                 move.w  #$2300,sr
                 .if ^^defined PLAYING
 ; The keyboard's ACIA, read directly: its interrupt is off with the MFP's
-; others, so a byte waits in it. A key pressed is a scan code with bit 7
-; clear; a key released has it set and does not stop the tune.
+; others, so every byte the IKBD sends waits in it, the mouse's among
+; them, and each is taken whole so that TOS finds no packet half read
+; when it has the keyboard back. A byte of $F6 to $FF opens a report of
+; that many bytes more, which are not keys: a status report 7, an
+; absolute mouse 5, a relative mouse 2, the time 6, both joysticks 2, one
+; joystick 1. A key pressed is a scan code with bit 7 clear; a key
+; released has it set and does not stop the tune.
+                clr.w   d1                      ; the report's bytes to skip
 .wait:          btst    #0,$FFFFFC00.w
                 beq.s   .played
                 move.b  $FFFFFC02.w,d0
+                tst.w   d1
+                beq.s   .fresh
+                subq.w  #1,d1                   ; inside a report
+                bra.s   .played
+.fresh:         cmp.b   #$F6,d0
+                bcs.s   .key
+                lea     reports(pc),a0
+                sub.b   #$F6,d0
+                and.w   #15,d0
+                move.b  (a0,d0.w),d1
+                bra.s   .played
+.key:           tst.b   d0
                 bpl.s   .stop
 .played:        tst.w   frames_left
                 bne.s   .wait
@@ -145,6 +163,9 @@ hex:            dc.b    "00000000",13,10
                 .endif
                 dc.b    0
 digits:         dc.b    "0123456789ABCDEF"
+                .if ^^defined PLAYING
+reports:        dc.b    7,5,2,2,2,2,6,2,1,1     ; the bytes after $F6 to $FF
+                .endif
                 .even
 player:         .incbin "YMXR.bin"
                 .even
