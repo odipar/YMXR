@@ -11,17 +11,20 @@ import java.nio.file.Path;
  * ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR]
  * </pre>
  *
- * {@code -k} is the unit the table packs at, 1 by default; {@code -m} the
+ * {@code -k} is the unit the table packs at, 2 by default; {@code -m} the
  * ring in bytes, 960; {@code -r} the row the tune repeats to, the dump's
  * loop frame by default, and {@code -r} alone a tune that plays once.
  */
 public final class YmToYmxr {
 
+    /** The unit a table packs at unless {@code -k} names another. */
+    static final int UNIT = 2;
+
     private YmToYmxr() {
     }
 
     public static void main(String[] args) throws IOException {
-        int unit = 1;
+        int unit = UNIT;
         int ring = Tune.RING;
         int repeat = -1;
         boolean once = false;

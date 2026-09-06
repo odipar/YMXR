@@ -13,7 +13,7 @@ bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r]
 
 | flag | gives |
 |---|---|
-| `-kK` | the unit the table packs at, 1 by default |
+| `-kK` | the unit the table packs at, 2 by default |
 | `-mN` | the ring a column unpacks through, in bytes, 960 by default and at most 1129: the player reaches column 29 through a 16-bit displacement |
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
 
@@ -22,13 +22,18 @@ The first file is unpacked where it is an LHA archive, as distributed
 run, the repeat row and the bytes written, then its notes: effects
 dropped, rows padded, and a ring other than the one asked for.
 
-A table that repeats packs at a period of thirty rows, the column count
-and the smallest DTX allows, since a refill decodes a period's bytes of
-one column at once and the period is what a refill costs (performance.md).
+A table packs at unit 2: unit 1 packs the corpus to 0.69 bytes a frame
+against 0.81, and costs the play call about a seventh more on average
+(performance.md), and `-k1` asks for it. A table that repeats packs at a
+period of thirty rows, the column count and the smallest DTX allows,
+since a refill decodes a period's rows of one column at once and the
+period is what a refill costs (performance.md).
 DTX asks that the repeat row and the loop's rows divide by the period, so
 silent rows pad the repeat row up to a multiple of thirty and the loop
 up to a multiple of thirty of three periods or more, and the tool says
-how many. The ring is shorter than the loop, so that the loop is
+how many. A tune that plays once is padded to thirty rows at least and
+to a multiple of the unit, since DTX asks that a column's bytes divide
+by it. The ring is shorter than the loop, so that the loop is
 replayed at the wrap: a loop the ring holds is read wrong past the wrap
 by DTX 0.4.0's reader, which `68k/test/emu/test_ymxr.py` found. The
 reader on DTX's `lean-advance` branch reads such a loop right, and the

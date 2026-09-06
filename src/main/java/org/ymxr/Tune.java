@@ -55,7 +55,8 @@ final class Tune {
 
     /** A tune file written, and the rows it holds beyond the dump's frames:
      *  {@code before} silent rows put in ahead of the row the tune repeats
-     *  to, and {@code after} appended, where DTX's period asked for them. */
+     *  to, and {@code after} appended, where DTX's period or its unit asked
+     *  for them. */
     record Written(byte[] file, int repeat, int before, int after) {
     }
 
@@ -75,7 +76,9 @@ final class Tune {
      *  smallest, with silent rows padding the repeat row and the loop up to
      *  multiples of `C`, the loop to three periods at least, and at a ring
      *  shorter than the loop, the multiple of `C` nearest the one asked
-     *  for. */
+     *  for. A table that plays once takes `C` rows at least, and a
+     *  multiple of the unit, since a column's bytes divide by it (DTX's
+     *  R5.6). */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          Report report) {
         int frames = columns.column[0].length;
@@ -89,11 +92,20 @@ final class Tune {
             after += (Columns.C - loop % Columns.C) % Columns.C;
             after += Math.max(0, 3 * Columns.C - (frames + after - repeat));
             at = ringFor(frames + after - repeat, ring);
+        } else {
+            after += (unit - (frames + after) % unit) % unit;
         }
         byte[] image = image(columns.column, frames, repeat, before, after, unit, at);
-        if (before > 0 || after > 0) {
+        if (repeat < frames && (before > 0 || after > 0)) {
             report.note(before + " silent rows before the repeat row and " + after
                     + " after the last, so that a period of " + Columns.C + " divides the loop");
+        } else if (after > 0) {
+            int toC = Math.max(0, Columns.C - frames);
+            String why = toC == 0 ? "divide by the unit of " + unit
+                    : after == toC ? "reach " + Columns.C
+                    : "reach " + Columns.C + " and divide by the unit of " + unit;
+            report.note(after + " silent " + (after == 1 ? "row" : "rows")
+                    + " after the last, so that the rows " + why);
         }
         if (at != ring) {
             report.note("the ring is " + at + " bytes: a multiple of the period, under the loop");
