@@ -14,13 +14,13 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Chambers of Shaolin 5 - you blew it! | 1020 | 2405 | 7854 | 1717 | 7166 |
-| Circus Attractions 2 | 180 | 2563 | 7848 | 1898 | 7190 |
-| Digidrum preempt, built | 840 | 2683 | 8138 | 1656 | 7166 |
-| Retrigger retune, built | 1200 | 2464 | 8000 | 1623 | 7168 |
-| Synergy Credits | 10800 | 2932 | 8256 | 1718 | 6972 |
-| Turrican - world 4-3 | 3720 | 2500 | 7968 | 1638 | 7166 |
-| Turrican 2 - world completed 1 | 360 | 2654 | 7932 | 1860 | 7166 |
+| Chambers of Shaolin 5 - you blew it! | 1020 | 2325 | 7794 | 1717 | 7166 |
+| Circus Attractions 2 | 180 | 2445 | 7728 | 1898 | 7190 |
+| Digidrum preempt, built | 840 | 2567 | 8010 | 1656 | 7166 |
+| Retrigger retune, built | 1200 | 2378 | 7912 | 1623 | 7168 |
+| Synergy Credits | 10800 | 2828 | 8138 | 1718 | 6972 |
+| Turrican - world 4-3 | 3720 | 2382 | 7824 | 1638 | 7166 |
+| Turrican 2 - world completed 1 | 360 | 2512 | 7768 | 1860 | 7166 |
 
 A table packs at a period of thirty rows, the column count, so a refill
 is thirty bytes and one comes every row (tools.md, Convert). What those
@@ -32,14 +32,15 @@ rarer: packed at 283 rows, the only period dividing its 5,377-row loop
 before the converter padded it, Synergy Credits refilled 283 bytes at a
 time, from 4,792 to 19,742 cycles, and its costliest frame was 20,936.
 
-The frame procedure is the rest, from 660 to 1,210 cycles on average.
-On Turrican - world 4-3 that is 497 for the fourteen register columns'
-tests and the writes they admit, 174 for the effects' columns and 178
-for the call's own entry and exit; on Synergy Credits, whose two effects
-start and bend often, the effects' columns are 529. An effect the tune
-does not run is jumped over, two nops standing at its columns' head where
-the tune runs it, and a column's select is loaded only where the column
-is set.
+The frame procedure is the rest, from 550 to 1,110 cycles on average:
+the fourteen register columns' tests and the writes they admit, the
+effects' columns and the call's own entry and exit. An effect the tune
+does not run is jumped over, two nops standing at its columns' head
+where the tune runs it; an effect it runs tests its three set-bit
+columns in one pass and reads its count alone where none is set; a tone
+period and the envelope period branch on a zero byte before the bit
+beside it; a column's select is formed only where the column is set;
+and the frame stands inline in the call.
 
 The costliest frame of every tune is the same row: the one before a
 pass's last period, where a table that repeats puts every column's
@@ -47,7 +48,7 @@ decoder back to what it was at the loop's first row, thirty decoders at
 170 cycles each, 5,104 in one call, on top of that row's refill.
 
 R4.5 budgets 6,656 cycles a frame. The average is under it by more than
-half; that one frame is over it on every tune, by 1,192 to 1,600 cycles,
+half; that one frame is over it on every tune, by 1,072 to 1,482 cycles,
 and what it costs is DTX's.
 
 ## Against YMX
@@ -60,19 +61,19 @@ the two players read by one method, on the same dumps, over 2,000 calls:
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2317 | 3424 | 3880 |
-| Synergy Credits | YMXR | 3123 | 4852 | 6844 |
+| Synergy Credits | YMXR | 2986 | 4764 | 6724 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1912 | 3232 | 4252 |
-| Turrican - world 4-3 | YMXR | 2712 | 4128 | 8200 |
+| Turrican - world 4-3 | YMXR | 2583 | 4016 | 8052 |
 
-YMXR costs a third to two fifths more on average and near twice as much
-at its worst, and the difference has three parts. The frame procedure is
-660 to 1,210 cycles: the fourteen register columns' tests and the writes
-they admit, the effects' columns and the call's own entry and exit,
-where YMX writes its fourteen registers unconditionally, one `movep`
-each, and its whole call with nothing to decode is 908, the writes
-included. Fourteen tests and a few writes cost what fourteen writes cost,
-which YMX's own measurement found and its design took; the effects'
-columns and the entry are what the schema adds. DTX's advance spends
+YMXR costs a third more on average and near twice as much at its worst,
+and the difference has three parts. The frame procedure is 550 to 1,110
+cycles: the fourteen register columns' tests and the writes they admit,
+the effects' columns and the call's own entry and exit, where YMX
+writes its fourteen registers unconditionally, one `movep` each, and its
+whole call with nothing to decode is 908, the writes included. Fourteen
+tests and a few writes cost what fourteen writes cost, which YMX's own
+measurement found and its design took; the effects' columns and the
+entry are what the schema adds. DTX's advance spends
 954 cycles a refill outside the decoder, loading and storing the
 decoder's eight registers and keeping its ring, its turn and its
 budget, and 700 to 950 inside it for thirty bytes, where a byte costs 12
@@ -107,14 +108,14 @@ as it stands. What the player can do alone comes first; what needs DTX
 follows; a rule in SPEC.md is last and optional. The figures of steps 2
 to 4 are counted from the 68000's manual and not yet run.
 
-1. **The player alone.** An effect the tune runs reads its three set-bit
-   columns into one register and branches on the sign, reading the count
-   alone where none is set: 66 a quiet effect against 118. A tone period
-   and the envelope period branch on the fine byte's own zero before the
-   bit beside it. The frame procedure stands inline behind one entry branch
-   init aims at the highest effect the tune runs. Together 147 a frame:
-   2,500 to 2,353 on average, 7,968 to 7,800 at worst. No packed byte, no
-   rule, about 200 bytes of code.
+1. **The player alone, taken.** An effect the tune runs reads its three
+   set-bit columns into one register and branches on the sign, reading
+   the count alone where none is set: 66 a quiet effect against 118. A
+   tone period and the envelope period branch on the fine byte's own zero
+   before the bit beside it. The frame procedure stands inline in the
+   call. Counted at 147 a frame, measured at 118: 2,500 to 2,382 on
+   average, 7,968 to 7,824 at worst. No packed byte, no rule, 270 bytes
+   of code.
 2. **A proposal to DTX.** Of the 954 a refilling row spends outside the
    decoder, a walker over the decoders' states removes the two `bsr` and
    `rts` pairs, the recomputed ring end, the five-instruction budget, the
@@ -151,16 +152,17 @@ and does not for the 22 of a test that forms the select only where it
 writes.
 
 What each step leaves, Turrican - world 4-3, in the rig's count, with
-the Hatari figure as the count plus the offset measured on the player
-as it stands, 212 on average and 232 at worst:
+the Hatari figure as the count plus the offset measured on the player,
+about 200 on average and 230 at worst; steps 2 to 4 are counted from
+step 1 as measured:
 
 | after | average | worst | Hatari, average | Hatari, worst |
 |---|---|---|---|---|
-| the player as it stands, measured | 2500 | 7968 | 2712 | 8200 |
-| step 1 | 2353 | 7800 | 2565 | 8030 |
-| step 2 | 1840 | 5070 | 2050 | 5300 |
-| step 3 | 1590 | 4750 | 1800 | 4980 |
-| step 4 | 1550 | 4700 | 1760 | 4940 |
+| the two savings before the design, measured | 2500 | 7968 | 2712 | 8200 |
+| step 1, measured | 2382 | 7824 | 2583 | 8052 |
+| step 2 | 1870 | 5100 | 2070 | 5330 |
+| step 3 | 1620 | 4780 | 1820 | 5010 |
+| step 4 | 1580 | 4730 | 1780 | 4960 |
 | YMX 0.10.1, measured | | | 1912 | 4252 |
 | R4.5 | | 6656 | | |
 
