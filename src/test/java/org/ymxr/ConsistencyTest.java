@@ -40,6 +40,11 @@ final class ConsistencyTest {
         return Files.readString(p);
     }
 
+    /** A claim in prose, where any space may be the line wrap. */
+    private static Pattern wrapped(String claim) {
+        return Pattern.compile(claim.replace(" ", "\\s+"));
+    }
+
     /** The rows of the column table: first index, last index, what it holds. */
     private static List<Object[]> columnTable(String spec) {
         int at = spec.indexOf("| column | holds |");
@@ -81,10 +86,8 @@ final class ConsistencyTest {
         assertTrue(astray.isEmpty(), () -> "a register column is not its"
                 + " register: " + astray);
 
-        // the claim wraps where it wraps, so every space may be a line break
-        String claim = "(\\d+) columns of the 32 R\\d+\\.\\d+ allows, each one"
-                + " byte, so a row is (\\d+) bytes";
-        Matcher m = Pattern.compile(claim.replace(" ", "\\s+")).matcher(spec);
+        Matcher m = wrapped("(\\d+) columns of the 32 R\\d+\\.\\d+ allows, each"
+                + " one byte, so a row is (\\d+) bytes").matcher(spec);
         assertTrue(m.find(), "SPEC.md does not state its column and byte count");
         int saidColumns = Integer.parseInt(m.group(1));
         int saidBytes = Integer.parseInt(m.group(2));
@@ -228,9 +231,9 @@ final class ConsistencyTest {
      */
     @Test
     void theToneShareIsTheSumOfTheThreeItStates() throws IOException {
-        Matcher share = Pattern.compile("take (\\d+\\.\\d)%, (\\d+\\.\\d)% and"
-                + "\\s+(\\d+\\.\\d)% of the packed bytes,\\s+(\\d+\\.\\d)%"
-                + " between them").matcher(read(EXP));
+        Matcher share = wrapped("take (\\d+\\.\\d)%, (\\d+\\.\\d)% and"
+                + " (\\d+\\.\\d)% of the packed bytes, (\\d+\\.\\d)% between"
+                + " them").matcher(read(EXP));
         assertTrue(share.find(), "experiments.md gives no tone shares");
         double sum = 0;
         for (int i = 1; i <= 3; i++) {
@@ -250,11 +253,11 @@ final class ConsistencyTest {
     @Test
     void theEnvelopeSavingIsTheDifferenceItStates() throws IOException {
         String experiments = read(EXP);
-        Matcher both = Pattern.compile("cost\\s+([\\d,]+) bytes as\\s+SPEC\\.md"
-                + " has them, and ([\\d,]+) under").matcher(experiments);
+        Matcher both = wrapped("cost ([\\d,]+) bytes as SPEC\\.md has them, and"
+                + " ([\\d,]+) under").matcher(experiments);
         assertTrue(both.find(), "experiments.md gives no envelope pair");
-        Matcher saved = Pattern.compile("saves ([\\d,]+) bytes, (\\d+)% of the"
-                + "\\s+([\\d,]+) the corpus").matcher(experiments);
+        Matcher saved = wrapped("saves ([\\d,]+) bytes, (\\d+\\.\\d)% of the"
+                + " ([\\d,]+) the corpus").matcher(experiments);
         assertTrue(saved.find(), "experiments.md gives no envelope saving");
         long mine = number(both.group(1));
         long other = number(both.group(2));
@@ -263,12 +266,16 @@ final class ConsistencyTest {
                 + says + ", and " + other + " less " + mine + " is "
                 + (other - mine));
         long whole = number(saved.group(3));
-        long percent = Math.round(says * 100.0 / whole);
-        assertTrue(Long.parseLong(saved.group(2)) == percent,
+        double percent = Math.round(says * 1000.0 / whole) / 10.0;
+        assertTrue(Double.parseDouble(saved.group(2)) == percent,
                 () -> "the saving is stated as " + saved.group(2) + "% and is "
                         + percent + "% of " + whole);
-        assertTrue(experiments.contains("| " + string(whole) + " | 0.72 |"),
-                string(whole) + " is not what the packing table gives");
+        Matcher row = Pattern.compile("^\\| DTX2 files at `k` = 1 \\| ([\\d,]+) \\|",
+                Pattern.MULTILINE).matcher(experiments);
+        assertTrue(row.find(), "experiments.md has no row for k = 1");
+        assertTrue(number(row.group(1)) == whole, () -> string(whole)
+                + " is not what the packing table gives at k = 1, "
+                + row.group(1));
     }
 
     private static long number(String said) {

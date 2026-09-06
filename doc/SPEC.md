@@ -101,7 +101,9 @@ R3 or R5. Bits 5 and 4 are zero.
 A period whose low byte is 0 sets the fine column to 0 and bit 6 of the
 coarse column to 1 on the same row. Bit 6 is beside the coarse column's
 value, not part of it (R3.5), so a player reads it on every row, and a row
-may say the fine byte is 0 without setting the coarse.
+may say the fine byte is 0 without setting the coarse. Across the 543
+tunes the fine byte moves to 0 in 3,541, 2,697 and 13,970 frames of
+3,789,212 for voices A, B and C, which `ym/measure.py` reads back.
 
 ### 1.3 Volume
 
@@ -192,12 +194,12 @@ voice following the envelope. There the registers are untouched, which is
 what "the row does not set these columns" says, so the reserved value and
 the common case agree.
 
-**Why the bits are not the whole answer.** A set bit for a period byte
-held here, saying not set against set, would move whenever the byte moved
-between set and unset. Measured with the period as one column of two
-bytes, that is 60,973 changes on a column that has 24,099 of its own. A
-bit beside moves only where a row sets a byte to 0. `ym/measure.py` reads
-the figures back, over the period as one column.
+**Why the bits are not the whole answer.** Set bits for the two period
+bytes held here, saying not set against set, would move whenever a byte
+moved between set and unset: 101,444 changes on a column that has 24,099
+of its own. The two bits beside move only where a row sets a byte to 0:
+55,799 changes. `ym/measure.py` reads the three figures back, and
+experiments.md has what the difference packs to.
 
 ### 1.8 Effect
 
