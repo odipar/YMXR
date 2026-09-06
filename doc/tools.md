@@ -48,7 +48,7 @@ Maven repository: `mvn install` at DTX's `v0.4.0` tag.
 
 ## The player
 
-`68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,010 bytes. Its
+`68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,158 bytes. Its
 first three longs are the calls:
 
 | call | takes | gives |
