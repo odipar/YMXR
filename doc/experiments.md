@@ -11,6 +11,13 @@ built from YMX's `go/cmd/st4`, with
 back-references held to 960 bytes (`ST4_RING=960`): a streaming player
 decodes into a ring, and 960 bytes a stream is YMX 0.7's default.
 
+Every figure below was measured over the column set the specification
+held then: eighteen columns, twelve of two bytes and six of one, 30 bytes
+a row, in DTX2 files as DTX laid them out then, a header of 14 bytes plus
+`C` rounded up to a long. The specification now holds thirty columns of
+one byte (SPEC 1), the one width DTX 0.4.0 gives a whole table, and the
+converter has not run over them.
+
 ---
 
 ## Everything fits
