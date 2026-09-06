@@ -14,23 +14,28 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Chambers of Shaolin 5 - you blew it! | 1020 | 1818 | 4280 | 1209 | 3742 |
-| Circus Attractions 2 | 180 | 1947 | 3690 | 1400 | 3104 |
-| Digidrum preempt, built | 840 | 2061 | 3846 | 1149 | 3132 |
-| Retrigger retune, built | 1200 | 1869 | 3954 | 1113 | 3162 |
-| Synergy Credits | 10800 | 2320 | 6600 | 1210 | 5326 |
-| Turrican - world 4-3 | 3720 | 1874 | 5110 | 1130 | 4448 |
-| Turrican 2 - world completed 1 | 360 | 2018 | 5748 | 1367 | 5060 |
+| Chambers of Shaolin 5 - you blew it! | 1020 | 1550 | 3470 | 941 | 2842 |
+| Circus Attractions 2 | 180 | 1696 | 3424 | 1149 | 2838 |
+| Digidrum preempt, built | 840 | 1811 | 3582 | 900 | 2868 |
+| Retrigger retune, built | 1200 | 1622 | 3680 | 867 | 2888 |
+| Synergy Credits | 10800 | 2048 | 4746 | 939 | 3080 |
+| Turrican - world 4-3 | 3720 | 1624 | 4794 | 880 | 4132 |
+| Turrican 2 - world completed 1 | 360 | 1749 | 4434 | 1098 | 3716 |
 
-A table packs at a period of thirty rows, the column count, so a refill
-is thirty bytes and one comes every row (tools.md, Convert). What those
-bytes cost depends on how the column packed: a run of long matches
-decodes at 17 cycles a byte and a run of short operations, each a length
-and an offset read bit by bit, at 70 or more, which is the spread between
-the tunes' averages. A larger period would make the refill larger and
-rarer: packed at 283 rows, the only period dividing its 5,377-row loop
-before the converter padded it, Synergy Credits refilled 283 bytes at a
-time, from 4,792 to 19,742 cycles, and its costliest frame was 20,936.
+A table packs at unit 2 and a period of thirty rows, the column count,
+so a refill is fifteen units of two bytes and one comes every row
+(tools.md, Convert). What those units cost depends on how the column
+packed: a run of long matches costs a few cycles a unit and a run of
+short operations, each a length and an offset read bit by bit, over a
+hundred each, which is the spread between the tunes' averages. Unit 1
+packs the corpus to 0.69 bytes a frame against 0.81 (experiments.md) and
+costs more to decode: on Turrican - world 4-3 the advance 1,130 on
+average and 4,448 at most against 880 and 4,132, and the play call 1,874
+and 5,110 against 1,624 and 4,794; `-k1` packs at it. A larger period
+would make the refill larger and rarer: packed at unit 1 and 283 rows,
+the only period dividing its 5,377-row loop before the converter padded
+it, Synergy Credits refilled 283 bytes at a time, from 4,792 to 19,742
+cycles, and its costliest frame was 20,936.
 
 The frame procedure is the rest, from 550 to 1,110 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
@@ -50,8 +55,8 @@ period after the pass's end, so no row takes more than one decoder's
 copy.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is under
-it: the averages by more than half, and the costliest frame by 56 cycles
-on Synergy Credits and by 900 or more on the others.
+it: the averages by more than two thirds, and the costliest frame by
+1,862 cycles or more.
 
 ## Against YMX
 
@@ -63,29 +68,27 @@ the two players read by one method, on the same dumps, over 2,000 calls:
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2317 | 3424 | 3880 |
-| Synergy Credits | YMXR | 2431 | 4220 | 6180 |
+| Synergy Credits | YMXR | 2144 | 3604 | 4648 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1912 | 3232 | 4252 |
-| Turrican - world 4-3 | YMXR | 2037 | 3468 | 5424 |
+| Turrican - world 4-3 | YMXR | 1777 | 2976 | 5116 |
 
-YMXR costs a twentieth more on average and a third to a half more at
-its worst, and the difference has two parts. The frame procedure is 550
-to 1,110 cycles: the fourteen register columns' tests and the writes
-they admit, the effects' columns and the call's own entry and exit,
-where YMX writes its fourteen registers unconditionally, one `movep`
-each, and its whole call with nothing to decode is 908, the writes
-included. Fourteen tests and a few writes cost what fourteen writes
-cost, which YMX's own measurement found and its design took; the
-effects' columns and the entry are what the schema adds. DTX's advance
-spends about 450 cycles a refill outside the decoder, loading and
-storing the decoder's eight registers and stepping to the next: the
-advance fell by 508 on average when DTX's reader took to walking its
-decoder states, from 954 outside the decoder before. Inside it a refill
-is 700 to 950 for thirty bytes, where a byte costs 12 cycles to copy
-and each operation the stream holds 175 to 220 to parse; YMX's refill
-decodes sixty-four bytes at unit 2 for about 950 in all, and the worst
-frame is the heaviest thirty-byte refill against YMX's heaviest
-sixty-four-byte group. Packed at unit 2 the advance falls by a sixth,
-no more.
+YMXR costs a fourteenth less on average and a fifth more at its worst,
+and the two figures have two causes. The frame procedure is 550 to
+1,110 cycles: the fourteen register columns' tests and the writes they
+admit, the effects' columns and the call's own entry and exit, where
+YMX writes its fourteen registers unconditionally, one `movep` each,
+and its whole call with nothing to decode is 908, the writes included.
+Fourteen tests and a few writes cost what fourteen writes cost, which
+YMX's own measurement found and its design took; the effects' columns
+and the entry are what the schema adds. DTX's advance spends about 450
+cycles a refill outside the decoder, loading and storing the decoder's
+eight registers and stepping to the next, and about 430 on average
+inside it for fifteen units, where YMX's refill decodes sixty-four
+bytes at the same unit for about 950 in all: a refill a row, half the
+size of YMX's every second row, costs less on average. The worst frame
+is the heaviest fifteen-unit refill, 4,132 of the 4,794 on Turrican -
+world 4-3, against YMX's heaviest sixty-four-byte group, and that is
+the decoder's spread and not either player's.
 
 ## What can be done
 
@@ -133,13 +136,14 @@ to 4 are counted from the 68000's manual and not yet run.
    6,600 on Synergy Credits against 6,540, under by 56. The cost was
    DTX's: a 48-byte decoder state in its abi, its three packagers'
    state formula, 184 bytes of code, a release.
-3. **Unit 2 in the converter.** Measured before step 2: the advance
-   1,638 to 1,398 on Turrican, the heaviest refill inside the decoder
-   4,008 to 3,692 there and 4,886 to 2,624 on Synergy Credits. It costs
-   18% of the corpus's packed bytes, 0.69 to 0.81 a frame, and one
-   padding frame on 148 of 543 tunes. A converter choosing unit 2 only
-   where a tune's heaviest refill at unit 1 passes the budget keeps most
-   of the corpus at 0.69.
+3. **Unit 2 in the converter, taken as the default.** Measured after
+   step 2: on Turrican the advance 1,130 to 880 on average, the play
+   call 1,874 to 1,624 on average and 5,110 to 4,794 at most; on
+   Synergy Credits 2,320 to 2,048 and 6,600 to 4,746. It costs 18% of
+   the corpus's packed bytes, 0.69 to 0.81 a frame, and no padding
+   frame on a table that repeats, since the period of thirty rows
+   divides by 2. The converter packs at unit 2 unless `-k1` asks for the
+   bytes.
 4. **A rule, optional.** A row that sets any of an effect's columns sets
    its count column too, so a count of 0 says the effect sets nothing: a
    quiet effect then costs 22. About 40 a frame on a tune running two
@@ -158,23 +162,23 @@ writes.
 
 What each step leaves, Turrican - world 4-3, in the rig's count, with
 the Hatari figure as the count plus the offset measured on the player,
-about 160 on average and 310 at worst after step 2; steps 3 and 4 are
-counted from step 2 as measured:
+about 150 on average and 320 at worst after step 3; step 4 is counted
+from step 3 as measured:
 
 | after | average | worst | Hatari, average | Hatari, worst |
 |---|---|---|---|---|
 | the two savings before the design, measured | 2500 | 7968 | 2712 | 8200 |
 | step 1, measured | 2382 | 7824 | 2583 | 8052 |
 | step 2, measured | 1874 | 5110 | 2037 | 5424 |
-| step 3 | 1620 | 4790 | 1780 | 5100 |
-| step 4 | 1580 | 4750 | 1740 | 5060 |
+| step 3, measured | 1624 | 4794 | 1777 | 5116 |
+| step 4 | 1584 | 4754 | 1737 | 5076 |
 | YMX 0.10.1, measured | | | 1912 | 4252 |
 | R4.5 | | 6656 | | |
 
-The average reaches YMX's at step 3. The worst frame came under R4.5 at
-step 2 and stays about 1,170 over YMX's: a thirty-byte refill's heaviest
-case against YMX's sixty-four-byte group, which is the decoder's and not
-either player's.
+The average passed YMX's at step 3, by a fourteenth. The worst frame
+came under R4.5 at step 2 and stays about 860 over YMX's: a fifteen-unit
+refill's heaviest case against YMX's sixty-four-byte group, which is the
+decoder's and not either player's.
 
 ## A tick
 

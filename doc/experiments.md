@@ -47,7 +47,10 @@ each data set on a long.
 `k` = 1 packs smallest, and it is the unit every `R` divides by (DTX,
 R5.6). At `k` = 2, 148 of the 543 tunes need one frame added to divide; at
 `k` = 4, 250 tunes need 508 frames between them, and the packing is worse
-besides.
+besides. The converter packs at `k` = 2 (tools.md): `k` = 1 costs the
+play call a sixth more on average (performance.md), and a table that
+repeats is padded to a period of thirty rows, which 2 divides, so the
+unit adds no frame there.
 
 The gain over YMX, on the 42 tunes it ships with both files and their
 391,193 frames. The `.ymx` files are YMX 0.10.1's, format 0.9, every one
@@ -62,17 +65,18 @@ the first, where a DTX2 file here does not repeat.
 | YMXR, DTX2 files at `k` = 2 | 373,300 | 0.95 | 0.92x |
 | YMXR, DTX2 files at `k` = 4 | 540,668 | 1.38 | 1.34x |
 
-YMXR holds the same music in 21% fewer bytes. Both sides are whole files,
-but a `.ymx` holds its sample tables and a DTX2 file holds no sources
-yet, since where a tune places them is not written (SPEC 7). That margin
-flatters the DTX2 side.
+YMXR holds the same music in 8% fewer bytes at `k` = 2, the unit the
+converter packs at (tools.md), and in 21% fewer at `k` = 1. Both sides
+are whole files, but a `.ymx` holds its sample tables and a DTX2 file
+holds no sources yet, since where a tune places them is not written
+(SPEC 7). That margin flatters the DTX2 side.
 
-The three tone periods, fine and coarse together, take 21.9%, 18.0% and
-19.3% of the packed bytes, 59.2% between them. The sixteen effect columns
-take 15.7%, and the envelope shape 1.4%. No corpus tune runs more than
-two effects at once, so columns 22 to 29 hold zeros throughout and pack
-to 20,284 bytes each: the floor a column costs, mostly the 28-byte ST4
-header its data set opens with, one a tune.
+At `k` = 1, the three tone periods, fine and coarse together, take 21.9%,
+18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen
+effect columns take 15.7%, and the envelope shape 1.4%. No corpus tune
+runs more than two effects at once, so columns 22 to 29 hold zeros
+throughout and pack to 20,284 bytes each: the floor a column costs,
+mostly the 28-byte ST4 header its data set opens with, one a tune.
 
 ---
 
@@ -116,10 +120,10 @@ The period's two bytes fill their columns, so 0 says the row does not set
 one, and bits 6 and 5 of the shape keep a zero byte reachable (SPEC 1.1,
 1.7). The other way to keep it is a set bit for each byte, held in the
 shape column, which then moves whenever a byte moves between set and
-unset (1.7). Packed both ways at the same ring and the same unit, the
-three envelope columns cost 123,646 bytes as SPEC.md has them, and
-131,622 under set bits held in the shape. The reservation saves 7,976
-bytes, 0.3% of the 2,600,640 the corpus packs to.
+unset (1.7). Packed both ways at the same ring and at `k` = 1, the three
+envelope columns cost 123,646 bytes as SPEC.md has them, and 131,622
+under set bits held in the shape. The reservation saves 7,976 bytes,
+0.3% of the 2,600,640 the corpus packs to at that unit.
 
 The saving is smaller than the 27,362 an earlier measurement gave. That
 one set the period as one column of two bytes against a plain column of

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import org.dtx.Table;
@@ -40,7 +41,8 @@ final class ConversionTest {
         int repeat = (int) Math.min(song.loopFrame(), song.frames());
         Sources sources = new Sources(song);
         Columns columns = new Columns(song, sources, repeat, report);
-        Tune.Written written = Tune.write(columns, sources, song.playerHz(), 1, Tune.RING, report);
+        Tune.Written written = Tune.write(columns, sources, song.playerHz(), YmToYmxr.UNIT,
+                Tune.RING, report);
         TuneFile tune = TuneFile.read(written.file());
         assertEquals(song.playerHz(), tune.frameRate());
         assertEquals(song.frames() + written.before() + written.after(), tune.table().rows());
@@ -124,6 +126,33 @@ final class ConversionTest {
             }
         }
         assertTrue(wrong.isEmpty(), () -> path + ":\n" + String.join("\n", wrong));
+    }
+
+    @Test
+    void aTuneThatPlaysOnceIsPaddedToTheUnit() throws IOException {
+        // Thirty-one frames of a dump that repeats, cut to a tune that plays
+        // once: a column of 31 bytes does not divide by a unit of 2 (DTX's
+        // R5.6), so one silent row follows the last.
+        YmDump.Song whole = YmDump.read(Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym")));
+        int frames = 31;
+        byte[][] registers = new byte[whole.registers().length][];
+        for (int r = 0; r < registers.length; r++) {
+            registers[r] = Arrays.copyOf(whole.registers()[r], frames);
+        }
+        YmDump.Song song = new YmDump.Song(whole.format(), frames, whole.playerHz(),
+                whole.masterClock(), frames, whole.interleaved(), whole.attributes(),
+                whole.drums(), whole.name(), whole.author(), whole.comment(), registers);
+        Report report = new Report();
+        Sources sources = new Sources(song);
+        Columns columns = new Columns(song, sources, frames, report);
+        Tune.Written written = Tune.write(columns, sources, song.playerHz(), 2, Tune.RING, report);
+        assertEquals(0, written.before());
+        assertEquals(1, written.after(), "one silent row makes 32 rows, a multiple of the unit");
+        TuneFile tune = TuneFile.read(written.file());
+        assertEquals(32, tune.table().rows());
+        assertEquals(32, tune.table().repeat(), "a tune that plays once repeats at its row count");
+        assertTrue(report.notes().stream().anyMatch(n -> n.contains("divide by the unit")),
+                "the tool says why the row was added: " + report.notes());
     }
 
     @Test
