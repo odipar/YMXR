@@ -107,11 +107,14 @@ final class Columns {
                     continue;
                 }
                 int other = 1 - i;
-                boolean drumRuns = running[other].kind() == Effects.DRUM
-                        && running[other].voice() == slot[i].voice() && f < drumEnd[other]
-                        && !keyframe;
                 boolean drumStarts = slot[other].on() && slot[other].kind() == Effects.DRUM
                         && slot[other].voice() == slot[i].voice();
+                // a drum the other slot replaces in this frame, by another
+                // kind or another voice, runs no longer
+                boolean replaced = slot[other].on() && !drumStarts;
+                boolean drumRuns = running[other].kind() == Effects.DRUM
+                        && running[other].voice() == slot[i].voice() && f < drumEnd[other]
+                        && !keyframe && !replaced;
                 if (slot[i].kind() == Effects.SID && (drumRuns || drumStarts)) {
                     slot[i] = Effects.Slot.EMPTY;
                     report.preempted++;

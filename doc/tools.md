@@ -39,15 +39,15 @@ by DTX 0.4.0's reader, which `68k/test/emu/test_ymxr.py` found. DTX
 0.5.0's reader reads such a loop right, and the rule stays until the
 converter is measured without it.
 
-What the converter does with a dump's effects: a SID voice is a source of
-two rows, its level and 0; a sync buzzer one row, its shape; a digidrum
-the recording's 4-bit levels and a closing row at mid-scale, which owns
-the voice's volume for the frames its rows take at its rate and sets the
-mixer's bits for the voice meanwhile. A sinus SID is dropped, as the
-reference player runs an empty handler for it. The row the tune repeats
-to sets every register and every effect, so the wrap lands on a known
-state. `ConversionTest` replays every tune under `ym/test` against its
-dump.
+What the converter does with a dump's effects: a SID voice is a source of two
+rows, its level and 0; a sync buzzer one row, its shape; a digidrum the
+recording's 4-bit levels and a closing row at mid-scale, which owns the
+voice's volume for the frames its rows take at its rate and sets the mixer's
+bits for the voice meanwhile. A sinus SID is dropped, as the reference player
+runs an empty handler for it. The row the tune repeats to sets every register
+but R13, and every effect that ran up to it or runs into the wrap, so the wrap
+lands on a known state. `ConversionTest` replays every tune under `ym/test`
+against its dump.
 
 The tool runs out of `target/classes`, and builds first where a source or
 the pom is newer than the last build. Java 23 and Maven, and DTX 0.5.0 in
@@ -69,20 +69,22 @@ target, rate and count held to what the dump flags. One line a tune, the
 first twenty wrong frames under a tune that fails, and an exit of 1 where
 any does; a file that is not a YM5!/YM6! dump is said and not counted.
 `ConversionTest` runs the same check on the tunes under `ym/test`, and
-the corpus (Measure, `YM_CORPUS`) runs through it whole in about three
+the corpus (Measure, `YM_CORPUS`) runs through it whole in under two
 minutes: 543 dumps replay to their dumps, and one file is not a dump.
-The check steps one pass and the loop once, as a reader's record runs.
+The check steps one pass and the loop once, as a reader's record runs,
+and takes the converter's flags: `bin/ymxr-check -r DIR` replays every
+dump as a tune that plays once.
 
 ## Trace
 
 ```
-bin/ymxr-trace TUNE [LINES]
+bin/ymxr-trace TUNE [FRAMES]
 ```
 
 What a reader reports of a tune file (SPEC.md 7), on standard output:
-the first line what the tune states once, then one line a frame, `LINES`
-of them in all or the count the kit takes of the tune, one pass and the
-loop once, or the pass and the frame that reports its end. Of a file of
+the first line what the tune states once, then one line a frame,
+`FRAMES` of them or the count the kit takes of the tune, one pass and
+the loop once, or the pass and the frame that reports its end. Of a file of
 another version it prints nothing. The conformance kit's references are
 what this gives (doc/conformance/README.md).
 

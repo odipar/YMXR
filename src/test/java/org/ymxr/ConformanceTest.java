@@ -45,8 +45,9 @@ final class ConformanceTest {
                     null, exercises);
         }
 
-        static Fixture built(String name, Supplier<Tune.Written> built, String exercises) {
-            return new Fixture(name, null, List.of(), built, exercises);
+        static Fixture built(String name, String builder, Supplier<Tune.Written> built,
+                             String exercises) {
+            return new Fixture(name, builder, List.of(), built, exercises);
         }
     }
 
@@ -61,18 +62,18 @@ final class ConformanceTest {
             Fixture.of("turrican", "Turrican - world 4-3.ym", "",
                     "three drums on Timer D, each ending by its marker; RR at 180 with twenty silent rows before it; R13 restated"),
             Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "",
-                    "a loop of one row padded to ninety; a drum running into the wrap"),
+                    "a loop of one row padded to ninety, touching no effect; six drums before it, the last stopped by a row"),
             Fixture.of("synergy", "Synergy Credits.ym", "",
-                    "nine SIDs on Timers A and D at once, one source named by both; select-only and count-only changes; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it"),
+                    "nine SIDs on Timers A and D at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it"),
             Fixture.of("preempt", "Digidrum preempt, built.ym", "",
                     "a drum starting on the voice a SID runs on stops the SID first, and the SID starts again when the drum ends; R8 passed between them with its column unset"),
             Fixture.of("retune", "Retrigger retune, built.ym", "",
                     "a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7; stopped at the wrap alone"),
             Fixture.of("fine-zero", "Big - Samantha Fox Strip Poker 6.ym", "",
                     "a tone fine byte moving to 0: on voice A without the coarse set bit, on B and C with it"),
-            Fixture.built("four-timers", BuiltTunes::fourTimers,
+            Fixture.built("four-timers", "`BuiltTunes.fourTimers`", BuiltTunes::fourTimers,
                     "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump gives: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and taken at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with nothing running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
-            Fixture.built("wrong-version", () -> wrongVersion(),
+            Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     "chambers with the version word $0002: a reader reports nothing of it"));
 
     /** chambers with another version in its header: what a reader reports
@@ -100,13 +101,13 @@ final class ConformanceTest {
     }
 
     /** The dump's own header name and author, the only attribution the
-     *  file carries, or what a built tune says of itself. */
+     *  file holds, as two cells; none for a tune built without a dump. */
     static String credit(Fixture f) throws IOException {
         if (f.built() != null) {
-            return "built";
+            return "none | none";
         }
         YmDump.Song song = YmDump.read(Files.readAllBytes(Path.of("ym", "test", f.dump())));
-        return song.name() + ", " + song.author();
+        return song.name() + " | " + song.author();
     }
 
     /** The reference: the reader's record of the tune, the kit's count of frames. */
@@ -114,24 +115,17 @@ final class ConformanceTest {
         return Trace.record(tune, -1);
     }
 
-    /** The table's rows as DTX0 lays them out: row 0 to R minus one, each
-     *  its thirty columns in order (DTX, SPEC.md 2.1); what a reader takes
-     *  the rows from, since the image's packing is DTX's and not this
+    /** The tune's table as a DTX0 file: the sixteen-byte header giving R
+     *  and RR (SPEC.md 3.1), then row 0 to R minus one, each its thirty
+     *  columns in order (DTX, SPEC.md 2.1); what a reader takes the table
+     *  from, since the image's packing is DTX's and not this
      *  specification's. Empty for a file of another version. */
     static byte[] rows(byte[] tune) {
-        org.dtx.Table table;
         try {
-            table = TuneFile.read(tune).table();
+            return org.dtx.Dtx0.write(TuneFile.read(tune).table());
         } catch (IllegalArgumentException another) {
             return new byte[0];
         }
-        byte[] out = new byte[table.rows() * Columns.C];
-        for (int r = 0; r < table.rows(); r++) {
-            for (int c = 0; c < Columns.C; c++) {
-                out[r * Columns.C + c] = table.column(c)[r];
-            }
-        }
-        return out;
     }
 
     static String sha256(byte[] bytes) {
@@ -145,7 +139,7 @@ final class ConformanceTest {
 
     /** SOURCES.md's row for a fixture. */
     static String row(Fixture f, byte[] tune) throws IOException {
-        String from = f.built() != null ? "built" : "`" + f.dump() + "`";
+        String from = f.built() != null ? f.dump() : "`" + f.dump() + "`";
         String options = f.options().isEmpty() ? "none" : "`" + String.join(" ", f.options()) + "`";
         return "| `" + f.name() + "` | " + from + " | " + credit(f) + " | " + options + " | "
                 + tune.length + " | " + sha256(tune).substring(0, 16) + " | " + f.exercises() + " |";
@@ -154,11 +148,14 @@ final class ConformanceTest {
     /** MANIFEST.txt's three lines for a fixture: the tune, its rows, and
      *  the reference, which is not in the kit. */
     static String manifest(Fixture f, byte[] tune, byte[] rows, byte[] reference) {
-        long lines = reference.length == 0 ? 0
-                : new String(reference, StandardCharsets.US_ASCII).lines().count();
         return sha256(tune) + "  " + tune.length + "  tunes/" + f.name() + ".ymxr\n"
                 + sha256(rows) + "  " + rows.length + "  tunes/" + f.name() + ".rows\n"
-                + sha256(reference) + "  " + lines + "  " + f.name() + ".jsonl";
+                + sha256(reference) + "  " + reference.length + "  " + f.name() + ".jsonl";
+    }
+
+    /** The lines of a record. */
+    static long lines(byte[] record) {
+        return record.length == 0 ? 0 : new String(record, StandardCharsets.US_ASCII).lines().count();
     }
 
     @Test
@@ -199,7 +196,7 @@ final class ConformanceTest {
 
     @Test
     void everyReferenceIsInTheManifest() throws IOException {
-        StringBuilder want = new StringBuilder("# sha256  bytes or entries  file\n");
+        StringBuilder want = new StringBuilder("# sha256  bytes  file\n");
         for (Fixture f : FIXTURES) {
             byte[] tune = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));
             want.append(manifest(f, tune, rows(tune), reference(tune))).append('\n');
@@ -220,13 +217,30 @@ final class ConformanceTest {
         assertTrue(tunes.find(), "README.md does not count the tunes");
         assertEquals(FIXTURES.size(), Integer.parseInt(tunes.group(1)), "README.md's tune count");
         long entries = 0;
+        String task = Files.readString(KIT.resolve("TASK.md"));
         for (Fixture f : FIXTURES) {
-            byte[] record = reference(Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr")));
-            entries += record.length == 0 ? 0
-                    : new String(record, StandardCharsets.US_ASCII).lines().count();
+            long lines = lines(reference(Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"))));
+            entries += lines;
+            Matcher row = Pattern.compile("^\\| `" + Pattern.quote(f.name()) + "\\.ymxr` \\| ([\\d,]+) \\|$",
+                    Pattern.MULTILINE).matcher(task);
+            assertTrue(row.find(), "TASK.md has no row for " + f.name());
+            assertEquals(lines, Long.parseLong(row.group(1).replace(",", "")),
+                    "TASK.md's lines for " + f.name());
         }
         Matcher count = Pattern.compile("([\\d,]+) entries").matcher(readme);
         assertTrue(count.find(), "README.md does not count the entries");
         assertEquals(entries, Long.parseLong(count.group(1).replace(",", "")), "README.md's entry count");
+    }
+
+    @Test
+    void everyDumpOfTheKitReplaysToItsDumpAtItsOptions() throws IOException {
+        for (Fixture f : FIXTURES) {
+            if (f.built() != null) {
+                continue;
+            }
+            YmDump.Song song = YmDump.read(Files.readAllBytes(Path.of("ym", "test", f.dump())));
+            List<String> wrong = Check.of(song, f.options());
+            assertTrue(wrong.isEmpty(), () -> f.name() + ":\n" + String.join("\n", wrong));
+        }
     }
 }

@@ -408,7 +408,7 @@ Section 3.3 gives the bytes.
 An effect's source column gives a source number, 1 to 127, and the index's
 entry at that number gives where the source's table stands. A source is a
 DTX1 table (DTX, SPEC.md 2.2): one column of one-byte values, its rows
-from the table's sixteenth byte, and its header giving `R` at bytes 4 to
+from byte 16 of the table, and its header giving `R` at bytes 4 to
 7 and `RR` at bytes 10 to 13, each most significant byte first (R1.1),
 `RR` equal to `R` where the source does not repeat, as DTX has it.
 
@@ -618,16 +618,17 @@ frame:
   order: `target` as the player holds it after step 1, 0 to 127 as the
   column holds it, and 0 before a row sets it; `source`, the number the
   last row set, 0 to 127, whether or not its ticks have reached the
-  marker (section 5); `select`, 1 to 7, the column's three bits, and
-  `count`, 1 to 255, as the player keeps them (1.9); `timer`, bit 6 of
-  the row's control column where that column is set, and `place`, bit
-  5 the same, false where the column is not set.
+  marker (section 5); `select`, the column's three bits, and `count`,
+  as the player keeps them (1.9): 0 before a row sets them, and kept
+  through a stop after; `timer`, bit 6 of the row's control column where
+  that column is set, and `place`, bit 5 the same, false where the
+  column is not set.
 
 The record of a tune is its first line and the entries of its frames from
-the first, as many as the frames given: `R` plus `R` minus `RR` frames for
-a tune that repeats, with `R` and `RR` the table's, and `R` plus 1 for
-one that does not. doc/conformance/TASK.md gives the count of each tune
-of the kit.
+the first, as many as are asked of the reader: one pass and the loop
+once is `R` plus `R` minus `RR` frames for a tune that repeats, with `R`
+and `RR` the table's, and the pass and the frame after it `R` plus 1 for
+one that does not.
 
 ---
 

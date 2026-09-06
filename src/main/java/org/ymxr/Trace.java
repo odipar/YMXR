@@ -98,11 +98,12 @@ final class Trace {
         return bytes.toByteArray();
     }
 
-    /** {@code ymxr-trace TUNE [CALLS]}: the tune's record on standard
-     *  output, the kit's count of frames unless one is given. */
+    /** {@code ymxr-trace TUNE [FRAMES]}: the tune's record on standard
+     *  output, its first line and one line a frame, the kit's count of
+     *  frames unless one is given. */
     public static void main(String[] args) throws IOException {
         if (args.length < 1 || args.length > 2) {
-            System.err.println("ymxr-trace TUNE [CALLS]");
+            System.err.println("ymxr-trace TUNE [FRAMES]");
             System.exit(2);
         }
         int calls = args.length == 2 ? Integer.parseInt(args[1]) : -1;

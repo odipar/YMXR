@@ -57,6 +57,9 @@ public final class YmToYmxr {
         }
         if (once) {
             repeat = song.frames();
+        } else if (repeat > song.frames()) {
+            throw new IllegalArgumentException("the repeat row " + repeat + " is past the dump's "
+                    + song.frames() + " frames");
         } else if (repeat < 0) {
             repeat = (int) Math.min(song.loopFrame(), song.frames());
             if (song.loopFrame() >= song.frames()) {

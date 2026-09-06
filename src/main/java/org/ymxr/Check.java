@@ -186,9 +186,9 @@ final class Check {
     record Result(Path file, boolean dump, List<String> wrong) {
     }
 
-    /** The file at {@code path}, checked; a dump the converter refuses is
-     *  one line saying why. */
-    static Result of(Path path) {
+    /** The file at {@code path}, checked at the tool's flags; a dump the
+     *  converter rejects is one line saying why. */
+    static Result of(Path path, List<String> flags) {
         byte[] data;
         try {
             data = Files.readAllBytes(path);
@@ -207,7 +207,7 @@ final class Check {
             return new Result(path, false, List.of());
         }
         try {
-            return new Result(path, true, of(YmDump.read(data)));
+            return new Result(path, true, of(YmDump.read(data), flags));
         } catch (RuntimeException failed) {
             return new Result(path, true, List.of("the converter refuses it: "
                     + failed.getMessage()));
@@ -232,16 +232,23 @@ final class Check {
     }
 
     /**
-     * {@code ymxr-check DUMP|DIR ...}: one line a file, the wrong frames
-     * under a tune that fails, and an exit of 1 where any does. A file that
-     * is not a YM5!/YM6! dump is said and not counted.
+     * {@code ymxr-check [-kK] [-mN] [-rRR | -r] DUMP|DIR ...}: one line a
+     * file, the wrong frames under a tune that fails, and an exit of 1
+     * where any does; the flags are the converter's. A file that is not a
+     * YM5!/YM6! dump is said and not counted.
      */
     public static void main(String[] args) throws IOException {
-        if (args.length == 0) {
-            System.err.println("ymxr-check DUMP|DIR ...");
+        List<String> flags = new ArrayList<>();
+        List<String> named = new ArrayList<>();
+        for (String arg : args) {
+            (arg.startsWith("-") ? flags : named).add(arg);
+        }
+        if (named.isEmpty()) {
+            System.err.println("ymxr-check [-kK] [-mN] [-rRR | -r] DUMP|DIR ...");
             System.exit(2);
         }
-        List<Result> results = dumps(args).parallelStream().map(Check::of).toList();
+        List<Result> results = dumps(named.toArray(new String[0])).parallelStream()
+                .map(path -> of(path, flags)).toList();
         int dumps = 0;
         int failed = 0;
         for (Result result : results) {
