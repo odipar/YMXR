@@ -43,17 +43,19 @@ recording's 4-bit levels and a closing row at mid-scale, which owns the
 voice's volume for the frames its rows take at its rate and sets the mixer's
 bits for the voice meanwhile. A sinus SID is dropped, as the reference player
 runs an empty handler for it. The row the tune repeats to sets every register
-but R13, and every effect that ran up to it or runs into the wrap, so the wrap
-lands on a known state. `ConversionTest` replays every tune under `ym/test`
-against its dump.
+but R13 and the ones an effect owns there, and every effect that ran up to it
+or runs into the wrap, so the wrap lands on a known state. `ConversionTest`
+replays every tune under `ym/test` against its dump.
 
 The tune file holds the tune's tables and no code: BINARIES.md says how a
 tool binds them with DTX's reader into what the player takes.
 
-The tool runs out of `target/classes`, and builds first where a source or
-the pom is newer than the last build. Java 23 and Maven, and DTX 0.6.0 in
-the local Maven repository: `mvn install` at DTX's `v0.6.0` tag, whose
-reader this player's frame figures (performance.md) are measured
+The tool runs out of `target/classes`, and builds first where a source,
+the pom or a 68000 source is newer than the last build, or the core is
+not assembled. Java 23, Maven and rmac, with which the build assembles
+both cores and the stub once (`-Drmac=PATH` names another), and DTX 0.6.0
+in the local Maven repository: `mvn install` at DTX's `v0.6.0` tag,
+whose reader this player's frame figures (performance.md) are measured
 against.
 
 ## Check
@@ -91,7 +93,7 @@ what this gives (doc/conformance/README.md).
 
 ## The player
 
-`68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,428 bytes. Its
+`68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,564 bytes. Its
 first three longs are the calls:
 
 | call | takes | gives |
@@ -101,7 +103,7 @@ first three longs are the calls:
 | `YMXR_stop` | `a0` the workspace | the claimed timers stopped, disabled and masked, the three volumes silenced |
 
 Every call clobbers `d0` to `d5` and `a0` to `a5`, and leaves `d6`, `d7`
-and `a6` as they were. The workspace is `YMXR_FIXED`, 56 bytes, then the
+and `a6` as they were. The workspace is `YMXR_FIXED`, 60 bytes, then the
 state block the bound tune states at offset 12 (BINARIES.md). The host
 owns the machine: the player saves and restores no vector, timer control
 or interrupt enable, and touches no timer the tune does not run. The
@@ -112,8 +114,8 @@ header of the source gives the contract in full.
 ```
 bin/ymxr-bind tune.ymxr tune.bin
 bin/ymxr-sndh tune.ymxr [more.ymxr ...] tune.sndh [-tTITLE] [-cCOMPOSER]
-              [-nNAME ...]
-bin/ymxr-prg tune.sndh TUNE.PRG [-paint] [-rROWS]
+              [-nNAME ...] [-perf]
+bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS]
 ```
 
 A tune file holds tables and no code. What the player takes is the bound
@@ -124,21 +126,38 @@ an SNDH file any SNDH host plays, with the tags the flags give; and
 `bin/ymxr-prg` puts the program stub in front of an SNDH file, making a
 TOS program that takes the machine over under Supexec, plays the file
 from the VBL or Timer C, stops on SPACE or ESC or after `ROWS` rows,
-switches subtunes on 1 to 9, and hands the machine back. `-paint` has
-the program paint the background around each play call, the rig's
-measure under Hatari (The rigs). The core and the stub are assembled by
-the build with rmac, once, into the classpath; BINARIES.md is the
-contract for every byte of the three files, and no assembler runs at
-combine time.
+switches subtunes on 1 to 9, and hands the machine back. `-perf` puts
+the core with the raster monitor in (Measure), and the program then
+clears the screen so that its bars show. The core, that core and the
+stub are assembled by the build with rmac, once, into the classpath;
+BINARIES.md is the contract for every byte of them, and no assembler
+runs at combine time.
 
-A tune plays under Hatari like this:
+## Play
 
 ```
-bin/ym-to-ymxr tune.ym WORK/tune.ymxr
-bin/ymxr-sndh WORK/tune.ymxr WORK/tune.sndh -t"The title"
-bin/ymxr-prg WORK/tune.sndh WORK/TUNE.PRG
-hatari --sound 44100 WORK/TUNE.PRG
+ym/play.sh [-kK] [-mN] [-rRR | -r] [-tTITLE] [-cCOMPOSER] [-perf] [-vN]
+           tune.ym [out.wav]
 ```
+
+`ym/play.sh` runs the three tools above and hands the program to Hatari
+with its sound on. SPACE stops the tune, and `-vN` stops the run after
+`N` frames. Named a second file it records instead: Hatari writes an
+AVI, video and sound, which `ym/avi.py` reads back as a WAV, with the
+run's last frame beside it as a PNG.
+
+| option | gives |
+|---|---|
+| `-kK` | the unit the table packs at, 2 by default |
+| `-mN` | the ring in bytes, 960 |
+| `-rRR`, `-r` | the row the tune repeats to, or a tune that plays once |
+| `-tTITLE`, `-cCOMPOSER` | the tags; the title is the file's name by default |
+| `-perf` | the core with the raster monitor in, so the recorded frame shows the bars (Measure) |
+| `-vN` | the frames to run |
+
+`-k`, `-m` and `-r` are the converter's, and a tune file, which is
+packed already, takes none of them. `HATARI` and `TOS` name the emulator
+and a TOS image, as they do for the rigs.
 
 ## The rigs
 
@@ -158,7 +177,10 @@ python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
 
 A tune named as a `.ymxr` file plays as it stands, without the
 converter. A tune whose `RR` is `R` is played one frame past its last
-row, where the call reports -1 and writes nothing.
+row, where the call reports -1 and writes nothing. `-hatari` takes tunes
+at 50 Hz: it cuts the trace into frames at the VBL, which the program
+plays from where the screen's rate is the tune's, and Hatari's ST
+refreshes at 50 Hz.
 
 Under unicorn, which raises no interrupt, the rig models the four timers and
 fires every tick by hand at the time the model gives. `-cycles` counts the
@@ -166,20 +188,21 @@ play call, the share of it spent in DTX's advance, and the tick handlers, with
 DTX's cycle counter, whose tables this rig adds `movep` to, and fails where
 performance.md's figures are not what it counts. `-hatari` puts the tune into
 an SNDH file and a program around it through `bin/ymxr-sndh` and
-`bin/ymxr-prg`, with the paint on and 2,000 rows to play, runs it under a
-cycle-exact Hatari, and reads the trace of every chip write against the same
-model, so the ticks are the MFP's own: the frames are told apart by the VBL,
-and the ticks counted against the rates the trace shows the timers programmed
-at. The program paints the background red around each call, so a run traced
-with `--trace video_color` reads back through YMX's `ymx/test/cost.py` as the
-call's cycles on a cycle-exact machine (performance.md, Against YMX). `-kit`
-plays the conformance kit's tunes, or the tune files named, and holds each
-frame the player makes to the reader's record of it through `bin/ymxr-trace`,
-and the record's first line to the tune's header, so the player, the rig's
-model and the reader agree line by line. Every tune is bound through
-`bin/ymxr-bind` before the player takes it; a tune file of another version is
-one the binder and the reader reject, and the player rejects a bound tune
-whose version is not its own.
+`bin/ymxr-prg`, with 2,000 rows to play, runs it under a cycle-exact Hatari,
+and reads the trace of every chip write against the same model, so the ticks
+are the MFP's own: the frames are told apart by the VBL, and the ticks counted
+against the rates the trace shows the timers programmed at. `ym/cost.sh`
+measures the same program's cycles instead, through the raster monitor
+(Measure). `-perf` builds the player with that monitor in and holds it to the
+model under unicorn, so a band painted or a cost counted changes no register a
+frame writes, and none of the order it writes them in. `-kit` plays the
+conformance kit's tunes, or the tune files named, and holds each frame the
+player makes to the reader's record of it through `bin/ymxr-trace`, and the
+record's first line to the tune's header, so the player, the rig's model and
+the reader agree line by line. Every tune is bound through `bin/ymxr-bind`
+before the player takes it; a tune file of another version is one the binder
+and the reader reject, and the player rejects a bound tune whose version is
+not its own.
 
 | variable | gives |
 |---|---|
@@ -195,3 +218,19 @@ figures experiments.md holds, and `ym/measure.py` the register-level
 figures SPEC.md 1.2 and 1.7 give. `YM_CORPUS` names the corpus,
 `DTX_WRITE` the DTX writer, `DTX_RING` the ring, `JOBS` how many tunes
 convert at once, and `YMX_PAIRS` the tunes with a `.ymx` beside them.
+
+```
+ym/cost.sh tune.ymxr [more.ymxr ...]
+VBLS=3000 ym/cost.sh tune.ymxr
+```
+
+`ym/cost.sh` measures the play call on a cycle-exact machine: it builds
+a program with the raster monitor's core for each tune, runs it under
+Hatari tracing the writes to the background, and reads every call's
+span back through `ym/cost.py`. The monitor is a build of the player
+(`68k/YMXR.S`, `YMXR_PERF`): the call paints the background red while
+its work runs, each tick handler paints its own colour, and the call
+burns a yellow bar for what the ticks it counted cost, after its own
+writes, so none of them moves for it. `HATARI`, `TOS` and `VBLS` name
+the emulator, a TOS image and the frames to run. performance.md has the
+figures and what the method leaves out.

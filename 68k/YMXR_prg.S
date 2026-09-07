@@ -1,26 +1,31 @@
 ; YMXR_prg.S - the program stub: a block a tool puts in front of an SNDH
 ; file to make a TOS program (doc/BINARIES.md). Position-independent; the
-; SNDH file begins at the stub's last byte, and the tool patches the
+; SNDH file begins after the stub's last byte, and the tool patches the
 ; descriptor:
 ;
 ;   +4   'YMXT'
 ;   +8   the descriptor's version, 1
 ;   +10  the subtunes, a word
-;   +12  flags, a word: bit 0 paints the background around each play, for
-;        a run under Hatari that reads the palette back; bit 1 plays from
-;        the VBL, at 50 Hz, and clear from Timer C at the rate
+;   +12  flags, a word: bit 0 clears the screen before the banner, which
+;        the tool sets where the core has the raster monitor in, so that
+;        the bars stand where the desktop's pixels were; bit 1 plays from
+;        the VBL, which the tool sets where the set claims Timer C; with
+;        it clear the program takes the VBL where the screen's rate is the
+;        tune's, and Timer C at the rate where it is not
 ;   +14  the rate, a word, rows a second
 ;   +16  the rows to play, a long, 0 for as many as the tune gives
 ;   +20  the core's offset from the SNDH file's first byte, a long
 ;
 ; The machine is taken over under Supexec: the VBL vector, the four
-; timers' vectors, the enable, mask and control registers and Timer C's
-; count kept, every MFP interrupt off, the core's init called, the rows
-; played from the VBL or Timer C, and the state put back once the rows
-; have played or a key has stopped the tune. SPACE and ESC stop; 1 to 9
-; pick a subtune. The SNDH file's address is printed first, so that a
-; trace can be read against the core's addresses (the rig,
-; 68k/test/emu/test_ymxr.py, -hatari).
+; timers' vectors and the enable, mask and control registers kept, every
+; MFP interrupt off and every timer stopped, the core's init called, the
+; rows played from the VBL or Timer C, and the state put back once the
+; rows have played, the core's state byte marks the tune over, or a key
+; has stopped it. SPACE and ESC stop; 1 to 9 pick a subtune. Timer C's
+; count is written back as the 192 of the system's 200 Hz, since the
+; register reads as the live count and writes as the reload. The SNDH
+; file's address is printed first, so that a trace can be read against
+; the core's addresses (the rig, 68k/test/emu/test_ymxr.py, -hatari).
 ;
 ; The keyboard's ACIA is read directly: its interrupt is off with the
 ; MFP's others, so every byte the IKBD sends waits in it, the mouse's
@@ -44,12 +49,18 @@ stub:           bra.w   main
                 dc.b    'YMXT'
                 dc.w    1
 subtunes:       dc.w    1
-flags:          dc.w    2
+flags:          dc.w    0
 rate:           dc.w    50
 rows:           dc.l    0
 core:           dc.l    0
 
-main:           lea     hex(pc),a0
+main:           btst    #0,flags+1(pc)
+                beq.s   .banner
+                pea     clear(pc)               ; the desktop's pixels away,
+                move.w  #Cconws,-(sp)           ; so the monitor's bars show
+                trap    #GEMDOS
+                addq.l  #6,sp
+.banner:        lea     hex(pc),a0
                 lea     sndh(pc),a1
                 lea     digits(pc),a2
                 move.l  a1,d0
@@ -89,7 +100,6 @@ play:
                 move.b  $FFFFFA19.w,(a5)+
                 move.b  $FFFFFA1B.w,(a5)+
                 move.b  $FFFFFA1D.w,(a5)+
-                move.b  $FFFFFA23.w,(a5)+
                 clr.b   $FFFFFA07.w
                 clr.b   $FFFFFA09.w
                 clr.b   $FFFFFA13.w
@@ -103,6 +113,7 @@ play:
                 clr.w   d1                      ; the report's bytes to skip
 .wait:          btst    #0,$FFFFFC00.w
                 beq.s   .read
+                moveq   #0,d0
                 move.b  $FFFFFC02.w,d0
                 tst.w   d1
                 beq.s   .fresh
@@ -147,13 +158,14 @@ play:
                 move.b  (a5)+,$FFFFFA15.w
                 move.b  (a5)+,$FFFFFA19.w
                 move.b  (a5)+,$FFFFFA1B.w
+                move.b  #192,$FFFFFA23.w        ; the system's 200 Hz count
                 move.b  (a5)+,$FFFFFA1D.w
-                move.b  (a5)+,$FFFFFA23.w
                 move.w  (sp)+,sr
                 rts
 
 ; d0.w the subtune: the one playing stopped, this one started and its
-; clock armed, at level 7.
+; clock armed, at level 7. The VBL where the tool asked for it, or where
+; the screen refreshes at the tune's rate; Timer C where it does not.
 start:
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit: nothing where none plays
@@ -162,8 +174,11 @@ start:
                 clr.b   (a0)
                 move.l  rows(pc),rows_left-done(a0)
                 btst    #1,flags+1(pc)
-                beq.s   .timer
-                lea     tick(pc),a0
+                bne.s   .vbl
+                bsr     screen_hz
+                cmp.w   rate(pc),d0
+                bne.s   .timer
+.vbl:           lea     vbl(pc),a0
                 move.l  a0,VBL.w
                 rts
 .timer:         lea     timer_c(pc),a0          ; Timer C at 200 Hz, and the
@@ -178,26 +193,35 @@ start:
                 bset    #5,$FFFFFA15.w
                 rts
 
-; One row from the core, and the background red while the call runs and
-; yellow at its end where the tool asked for the paint, which a trace of
-; the palette writes turns into the call's cycles. The tune is done once
-; the core says its last row has played, or the rows asked for have.
+; d0 the screen's rate: 71 in high resolution, else 50 or 60 by the sync
+; bit.
+screen_hz:
+                moveq   #71,d0
+                cmp.b   #2,$FFFF8260.w
+                beq.s   .known
+                moveq   #60,d0
+                btst    #1,$FFFF820A.w
+                beq.s   .known
+                moveq   #50,d0
+.known:         rts
+
+; The VBL: one row a frame.
+vbl:
+                bsr     tick
+                rte
+
+; One row from the core. The tune is done once the core says its last row
+; has played, or the rows asked for have. Every register kept. A core
+; with the raster monitor in paints the call itself (the player,
+; doc/performance.md), and this program clears the screen for it.
 tick:
                 movem.l d0-d7/a0-a6,-(sp)
                 move.b  done(pc),d0
                 bne.s   .done
                 lea     sndh(pc),a1
-                btst    #0,flags+1(pc)
-                beq.s   .plain
-                move.w  $FFFF8240.w,-(sp)
-                move.w  #$700,$FFFF8240.w
                 jsr     8(a1)
-                move.w  #$770,$FFFF8240.w
-                move.w  (sp)+,$FFFF8240.w
-                bra.s   .played
-.plain:         jsr     8(a1)
-.played:        adda.l  core(pc),a1
-                move.w  22(a1),d0
+                adda.l  core(pc),a1
+                move.w  24(a1),d0
                 btst    #1,(a1,d0.w)
                 bne.s   .over
                 lea     rows_left(pc),a0
@@ -209,12 +233,17 @@ tick:
 .over:          lea     done(pc),a0
                 st      (a0)
 .done:          movem.l (sp)+,d0-d7/a0-a6
-                rte
+                rts
 
-; Timer C, 200 times a second: a row every 200 over the rate of them, the
-; remainder carried. The interrupt is ended first and the level lowered
-; so that the effects' timers tick through the row, and a tick of this
-; timer that lands inside the row counts and plays nothing.
+; Timer C, 200 times a second: the rate counted against 200, a row for
+; every 200 the count reaches and the remainder carried, so a rate that
+; does not divide 200 lands its rows over the second without drift and a
+; rate above 200 lands more than one row on a tick. The interrupt is
+; ended first and the level lowered so that the effects' timers tick
+; through the row; a tick of this timer that lands inside the row adds
+; its rate to the count and plays nothing, and the row's caller, or the
+; next tick, plays what the count has reached. The count is moved in
+; single instructions below the level, which a tick cannot split.
 timer_c:
                 bclr    #5,$FFFFFA11.w
                 move.l  a0,-(sp)
@@ -223,27 +252,24 @@ timer_c:
                 move.w  (a0),d0
                 add.w   rate(pc),d0
                 cmp.w   #200,d0
-                bcs.s   .carry
-                sub.w   #200,d0
-                move.w  d0,(a0)
+                bcs.s   .kept
                 tas     busy-accumulated(a0)
-                bne.s   .out
+                bne.s   .kept                   ; inside a row
+                move.w  d0,(a0)
                 move.w  #$2500,sr
-                bsr.s   row
+.row:           sub.w   #200,(a0)
+                bsr     tick
+                cmpi.w  #200,(a0)
+                bcc.s   .row
                 lea     busy(pc),a0
                 clr.b   (a0)
+                bra.s   .out
+.kept:          move.w  d0,(a0)
 .out:           move.w  (sp)+,d0
                 movea.l (sp)+,a0
                 rte
-.carry:         move.w  d0,(a0)
-                bra.s   .out
 
-; The row, as a call.
-row:            pea     .back(pc)
-                move.w  sr,-(sp)
-                bra     tick
-.back:          rts
-
+clear:          dc.b    27,"E",0                ; VT52: the screen cleared
 text:           dc.b    "YMXR at $"
 hex:            dc.b    "00000000",13,10
                 dc.b    "SPACE stops the tune, 1 to 9 pick a subtune",13,10,0

@@ -12,10 +12,12 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * The two 68000 binaries the tools combine with bound tunes
+ * The three 68000 binaries the tools combine with bound tunes
  * (doc/BINARIES.md): the SNDH core, which {@link Sndh} puts under an SNDH
- * file's entries, and the program stub, which {@link Prg} puts in front of
- * an SNDH file. The build assembles each once from its source under
+ * file's entries, the same core with the player's raster monitor
+ * assembled in, which {@link Sndh} puts there instead where a run is to
+ * be read, and the program stub, which {@link Prg} puts in front of an
+ * SNDH file. The build assembles each once from its source under
  * {@code 68k} and writes it into the classes, the one step rmac is needed
  * for; a tool reads them there and runs no assembler.
  */
@@ -24,25 +26,43 @@ final class Binaries {
     /** Where the classes carry them. */
     static final String CARRIED = "/org/ymxr/68k/";
 
-    /** One binary: the file it is carried as, and the source it is
-     *  assembled from. */
-    record Binary(String name, String source) {
+    /** One binary: the file it is carried as, the source it is assembled
+     *  from, and the switches rmac assembles it with. */
+    record Binary(String name, String source, List<String> defines) {
     }
 
-    static final Binary CORE = new Binary("YMXR_sndh.bin", "YMXR_sndh.S");
-    static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S");
+    static final Binary CORE = new Binary("YMXR_sndh.bin", "YMXR_sndh.S", List.of());
+
+    /**
+     * The core with the player's raster monitor assembled in (the
+     * player's {@code YMXR_PERF}, doc/performance.md): the play call
+     * paints the background red while its work runs and burns a yellow
+     * bar for the timers' counted cost, and each tick handler paints its
+     * own colour. A trace of the palette writes gives what the run cost,
+     * and a file made for reading a run takes this core in place of the
+     * plain one.
+     */
+    static final Binary MONITOR = new Binary("YMXR_sndh-perf.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_PERF=1"));
+
+    static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S", List.of());
 
     private Binaries() {
     }
 
-    /** Both, in the order the build writes them. */
+    /** All three, in the order the build writes them. */
     static List<Binary> all() {
-        return List.of(CORE, STUB);
+        return List.of(CORE, MONITOR, STUB);
     }
 
     /** The SNDH core as carried. */
     static byte[] core() {
         return carried(CORE.name());
+    }
+
+    /** The core with the raster monitor in, as carried. */
+    static byte[] monitorCore() {
+        return carried(MONITOR.name());
     }
 
     /** The program stub as carried. */
@@ -70,7 +90,7 @@ final class Binaries {
     /**
      * rmac's assembly of one source under {@code sources}, raw, for the
      * 68000, with {@code sources} on the include path for the player the
-     * core includes.
+     * core includes and the binary's own switches after it.
      *
      * @throws IllegalStateException where rmac does not run or fails
      */
@@ -78,10 +98,13 @@ final class Binaries {
         Path work = Files.createTempDirectory("ymxr68k");
         try {
             Path out = work.resolve(binary.name());
-            Process run = new ProcessBuilder(rmac.toString(), "-m68000", "-fr",
-                    "-i" + sources, "-o", out.toString(),
-                    sources.resolve(binary.source()).toString())
-                    .redirectErrorStream(true).start();
+            List<String> command = new ArrayList<>(
+                    List.of(rmac.toString(), "-m68000", "-fr", "-i" + sources));
+            command.addAll(binary.defines());
+            command.add("-o");
+            command.add(out.toString());
+            command.add(sources.resolve(binary.source()).toString());
+            Process run = new ProcessBuilder(command).redirectErrorStream(true).start();
             byte[] said = run.getInputStream().readAllBytes();
             if (run.waitFor() != 0 || !Files.exists(out)) {
                 throw new IllegalStateException(rmac + " gave "
@@ -104,8 +127,8 @@ final class Binaries {
     }
 
     /**
-     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the core and the stub
-     * assembled and written into each directory named, one line each
+     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the two cores and the
+     * stub assembled and written into each directory named, one line each
      * with its bytes. The assembler is {@code rmac} on the path unless
      * {@code -a} names another, and the sources are under {@code 68k}
      * unless {@code -s} names another directory. A failure to assemble
@@ -149,7 +172,7 @@ final class Binaries {
             for (Path at : into) {
                 Files.write(at.resolve(binary.name()), code);
             }
-            System.out.printf("%-14s %5d bytes%n", binary.name(), code.length);
+            System.out.printf("%-18s %5d bytes%n", binary.name(), code.length);
         }
     }
 

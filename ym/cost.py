@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""The play call's cost, out of a raster monitor run's palette writes.
+
+A player with the monitor in (68k/YMXR.S, YMXR_PERF) paints the
+background red while a call's work runs and yellow while it burns the
+timers' counted cost, and each tick handler paints its own colour and
+puts back what stood before it. This reads a Hatari trace of the writes
+to the background back: the red mark to the yellow one is the call's own
+work, less every tick band inside it, and the yellow to the write that
+puts the desktop's colour back is the bar. doc/performance.md has the
+figures and the method.
+
+    ym/cost.py trace.txt
+"""
+import re
+import sys
+
+FRAME = 160256                  # a PAL frame of an ST, in cycles
+LINE = 512                      # a scanline
+WORK = 0x700                    # the call's work
+BAR = 0x770                     # the timers' bar
+TICKS = (0x070, 0x007, 0x707, 0x077)
+WRITE = re.compile(r"write col addr=ff8240 col=(\w+) video_cyc_w=(\d+).*pc=([0-9a-f]+)")
+ROM = 0xE00000
+
+
+def read(path):
+    """Every palette write the program made, in order: its colour and the
+    cycle it landed on. A write from the operating system's own code is
+    not the monitor's and is left out."""
+    out = []
+    for line in open(path, errors="replace"):
+        m = WRITE.search(line)
+        if m and int(m.group(3), 16) < ROM:
+            out.append((int(m.group(1), 16), int(m.group(2))))
+    return out
+
+
+def span(at, to):
+    """The cycles between two marks, a frame's wrap taken."""
+    return to - at + (FRAME if to < at else 0)
+
+
+def bands(writes, at, under):
+    """The tick bands from writes[at] on, while they nest under a mark of
+    colour under: (the cycles each band's own tick took, the cycles the
+    outermost bands took together, the write the nesting ends at). A tick
+    marks its colour and puts back the colour it found, so a write of the
+    colour under the top of the nest closes one band."""
+    own, whole, nest = [], 0, []
+    while at < len(writes):
+        colour, now = writes[at]
+        if nest and colour == (nest[-2][0] if len(nest) > 1 else under):
+            _, began, inner = nest.pop()
+            took = span(began, now)
+            own.append(took - inner)     # a band of its own, its nest out
+            if nest:
+                nest[-1][2] += took
+            else:
+                whole += took            # an outermost band, whole
+        elif colour in TICKS and (nest or (at + 1 < len(writes)
+                                           and writes[at + 1][0] == under)):
+            nest.append([colour, now, 0])
+        else:
+            break                        # the mark this nest stands under is over
+        at += 1
+    return own, whole, at
+
+
+def spans(writes):
+    """(the calls' work, the ticks, the bars), each a list of cycles."""
+    work, ticks, bars = [], [], []
+    at = 0
+    while at < len(writes):
+        colour, opened = writes[at]
+        at += 1
+        if colour != WORK:
+            continue
+        own, inside, at = bands(writes, at, WORK)
+        if at == len(writes) or writes[at][0] != BAR:
+            continue                    # no yellow mark: no call to measure
+        ticks += own
+        whole = span(opened, writes[at][1])
+        burnt = writes[at][1]
+        at += 1
+        own, _, at = bands(writes, at, BAR)
+        ticks += own
+        if whole < FRAME // 2:          # a span over a stop is no call
+            work.append(whole - inside)
+            if at < len(writes):
+                bars.append(span(burnt, writes[at][1]))
+    return work, ticks, bars
+
+
+def main():
+    if len(sys.argv) != 2:
+        print(__doc__.strip())
+        return 2
+    work, ticks, bars = spans(read(sys.argv[1]))
+    if not work:
+        print("the trace holds no call")
+        return 1
+    work.sort()
+    n = len(work)
+    line = "calls %d, %d cycles on average, %d at the 99th in a hundred, %d at most (%.2f lines)" % (
+        n, sum(work) / n, work[int(n * 0.99)], work[-1], work[-1] / LINE)
+    if ticks:
+        line += "; ticks %.2f a call, %d cycles each on average" % (
+            len(ticks) / n, sum(ticks) / len(ticks))
+    if bars:
+        line += "; the bar %.2f lines on average, %.2f at most" % (
+            sum(bars) / len(bars) / LINE, max(bars) / LINE)
+    print(line)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

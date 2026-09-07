@@ -12,12 +12,26 @@ import org.dtx.Table;
 /**
  * A dump converted and replayed against itself: the tune file's table
  * stepped frame by frame by {@link Replay}, every frame's registers held to
- * the dump's but those an effect owns, and every effect's source, target,
- * rate and count held to what the dump flags. {@code ConversionTest} runs
- * it on the tunes under {@code ym/test}, and {@code bin/ymxr-check} on any
- * dumps, the corpus among them.
+ * the dump's, a volume register an effect owns held to an unset column
+ * instead, and every effect's source, target, rate and count held to what
+ * the dump flags. {@code ConversionTest} runs it on the tunes under
+ * {@code ym/test}, and {@code bin/ymxr-check} on any dumps, the corpus
+ * among them.
  */
 final class Check {
+    /** Whether a row started an effect on this register and placed it at
+     *  its first row, the one write the rule allows against a register an
+     *  effect owns (SPEC.md 1.3). */
+    private static boolean started(Replay model, int register) {
+        for (Replay.Effect e : model.effect) {
+            if (e.started() && e.place() && e.target() == register) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    
 
     /** The wrong frames listed for one tune, at most. */
     static final int MOST = 20;
@@ -110,16 +124,20 @@ final class Check {
                                 + " under a drum on its voice");
                     }
                 } else if (slot.on() && sources.number(slot, new Report()) != 0) {
+                    int number = sources.number(slot, new Report());
                     if (e.source() == 0) {
                         wrong.add(f + ": effect " + i + " runs nothing where the dump flags kind "
                                 + slot.kind());
                     } else {
                         Sources.Source s = sources.get(e.source());
-                        if (s.kind() != slot.kind() || e.target() != slot.target()
+                        if (e.source() != number || e.target() != slot.target()
                                 || e.select() != slot.select() || e.count() != slot.count()) {
-                            wrong.add(f + ": effect " + i + " runs kind " + s.kind() + " on R"
+                            Sources.Source flagged = sources.get(number);
+                            wrong.add(f + ": effect " + i + " runs source " + e.source()
+                                    + " (kind " + s.kind() + " value " + s.data() + ") on R"
                                     + e.target() + " at " + e.select() + "/" + e.count()
-                                    + ", not kind " + slot.kind() + " on R" + slot.target()
+                                    + ", not source " + number + " (kind " + flagged.kind()
+                                    + " value " + flagged.data() + ") on R" + slot.target()
                                     + " at " + slot.select() + "/" + slot.count());
                         }
                         if (slot.kind() == Effects.DRUM) {
@@ -147,7 +165,18 @@ final class Check {
             }
             for (int c = 0; c < 13; c++) {
                 int want = c == 7 ? dump[7] | mixer : dump[c];
-                if ((owned & 1 << c) == 0 && model.registers[c] != want) {
+                if ((owned & 1 << c) != 0) {
+                    // The row that starts a square wave on a volume register
+                    // and places it at its first row sets that column to 0,
+                    // silencing the voice until the first tick (SPEC.md 1.3,
+                    // section 6 rule 1). One whose place stands where it
+                    // is leaves the column unset, as any other row does.
+                    boolean silences = model.written[c] == 0 && started(model, c);
+                    if (c >= 8 && c <= 10 && model.written[c] >= 0 && !silences) {
+                        wrong.add(f + ": R" + c + "'s column is set to " + model.written[c]
+                                + " while an effect runs on it");
+                    }
+                } else if (model.registers[c] != want) {
                     wrong.add(f + ": R" + c + " holds " + model.registers[c] + ", not " + want);
                 }
             }

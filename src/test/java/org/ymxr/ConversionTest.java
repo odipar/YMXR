@@ -69,6 +69,59 @@ final class ConversionTest {
     }
 
     @Test
+    void aSquareChangedUnderARunningTimerCarriesItsPlaceOver() throws IOException {
+        // SPEC.md 6 rule 5: a row that sets the source column sets bit 6 of
+        // the control column where the timer is stopped, and bit 5 unless
+        // the source it starts is a square replacing a square on the same
+        // target. Effect 1 of Synergy Credits starts on row 12, where
+        // nothing runs on its timer, and takes another source at another
+        // count on row 36, where the timer has run since. The count row 36
+        // gives is taken when the running count reaches zero (1.9), so the
+        // pitch moves and the phase holds; the place stands where it is
+        // with it, so the half the square is in runs to its end.
+        byte[] dump = Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym"));
+        Table table = TuneFile.read(YmToYmxr.convert(dump, List.of(), new Report())
+                .written().file()).table();
+        int t = Columns.EFFECT + 4;
+        assertEquals(0x80 | 10, table.column(t)[12] & 0xFF, "row 12 gives effect 1 R10");
+        assertEquals(0x80 | 3, table.column(t + 1)[12] & 0xFF, "row 12 starts source 3");
+        assertEquals(0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET | 5,
+                table.column(t + 2)[12] & 0xFF, "row 12 starts the stopped timer");
+        assertEquals(0xE7, table.column(t + 3)[12] & 0xFF, "row 12's count");
+        assertEquals(0x80 | 1, table.column(t + 1)[36] & 0xFF, "row 36 takes source 1");
+        assertEquals(0x80 | 5, table.column(t + 2)[36] & 0xFF,
+                "row 36 takes the source without stopping the timer or the place");
+        assertEquals(0xEB, table.column(t + 3)[36] & 0xFF, "row 36's count");
+        // Every start on this tune's two effects is a square. One on a
+        // stopped timer takes bits 6 and 5; one that moves the square to
+        // another voice sets the target column and takes bit 5; one that
+        // replaces a square on the target the effect holds takes neither,
+        // and its place stands where it is.
+        for (int i = 0; i < 2; i++) {
+            byte[] target = table.column(Columns.EFFECT + 4 * i);
+            byte[] source = table.column(Columns.EFFECT + 4 * i + 1);
+            byte[] control = table.column(Columns.EFFECT + 4 * i + 2);
+            int bits = Columns.TIMER_RESET | Columns.PLACE_RESET;
+            boolean running = false;
+            int carried = 0;
+            for (int f = 0; f < table.rows(); f++) {
+                if ((source[f] & 0xFF) > 0x80) {
+                    boolean moved = (target[f] & 0x80) != 0;
+                    int want = !running ? bits : moved ? Columns.PLACE_RESET : 0;
+                    assertEquals(want, control[f] & bits,
+                            "row " + f + " starts effect " + i + " on the wrong bits");
+                    carried += want == 0 ? 1 : 0;
+                    running = true;
+                } else if ((source[f] & 0xFF) == 0x80) {
+                    running = false;
+                }
+            }
+            assertTrue(carried > 100, "effect " + i + " keeps its place on "
+                    + carried + " starts");
+        }
+    }
+
+    @Test
     void aSidVoiceIsTwoRowsAndABuzzerOne() throws IOException {
         YmDump.Song song = YmDump.read(Files.readAllBytes(Path.of("ym/test/Retrigger retune, built.ym")));
         Sources sources = new Sources(song);
@@ -89,7 +142,7 @@ final class ConversionTest {
         Sources.Source sid = sources.get(sources.number(
                 new Effects.Slot(Effects.SID, 0, 8, 9, 1, 100), report));
         assertEquals(2, sid.rows().length);
-        assertEquals(9, sid.rows()[0]);
+        assertEquals(9, sid.rows()[0], "the loud half, the row having silenced the voice");
         assertEquals(Sources.MARK, sid.rows()[1] & 0xFF);
         assertEquals(0, sid.repeat());
     }

@@ -7,18 +7,21 @@ import java.util.Arrays;
  * from a YM dump. A column is set where its value differs from what the
  * player holds; an unset value is 0, which R3.6 does not read.
  *
- * <p>An effect starts on the frame the dump flags it, with the timer's and
- * the place's reset (1.9, section 6), and runs on while the dump flags the
- * same voice at the same value, its rate moving where the dump's moves. A
- * digidrum runs for the frames its rows take at its rate, the dump flagging
- * only the trigger, and the row it ends on stops it and sets the voice's
- * volume again (1.3). A SID voice or a digidrum owns its volume register
- * while it runs (section 6); a sync buzzer owns nothing, the frame's own
- * write to R13 restarting the envelope beside its ticks, as the reference
- * player has it.
+ * <p>An effect starts on the frame the dump flags it, with the place's
+ * reset and, where the timer is stopped, the timer's (1.9, section 6 rule
+ * 5): a source that changes under a running timer reloads the count, and
+ * the timer takes it at its next zero. An effect runs on while the dump
+ * flags the same voice at the same value, its rate moving where the dump's
+ * moves. A digidrum runs for the frames its rows take at its rate, the dump
+ * flagging only the trigger, and the row it ends on stops it and sets the
+ * voice's volume again (1.3). A SID voice or a digidrum owns its volume
+ * register while it runs (section 6); a sync buzzer owns nothing, the
+ * frame's own write to R13 restarting the envelope beside its ticks, as the
+ * reference player has it.
  *
- * <p>The row the tune repeats to sets every register but R13 and every
- * effect, so the wrap lands on a known state whatever the last row left.
+ * <p>The row the tune repeats to sets every register but R13 and the ones
+ * an effect owns there, and every effect, so the wrap lands on a known
+ * state whatever the last row left.
  */
 final class Columns {
 
@@ -77,8 +80,9 @@ final class Columns {
         int used = 0;
         for (int f = 0; f < frames; f++) {
             // The row the tune repeats to sets every register but R13 and
-            // every effect, so the wrap lands on a known state: row 0 too,
-            // where the tune repeats to it.
+            // the ones an effect owns there, and every effect, so the wrap
+            // lands on a known state: row 0 too, where the tune repeats to
+            // it.
             boolean keyframe = f == repeat;
             if (keyframe) {
                 Arrays.fill(held, -1);
@@ -127,6 +131,7 @@ final class Columns {
             }
             byte[] out = new byte[C];
             int owned = 0;
+            int silenced = 0;
             for (int i = 0; i < 2; i++) {
                 int t = EFFECT + 4 * i;
                 boolean drum = running[i].kind() == Effects.DRUM;
@@ -150,8 +155,46 @@ final class Columns {
                         targetHeld[i] = slot[i].target();
                     }
                     if (starting) {
+                        // Bit 6 stops the timer, writes the count and starts
+                        // it, so the timer takes a whole period and loses
+                        // what it had run of the last one. Section 6 rule 5
+                        // sets the bit where the timer is stopped; where the
+                        // timer runs, the count this row writes is taken
+                        // when the running count reaches zero, which moves
+                        // the pitch without a break (1.9). A timer is
+                        // stopped where no effect runs on it, the row that
+                        // stopped the effect having written select 0, and
+                        // where a digidrum's source has run out: that source
+                        // does not repeat, so its last tick stops the timer
+                        // (section 5). A SID voice's source and a sync
+                        // buzzer's repeat, and run until a row stops them.
+                        // The keyframe sets the bit whatever the wrap left.
+                        boolean stopped = keyframe || !running[i].on()
+                                || running[i].kind() == Effects.DRUM && f >= drumEnd[i];
+                        // Where a square replaces a square on the same
+                        // target the place stands where it is: the row leaves
+                        // bit 5 clear, and the new source's rows go under the
+                        // place at the row it stands on (1.9). Every level is
+                        // its own source, so a square whose level moves
+                        // starts one each time; the half in flight runs to
+                        // its end and the alternation holds its period. A
+                        // drum struck again begins at its first row, so it
+                        // takes bit 5 as any other start does.
+                        boolean keeps = !keyframe && slot[i].kind() == Effects.SID
+                                && running[i].kind() == Effects.SID
+                                && running[i].target() == slot[i].target();
+                        if (slot[i].kind() == Effects.SID && !keeps) {
+                            // The voice is silenced on the row that starts
+                            // the square, so the tick a period later is its
+                            // loud half (1.3, section 6): the square begins
+                            // where the reference player begins it. A start
+                            // that keeps the place writes no level: the
+                            // alternation runs on.
+                            silenced |= 1 << slot[i].target();
+                        }
                         out[t + 1] = (byte) (0x80 | number[i]);
-                        out[t + 2] = (byte) (0x80 | TIMER_RESET | PLACE_RESET | slot[i].select());
+                        out[t + 2] = (byte) (0x80 | (stopped ? TIMER_RESET : 0)
+                                | (keeps ? 0 : PLACE_RESET) | slot[i].select());
                         out[t + 3] = (byte) slot[i].count();
                         running[i] = slot[i];
                         runningNumber[i] = number[i];
@@ -188,7 +231,10 @@ final class Columns {
                         held[c] = reg[c];
                     }
                 } else if ((owned & 1 << c) != 0) {
-                    held[c] = -1;
+                    if ((silenced & 1 << c) != 0) {
+                        out[c] = (byte) 0x80;       // the level 0: the voice
+                    }                               // silent until the first
+                    held[c] = -1;                   // tick a period on
                 } else if (reg[c] != held[c]) {
                     out[c] |= (byte) (0x80 | reg[c]);
                     held[c] = reg[c];

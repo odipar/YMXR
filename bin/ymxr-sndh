@@ -7,7 +7,7 @@ set -e
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 classes=$root/target/classes
 built=$classes/.built
-if [ ! -f "$built" ] || [ ! -f "$classes/org/ymxr/68k/YMXR_sndh.bin" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]; then
+if [ ! -f "$built" ] || [ ! -f "$classes/org/ymxr/68k/YMXR_sndh.bin" ] || [ ! -f "$classes/org/ymxr/68k/YMXR_sndh-perf.bin" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]; then
     (cd "$root" && mvn -q process-classes dependency:build-classpath -Dmdep.outputFile=target/classpath >/dev/null)
     : > "$built"
 fi

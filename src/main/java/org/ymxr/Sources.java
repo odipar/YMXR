@@ -84,6 +84,10 @@ final class Sources {
     private Source build(int kind, int data) {
         switch (kind) {
             case Effects.SID:
+                // The level then the silence, and the row that starts it
+                // silences the voice itself (Columns), so the square begins
+                // as the reference player begins it: the voice silent at
+                // once, a timer's period of it, then the loud half.
                 return new Source(kind, data, new byte[] {(byte) data, (byte) MARK}, 0);
             case Effects.BUZZER:
                 return new Source(kind, data, new byte[] {(byte) (MARK | data)}, 0);

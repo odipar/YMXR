@@ -9,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -55,6 +57,35 @@ final class PlayerTest {
         assertEquals(Bound.FORMAT_AT, e.get("IM_FORMAT"));
         assertEquals(Columns.EFFECT, 14);
         assertEquals(Tune.MAX_RING, 32767 / (Columns.C - 1));
+    }
+
+    /** Each tick kind as a pair: the text of its row in performance.md,
+     *  then the player's equate that gives the monitor's count for it. */
+    private static final List<String> TICKS = List.of(
+            "a row written, the place stepped", "PERF_ON",
+            "the marker, the place to row `RR`", "PERF_LOOP",
+            "the marker, the timer stopped", "PERF_STOP");
+
+    @Test
+    void theMonitorCountsATickAtWhatItCosts() throws IOException {
+        // The raster monitor burns a bar for the ticks' counted cost, in
+        // turns of ten cycles (68k/YMXR.S, YMXR_PERF). Each count stands
+        // within a twentieth of what performance.md measures that tick at,
+        // so the bar reads as the timers' share of the frame.
+        Map<String, Integer> e = equates();
+        String said = Files.readString(Path.of("doc/performance.md"));
+        for (int i = 0; i < TICKS.size(); i += 2) {
+            String row = TICKS.get(i);
+            int count = Objects.requireNonNull(e.get(TICKS.get(i + 1)),
+                    TICKS.get(i + 1) + " is not an equate of the player");
+            Matcher m = Pattern.compile("^\\| " + Pattern.quote(row) + " \\| (\\d+) \\|$",
+                    Pattern.MULTILINE).matcher(said);
+            assertTrue(m.find(), "performance.md has no row for " + row);
+            int measured = Integer.parseInt(m.group(1));
+            assertTrue(Math.abs(count * 10 - measured) * 20 <= measured,
+                    row + " is measured at " + measured + " cycles, and the monitor counts "
+                            + count + " turns of ten");
+        }
     }
 
     @Test
