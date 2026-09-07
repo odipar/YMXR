@@ -42,7 +42,8 @@ ym/play.sh tune.ym
 ```
 
 That converts, combines and plays it under Hatari; named a second file it
-records the run to a WAV instead. The three tools it drives are these:
+records the run to a WAV instead, and its options reach the tools it
+drives, `-perf` among them for the raster monitor. The three are these:
 
 ```bash
 bin/ym-to-ymxr tune.ym tune.ymxr

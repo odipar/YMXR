@@ -136,18 +136,28 @@ runs at combine time.
 ## Play
 
 ```
-ym/play.sh tune.ym                  play it, SPACE stops
-ym/play.sh tune.ymxr                a tune file plays as it stands
-ym/play.sh tune.ym out.wav          record it instead, sound to a WAV
-VBLS=1500 ym/play.sh tune.ym        stop after that many frames
-PERF=1 ym/play.sh tune.ym out.wav   the raster monitor's core in
+ym/play.sh tune.ym [out.wav] [-kK] [-mN] [-rRR | -r] [-tTITLE]
+           [-cCOMPOSER] [-perf] [-vN]
 ```
 
 `ym/play.sh` runs the three tools above and hands the program to Hatari
-with its sound on. Named a second file it records instead: Hatari writes
-an AVI, video and sound, which `ym/avi.py` reads back as a WAV, with the
-run's last frame beside it as a PNG. With `PERF` the program takes the
-monitor's core, so that frame shows the bars (Measure).
+with its sound on. SPACE stops the tune, and `-vN` stops the run after
+`N` frames. Named a second file it records instead: Hatari writes an
+AVI, video and sound, which `ym/avi.py` reads back as a WAV, with the
+run's last frame beside it as a PNG.
+
+| option | gives |
+|---|---|
+| `-kK` | the unit the table packs at, 2 by default |
+| `-mN` | the ring in bytes, 960 |
+| `-rRR`, `-r` | the row the tune repeats to, or a tune that plays once |
+| `-tTITLE`, `-cCOMPOSER` | the tags; the title is the file's name by default |
+| `-perf` | the core with the raster monitor in, so the recorded frame shows the bars (Measure) |
+| `-vN` | the frames to run |
+
+`-k`, `-m` and `-r` are the converter's, and a tune file, which is
+packed already, takes none of them. `HATARI` and `TOS` name the emulator
+and a TOS image, as they do for the rigs.
 
 ## The rigs
 

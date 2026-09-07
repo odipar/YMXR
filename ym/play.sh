@@ -3,22 +3,50 @@
 # a program around it, and the program run under Hatari with its sound on.
 # tools.md has the tools this drives and BINARIES.md the files they write.
 #
-#   ym/play.sh tune.ym                  play it, SPACE stops
-#   ym/play.sh tune.ymxr                a tune file plays as it stands
-#   ym/play.sh tune.ym out.wav          record it instead, sound to a WAV
-#   VBLS=1500 ym/play.sh tune.ym        stop after that many frames
-#   PERF=1 ym/play.sh tune.ym out.wav   the raster monitor's core in
+#   ym/play.sh tune.ym [out.wav] [options]
 #
-# A recording is a Hatari AVI, video and sound; ym/avi.py takes the sound
-# out of it as a WAV and writes the run's last frame beside it as a PNG.
+#   -kK        the unit the table packs at, 2 by default
+#   -mN        the ring in bytes, 960
+#   -rRR       the row the tune repeats to; -r alone plays it once
+#   -tTITLE    the title in the tags, the file's name by default
+#   -cCOMPOSER the composer in the tags
+#   -perf      the core with the raster monitor in, so the run paints
+#              what each call costs (performance.md)
+#   -vN        stop after N frames; the tune plays on without it
+#
+# -k, -m and -r are the converter's and a tune file takes none of them.
+# A second name records the run instead of playing it: Hatari writes an
+# AVI, video and sound, which ym/avi.py reads back as a WAV, with the
+# run's last frame beside it as a PNG. HATARI and TOS name the emulator
+# and a TOS image.
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}
 TOS=${TOS:-$HOME/hatari-2.6.1_macos/tos-2.06.rom}
-tune=$1
-out=$2
+tune=
+out=
+unit=
+ring=
+repeat=
+title=
+composer=
+perf=
+vbls=
+for arg do
+    case $arg in
+        -perf) perf=-perf ;;
+        -k*) unit=$arg ;;
+        -m*) ring=$arg ;;
+        -r*) repeat=$arg ;;
+        -t*) title=${arg#-t} ;;
+        -c*) composer=${arg#-c} ;;
+        -v*) vbls=${arg#-v} ;;
+        -*) echo "ym/play.sh does not read $arg" >&2; exit 2 ;;
+        *) if [ -z "$tune" ]; then tune=$arg; else out=$arg; fi ;;
+    esac
+done
 if [ -z "$tune" ]; then
-    sed -n '2,12p' "$0" | cut -c3-
+    sed -n '2,22p' "$0" | cut -c3-
     exit 2
 fi
 case $tune in /*) ;; *) tune=$(pwd)/$tune ;; esac
@@ -29,16 +57,26 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 name=$(basename "$tune")
 case $tune in
-    *.ymxr) file=$tune ;;
-    *) file=$work/tune.ymxr; "$here/bin/ym-to-ymxr" "$tune" "$file" >/dev/null ;;
+    *.ymxr)
+        file=$tune
+        if [ -n "$unit$ring$repeat" ]; then
+            echo "ym/play.sh: $name is a tune file, and -k, -m and -r pack one" >&2
+            exit 2
+        fi
+        ;;
+    *)
+        file=$work/tune.ymxr
+        "$here/bin/ym-to-ymxr" "$tune" "$file" ${unit:+"$unit"} ${ring:+"$ring"} \
+            ${repeat:+"$repeat"} >/dev/null
+        ;;
 esac
-"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" ${PERF:+-perf} \
-    -t"${name%.*}" >/dev/null
+"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" $perf \
+    "-t${title:-${name%.*}}" ${composer:+"-c$composer"} >/dev/null
 "$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" >/dev/null
 set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \
     --compatible on --memsize 4 --sound 44100 --log-level fatal
-if [ -n "$VBLS" ]; then
-    set -- "$@" --run-vbls "$VBLS"
+if [ -n "$vbls" ]; then
+    set -- "$@" --run-vbls "$vbls"
 fi
 if [ -n "$out" ]; then
     set -- "$@" --fast-forward on --avirecord --avi-vcodec png \
