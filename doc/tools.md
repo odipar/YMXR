@@ -43,9 +43,9 @@ recording's 4-bit levels and a closing row at mid-scale, which owns the
 voice's volume for the frames its rows take at its rate and sets the mixer's
 bits for the voice meanwhile. A sinus SID is dropped, as the reference player
 runs an empty handler for it. The row the tune repeats to sets every register
-but R13, and every effect that ran up to it or runs into the wrap, so the wrap
-lands on a known state. `ConversionTest` replays every tune under `ym/test`
-against its dump.
+but R13 and the ones an effect owns there, and every effect that ran up to it
+or runs into the wrap, so the wrap lands on a known state. `ConversionTest`
+replays every tune under `ym/test` against its dump.
 
 The tune file holds the tune's tables and no code: BINARIES.md says how a
 tool binds them with DTX's reader into what the player takes.

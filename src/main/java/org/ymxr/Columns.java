@@ -17,8 +17,9 @@ import java.util.Arrays;
  * write to R13 restarting the envelope beside its ticks, as the reference
  * player has it.
  *
- * <p>The row the tune repeats to sets every register but R13 and every
- * effect, so the wrap lands on a known state whatever the last row left.
+ * <p>The row the tune repeats to sets every register but R13 and the ones
+ * an effect owns there, and every effect, so the wrap lands on a known
+ * state whatever the last row left.
  */
 final class Columns {
 
@@ -77,8 +78,9 @@ final class Columns {
         int used = 0;
         for (int f = 0; f < frames; f++) {
             // The row the tune repeats to sets every register but R13 and
-            // every effect, so the wrap lands on a known state: row 0 too,
-            // where the tune repeats to it.
+            // the ones an effect owns there, and every effect, so the wrap
+            // lands on a known state: row 0 too, where the tune repeats to
+            // it.
             boolean keyframe = f == repeat;
             if (keyframe) {
                 Arrays.fill(held, -1);

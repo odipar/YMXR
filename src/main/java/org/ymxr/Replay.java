@@ -8,9 +8,10 @@ import org.dtx.Table;
  * registers hold after each row, and what each effect runs. A reader in
  * the sense of R2.4, writing to no chip.
  *
- * <p>A register the model has not seen set is -1. The effects' ticks are
- * not modelled: a running effect's source, target and rate are what the
- * rows gave, and its place is not followed.
+ * <p>A register the model has not seen set is -1, and so is a register an
+ * effect runs on, from the row after the one that starts it. The effects'
+ * ticks are not modelled: a running effect's source, target and rate are
+ * what the rows gave, and its place is not followed.
  *
  * <p>What the last step wrote stands beside the state: {@code written}
  * gives each register's value where the row wrote it and -1 where not,
@@ -58,6 +59,12 @@ final class Replay {
         for (int i = 0; i < 4; i++) {
             int t = Columns.EFFECT + 4 * i;
             Effect was = effect[i];
+            // A row leaves the column of a volume register an effect runs
+            // on unset (SPEC.md 6 rule 1), so the model holds no value for
+            // it: the row that stops the effect sets the register again.
+            if (was.source() != 0 && was.target() < 13) {
+                registers[was.target()] = -1;
+            }
             int target = (r[t] & 0x80) != 0 ? r[t] & 0x7F : was.target();
             int source = was.source();
             boolean started = false;
