@@ -1,15 +1,17 @@
 ; YMXR.S - the player: a tune's rows to the YM2149 and the MFP, one row a
 ; frame, and a source's rows to one register at a timer's rate.
 ;
-; doc/SPEC.md is the contract. Section 4 is YMXR_play, section 5 the tick
-; handlers, and the tune file section 3.3. DTX reads the tune's table: the
-; tune carries the image DTX packaged it with, and this player calls that
+; doc/SPEC.md is the contract: section 4 is YMXR_play and section 5 the
+; tick handlers. What this player takes is the bound tune of
+; doc/BINARIES.md: the tune file's tables, and no code, bound by a tool
+; with the image DTX packaged the table with. The player calls that
 ; image's slots (DTX, doc/abi.md) and reads the row they give.
 ;
 ; The calls, by the jump table at the top of the binary:
 ;
-;   YMXR_init   a0 the tune, on an even address; a1 the workspace, on a
-;               long. d0 is 0, or -1 for a file this player does not read.
+;   YMXR_init   a0 the bound tune, on an even address; a1 the workspace,
+;               on a long. d0 is 0, or -1 for one this player does not
+;               read.
 ;   YMXR_play   a0 the workspace. One row. d0 is 0, or -1 where the tune
 ;               has played its last row and does not repeat: nothing is
 ;               written then.
@@ -21,8 +23,8 @@
 ; write of a select and a value is one movep, which no tick lands inside.
 ;
 ; The workspace is YMXR_FIXED bytes, then the state block the image's
-; format block asks for, which the tune file states at offset 12
-; (SPEC.md 3.3): a host allocates YMXR_FIXED plus that.
+; format block asks for, which the bound tune states at offset 12
+; (BINARIES.md): a host allocates YMXR_FIXED plus that.
 ;
 ; The host owns the machine. This player saves and restores no vector, no
 ; timer control and no interrupt enable: around init and stop a host keeps
@@ -37,12 +39,12 @@
 ; operands at every start. It runs from RAM, and one loaded copy serves
 ; one workspace.
 
-YMXR_MAGIC      equ     $594D5852       ; YMXR
-YMXR_VERSION    equ     $0001
+YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
+YMXR_VERSION    equ     $0001           ; its version
 YMXR_COLUMNS    equ     30
 YMXR_SITES      equ     18              ; the other read sites (ymxr_sites)
 
-; The tune file (SPEC.md 3.3).
+; The bound tune (BINARIES.md).
 TF_VERSION      equ     4
 TF_RATE         equ     6
 TF_EFFECTS      equ     8
@@ -64,7 +66,7 @@ DT_REPEAT       equ     10
 DT_PAYLOAD      equ     16
 
 ; The workspace.
-WS_TUNE         equ     0               ; the tune
+WS_TUNE         equ     0               ; the bound tune
 WS_IMAGE        equ     4               ; the image in it
 WS_ROWS         equ     8               ; rows to the last, or to the wrap
 WS_R            equ     12

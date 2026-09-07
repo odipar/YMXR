@@ -13,6 +13,10 @@
         <maven.compiler.target>23</maven.compiler.target>
         <maven.compiler.release>23</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- The assembler that builds the SNDH core and the program stub
+             the tools combine with bound tunes. Nothing else in the build
+             runs it. -->
+        <rmac>rmac</rmac>
         <jspecify.version>1.0.0</jspecify.version>
         <errorprone.version>2.36.0</errorprone.version>
         <nullaway.version>0.12.3</nullaway.version>
@@ -26,7 +30,7 @@
     <dependencies>
         <dependency>
             <!-- the tables a tune is made of, and the 68000 reader images
-                 the converter packages them with (doc/requirements.md, R1) -->
+                 a tool binds them with (doc/BINARIES.md 1) -->
             <groupId>org.dtx</groupId>
             <artifactId>dtx</artifactId>
             <version>0.6.0</version>
@@ -103,6 +107,21 @@
                         <configuration>
                             <executable>java</executable>
                             <commandlineArgs>-ea -cp %classpath org.ymxr.YmToYmxr ${args}</commandlineArgs>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!-- The SNDH core and the program stub, assembled
+                             from 68k/ into the classes the jar is made of
+                             (doc/BINARIES.md). This is the one step rmac is
+                             needed for: name another with -Drmac=PATH. -->
+                        <id>binaries</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>java</executable>
+                            <commandlineArgs>-ea -cp %classpath org.ymxr.Binaries ${project.build.outputDirectory}/org/ymxr/68k -a${rmac} -s${project.basedir}/68k</commandlineArgs>
                         </configuration>
                     </execution>
                 </executions>

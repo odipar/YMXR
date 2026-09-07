@@ -442,27 +442,25 @@ one row is the marker alone.
 | offset | bytes | gives |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, $0001 |
+| 4 | 2 | the version, $0002 |
 | 6 | 2 | the frame rate, in Hz |
 | 8 | 1 | effects used |
 | 9 | 1 | `S`, the source count, 0 to 127 |
 | 10 | 2 | zero |
-| 12 | 4 | the bytes of the state block the image's reader needs |
-| 16 | 4 | where the image begins |
-| 20 | 4`S` | the source index: where the table of source 1 to `S` begins |
-| | | the image, on a long |
+| 12 | 4 | where the DTX2 table begins |
+| 16 | 4`S` | the source index: where the table of source 1 to `S` begins |
+| | | the DTX2 table, on a long |
 | | | the DTX1 tables, each on a long |
 
 Every offset counts from the file's first byte, and a field of more than
 one byte is most significant byte first.
 
-The image is what DTX packages the tune's DTX2 table with (DTX, abi.md 1):
-its reader's code, its column table and the table itself, read through the
-four calls at its first bytes. A player calls those and reads the row they
-give; the tune brings the reader of its own rows with it, and the player
-holds the schema alone. The state block's bytes are stated at offset 12 so
-that a host allocates them without reading the image, and a player
-reads a tune of its own version and rejects another (R6.1).
+The DTX2 table is the tune's table as a complete DTX file (DTX, SPEC.md 1
+and 2.3), its header and its payload, which DTX's reader reads. The file
+holds the tune's tables and no code: a tool outside this specification
+binds them with that reader into what a player takes, and the player's
+own documents give that form. A reader reads a tune of its own version
+and rejects another (R6.1).
 
 ---
 
@@ -579,7 +577,7 @@ reports what it holds, and writes to no chip. It reports what the tune
 states once, then what the frame procedure does, one entry a frame in
 order and one for the frame after the last row, and nothing of what a
 timer writes between frames (section 5): a tick's rate is the machine's,
-and a reader has no machine. Of a tune whose version is not $0001 it
+and a reader has no machine. Of a tune whose version is not $0002 it
 reports nothing (3.3, R6.1).
 
 The report is lines of JSON, one entry a line. A line has no space in

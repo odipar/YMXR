@@ -13,18 +13,24 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -hatari [tunes]    the same tunes on a real MFP, under
                                        Hatari
 
+The player takes a bound tune (doc/BINARIES.md 1): each tune file is
+bound through bin/ymxr-bind before it is played, and a tune file of
+another version is held to be rejected by the binder, the reader and, its
+bound form's version moved, the player.
+
 Under unicorn the timers are modelled here, since it raises no interrupt:
 every tick is fired by hand at the time the model gives. Under Hatari the
-MFP fires them: a program around the player (68k/YMXR_prg.S) takes the
-machine over and plays the tune on the VBL, and the trace of every chip
-write is read against the same model, the ticks counted against the rates
-the trace shows the timers programmed at.
+MFP fires them: the tune goes into an SNDH file and a program around it
+through bin/ymxr-sndh and bin/ymxr-prg (BINARIES.md 3 and 4), the program
+takes the machine over and plays the tune on the VBL, and the trace of
+every chip write is read against the same model, the ticks counted
+against the rates the trace shows the timers programmed at.
 
 Needs rmac (RMAC, or on the path), DTX's dtx-write (DTX_WRITE, or on the
 path) to read the table back, unicorn (pip install unicorn), and the
-converter under bin/. DTX's rig, at DTX_REPO/68k/test/emu, counts the
-cycles where it is found; hatari (HATARI) with a TOS image (TOS) plays
-the tune on a real MFP.
+converter, the binder and the two combiners under bin/. DTX's rig, at
+DTX_REPO/68k/test/emu, counts the cycles where it is found; hatari
+(HATARI) with a TOS image (TOS) plays the tune on a real MFP.
 """
 import json, os
 import re
@@ -48,10 +54,11 @@ DTX_WRITE = os.environ.get("DTX_WRITE", "dtx-write")
 DTX_REPO = os.environ.get("DTX_REPO", os.path.join(ROOT, "..", "DTX"))
 HATARI = os.environ.get("HATARI", "hatari")
 TOS = os.environ.get("TOS", os.path.expanduser("~/hatari-2.6.1_macos/tos-2.06.rom"))
-# What the program stub plays before it stops (68k/YMXR_prg.S).
+# The rows the program is asked to play before it stops (bin/ymxr-prg -r).
 STUB_FRAMES = 2000
-# A PRG's header, before its text.
-PRG_HEADER = 28
+# The tune file's version (SPEC.md 3.3) and the bound tune's (BINARIES.md 1).
+TUNE_VERSION = 2
+BOUND_VERSION = 1
 
 # The memory map: the player, the tune two bytes past a long so nothing
 # assumes one, the workspace on a long, a stack, and a sentinel a call
@@ -101,12 +108,13 @@ FIXED = equate("YMXR_FIXED")
 TICK_SEL, TICK_PTR, TICK_CELL = equate("TICK_SEL"), equate("TICK_PTR"), equate("TICK_CELL")
 
 
-def assemble():
-    """The player's bytes and its symbols."""
+def assemble(source="YMXR.S"):
+    """The bytes a source under 68k/ assembles to, and its symbols: the
+    player's, or the SNDH core's, which includes the player."""
     work = tempfile.mkdtemp()
-    out, lst = os.path.join(work, "YMXR.bin"), os.path.join(work, "YMXR.lst")
-    r = subprocess.run([RMAC, "-m68000", "-fr", "-l*" + lst, "-o", out,
-                        os.path.join(ROOT, "68k", "YMXR.S")], capture_output=True)
+    out, lst = os.path.join(work, "code.bin"), os.path.join(work, "code.lst")
+    r = subprocess.run([RMAC, "-m68000", "-fr", "-l*" + lst, "-i" + os.path.join(ROOT, "68k"),
+                        "-o", out, os.path.join(ROOT, "68k", source)], capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     symbols = {}
     for line in open(lst):
@@ -131,6 +139,17 @@ def convert(ym, work):
                        capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     return open(out, "rb").read(), r.stdout.decode().strip()
+
+
+def bind(file, work):
+    """The bound tune of a tune file, through bin/ymxr-bind; None where the
+    binder rejects the file."""
+    path, out = os.path.join(work, "bound.ymxr"), os.path.join(work, "bound.bin")
+    open(path, "wb").write(file)
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), path, out], capture_output=True)
+    if r.returncode != 0:
+        return None
+    return open(out, "rb").read()
 
 
 def trace(file, work, calls):
@@ -170,11 +189,11 @@ def long_at(d, at):
 
 
 class Tune:
-    """A tune file read back: the header, the rows out of the image's
+    """A bound tune read back: the header, the rows out of the image's
     table through dtx-write, and the sources' rows."""
 
     def __init__(self, file, work):
-        assert file[:4] == b"YMXR", "not a YMXR file"
+        assert file[:4] == b"YMXB", "not a bound tune"
         self.version = struct.unpack(">H", file[4:6])[0]
         self.rate = struct.unpack(">H", file[6:8])[0]
         self.effects = file[8]
@@ -499,20 +518,31 @@ def check(ym, code, symbols, cycles=None, kit=False):
     and a tune that plays once to the call that reports its end."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
-    tune = Tune(file, work)
-    m = Machine(code, symbols, file)
+    workspace = WORK + 0x100
+    version = struct.unpack(">H", file[4:6])[0]
+    if version != TUNE_VERSION:
+        # the binder and the reader reject the file; the player, which never
+        # sees it, rejects a bound tune whose own version word is moved
+        assert bind(file, work) is None, "the binder took a tune file of version %d" % version
+        if kit:
+            assert trace(file, work, 1) == [], "the reader reports something of version %d" % version
+        bound = bind(file[:4] + struct.pack(">H", TUNE_VERSION) + file[6:], work)
+        assert bound is not None, "the file is not a tune of the version it states"
+        moved = bound[:4] + struct.pack(">H", BOUND_VERSION + 1) + bound[6:]
+        m = Machine(code, symbols, moved)
+        assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
+            "init took a bound tune of version %d" % (BOUND_VERSION + 1)
+        return 0, 0, [], {}, (0, 0, 0, [])
+    bound = bind(file, work)
+    assert bound is not None, "the binder rejected the tune"
+    tune = Tune(bound, work)
+    assert tune.version == BOUND_VERSION, "the binder wrote version %d" % tune.version
+    m = Machine(code, symbols, bound)
     if cycles:
-        end = FILE + (long_at(file, 20) if file[9] else len(file))
+        end = FILE + (long_at(bound, 20) if bound[9] else len(bound))
         cycles.attach(m, (FILE + tune.image_at, end))
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
-    workspace = WORK + 0x100
-    if tune.version != 1:
-        assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
-            "init took a tune of version %d" % tune.version
-        if kit:
-            assert trace(file, work, 1) == [], "the reader reports something of version %d" % tune.version
-        return 0, 0, [], {}, (0, tune.R, tune.RR, [])
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
     # Timer C's nibble is the host's 200 Hz clock, kept unless effect 3 runs
     nibble = 0 if tune.effects & 8 else 0x50
@@ -617,19 +647,29 @@ ROM = 0xE00000
 
 
 def hatari(ym, code, symbols):
-    """The tune through the program stub under Hatari: the frames the
-    trace holds, checked against the model, and the ticks counted."""
+    """The tune in an SNDH file in a program under Hatari: the frames the
+    trace holds, checked against the model, and the ticks counted. code
+    and symbols are the SNDH core's, the player's symbols among them."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
-    tune = Tune(file, work)
-    open(os.path.join(work, "YMXR.bin"), "wb").write(code)
-    open(os.path.join(work, "TUNE.YMXR"), "wb").write(file)
-    prg = os.path.join(work, "YMXR.PRG")
-    r = subprocess.run([RMAC, "-m68000", "-p", "-i" + work, "-o", prg,
-                        os.path.join(ROOT, "68k", "YMXR_prg.S")], capture_output=True)
+    bound = bind(file, work)
+    assert bound is not None, "the binder rejected the tune"
+    tune = Tune(bound, work)
+    path = os.path.join(work, "TUNE.YMXR")
+    open(path, "wb").write(file)
+    sndh = os.path.join(work, "TUNE.SND")
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), path, sndh,
+                        "-t" + os.path.basename(ym)], capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
-    player = open(prg, "rb").read().find(code) - PRG_HEADER
-    assert player >= 0, "the player is not in the program"
+    prg = os.path.join(work, "YMXR.PRG")
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), sndh, prg, "-paint",
+                        "-r%d" % STUB_FRAMES], capture_output=True)
+    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
+    sndh_bytes = open(sndh, "rb").read()
+    core = sndh_bytes.find(b"YMXS") - 12
+    assert core >= 12, "the core is not in the SNDH file"
+    assert sndh_bytes[core:core + 24] == code[:24] and sndh_bytes[core + 32:core + len(code)] == code[32:], \
+        "the core in the file is not the one assembled, its two patched longs aside"
     trace = os.path.join(work, "trace.txt")
     r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
@@ -640,7 +680,8 @@ def hatari(ym, code, symbols):
                        cwd=work, capture_output=True)
     said = re.search(r"YMXR at \$([0-9A-F]{8})", r.stdout.decode(errors="replace"))
     assert said, "the program did not print its address: " + r.stdout.decode(errors="replace")[-300:]
-    base = int(said.group(1), 16) + player
+    sndh_at = int(said.group(1), 16)
+    base = sndh_at + core
     frame = (base + symbols["ymxr_frame"], base + symbols["ymxr_reads"])
     stop = (base + symbols["YMXR_stop"], base + symbols["YMXR_play"])
     ticks = [(base + symbols["ymxr_tick%d" % i], base + symbols["ymxr_tick%d" % i] + 78)
@@ -654,7 +695,7 @@ def hatari(ym, code, symbols):
         for i in range(4):
             if ticks[i][0] <= pc < ticks[i][1]:
                 return i
-        return "stub" if base - player <= pc < base + len(code) + 0x10000 else None
+        return "stub" if sndh_at - 0x1000 <= pc < sndh_at + len(sndh_bytes) + 0x10000 else None
 
     # the trace as frames: each a list of (kind, reg, value) and its
     # length in MFP clocks
@@ -775,6 +816,9 @@ def main():
                                if f.endswith(".ym"))
     code, symbols = assemble()
     print("the player: %d bytes" % len(code))
+    if real:
+        code, symbols = assemble("YMXR_sndh.S")
+        print("the SNDH core: %d bytes" % len(code))
     cycles_of = None
     if count:
         sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))

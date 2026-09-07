@@ -3,26 +3,26 @@ package org.ymxr;
 import java.util.List;
 import org.dtx.Dtx1;
 import org.dtx.Dtx2;
-import org.dtx.Packager;
 import org.dtx.St4;
 import org.dtx.Table;
 
 /**
- * A tune file (SPEC.md 3.3): the values a tune states once, the DTX2 image
- * DTX packages its table with, and one DTX1 table a source.
+ * A tune file (SPEC.md 3.3): the values a tune states once, the tune's
+ * table as a DTX2 file, and one DTX1 table a source. The file holds the
+ * tune's tables and no code; a tool binds them with DTX's reader into what
+ * the player takes (doc/BINARIES.md, {@link Bound}).
  *
  * <pre>
  *  offset  bytes  gives
  *  0       4      YMXR
- *  4       2      the version, $0001
+ *  4       2      the version, $0002
  *  6       2      the frame rate, in Hz
  *  8       1      effects used, bits 3 to 0
  *  9       1      S, the source count, 0 to 127
  *  10      2      zero
- *  12      4      the state block's bytes the image's reader needs
- *  16      4      where the image begins
- *  20      4S     the source index: where source 1 to S's DTX1 table begins
- *          ..     the image, on a long
+ *  12      4      where the DTX2 table begins
+ *  16      4S     the source index: where source 1 to S's DTX1 table begins
+ *          ..     the DTX2 table, on a long
  *          ..     the DTX1 tables, each on a long
  * </pre>
  *
@@ -31,19 +31,12 @@ import org.dtx.Table;
 final class Tune {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
-    static final int VERSION = 0x0001;
+    static final int VERSION = 0x0002;
     static final int FRAME_RATE_AT = 6;
     static final int EFFECTS_AT = 8;
     static final int COUNT_AT = 9;
-    static final int STATE_AT = 12;
-    static final int IMAGE_AT = 16;
-    static final int INDEX_AT = 20;
-
-    /** The image's format block, and where the state block's bytes stand in
-     *  it (DTX, abi.md 1). */
-    static final int FORMAT_AT = 16;
-    static final int FORMAT_STATE_AT = 4;
-    static final int FORMAT_TABLE_AT = 8;
+    static final int TABLE_AT = 12;
+    static final int INDEX_AT = 16;
 
     /** The ring a column unpacks through, dtx-write's own default. */
     static final int RING = 960;
@@ -62,7 +55,7 @@ final class Tune {
     }
 
     /** The file: its table packed at `unit` through a ring of `ring` bytes,
-     *  packaged with DTX's reader.
+     *  as a DTX2 file.
      *
      *  <p>The table is the dump's frames row for row, the row it repeats
      *  to the dump's loop frame, and no row is added anywhere. A column's
@@ -88,7 +81,7 @@ final class Tune {
             report.note("the ring is " + at + " bytes: a multiple of the period within the"
                     + " player's reach");
         }
-        byte[] image = image(columns.column, frames, repeat, unit, at);
+        byte[] table = table(columns.column, frames, repeat, unit, at);
         List<Sources.Source> all = sources.all();
         byte[][] tables = new byte[all.size()][];
         for (int i = 0; i < tables.length; i++) {
@@ -97,8 +90,8 @@ final class Tune {
                     new byte[][] {s.rows()}));
         }
         int here = align(INDEX_AT + 4 * tables.length);
-        int imageAt = here;
-        here = align(here + image.length);
+        int tableAt = here;
+        here = align(here + table.length);
         int[] sourceAt = new int[tables.length];
         for (int i = 0; i < tables.length; i++) {
             sourceAt[i] = here;
@@ -110,23 +103,21 @@ final class Tune {
         putWord(file, FRAME_RATE_AT, frameRate);
         file[EFFECTS_AT] = (byte) columns.effects;
         file[COUNT_AT] = (byte) tables.length;
-        putLong(file, STATE_AT, getLong(image, FORMAT_AT + FORMAT_STATE_AT));
-        putLong(file, IMAGE_AT, imageAt);
+        putLong(file, TABLE_AT, tableAt);
         for (int i = 0; i < tables.length; i++) {
             putLong(file, INDEX_AT + 4 * i, sourceAt[i]);
         }
-        System.arraycopy(image, 0, file, imageAt, image.length);
+        System.arraycopy(table, 0, file, tableAt, table.length);
         for (int i = 0; i < tables.length; i++) {
             System.arraycopy(tables[i], 0, file, sourceAt[i], tables[i].length);
         }
         return new Written(file, repeat < frames ? repeat : frames);
     }
 
-    /** The image of the columns, packed and packaged. */
-    private static byte[] image(byte[][] column, int frames, int repeat, int unit, int ring) {
+    /** The columns as a DTX2 file, packed. */
+    private static byte[] table(byte[][] column, int frames, int repeat, int unit, int ring) {
         int rr = repeat < frames ? repeat : frames;
-        Table table = Table.of(frames, rr, 1, column);
-        return Packager.image(Dtx2.write(table, new St4(), unit, ring));
+        return Dtx2.write(Table.of(frames, rr, 1, column), new St4(), unit, ring);
     }
 
     /** The ring the table packs through: the multiple of `C` nearest `ring`,

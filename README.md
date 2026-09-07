@@ -29,21 +29,26 @@ written until it says what YMXR has to do.
 |---|---|
 | `doc/` | the specification, the requirements it is written against, and the rest |
 | `src/main/java/org/ymxr/` | the converter: a YM5!/YM6! dump into a tune file, on DTX's Java library |
-| `68k/YMXR.S` | the player, and `68k/YMXR_prg.S` a program around it for Hatari |
+| `68k/YMXR.S` | the player; `68k/YMXR_sndh.S` the SNDH core around it and `68k/YMXR_prg.S` the program stub, assembled once and combined with a tune by a tool (doc/BINARIES.md) |
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
 | `ym/` | the measurements behind the figures, and `ym/test` eight tunes the tests run on |
-| `bin/` | the converter, the check and the trace, run out of a build |
+| `bin/` | the converter, the check, the trace, the binder and the SNDH and program combiners, run out of a build |
 
 A tune converts and plays like this:
 
 ```bash
 bin/ym-to-ymxr tune.ym tune.ymxr
+bin/ymxr-sndh tune.ymxr tune.sndh -t"The title"
+bin/ymxr-prg tune.sndh TUNE.PRG
 python3 68k/test/emu/test_ymxr.py tune.ym
 ```
 
-`bin/ymxr-check` replays a dump against the tune it converts to, and
-`bin/ymxr-trace` prints what a reader reports of a tune file (SPEC.md 7),
-which the conformance kit's references are.
+The tune file holds the tune's tables and no code; the SNDH file is the
+tables bound with DTX's reader behind the player, which any SNDH host
+plays, and the program plays the SNDH file on a bare machine
+(doc/BINARIES.md). `bin/ymxr-check` replays a dump against the tune it
+converts to, and `bin/ymxr-trace` prints what a reader reports of a tune
+file (SPEC.md 7), which the conformance kit's references are.
 
 The shape follows [YMX](https://github.com/odipar/YMX): Java is the
 source of truth, and the Go and C# trees are to follow it byte for byte.
@@ -52,9 +57,9 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 
 | what runs | what it checks |
 |---|---|
-| `mvn test` | the documents against themselves and the house style, every tune under `ym/test` converted, read back and replayed against its dump, and the conformance kit converted again and compared byte for byte |
+| `mvn test` | the documents against themselves and the house style, every tune under `ym/test` converted, read back and replayed against its dump, the conformance kit converted again and compared byte for byte, and the core and the stub assembled and their descriptors, an SNDH file and a program read back |
 | `68k/test/emu/test_ymxr.py` | the player on an emulated 68000: every frame's writes, the timers' programming and every tick against the specification's model |
-| the same, `-hatari` | the player on a real MFP under Hatari, the trace of its writes against that model |
+| the same, `-hatari` | the SNDH file's program on a real MFP under Hatari, the trace of the player's writes against that model |
 | the same, `-kit` | the conformance kit's tunes on the player, each frame held to the reader's record |
 
 | | |

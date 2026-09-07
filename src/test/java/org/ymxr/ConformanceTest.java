@@ -74,7 +74,7 @@ final class ConformanceTest {
             Fixture.built("four-timers", "`BuiltTunes.fourTimers`", BuiltTunes::fourTimers,
                     "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump gives: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and taken at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with nothing running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
-                    "chambers with the version word $0002: a reader reports nothing of it"));
+                    "chambers with the version word $0003: a reader reports nothing of it"));
 
     /** chambers with another version in its header: what a reader reports
      *  nothing of (R6.1). */
@@ -84,7 +84,7 @@ final class ConformanceTest {
             Tune.Written it = YmToYmxr.convert(dump, List.of(), new Report()).written();
             byte[] file = it.file().clone();
             file[4] = 0;
-            file[5] = 2;
+            file[5] = 3;
             return new Tune.Written(file, it.repeat());
         } catch (IOException failed) {
             throw new IllegalStateException(failed);
@@ -118,7 +118,7 @@ final class ConformanceTest {
     /** The tune's table as a DTX0 file: the sixteen-byte header giving R
      *  and RR (SPEC.md 3.1), then row 0 to R minus one, each its thirty
      *  columns in order (DTX, SPEC.md 2.1); what a reader takes the table
-     *  from, since the image's packing is DTX's and not this
+     *  from, since the DTX2 table's packing is DTX's and not this
      *  specification's. Empty for a file of another version. */
     static byte[] rows(byte[] tune) {
         try {

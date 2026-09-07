@@ -29,8 +29,8 @@ SPEC.md 3.1 gives a source's, then row 0 to `R` minus one, each row its thirty
 columns in order, one byte a column, and nothing between them. Take the table
 from it. Everything else, the frame rate, the effects used, the source index
 and the sources' tables, is in the tune file as SPEC.md 3 lays it out. The
-image in the tune file packs the same table in a form another format defines,
-and you do not read it.
+DTX2 table in the tune file packs the same rows in a form another format
+defines, and you do not read it.
 
 ## The tunes
 
