@@ -48,9 +48,8 @@ lands on a known state. `ConversionTest` replays every tune under `ym/test`
 against its dump.
 
 The tool runs out of `target/classes`, and builds first where a source or
-the pom is newer than the last build. Java 23 and Maven, and DTX
-0.6-SNAPSHOT in the local Maven repository: `mvn install` on DTX's main
-past the reader that turns a replayed pass at its exact row, whose
+the pom is newer than the last build. Java 23 and Maven, and DTX 0.6.0 in
+the local Maven repository: `mvn install` at DTX's `v0.6.0` tag, whose
 reader this player's frame figures (performance.md) are measured
 against.
 
