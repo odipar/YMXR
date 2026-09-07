@@ -7,15 +7,17 @@ import java.util.Arrays;
  * from a YM dump. A column is set where its value differs from what the
  * player holds; an unset value is 0, which R3.6 does not read.
  *
- * <p>An effect starts on the frame the dump flags it, with the timer's and
- * the place's reset (1.9, section 6), and runs on while the dump flags the
- * same voice at the same value, its rate moving where the dump's moves. A
- * digidrum runs for the frames its rows take at its rate, the dump flagging
- * only the trigger, and the row it ends on stops it and sets the voice's
- * volume again (1.3). A SID voice or a digidrum owns its volume register
- * while it runs (section 6); a sync buzzer owns nothing, the frame's own
- * write to R13 restarting the envelope beside its ticks, as the reference
- * player has it.
+ * <p>An effect starts on the frame the dump flags it, with the place's
+ * reset and, where the timer is stopped, the timer's (1.9, section 6 rule
+ * 5): a source that changes under a running timer reloads the count, and
+ * the timer takes it at its next zero. An effect runs on while the dump
+ * flags the same voice at the same value, its rate moving where the dump's
+ * moves. A digidrum runs for the frames its rows take at its rate, the dump
+ * flagging only the trigger, and the row it ends on stops it and sets the
+ * voice's volume again (1.3). A SID voice or a digidrum owns its volume
+ * register while it runs (section 6); a sync buzzer owns nothing, the
+ * frame's own write to R13 restarting the envelope beside its ticks, as the
+ * reference player has it.
  *
  * <p>The row the tune repeats to sets every register but R13 and the ones
  * an effect owns there, and every effect, so the wrap lands on a known
@@ -152,8 +154,25 @@ final class Columns {
                         targetHeld[i] = slot[i].target();
                     }
                     if (starting) {
+                        // Bit 6 stops the timer, writes the count and starts
+                        // it, so the timer takes a whole period and loses
+                        // what it had run of the last one. Section 6 rule 5
+                        // sets the bit where the timer is stopped; where the
+                        // timer runs, the count this row writes is taken
+                        // when the running count reaches zero, which moves
+                        // the pitch without a break (1.9). A timer is
+                        // stopped where no effect runs on it, the row that
+                        // stopped the effect having written select 0, and
+                        // where a digidrum's source has run out: that source
+                        // does not repeat, so its last tick stops the timer
+                        // (section 5). A SID voice's source and a sync
+                        // buzzer's repeat, and run until a row stops them.
+                        // The keyframe sets the bit whatever the wrap left.
+                        boolean stopped = keyframe || !running[i].on()
+                                || running[i].kind() == Effects.DRUM && f >= drumEnd[i];
                         out[t + 1] = (byte) (0x80 | number[i]);
-                        out[t + 2] = (byte) (0x80 | TIMER_RESET | PLACE_RESET | slot[i].select());
+                        out[t + 2] = (byte) (0x80 | (stopped ? TIMER_RESET : 0) | PLACE_RESET
+                                | slot[i].select());
                         out[t + 3] = (byte) slot[i].count();
                         running[i] = slot[i];
                         runningNumber[i] = number[i];

@@ -287,14 +287,17 @@ A player writes each column where the row sets it (section 4): the count
 to the data register, the select to the control register, and the timer
 runs on. A count written while the timer runs is taken when the running
 count reaches zero, which moves the pitch without a break; a select
-written while it runs changes the prescaler under the running count.
+written while it runs neither stops nor reloads the running count, and
+the new prescaler divides the 2,457,600 clock from the write on, so the
+period in flight is part at the old prescaler and part at the new.
 
 Bit 6 puts a stop before those writes and a start after them: the player
-writes select 0, then the count, then the select, so the timer begins a
-whole period at the count. The count and the select it writes are the
-row's, or where the row leaves a column unset, the ones the player keeps
-(R4.6). A stopped timer is started this way, on the row that starts its
-effect (section 6).
+writes select 0, then the count, then the select. A count written to a
+stopped timer is taken at once, and the select that follows starts the
+timer from it, so the timer begins a whole period at the count. The
+count and the select it writes are the row's, or where the row leaves a
+column unset, the ones the player keeps (R4.6). A stopped timer is
+started this way, on the row that starts its effect (section 6).
 
 Bit 5 returns the timer's place in its source to the first row, and the
 next tick takes it. Without the bit the source runs on from where it is,
@@ -487,17 +490,20 @@ The effects go first, then the registers.
 
 1. Columns 14, 18, 22 and 26, the targets. The player keeps the value for
    the effect's next start, and writes nothing.
-2. Columns 15, 19, 23 and 27, the sources, each on its timer (2.3). A
-   source of 0 stops the timer: select 0 to its control register. Any
-   other is resolved through the index (3.1) on the target the player
-   keeps, and is what the timer's ticks advance from here on.
+2. Columns 15, 19, 23 and 27, the sources, each on its timer (2.3).
+   Where the row sets that effect's control column with bit 6 (1.9), the
+   player writes select 0 to the timer's control register first, whether
+   or not the row sets the source column, so that no tick of the old
+   rate takes the new source. A source of 0 stops the timer: select 0 to
+   its control register. Any other is resolved through the index (3.1)
+   on the target the player keeps, and is what the timer's ticks advance
+   from here on.
 3. Columns 16, 20, 24 and 28, the controls, each with the count column
-   beside it, to its timer's two registers as 1.9 gives: with bit 6,
-   select 0 first, before step 2 switches the source, so that no tick of
-   the old rate takes the new one; then the count, where the row sets it
-   or bit 6 is set; then the select, where the row sets it or bit 6 is
-   set; and the timer's place to its source's first row where bit 5 is
-   set.
+   beside it, to its timer's two registers as 1.9 gives: the count,
+   where the row sets it or bit 6 is set; then the select, where the row
+   sets it or bit 6 is set; and the timer's place to its source's first
+   row where bit 5 is set. Bit 6's stop is step 2's write, and the
+   select here is the start after it.
 4. Columns 0 to 5, the tone periods, to R0 to R5.
 5. Column 6 to R6, and columns 11 and 12 to R11 and R12, as 1.7's table
    reads them.
@@ -564,9 +570,12 @@ once and tests nothing.
    alone. A row that sets the source column to 0 leaves the control and
    count columns unset.
 6. A row sets a rate column (1.9) on the row that starts its effect, or
-   while the effect runs, and not before its first start. A select
-   written to a timer with no effect on it starts the timer with nothing
-   to run.
+   while the effect runs, and not before its first start. The row that
+   starts an effect for the first time sets its count column, because
+   the count the player keeps is 0 until a row sets it, bit 6 writes the
+   kept count where the row leaves the column unset, and the MFP reads a
+   count of 0 as 256 (1.9). A select written to a timer with no effect
+   on it starts the timer with nothing to run.
 
 ---
 

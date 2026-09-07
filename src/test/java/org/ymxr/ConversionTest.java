@@ -69,6 +69,40 @@ final class ConversionTest {
     }
 
     @Test
+    void aSourceChangedUnderARunningTimerPlacesItWithoutStoppingTheTimer() throws IOException {
+        // SPEC.md 6 rule 5: a row that sets the source column sets bit 5 of
+        // the control column with it, and bit 6 where the timer is stopped.
+        // Effect 1 of Synergy Credits starts on row 12, where nothing runs
+        // on its timer, and takes another source at another count on row 36,
+        // where the timer has run since. The count row 36 gives is taken
+        // when the running count reaches zero (1.9), so the pitch moves and
+        // the phase holds.
+        byte[] dump = Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym"));
+        Table table = TuneFile.read(YmToYmxr.convert(dump, List.of(), new Report())
+                .written().file()).table();
+        int t = Columns.EFFECT + 4;
+        assertEquals(0x80 | 10, table.column(t)[12] & 0xFF, "row 12 gives effect 1 R10");
+        assertEquals(0x80 | 3, table.column(t + 1)[12] & 0xFF, "row 12 starts source 3");
+        assertEquals(0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET | 5,
+                table.column(t + 2)[12] & 0xFF, "row 12 starts the stopped timer");
+        assertEquals(0xE7, table.column(t + 3)[12] & 0xFF, "row 12's count");
+        assertEquals(0x80 | 1, table.column(t + 1)[36] & 0xFF, "row 36 takes source 1");
+        assertEquals(0x80 | Columns.PLACE_RESET | 5, table.column(t + 2)[36] & 0xFF,
+                "row 36 places the source without stopping the timer");
+        assertEquals(0xEB, table.column(t + 3)[36] & 0xFF, "row 36's count");
+        for (int i = 0; i < 2; i++) {
+            byte[] source = table.column(Columns.EFFECT + 4 * i + 1);
+            byte[] control = table.column(Columns.EFFECT + 4 * i + 2);
+            for (int f = 0; f < table.rows(); f++) {
+                if ((source[f] & 0xFF) > 0x80) {
+                    assertEquals(Columns.PLACE_RESET, control[f] & Columns.PLACE_RESET,
+                            "row " + f + " starts effect " + i + " without the place's reset");
+                }
+            }
+        }
+    }
+
+    @Test
     void aSidVoiceIsTwoRowsAndABuzzerOne() throws IOException {
         YmDump.Song song = YmDump.read(Files.readAllBytes(Path.of("ym/test/Retrigger retune, built.ym")));
         Sources sources = new Sources(song);
