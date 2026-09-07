@@ -22,6 +22,11 @@
 ; were. YMXR_play runs in supervisor mode, at any interrupt level: every
 ; write of a select and a value is one movep, which no tick lands inside.
 ;
+; A call writes the row the call before it took, and takes the next when
+; its writes are made: the row's writes then leave a host's clock at one
+; offset, where an advance before them would move by what the refill of
+; the row costs. Init takes the first row.
+;
 ; The workspace is YMXR_FIXED bytes, then the state block the image's
 ; format block asks for, which the bound tune states at offset 12
 ; (BINARIES.md): a host allocates YMXR_FIXED plus that.
@@ -119,8 +124,9 @@ FX_SELECT       equ     1               ; the select it last took
 FX_COUNT        equ     2               ; the count it last took
 FX_FIRST        equ     4               ; the running source's first row
 FX_SIZE         equ     8
-YMXR_FIXED      equ     56
-WS_STATE        equ     56              ; the image's state block, on a long
+WS_ROW          equ     56              ; the row the next call writes
+YMXR_FIXED      equ     60
+WS_STATE        equ     60              ; the image's state block, on a long
 
 ; The chip.
 YM_SELECT       equ     $FFFF8800
@@ -489,6 +495,14 @@ YMXR_init:
                 RUNS    2,ymxr_tick2_over
                 RUNS    3,ymxr_tick3_over
 
+; The first row, taken here so that a call writes a row it already has
+; (SPEC.md 4): the writes then leave a host's clock at one offset,
+; whatever the advance for the next row costs.
+                lea     WS_STATE(a6),a0
+                movea.l WS_IMAGE(a6),a2
+                jsr     IM_ADVANCE(a2)          ; a1 the row
+                move.l  a1,WS_ROW(a6)
+
 ; The timers the tune runs, claimed. The others stand as they are.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
@@ -548,10 +562,8 @@ YMXR_play:
                                                 ; the counter stands still
                 move.w  #PERF_FRAME,PERF_COLOUR.w
                 .endif
-                lea     WS_STATE(a6),a0
-                movea.l WS_IMAGE(a6),a2
-                jsr     IM_ADVANCE(a2)          ; a1 the row
-                lea     YM_SELECT.w,a2
+                movea.l WS_ROW(a6),a1           ; the row this call writes,
+                lea     YM_SELECT.w,a2          ; taken by the call before it
 
 ; ---------------------------------------------------------------- frame
 
@@ -597,12 +609,20 @@ ymxr_volumes:
                 move.w  #$0D00,d1
                 move.b  d2,d1
                 movep.w d1,(a2)
+; The row is written: the next one is taken now, after every write this
+; call makes, so nothing the advance costs stands between a host's clock
+; and the chip.
 ymxr_played:
                 subq.l  #1,WS_ROWS(a6)
-                bne.s   ymxr_return
+                bne.s   ymxr_next
                 move.l  WS_R(a6),d0             ; the last row: the loop's
                 sub.l   WS_RR(a6),d0            ; rows, or none
                 move.l  d0,WS_ROWS(a6)
+                beq.s   ymxr_return             ; none: no row to take
+ymxr_next:      lea     WS_STATE(a6),a0
+                movea.l WS_IMAGE(a6),a2
+                jsr     IM_ADVANCE(a2)
+                move.l  a1,WS_ROW(a6)
 ymxr_return:
                 .if     YMXR_PERF
                 move.w  #PERF_BAR,PERF_COLOUR.w ; the timers' bar, burnt

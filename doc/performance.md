@@ -14,15 +14,15 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 430 | 1629 | 2582 | 1074 | 1642 |
-| Chambers of Shaolin 5 - you blew it! | 1000 | 1462 | 3488 | 852 | 2860 |
-| Circus Attractions 2 | 8 | 1534 | 1732 | 792 | 792 |
-| DBA 2 | 19442 | 2059 | 5612 | 1185 | 4920 |
-| Digidrum preempt, built | 800 | 1714 | 3128 | 822 | 1530 |
-| Retrigger retune, built | 1200 | 1585 | 2242 | 828 | 1498 |
-| Synergy Credits | 10754 | 2422 | 6718 | 1267 | 5382 |
-| Turrican - world 4-3 | 3680 | 1686 | 4834 | 933 | 4176 |
-| Turrican 2 - world completed 1 | 179 | 1993 | 5750 | 1290 | 5062 |
+| Big - Samantha Fox Strip Poker 6 | 430 | 1660 | 2254 | 1072 | 1654 |
+| Chambers of Shaolin 5 - you blew it! | 1000 | 1494 | 3520 | 852 | 2860 |
+| Circus Attractions 2 | 8 | 1568 | 1764 | 792 | 792 |
+| DBA 2 | 19442 | 2091 | 5644 | 1185 | 4920 |
+| Digidrum preempt, built | 800 | 1746 | 2928 | 822 | 2052 |
+| Retrigger retune, built | 1200 | 1617 | 2462 | 828 | 1098 |
+| Synergy Credits | 10754 | 2454 | 6392 | 1267 | 4994 |
+| Turrican - world 4-3 | 3680 | 1718 | 4948 | 933 | 4176 |
+| Turrican 2 - world completed 1 | 179 | 2019 | 5756 | 1284 | 5062 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
@@ -109,6 +109,14 @@ bar is counted in the next call's; and the wait moves the call's writes
 in time, which is why the monitor is a build for reading a run and not
 one to play a tune with.
 
+A call writes the row the call before it took, and takes the next once
+its writes are made (68k/YMXR.S). What that buys is where the writes
+land: measured on DBA 2 over 3,000 frames, the first register write of
+a frame stood 2,363 cycles after the VBL before the row was taken ahead
+and stands 1,125 after it, and the energy at the frame rate fell from
+8.48 per cent of the whole to 6.38, against YMX's 6.56. YMX writes its
+fourteen registers before it decodes for the same reason.
+
 Measure from the VBL, at the tune's own rate. Where the program plays
 from Timer C, a call runs inside the tick handler the timer
 interrupted, since a handler drops the level once its write is made
@@ -128,9 +136,9 @@ read by one method, on the same dumps, over the 2,019 calls of a
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
-| Synergy Credits | YMXR | 2373 | 4176 | 6088 |
+| Synergy Credits | YMXR | 2391 | 4192 | 5408 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
-| Turrican - world 4-3 | YMXR | 1712 | 2896 | 5024 |
+| Turrican - world 4-3 | YMXR | 1748 | 3008 | 5148 |
 
 These figures and the rig's are not one sample: the rig counts every frame
 of the tune and the 68000's own cycles with no wait state, and these are the
@@ -138,9 +146,9 @@ first 2,019 calls on a machine that stalls the processor while the shifter
 fetches. Synergy Credits' costliest frame is its 4,517th, past the end of
 this run.
 
-YMXR costs a tenth less on average on Turrican - world 4-3 and a fiftieth
-more on Synergy Credits, whose odd row count puts it at unit 1, and a sixth
-and more than a quarter more at their worst, and the figures have two causes.
+YMXR costs a twelfth less on average on Turrican - world 4-3 and a fortieth
+more on Synergy Credits, whose odd row count puts it at unit 1, and a fifth
+and a seventh more at their worst, and the figures have two causes.
 The frame procedure is 550 to 1,110 cycles: the fourteen register columns'
 tests and the writes they admit, the effects' columns and the call's own entry
 and exit, where YMX writes its fourteen registers unconditionally, one `movep`
@@ -247,7 +255,7 @@ measured:
 | step 1, measured | 2382 | 7824 | 2408 | 8014 |
 | step 2, measured | 1874 | 5110 | 1900 | 5300 |
 | step 3, measured | 1624 | 4794 | 1650 | 4984 |
-| the tune's own rows, no row added, measured | 1686 | 4834 | 1712 | 5024 |
+| the tune's own rows, no row added, measured | 1718 | 4948 | 1748 | 5148 |
 | step 4 | 1639 | 4794 | 1665 | 4984 |
 | YMX 0.10.1, measured | | | 1897 | 4284 |
 | R4.5 | | 6656 | | |

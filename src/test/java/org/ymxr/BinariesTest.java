@@ -55,8 +55,8 @@ final class BinariesTest {
         assertArrayEquals(Sndh.CORE_MAGIC, Arrays.copyOfRange(core, 12, 16));
         assertEquals(1, Tune.getWord(core, 16));
         assertEquals(Bound.VERSION, Tune.getWord(core, 18));
-        assertEquals(56, Tune.getWord(core, 20));
-        assertEquals(PlayerTest.equates().get("YMXR_FIXED"), Tune.getWord(core, 20));
+        assertEquals(PlayerTest.equates().get("YMXR_FIXED"), Tune.getWord(core, 20),
+                "the workspace's fixed bytes are the player's own");
         assertEquals(flags, Tune.getWord(core, 22), "the flags word");
         assertEquals(0, Tune.getWord(core, 26));
         int state = Tune.getWord(core, 24);

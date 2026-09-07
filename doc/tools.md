@@ -103,7 +103,7 @@ first three longs are the calls:
 | `YMXR_stop` | `a0` the workspace | the claimed timers stopped, disabled and masked, the three volumes silenced |
 
 Every call clobbers `d0` to `d5` and `a0` to `a5`, and leaves `d6`, `d7`
-and `a6` as they were. The workspace is `YMXR_FIXED`, 56 bytes, then the
+and `a6` as they were. The workspace is `YMXR_FIXED`, 60 bytes, then the
 state block the bound tune states at offset 12 (BINARIES.md). The host
 owns the machine: the player saves and restores no vector, timer control
 or interrupt enable, and touches no timer the tune does not run. The
