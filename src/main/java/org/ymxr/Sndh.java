@@ -29,9 +29,11 @@ import org.jspecify.annotations.Nullable;
  *  16      2      the descriptor's version, 1
  *  18      2      the bound tune's version the core reads
  *  20      2      YMXR_FIXED, the workspace's bytes before the state block
- *  22      2      where the core's state byte is
- *  24      4      the subtune table's offset, patched here
- *  28      4      the workspace's offset, patched here
+ *  22      2      flags: bit 0 where the raster monitor is assembled in
+ *  24      2      where the core's state byte is
+ *  26      2      zero
+ *  28      4      the subtune table's offset, patched here
+ *  32      4      the workspace's offset, patched here
  * </pre>
  */
 final class Sndh {
@@ -45,10 +47,15 @@ final class Sndh {
     static final int CORE_VERSION_AT = 16;
     static final int CORE_READS_AT = 18;
     static final int CORE_FIXED_AT = 20;
-    static final int CORE_STATE_AT = 22;
-    static final int CORE_TABLE_AT = 24;
-    static final int CORE_WORK_AT = 28;
-    static final int CORE_DESCRIPTOR = 32;
+    static final int CORE_FLAGS_AT = 22;
+    static final int CORE_STATE_AT = 24;
+    static final int CORE_TABLE_AT = 28;
+    static final int CORE_WORK_AT = 32;
+    static final int CORE_DESCRIPTOR = 36;
+
+    /** The core's flag bit 0: the player's raster monitor assembled in
+     *  (doc/performance.md). */
+    static final int CORE_MONITOR = 1;
 
     /** The word of a bra.w, before its displacement. */
     static final int BRA_W = 0x6000;
@@ -67,8 +74,11 @@ final class Sndh {
     private static final int[] TIMER_OF_EFFECT = {0, 3, 1, 2};
 
     /** The tag block's text: the title, the composer where there is one,
-     *  and a name a subtune where names are given. */
-    record Options(String title, @Nullable String composer, @Nullable List<String> names) {
+     *  and a name a subtune where names are given; and the core the file
+     *  takes, the one with the raster monitor in where {@code monitor} is
+     *  set. */
+    record Options(String title, @Nullable String composer, @Nullable List<String> names,
+            boolean monitor) {
     }
 
     private Sndh() {
@@ -76,7 +86,8 @@ final class Sndh {
 
     /**
      * The file, from the tune files as subtunes 1 up, around the core
-     * carried.
+     * carried: the one with the raster monitor in where the options ask
+     * for it, the plain one where not.
      *
      * @throws IllegalArgumentException where a tune file is not one this
      *     reads, the bound tunes are not of the version the core reads,
@@ -84,12 +95,13 @@ final class Sndh {
      *     holds
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
-        return of(Binaries.core(), tuneFiles, options);
+        return of(options.monitor() ? Binaries.monitorCore() : Binaries.core(), tuneFiles,
+                options);
     }
 
     /** The same, around the core given. */
     static byte[] of(byte[] core, List<byte[]> tuneFiles, Options options) {
-        checkCore(core);
+        checkCore(core, options.monitor());
         int n = tuneFiles.size();
         if (n == 0) {
             throw new IllegalArgumentException("no tune files: an SNDH file holds one subtune"
@@ -136,13 +148,16 @@ final class Sndh {
     }
 
     /**
-     * The core's descriptor held to what this writes.
+     * The core's descriptor held to what this writes, and its flags to
+     * the core asked for: the flags word gives whether the raster
+     * monitor is in, and the file the core was read from does not.
      *
      * @throws IllegalArgumentException where the core is not one, is of
-     *     another descriptor version, or reads bound tunes of another
-     *     version than {@link Bound} writes
+     *     another descriptor version, reads bound tunes of another
+     *     version than {@link Bound} writes, or has no raster monitor in
+     *     where {@code monitor} asks for one
      */
-    static void checkCore(byte[] core) {
+    static void checkCore(byte[] core, boolean monitor) {
         if (core.length < CORE_DESCRIPTOR || !Arrays.equals(CORE_MAGIC,
                 Arrays.copyOfRange(core, CORE_MAGIC_AT, CORE_MAGIC_AT + 4))) {
             throw new IllegalArgumentException("not an SNDH core: no YMXS at " + CORE_MAGIC_AT);
@@ -156,6 +171,12 @@ final class Sndh {
         if (reads != Bound.VERSION) {
             throw new IllegalArgumentException("the core reads bound tunes of version " + reads
                     + ", and this binds at " + Bound.VERSION);
+        }
+        int flags = Tune.getWord(core, CORE_FLAGS_AT);
+        if (monitor && (flags & CORE_MONITOR) == 0) {
+            throw new IllegalArgumentException("the raster monitor was asked for and the core's"
+                    + " flags at " + CORE_FLAGS_AT + " read " + flags + ": bit 0 is clear, so"
+                    + " this core has no monitor in");
         }
     }
 
@@ -305,18 +326,23 @@ final class Sndh {
 
     /**
      * {@code ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER]
-     * [-nNAME]...}: the SNDH file of the tune files, as subtunes in the
-     * order named. The title is the output's stem unless one is given.
-     * Where any name is given, each tune past the names given is named
-     * by its file's stem; where none is, the file has no names.
+     * [-nNAME]... [-perf]}: the SNDH file of the tune files, as subtunes
+     * in the order named. The title is the output's stem unless one is
+     * given. Where any name is given, each tune past the names given is
+     * named by its file's stem; where none is, the file has no names.
+     * {@code -perf} puts the core with the raster monitor in under the
+     * entries, for reading a run.
      */
     public static void main(String[] args) throws IOException {
         @Nullable String title = null;
         @Nullable String composer = null;
+        boolean monitor = false;
         List<String> names = new ArrayList<>();
         List<String> files = new ArrayList<>();
         for (String arg : args) {
-            if (arg.startsWith("-t")) {
+            if (arg.equals("-perf")) {
+                monitor = true;
+            } else if (arg.startsWith("-t")) {
                 title = arg.substring(2);
             } else if (arg.startsWith("-c")) {
                 composer = arg.substring(2);
@@ -350,7 +376,7 @@ final class Sndh {
         byte[] sndh;
         try {
             sndh = of(tunes, new Options(title == null ? stem(out) : title, composer,
-                    names.isEmpty() ? null : names));
+                    names.isEmpty() ? null : names, monitor));
         } catch (IllegalArgumentException wrong) {
             System.err.println("ymxr-sndh: " + wrong.getMessage());
             System.exit(1);
@@ -369,7 +395,9 @@ final class Sndh {
     }
 
     private static void usage() {
-        System.err.println("ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER] [-nNAME]...");
+        System.err.println("ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER] [-nNAME]..."
+                + " [-perf]");
+        System.err.println("  -perf  the core with the raster monitor in, for reading a run");
         System.exit(2);
     }
 }

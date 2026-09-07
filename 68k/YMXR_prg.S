@@ -6,8 +6,9 @@
 ;   +4   'YMXT'
 ;   +8   the descriptor's version, 1
 ;   +10  the subtunes, a word
-;   +12  flags, a word: bit 0 paints the background around each play, for
-;        a run under Hatari that reads the palette back; bit 1 plays from
+;   +12  flags, a word: bit 0 clears the screen before the banner, which
+;        the tool sets where the core has the raster monitor in, so that
+;        the bars stand where the desktop's pixels were; bit 1 plays from
 ;        the VBL, which the tool sets where the set claims Timer C; with
 ;        it clear the program takes the VBL where the screen's rate is the
 ;        tune's, and Timer C at the rate where it is not
@@ -53,7 +54,13 @@ rate:           dc.w    50
 rows:           dc.l    0
 core:           dc.l    0
 
-main:           lea     hex(pc),a0
+main:           btst    #0,flags+1(pc)
+                beq.s   .banner
+                pea     clear(pc)               ; the desktop's pixels away,
+                move.w  #Cconws,-(sp)           ; so the monitor's bars show
+                trap    #GEMDOS
+                addq.l  #6,sp
+.banner:        lea     hex(pc),a0
                 lea     sndh(pc),a1
                 lea     digits(pc),a2
                 move.l  a1,d0
@@ -203,27 +210,18 @@ vbl:
                 bsr     tick
                 rte
 
-; One row from the core, and the background red while the call runs and
-; yellow at its end where the tool asked for the paint, which a trace of
-; the palette writes turns into the call's cycles. The tune is done once
-; the core says its last row has played, or the rows asked for have.
-; Every register kept.
+; One row from the core. The tune is done once the core says its last row
+; has played, or the rows asked for have. Every register kept. A core
+; with the raster monitor in paints the call itself (the player,
+; doc/performance.md), and this program clears the screen for it.
 tick:
                 movem.l d0-d7/a0-a6,-(sp)
                 move.b  done(pc),d0
                 bne.s   .done
                 lea     sndh(pc),a1
-                btst    #0,flags+1(pc)
-                beq.s   .plain
-                move.w  $FFFF8240.w,-(sp)
-                move.w  #$700,$FFFF8240.w
                 jsr     8(a1)
-                move.w  #$770,$FFFF8240.w
-                move.w  (sp)+,$FFFF8240.w
-                bra.s   .played
-.plain:         jsr     8(a1)
-.played:        adda.l  core(pc),a1
-                move.w  22(a1),d0
+                adda.l  core(pc),a1
+                move.w  24(a1),d0
                 btst    #1,(a1,d0.w)
                 bne.s   .over
                 lea     rows_left(pc),a0
@@ -271,6 +269,7 @@ timer_c:
                 movea.l (sp)+,a0
                 rte
 
+clear:          dc.b    27,"E",0                ; VT52: the screen cleared
 text:           dc.b    "YMXR at $"
 hex:            dc.b    "00000000",13,10
                 dc.b    "SPACE stops the tune, 1 to 9 pick a subtune",13,10,0

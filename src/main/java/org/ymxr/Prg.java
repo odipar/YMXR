@@ -38,9 +38,11 @@ final class Prg {
     static final int STUB_CORE_AT = 20;
     static final int STUB_DESCRIPTOR = 24;
 
-    /** Flag bit 0: the background painted around each play call, for a
-     *  run under Hatari that reads the palette back. */
-    static final int FLAG_PAINT = 1;
+    /** Flag bit 0: the screen cleared before the banner. Set where the
+     *  SNDH file's core has the raster monitor in, so that the monitor's
+     *  bars stand where the desktop's pixels were. It follows the core,
+     *  and a caller does not choose it. */
+    static final int FLAG_CLEAR = 1;
 
     /** Flag bit 1: play from the VBL, a 50 Hz clock. Set where the set
      *  claims Timer C, since the stub then has no timer to play from;
@@ -68,18 +70,17 @@ final class Prg {
     /**
      * The program around an SNDH file, from the stub carried.
      *
-     * @param paint flag bit 0
      * @param rows the rows to play, 0 for as many as the tune gives
      * @throws IllegalArgumentException where the file is not an SNDH file
      *     around this player's core, or the set claims Timer C at a rate
      *     other than 50
      */
-    static byte[] of(byte[] sndh, boolean paint, long rows) {
-        return of(Binaries.stub(), sndh, paint, rows);
+    static byte[] of(byte[] sndh, long rows) {
+        return of(Binaries.stub(), sndh, rows);
     }
 
     /** The same, from the stub given. */
-    static byte[] of(byte[] stub, byte[] sndh, boolean paint, long rows) {
+    static byte[] of(byte[] stub, byte[] sndh, long rows) {
         checkStub(stub);
         if (rows < 0 || rows > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("rows " + rows + " does not fit a long");
@@ -92,12 +93,14 @@ final class Prg {
                     + " a host of its own");
         }
         int core = core(sndh, tags.end() + 4);
+        boolean monitor = (Tune.getWord(sndh, core + Sndh.CORE_FLAGS_AT)
+                & Sndh.CORE_MONITOR) != 0;
         byte[] prg = new byte[HEADER + stub.length + sndh.length + 4];
         Tune.putWord(prg, 0, PRG_MAGIC);
         Tune.putLong(prg, 2, stub.length + sndh.length);
         System.arraycopy(stub, 0, prg, HEADER, stub.length);
         Tune.putWord(prg, HEADER + STUB_SUBTUNES_AT, tags.subtunes());
-        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, (paint ? FLAG_PAINT : 0)
+        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, (monitor ? FLAG_CLEAR : 0)
                 | (timerC ? FLAG_VBL : 0));
         Tune.putWord(prg, HEADER + STUB_RATE_AT, tags.rate());
         Tune.putLong(prg, HEADER + STUB_ROWS_AT, (int) rows);
@@ -242,7 +245,8 @@ final class Prg {
     /**
      * Where the core begins: its YMXS, past the tags, less the magic's
      * offset. The entry triple's first bra.w reaches the core's first
-     * byte, or the file is not one {@link Sndh} wrote.
+     * byte, or the file is not one {@link Sndh} wrote, and the core's
+     * descriptor stands whole in the file, since this reads its flags.
      */
     static int core(byte[] sndh, int from) {
         int at = find(sndh, new String(Sndh.CORE_MAGIC, StandardCharsets.ISO_8859_1), from,
@@ -257,6 +261,11 @@ final class Prg {
         if (core < from || reached != core) {
             throw new IllegalArgumentException("the core begins at " + core + ", and the"
                     + " entry triple reaches " + reached);
+        }
+        if (core + Sndh.CORE_DESCRIPTOR > sndh.length) {
+            throw new IllegalArgumentException("the core begins at " + core + " and the file ends "
+                    + (sndh.length - core) + " bytes on, short of the core's descriptor, "
+                    + Sndh.CORE_DESCRIPTOR + " bytes");
         }
         return core;
     }
@@ -281,20 +290,17 @@ final class Prg {
     }
 
     /**
-     * {@code ymxr-prg in.sndh out.prg [-paint] [-rROWS]}: the program
-     * around an SNDH file, painting the background around each play call
-     * with {@code -paint}, and playing {@code ROWS} rows, as many as the
-     * tune gives without.
+     * {@code ymxr-prg in.sndh out.prg [-rROWS]}: the program around an
+     * SNDH file, playing {@code ROWS} rows, as many as the tune gives
+     * without. The stub's flag bit 0 follows the file's core: the screen
+     * is cleared where that core has the raster monitor in.
      */
     public static void main(String[] args) throws IOException {
-        boolean paint = false;
         long rows = 0;
         String in = null;
         String out = null;
         for (String arg : args) {
-            if (arg.equals("-paint")) {
-                paint = true;
-            } else if (arg.startsWith("-r") && arg.substring(2).matches("[0-9]+")) {
+            if (arg.startsWith("-r") && arg.substring(2).matches("[0-9]+")) {
                 rows = Long.parseLong(arg.substring(2));
             } else if (arg.startsWith("-") || out != null) {
                 usage();
@@ -311,7 +317,7 @@ final class Prg {
         }
         byte[] prg;
         try {
-            prg = of(Files.readAllBytes(Path.of(in)), paint, rows);
+            prg = of(Files.readAllBytes(Path.of(in)), rows);
         } catch (IllegalArgumentException wrong) {
             System.err.println("ymxr-prg: " + wrong.getMessage());
             System.exit(1);
@@ -322,7 +328,7 @@ final class Prg {
     }
 
     private static void usage() {
-        System.err.println("ymxr-prg in.sndh out.prg [-paint] [-rROWS]");
+        System.err.println("ymxr-prg in.sndh out.prg [-rROWS]");
         System.exit(2);
     }
 }

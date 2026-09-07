@@ -32,6 +32,7 @@ same change (requirements.md, R0.6 to R0.8).
 | prescaler | The MFP's first divisor: 4, 10, 16, 50, 64, 100 or 200. | terminology.md, the timers |
 | procedure | What a clock calls with a row: it writes the row to the chips. The frame's writes a row of the tune's table, a target a row of a source. | terminology.md, tables, rows and procedures |
 | `R` | The table's row count. | requirements.md R1.1 |
+| raster monitor | The play call painting the background red while its work runs and yellow while it burns the timers' counted cost, and each tick handler painting its own colour: a build of the player, off by default, which a run under an emulator reads back as cycles. | performance.md |
 | rate | How often a tick comes. | terminology.md, rates |
 | reader | Reads a tune and reports what it holds, writing to no chip. The conformance kit is written against one. | requirements.md R2.4 |
 | register | One byte of YM2149 state. Sixteen of them: fourteen steer the sound, two are I/O ports. | terminology.md, the sound chip |

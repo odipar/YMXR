@@ -38,11 +38,52 @@
 ; over the effects the tune does not run at init, and the tick handlers'
 ; operands at every start. It runs from RAM, and one loaded copy serves
 ; one workspace.
+;
+; YMXR_PERF equ 1 assembles the raster monitor in: the play call paints
+; the background red for as long as its work runs, one scanline to 512
+; cycles, and each tick handler paints its own colour where the beam
+; stands. A tick's band is a few hundred cycles wide and hard to read, so
+; each handler adds an estimate of its cost to a count, which the next
+; call burns off as a yellow bar after its own work, the register writes
+; among them: the bar shows what the timers cost the frame, and no chip
+; write moves for it. The call waits for the display to start before it
+; paints, since the VBL fires far above the screen and an unsynced bar
+; lands in the top border; the wait stands before the red mark, so it
+; costs the figures nothing. Each count is an estimate, in turns of ten
+; cycles, and the monitor is for reading a run: with the switch off, the
+; default, no byte and no cycle of it stands.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
 YMXR_VERSION    equ     $0001           ; its version
 YMXR_COLUMNS    equ     30
 YMXR_SITES      equ     18              ; the other read sites (ymxr_sites)
+
+; The raster monitor, off unless the assembly defines it (rmac
+; -dYMXR_PERF=1).
+                .if     ^^defined YMXR_PERF
+                .else
+YMXR_PERF       equ     0
+                .endif
+PERF_PAD        equ     YMXR_PERF*10    ; the colour mark's bytes, which
+                                        ; stand ahead of a handler's
+                                        ; patched operands
+PERF_SYNC       equ     8000            ; the wait's ceiling, a frame of
+                                        ; turns, so a call from anywhere
+                                        ; runs on
+PERF_FRAME      equ     $700            ; the call's own work
+PERF_BAR        equ     $770            ; the timers' burnt bar
+PERF_COLOUR     equ     $FFFF8240       ; the background
+PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
+                                        ; byte, which moves while the chip
+                                        ; fetches pixels
+; What a tick of each kind is counted at, in turns of ten cycles, beside
+; what performance.md measures each at: a row written 108 cycles, the
+; marker with the place to row RR 130, the marker with the timer stopped
+; 116. Each count stands within a twentieth of its measurement, and
+; PlayerTest holds the three to the document's figures.
+PERF_ON         equ     11
+PERF_LOOP       equ     13
+PERF_STOP       equ     12
 
 ; The bound tune (BINARIES.md).
 TF_VERSION      equ     4
@@ -93,15 +134,10 @@ YM_PORTS        equ     $C0             ; R7's port directions, the ST's
 ; effect 3, Timer C     $FFFA1D   $FFFA23   $114    $FFFA09 5    $0F   4
 ; IER+4 is the pending register, IER+8 the in-service, IER+12 the mask.
 
-; A tick handler's operands, patched at a start: the byte offsets into a
-; handler as the TICK macro lays it out. The rig reads them back.
-TICK_SEL        equ     3               ; the target register
-TICK_PTR        equ     8               ; the place: the row the next tick takes
-TICK_STEP       equ     22              ; the place's own address, set at init
-TICK_LOOPT      equ     36              ; the loop cell's address, set at init
-TICK_LOOPR      equ     44              ; the same
-TICK_LOOPW      equ     48              ; the place's address, set at init
-TICK_CELL       equ     74              ; the loop cell: row RR, or 0 once
+; A tick handler's operands, patched at a start, stand at fixed offsets
+; into it; the equates are below the handlers, since the raster monitor's
+; marks stand between the three blocks a handler is made of and the
+; assembler measures the distances.
 
 ; ---------------------------------------------------------------- macros
 
@@ -306,30 +342,58 @@ q\{col}:
 .no\~:
                 .endm
 
+; The monitor's mark: the background kept on the stack and this handler's
+; colour written.
+                .macro  MARK    colour
+                .if     YMXR_PERF
+                move.w  PERF_COLOUR.w,-(sp)
+                move.w  #\colour,PERF_COLOUR.w
+                .endif
+                .endm
+
+; The other end of a mark: this tick's estimated cost counted, in turns
+; of ten cycles, and the background put back. It stands after the write
+; the tick makes and before the end of interrupt, so a nested tick of a
+; higher timer marks and unmarks inside it.
+                .macro  COUNT   turns
+                .if     YMXR_PERF
+                move.l  a0,-(sp)
+                lea     ymxr_perf_acc(pc),a0
+                add.w   #\turns,(a0)
+                movea.l (sp)+,a0
+                move.w  (sp)+,PERF_COLOUR.w
+                .endif
+                .endm
+
 ; A tick (SPEC.md 5): the place's row to the target, the place advanced;
 ; on the marker, the place to row RR, or the timer stopped. No register
 ; is used: the place is the write's own operand, stepped in place. The
 ; interrupt level drops once the select and the value are written, so a
 ; higher timer may nest, and the in-service bit is cleared by hand, as
 ; software end-of-interrupt mode asks.
-                .macro  TICK    name,eoi,eoir,ctrl,keep
+                .macro  TICK    name,eoi,eoir,ctrl,keep,colour
 \name:
-                move.b  #8,YM_SELECT.w          ; +3: the target register
+                MARK    \colour
+\{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
                 move.b  ($12345678).l,YM_SELECT+2.w ; +8: the place
                 bmi.s   .last\~
                 move.w  #$2500,sr
                 addq.l  #1,($12345678).l        ; +22: the place, stepped
+                COUNT   PERF_ON
                 move.b  #\eoi,\eoir.w
                 rte
-.last\~:        tst.l   ($12345678).l           ; +36: the loop cell
+.last\~:
+\{name}_mark:   tst.l   ($12345678).l           ; +2: the loop cell
                 beq.s   .stop\~
-                move.l  ($12345678).l,($12345678).l ; +44 the cell, +48 the place
+                move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
+                COUNT   PERF_LOOP
                 move.b  #\eoi,\eoir.w
                 rte
 .stop\~:        andi.b  #\keep,\ctrl.w
+                COUNT   PERF_STOP
                 move.b  #\eoi,\eoir.w
                 rte
-                dc.l    0                       ; +74: the loop cell
+\{name}_cell:   dc.l    0                       ; the loop cell
                 .endm
 
 ; ---------------------------------------------------------------- calls
@@ -452,6 +516,16 @@ YMXR_play:
                 movea.l a0,a6
                 tst.l   WS_ROWS(a6)
                 beq     ymxr_over
+                .if     YMXR_PERF
+                move.w  PERF_COLOUR.w,-(sp)     ; the background, kept
+                move.b  PERF_BEAM.w,d0          ; before a tick can paint
+                move.w  #PERF_SYNC,d1           ; over it; then the wait for
+.beam:          cmp.b   PERF_BEAM.w,d0          ; the display, which the
+                dbne    d1,.beam                ; counter marks by moving,
+                                                ; and the ceiling ends where
+                                                ; the counter stands still
+                move.w  #PERF_FRAME,PERF_COLOUR.w
+                .endif
                 lea     WS_STATE(a6),a0
                 movea.l WS_IMAGE(a6),a2
                 jsr     IM_ADVANCE(a2)          ; a1 the row
@@ -507,12 +581,25 @@ ymxr_played:
                 move.l  WS_R(a6),d0             ; the last row: the loop's
                 sub.l   WS_RR(a6),d0            ; rows, or none
                 move.l  d0,WS_ROWS(a6)
-ymxr_return:    moveq   #0,d0
+ymxr_return:
+                .if     YMXR_PERF
+                move.w  #PERF_BAR,PERF_COLOUR.w ; the timers' bar, burnt
+                lea     ymxr_perf_acc(pc),a0    ; after the writes this call
+                move.w  (a0),d0                 ; makes, so none of them
+                clr.w   (a0)                    ; moves for it
+.bar:           dbra    d0,.bar
+                move.w  (sp)+,PERF_COLOUR.w
+                .endif
+                moveq   #0,d0
                 movea.l (sp)+,a6
                 rts
 ymxr_over:      moveq   #-1,d0
                 movea.l (sp)+,a6
                 rts
+
+                .if     YMXR_PERF
+ymxr_perf_acc:  dc.w    0                       ; the ticks' counted cost
+                .endif                          ; since the last call
 
 ; The reads' displacement words, one a column, in column order.
 ymxr_reads:
@@ -542,10 +629,23 @@ ymxr_sites:
 
 ; ---------------------------------------------------------------- ticks
 
-                TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0
-                TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0
-                TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0
-                TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F
+                TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$070
+                TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$007
+                TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$707
+                TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$077
+
+; The offsets the patching writes at, measured off the first handler's
+; own labels: the row it writes, the marker it reads, and its loop cell.
+; A monitor's mark stands between those blocks, and the distances follow
+; it. Every handler is laid out by the one macro, so one handler's
+; offsets are all four handlers'. The rig reads them back.
+TICK_SEL        equ     ymxr_tick0_row-ymxr_tick0+3   ; the target register
+TICK_PTR        equ     ymxr_tick0_row-ymxr_tick0+8   ; the place: a tick's row
+TICK_STEP       equ     ymxr_tick0_row-ymxr_tick0+22  ; the place's own address
+TICK_LOOPT      equ     ymxr_tick0_mark-ymxr_tick0+2  ; the loop cell's address
+TICK_LOOPR      equ     ymxr_tick0_mark-ymxr_tick0+10 ; the same
+TICK_LOOPW      equ     ymxr_tick0_mark-ymxr_tick0+14 ; the place's address
+TICK_CELL       equ     ymxr_tick0_cell-ymxr_tick0    ; row RR, or 0 once
 
 ; A parked place: a marker with no loop cell, so a stray tick stops its
 ; timer.

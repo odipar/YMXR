@@ -29,7 +29,7 @@ written until it says what YMXR has to do.
 |---|---|
 | `doc/` | the specification, the requirements it is written against, and the rest |
 | `src/main/java/org/ymxr/` | the converter: a YM5!/YM6! dump into a tune file, on DTX's Java library |
-| `68k/YMXR.S` | the player |
+| `68k/YMXR.S` | the player, with the raster monitor as a build (doc/performance.md) |
 | `68k/YMXR_sndh.S`, `68k/YMXR_prg.S` | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool (doc/BINARIES.md) |
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
 | `ym/` | the measurements behind the figures, and `ym/test` eight tunes the tests run on |
@@ -62,6 +62,7 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 | `68k/test/emu/test_ymxr.py` | the player on an emulated 68000: every frame's writes, the timers' programming and every tick against the specification's model |
 | the same, `-hatari` | the SNDH file's program on a real MFP under Hatari, the trace of the player's writes against that model |
 | the same, `-kit` | the conformance kit's tunes on the player, each frame held to the reader's record |
+| the same, `-perf` | the player built with the raster monitor in, held to the same model: the monitor moves no chip write |
 
 | | |
 |---|---|

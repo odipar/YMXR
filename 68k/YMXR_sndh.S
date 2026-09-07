@@ -23,11 +23,14 @@
 ;   +16  the descriptor's version, 1
 ;   +18  the bound tune's version this core reads
 ;   +20  the workspace's bytes before the state block, YMXR_FIXED
-;   +22  where the state byte is, a word: bit 0 set while a tune plays,
+;   +22  flags, a word: bit 0 where the raster monitor is assembled in
+;        (the player's YMXR_PERF, doc/performance.md)
+;   +24  where the state byte is, a word: bit 0 set while a tune plays,
 ;        bit 1 once it has played its last row and does not repeat
-;   +24  the subtune table, a long: a word count, then a long an entry,
+;   +26  zero
+;   +28  the subtune table, a long: a word count, then a long an entry,
 ;        each the bound tune's offset. Patched by the tool.
-;   +28  the workspace, a long. Patched by the tool. The player takes
+;   +32  the workspace, a long. Patched by the tool. The player takes
 ;        its workspace on a long and an SNDH host loads the file on an
 ;        even address, so the core rounds the address up to a long, and
 ;        the tool gives the workspace two bytes more than the state needs.
@@ -42,7 +45,9 @@ sndh_core:
                 dc.w    1
                 dc.w    YMXR_VERSION
                 dc.w    YMXR_FIXED
+                dc.w    YMXR_PERF               ; the flags: the monitor
                 dc.w    sndh_state-sndh_core
+                dc.w    0
 sndh_table:     dc.l    0
 sndh_work:      dc.l    0
 

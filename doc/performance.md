@@ -63,23 +63,59 @@ averages by more than two thirds, and the costliest frame of every tune but
 one by 900 cycles or more. Synergy Credits' costliest frame, at unit 1, is the
 budget itself.
 
+## The raster monitor
+
+The figures above are the rig's, counted instruction by instruction
+under an emulated 68000. A second measure runs on a cycle-exact machine,
+and the player is built with it: `rmac -dYMXR_PERF=1` puts the
+raster monitor in (`68k/YMXR.S`), and `bin/ymxr-sndh -perf` puts that
+core in an SNDH file. The call paints the background red while its work
+runs, one scanline to 512 cycles, and each tick handler paints its own
+colour where the beam stands: effect 0 green, effect 1 blue, effect 2
+magenta, effect 3 cyan, four colours the call's red and the bar's yellow
+are not, so a reader tells every band apart. A tick's band is a few
+hundred cycles wide, so each handler also adds a count of what it costs,
+in turns of ten cycles, and the next call burns the total off as a
+yellow bar after its own work, the register writes among them: no chip
+write moves for the monitor, and the bar shows the timers' share of the
+frame. The call waits for the display to start before it paints, since
+the VBL fires far above the screen and an unsynced bar lands in the top
+border where nothing shows; the wait stands before the red mark, so it
+costs the figures nothing, and it is bounded, so a call from anywhere
+runs on. With the switch off, the default, the player is byte for byte
+the player without it.
+
+`ym/cost.sh` builds a program with that core, runs it under Hatari
+tracing the writes to the background, and `ym/cost.py` reads every
+call's span back: the red mark to the yellow one is the call's own work,
+less each tick band inside it, and the yellow to the write that puts the
+desktop's colour back is the bar. What the method leaves out: the ticks'
+counts are estimates, each within a twentieth of what A tick measures
+below, which PlayerTest holds them to; a tick that lands inside the bar
+is counted in the next call's; and the wait moves the call's writes in
+time, which is why the monitor is a build for reading a run and not one
+to play a tune with.
+
 ## Against YMX
 
-YMX's performance.md measures its player by painting the background red
-while a call runs and reading the palette writes back from a cycle-exact
-Hatari (`ymx/test/cost.py` there). The stub here paints the same way, so
-the two players read by one method, on the same dumps, over 2,000 calls:
+YMX's performance.md measures its player the same way, painting the
+background red while a call runs and reading the palette writes back
+from a cycle-exact Hatari (`ymx/test/cost.py` there). So the two players
+read by one method, on the same dumps, over 2,019 calls:
 
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2317 | 3424 | 3880 |
-| Synergy Credits | YMXR | 2485 | 4276 | 6236 |
+| Synergy Credits | YMXR | 2391 | 4192 | 6212 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1912 | 3232 | 4252 |
-| Turrican - world 4-3 | YMXR | 1832 | 2988 | 5144 |
+| Turrican - world 4-3 | YMXR | 1723 | 2920 | 5024 |
 
-YMXR costs a twenty-fifth less on average on Turrican - world 4-3 and a
-fourteenth more on Synergy Credits, whose odd row count puts it at unit 1, and
-a fifth and three fifths more at their worst, and the figures have two causes.
+Both players' figures stand above the ones the rig counts, which are the
+68000's own cycles with no wait state.
+
+YMXR costs a tenth less on average on Turrican - world 4-3 and a thirtieth
+more on Synergy Credits, whose odd row count puts it at unit 1, and a fifth
+and three fifths more at their worst, and the figures have two causes.
 The frame procedure is 550 to 1,110 cycles: the fourteen register columns'
 tests and the writes they admit, the effects' columns and the call's own entry
 and exit, where YMX writes its fourteen registers unconditionally, one `movep`
@@ -93,7 +129,7 @@ units on Turrican - world 4-3: 933 a row, where YMX refills one stream of
 sixty-four bytes at the same unit on nineteen to twenty-five rows in
 thirty-two, about 950 each, 560 to 740 a row. So YMXR's refill costs more a
 row, and its frame procedure less on the rows that set few columns, 746 on
-average on that tune against YMX's 908, and the average lands a twenty-fifth
+average on that tune against YMX's 908, and the average lands a tenth
 under. The worst frame is the heaviest fifteen-unit refill, 4,176 of the 4,834
 on Turrican - world 4-3, against YMX's heaviest sixty-four-byte group, and
 that is the decoder's spread and not either player's.

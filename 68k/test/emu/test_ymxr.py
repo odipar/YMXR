@@ -12,6 +12,9 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -cycles [tunes]    the play call's cost as well
        test_ymxr.py -hatari [tunes]    the same tunes on a real MFP, under
                                        Hatari
+       test_ymxr.py -perf [tunes]      the player built with the raster
+                                       monitor in, held to the same model:
+                                       the monitor moves no chip write
 
 The player takes a bound tune (doc/BINARIES.md 1): each tune file is
 bound through bin/ymxr-bind before it is played, and a tune file of
@@ -42,7 +45,7 @@ import sys
 import tempfile
 
 from unicorn import (Uc, UcError, UC_ARCH_M68K, UC_MODE_BIG_ENDIAN,
-                     UC_HOOK_MEM_WRITE, UC_HOOK_CODE)
+                     UC_HOOK_MEM_WRITE, UC_HOOK_MEM_READ, UC_HOOK_CODE)
 from unicorn.m68k_const import (UC_CPU_M68K_M68000, UC_M68K_REG_D0,
                                 UC_M68K_REG_D1, UC_M68K_REG_D2, UC_M68K_REG_D3,
                                 UC_M68K_REG_D6, UC_M68K_REG_D7, UC_M68K_REG_A0,
@@ -61,6 +64,13 @@ STUB_FRAMES = 2000
 # The tune file's version (SPEC.md 3.3) and the bound tune's (BINARIES.md 1).
 TUNE_VERSION = 2
 BOUND_VERSION = 1
+# The video address counter's low byte, which the raster monitor waits on,
+# and the background it paints.
+VIDEO = 0xFFFF8209
+PALETTE = 0xFFFF8240
+# What the monitor's build paints: the call's work, and the timers' bar.
+PERF_FRAME = 0x0700
+PERF_BAR = 0x0770
 
 # The memory map: the player, the tune two bytes past a long so nothing
 # assumes one, the workspace on a long, a stack, and a sentinel a call
@@ -94,29 +104,56 @@ def taken(writes):
     return [(reg, value & TAKES[reg]) for reg, value in writes]
 
 
-def equate(name):
+# What the player is assembled with: the raster monitor's switch, which
+# an equate of the source reads as the assembly defines it.
+PERF = "-perf" in sys.argv
+DEFINED = {"YMXR_PERF": 1 if PERF else 0}
+
+
+def equate(name, symbols=None):
     """An equate out of the player's source, so the rig reads what the
-    player reads."""
-    m = re.search(r"^%s\s+equ\s+(\$?[0-9A-Fa-f]+)" % name,
-                  open(os.path.join(ROOT, "68k", "YMXR.S")).read(), re.M)
+    player reads. A term that names another equate is read through to its
+    figures, one that names a label is the address the assembly gave it,
+    and a name the assembly defines takes the value it was defined with.
+    A tick's offsets are measured off the handler's own labels, so they
+    are read with the symbols the assembly gave."""
+    if name in DEFINED:
+        return DEFINED[name]
+    if symbols and name in symbols:
+        return symbols[name]
+    source = open(os.path.join(ROOT, "68k", "YMXR.S")).read()
+    m = re.search(r"^%s\s+equ\s+([-$\w+*]+)" % name, source, re.M)
     assert m, name + " is not an equate of YMXR.S"
-    v = m.group(1)
-    return int(v[1:], 16) if v.startswith("$") else int(v)
+    whole = 0
+    for signed in re.finditer(r"([+-]?)([$\w*]+)", m.group(1)):
+        product = 1
+        for factor in signed.group(2).split("*"):
+            if factor.startswith("$"):
+                product *= int(factor[1:], 16)
+            elif factor.isdigit():
+                product *= int(factor)
+            else:
+                product *= equate(factor, symbols)
+        whole += -product if signed.group(1) == "-" else product
+    return whole
 
 
 # The workspace's fixed part, before the image's state block, and a tick
 # handler's operands: the register, the place, the cell.
 FIXED = equate("YMXR_FIXED")
-TICK_SEL, TICK_PTR, TICK_CELL = equate("TICK_SEL"), equate("TICK_PTR"), equate("TICK_CELL")
+# The tick offsets are measured off the handler's labels, so they stand
+# once the player is assembled (main).
+TICK_SEL = TICK_PTR = TICK_CELL = 0
 
 
-def assemble(source="YMXR.S"):
+def assemble(source="YMXR.S", defines=()):
     """The bytes a source under 68k/ assembles to, and its symbols: the
     player's, or the SNDH core's, which includes the player."""
     work = tempfile.mkdtemp()
     out, lst = os.path.join(work, "code.bin"), os.path.join(work, "code.lst")
-    r = subprocess.run([RMAC, "-m68000", "-fr", "-l*" + lst, "-i" + os.path.join(ROOT, "68k"),
-                        "-o", out, os.path.join(ROOT, "68k", source)], capture_output=True)
+    r = subprocess.run([RMAC, "-m68000", "-fr", "-l*" + lst, "-i" + os.path.join(ROOT, "68k")]
+                       + list(defines) + ["-o", out, os.path.join(ROOT, "68k", source)],
+                       capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     symbols = {}
     for line in open(lst):
@@ -345,9 +382,19 @@ class Machine:
         self.mfp = []
         self.select = None
         self.stray = []
+        self.palette = []
         mu.hook_add(UC_HOOK_MEM_WRITE, self._write)
         self.rte_at = None
+        self.beam = 0
         mu.hook_add(UC_HOOK_CODE, self._code)
+        # the video address counter, which moves while the chip fetches
+        # pixels: the raster monitor waits for it, and a value that never
+        # moved would hold the wait to its ceiling
+        mu.hook_add(UC_HOOK_MEM_READ, self._beam, begin=VIDEO, end=VIDEO + 1)
+
+    def _beam(self, mu, access, address, size, value, data):
+        self.beam = (self.beam + 1) & 0xFF
+        mu.mem_write(VIDEO, bytes([self.beam]))
 
     def _code(self, mu, address, size, data):
         if self.rte_at is not None and bytes(mu.mem_read(address, 2)) == b"\x4e\x73":
@@ -367,6 +414,9 @@ class Machine:
             for lane in range(size):
                 byte = (value >> (8 * (size - 1 - lane))) & 0xFF
                 self.mfp.append((address + lane, byte))
+        elif PALETTE <= address < PALETTE + 2:
+            for lane in range(size):    # the raster monitor's marks
+                self.palette.append((value >> (8 * (size - 1 - lane))) & 0xFF)
         elif address < 0x1000 or CODE <= address < CODE + 0x10000:
             pass                        # a vector, or the player patching itself
         elif not (WORK <= address < WORK + 0x40000 or STACK <= address < STACK + 0x10000):
@@ -385,7 +435,7 @@ class Machine:
         sp = STACK + 0x8000
         mu.mem_write(sp - 4, struct.pack(">I", DONE))
         mu.reg_write(UC_M68K_REG_A7, sp - 4)
-        self.psg, self.mfp, self.stray = [], [], []
+        self.psg, self.mfp, self.stray, self.palette = [], [], [], []
         try:
             mu.emu_start(CODE + slot, DONE, count=50_000_000)
         except UcError as bad:
@@ -515,7 +565,7 @@ class Timers:
         return n
 
 
-def check(ym, code, symbols, cycles=None, kit=False):
+def check(ym, code, symbols, cycles=None, kit=False, perf=False):
     """The tune on the player, held to the model frame by frame and tick
     by tick; with kit, each frame is held to the reader's entry as well,
     and a tune that plays once to the call that reports its end."""
@@ -594,6 +644,13 @@ def check(ym, code, symbols, cycles=None, kit=False):
                 assert entries[f] == {"result": -1}, "the reader's last entry is %s" % entries[f]
             break
         assert d0 == 0, "play gave %d at frame %d" % (d0, f)
+        if perf:
+            # the monitor marks the call's work and burns the timers' bar
+            # after it, so the two marks stand around every chip write
+            marks = [(m.palette[i] << 8) | m.palette[i + 1]
+                     for i in range(0, len(m.palette) - 1, 2)]
+            assert marks[:1] == [PERF_FRAME] and PERF_BAR in marks, \
+                "frame %d: the monitor's marks are %s" % (f, [hex(x) for x in marks])
         want = model.frame()
         assert taken(m.psg) == taken(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
@@ -670,13 +727,14 @@ def hatari(ym, code, symbols):
                         "-t" + os.path.basename(ym)], capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     prg = os.path.join(work, "YMXR.PRG")
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), sndh, prg, "-paint",
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), sndh, prg,
                         "-r%d" % STUB_FRAMES], capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     sndh_bytes = open(sndh, "rb").read()
     core = sndh_bytes.find(b"YMXS") - 12
     assert core >= 12, "the core is not in the SNDH file"
-    assert sndh_bytes[core:core + 24] == code[:24] and sndh_bytes[core + 32:core + len(code)] == code[32:], \
+    assert sndh_bytes[core:core + 28] == code[:28] \
+        and sndh_bytes[core + 36:core + len(code)] == code[36:], \
         "the core in the file is not the one assembled, its two patched longs aside"
     trace = os.path.join(work, "trace.txt")
     r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
@@ -814,6 +872,7 @@ def main():
     count = "-cycles" in sys.argv
     real = "-hatari" in sys.argv
     kit = "-kit" in sys.argv
+    perf = PERF
     if kit:
         where = os.path.join(ROOT, "doc", "conformance", "tunes")
         tunes = args or sorted(os.path.join(where, f) for f in os.listdir(where)
@@ -822,8 +881,12 @@ def main():
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
-    code, symbols = assemble()
-    print("the player: %d bytes" % len(code))
+    code, symbols = assemble(defines=["-dYMXR_PERF=1"] if perf else [])
+    global TICK_SEL, TICK_PTR, TICK_CELL
+    TICK_SEL = equate("TICK_SEL", symbols)
+    TICK_PTR = equate("TICK_PTR", symbols)
+    TICK_CELL = equate("TICK_CELL", symbols)
+    print("the player: %d bytes%s" % (len(code), ", the raster monitor in" if perf else ""))
     if real:
         code, symbols = assemble("YMXR_sndh.S")
         print("the SNDH core: %d bytes" % len(code))
@@ -840,11 +903,13 @@ def main():
             print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
             continue
         frames, ticks, cost, tick_cost, where = check(ym, code, symbols,
-                                                      cycles_of and CyclesOn(cycles_of), kit)
+                                                      cycles_of and CyclesOn(cycles_of), kit, perf)
         line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
         if kit:
             line += ", the player's frames are the reader's entries"
-        if cost:
+        if cost and perf:
+            line += ", the monitor's own cycles among them"
+        if cost and not perf:
             average = int(sum(cost) / len(cost))
             adv = where[3]
             line += ", play %5d cycles on average, %5d at most, at frame %d of R %d RR %d" % (

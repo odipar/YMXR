@@ -14,6 +14,7 @@ Big-endian throughout; every offset and size in bytes.
 | file | contents |
 |---|---|
 | `YMXR_sndh.bin` | the SNDH core: the player and its SNDH glue, assembled from `68k/YMXR_sndh.S` |
+| `YMXR_sndh-perf.bin` | the same core with the player's raster monitor assembled in (`YMXR_PERF`, performance.md), for reading a run |
 | `YMXR_prg.bin` | the program stub, assembled from `68k/YMXR_prg.S` |
 | `DTX0.bin`, `DTX1-w1.bin`, `DTX2-w1-k1.bin` and the rest | DTX's reader code, twenty-two files: one for DTX0, one a width for DTX1, one a width, a unit and the copies flag for DTX2, at `org/dtx/68k/` in the dtx jar (DTX, doc/abi.md) |
 
@@ -85,11 +86,16 @@ Position-independent. Its layout from its first byte:
 | 16 | 2 | the descriptor's version, 1 |
 | 18 | 2 | the bound tune's version this core reads |
 | 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block |
-| 22 | 2 | where the core's state byte is |
-| 24 | 4 | the subtune table: written 0, patched by the tool |
-| 28 | 4 | the workspace: written 0, patched by the tool |
+| 22 | 2 | flags: bit 0 where the raster monitor is in |
+| 24 | 2 | where the core's state byte is |
+| 26 | 2 | zero |
+| 28 | 4 | the subtune table: written 0, patched by the tool |
+| 32 | 4 | the workspace: written 0, patched by the tool |
 
 Both patched offsets count from the core's first byte and are even. The
+flags word says what the core was assembled with, so a tool that asks
+for the monitor reads the word rather than the file's name, and stops
+where the two part. The
 state byte has bit 0 set while a tune plays and bit 1 set once the tune
 has played its last row and does not repeat; a host that has to know
 when a tune that plays once is over reads it, since play returns
@@ -163,7 +169,7 @@ The flags word:
 
 | bit | set by the tool where | the stub then |
 |---|---|---|
-| 0 | the caller asked for it | paints the background around each play call, red while it runs and yellow at its end: a trace of the palette writes gives the call's cycles |
+| 0 | the core has the raster monitor in | clears the screen before the banner, so that the monitor's bars stand where the desktop's pixels were |
 | 1 | the set claims Timer C | plays from the VBL; with the bit clear, from the VBL where the screen's rate is the tune's and from Timer C where it is not |
 
 The VBL is the screen's own clock: 50 or 60 Hz by the sync bit, 71 in
@@ -213,6 +219,6 @@ run.
 
 The tools: `bin/ymxr-bind tune.ymxr out.bin` writes the bound tune;
 `bin/ymxr-sndh tune.ymxr ... out.sndh` the SNDH file, with `-tTITLE`,
-`-cCOMPOSER` and `-nNAME` a subtune; `bin/ymxr-prg in.sndh out.prg` the
-program, with `-paint` for flag bit 0 and `-rROWS` for the rows.
-tools.md has them.
+`-cCOMPOSER`, `-nNAME` a subtune and `-perf` for the monitor's core;
+`bin/ymxr-prg in.sndh out.prg` the program, with `-rROWS` for the rows.
+tools.md has them, and `ym/cost.sh` reads a monitor run back.
