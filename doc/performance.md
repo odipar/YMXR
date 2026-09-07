@@ -1,6 +1,6 @@
 # performance
 
-What a play call costs, in cycles, measured on the nine tunes under
+What a play call costs, in cycles, measured on the ten tunes under
 `ym/test` by the rig's cycle counter (tools.md, the rigs): the 68000's own
 cycles, with no wait state, over every frame of a tune played through its
 wrap once. A tick handler's cost is its own instructions, from its vector
@@ -17,12 +17,13 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Big - Samantha Fox Strip Poker 6 | 430 | 1660 | 2254 | 1072 | 1654 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1494 | 3520 | 852 | 2860 |
 | Circus Attractions 2 | 8 | 1568 | 1764 | 792 | 792 |
-| DBA 2 | 19442 | 2075 | 5644 | 1187 | 4920 |
-| Digidrum preempt, built | 800 | 1744 | 2928 | 823 | 2052 |
-| Retrigger retune, built | 1200 | 1616 | 2388 | 828 | 1098 |
-| Synergy Credits | 10754 | 2456 | 6418 | 1274 | 4994 |
-| Turrican - world 4-3 | 3680 | 1718 | 4948 | 933 | 4176 |
-| Turrican 2 - world completed 1 | 179 | 2019 | 5756 | 1284 | 5062 |
+| DBA 2 | 19442 | 2085 | 5644 | 1185 | 4920 |
+| DBA 5 | 22262 | 2172 | 5790 | 1257 | 4554 |
+| Digidrum preempt, built | 800 | 1747 | 2928 | 823 | 2052 |
+| Retrigger retune, built | 1200 | 1616 | 2412 | 828 | 1098 |
+| Synergy Credits | 10754 | 2469 | 6450 | 1266 | 4994 |
+| Turrican - world 4-3 | 3680 | 1720 | 4948 | 933 | 4176 |
+| Turrican 2 - world completed 1 | 179 | 2020 | 5756 | 1284 | 5062 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
@@ -69,9 +70,9 @@ period after the pass's end, so no row takes more than one decoder's
 copy.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it: the
-averages by more than two thirds, and the costliest frame of every tune but
-one by 900 cycles or more. Synergy Credits' costliest frame, at unit 1, is the
-budget itself.
+averages by more than three fifths of it, and the costliest frame of every
+tune but two by 900 cycles or more. DBA 5's costliest frame is 866 cycles
+under the budget and Synergy Credits', at unit 1, 206.
 
 ## The raster monitor
 
@@ -136,9 +137,9 @@ read by one method, on the same dumps, over the 2,019 calls of a
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
-| Synergy Credits | YMXR | 2391 | 4192 | 5408 |
+| Synergy Credits | YMXR | 2421 | 4220 | 5408 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
-| Turrican - world 4-3 | YMXR | 1748 | 3008 | 5148 |
+| Turrican - world 4-3 | YMXR | 1749 | 3032 | 5148 |
 
 These figures and the rig's are not one sample: the rig counts every frame
 of the tune and the 68000's own cycles with no wait state, and these are the
@@ -146,8 +147,9 @@ first 2,019 calls on a machine that stalls the processor while the shifter
 fetches. Synergy Credits' costliest frame is its 4,517th, past the end of
 this run.
 
-YMXR costs a twelfth less on average on Turrican - world 4-3 and a fortieth
-more on Synergy Credits, whose odd row count puts it at unit 1, and a fifth
+YMXR costs a thirteenth less on average on Turrican - world 4-3 and a
+twenty-fifth more on Synergy Credits, whose odd row count puts it at unit 1,
+and a fifth
 and a seventh more at their worst, and the figures have two causes.
 The frame procedure is 550 to 1,110 cycles: the fourteen register columns'
 tests and the writes they admit, the effects' columns and the call's own entry

@@ -32,7 +32,7 @@ written until it says what YMXR has to do.
 | `68k/YMXR.S` | the player, with the raster monitor as a build (doc/performance.md) |
 | `68k/YMXR_sndh.S`, `68k/YMXR_prg.S` | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool (doc/BINARIES.md) |
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
-| `ym/` | the measurements behind the figures, and `ym/test` nine tunes the tests run on |
+| `ym/` | the measurements behind the figures, and `ym/test` ten tunes the tests run on |
 | `bin/` | the converter, the check, the trace, the binder and the SNDH and program combiners, run out of a build |
 
 A tune converts and plays like this:
