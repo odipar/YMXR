@@ -1,6 +1,6 @@
 # performance
 
-What a play call costs, in cycles, measured on the eight tunes under
+What a play call costs, in cycles, measured on the nine tunes under
 `ym/test` by the rig's cycle counter (tools.md, the rigs): the 68000's own
 cycles, with no wait state, over every frame of a tune played through its
 wrap once. A tick handler's cost is its own instructions, from its vector
@@ -17,6 +17,7 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Big - Samantha Fox Strip Poker 6 | 430 | 1629 | 2582 | 1074 | 1642 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1462 | 3488 | 852 | 2860 |
 | Circus Attractions 2 | 8 | 1534 | 1732 | 792 | 792 |
+| DBA 2 | 19442 | 2059 | 5612 | 1185 | 4920 |
 | Digidrum preempt, built | 800 | 1714 | 3128 | 822 | 1530 |
 | Retrigger retune, built | 1200 | 1585 | 2242 | 828 | 1498 |
 | Synergy Credits | 10754 | 2422 | 6718 | 1267 | 5382 |
@@ -28,17 +29,26 @@ refill is fifteen units of two bytes and one comes every row (tools.md,
 Convert); a tune whose row count or repeat row is odd packs at unit 1, Synergy
 Credits and Turrican 2 - world completed 1 among these, so a refill of theirs
 is thirty units of a byte. What those units cost depends on how the column
-packed: a run of long matches costs 12 cycles a unit to copy and a run of
-short operations, each a length and an offset read bit by bit, 175 to 220 an
-operation to parse, which is the spread between the tunes' averages. Unit 1
-packs the corpus to 0.69 bytes a frame against 0.81 (experiments.md) and costs
-more to decode: measured on Turrican - world 4-3 with the same rows, the
-advance 1,130 on average and 4,448 at most against 880 and 4,132, and the play
-call 1,874 and 5,110 against 1,624 and 4,794; `-k1` packs at it. A larger
-period would make the refill larger and rarer: packed at unit 1 and 283 rows,
-the only period dividing its 5,377-row loop while DTX asked that the loop
-divide by the period, Synergy Credits refilled 283 bytes at a time, from 4,792
-to 19,742 cycles, and its costliest frame was 20,936.
+packed: a run of long matches costs 12 cycles a unit to copy, and a short
+operation, a length and an offset read bit by bit, about 225 to 240 an
+operation to parse. The advance spends 496 cycles a refill outside the
+decoder, loading and storing the decoder's eight registers, testing its mark
+and stepping to the next, and a refill that parses nothing new adds 334 on
+Turrican - world 4-3 at unit 2 and 578 on Synergy Credits at unit 1. The range
+comes from the endpoints on Turrican - world 4-3: the 334 above and 3,680 at
+its heaviest are 3,346 over fourteen operations, about 239 each, and YMX's own
+slope is about 225 an operation. A least-squares fit over every refill reads
+higher, 285 to 342 an operation, since a refill that parses few operations is
+mostly the fixed part. A refill of 496 outside and the heaviest 3,680 inside
+is the 4,176 the table above gives as Turrican's advance in its costliest
+frame. Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
+(experiments.md) and costs more to decode: measured on Turrican - world 4-3
+with the same rows, the advance 1,130 on average and 4,448 at most against 880
+and 4,132, and the play call 1,874 and 5,110 against 1,624 and 4,794; `-k1`
+packs at it. A larger period would make the refill larger and rarer: packed at
+unit 1 and 283 rows, the only period dividing its 5,377-row loop while DTX
+asked that the loop divide by the period, Synergy Credits refilled 283 bytes
+at a time, from 4,792 to 19,742 cycles, and its costliest frame was 20,936.
 
 The frame procedure is the rest, from 550 to 1,110 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
@@ -137,17 +147,24 @@ and exit, where YMX writes its fourteen registers unconditionally, one `movep`
 each, and its whole call with nothing to decode is 908, the writes included.
 Fourteen tests and a few writes cost what fourteen writes cost, which YMX's
 own measurement found and its design took; the effects' columns and the entry
-are what the schema adds. DTX's advance spends about 470 cycles a refill
-outside the decoder, loading and storing the decoder's eight registers,
-testing its mark and stepping to the next, and about 460 inside it for fifteen
-units on Turrican - world 4-3: 933 a row, where YMX refills one stream of
-sixty-four bytes at the same unit on nineteen to twenty-five rows in
-thirty-two, about 950 each, 560 to 740 a row. So YMXR's refill costs more a
-row, and its frame procedure less on the rows that set few columns, 746 on
-average on that tune against YMX's 908, and the average lands a tenth
-under. The worst frame is the heaviest fifteen-unit refill, 4,176 of the 4,834
-on Turrican - world 4-3, against YMX's heaviest sixty-four-byte group, and
-that is the decoder's spread and not either player's.
+are what the schema adds. So YMXR's frame procedure costs less on the rows
+that set few columns, 746 on average on that tune against YMX's 908, and the
+average lands a tenth under.
+
+The refill is the second cause. YMXR refills fifteen units every row; YMX
+serves a round-robin of twenty-four slots, twenty-one of them holding a live
+stream, so its group is twenty-four bytes, twelve units at the same unit 2,
+and it refills on twenty-one rows in twenty-four: the three slots without a
+stream refill nothing and cost 1,012 cycles a call over 252 of the 2,019
+calls, against 2,023 on the 1,767 calls that refill. YMX's refill is the
+smaller of the two, twelve units against fifteen, which is why its worst call
+is the lower. A refill parses at most one operation a unit, so its unit count
+bounds the parse, and that count follows the streams the schedule serves:
+thirty columns here against twenty-one live streams there. The worst frame of
+each player parses one operation for every unit, fifteen of fifteen here and
+twelve of twelve there, so each worst frame is that bound. On Synergy Credits
+the gap is wider: unit 1 makes the refill thirty units, where YMX duplicates a
+frame to raise its own row count and stays at unit 2.
 
 ## What can be done
 
@@ -239,8 +256,8 @@ The average passed YMX's at step 3. The rows after it are the dump's own, the
 padding that kept every loop on a period gone with DTX's rule that asked for
 it, and the repeat replayed at its exact row costs the advance a mark's test a
 row. The worst frame came under R4.5 at step 2 and stays about 740 over YMX's:
-a fifteen-unit refill's heaviest case against YMX's sixty-four-byte group,
-which is the decoder's and not either player's.
+a fifteen-unit refill's heaviest case against YMX's twelve-unit group, and the
+two sizes follow the streams each schedule serves.
 
 ## A tick
 
