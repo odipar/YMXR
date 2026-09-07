@@ -131,6 +131,7 @@ final class Columns {
             }
             byte[] out = new byte[C];
             int owned = 0;
+            int silenced = 0;
             for (int i = 0; i < 2; i++) {
                 int t = EFFECT + 4 * i;
                 boolean drum = running[i].kind() == Effects.DRUM;
@@ -170,6 +171,13 @@ final class Columns {
                         // The keyframe sets the bit whatever the wrap left.
                         boolean stopped = keyframe || !running[i].on()
                                 || running[i].kind() == Effects.DRUM && f >= drumEnd[i];
+                        if (slot[i].kind() == Effects.SID) {
+                            // The voice is silenced on the row that starts
+                            // the square, so the tick a period later is its
+                            // loud half (1.3, section 6): the square begins
+                            // where the reference player begins it.
+                            silenced |= 1 << slot[i].target();
+                        }
                         out[t + 1] = (byte) (0x80 | number[i]);
                         out[t + 2] = (byte) (0x80 | (stopped ? TIMER_RESET : 0) | PLACE_RESET
                                 | slot[i].select());
@@ -209,7 +217,10 @@ final class Columns {
                         held[c] = reg[c];
                     }
                 } else if ((owned & 1 << c) != 0) {
-                    held[c] = -1;
+                    if ((silenced & 1 << c) != 0) {
+                        out[c] = (byte) 0x80;       // the level 0: the voice
+                    }                               // silent until the first
+                    held[c] = -1;                   // tick a period on
                 } else if (reg[c] != held[c]) {
                     out[c] |= (byte) (0x80 | reg[c]);
                     held[c] = reg[c];

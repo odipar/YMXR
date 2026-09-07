@@ -112,9 +112,12 @@ from the envelope generator instead. The low five bits reach R8, R9 or R10.
 Bits 6 and 5 are zero.
 
 While an effect writes this voice's volume register, a row leaves this
-column unset (section 6), so the frame's one write a row does not undo what
-the effect's ticks write. The row that stops the effect sets it again, and
-that write restores the voice's level.
+column unset (section 6), so the frame's one write a row does not undo
+what the effect's ticks write. Two rows set it: the row that stops the
+effect, whose write restores the voice's level, and the row that starts a
+square wave on it, which sets the column to 0. The voice is silent for the
+timer's first period then, and the first tick writes the loud half, which
+is where a square wave begins.
 
 ### 1.4 Mixing
 
