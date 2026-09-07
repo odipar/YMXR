@@ -314,8 +314,9 @@ class Model:
             source = r[t + 1] & 0x7F
             fx["source"] = source
             if source == 0:
+                # the place stands where the last tick left it, so a source
+                # that starts again takes up from it (SPEC.md 1.9)
                 fx["running"] = False
-                fx["place"] = None
             else:
                 at, R, RR, rows = self.tune.sources[source]
                 # the first row, or where the row leaves bit 5 of the control
@@ -389,7 +390,7 @@ class Model:
 
     def place_address(self, i):
         fx = self.fx[i]
-        if fx["place"] is None:
+        if fx["place"] is None or fx["source"] == 0:
             return None
         return FILE + self.tune.sources[fx["source"]][0] + fx["place"]
 

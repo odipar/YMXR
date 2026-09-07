@@ -234,3 +234,18 @@ burns a yellow bar for what the ticks it counted cost, after its own
 writes, so none of them moves for it. `HATARI`, `TOS` and `VBLS` name
 the emulator, a TOS image and the frames to run. performance.md has the
 figures and what the method leaves out.
+
+```
+hatari --trace psg_write,video_vbl --trace-file trace.txt TUNE.PRG
+python3 ym/halves.py trace.txt
+```
+
+`ym/halves.py` measures a square wave: for every volume register a run
+writes, the edges its writes make and how far each half stands from the
+median. A square is a voice moving between a level and 0 at a timer's
+rate, so what the ear hears is the length of each half, and a comparison
+of values, of counts, or of the register at each frame boundary passes a
+player that writes the right values at the wrong times. Run it on the
+player and on another player's trace of the same tune before believing a
+square is right; experiments.md, What a square does when it starts, has
+what it caught and the figures it read.
