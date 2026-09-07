@@ -1,18 +1,21 @@
 ; YMXR_sndh.S - the SNDH core: the player under SNDH's three entries, with
-; what a host needs of the machine kept and put back. A tool binds it with
-; one bound tune or more into an SNDH file (doc/BINARIES.md) and patches
-; the two offsets in the descriptor; the core moves no tune itself.
+; what a host needs of the machine kept and put back. A tool combines it
+; with one bound tune or more into an SNDH file (doc/BINARIES.md) and
+; patches the two offsets in the descriptor; the core moves no tune itself.
 ;
 ;   +0   init  d0.w the subtune, 1 up; one out of range plays the first
 ;   +4   exit
 ;   +8   play  one row
 ;
-; Each keeps every register. Init keeps the four timers' vectors, control,
-; data and interrupt bits as it finds them, and exit puts back those of
-; the timers the tune claimed: the player claims a timer only for an
-; effect the tune runs, and the bound tune's effects byte says which. A
-; timer the tune does not run is never touched, so what a host runs on it
-; runs on through the tune.
+; Each keeps every register. Init keeps the four timers' vectors, control
+; and interrupt bits as it finds them, and exit puts back those of the
+; timers the tune claimed: the player claims a timer only for an effect
+; the tune runs, and the bound tune's effects byte says which. A timer the
+; tune does not run is never touched, so what a host runs on it runs on
+; through the tune. No data register is kept: it reads as the live count
+; and writes as the reload, so a count written back sets a rate no one
+; asked for, and a host that needs a timer's rate back writes the value
+; it knows.
 ;
 ; The descriptor, from the core's first byte:
 ;
@@ -24,7 +27,10 @@
 ;        bit 1 once it has played its last row and does not repeat
 ;   +24  the subtune table, a long: a word count, then a long an entry,
 ;        each the bound tune's offset. Patched by the tool.
-;   +28  the workspace, a long. Patched by the tool.
+;   +28  the workspace, a long. Patched by the tool. The player takes
+;        its workspace on a long and an SNDH host loads the file on an
+;        even address, so the core rounds the address up to a long, and
+;        the tool gives the workspace two bytes more than the state needs.
 ;
 ; Every offset counts from the core's first byte.
 
@@ -43,22 +49,19 @@ sndh_work:      dc.l    0
 ; The kept state of the timers, in timer order A, B, C, D.
 SAV_VEC         equ     0               ; four vectors
 SAV_CTRL        equ     16              ; TACR, TBCR, TCDCR
-SAV_DATA        equ     19              ; four data registers
-SAV_IER         equ     23              ; IERA, IERB
-SAV_IMR         equ     25              ; IMRA, IMRB
-SAV_SIZE        equ     28
+SAV_IER         equ     19              ; IERA, IERB
+SAV_IMR         equ     21              ; IMRA, IMRB
+SAV_SIZE        equ     24
 
-; A timer put back where d2 has its bit: its vector, its data, its own
-; bits of its control register (keep is the other timer's), and its
-; enable and mask bits as they were kept. slot is its byte's place in the
-; kept control bytes, and ier the enable register, IERA or IERB, with the
-; kept byte at kept: the mask register and its kept byte stand 12 and 2
-; on.
-                .macro  PUTBACK i,vector,ctrl,keep,slot,data,ier,bit,kept
+; A timer put back where d2 has its bit: its vector, its own bits of its
+; control register (keep is the other timer's), and its enable and mask
+; bits as they were kept. slot is its byte's place in the kept control
+; bytes, and ier the enable register, IERA or IERB, with the kept byte at
+; kept: the mask register and its kept byte stand 12 and 2 on.
+                .macro  PUTBACK i,vector,ctrl,keep,slot,ier,bit,kept
                 btst    #\i,d2
                 beq.s   .no\~
                 move.l  SAV_VEC+\i*4(a5),\vector.w
-                move.b  SAV_DATA+\i(a5),\data.w
                 move.b  \ctrl.w,d0
                 and.b   #\keep,d0
                 move.b  SAV_CTRL+\slot(a5),d1
@@ -101,10 +104,6 @@ sndh_init:
                 move.b  $FFFFFA19.w,SAV_CTRL(a5)
                 move.b  $FFFFFA1B.w,SAV_CTRL+1(a5)
                 move.b  $FFFFFA1D.w,SAV_CTRL+2(a5)
-                move.b  $FFFFFA1F.w,SAV_DATA(a5)
-                move.b  $FFFFFA21.w,SAV_DATA+1(a5)
-                move.b  $FFFFFA23.w,SAV_DATA+2(a5)
-                move.b  $FFFFFA25.w,SAV_DATA+3(a5)
                 move.b  $FFFFFA07.w,SAV_IER(a5)
                 move.b  $FFFFFA09.w,SAV_IER+1(a5)
                 move.b  $FFFFFA13.w,SAV_IMR(a5)
@@ -122,8 +121,7 @@ sndh_init:
 .known:         add.w   d0,d0
                 add.w   d0,d0
                 adda.l  0(a1,d0.w),a0
-                lea     sndh_core(pc),a1
-                adda.l  sndh_work(pc),a1
+                bsr     sndh_workspace
                 moveq   #0,d6
                 move.b  TF_EFFECTS(a0),d6       ; kept through the call
                 bsr     YMXR_init
@@ -153,22 +151,33 @@ sndh_exit:
                 rts
 
 ; a6 the state byte: the player stopped, the claimed timers put back as
-; they were kept, the data before the control.
+; they were kept.
 sndh_stop:
                 clr.b   (a6)
-                lea     sndh_core(pc),a0
-                adda.l  sndh_work(pc),a0
+                bsr     sndh_workspace
+                movea.l a1,a0
                 bsr     YMXR_stop
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 moveq   #0,d2
                 move.b  sndh_claims-sndh_state(a6),d2
                 lea     sndh_saved(pc),a5
-                PUTBACK 0,$134,$FFFFFA19,$F0,0,$FFFFFA1F,$FFFFFA07,5,SAV_IER
-                PUTBACK 1,$120,$FFFFFA1B,$F0,1,$FFFFFA21,$FFFFFA07,0,SAV_IER
-                PUTBACK 2,$114,$FFFFFA1D,$0F,2,$FFFFFA23,$FFFFFA09,5,SAV_IER+1
-                PUTBACK 3,$110,$FFFFFA1D,$F0,2,$FFFFFA25,$FFFFFA09,4,SAV_IER+1
+                PUTBACK 0,$134,$FFFFFA19,$F0,0,$FFFFFA07,5,SAV_IER
+                PUTBACK 1,$120,$FFFFFA1B,$F0,1,$FFFFFA07,0,SAV_IER
+                PUTBACK 2,$114,$FFFFFA1D,$0F,2,$FFFFFA09,5,SAV_IER+1
+                PUTBACK 3,$110,$FFFFFA1D,$F0,2,$FFFFFA09,4,SAV_IER+1
                 move.w  (sp)+,sr
+                rts
+
+; a1 the workspace: the patched offset from the core, rounded up to a
+; long. d0 clobbered.
+sndh_workspace:
+                lea     sndh_core(pc),a1
+                adda.l  sndh_work(pc),a1
+                move.l  a1,d0
+                addq.l  #3,d0
+                and.b   #$FC,d0
+                movea.l d0,a1
                 rts
 
 ; ------------------------------------------------------------------ play
@@ -178,8 +187,8 @@ sndh_play:
                 lea     sndh_state(pc),a6
                 btst    #0,(a6)
                 beq.s   .done
-                lea     sndh_core(pc),a0
-                adda.l  sndh_work(pc),a0
+                bsr     sndh_workspace
+                movea.l a1,a0
                 bsr     YMXR_play
                 tst.l   d0
                 bpl.s   .done

@@ -4,23 +4,22 @@ The prebuilt binaries, and how a tool combines them with a tune file
 without an assembler: the SNDH core, the player under SNDH's three
 entries, and the program stub, a block that drives an SNDH file as a TOS
 program, each assembled once by the build and kept in the jar; DTX's
-reader images, in the dtx jar; and the tune file, which holds the tune's
-tables and no code. Combined they make a bound tune, an SNDH
-file any SNDH host plays, and a program around it. Any tool that follows
-this document writes files of the same layout; what stays each tool's
-own is the tag text, and the workspace above the floor of section 2.
+reader code, in the dtx jar; and the tune file, which holds the tune's
+tables and no code. Combined they make a bound tune, an SNDH file any
+SNDH host plays, and a program around it. Any tool that follows this
+document writes files of the same layout; what stays each tool's own is
+the tag text, and the workspace above the floor of section 2.
 Big-endian throughout; every offset and size in bytes.
 
 | file | contents |
 |---|---|
 | `YMXR_sndh.bin` | the SNDH core: the player and its SNDH glue, assembled from `68k/YMXR_sndh.S` |
 | `YMXR_prg.bin` | the program stub, assembled from `68k/YMXR_prg.S` |
-| `dtx2-w1-k1.bin` and the rest | DTX's reader images, one a variant, in the dtx jar (DTX, abi.md) |
+| `DTX0.bin`, `DTX1-w1.bin`, `DTX2-w1-k1.bin` and the rest | DTX's reader code, twenty-two files: one for DTX0, one a width for DTX1, one a width, a unit and the copies flag for DTX2, at `org/dtx/68k/` in the dtx jar (DTX, doc/abi.md) |
 
 The build assembles the core and the stub into `org/ymxr/68k/` on the
 classpath (pom.xml, the `binaries` step; `-Drmac=PATH` names the
-assembler), and the tools of section 5 read them there. A release
-attaches them with a manifest of their sizes and digests.
+assembler), and the tools of section 5 read them there.
 
 ## The stack
 
@@ -69,10 +68,9 @@ and nothing in the rows moves.
 | | | the DTX1 tables, each on a long, as the tune file has them |
 
 The player reads the magic and the version at init and rejects another
-of either (its source gives both), reads the effects byte, the image and
-the index, and never reads the state block's bytes: a host reads them,
-to give the player a workspace of `YMXR_FIXED` plus that many bytes,
-on a long.
+of either, reads the effects byte, the image and the index, and never
+reads the state block's bytes: a host reads them, to give the player a
+workspace of `YMXR_FIXED` plus that many bytes, on a long.
 
 ## 2. The SNDH core
 
@@ -103,15 +101,21 @@ in `d0.w`, 1 up, plays the tune at entry `s`; one out of range plays the
 first.
 
 The workspace: `YMXR_FIXED` plus the largest state block over the set's
-bound tunes, rounded up to a long, zero bytes, last in the file.
+bound tunes, rounded up to a long, plus two bytes, zero bytes, last in
+the file. The player takes its workspace on a long and an SNDH host
+loads the file on an even address, so the core rounds the workspace's
+address up to a long, and the two bytes give it room.
 
-Init keeps the four timers' vectors, control, data, enable and mask bits
-as it finds them, calls the player's init on the subtune's bound tune
-and the workspace, and records which timers the tune claims from its
-effects byte: effects 0 to 3 run Timers A, D, B and C. Exit stops the
-player and puts the claimed timers back as they were kept, the data
-before the control; a timer the tune does not run is never touched. Play
-calls the player's play. Each entry keeps every register.
+Init keeps the four timers' vectors, control, enable and mask bits as it
+finds them, calls the player's init on the subtune's bound tune and the
+workspace, and records which timers the tune claims from its effects
+byte: effects 0 to 3 run Timers A, D, B and C. Exit stops the player and
+puts the claimed timers back as they were kept; a timer the tune does
+not run is never touched. No data register is kept: it reads as the live
+count and writes as the reload, so a count written back sets a rate no
+one asked for, and a host that needs a timer's rate back writes the
+value it knows. Play calls the player's play. Each entry keeps every
+register.
 
 ## 3. The SNDH file
 
@@ -141,8 +145,8 @@ two digits of `##`.
 
 ## 4. The program stub
 
-Position-independent, raw and even-sized; the SNDH file begins at the
-stub's last byte. Its layout from its first byte:
+Position-independent, raw and even-sized; the SNDH file begins after
+the stub's last byte. Its layout from its first byte:
 
 | offset | bytes | gives |
 |---|---|---|
@@ -160,15 +164,18 @@ The flags word:
 | bit | set by the tool where | the stub then |
 |---|---|---|
 | 0 | the caller asked for it | paints the background around each play call, red while it runs and yellow at its end: a trace of the palette writes gives the call's cycles |
-| 1 | the rate is 50, or the set claims Timer C | plays from the VBL, and from Timer C with the bit clear |
+| 1 | the set claims Timer C | plays from the VBL; with the bit clear, from the VBL where the screen's rate is the tune's and from Timer C where it is not |
 
-Bit 1 takes two cases because the stub does one thing for both: a set
-that claims Timer C leaves the stub no timer to play from, and the VBL
-is a 50 Hz clock either way, so a set that claims Timer C at another
-rate stops the combine. With the bit clear the stub runs Timer C at
-200 Hz, counts the rate against 200 and plays when the count crosses,
-the remainder carried, so a rate that does not divide 200 lands its
-rows over the second without drift.
+The VBL is the screen's own clock: 50 or 60 Hz by the sync bit, 71 in
+high resolution. A set that claims Timer C leaves the stub no timer to
+play from, so it plays from the VBL, and the tool holds such a set to
+50 Hz, the rate of the screen the tune is written for; on another
+screen it plays at that screen's rate. With the bit clear the stub reads
+the screen's rate, takes the VBL where it is the tune's, and otherwise
+runs Timer C at 200 Hz, counts the rate against 200 and plays a row for
+every 200 the count reaches, the remainder carried, so a rate that does
+not divide 200 lands its rows over the second without drift, and a rate
+above 200 lands more than one row on a tick.
 
 A program from the stub, in order:
 
@@ -183,12 +190,13 @@ A program from the stub, in order:
    the SNDH file is relocated.
 
 The program prints the SNDH file's address, takes the machine over under
-Supexec, keeping the VBL vector, the four timers' vectors, the enable,
-mask and control registers and Timer C's count, and turns every MFP
-interrupt off; calls init with subtune 1 and plays from the VBL or
-Timer C; stops on SPACE or ESC, or once the rows patched in have played,
-or once the core's state byte says the tune is over; switches subtunes
-on 1 to 9; and hands the machine back. The keyboard is read at its ACIA,
+Supexec, keeping the VBL vector, the four timers' vectors and the
+enable, mask and control registers, and turns every MFP interrupt off
+and stops the four timers; calls init with subtune 1 and plays from the
+VBL or Timer C; stops on SPACE or ESC, or once the rows patched in have
+played, or once the core's state byte says the tune is over; switches
+subtunes on 1 to 9; and hands the machine back, Timer C's count written
+as the 192 of the system's 200 Hz. The keyboard is read at its ACIA,
 every IKBD report taken whole, so that the mouse works when TOS has the
 keyboard back.
 

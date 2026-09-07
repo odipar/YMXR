@@ -15,8 +15,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * An SNDH file from tune files (doc/BINARIES.md 3): the entry triple, the
  * tag block, the core with its two offsets patched, the subtune table,
- * each tune bound ({@link Bound}) on an even address, and the workspace.
- * Any SNDH host plays it, and {@link Prg} puts a program around it.
+ * each tune bound ({@link Bound}) on an even address, and the workspace,
+ * two bytes more than the state needs, since init rounds its address up
+ * to a long. Any SNDH host plays it, and {@link Prg} puts a program
+ * around it.
  *
  * <p>The core's descriptor, from the core's first byte:
  *
@@ -50,6 +52,11 @@ final class Sndh {
 
     /** The word of a bra.w, before its displacement. */
     static final int BRA_W = 0x6000;
+
+    /** The workspace's bytes past what the state needs: the player takes
+     *  its workspace on a long, an SNDH host loads the file on an even
+     *  address, and init rounds the workspace's address up to a long. */
+    static final int WORK_ROUNDING = 2;
 
     /** The CONV tag's text: the player, and the converter that writes its
      *  tune files. */
@@ -124,7 +131,7 @@ final class Sndh {
             bound.add(b);
         }
         byte[] tags = tags(options, rate, n, frames, claimed);
-        int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state);
+        int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
         return combine(core, bound, tags, workspace);
     }
 

@@ -50,10 +50,12 @@ against its dump.
 The tune file holds the tune's tables and no code: BINARIES.md says how a
 tool binds them with DTX's reader into what the player takes.
 
-The tool runs out of `target/classes`, and builds first where a source or
-the pom is newer than the last build. Java 23 and Maven, and DTX 0.6.0 in
-the local Maven repository: `mvn install` at DTX's `v0.6.0` tag, whose
-reader this player's frame figures (performance.md) are measured
+The tool runs out of `target/classes`, and builds first where a source,
+the pom or a 68000 source is newer than the last build, or the core is
+not assembled. Java 23, Maven and rmac, with which the build assembles
+the core and the stub once (`-Drmac=PATH` names another), and DTX 0.6.0
+in the local Maven repository: `mvn install` at DTX's `v0.6.0` tag,
+whose reader this player's frame figures (performance.md) are measured
 against.
 
 ## Check
@@ -158,7 +160,10 @@ python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
 
 A tune named as a `.ymxr` file plays as it stands, without the
 converter. A tune whose `RR` is `R` is played one frame past its last
-row, where the call reports -1 and writes nothing.
+row, where the call reports -1 and writes nothing. `-hatari` takes tunes
+at 50 Hz: it cuts the trace into frames at the VBL, which the program
+plays from where the screen's rate is the tune's, and Hatari's ST
+refreshes at 50 Hz.
 
 Under unicorn, which raises no interrupt, the rig models the four timers and
 fires every tick by hand at the time the model gives. `-cycles` counts the

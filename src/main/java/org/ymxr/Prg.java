@@ -42,16 +42,25 @@ final class Prg {
      *  run under Hatari that reads the palette back. */
     static final int FLAG_PAINT = 1;
 
-    /** Flag bit 1: play from the VBL, a 50 Hz clock; clear, play from
-     *  Timer C at the rate. */
+    /** Flag bit 1: play from the VBL, a 50 Hz clock. Set where the set
+     *  claims Timer C, since the stub then has no timer to play from;
+     *  such a set is at 50 Hz, or there is no program. Clear, the stub
+     *  reads the screen's rate, and plays from the VBL where that equals
+     *  the descriptor's rate and from Timer C where not. */
     static final int FLAG_VBL = 2;
 
     /** The PRG header's bytes, and its magic. */
     static final int HEADER = 28;
     static final int PRG_MAGIC = 0x601A;
 
-    /** Where the tags begin in an SNDH file, past the entry triple. */
+    /** Where the tag block begins in an SNDH file, past the entry triple:
+     *  its SNDH, then the tags. */
     private static final int TAGS_AT = 12;
+
+    /** What the tag block gives the stub: the '##' count, the TC rate, the
+     *  FLAG letters after its '~', and where HDNS stands. */
+    record Tags(int subtunes, int rate, String flag, int end) {
+    }
 
     private Prg() {
     }
@@ -75,27 +84,22 @@ final class Prg {
         if (rows < 0 || rows > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("rows " + rows + " does not fit a long");
         }
-        int end = find(sndh, "HDNS", TAGS_AT, sndh.length);
-        if (end < 0) {
-            throw new IllegalArgumentException("not an SNDH file: no HDNS ends its tags");
-        }
-        int subtunes = subtunes(sndh, end);
-        int rate = rate(sndh, end);
-        boolean timerC = flag(sndh, end).indexOf('c') >= 0;
-        if (timerC && rate != 50) {
-            throw new IllegalArgumentException("the set claims Timer C and plays at " + rate
+        Tags tags = tags(sndh);
+        boolean timerC = tags.flag().indexOf('c') >= 0;
+        if (timerC && tags.rate() != 50) {
+            throw new IllegalArgumentException("the set claims Timer C and plays at " + tags.rate()
                     + " Hz: the stub then plays from the VBL, a 50 Hz clock, so this set needs"
                     + " a host of its own");
         }
-        int core = core(sndh, end + 4);
+        int core = core(sndh, tags.end() + 4);
         byte[] prg = new byte[HEADER + stub.length + sndh.length + 4];
         Tune.putWord(prg, 0, PRG_MAGIC);
         Tune.putLong(prg, 2, stub.length + sndh.length);
         System.arraycopy(stub, 0, prg, HEADER, stub.length);
-        Tune.putWord(prg, HEADER + STUB_SUBTUNES_AT, subtunes);
+        Tune.putWord(prg, HEADER + STUB_SUBTUNES_AT, tags.subtunes());
         Tune.putWord(prg, HEADER + STUB_FLAGS_AT, (paint ? FLAG_PAINT : 0)
-                | (rate == 50 || timerC ? FLAG_VBL : 0));
-        Tune.putWord(prg, HEADER + STUB_RATE_AT, rate);
+                | (timerC ? FLAG_VBL : 0));
+        Tune.putWord(prg, HEADER + STUB_RATE_AT, tags.rate());
         Tune.putLong(prg, HEADER + STUB_ROWS_AT, (int) rows);
         Tune.putLong(prg, HEADER + STUB_CORE_AT, core);
         System.arraycopy(sndh, 0, prg, HEADER + stub.length, sndh.length);
@@ -125,42 +129,114 @@ final class Prg {
         }
     }
 
-    /** The '##' tag's two digits. */
-    static int subtunes(byte[] sndh, int end) {
-        int at = find(sndh, "##", TAGS_AT, end);
-        if (at < 0 || at + 4 > end || !digit(sndh[at + 2]) || !digit(sndh[at + 3])) {
-            throw new IllegalArgumentException("the SNDH file's tags give no '##' subtune count");
+    /**
+     * The tag block walked from its first tag to HDNS, as {@link Sndh}
+     * writes it. A zero byte where a tag name would begin is a pad, one
+     * byte. '##' is four bytes, its two digits the subtunes; TC and each
+     * text tag, TITL, COMM, CONV and FLAG, run to their zero byte and one
+     * past; FRMS is 4 + 4 bytes a subtune, and '!#SN' 4 + 2 bytes a
+     * subtune, then a name a subtune, each to its zero byte and one past.
+     * The subtunes, the rate and the FLAG letters come from those tags
+     * alone, so a title or a composer that reads like a tag patches
+     * nothing.
+     *
+     * @throws IllegalArgumentException where the file has no SNDH at 12,
+     *     no HDNS ends its tags, a tag is not one {@link Sndh} writes,
+     *     FRMS or '!#SN' stands before '##', or '##' or TC is missing
+     */
+    static Tags tags(byte[] sndh) {
+        if (sndh.length < TAGS_AT + 4 || !ascii(sndh, TAGS_AT, 4).equals("SNDH")) {
+            throw new IllegalArgumentException("not an SNDH file: no SNDH at " + TAGS_AT);
         }
-        return (sndh[at + 2] - '0') * 10 + sndh[at + 3] - '0';
-    }
-
-    /** The TC tag's rate, in decimal. */
-    static int rate(byte[] sndh, int end) {
-        int at = find(sndh, "TC", TAGS_AT, end);
-        int rate = 0;
-        if (at >= 0) {
-            for (int i = at + 2; i < end && digit(sndh[i]); i++) {
-                rate = rate * 10 + sndh[i] - '0';
+        int subtunes = -1;
+        int rate = -1;
+        String flag = "";
+        int at = TAGS_AT + 4;
+        while (true) {
+            if (at < sndh.length && sndh[at] == 0) {
+                at++;
+                continue;
+            }
+            String name = name(sndh, at);
+            if (name.equals("HDNS")) {
+                break;
+            }
+            if (name.startsWith("##")) {
+                if (!digit(sndh[at + 2]) || !digit(sndh[at + 3])) {
+                    throw new IllegalArgumentException("the SNDH file's tags give no '##'"
+                            + " subtune count");
+                }
+                subtunes = (sndh[at + 2] - '0') * 10 + sndh[at + 3] - '0';
+                at += 4;
+            } else if (name.startsWith("TC")) {
+                int to = zero(sndh, at + 2);
+                rate = 0;
+                for (int i = at + 2; i < to && digit(sndh[i]); i++) {
+                    rate = rate * 10 + sndh[i] - '0';
+                }
+                if (rate == 0) {
+                    throw new IllegalArgumentException("the SNDH file's tags give no TC rate");
+                }
+                at = to + 1;
+            } else if (name.equals("FRMS")) {
+                at += 4 + 4 * sized(subtunes, name, at);
+            } else if (name.equals("!#SN")) {
+                int names = sized(subtunes, name, at);
+                at += 4 + 2 * names;
+                for (int i = 0; i < names; i++) {
+                    at = zero(sndh, at) + 1;
+                }
+            } else if (name.equals("TITL") || name.equals("COMM") || name.equals("CONV")
+                    || name.equals("FLAG")) {
+                int to = zero(sndh, at + 4);
+                if (name.equals("FLAG")) {
+                    String text = ascii(sndh, at + 4, to - at - 4);
+                    flag = text.substring(text.indexOf('~') + 1);
+                }
+                at = to + 1;
+            } else {
+                throw new IllegalArgumentException("the SNDH file's tag " + name + " at " + at
+                        + " is not one this reads");
             }
         }
-        if (rate == 0) {
+        if (subtunes < 0) {
+            throw new IllegalArgumentException("the SNDH file's tags give no '##' subtune count");
+        }
+        if (rate < 0) {
             throw new IllegalArgumentException("the SNDH file's tags give no TC rate");
         }
-        return rate;
+        return new Tags(subtunes, rate, flag, at);
     }
 
-    /** The FLAG tag's letters after its '~', or none. */
-    static String flag(byte[] sndh, int end) {
-        int at = find(sndh, "FLAG~", TAGS_AT, end);
-        if (at < 0) {
-            return "";
+    /** A tag's four-byte name at {@code at}. */
+    private static String name(byte[] sndh, int at) {
+        if (at + 4 > sndh.length) {
+            throw noEnd();
         }
-        int from = at + 5;
-        int to = from;
-        while (to < end && sndh[to] != 0) {
-            to++;
+        return ascii(sndh, at, 4);
+    }
+
+    /** Where the next zero byte from {@code from} stands. */
+    private static int zero(byte[] sndh, int from) {
+        for (int at = from; at < sndh.length; at++) {
+            if (sndh[at] == 0) {
+                return at;
+            }
         }
-        return new String(sndh, from, to - from, StandardCharsets.ISO_8859_1);
+        throw noEnd();
+    }
+
+    /** The subtunes a tag sized by '##' runs over: '##' stands before it. */
+    private static int sized(int subtunes, String name, int at) {
+        if (subtunes < 0) {
+            throw new IllegalArgumentException("the SNDH file's " + name + " tag at " + at
+                    + " stands before the '##' count that sizes it");
+        }
+        return subtunes;
+    }
+
+    private static IllegalArgumentException noEnd() {
+        return new IllegalArgumentException("not an SNDH file: no HDNS ends its tags");
     }
 
     /**
@@ -187,6 +263,10 @@ final class Prg {
 
     private static boolean digit(byte b) {
         return b >= '0' && b <= '9';
+    }
+
+    private static String ascii(byte[] bytes, int at, int length) {
+        return new String(bytes, at, length, StandardCharsets.ISO_8859_1);
     }
 
     /** Where a text first stands in {@code [from, end)}, or -1. */

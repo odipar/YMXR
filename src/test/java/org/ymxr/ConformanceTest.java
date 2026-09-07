@@ -14,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -51,6 +52,10 @@ final class ConformanceTest {
         }
     }
 
+    /** The version word {@code wrong-version} holds: one past the version
+     *  the reader reads. */
+    static final int WRONG_VERSION = Tune.VERSION + 1;
+
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(
             Fixture.of("chambers", "Chambers of Shaolin 5 - you blew it!.ym", "",
@@ -74,7 +79,8 @@ final class ConformanceTest {
             Fixture.built("four-timers", "`BuiltTunes.fourTimers`", BuiltTunes::fourTimers,
                     "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump gives: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and taken at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with nothing running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
-                    "chambers with the version word $0003: a reader reports nothing of it"));
+                    String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
+                            + " reports nothing of it", WRONG_VERSION)));
 
     /** chambers with another version in its header: what a reader reports
      *  nothing of (R6.1). */
@@ -83,8 +89,7 @@ final class ConformanceTest {
             byte[] dump = Files.readAllBytes(Path.of("ym", "test", "Chambers of Shaolin 5 - you blew it!.ym"));
             Tune.Written it = YmToYmxr.convert(dump, List.of(), new Report()).written();
             byte[] file = it.file().clone();
-            file[4] = 0;
-            file[5] = 3;
+            Tune.putWord(file, 4, WRONG_VERSION);
             return new Tune.Written(file, it.repeat());
         } catch (IOException failed) {
             throw new IllegalStateException(failed);
@@ -230,6 +235,10 @@ final class ConformanceTest {
         Matcher count = Pattern.compile("([\\d,]+) entries").matcher(readme);
         assertTrue(count.find(), "README.md does not count the entries");
         assertEquals(entries, Long.parseLong(count.group(1).replace(",", "")), "README.md's entry count");
+        Matcher version = Pattern.compile("version word \\$([0-9A-Fa-f]{4})").matcher(readme);
+        assertTrue(version.find(), "README.md does not give wrong-version's version word");
+        assertEquals(Tune.getWord(Files.readAllBytes(TUNES.resolve("wrong-version.ymxr")), 4),
+                Integer.parseInt(version.group(1), 16), "README.md's version word for wrong-version");
     }
 
     @Test

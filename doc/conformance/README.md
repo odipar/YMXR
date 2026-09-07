@@ -72,16 +72,16 @@ full.
 
 ## How the kit is kept true
 
-Every tune is converted or built by this repository's own code from the
-row SOURCES.md gives, and `ConformanceTest` makes each again under
+Every tune is converted or built by this repository's own code from
+the row SOURCES.md gives, and `ConformanceTest` makes each again under
 `mvn test` and compares the file, its rows and `MANIFEST.txt` with it,
-so a change to the converter or the reader that moved a byte of the kit
-fails there and writes what is missing beside the kit for the writer to
-take. The reference is the reader's report (SPEC.md 7), which
-`bin/ymxr-trace` gives; `68k/test/emu/test_ymxr.py -kit` plays every
-tune but `wrong-version`, which the player's init rejects, on the 68000
-player and holds the player's frames, the rig's own model of section 4
-and the reader's record to one another, so a disagreement between the
-three is a failing test here and no kit is published on it. Every tune
-converted from a dump replays to the dump through `ymxr-check` at its
-options, in `ConformanceTest`.
+so a change to the converter or the reader that moved a byte of the
+kit fails there and writes what is missing beside the kit for the
+writer to take. The reference is the reader's report (SPEC.md 7),
+which `bin/ymxr-trace` gives; `68k/test/emu/test_ymxr.py -kit` plays
+every tune but `wrong-version`, which the binder and the reader
+reject, on the 68000 player and holds the player's frames, the rig's
+own model of section 4 and the reader's record to one another, so a
+disagreement between the three is a failing test here and no kit is
+published on it. Every tune converted from a dump replays to the dump
+through `ymxr-check` at its options, in `ConformanceTest`.

@@ -22,9 +22,11 @@ Under unicorn the timers are modelled here, since it raises no interrupt:
 every tick is fired by hand at the time the model gives. Under Hatari the
 MFP fires them: the tune goes into an SNDH file and a program around it
 through bin/ymxr-sndh and bin/ymxr-prg (BINARIES.md 3 and 4), the program
-takes the machine over and plays the tune on the VBL, and the trace of
-every chip write is read against the same model, the ticks counted
-against the rates the trace shows the timers programmed at.
+takes the machine over and plays the tune on the VBL, since the screen's
+rate is the tune's 50 Hz, and the trace of every chip write is read
+against the same model, the frames cut at the VBL and the ticks counted
+against the rates the trace shows the timers programmed at. So -hatari
+takes tunes at 50 Hz.
 
 Needs rmac (RMAC, or on the path), DTX's dtx-write (DTX_WRITE, or on the
 path) to read the table back, unicorn (pip install unicorn), and the
@@ -143,12 +145,13 @@ def convert(ym, work):
 
 def bind(file, work):
     """The bound tune of a tune file, through bin/ymxr-bind; None where the
-    binder rejects the file."""
+    binder rejects the file, which it says on its own line."""
     path, out = os.path.join(work, "bound.ymxr"), os.path.join(work, "bound.bin")
     open(path, "wb").write(file)
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), path, out], capture_output=True)
-    if r.returncode != 0:
+    if r.returncode == 1 and r.stderr.startswith(b"ymxr-bind: "):
         return None
+    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     return open(out, "rb").read()
 
 
@@ -528,6 +531,8 @@ def check(ym, code, symbols, cycles=None, kit=False):
             assert trace(file, work, 1) == [], "the reader reports something of version %d" % version
         bound = bind(file[:4] + struct.pack(">H", TUNE_VERSION) + file[6:], work)
         assert bound is not None, "the file is not a tune of the version it states"
+        assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) == 0, \
+            "init rejected the bound tune before its version was moved"
         moved = bound[:4] + struct.pack(">H", BOUND_VERSION + 1) + bound[6:]
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
@@ -655,6 +660,9 @@ def hatari(ym, code, symbols):
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
+    # the frames are cut at the VBL, which the program plays from where the
+    # screen's rate is the tune's: Hatari's ST here refreshes at 50 Hz
+    assert tune.rate == 50, "-hatari takes tunes at 50 Hz, and this one plays at %d" % tune.rate
     path = os.path.join(work, "TUNE.YMXR")
     open(path, "wb").write(file)
     sndh = os.path.join(work, "TUNE.SND")
@@ -695,7 +703,7 @@ def hatari(ym, code, symbols):
         for i in range(4):
             if ticks[i][0] <= pc < ticks[i][1]:
                 return i
-        return "stub" if sndh_at - 0x1000 <= pc < sndh_at + len(sndh_bytes) + 0x10000 else None
+        return None
 
     # the trace as frames: each a list of (kind, reg, value) and its
     # length in MFP clocks

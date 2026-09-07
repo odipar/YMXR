@@ -29,7 +29,8 @@ written until it says what YMXR has to do.
 |---|---|
 | `doc/` | the specification, the requirements it is written against, and the rest |
 | `src/main/java/org/ymxr/` | the converter: a YM5!/YM6! dump into a tune file, on DTX's Java library |
-| `68k/YMXR.S` | the player; `68k/YMXR_sndh.S` the SNDH core around it and `68k/YMXR_prg.S` the program stub, assembled once and combined with a tune by a tool (doc/BINARIES.md) |
+| `68k/YMXR.S` | the player |
+| `68k/YMXR_sndh.S`, `68k/YMXR_prg.S` | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool (doc/BINARIES.md) |
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
 | `ym/` | the measurements behind the figures, and `ym/test` eight tunes the tests run on |
 | `bin/` | the converter, the check, the trace, the binder and the SNDH and program combiners, run out of a build |

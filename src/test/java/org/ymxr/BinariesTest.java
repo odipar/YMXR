@@ -207,8 +207,9 @@ final class BinariesTest {
             next = Sndh.even(at + bound.length);
         }
         assertEquals(next, workAt, "the workspace follows the last tune");
-        int workspace = Tune.align(Tune.getWord(core, Sndh.CORE_FIXED_AT) + state);
-        assertEquals(header + workAt + workspace, sndh.length, "the workspace is last");
+        int workspace = Tune.align(Tune.getWord(core, Sndh.CORE_FIXED_AT) + state) + 2;
+        assertEquals(header + workAt + workspace, sndh.length,
+                "the workspace is last, two bytes more than the state needs");
         for (int at = header + workAt; at < sndh.length; at++) {
             assertEquals(0, sndh[at], "a workspace byte at " + at);
         }
@@ -309,7 +310,8 @@ final class BinariesTest {
         byte[] patched = Arrays.copyOfRange(prg, 28, 28 + stub.length);
         assertEquals("YMXT", ascii(patched, 4, 4));
         assertEquals(2, Tune.getWord(patched, Prg.STUB_SUBTUNES_AT));
-        assertEquals(Prg.FLAG_VBL, Tune.getWord(patched, Prg.STUB_FLAGS_AT), "50 Hz: the VBL");
+        assertEquals(0, Tune.getWord(patched, Prg.STUB_FLAGS_AT),
+                "no Timer C claimed: the stub takes the screen's rate");
         assertEquals(50, Tune.getWord(patched, Prg.STUB_RATE_AT));
         assertEquals(0, Tune.getLong(patched, Prg.STUB_ROWS_AT));
         int core = Tune.getLong(patched, Prg.STUB_CORE_AT);
@@ -325,7 +327,7 @@ final class BinariesTest {
         assertEquals(0, Tune.getLong(prg, prg.length - 4), "the relocation table");
 
         byte[] painted = Prg.of(sndh, true, 2000);
-        assertEquals(Prg.FLAG_VBL | Prg.FLAG_PAINT, Tune.getWord(painted, 28 + Prg.STUB_FLAGS_AT));
+        assertEquals(Prg.FLAG_PAINT, Tune.getWord(painted, 28 + Prg.STUB_FLAGS_AT));
         assertEquals(2000, Tune.getLong(painted, 28 + Prg.STUB_ROWS_AT));
     }
 
@@ -339,7 +341,18 @@ final class BinariesTest {
     }
 
     @Test
-    void aSetAtAnotherRateWithoutTimerCPlaysFromTimerC() throws IOException {
+    void aSetClaimingTimerCAtFiftyHertzPlaysFromTheVbl() throws IOException {
+        byte[] file = tune("four-timers").clone();
+        Tune.putWord(file, Tune.FRAME_RATE_AT, 50);
+        byte[] sndh = Sndh.of(List.of(file), new Sndh.Options("Four at fifty", null, null));
+        assertEquals("abcdy", tags(sndh).flag());
+        byte[] prg = Prg.of(sndh, false, 0);
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(prg, 28 + Prg.STUB_FLAGS_AT), "Timer C claimed");
+        assertEquals(50, Tune.getWord(prg, 28 + Prg.STUB_RATE_AT));
+    }
+
+    @Test
+    void aSetWithoutTimerCLeavesBitOneClear() throws IOException {
         byte[] file = tune("chambers").clone();
         Tune.putWord(file, Tune.FRAME_RATE_AT, 60);
         byte[] prg = Prg.of(Sndh.of(List.of(file), new Sndh.Options("Sixty", null, null)),
@@ -349,12 +362,32 @@ final class BinariesTest {
     }
 
     @Test
-    void aFileThatIsNotAnSndhFileMakesNoProgram() {
+    void aTitleThatReadsLikeATagPatchesNothing() throws IOException {
+        byte[] sndh = Sndh.of(List.of(tune("chambers")),
+                new Sndh.Options("TC##HDNS FLAG~c", "##99", null));
+        Tags tags = tags(sndh);
+        assertEquals("TC##HDNS FLAG~c", tags.text().get("TITL"));
+        assertEquals("##99", tags.text().get("COMM"));
+        byte[] prg = Prg.of(sndh, false, 0);
+        assertEquals(1, Tune.getWord(prg, 28 + Prg.STUB_SUBTUNES_AT));
+        assertEquals(50, Tune.getWord(prg, 28 + Prg.STUB_RATE_AT));
+        assertEquals(0, Tune.getWord(prg, 28 + Prg.STUB_FLAGS_AT), "the FLAG tag reads ~y");
+        assertEquals(Sndh.even(tags.end()), Tune.getLong(prg, 28 + Prg.STUB_CORE_AT),
+                "the core's offset");
+    }
+
+    @Test
+    void aFileThatIsNotAnSndhFileMakesNoProgram() throws IOException {
         byte[] core = Binaries.core();
         for (byte[] file : List.of(core, new byte[0])) {
             IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                     () -> Prg.of(file, false, 0));
-            assertTrue(said(wrong).contains("HDNS"), said(wrong));
+            assertTrue(said(wrong).contains("no SNDH at 12"), said(wrong));
         }
+        byte[] sndh = Sndh.of(List.of(tune("circus")), new Sndh.Options("Cut", null, null));
+        byte[] cut = Arrays.copyOf(sndh, tags(sndh).end() - 4);
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Prg.of(cut, false, 0));
+        assertTrue(said(wrong).contains("no HDNS"), said(wrong));
     }
 }
