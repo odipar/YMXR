@@ -17,8 +17,9 @@
 # -k, -m and -r are the converter's and a tune file takes none of them.
 # A second name records the run instead of playing it: Hatari writes an
 # AVI, video and sound, which ym/avi.py reads back as a WAV, with the
-# run's last frame beside it as a PNG. HATARI and TOS name the emulator
-# and a TOS image.
+# run's last frame beside it as a PNG. The emulator is asked for its
+# modelled YM mixing, which is what a voice whose volume a timer moves is
+# heard through. HATARI and TOS name the emulator and a TOS image.
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}
@@ -74,7 +75,8 @@ esac
     "-t${title:-${name%.*}}" ${composer:+"-c$composer"} >/dev/null
 "$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" >/dev/null
 set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \
-    --compatible on --memsize 4 --sound 44100 --log-level fatal
+    --compatible on --memsize 4 --sound 44100 --ym-mixing model \
+    --log-level fatal
 if [ -n "$vbls" ]; then
     set -- "$@" --run-vbls "$vbls"
 fi
