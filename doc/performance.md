@@ -17,11 +17,11 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Big - Samantha Fox Strip Poker 6 | 430 | 1629 | 2582 | 1074 | 1642 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1462 | 3488 | 852 | 2860 |
 | Circus Attractions 2 | 8 | 1534 | 1732 | 792 | 792 |
-| Digidrum preempt, built | 800 | 1702 | 2998 | 822 | 1530 |
-| Retrigger retune, built | 1200 | 1584 | 2208 | 828 | 1464 |
-| Synergy Credits | 10754 | 2377 | 6656 | 1266 | 5382 |
-| Turrican - world 4-3 | 3680 | 1679 | 4834 | 933 | 4176 |
-| Turrican 2 - world completed 1 | 179 | 1989 | 5750 | 1290 | 5062 |
+| Digidrum preempt, built | 800 | 1714 | 3128 | 822 | 1530 |
+| Retrigger retune, built | 1200 | 1585 | 2242 | 828 | 1498 |
+| Synergy Credits | 10754 | 2422 | 6718 | 1267 | 5382 |
+| Turrican - world 4-3 | 3680 | 1686 | 4834 | 933 | 4176 |
+| Turrican 2 - world completed 1 | 179 | 1993 | 5750 | 1290 | 5062 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
@@ -118,9 +118,9 @@ read by one method, on the same dumps, over the 2,019 calls of a
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
-| Synergy Credits | YMXR | 2337 | 4136 | 6048 |
+| Synergy Credits | YMXR | 2373 | 4176 | 6088 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
-| Turrican - world 4-3 | YMXR | 1705 | 2852 | 5024 |
+| Turrican - world 4-3 | YMXR | 1712 | 2896 | 5024 |
 
 These figures and the rig's are not one sample: the rig counts every frame
 of the tune and the 68000's own cycles with no wait state, and these are the
@@ -128,9 +128,9 @@ first 2,019 calls on a machine that stalls the processor while the shifter
 fetches. Synergy Credits' costliest frame is its 4,517th, past the end of
 this run.
 
-YMXR costs a tenth less on average on Turrican - world 4-3 and stands level
-on Synergy Credits, whose odd row count puts it at unit 1, and a sixth and
-more than a quarter more at their worst, and the figures have two causes.
+YMXR costs a tenth less on average on Turrican - world 4-3 and a fiftieth
+more on Synergy Credits, whose odd row count puts it at unit 1, and a sixth
+and more than a quarter more at their worst, and the figures have two causes.
 The frame procedure is 550 to 1,110 cycles: the fourteen register columns'
 tests and the writes they admit, the effects' columns and the call's own entry
 and exit, where YMX writes its fourteen registers unconditionally, one `movep`
@@ -230,7 +230,7 @@ measured:
 | step 1, measured | 2382 | 7824 | 2408 | 8014 |
 | step 2, measured | 1874 | 5110 | 1900 | 5300 |
 | step 3, measured | 1624 | 4794 | 1650 | 4984 |
-| the tune's own rows, no row added, measured | 1679 | 4834 | 1705 | 5024 |
+| the tune's own rows, no row added, measured | 1686 | 4834 | 1712 | 5024 |
 | step 4 | 1639 | 4794 | 1665 | 4984 |
 | YMX 0.10.1, measured | | | 1897 | 4284 |
 | R4.5 | | 6656 | | |
