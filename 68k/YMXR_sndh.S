@@ -90,6 +90,7 @@ SAV_SIZE        equ     24
 
 sndh_init:
                 movem.l d0-d7/a0-a6,-(sp)
+                move.w  d0,d7                   ; the subtune, kept through the stop
                 lea     sndh_state(pc),a6
                 btst    #0,(a6)
                 beq.s   .fresh
@@ -114,13 +115,13 @@ sndh_init:
                 lea     sndh_core(pc),a0
                 movea.l a0,a1
                 adda.l  sndh_table(pc),a1
-                subq.w  #1,d0
-                cmp.w   (a1)+,d0
+                subq.w  #1,d7
+                cmp.w   (a1)+,d7
                 bcs.s   .known
-                moveq   #0,d0
-.known:         add.w   d0,d0
-                add.w   d0,d0
-                adda.l  0(a1,d0.w),a0
+                moveq   #0,d7
+.known:         add.w   d7,d7
+                add.w   d7,d7
+                adda.l  0(a1,d7.w),a0
                 bsr     sndh_workspace
                 moveq   #0,d6
                 move.b  TF_EFFECTS(a0),d6       ; kept through the call
@@ -198,8 +199,8 @@ sndh_play:
 
 sndh_state:     dc.b    0
 sndh_claims:    dc.b    0
-sndh_saved:     dcb.b   SAV_SIZE,0
                 .even
+sndh_saved:     dcb.b   SAV_SIZE,0
 
 ; ---------------------------------------------------------------- player
 

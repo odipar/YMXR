@@ -242,8 +242,10 @@ tick:
 ; does not divide 200 lands its rows over the second without drift and a
 ; rate above 200 lands more than one row on a tick. The interrupt is
 ; ended first and the level lowered so that the effects' timers tick
-; through the row; a tick of this timer that lands inside the row keeps
-; its count, and the row's caller plays what the count has reached.
+; through the row; a tick of this timer that lands inside the row adds
+; its rate to the count and plays nothing, and the row's caller, or the
+; next tick, plays what the count has reached. The count is moved in
+; single instructions below the level, which a tick cannot split.
 timer_c:
                 bclr    #5,$FFFFFA11.w
                 move.l  a0,-(sp)
@@ -255,12 +257,11 @@ timer_c:
                 bcs.s   .kept
                 tas     busy-accumulated(a0)
                 bne.s   .kept                   ; inside a row
-                move.w  #$2500,sr
-.row:           sub.w   #200,d0
                 move.w  d0,(a0)
+                move.w  #$2500,sr
+.row:           sub.w   #200,(a0)
                 bsr     tick
-                move.w  (a0),d0
-                cmp.w   #200,d0
+                cmpi.w  #200,(a0)
                 bcc.s   .row
                 lea     busy(pc),a0
                 clr.b   (a0)
