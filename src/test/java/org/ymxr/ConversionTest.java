@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
+import org.dtx.Dtx;
 import org.dtx.Table;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -61,7 +62,8 @@ final class ConversionTest {
         TuneFile tune = TuneFile.read(written.file());
         assertEquals(31, tune.table().rows(), "the rows are the frames");
         assertEquals(31, tune.table().repeat(), "a tune that plays once repeats at its row count");
-        assertEquals(1, tune.image()[Tune.FORMAT_AT + 18] & 0xFF, "the image's unit");
+        // the payload's byte 2 is k, the unit (DTX, SPEC.md 2.3)
+        assertEquals(1, tune.dtx2()[Dtx.HEADER + 2] & 0xFF, "the table's unit");
         assertTrue(report.notes().stream().anyMatch(n -> n.contains("packed at unit 1")),
                 "the tool says why: " + report.notes());
     }
