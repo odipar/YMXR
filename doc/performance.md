@@ -17,10 +17,10 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Big - Samantha Fox Strip Poker 6 | 430 | 1660 | 2254 | 1072 | 1654 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1494 | 3520 | 852 | 2860 |
 | Circus Attractions 2 | 8 | 1568 | 1764 | 792 | 792 |
-| DBA 2 | 19442 | 2091 | 5644 | 1185 | 4920 |
-| Digidrum preempt, built | 800 | 1746 | 2928 | 822 | 2052 |
-| Retrigger retune, built | 1200 | 1617 | 2462 | 828 | 1098 |
-| Synergy Credits | 10754 | 2454 | 6392 | 1267 | 4994 |
+| DBA 2 | 19442 | 2075 | 5644 | 1187 | 4920 |
+| Digidrum preempt, built | 800 | 1744 | 2928 | 823 | 2052 |
+| Retrigger retune, built | 1200 | 1616 | 2388 | 828 | 1098 |
+| Synergy Credits | 10754 | 2456 | 6418 | 1274 | 4994 |
 | Turrican - world 4-3 | 3680 | 1718 | 4948 | 933 | 4176 |
 | Turrican 2 - world completed 1 | 179 | 2019 | 5756 | 1284 | 5062 |
 

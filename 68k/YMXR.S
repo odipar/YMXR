@@ -229,7 +229,7 @@ q\{col}:
 
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset.
-                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,tick
+                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick
 \{tick}_over:
                 bra.w   \{tick}_done             ; two nops where the tune
                 QREAD   \ct                     ; runs this effect (init)
@@ -276,6 +276,10 @@ q\{col}:
 ; source's row to the new target, and one between the place and the loop
 ; cell takes the new place against the cell the old source left
 .aim\~:         lea     \tick(pc),a5
+; The three behind level 7, so a tick takes none of them half made. The
+; window is three writes wide and costs no measurable jitter: the ticks
+; of a tune running one effect keep their period to 0.31 per cent with
+; it and to 0.31 without, where the reference player's keep 0.33.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  \fx+FX_TARGET(a6),TICK_SEL(a5)
@@ -318,8 +322,11 @@ q\{col}:
 ; the control register takes one write: a select written to a running
 ; timer neither stops nor reloads the running count (SPEC.md 1.9), and
 ; select 0 in front of the new select stops the timer and costs it the
-; prescaler's partial count. Timers C and D share the register, so the
-; read, the mask and the or run at level 7
+; prescaler's partial count. Timer A's and Timer B's control register is
+; the timer's own, so one move writes it and no interrupt can fall
+; inside an instruction; Timers C and D share theirs, and only there
+; does the read, the mask and the or run at level 7.
+                .if     \shared
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  \ctrl.w,d0
@@ -327,6 +334,9 @@ q\{col}:
                 or.b    d1,d0
                 move.b  d0,\ctrl.w
                 move.w  (sp)+,sr
+                .else
+                move.b  d1,\ctrl.w
+                .endif
                 btst    #5,d2
                 beq.s   .done\~
                 lea     \tick(pc),a5          ; the place's reset
@@ -571,10 +581,10 @@ YMXR_play:
 ; chip's select register, a6 the workspace.
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
-                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,ymxr_tick0
-                EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,ymxr_tick1
-                EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,ymxr_tick2
-                EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,ymxr_tick3
+                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0
+                EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1
+                EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2
+                EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3
 ; 4: the tone periods.
                 TONE    _0,_1,$0000,$0100
                 TONE    _2,_3,$0200,$0300
