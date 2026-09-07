@@ -318,7 +318,11 @@ class Model:
                 fx["place"] = None
             else:
                 at, R, RR, rows = self.tune.sources[source]
-                fx["place"] = 0
+                # the first row, or where the row leaves bit 5 of the control
+                # column clear, the row the place stands on in the rows this
+                # source replaces (SPEC.md 1.9)
+                if r[t + 2] & 0x20 or fx["place"] is None:
+                    fx["place"] = 0
                 fx["using"] = fx["target"]
         if r[t + 2] & 0x80:
             if r[t + 2] & 0x40:

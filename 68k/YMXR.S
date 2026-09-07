@@ -264,7 +264,6 @@ q\{col}:
                 move.l  TF_INDEX-4(a3,d1.w),d0
                 adda.l  d0,a3                   ; the source's DTX1 table
                 lea     DT_PAYLOAD(a3),a4       ; its first row
-                move.l  a4,\fx+FX_FIRST(a6)
                 move.l  DT_REPEAT(a3),d0        ; the loop cell: row RR, or 0
                 cmp.l   DT_ROWS(a3),d0          ; where the source plays once
                 beq.s   .once\~
@@ -279,13 +278,21 @@ q\{col}:
 ; The three behind level 7, so a tick takes none of them half made. The
 ; window is three writes wide and costs no measurable jitter: the ticks
 ; of a tune running one effect keep their period to 0.31 per cent with
-; it and to 0.31 without, where the reference player's keep 0.33.
+; it and to 0.31 without, where the reference player's keep 0.33. The
+; place the row does not reset is read in the window too, since a tick
+; between the read and the write steps it (1.9).
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  \fx+FX_TARGET(a6),TICK_SEL(a5)
-                move.l  a4,TICK_PTR(a5)
+                move.l  a4,d1                   ; the place: the first row,
+                btst    #5,d2                   ; or the row it stands on in
+                bne.s   .put\~                  ; the rows it replaces
+                add.l   TICK_PTR(a5),d1
+                sub.l   \fx+FX_FIRST(a6),d1
+.put\~:         move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 move.w  (sp)+,sr
+                move.l  a4,\fx+FX_FIRST(a6)
 ; the start placed the source, so the row's place reset is made: a tick
 ; before the select steps the place on, and the reset below would undo it
                 bclr    #5,d2

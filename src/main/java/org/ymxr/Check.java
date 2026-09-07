@@ -19,11 +19,12 @@ import org.dtx.Table;
  * among them.
  */
 final class Check {
-    /** Whether a row started an effect on this register, the one write the
-     *  rule allows against a register an effect owns (SPEC.md 1.3). */
+    /** Whether a row started an effect on this register and placed it at
+     *  its first row, the one write the rule allows against a register an
+     *  effect owns (SPEC.md 1.3). */
     private static boolean started(Replay model, int register) {
         for (Replay.Effect e : model.effect) {
-            if (e.started() && e.target() == register) {
+            if (e.started() && e.place() && e.target() == register) {
                 return true;
             }
         }
@@ -166,8 +167,10 @@ final class Check {
                 int want = c == 7 ? dump[7] | mixer : dump[c];
                 if ((owned & 1 << c) != 0) {
                     // The row that starts a square wave on a volume register
-                    // sets that column to 0, silencing the voice until the
-                    // first tick (SPEC.md 1.3, section 6 rule 1).
+                    // and places it at its first row sets that column to 0,
+                    // silencing the voice until the first tick (SPEC.md 1.3,
+                    // section 6 rule 1). One whose place stands where it
+                    // is leaves the column unset, as any other row does.
                     boolean silences = model.written[c] == 0 && started(model, c);
                     if (c >= 8 && c <= 10 && model.written[c] >= 0 && !silences) {
                         wrong.add(f + ": R" + c + "'s column is set to " + model.written[c]

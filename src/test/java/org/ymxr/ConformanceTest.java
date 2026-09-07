@@ -69,7 +69,7 @@ final class ConformanceTest {
             Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "",
                     "a loop of one row, RR at 177, odd, so the table packs at unit 1; six drums before it, the last stopped by a row"),
             Fixture.of("synergy", "Synergy Credits.ym", "",
-                    "nine SIDs on Timers A and D at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so the table packs at unit 1"),
+                    "nine SIDs on Timers A and D at once, six of them named by both; a square replacing a square on the target its effect holds, its place standing where it was; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so the table packs at unit 1"),
             Fixture.of("preempt", "Digidrum preempt, built.ym", "",
                     "a drum starting on the voice a SID runs on stops the SID first, and the SID starts again when the drum ends; R8 passed between them with its column unset"),
             Fixture.of("retune", "Retrigger retune, built.ym", "",

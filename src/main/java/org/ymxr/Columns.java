@@ -171,16 +171,30 @@ final class Columns {
                         // The keyframe sets the bit whatever the wrap left.
                         boolean stopped = keyframe || !running[i].on()
                                 || running[i].kind() == Effects.DRUM && f >= drumEnd[i];
-                        if (slot[i].kind() == Effects.SID) {
+                        // Where a square replaces a square on the same
+                        // target the place stands where it is: the row leaves
+                        // bit 5 clear, and the new source's rows go under the
+                        // place at the row it stands on (1.9). Every level is
+                        // its own source, so a square whose level moves
+                        // starts one each time; the half in flight runs to
+                        // its end and the alternation holds its period. A
+                        // drum struck again begins at its first row, so it
+                        // takes bit 5 as any other start does.
+                        boolean keeps = !keyframe && slot[i].kind() == Effects.SID
+                                && running[i].kind() == Effects.SID
+                                && running[i].target() == slot[i].target();
+                        if (slot[i].kind() == Effects.SID && !keeps) {
                             // The voice is silenced on the row that starts
                             // the square, so the tick a period later is its
                             // loud half (1.3, section 6): the square begins
-                            // where the reference player begins it.
+                            // where the reference player begins it. A start
+                            // that keeps the place writes no level: the
+                            // alternation runs on.
                             silenced |= 1 << slot[i].target();
                         }
                         out[t + 1] = (byte) (0x80 | number[i]);
-                        out[t + 2] = (byte) (0x80 | (stopped ? TIMER_RESET : 0) | PLACE_RESET
-                                | slot[i].select());
+                        out[t + 2] = (byte) (0x80 | (stopped ? TIMER_RESET : 0)
+                                | (keeps ? 0 : PLACE_RESET) | slot[i].select());
                         out[t + 3] = (byte) slot[i].count();
                         running[i] = slot[i];
                         runningNumber[i] = number[i];
