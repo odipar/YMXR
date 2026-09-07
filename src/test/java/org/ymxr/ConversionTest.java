@@ -142,7 +142,7 @@ final class ConversionTest {
         Sources.Source sid = sources.get(sources.number(
                 new Effects.Slot(Effects.SID, 0, 8, 9, 1, 100), report));
         assertEquals(2, sid.rows().length);
-        assertEquals(9, sid.rows()[0], "the loud half, the row having silenced the voice");
+        assertEquals(9, sid.rows()[0], "the loud half, which the first tick writes");
         assertEquals(Sources.MARK, sid.rows()[1] & 0xFF);
         assertEquals(0, sid.repeat());
     }

@@ -113,13 +113,12 @@ Bits 6 and 5 are zero.
 
 While an effect writes this voice's volume register, a row leaves this
 column unset (section 6), so the frame's one write a row does not undo
-what the effect's ticks write. Two rows set it: the row that stops the
-effect, whose write restores the voice's level, and the row that starts a
-square wave where none runs on the voice, which sets the column to 0. The
-voice is silent for the timer's first period then, and the first tick
-writes the loud half, which is where a square wave begins. A row that
-starts a square where one runs on the voice already leaves the column
-unset, and the place stands where it is (1.9): the half in flight runs to
+what the effect's ticks write. One row sets it: the row that stops the
+effect, whose write restores the voice's level. The row that starts a
+square wave sets no level of its own, so the voice holds what the last
+row left it at for the timer's first period and the first tick writes
+the loud half. A row that starts a square where one runs on the voice
+already leaves the place where it is (1.9): the half in flight runs to
 its end, and the new source's level is the one the next loud half takes.
 
 ### 1.4 Mixing
@@ -447,11 +446,10 @@ The last row of a source has bit 7 set, and no other row has. That bit
 is the marker: a tick tests it after the write, so it costs the tick
 nothing before, and the register takes the rest of the byte (2.1). What
 the rest holds is the writer's: a square wave's is its silent half, its
-first row being the loud one, and the row that starts the square
-silences the voice itself (1.3), so the first tick a timer's period
-later writes the loud half, which is where the reference player begins
-it; a drum's is a level the register is left at until a row sets it
-again (1.3); and a source of one row is the marker alone.
+first row being the loud one, so the first tick a timer's period after
+the start writes the loud half; a drum's is a level the register is
+left at until a row sets it again (1.3); and a source of one row is the
+marker alone.
 
 ### 3.3 The tune file
 
