@@ -5,21 +5,21 @@
   python3 ym/halves.py trace.txt
 
 A square wave on a voice is that voice's volume register moving between
-a level and 0 at the timer's rate, so what the ear hears is the length
-of each half. A comparison of values, of counts, or of the register at
-each frame boundary passes a player that writes the right values at the
-wrong times; this reads the times.
+a level and 0 at the timer's rate, and the ear hears the length of each
+half. A comparison of values, of counts, or of the register at each
+frame boundary passes a player that writes the right values at the wrong
+times; this reads the times.
 
 For every volume register the trace writes, it reports the writes, the
 edges among them, the median half and how many halves stand far from the
 median. A player that breaks a square's phase reads high there: the row
-that started a square used to silence the voice part way through the
-half in flight, and DBA 5 came out at 2.4 per cent against the reference
-player's 0.2 (SPEC.md 1.9, experiments.md).
+that started a square used to write 0 to the voice between two ticks, and
+DBA 5 came out at 2.4 per cent against the reference player's 0.2
+(SPEC.md 1.9, experiments.md).
 
 The register a digidrum owns moves through a recording's levels and its
-halves mean nothing; the tool reports every volume register and leaves
-the reading to whoever asks.
+halves mean nothing. The tool marks the registers only a row writes,
+which no timer drives, and reports the halves of the rest.
 """
 import re
 import statistics
