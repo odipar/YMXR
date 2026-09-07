@@ -482,6 +482,8 @@ class Timers:
         self.mode = list(mode)          # the control field, 0 stopped
         self.count = list(count)
         self.pending = [None] * 4
+        self.loaded = [False] * 4       # the data register written while
+                                        # the control register is 0
         self.phase = [float(PRESCALER[self.mode[i] & 7] * self.count[i]) for i in range(4)]
         self.restarts = [0, 0, 0, 0]
         self.ier = dict(ier)            # by register address
@@ -496,7 +498,13 @@ class Timers:
                       {0xFFFFFA13: m.byte(0xFFFFFA13), 0xFFFFFA15: m.byte(0xFFFFFA15)})
 
     def apply(self, writes):
-        """The MFP writes of a call, in order."""
+        """The MFP writes of a call, in order.
+
+        The main counter runs on through a stop: a control register of 0
+        holds it where it stands and a select written back resumes from
+        there, so a select alone moves the prescaler and no more. The
+        data register written while the control register is 0 loads the
+        counter, and the select after that is the start this counts."""
         for reg, value in writes:
             if reg in self.ier:
                 self.ier[reg] = value
@@ -505,15 +513,17 @@ class Timers:
             for i, t in enumerate(TIMER):
                 if reg == t["ctrl"]:
                     mode = (value >> t["shift"]) & 0x0F
-                    if mode != self.mode[i]:
-                        if self.mode[i] == 0 and mode:
-                            self.restarts[i] += 1
-                            self.phase[i] = self.period(i)
-                        self.mode[i] = mode
+                    started = mode and self.mode[i] == 0 and self.loaded[i]
+                    self.mode[i] = mode
+                    if started:
+                        self.restarts[i] += 1
+                        self.phase[i] = self.period(i)
+                        self.loaded[i] = False
                 elif reg == t["data"]:
                     if self.mode[i] == 0:
                         self.count[i] = value or 256
                         self.pending[i] = None
+                        self.loaded[i] = True
                     else:
                         self.pending[i] = value or 256
 
@@ -668,6 +678,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             if fx["restart"]:
                 assert timers.restarts[i] == restarts[i] + 1, \
                     "frame %d: effect %d's timer was not restarted" % (f, i)
+            else:
+                # bit 6 clear: a row that retunes or reaims a running
+                # effect leaves the count the timer is running (1.9)
+                assert timers.restarts[i] == restarts[i], \
+                    "frame %d: effect %d's timer restarted where the row sets no bit 6" % (f, i)
             if fx["running"]:
                 assert timers.mode[i] == fx["select"], "frame %d: effect %d runs at select %d, not %d" % (f, i, timers.mode[i], fx["select"])
                 assert (timers.pending[i] or timers.count[i]) == fx["count"], \

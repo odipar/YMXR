@@ -93,7 +93,7 @@ what this gives (doc/conformance/README.md).
 
 ## The player
 
-`68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,428 bytes. Its
+`68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,564 bytes. Its
 first three longs are the calls:
 
 | call | takes | gives |

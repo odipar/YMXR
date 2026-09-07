@@ -223,7 +223,7 @@ q\{col}:
 
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset.
-                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,keep,shift,tick
+                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,tick
 \{tick}_over:
                 bra.w   \{tick}_done             ; two nops where the tune
                 QREAD   \ct                     ; runs this effect (init)
@@ -240,8 +240,9 @@ q\{col}:
                 tst.b   d2                      ; the timer's reset stops the
                 bpl.s   .kept\~                 ; timer before the source is
                 btst    #6,d2                   ; switched, so no tick of the
-                beq.s   .kept\~                 ; old rate takes the new source
-                andi.b  #\keep,\ctrl.w
+                beq.s   .kept\~                 ; old rate takes the new
+                andi.b  #\keep,\ctrl.w          ; source, and the tick latched
+                bclr    #\bit,(\ier+4).w        ; before the stop is dropped
 .kept\~:
                 READ    \ct
                 bpl.s   .t\~
@@ -258,18 +259,29 @@ q\{col}:
                 adda.l  d0,a3                   ; the source's DTX1 table
                 lea     DT_PAYLOAD(a3),a4       ; its first row
                 move.l  a4,\fx+FX_FIRST(a6)
-                lea     \tick(pc),a5
-                move.b  \fx+FX_TARGET(a6),TICK_SEL(a5)
-                move.l  a4,TICK_PTR(a5)
-                move.l  DT_REPEAT(a3),d0
-                cmp.l   DT_ROWS(a3),d0
+                move.l  DT_REPEAT(a3),d0        ; the loop cell: row RR, or 0
+                cmp.l   DT_ROWS(a3),d0          ; where the source plays once
                 beq.s   .once\~
                 add.l   a4,d0
+                bra.s   .aim\~
+.once\~:        moveq   #0,d0
+; the handler's three operands stand under one mask, since the timer may
+; run: a tick between the target register and the place writes the old
+; source's row to the new target, and one between the place and the loop
+; cell takes the new place against the cell the old source left
+.aim\~:         lea     \tick(pc),a5
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                move.b  \fx+FX_TARGET(a6),TICK_SEL(a5)
+                move.l  a4,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
-                bra.s   .rate\~
-.once\~:        clr.l   TICK_CELL(a5)
+                move.w  (sp)+,sr
+; the start placed the source, so the row's place reset is made: a tick
+; before the select steps the place on, and the reset below would undo it
+                bclr    #5,d2
                 bra.s   .rate\~
 .stop\~:        andi.b  #\keep,\ctrl.w      ; select 0: the timer stops
+                bclr    #\bit,(\ier+4).w    ; and drops its latched tick
 .rate\~:        READ    \cn
                 tst.b   d2
                 bpl.s   .live\~
@@ -297,8 +309,18 @@ q\{col}:
                 .if     \shift
                 lsl.b   #\shift,d1
                 .endif
-                andi.b  #\keep,\ctrl.w
-                or.b    d1,\ctrl.w
+; the control register takes one write: a select written to a running
+; timer neither stops nor reloads the running count (SPEC.md 1.9), and
+; select 0 in front of the new select stops the timer and costs it the
+; prescaler's partial count. Timers C and D share the register, so the
+; read, the mask and the or run at level 7
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                move.b  \ctrl.w,d0
+                and.b   #\keep,d0
+                or.b    d1,d0
+                move.b  d0,\ctrl.w
+                move.w  (sp)+,sr
                 btst    #5,d2
                 beq.s   .done\~
                 lea     \tick(pc),a5          ; the place's reset
@@ -537,10 +559,10 @@ YMXR_play:
 ; chip's select register, a6 the workspace.
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
-                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$F0,0,ymxr_tick0
-                EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$F0,0,ymxr_tick1
-                EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$F0,0,ymxr_tick2
-                EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$0F,4,ymxr_tick3
+                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,ymxr_tick0
+                EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,ymxr_tick1
+                EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,ymxr_tick2
+                EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,ymxr_tick3
 ; 4: the tone periods.
                 TONE    _0,_1,$0000,$0100
                 TONE    _2,_3,$0200,$0300
