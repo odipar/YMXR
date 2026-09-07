@@ -42,15 +42,18 @@
 ; YMXR_PERF equ 1 assembles the raster monitor in: the play call paints
 ; the background red for as long as its work runs, one scanline to 512
 ; cycles, and each tick handler paints its own colour where the beam
-; stands. A tick's band is a few hundred cycles wide and hard to read, so
-; each handler adds an estimate of its cost to a count, which the next
-; call burns off as a yellow bar after its own work, the register writes
-; among them: the bar shows what the timers cost the frame, and no chip
-; write moves for it. The call waits for the display to start before it
-; paints, since the VBL fires far above the screen and an unsynced bar
-; lands in the top border; the wait stands before the red mark, so it
-; costs the figures nothing. Each count is an estimate, in turns of ten
-; cycles, and the monitor is for reading a run: with the switch off, the
+; stands. A tick's band is a few hundred cycles wide and hard to read,
+; so each handler adds a count of what its own instructions cost, which
+; the next call burns off as a yellow bar after its own work, the
+; register writes among them: the bar shows what the handlers cost the
+; frame, and no chip write moves for the bar. What a tick costs beyond
+; its handler, the 44 cycles the 68000 spends entering an interrupt and
+; the 20 on the rte, stands where the tick landed and is not counted
+; here. The call waits for the display to start before it paints, since
+; the VBL fires far above the screen and an unsynced bar lands in the
+; top border; the wait stands before the red mark, so it costs the
+; figures nothing. Each count is an estimate, in turns of ten cycles,
+; and the monitor is for reading a run: with the switch off, the
 ; default, no byte and no cycle of it stands.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
@@ -64,12 +67,9 @@ YMXR_SITES      equ     18              ; the other read sites (ymxr_sites)
                 .else
 YMXR_PERF       equ     0
                 .endif
-PERF_PAD        equ     YMXR_PERF*10    ; the colour mark's bytes, which
-                                        ; stand ahead of a handler's
-                                        ; patched operands
-PERF_SYNC       equ     8000            ; the wait's ceiling, a frame of
-                                        ; turns, so a call from anywhere
-                                        ; runs on
+PERF_SYNC       equ     8000            ; the wait's ceiling, over a frame
+                                        ; of turns, so a call from
+                                        ; anywhere runs on
 PERF_FRAME      equ     $700            ; the call's own work
 PERF_BAR        equ     $770            ; the timers' burnt bar
 PERF_COLOUR     equ     $FFFF8240       ; the background

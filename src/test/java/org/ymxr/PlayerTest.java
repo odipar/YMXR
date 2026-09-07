@@ -59,8 +59,8 @@ final class PlayerTest {
         assertEquals(Tune.MAX_RING, 32767 / (Columns.C - 1));
     }
 
-    /** What each tick kind costs, as performance.md measures it: the row's
-     *  text, then its cycles. */
+    /** Each tick kind as a pair: the text of its row in performance.md,
+     *  then the player's equate that gives the monitor's count for it. */
     private static final List<String> TICKS = List.of(
             "a row written, the place stepped", "PERF_ON",
             "the marker, the place to row `RR`", "PERF_LOOP",

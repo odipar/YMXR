@@ -6,12 +6,15 @@
 #
 #   ym/cost.sh tune.ymxr [more.ymxr ...]
 #   VBLS=3000 ym/cost.sh tune.ymxr        # a longer run
+#
+# performance.md's figures are a VBLS=2300 run, which plays 2,019 calls.
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}
 TOS=${TOS:-$HOME/hatari-2.6.1_macos/tos-2.06.rom}
 VBLS=${VBLS:-1500}
 work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
 for tune in "$@"; do
     case $tune in
         /*) path=$tune ;;
@@ -28,4 +31,3 @@ for tune in "$@"; do
     printf '%-40s ' "$(basename "$tune" .ymxr)"
     python3 "$here/ym/cost.py" "$work/trace.txt"
 done
-rm -rf "$work"

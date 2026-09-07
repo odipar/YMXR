@@ -138,12 +138,10 @@ def equate(name, symbols=None):
     return whole
 
 
-# The workspace's fixed part, before the image's state block, and a tick
-# handler's operands: the register, the place, the cell.
-FIXED = equate("YMXR_FIXED")
-# The tick offsets are measured off the handler's labels, so they stand
-# once the player is assembled (main).
-TICK_SEL = TICK_PTR = TICK_CELL = 0
+# A tick handler's operands: the register it selects, and the place it
+# reads. Both offsets are measured off the handler's own labels, so they
+# stand once the player is assembled (main).
+TICK_SEL = TICK_PTR = 0
 
 
 def assemble(source="YMXR.S", defines=()):
@@ -414,9 +412,10 @@ class Machine:
             for lane in range(size):
                 byte = (value >> (8 * (size - 1 - lane))) & 0xFF
                 self.mfp.append((address + lane, byte))
-        elif PALETTE <= address < PALETTE + 2:
-            for lane in range(size):    # the raster monitor's marks
-                self.palette.append((value >> (8 * (size - 1 - lane))) & 0xFF)
+        elif PERF and PALETTE <= address < PALETTE + 2:
+            # a mark of the raster monitor: the colour, and how many chip
+            # writes of the call stand before it
+            self.palette.append((value & 0xFFFF, len(self.psg)))
         elif address < 0x1000 or CODE <= address < CODE + 0x10000:
             pass                        # a vector, or the player patching itself
         elif not (WORK <= address < WORK + 0x40000 or STACK <= address < STACK + 0x10000):
@@ -647,10 +646,16 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
         if perf:
             # the monitor marks the call's work and burns the timers' bar
             # after it, so the two marks stand around every chip write
-            marks = [(m.palette[i] << 8) | m.palette[i + 1]
-                     for i in range(0, len(m.palette) - 1, 2)]
-            assert marks[:1] == [PERF_FRAME] and PERF_BAR in marks, \
-                "frame %d: the monitor's marks are %s" % (f, [hex(x) for x in marks])
+            colours = [colour for colour, _ in m.palette]
+            assert colours[:1] == [PERF_FRAME] and PERF_BAR in colours, \
+                "frame %d: the monitor's marks are %s" % (f, [hex(x) for x in colours])
+            red = m.palette[0][1]
+            assert red == 0, \
+                "frame %d: the red mark falls on chip write %d, not before the first" % (f, red)
+            yellow = next(before for colour, before in m.palette if colour == PERF_BAR)
+            assert yellow == len(m.psg), \
+                "frame %d: the yellow mark falls on chip write %d of %d, not after the last" % (
+                    f, yellow, len(m.psg))
         want = model.frame()
         assert taken(m.psg) == taken(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
@@ -708,10 +713,11 @@ VBLA = re.compile(r"^VBL=(\d+) clock=(\d+)")
 ROM = 0xE00000
 
 
-def hatari(ym, code, symbols):
+def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
     trace holds, checked against the model, and the ticks counted. code
-    and symbols are the SNDH core's, the player's symbols among them."""
+    and symbols are the SNDH core's, the player's symbols among them; with
+    perf the core with the raster monitor in, which the SNDH file takes."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
     bound = bind(file, work)
@@ -724,7 +730,8 @@ def hatari(ym, code, symbols):
     open(path, "wb").write(file)
     sndh = os.path.join(work, "TUNE.SND")
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), path, sndh,
-                        "-t" + os.path.basename(ym)], capture_output=True)
+                        "-t" + os.path.basename(ym)] + (["-perf"] if perf else []),
+                       capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     prg = os.path.join(work, "YMXR.PRG")
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), sndh, prg,
@@ -750,7 +757,10 @@ def hatari(ym, code, symbols):
     base = sndh_at + core
     frame = (base + symbols["ymxr_frame"], base + symbols["ymxr_reads"])
     stop = (base + symbols["YMXR_stop"], base + symbols["YMXR_play"])
-    ticks = [(base + symbols["ymxr_tick%d" % i], base + symbols["ymxr_tick%d" % i] + 78)
+    # one macro lays out all four handlers, so the distance between the
+    # first two is every handler's length; the monitor's build is longer
+    handler = symbols["ymxr_tick1"] - symbols["ymxr_tick0"]
+    ticks = [(base + symbols["ymxr_tick%d" % i], base + symbols["ymxr_tick%d" % i] + handler)
              for i in range(4)]
 
     def where(pc):
@@ -856,10 +866,16 @@ def hatari(ym, code, symbols):
     # inside a frame is counted for the frame whole, so five in a hundred
     # are allowed, where a wrong prescaler would be off by half or more.
     # Every tick's value is held to its row above. YMXR_TICKS=1 prints the
-    # frames where the two part.
+    # frames where the two part. The monitor's build costs time, a mark at
+    # each end of a handler and the bar burnt in the call, so a real MFP
+    # drops ticks of a fast timer: with perf the count is held under the
+    # rates, not to them.
     for i in range(4):
         if expected[i] or counted[i]:
-            assert abs(counted[i] - expected[i]) <= 1 + expected[i] // 20, \
+            allowed = 1 + expected[i] // 20
+            assert counted[i] - expected[i] <= allowed, \
+                "effect %d ticked %d times, the rates allow %d" % (i, counted[i], expected[i])
+            assert perf or expected[i] - counted[i] <= allowed, \
                 "effect %d ticked %d times, the rates say %d" % (i, counted[i], expected[i])
     stopped = [(reg, value) for events, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
                for kind, reg, value in events if kind == "stop"]
@@ -882,14 +898,14 @@ def main():
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
     code, symbols = assemble(defines=["-dYMXR_PERF=1"] if perf else [])
-    global TICK_SEL, TICK_PTR, TICK_CELL
+    global TICK_SEL, TICK_PTR
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
-    TICK_CELL = equate("TICK_CELL", symbols)
     print("the player: %d bytes%s" % (len(code), ", the raster monitor in" if perf else ""))
     if real:
-        code, symbols = assemble("YMXR_sndh.S")
-        print("the SNDH core: %d bytes" % len(code))
+        code, symbols = assemble("YMXR_sndh.S", defines=["-dYMXR_PERF=1"] if perf else [])
+        print("the SNDH core: %d bytes%s" % (len(code),
+                                             ", the raster monitor in" if perf else ""))
     cycles_of = None
     if count:
         sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))
@@ -899,7 +915,7 @@ def main():
     stale = []
     for ym in tunes:
         if real:
-            frames, ticks = hatari(ym, code, symbols)
+            frames, ticks = hatari(ym, code, symbols, perf)
             print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
             continue
         frames, ticks, cost, tick_cost, where = check(ym, code, symbols,
@@ -908,7 +924,7 @@ def main():
         if kit:
             line += ", the player's frames are the reader's entries"
         if cost and perf:
-            line += ", the monitor's own cycles among them"
+            line += ", no cost figures: the monitor's own cycles run inside the call"
         if cost and not perf:
             average = int(sum(cost) / len(cost))
             adv = where[3]

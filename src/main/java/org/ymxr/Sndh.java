@@ -174,9 +174,8 @@ final class Sndh {
         }
         int flags = Tune.getWord(core, CORE_FLAGS_AT);
         if (monitor && (flags & CORE_MONITOR) == 0) {
-            throw new IllegalArgumentException("the raster monitor was asked for and the core's"
-                    + " flags at " + CORE_FLAGS_AT + " read " + flags + ": bit 0 is clear, so"
-                    + " this core has no monitor in");
+            throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
+                    + flags + ", and the raster monitor asked for needs bit 0 set");
         }
     }
 

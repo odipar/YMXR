@@ -67,23 +67,23 @@ budget itself.
 
 The figures above are the rig's, counted instruction by instruction
 under an emulated 68000. A second measure runs on a cycle-exact machine,
-and the player is built with it: `rmac -dYMXR_PERF=1` puts the
-raster monitor in (`68k/YMXR.S`), and `bin/ymxr-sndh -perf` puts that
-core in an SNDH file. The call paints the background red while its work
-runs, one scanline to 512 cycles, and each tick handler paints its own
-colour where the beam stands: effect 0 green, effect 1 blue, effect 2
-magenta, effect 3 cyan, four colours the call's red and the bar's yellow
-are not, so a reader tells every band apart. A tick's band is a few
-hundred cycles wide, so each handler also adds a count of what it costs,
-in turns of ten cycles, and the next call burns the total off as a
-yellow bar after its own work, the register writes among them: no chip
-write moves for the monitor, and the bar shows the timers' share of the
-frame. The call waits for the display to start before it paints, since
-the VBL fires far above the screen and an unsynced bar lands in the top
-border where nothing shows; the wait stands before the red mark, so it
-costs the figures nothing, and it is bounded, so a call from anywhere
-runs on. With the switch off, the default, the player is byte for byte
-the player without it.
+and the player is built with it: `rmac -dYMXR_PERF=1` puts the raster
+monitor in (`68k/YMXR.S`), and `bin/ymxr-sndh -perf` puts that core in
+an SNDH file. The call paints the background red while its work runs,
+one scanline to 512 cycles, and each tick handler paints its own colour
+where the beam stands: effect 0 green, effect 1 blue, effect 2 magenta,
+effect 3 cyan, four colours the call's red and the bar's yellow are not,
+so a reader tells every band apart. A tick's band is a few hundred
+cycles wide, so each handler also adds a count of what its own
+instructions cost, in turns of ten cycles, and the next call burns the
+total off as a yellow bar after its own work, the register writes among
+them: no chip write moves for the bar, and the bar shows what the
+handlers cost the frame. The call waits for the display to start before
+it paints, since the VBL fires far above the screen and an unsynced bar
+lands in the top border where nothing shows; the wait stands before the
+red mark, so it costs the figures nothing, and it is bounded, so a call
+from anywhere runs on. With the switch off, the default, the player is
+byte for byte the player without it.
 
 `ym/cost.sh` builds a program with that core, runs it under Hatari
 tracing the writes to the background, and `ym/cost.py` reads every
@@ -91,31 +91,46 @@ call's span back: the red mark to the yellow one is the call's own work,
 less each tick band inside it, and the yellow to the write that puts the
 desktop's colour back is the bar. What the method leaves out: the ticks'
 counts are estimates, each within a twentieth of what A tick measures
-below, which PlayerTest holds them to; a tick that lands inside the bar
-is counted in the next call's; and the wait moves the call's writes in
-time, which is why the monitor is a build for reading a run and not one
-to play a tune with.
+below, which PlayerTest holds them to; what a tick costs beyond its
+handler, the 44 cycles of the interrupt's entry and the 20 of its `rte`,
+stands where the tick landed, inside the call's own work where it landed
+there and counted nowhere where it did not; a tick that lands inside the
+bar is counted in the next call's; and the wait moves the call's writes
+in time, which is why the monitor is a build for reading a run and not
+one to play a tune with.
+
+Measure from the VBL, at the tune's own rate. Where the program plays
+from Timer C, a call runs inside the tick handler the timer
+interrupted, since a handler drops the level once its write is made
+(SPEC.md 5), and the wait then holds that handler open for as long as it
+runs: the timer's own next ticks wait with it, and the tune's sound
+changes. At the screen's rate the program plays from the VBL and no call
+nests inside a tick.
 
 ## Against YMX
 
 YMX's performance.md measures its player the same way, painting the
 background red while a call runs and reading the palette writes back
 from a cycle-exact Hatari (`ymx/test/cost.py` there). So the two players
-read by one method, on the same dumps, over 2,019 calls:
+read by one method, on the same dumps, over the 2,019 calls of a
+`VBLS=2300` run:
 
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
-| Synergy Credits | YMX 0.10.1 | 2317 | 3424 | 3880 |
-| Synergy Credits | YMXR | 2391 | 4192 | 6212 |
-| Turrican - world 4-3 | YMX 0.10.1 | 1912 | 3232 | 4252 |
-| Turrican - world 4-3 | YMXR | 1723 | 2920 | 5024 |
+| Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
+| Synergy Credits | YMXR | 2337 | 4136 | 6048 |
+| Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
+| Turrican - world 4-3 | YMXR | 1705 | 2852 | 5024 |
 
-Both players' figures stand above the ones the rig counts, which are the
-68000's own cycles with no wait state.
+These figures and the rig's are not one sample: the rig counts every frame
+of the tune and the 68000's own cycles with no wait state, and these are the
+first 2,019 calls on a machine that stalls the processor while the shifter
+fetches. Synergy Credits' costliest frame is its 4,517th, past the end of
+this run.
 
-YMXR costs a tenth less on average on Turrican - world 4-3 and a thirtieth
-more on Synergy Credits, whose odd row count puts it at unit 1, and a fifth
-and three fifths more at their worst, and the figures have two causes.
+YMXR costs a tenth less on average on Turrican - world 4-3 and stands level
+on Synergy Credits, whose odd row count puts it at unit 1, and a sixth and
+more than a quarter more at their worst, and the figures have two causes.
 The frame procedure is 550 to 1,110 cycles: the fourteen register columns'
 tests and the writes they admit, the effects' columns and the call's own entry
 and exit, where YMX writes its fourteen registers unconditionally, one `movep`
@@ -205,25 +220,25 @@ and does not for the 22 of a test that forms the select only where it
 writes.
 
 What each step leaves, Turrican - world 4-3, in the rig's count, with the
-Hatari figure as the count plus the offset measured on the player, about 150
-on average and 310 at worst; step 4 is counted from the tune's own rows as
+Hatari figure as the count plus the offset measured on the player, about 26
+on average and 190 at worst; step 4 is counted from the tune's own rows as
 measured:
 
 | after | average | worst | Hatari, average | Hatari, worst |
 |---|---|---|---|---|
-| the two savings before the design, measured | 2500 | 7968 | 2712 | 8200 |
-| step 1, measured | 2382 | 7824 | 2583 | 8052 |
-| step 2, measured | 1874 | 5110 | 2037 | 5424 |
-| step 3, measured | 1624 | 4794 | 1777 | 5116 |
-| the tune's own rows, no row added, measured | 1679 | 4834 | 1832 | 5144 |
-| step 4 | 1639 | 4794 | 1792 | 5104 |
-| YMX 0.10.1, measured | | | 1912 | 4252 |
+| the two savings before the design, measured | 2500 | 7968 | 2526 | 8158 |
+| step 1, measured | 2382 | 7824 | 2408 | 8014 |
+| step 2, measured | 1874 | 5110 | 1900 | 5300 |
+| step 3, measured | 1624 | 4794 | 1650 | 4984 |
+| the tune's own rows, no row added, measured | 1679 | 4834 | 1705 | 5024 |
+| step 4 | 1639 | 4794 | 1665 | 4984 |
+| YMX 0.10.1, measured | | | 1897 | 4284 |
 | R4.5 | | 6656 | | |
 
 The average passed YMX's at step 3. The rows after it are the dump's own, the
 padding that kept every loop on a period gone with DTX's rule that asked for
 it, and the repeat replayed at its exact row costs the advance a mark's test a
-row. The worst frame came under R4.5 at step 2 and stays about 890 over YMX's:
+row. The worst frame came under R4.5 at step 2 and stays about 740 over YMX's:
 a fifteen-unit refill's heaviest case against YMX's sixty-four-byte group,
 which is the decoder's and not either player's.
 

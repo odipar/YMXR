@@ -53,7 +53,7 @@ tool binds them with DTX's reader into what the player takes.
 The tool runs out of `target/classes`, and builds first where a source,
 the pom or a 68000 source is newer than the last build, or the core is
 not assembled. Java 23, Maven and rmac, with which the build assembles
-the core and the stub once (`-Drmac=PATH` names another), and DTX 0.6.0
+both cores and the stub once (`-Drmac=PATH` names another), and DTX 0.6.0
 in the local Maven repository: `mvn install` at DTX's `v0.6.0` tag,
 whose reader this player's frame figures (performance.md) are measured
 against.
@@ -133,14 +133,21 @@ stub are assembled by the build with rmac, once, into the classpath;
 BINARIES.md is the contract for every byte of them, and no assembler
 runs at combine time.
 
-A tune plays under Hatari like this:
+## Play
 
 ```
-bin/ym-to-ymxr tune.ym WORK/tune.ymxr
-bin/ymxr-sndh WORK/tune.ymxr WORK/tune.sndh -t"The title"
-bin/ymxr-prg WORK/tune.sndh WORK/TUNE.PRG
-hatari --sound 44100 WORK/TUNE.PRG
+ym/play.sh tune.ym                  play it, SPACE stops
+ym/play.sh tune.ymxr                a tune file plays as it stands
+ym/play.sh tune.ym out.wav          record it instead, sound to a WAV
+VBLS=1500 ym/play.sh tune.ym        stop after that many frames
+PERF=1 ym/play.sh tune.ym out.wav   the raster monitor's core in
 ```
+
+`ym/play.sh` runs the three tools above and hands the program to Hatari
+with its sound on. Named a second file it records instead: Hatari writes
+an AVI, video and sound, which `ym/avi.py` reads back as a WAV, with the
+run's last frame beside it as a PNG. With `PERF` the program takes the
+monitor's core, so that frame shows the bars (Measure).
 
 ## The rigs
 
@@ -177,14 +184,15 @@ are the MFP's own: the frames are told apart by the VBL, and the ticks counted
 against the rates the trace shows the timers programmed at. `ym/cost.sh`
 measures the same program's cycles instead, through the raster monitor
 (Measure). `-perf` builds the player with that monitor in and holds it to the
-model under unicorn, so a band painted or a cost counted moves no chip write.
-`-kit` plays the conformance kit's tunes, or the tune files named, and holds
-each frame the player makes to the reader's record of it through
-`bin/ymxr-trace`, and the record's first line to the tune's header, so the
-player, the rig's model and the reader agree line by line. Every tune is bound
-through `bin/ymxr-bind` before the player takes it; a tune file of another
-version is one the binder and the reader reject, and the player rejects a
-bound tune whose version is not its own.
+model under unicorn, so a band painted or a cost counted changes no register a
+frame writes, and none of the order it writes them in. `-kit` plays the
+conformance kit's tunes, or the tune files named, and holds each frame the
+player makes to the reader's record of it through `bin/ymxr-trace`, and the
+record's first line to the tune's header, so the player, the rig's model and
+the reader agree line by line. Every tune is bound through `bin/ymxr-bind`
+before the player takes it; a tune file of another version is one the binder
+and the reader reject, and the player rejects a bound tune whose version is
+not its own.
 
 | variable | gives |
 |---|---|

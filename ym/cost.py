@@ -6,9 +6,9 @@ background red while a call's work runs and yellow while it burns the
 timers' counted cost, and each tick handler paints its own colour and
 puts back what stood before it. This reads a Hatari trace of the writes
 to the background back: the red mark to the yellow one is the call's own
-work, a tick's colour and the write that puts the red back are a tick
-inside it, and the yellow to the write that puts the desktop's colour
-back is the bar. doc/performance.md carries the figures and the method.
+work, less every tick band inside it, and the yellow to the write that
+puts the desktop's colour back is the bar. doc/performance.md has the
+figures and the method.
 
     ym/cost.py trace.txt
 """
@@ -17,9 +17,9 @@ import sys
 
 FRAME = 160256                  # a PAL frame of an ST, in cycles
 LINE = 512                      # a scanline
-WORK = "700"                    # the call's work
-BAR = "770"                     # the timers' bar
-TICKS = ("070", "007", "707", "077")
+WORK = 0x700                    # the call's work
+BAR = 0x770                     # the timers' bar
+TICKS = (0x070, 0x007, 0x707, 0x077)
 WRITE = re.compile(r"write col addr=ff8240 col=(\w+) video_cyc_w=(\d+).*pc=([0-9a-f]+)")
 ROM = 0xE00000
 
@@ -32,7 +32,7 @@ def read(path):
     for line in open(path, errors="replace"):
         m = WRITE.search(line)
         if m and int(m.group(3), 16) < ROM:
-            out.append((m.group(1).upper().lstrip("0") or "0", int(m.group(2))))
+            out.append((int(m.group(1), 16), int(m.group(2))))
     return out
 
 
@@ -41,36 +41,54 @@ def span(at, to):
     return to - at + (FRAME if to < at else 0)
 
 
+def bands(writes, at, under):
+    """The tick bands from writes[at] on, while they nest under a mark of
+    colour under: (the cycles each band's own tick took, the cycles the
+    outermost bands took together, the write the nesting ends at). A tick
+    marks its colour and puts back the colour it found, so a write of the
+    colour under the top of the nest closes one band."""
+    own, whole, nest = [], 0, []
+    while at < len(writes):
+        colour, now = writes[at]
+        if nest and colour == (nest[-2][0] if len(nest) > 1 else under):
+            _, began, inner = nest.pop()
+            took = span(began, now)
+            own.append(took - inner)     # a band of its own, its nest out
+            if nest:
+                nest[-1][2] += took
+            else:
+                whole += took            # an outermost band, whole
+        elif colour in TICKS and (nest or (at + 1 < len(writes)
+                                           and writes[at + 1][0] == under)):
+            nest.append([colour, now, 0])
+        else:
+            break                        # the mark this nest stands under is over
+        at += 1
+    return own, whole, at
+
+
 def spans(writes):
     """(the calls' work, the ticks, the bars), each a list of cycles."""
     work, ticks, bars = [], [], []
     at = 0
     while at < len(writes):
         colour, opened = writes[at]
+        at += 1
         if colour != WORK:
-            at += 1
             continue
-        inside = 0
-        at += 1
-        while at < len(writes) and writes[at][0] != BAR:
-            if writes[at][0] in TICKS and at + 1 < len(writes):
-                took = span(writes[at][1], writes[at + 1][1])
-                inside += took
-                ticks.append(took)
-                at += 2
-                continue
-            at += 1
-        if at == len(writes):
-            break
+        own, inside, at = bands(writes, at, WORK)
+        if at == len(writes) or writes[at][0] != BAR:
+            continue                    # no yellow mark: no call to measure
+        ticks += own
         whole = span(opened, writes[at][1])
-        if whole < FRAME // 2:  # a span over a stop is no call
-            work.append(whole - inside)
-            burnt = at + 1
-            while burnt < len(writes) and writes[burnt][0] in TICKS:
-                burnt += 1
-            if burnt < len(writes):
-                bars.append(span(writes[at][1], writes[burnt][1]))
+        burnt = writes[at][1]
         at += 1
+        own, _, at = bands(writes, at, BAR)
+        ticks += own
+        if whole < FRAME // 2:          # a span over a stop is no call
+            work.append(whole - inside)
+            if at < len(writes):
+                bars.append(span(burnt, writes[at][1]))
     return work, ticks, bars
 
 

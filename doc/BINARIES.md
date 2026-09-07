@@ -18,7 +18,7 @@ Big-endian throughout; every offset and size in bytes.
 | `YMXR_prg.bin` | the program stub, assembled from `68k/YMXR_prg.S` |
 | `DTX0.bin`, `DTX1-w1.bin`, `DTX2-w1-k1.bin` and the rest | DTX's reader code, twenty-two files: one for DTX0, one a width for DTX1, one a width, a unit and the copies flag for DTX2, at `org/dtx/68k/` in the dtx jar (DTX, doc/abi.md) |
 
-The build assembles the core and the stub into `org/ymxr/68k/` on the
+The build assembles both cores and the stub into `org/ymxr/68k/` on the
 classpath (pom.xml, the `binaries` step; `-Drmac=PATH` names the
 assembler), and the tools of section 5 read them there.
 
@@ -93,9 +93,8 @@ Position-independent. Its layout from its first byte:
 | 32 | 4 | the workspace: written 0, patched by the tool |
 
 Both patched offsets count from the core's first byte and are even. The
-flags word says what the core was assembled with, so a tool that asks
-for the monitor reads the word rather than the file's name, and stops
-where the two part. The
+flags word gives what the core was assembled with: a tool picks the core
+by name and holds it to the word, and stops where the two part. The
 state byte has bit 0 set while a tune plays and bit 1 set once the tune
 has played its last row and does not repeat; a host that has to know
 when a tune that plays once is over reads it, since play returns
