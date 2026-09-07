@@ -136,8 +136,8 @@ runs at combine time.
 ## Play
 
 ```
-ym/play.sh tune.ym [out.wav] [-kK] [-mN] [-rRR | -r] [-tTITLE]
-           [-cCOMPOSER] [-perf] [-vN]
+ym/play.sh [-kK] [-mN] [-rRR | -r] [-tTITLE] [-cCOMPOSER] [-perf] [-vN]
+           tune.ym [out.wav]
 ```
 
 `ym/play.sh` runs the three tools above and hands the program to Hatari

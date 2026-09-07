@@ -3,7 +3,7 @@
 # a program around it, and the program run under Hatari with its sound on.
 # tools.md has the tools this drives and BINARIES.md the files they write.
 #
-#   ym/play.sh tune.ym [out.wav] [options]
+#   ym/play.sh [options] tune.ym [out.wav]
 #
 #   -kK        the unit the table packs at, 2 by default
 #   -mN        the ring in bytes, 960
