@@ -77,6 +77,11 @@ final class Columns {
         int[] countHeld = {0, 0};
         int[] drumEnd = {-1, -1};
         boolean[] stopAtRepeat = {false, false};
+        // What each effect last ran, whether or not it runs now: a row that
+        // stops an effect leaves the place where the last tick left it, so a
+        // square that starts again takes up the half it was in.
+        int[] lastKind = {0, 0};
+        int[] lastTarget = {-1, -1};
         int used = 0;
         for (int f = 0; f < frames; f++) {
             // The row the tune repeats to sets every register but R13 and
@@ -87,6 +92,8 @@ final class Columns {
             if (keyframe) {
                 Arrays.fill(held, -1);
                 Arrays.fill(targetHeld, -1);
+                Arrays.fill(lastKind, 0);
+                Arrays.fill(lastTarget, -1);
                 for (int i = 0; i < 2; i++) {
                     stopAtRepeat[i] = running[i].on();
                 }
@@ -180,14 +187,16 @@ final class Columns {
                         // drum struck again begins at its first row, so it
                         // takes bit 5 as any other start does.
                         boolean keeps = !keyframe && slot[i].kind() == Effects.SID
-                                && running[i].kind() == Effects.SID
-                                && running[i].target() == slot[i].target();
+                                && lastKind[i] == Effects.SID
+                                && lastTarget[i] == slot[i].target();
                         out[t + 1] = (byte) (0x80 | number[i]);
                         out[t + 2] = (byte) (0x80 | (stopped ? TIMER_RESET : 0)
                                 | (keeps ? 0 : PLACE_RESET) | slot[i].select());
                         out[t + 3] = (byte) slot[i].count();
                         running[i] = slot[i];
                         runningNumber[i] = number[i];
+                        lastKind[i] = slot[i].kind();
+                        lastTarget[i] = slot[i].target();
                         used |= 1 << i;
                         if (slot[i].kind() == Effects.DRUM) {
                             drumEnd[i] = f + duration(sources.get(number[i]).rows().length,

@@ -19,9 +19,9 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Circus Attractions 2 | 8 | 1568 | 1764 | 792 | 792 |
 | DBA 2 | 19442 | 2085 | 5644 | 1185 | 4920 |
 | DBA 5 | 22262 | 2172 | 5790 | 1257 | 4554 |
-| Digidrum preempt, built | 800 | 1745 | 2928 | 822 | 2052 |
+| Digidrum preempt, built | 800 | 1746 | 2928 | 822 | 2052 |
 | Retrigger retune, built | 1200 | 1616 | 2412 | 828 | 1098 |
-| Synergy Credits | 10754 | 2468 | 6450 | 1266 | 4994 |
+| Synergy Credits | 10754 | 2469 | 6450 | 1266 | 4994 |
 | Turrican - world 4-3 | 3680 | 1720 | 4948 | 933 | 4176 |
 | Turrican 2 - world completed 1 | 179 | 2020 | 5756 | 1284 | 5062 |
 

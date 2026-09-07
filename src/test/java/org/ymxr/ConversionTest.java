@@ -83,6 +83,7 @@ final class ConversionTest {
         Table table = TuneFile.read(YmToYmxr.convert(dump, List.of(), new Report())
                 .written().file()).table();
         int t = Columns.EFFECT + 4;
+        int t2 = Columns.EFFECT;
         assertEquals(0x80 | 10, table.column(t)[12] & 0xFF, "row 12 gives effect 1 R10");
         assertEquals(0x80 | 3, table.column(t + 1)[12] & 0xFF, "row 12 starts source 3");
         assertEquals(0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET | 5,
@@ -92,32 +93,38 @@ final class ConversionTest {
         assertEquals(0x80 | 5, table.column(t + 2)[36] & 0xFF,
                 "row 36 takes the source without stopping the timer or the place");
         assertEquals(0xEB, table.column(t + 3)[36] & 0xFF, "row 36's count");
-        // Every start on this tune's two effects is a square. One on a
-        // stopped timer takes bits 6 and 5; one that moves the square to
-        // another voice sets the target column and takes bit 5; one that
-        // replaces a square on the target the effect holds takes neither,
-        // and its place stands where it is.
+        // Effect 0's source column goes to 0 on row 1944 and row 1950 starts
+        // a square on the target it last ran one on. The timer stopped, so
+        // the row programs it; the place stands where the last tick left it,
+        // so the row leaves bit 5 clear and the square takes up the half it
+        // was in (1.9).
+        assertEquals(0x80, table.column(t2 + 1)[1944] & 0xFF, "row 1944 stops effect 0");
+        assertEquals(0x80 | Columns.TIMER_RESET | 2, table.column(t2 + 2)[1950] & 0xFF,
+                "row 1950 programs the timer and keeps the place");
+        // Every start on this tune's two effects is a square, and a square
+        // that follows one on the same target keeps its place whether or not
+        // the effect ran between them.
         for (int i = 0; i < 2; i++) {
             byte[] target = table.column(Columns.EFFECT + 4 * i);
             byte[] source = table.column(Columns.EFFECT + 4 * i + 1);
             byte[] control = table.column(Columns.EFFECT + 4 * i + 2);
-            int bits = Columns.TIMER_RESET | Columns.PLACE_RESET;
-            boolean running = false;
-            int carried = 0;
+            int held = -1;
+            int last = -2;
+            int kept = 0;
             for (int f = 0; f < table.rows(); f++) {
+                if ((target[f] & 0x80) != 0) {
+                    held = target[f] & 0x7F;
+                }
                 if ((source[f] & 0xFF) > 0x80) {
-                    boolean moved = (target[f] & 0x80) != 0;
-                    int want = !running ? bits : moved ? Columns.PLACE_RESET : 0;
-                    assertEquals(want, control[f] & bits,
-                            "row " + f + " starts effect " + i + " on the wrong bits");
-                    carried += want == 0 ? 1 : 0;
-                    running = true;
-                } else if ((source[f] & 0xFF) == 0x80) {
-                    running = false;
+                    int want = held == last ? 0 : Columns.PLACE_RESET;
+                    assertEquals(want, control[f] & Columns.PLACE_RESET,
+                            "row " + f + " starts effect " + i + " on the wrong place bit");
+                    kept += want == 0 ? 1 : 0;
+                    last = held;
                 }
             }
-            assertTrue(carried > 100, "effect " + i + " keeps its place on "
-                    + carried + " starts");
+            assertTrue(kept > 100, "effect " + i + " keeps its place on "
+                    + kept + " starts");
         }
     }
 
