@@ -225,7 +225,10 @@ runs the source it names on the target the player holds for this effect,
 at the rate the two columns beside them give (1.9). The row places the
 source at its first row, or where it leaves bit 5 of the control column
 clear, at the row the place stands on, and starts a stopped timer through
-bit 6 (1.9, section 6). A row setting source 0 stops the timer.
+bit 6 (1.9, section 6). A row setting source 0 stops the timer; the
+place stands on the row the last tick left it on, so a source that starts
+on that timer again takes the row it stands on where the row leaves bit 5
+clear.
 
 The target the player holds is the one the row's target column gives, or
 where the row leaves that column unset, the last one it took (R4.6). A
@@ -308,11 +311,13 @@ Bit 5 returns the timer's place in its source to the first row, and the
 next tick takes it. Without the bit the source runs on from where it is,
 through a change of rate. Where the row starts a source and leaves the
 bit clear, the new source's rows go under the place at the row it stands
-on, counted from the first row of the source it replaces: a square whose
-level moves keeps the half it is in, and its alternation holds its
-period. A note that bends sets the count column; a note that is struck
-sets bits 6 and 5 with it; a drum struck again at the rate it has sets
-bit 5 with the select it has.
+on, counted from the first row of the source it replaces, and a row that
+stopped the effect in between makes no difference: nothing but bit 5
+moves the place. A square whose level moves keeps the half it is in, and
+its alternation holds its period, whether or not a row stopped it. A note
+that bends sets the count column; a note that is struck sets bits 6 and 5
+with it; a drum struck again at the rate it has sets bit 5 with the
+select it has.
 
 A row that leaves a rate column unset leaves the timer running at the
 rate it has.
@@ -579,11 +584,13 @@ once and tests nothing.
    order. A player writes what each tick gives it.
 5. A row that sets the source column to a source sets bit 5 of the
    control column with it, unless the source it starts has the row count
-   of the one it replaces on the target the effect holds, where the row
-   may leave the bit clear and the place stands where it is (1.9); and bit 6
-   where the timer is stopped. The place goes to the first row and the
-   timer starts for those bits alone. A row that sets the source column
-   to 0 leaves the control and count columns unset.
+   of the last source this effect ran on the target it holds, where the
+   row may leave the bit clear and the place stands where it is (1.9); a
+   row between them setting source 0 makes no difference. It sets bit 6
+   where the timer is stopped, which a row setting source 0 leaves it.
+   The place goes to the first row and the timer starts for those bits
+   alone. A row that sets the source column to 0 leaves the control and
+   count columns unset.
 6. A row sets a rate column (1.9) on the row that starts its effect, or
    while the effect runs, and not before its first start. The row that
    starts an effect for the first time sets its count column, because

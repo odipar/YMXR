@@ -129,3 +129,112 @@ The saving is smaller than the 27,362 an earlier measurement gave. That
 one set the period as one column of two bytes against a plain column of
 four with a set bit of its own, and a column of four bytes is one no
 table of one-byte values holds (R1.1).
+
+---
+
+## What a square does when it starts
+
+A SID voice is a volume register moving between a level and 0 at a
+timer's rate. Nothing in the YM format says what happens to that
+movement when a note ends and another begins, so every player of the era
+does it differently and every composer heard their own driver. Two models
+are on record.
+
+The **ym2149-rs model**, which the reference player ships: a fresh start
+writes the voice silent at once and installs the loud half, and the first
+tick, one timer period later, begins the alternation. A phase starts at
+zero.
+
+**maxYMiser's model**, the tracker most of these sections were written
+in: nothing is silenced and nothing is placed. Its replayer traced under
+Hatari on *Chipping for Ca$h* writes R0 to R10 every frame and leaves the
+volume register a square owns alone for all 218 frames the square runs;
+on the row the square starts it writes no level at all, and the first
+tick opens the wave. Its timer's count and control are restated every
+frame, live, and the timer is never stopped. Its release masks rather
+than stops, so a note that arrives again resumes the phase the timer
+never broke.
+
+This format took the first model and applied it to every row that starts
+a source. That is wrong twice over, because in this schema a source holds
+the values written (2.2), so a square whose level moves is a new source
+most rows: the lead of DBA 5 takes one on 957 of its first 1,575 rows and
+Synergy Credits on 3,396 of 5,377. Every one of those rows silenced the
+voice part way through the half in flight and placed the source at its
+loud row, so that half was cut in two and the one after it began early.
+Read off the voice's own edges over 1,575 frames of DBA 5:
+
+| the row that starts a square | edges | halves short | halves long | off |
+|---|---|---|---|---|
+| places the source and silences the voice | 16,906 | 351 | 52 | 2.4% |
+| places the source alone | 16,266 | 7 | 313 | 2.0% |
+| keeps the place, silences nothing | 16,625 | 5 | 29 | 0.2% |
+| the reference player | 16,625 | 4 | 28 | 0.2% |
+
+The middle row is what stood before the silencing was added: a start that
+landed in a loud half wrote the loud row again, so the half ran to twice
+its length. Adding the silencing turned 313 long halves into 351 short
+ones and changed nothing else. Both are one fault: a start that is not a
+start.
+
+What the format states now is the third row. A row that starts a square
+where this effect last ran one on the target it holds leaves bit 5 clear
+and sets no volume column, and the place stands where the last tick left
+it (1.3, 1.9, section 6 rule 5). The half in flight runs to its end, and
+the level the new source names is the one the next loud half takes.
+
+### The place stands where it is, with no code
+
+The player was changed for this and then changed back. A row that stops
+an effect writes select 0 and drops the latched tick, and touches neither
+the handler's place nor the source's first row; a start whose row leaves
+bit 5 clear puts the new source's rows under the place at the row it
+stands on. So a square that stops and starts again takes up the half it
+left with nothing added to the player, and the converter states it by
+holding the last kind and target each effect ran rather than the one it
+runs.
+
+The other half of maxYMiser's model, a timer that counts through the gap,
+was built and measured: the source column's 0 clears the enable bit
+instead of writing select 0, the tick that runs a source out does the
+same, and a start after a gap programs the timer only where the prescaler
+moved. It costs 64 bytes of player and the effect step's enable write,
+2,502 cycles a call on Synergy Credits against 2,469, and 2,457 through
+the raster monitor against 2,421. What it buys is the timer's own phase
+over a gap in which nothing sounds. Measured against it on the drum
+preempt tune, which stops and starts a square on one voice 191 times, the
+two give 2,873 and 2,874 edges, and the one that keeps the timer counting
+shows three short halves where the other shows none: a resumed square
+takes the fragment the free-running counter had left, where a restarted
+one begins a whole period. The cheaper model is the cleaner
+one, so the timer is stopped and the place alone stands where it was.
+
+### Four rules this left behind
+
+1. **A rule written into the specification, the converter, the player and
+   the rig's model is held by none of them.** Every rig here plays the
+   player against a model built from the tune's own tables, so it proves
+   the player writes what the table says. It cannot see that the table
+   says the wrong thing. The conformance kit is worse: it pins what the
+   converter writes, so it pinned the defect as the reference, and
+   `synergy.ymxr` shrank by 244 bytes when the defect was removed. A rule
+   about sound needs a check that reads sound.
+2. **Compare event timing, not event values.** Every comparison made
+   against the reference player before this one passed: which registers a
+   frame writes, the values, the order, the counts, each register at each
+   frame boundary, the timers' prescaler and count at each boundary. The
+   write that broke the square is a legal value at a legal moment; what
+   it destroys is the spacing between the writes to one register.
+   `ym/halves.py` reads that spacing out of a trace, and it is the
+   measurement to run before believing a square is right.
+3. **A loudness metric over a second says nothing.** The metric used for
+   two days was a per-second correlation of level against the reference,
+   and two builds whose output was identical byte for byte scored 0.70
+   and 0.28 on it, differing only in where the program landed in the
+   frame. A measure that moves with the phase cannot report on the phase.
+4. **Read the reference's own distinction, not one of its rules.** The
+   reference player has two routines here, and the comment on the first
+   says which is which: "a fresh square restarts at phase zero … Retunes
+   and resumes never come here". Reading the fresh-start routine and
+   applying its rule to every start is how one line of a reference
+   becomes a defect in another player.
