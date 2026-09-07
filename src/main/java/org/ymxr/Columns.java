@@ -77,9 +77,9 @@ final class Columns {
         int[] countHeld = {0, 0};
         int[] drumEnd = {-1, -1};
         boolean[] stopAtRepeat = {false, false};
-        // What each effect last ran, whether or not it runs now: a row that
-        // stops an effect leaves the place where the last tick left it, so a
-        // square that starts again takes up the half it was in.
+        // What each effect last ran, whether or not it runs now: a row
+        // that stops an effect moves no place, so a square that starts
+        // again reads the row it left off at.
         int[] lastKind = {0, 0};
         int[] lastTarget = {-1, -1};
         int used = 0;
@@ -178,20 +178,20 @@ final class Columns {
                         boolean stopped = keyframe || !running[i].on()
                                 || running[i].kind() == Effects.DRUM && f >= drumEnd[i];
                         // Where a square replaces a square on the same
-                        // target the place stands where it is: the row leaves
-                        // bit 5 clear, and the new source's rows go under the
-                        // place at the row it stands on (1.9). Every level is
-                        // its own source, so a square whose level moves
-                        // starts one each time; the half in flight runs to
-                        // its end and the alternation holds its period. A
-                        // drum struck again begins at its first row, so it
-                        // takes bit 5 as any other start does.
-                        boolean keeps = !keyframe && slot[i].kind() == Effects.SID
+                        // target the row leaves bit 5 clear and moves no
+                        // place: the row number the place holds counts into
+                        // the new source's rows (1.9). Every level is its
+                        // own source, so a square whose level moves starts
+                        // one each time, and its two ticks either side of
+                        // the start fall a whole period apart. A drum struck
+                        // again reads its first row, so it takes bit 5 as
+                        // any other start does.
+                        boolean unmoved = !keyframe && slot[i].kind() == Effects.SID
                                 && lastKind[i] == Effects.SID
                                 && lastTarget[i] == slot[i].target();
                         out[t + 1] = (byte) (0x80 | number[i]);
                         out[t + 2] = (byte) (0x80 | (stopped ? TIMER_RESET : 0)
-                                | (keeps ? 0 : PLACE_RESET) | slot[i].select());
+                                | (unmoved ? 0 : PLACE_RESET) | slot[i].select());
                         out[t + 3] = (byte) slot[i].count();
                         running[i] = slot[i];
                         runningNumber[i] = number[i];
@@ -245,8 +245,8 @@ final class Columns {
         }
         // The keyframe's stop is for an effect that ran up to the repeat
         // row, or runs into the wrap, so that the wrap lands on a known
-        // state; an effect that did neither, or that the tune never runs,
-        // keeps its columns unset there.
+        // state; the row leaves the columns of an effect that did neither,
+        // or that the tune never runs, unset.
         if (repeat < frames) {
             for (int i = 0; i < 2; i++) {
                 int t = EFFECT + 4 * i;

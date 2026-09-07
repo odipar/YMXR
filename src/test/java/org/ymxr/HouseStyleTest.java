@@ -53,6 +53,13 @@ final class HouseStyleTest {
             // a column holds a value; nothing sits anywhere
             "sits in",
             "stand apart",
+            // a place is a row number, and bit 5 moves it: nothing keeps
+            // one, and a thing that has not moved needs no sentence
+            "keeps its place",
+            "keeps the place",
+            "stands where it",
+            // a period is counted, not flown
+            "in flight",
             // a rule justified by quoting a speaking thing
             "spells out",
             "spell out",

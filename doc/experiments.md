@@ -135,64 +135,65 @@ table of one-byte values holds (R1.1).
 ## What a square does when it starts
 
 A SID voice is a volume register moving between a level and 0 at a
-timer's rate. Nothing in the YM format says what happens to that
-movement when a note ends and another begins, so every player of the era
-does it differently and every composer heard their own driver. Two models
+timer's rate. The YM format states nothing about that movement across the
+row where one note ends and another begins, so the players of the era
+each do something else there and each composer heard one of them. Two
 are on record.
 
-The **ym2149-rs model**, which the reference player ships: a fresh start
-writes the voice silent at once and installs the loud half, and the first
-tick, one timer period later, begins the alternation. A phase starts at
-zero.
+The **ym2149-rs model**, which the reference player ships: a start writes
+0 to the voice at once and sets the alternation to its loud half, and the
+first tick, one timer period later, writes that half.
 
 **maxYMiser's model**, the tracker most of these sections were written
-in: nothing is silenced and nothing is placed. Its replayer traced under
+in: the start writes no level and sets no half. Its replayer traced under
 Hatari on *Chipping for Ca$h* writes R0 to R10 every frame and leaves the
-volume register a square owns alone for all 218 frames the square runs;
-on the row the square starts it writes no level at all, and the first
-tick opens the wave. Its timer's count and control are restated every
-frame, live, and the timer is never stopped. Its release masks rather
-than stops, so a note that arrives again resumes the phase the timer
-never broke.
+volume register a square owns unwritten for all 218 frames the square
+runs; on the row the square starts it writes no level either, and the
+first tick writes the wave's first value. Its timer's count and control
+are restated every frame with the timer running, and no row stops it. Its
+release clears the mask and not the control register, so the count runs
+on and the tick after the next note falls a whole period after the tick
+before the gap.
 
 This format took the first model and applied it to every row that starts
-a source. That is wrong twice over, because in this schema a source holds
-the values written (2.2), so a square whose level moves is a new source
-most rows: the lead of DBA 5 takes one on 957 of its first 1,575 rows and
-Synergy Credits on 3,396 of 5,377. Every one of those rows silenced the
-voice part way through the half in flight and placed the source at its
-loud row, so that half was cut in two and the one after it began early.
-Read off the voice's own edges over 1,575 frames of DBA 5:
+a source. In this schema a source holds the values written (2.2), so a
+square whose level moves starts a new source most rows: the lead of DBA 5
+starts one on 957 of its first 1,575 rows and Synergy Credits on 3,396 of
+5,377. Every one of those rows wrote 0 to the voice between two ticks and
+moved the place to the source's loud row, so the half those two ticks
+bound was cut in two and the one after it began early. Read off the
+voice's own edges over 1,575 frames of DBA 5:
 
 | the row that starts a square | edges | halves short | halves long | off |
 |---|---|---|---|---|
-| places the source and silences the voice | 16,906 | 351 | 52 | 2.4% |
-| places the source alone | 16,266 | 7 | 313 | 2.0% |
-| keeps the place, silences nothing | 16,625 | 5 | 29 | 0.2% |
+| moves the place and writes 0 to the voice | 16,906 | 351 | 52 | 2.4% |
+| moves the place alone | 16,266 | 7 | 313 | 2.0% |
+| moves no place and writes nothing | 16,625 | 5 | 29 | 0.2% |
 | the reference player | 16,625 | 4 | 28 | 0.2% |
 
-The middle row is what stood before the silencing was added: a start that
-landed in a loud half wrote the loud row again, so the half ran to twice
-its length. Adding the silencing turned 313 long halves into 351 short
-ones and changed nothing else. Both are one fault: a start that is not a
-start.
+The middle row is what stood before the write of 0 was added: a start
+whose place moved to the loud row while the voice was loud wrote that
+level again, so no edge fell between the two ticks and the half ran to
+twice its length. Adding the write of 0 turned 313 long halves into 351
+short ones and changed nothing else. Both come of the same thing: a row
+that starts a source read as a row that starts a wave.
 
-What the format states now is the third row. A row that starts a square
-where this effect last ran one on the target it holds leaves bit 5 clear
-and sets no volume column, and the place stands where the last tick left
-it (1.3, 1.9, section 6 rule 5). The half in flight runs to its end, and
-the level the new source names is the one the next loud half takes.
+The third row is the rule now. A row that starts a square where this
+effect last ran one on the target it holds leaves bit 5 clear and sets no
+volume column, so nothing writes the voice between the two ticks either
+side of it and they fall a whole period apart (1.3, 1.9, section 6 rule
+5). The level the second writes is the new source's.
 
-### The place stands where it is, with no code
+### The place needs no code
 
 The player was changed for this and then changed back. A row that stops
-an effect writes select 0 and drops the latched tick, and touches neither
+an effect writes select 0 and drops the latched tick, and writes neither
 the handler's place nor the source's first row; a start whose row leaves
-bit 5 clear puts the new source's rows under the place at the row it
-stands on. So a square that stops and starts again takes up the half it
-left with nothing added to the player, and the converter states it by
-holding the last kind and target each effect ran rather than the one it
-runs.
+bit 5 clear reads the place and counts the number it holds into the new
+source's rows. So a square that stops and starts again reads the row it
+left off at, with nothing added to the player, and the converter states
+it by holding the last kind and target each effect ran rather than the
+one it runs.
 
 The other half of maxYMiser's model, a timer that counts through the gap,
 was built and measured: the source column's 0 clears the enable bit
@@ -200,14 +201,14 @@ instead of writing select 0, the tick that runs a source out does the
 same, and a start after a gap programs the timer only where the prescaler
 moved. It costs 64 bytes of player and the effect step's enable write,
 2,502 cycles a call on Synergy Credits against 2,469, and 2,457 through
-the raster monitor against 2,421. What it buys is the timer's own phase
-over a gap in which nothing sounds. Measured against it on the drum
+the raster monitor against 2,421. It buys the timer's own phase over a
+gap in which nothing sounds. Measured against it on the drum
 preempt tune, which stops and starts a square on one voice 191 times, the
-two give 2,873 and 2,874 edges, and the one that keeps the timer counting
-shows three short halves where the other shows none: a resumed square
-takes the fragment the free-running counter had left, where a restarted
-one begins a whole period. The cheaper model is the cleaner
-one, so the timer is stopped and the place alone stands where it was.
+two give 2,873 and 2,874 edges, and the one whose timer counts on shows
+three short halves where the other shows none: its first half after a gap
+runs for what the counter had left of a period, where a timer started
+again counts a whole one. It costs less and breaks fewer halves, so the
+timer is stopped and bit 5 alone moves the place.
 
 ### Four rules this left behind
 
@@ -215,18 +216,18 @@ one, so the timer is stopped and the place alone stands where it was.
    the rig's model is held by none of them.** Every rig here plays the
    player against a model built from the tune's own tables, so it proves
    the player writes what the table says. It cannot see that the table
-   says the wrong thing. The conformance kit is worse: it pins what the
-   converter writes, so it pinned the defect as the reference, and
-   `synergy.ymxr` shrank by 244 bytes when the defect was removed. A rule
-   about sound needs a check that reads sound.
+   says the wrong thing. The conformance kit pins what the converter
+   writes, so it pinned the defect as the reference too, and
+   `synergy.ymxr` shrank by 244 bytes when the defect was taken out. A
+   rule about sound needs a check that reads sound.
 2. **Compare event timing, not event values.** Every comparison made
    against the reference player before this one passed: which registers a
    frame writes, the values, the order, the counts, each register at each
    frame boundary, the timers' prescaler and count at each boundary. The
-   write that broke the square is a legal value at a legal moment; what
-   it destroys is the spacing between the writes to one register.
-   `ym/halves.py` reads that spacing out of a trace, and it is the
-   measurement to run before believing a square is right.
+   write that broke the square is a legal value at a legal moment, and it
+   changes the spacing between the writes to one register and nothing
+   else. `ym/halves.py` reads that spacing out of a trace; run it before
+   reading a square as right.
 3. **A loudness metric over a second says nothing.** The metric used for
    two days was a per-second correlation of level against the reference,
    and two builds whose output was identical byte for byte scored 0.70
@@ -236,5 +237,4 @@ one, so the timer is stopped and the place alone stands where it was.
    reference player has two routines here, and the comment on the first
    says which is which: "a fresh square restarts at phase zero … Retunes
    and resumes never come here". Reading the fresh-start routine and
-   applying its rule to every start is how one line of a reference
-   becomes a defect in another player.
+   applying its rule to every start put the defect here.

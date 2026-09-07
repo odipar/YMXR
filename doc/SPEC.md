@@ -118,8 +118,9 @@ effect, whose write restores the voice's level. The row that starts a
 square wave sets no level of its own, so the voice holds what the last
 row left it at for the timer's first period and the first tick writes
 the loud half. A row that starts a square where one runs on the voice
-already leaves the place where it is (1.9): the half in flight runs to
-its end, and the new source's level is the one the next loud half takes.
+already does not move the place (1.9), so the tick after it falls a
+whole period after the tick before it, and the level it writes is the
+new source's.
 
 ### 1.4 Mixing
 
@@ -222,13 +223,13 @@ source.
 The two columns and the timer this effect runs on (2.3) are the
 connection. A row setting the source column connects the three: the timer
 runs the source it names on the target the player holds for this effect,
-at the rate the two columns beside them give (1.9). The row places the
-source at its first row, or where it leaves bit 5 of the control column
-clear, at the row the place stands on, and starts a stopped timer through
-bit 6 (1.9, section 6). A row setting source 0 stops the timer; the
-place stands on the row the last tick left it on, so a source that starts
-on that timer again takes the row it stands on where the row leaves bit 5
-clear.
+at the rate the two columns beside them give (1.9). The row moves the
+place to the source's first row where bit 5 of the control column is set,
+and starts a stopped timer through bit 6 (1.9, section 6).
+
+A row setting source 0 stops the timer. It moves no place: the place
+holds the row number the last tick read, and a source that starts on that
+timer again reads from that number where the row leaves bit 5 clear.
 
 The target the player holds is the one the row's target column gives, or
 where the row leaves that column unset, the last one it took (R4.6). A
@@ -297,7 +298,8 @@ runs on. A count written while the timer runs is taken when the running
 count reaches zero, which moves the pitch without a break; a select
 written while it runs neither stops nor reloads the running count, and
 the new prescaler divides the 2,457,600 clock from the write on, so the
-period in flight is part at the old prescaler and part at the new.
+period the timer is counting is part at the old prescaler and part at
+the new.
 
 Bit 6 puts a stop before those writes and a start after them: the player
 writes select 0, then the count, then the select. A count written to a
@@ -307,17 +309,18 @@ count and the select it writes are the row's, or where the row leaves a
 column unset, the ones the player keeps (R4.6). A stopped timer is
 started this way, on the row that starts its effect (section 6).
 
-Bit 5 returns the timer's place in its source to the first row, and the
-next tick takes it. Without the bit the source runs on from where it is,
-through a change of rate. Where the row starts a source and leaves the
-bit clear, the new source's rows go under the place at the row it stands
-on, counted from the first row of the source it replaces, and a row that
-stopped the effect in between makes no difference: nothing but bit 5
-moves the place. A square whose level moves keeps the half it is in, and
-its alternation holds its period, whether or not a row stopped it. A note
-that bends sets the count column; a note that is struck sets bits 6 and 5
-with it; a drum struck again at the rate it has sets bit 5 with the
-select it has.
+The place is a row number into the source's rows. Bit 5 moves it to 0,
+and the next tick reads row 0; without the bit the row moves it nowhere,
+through a change of rate and through a start. So a row that starts a
+source without bit 5 leaves the number as it is, and it counts into the
+new source's rows; a row that stopped the effect in between makes no
+difference, since nothing but bit 5 and a tick moves the place. Two ticks
+of a square are then a whole period apart across a start, and the level
+the second writes is the new source's.
+
+A note that bends sets the count column; a note that is struck sets bits
+6 and 5 with it; a drum struck again at the rate it has sets bit 5 with
+the select it has.
 
 A row that leaves a rate column unset leaves the timer running at the
 rate it has.
@@ -520,8 +523,8 @@ The effects go first, then the registers.
    sets it or bit 6 is set; and the timer's place to its source's first
    row where bit 5 is set. Bit 6's stop is step 2's write, and the
    select here is the start after it. A row that sets the source column
-   and leaves bit 5 clear places the source at the row the place stands
-   on: the place keeps its distance from the first row (1.9).
+   and leaves bit 5 clear moves no place: the row number the place holds
+   counts into the new source's rows (1.9).
 4. Columns 0 to 5, the tone periods, to R0 to R5.
 5. Column 6 to R6, and columns 11 and 12 to R11 and R12, as 1.7's table
    reads them.
@@ -585,8 +588,8 @@ once and tests nothing.
 5. A row that sets the source column to a source sets bit 5 of the
    control column with it, unless the source it starts has the row count
    of the last source this effect ran on the target it holds, where the
-   row may leave the bit clear and the place stands where it is (1.9); a
-   row between them setting source 0 makes no difference. It sets bit 6
+   row may leave the bit clear and move no place (1.9); a row between
+   them setting source 0 makes no difference. It sets bit 6
    where the timer is stopped, which a row setting source 0 leaves it.
    The place goes to the first row and the timer starts for those bits
    alone. A row that sets the source column to 0 leaves the control and

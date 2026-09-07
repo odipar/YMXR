@@ -2,7 +2,7 @@
 # The play call's cost, measured: a program with the raster monitor's
 # core for each tune, run under a cycle-exact Hatari tracing the
 # background's palette writes, and every call's span read back.
-# doc/performance.md carries the figures this produced and the method.
+# doc/performance.md holds the figures this produced and the method.
 #
 #   ym/cost.sh tune.ymxr [more.ymxr ...]
 #   VBLS=3000 ym/cost.sh tune.ymxr        # a longer run

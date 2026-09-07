@@ -69,7 +69,7 @@ final class ConversionTest {
     }
 
     @Test
-    void aSquareChangedUnderARunningTimerCarriesItsPlaceOver() throws IOException {
+    void aSquareChangedUnderARunningTimerMovesNoPlace() throws IOException {
         // SPEC.md 6 rule 5: a row that sets the source column sets bit 6 of
         // the control column where the timer is stopped, and bit 5 unless
         // the source it starts is a square replacing a square on the same
@@ -77,8 +77,8 @@ final class ConversionTest {
         // nothing runs on its timer, and takes another source at another
         // count on row 36, where the timer has run since. The count row 36
         // gives is taken when the running count reaches zero (1.9), so the
-        // pitch moves and the phase holds; the place stands where it is
-        // with it, so the half the square is in runs to its end.
+        // pitch moves and the phase holds; the row moves no place with it,
+        // so its two ticks fall a whole period apart.
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym"));
         Table table = TuneFile.read(YmToYmxr.convert(dump, List.of(), new Report())
                 .written().file()).table();
@@ -95,14 +95,14 @@ final class ConversionTest {
         assertEquals(0xEB, table.column(t + 3)[36] & 0xFF, "row 36's count");
         // Effect 0's source column goes to 0 on row 1944 and row 1950 starts
         // a square on the target it last ran one on. The timer stopped, so
-        // the row programs it; the place stands where the last tick left it,
-        // so the row leaves bit 5 clear and the square takes up the half it
-        // was in (1.9).
+        // the row programs it; the rows between them moved no place, so the
+        // row leaves bit 5 clear and the tick reads the row the square left
+        // off at (1.9).
         assertEquals(0x80, table.column(t2 + 1)[1944] & 0xFF, "row 1944 stops effect 0");
         assertEquals(0x80 | Columns.TIMER_RESET | 2, table.column(t2 + 2)[1950] & 0xFF,
-                "row 1950 programs the timer and keeps the place");
-        // Every start on this tune's two effects is a square, and a square
-        // that follows one on the same target keeps its place whether or not
+                "row 1950 programs the timer and moves no place");
+        // Every start on this tune's two effects is a square, and one that
+        // follows a square on the same target moves no place, whether or not
         // the effect ran between them.
         for (int i = 0; i < 2; i++) {
             byte[] target = table.column(Columns.EFFECT + 4 * i);
@@ -110,7 +110,7 @@ final class ConversionTest {
             byte[] control = table.column(Columns.EFFECT + 4 * i + 2);
             int held = -1;
             int last = -2;
-            int kept = 0;
+            int unmoved = 0;
             for (int f = 0; f < table.rows(); f++) {
                 if ((target[f] & 0x80) != 0) {
                     held = target[f] & 0x7F;
@@ -119,12 +119,12 @@ final class ConversionTest {
                     int want = held == last ? 0 : Columns.PLACE_RESET;
                     assertEquals(want, control[f] & Columns.PLACE_RESET,
                             "row " + f + " starts effect " + i + " on the wrong place bit");
-                    kept += want == 0 ? 1 : 0;
+                    unmoved += want == 0 ? 1 : 0;
                     last = held;
                 }
             }
-            assertTrue(kept > 100, "effect " + i + " keeps its place on "
-                    + kept + " starts");
+            assertTrue(unmoved > 100, "effect " + i + " moves no place on "
+                    + unmoved + " starts");
         }
     }
 

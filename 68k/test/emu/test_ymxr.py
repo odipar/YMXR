@@ -314,14 +314,14 @@ class Model:
             source = r[t + 1] & 0x7F
             fx["source"] = source
             if source == 0:
-                # the place stands where the last tick left it, so a source
-                # that starts again takes up from it (SPEC.md 1.9)
+                # a row that stops an effect moves no place, so a source
+                # that starts again reads from it (SPEC.md 1.9)
                 fx["running"] = False
             else:
                 at, R, RR, rows = self.tune.sources[source]
-                # the first row, or where the row leaves bit 5 of the control
-                # column clear, the row the place stands on in the rows this
-                # source replaces (SPEC.md 1.9)
+                # row 0 where the row sets bit 5 of the control column, and
+                # where it does not, the row number the place already holds
+                # (SPEC.md 1.9)
                 if r[t + 2] & 0x20 or fx["place"] is None:
                     fx["place"] = 0
                 fx["using"] = fx["target"]
