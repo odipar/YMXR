@@ -93,6 +93,11 @@ TIMER = [dict(ctrl=0xFFFFFA19, shift=0, data=0xFFFFFA1F, ier=0xFFFFFA07, bit=5, 
          dict(ctrl=0xFFFFFA1D, shift=0, data=0xFFFFFA25, ier=0xFFFFFA09, bit=4, vector=0x110),
          dict(ctrl=0xFFFFFA1B, shift=0, data=0xFFFFFA21, ier=0xFFFFFA07, bit=0, vector=0x120),
          dict(ctrl=0xFFFFFA1D, shift=4, data=0xFFFFFA23, ier=0xFFFFFA09, bit=5, vector=0x114)]
+# The effects each of those registers belongs to, in effect order, so a
+# trace of the MFP says which effect the frame procedure has stepped.
+# Timers C and D share a control register, and that one gives two.
+OWNS = {reg: [i for i in range(4) if reg in (TIMER[i]["ctrl"], TIMER[i]["data"])]
+        for t in TIMER for reg in (t["ctrl"], t["data"])}
 C = 30
 EFFECT = 14
 # What each register takes of a byte written to it: the rest the chip
@@ -270,6 +275,9 @@ class Model:
     def __init__(self, tune):
         self.tune = tune
         self.row = 0
+        # the row the frame plays, taken by begin and read by the steps
+        # and the writes below
+        self.playing = None
         # target is what the player holds after step 1, and using the
         # target the running effect writes: the one held at its start
         self.fx = [dict(target=0, using=0, source=0, select=0, count=0, place=None,
@@ -277,41 +285,68 @@ class Model:
 
     def frame(self):
         """(the chip writes in order, the effects' state after the row)."""
-        r = self.tune.rows[self.row]
+        self.begin()
+        for i in range(4):
+            self.step(i)
+        return self.writes()
+
+    def begin(self):
+        """The row this frame plays, taken and the next one placed."""
+        self.playing = self.tune.rows[self.row]
         self.row += 1
         if self.row == self.tune.R:
             self.row = self.tune.RR
-        writes = []
-        for i in range(4):
-            t = EFFECT + 4 * i
-            fx = self.fx[i]
-            if r[t] & 0x80:
-                fx["target"] = r[t] & 0x7F
-            fx["restart"] = False
-            fx["reset_place"] = False
-            fx["touched"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
-            if r[t + 1] & 0x80:
-                source = r[t + 1] & 0x7F
-                fx["source"] = source
-                if source == 0:
-                    fx["running"] = False
-                    fx["place"] = None
-                else:
-                    at, R, RR, rows = self.tune.sources[source]
-                    fx["place"] = 0
-                    fx["using"] = fx["target"]
-            if r[t + 2] & 0x80:
-                if r[t + 2] & 0x40:
-                    fx["restart"] = True
-                    fx["running"] = True
-                if r[t + 3]:
-                    fx["count"] = r[t + 3]
-                fx["select"] = r[t + 2] & 7
-                if r[t + 2] & 0x20:
-                    fx["reset_place"] = True
-                    fx["place"] = 0
-            elif r[t + 3]:
+
+    def step(self, i):
+        """Effect i's four columns. The four effects are stepped in order,
+        and every chip write of the row comes after all four, so a tick
+        between two steps reads the effects before it as the row leaves
+        them and the ones after it as they were."""
+        r = self.playing
+        t = EFFECT + 4 * i
+        fx = self.fx[i]
+        if r[t] & 0x80:
+            fx["target"] = r[t] & 0x7F
+        fx["restart"] = False
+        fx["reset_place"] = False
+        fx["touched"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
+        if r[t + 1] & 0x80:
+            source = r[t + 1] & 0x7F
+            fx["source"] = source
+            if source == 0:
+                fx["running"] = False
+                fx["place"] = None
+            else:
+                at, R, RR, rows = self.tune.sources[source]
+                fx["place"] = 0
+                fx["using"] = fx["target"]
+        if r[t + 2] & 0x80:
+            if r[t + 2] & 0x40:
+                fx["restart"] = True
+                fx["running"] = True
+            if r[t + 3]:
                 fx["count"] = r[t + 3]
+            fx["select"] = r[t + 2] & 7
+            if r[t + 2] & 0x20:
+                fx["reset_place"] = True
+                fx["place"] = 0
+        elif r[t + 3]:
+            fx["count"] = r[t + 3]
+
+    def sets_select(self, i):
+        """Whether effect i's step writes the timer's control register:
+        the row gives the select, or the source column stops the effect.
+        Timers C and D share the register, and a write to it is read
+        against this."""
+        r = self.playing
+        t = EFFECT + 4 * i
+        return bool(r[t + 2] & 0x80) or (r[t + 1] & 0x80 and not r[t + 1] & 0x7F)
+
+    def writes(self):
+        """The chip writes the row makes, in order. They come after all
+        four effect steps."""
+        r = self.playing
+        writes = []
         for fine, coarse in ((0, 1), (2, 3), (4, 5)):
             if r[fine] != 0 or r[coarse] & 0x40:
                 writes.append((fine, r[fine]))
@@ -833,39 +868,84 @@ def hatari(ym, code, symbols, perf=False):
     played = 0
     counted = [0, 0, 0, 0]
     expected = [0, 0, 0, 0]
-    # The frame procedure runs early in a VBL, its effect steps before its
-    # first chip write, and a tick may land anywhere: before the frame,
-    # inside its effect steps, or after. So the events go in their own
-    # order, the model's frame applied at the first frame write, or at a
-    # tick that only reads right in the state the frame leaves.
-    for f, (events, clocks, stops) in enumerate(frames[first:first + STUB_FRAMES]):
+    # The frame procedure runs early in a VBL: the four effect steps in
+    # order, then every chip write of the row. A tick may land anywhere
+    # between, and reads the effects stepped before it as the row leaves
+    # them and the ones after it as they were, so the model is stepped one
+    # effect at a time and the trace says how far the procedure has got.
+    # Each step programs its own timer, so a write to an effect's control
+    # or data register places that step, and the frame's first chip write
+    # places all four.
+    # Two ticks the trace does not place: one on a row that programs no
+    # timer for its effect, before the frame's first chip write, and one
+    # inside its own effect's step, since the step aims the handler at the
+    # new source before it writes the timer. Both are read against the
+    # source the effect was running and, on a mismatch, against the source
+    # the step gives.
+    def replay(events, f):
+        """The frame's events against the model. The model is left as the
+        frame leaves it."""
+        model.begin()
+        stepped = [False, False, False, False]
         writes = []
         want = None
+
+        def upto(i):
+            """Effects 0 to i stepped, in the order the frame takes them."""
+            for j in range(i + 1):
+                if not stepped[j]:
+                    model.step(j)
+                    stepped[j] = True
+
+        def owner(reg):
+            """The effect whose step wrote a timer register, or None where
+            the trace does not say."""
+            of = [i for i in OWNS.get(reg, ()) if tune.effects & 1 << i]
+            if len(of) == 1:
+                return of[0]
+            of = [i for i in of if model.sets_select(i)]
+            if len(of) == 1:
+                return of[0]
+            # the register Timers C and D share, written by both effects:
+            # the first write is effect 1's, and the writes after it stand
+            # for either, so they place nothing
+            return of[0] if of and not stepped[of[0]] else None
+
         for kind, reg, value in events:
-            if kind == "frame":
+            if kind == "mfp":
+                i = owner(reg)
+                if i is not None:
+                    upto(i)
+            elif kind == "frame":
+                upto(3)
                 if want is None:
-                    want = model.frame()
+                    want = model.writes()
                 writes.append((reg, value))
             elif kind in (0, 1, 2, 3):
+                if not stepped[kind] and not model.fx[kind]["running"]:
+                    # nothing ran before the step, so the tick is after it
+                    upto(kind)
                 fx = model.fx[kind]
-                if want is None and not fx["running"]:
-                    want = model.frame()
-                    fx = model.fx[kind]
                 assert fx["running"], "frame %d: a tick of effect %d with nothing running" % (f, kind)
-                at = dict(fx)
+                held = dict(fx)
                 w, then = model.tick(kind)
-                if taken([(reg, value)]) != taken([w]) and want is None:
-                    model.fx[kind] = at        # the tick came after the frame's effect step
-                    want = model.frame()
-                    assert model.fx[kind]["running"], "frame %d: a tick of effect %d with nothing running" % (f, kind)
+                if not stepped[kind] and taken([(reg, value)]) != taken([w]):
+                    model.fx[kind] = held      # the tick came after the effect step
+                    upto(kind)
+                    assert model.fx[kind]["running"], \
+                        "frame %d: a tick of effect %d with nothing running" % (f, kind)
                     w, then = model.tick(kind)
                 assert taken([(reg, value)]) == taken([w]), \
                     "frame %d: a tick of effect %d wrote %s, not %s; the frame's events %s; the row %s" % (
-                        f, kind, (reg, value), w, events, tune.rows[(model.row - 1) % tune.R])
+                        f, kind, (reg, value), w, events, model.playing)
                 counted[kind] += 1
+        upto(3)
         if want is None:
-            want = model.frame()
+            want = model.writes()
         assert taken(writes) == taken(want), "frame %d writes %s, not %s" % (f, writes, want)
+
+    for f, (events, clocks, stops) in enumerate(frames[first:first + STUB_FRAMES]):
+        replay(events, f)
         played += 1
         timers.apply([(reg, value) for kind, reg, value in events if kind == "mfp"])
         for i in range(4):

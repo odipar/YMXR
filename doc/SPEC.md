@@ -433,12 +433,13 @@ Bound for a volume register, a recording's linear amplitudes convert to
 the logarithmic levels the register takes, and the conversion is the
 writer's work.
 
-The last row of a source has bit 7 set, and no other row has. That bit is
-the marker: a tick tests it after the write, so it costs the tick nothing
-before, and the register takes the rest of the byte (2.1). What the rest
-holds is the writer's: a square wave's is its silent half, a drum's a level
-the register is left at until a row sets it again (1.3), and a source of
-one row is the marker alone.
+The last row of a source has bit 7 set, and no other row has. That bit
+is the marker: a tick tests it after the write, so it costs the tick
+nothing before, and the register takes the rest of the byte (2.1). What
+the rest holds is the writer's: a square wave's is its loud half, its
+first row being the silence, so the voice begins where the reference
+player begins it; a drum's is a level the register is left at until a
+row sets it again (1.3); and a source of one row is the marker alone.
 
 ### 3.3 The tune file
 

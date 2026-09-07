@@ -84,7 +84,12 @@ final class Sources {
     private Source build(int kind, int data) {
         switch (kind) {
             case Effects.SID:
-                return new Source(kind, data, new byte[] {(byte) data, (byte) MARK}, 0);
+                // The silent half first, so a voice a timer switches begins
+                // where the reference player begins it: the marker carries
+                // the level, and the cycle repeats to the silence (SPEC.md
+                // 3.2). Beginning on the level puts the square against the
+                // voice's own tone the other way about, which is heard.
+                return new Source(kind, data, new byte[] {0, (byte) (MARK | data)}, 0);
             case Effects.BUZZER:
                 return new Source(kind, data, new byte[] {(byte) (MARK | data)}, 0);
             default:
