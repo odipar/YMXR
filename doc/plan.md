@@ -5,9 +5,9 @@ holds what it costs today; every figure below is against those, and each
 one says whether it was measured on the rig or counted from the 68000's
 manual.
 
-Two figures matter and they are not the same. A call is 1,494 to 2,469
-cycles on average by tune, and the costliest frame of a tune is 1,764 to
-6,450. R4.5 budgets 6,656 a frame, and what it binds is the costliest
+Two figures matter and they are not the same. A call is 1,396 to 2,375
+cycles on average by tune, and the costliest frame of a tune is 1,666 to
+6,356. R4.5 budgets 6,656 a frame, and what it binds is the costliest
 frame. Most of what follows moves the average; the steps that move the
 costliest frame are named where they are.
 
@@ -15,14 +15,14 @@ costliest frame are named where they are.
 
 ## Where the time is
 
-DTX's advance is 47 to 65 per cent of an average call and 77 to 84 per
-cent of the costliest frame: 4,176 of Turrican - world 4-3's 4,948 and
-4,994 of Synergy Credits' 6,450. A refill parses at most one ST4
+DTX's advance is 49 to 68 per cent of an average call and 78 to 86 per
+cent of the costliest frame: 4,166 of Turrican - world 4-3's 4,862 and
+4,984 of Synergy Credits' 6,356. A refill parses at most one ST4
 operation a unit at about 225 to 240 cycles each, and its unit count is
 the column count, so fifteen operations is a tune's costliest frame and
 the schema's thirty columns set that bound.
 
-The frame procedure is the rest, 588 to 1,203. A column the row leaves
+The frame procedure is the rest, 500 to 1,119. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset:
 a row sets 0.6 to 13.0 of the fourteen register columns, 3.2 on the
 median tune. Whole groups go unset, which is what a gate can skip,
@@ -71,15 +71,6 @@ Reversing the branch alone, with neither, moves 2 cycles: the plain
 path's `beq` taken at 10 becomes a `bne` not taken at 8, and the row
 that sets the column pays the 2 back.
 
-## 5. The effect's patched skip merged into its first read
-
-The two nops init writes over the branch of an effect the tune runs
-cost 8 cycles a frame each. Merging the skip into the effect's first
-read removes them. Counted, 8 a frame an effect run, and `RUNS` must
-write the non-skip case as well: a second init on one loaded copy finds
-the site as the first init left it.
-
----
 
 ## 6. Two bits in columns the specification states zero
 
@@ -156,17 +147,15 @@ Taken in the order they cost the least to take:
 
 | step | saves a frame | the costliest frame | asks for |
 |---|---|---|---|
-| 5, the merged skip | 8 an effect, counted | the same | nothing |
 | 1, the shape's test dropped | 14 | 8 to 14 less | 58 bytes, or section 4's order |
 | 6, the two bits | 62, measured | 40 less | version $0003 |
 
-Step 5 stands in `68k/YMXR.S` alone and takes neither bytes nor rule
-with it. Step 1 takes one of the two costs its own section gives. Step
-6 takes the tune file's version. Together they read about 80 cycles off
-a call of about 1,970, and about 50 off the frame the budget binds.
+Step 1 takes one of the two costs its own section gives, and step 6 the
+tune file's version. Together they read about 76 cycles off a call of
+about 1,960, and about 50 off the frame the budget binds.
 
-Three are taken, each at the figure it was counted at: the frame on
-`a0` at 44 a frame, the advance called at its own address at 24, and
-one branch over a run of effects at 19 as the mean of the ten, 30 where
-a tune runs no effect and 10 where it runs two. performance.md holds
-what a call costs with them in.
+Four are taken, each at the figure it was counted at: the frame on `a0`
+at 44 a frame, the advance called at its own address at 24, one branch
+over a run of effects at 19 as the mean of the ten, and the skip merged
+into an effect's first read at 8 for each effect a tune runs, 7 as that
+mean. performance.md holds what a call costs with them in.
