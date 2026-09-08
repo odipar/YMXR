@@ -120,11 +120,9 @@ final class Sndh {
         if (names != null && names.size() != n) {
             throw new IllegalArgumentException(names.size() + " names for " + n + " subtunes");
         }
-        List<byte[]> bound = new ArrayList<>();
         int[] frames = new int[n];
         int rate = 0;
         int claimed = 0;
-        int state = 0;
         for (int i = 0; i < n; i++) {
             TuneFile tune;
             try {
@@ -143,13 +141,18 @@ final class Sndh {
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
-            byte[] b = Bound.of(tuneFiles.get(i));
+        }
+        // The tunes are bound as a set, so those that agree on what an
+        // image gives once share one and the reader's code stands once for
+        // them (DTX abi.md 1, doc/BINARIES.md 2).
+        Bound.Set set = Bound.of(tuneFiles);
+        int state = 0;
+        for (byte[] b : set.tunes()) {
             state = Math.max(state, Tune.getLong(b, Bound.STATE_AT));
-            bound.add(b);
         }
         byte[] tags = tags(options, rate, n, frames, claimed);
         int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
-        return combine(core, bound, tags, workspace);
+        return combine(core, set, tags, workspace);
     }
 
     /**
@@ -269,6 +272,19 @@ final class Sndh {
      * displacements are the header's bytes less 2.
      */
     static byte[] combine(byte[] core, List<byte[]> tunes, byte[] tags, int workspace) {
+        return combine(core, new Bound.Set(List.of(), tunes, new int[tunes.size()],
+                new int[tunes.size()]), tags, workspace);
+    }
+
+    /**
+     * The same, of a set whose tunes share their images: the images stand
+     * behind the subtune table and every bound tune's {@code IMAGE_AT} is
+     * patched to reach the one that holds its table, from its own first
+     * byte. A tune whose set has no image carries its own, as a bound tune
+     * written on its own does.
+     */
+    static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace) {
+        List<byte[]> tunes = set.tunes();
         int header = even(12 + tags.length);
         if (header - 2 > Short.MAX_VALUE) {
             throw new IllegalArgumentException("the tag block is " + tags.length
@@ -277,6 +293,15 @@ final class Sndh {
         int n = tunes.size();
         int tableAt = even(core.length);
         int at = tableAt + 2 + 4 * n;
+        // The images first, each on a long: the reader's code stands once a
+        // set of tunes that agree on what an image gives once (DTX abi.md
+        // 1), and every bound tune of that set reaches it.
+        int[] imageAt = new int[set.images().size()];
+        for (int i = 0; i < imageAt.length; i++) {
+            at = Tune.align(at);
+            imageAt[i] = at;
+            at += set.images().get(i).length;
+        }
         int[] offsets = new int[n];
         for (int i = 0; i < n; i++) {
             offsets[i] = at;
@@ -293,9 +318,19 @@ final class Sndh {
         Tune.putLong(file, header + CORE_TABLE_AT, tableAt);
         Tune.putLong(file, header + CORE_WORK_AT, workAt);
         Tune.putWord(file, header + tableAt, n);
+        for (int i = 0; i < imageAt.length; i++) {
+            System.arraycopy(set.images().get(i), 0, file, header + imageAt[i],
+                    set.images().get(i).length);
+        }
         for (int i = 0; i < n; i++) {
             Tune.putLong(file, header + tableAt + 2 + 4 * i, offsets[i]);
             System.arraycopy(tunes.get(i), 0, file, header + offsets[i], tunes.get(i).length);
+            if (imageAt.length > 0) {
+                // The bound tune reaches its image from its own first byte,
+                // and the images stand before it, so the reach is negative.
+                Tune.putLong(file, header + offsets[i] + Bound.IMAGE_AT,
+                        imageAt[set.image()[i]] - offsets[i]);
+            }
         }
         return file;
     }
@@ -434,19 +469,29 @@ final class Sndh {
                 + (options.composer() == null ? "" : ", COMM " + options.composer())
                 + (options.names() == null ? "" : ", !#SN with " + options.names().size()
                 + (options.names().size() == 1 ? " name" : " names")));
+        Bound.Set set = Bound.of(tunes);
         int bound = 0;
+        int images = 0;
+        for (byte[] image : set.images()) {
+            images += image.length;
+        }
         List<String> names = options.names();
         for (int i = 0; i < files.size(); i++) {
-            byte[] b = Bound.of(tunes.get(i));
+            byte[] b = set.tunes().get(i);
             bound += b.length;
             // A subtune is called what its name gives, where names are
             // given: a tool that packs into a file of its own naming has
             // the tune's name and not the file's.
             report.row(names == null ? stem(files.get(i)) : names.get(i),
-                    tunes.get(i).length + " bytes bound to " + b.length);
+                    tunes.get(i).length + " bytes bound to " + b.length + ", its table in "
+                    + "image " + (set.image()[i] + 1));
         }
-        report.say("the file: " + sndh.length + " bytes, the core " + core + ", the tunes "
-                + bound + ", the workspace and the rest " + (sndh.length - core - bound));
+        report.say("the images: " + set.images().size()
+                + (set.images().size() == 1 ? " image of " : " images of ") + images
+                + " bytes, DTX's reader once a set of tunes that share one");
+        report.say("the file: " + sndh.length + " bytes, the core " + core + ", the images "
+                + images + ", the tunes " + bound + ", the workspace and the rest "
+                + (sndh.length - core - images - bound));
     }
 
     /** A file's name up to its last dot. */

@@ -53,6 +53,7 @@ final class PlayerTest {
         assertEquals(Tune.COUNT_AT, e.get("TF_SOURCES"));
         assertEquals(Bound.STATE_AT, e.get("TF_STATE"));
         assertEquals(Bound.IMAGE_AT, e.get("TF_IMAGE"));
+        assertEquals(Bound.TABLE_AT, e.get("TF_TABLE"));
         assertEquals(Bound.INDEX_AT, e.get("TF_INDEX"));
         assertEquals(Bound.FORMAT_AT, e.get("IM_FORMAT"));
         assertEquals(Columns.EFFECT, 14);
@@ -111,8 +112,9 @@ final class PlayerTest {
         assertEquals(12, Tune.TABLE_AT);
         assertEquals(16, Tune.INDEX_AT);
         // the bound tune keeps the header to offset 12 and puts the state
-        // block's bytes and the image's place before the index
-        assertEquals(20, Bound.INDEX_AT);
+        // block's bytes, the image's place and this tune's table in it
+        // before the index
+        assertEquals(24, Bound.INDEX_AT);
     }
 
     @Test
