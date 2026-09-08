@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  *  16      2      the descriptor's version, 1
  *  18      2      the bound tune's version the core reads
  *  20      2      YMXR_FIXED, the workspace's bytes before the state block
- *  22      2      flags: bit 0 where the raster monitor is assembled in
+ *  22      2      flags: bit 0 the raster monitor, bit 1 the lean tick
  *  24      2      where the core's state byte is
  *  26      2      zero
  *  28      4      the subtune table's offset, patched here
@@ -80,8 +80,8 @@ final class Sndh {
 
     /** The tag block's text: the title, the composer where there is one,
      *  and a name a subtune where names are given; and the core the file
-     *  takes, the one with the raster monitor in where {@code monitor} is
-     *  set. */
+     *  takes, which {@code monitor} and {@code lean} select a switch
+     *  each. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
             boolean monitor, boolean lean) {
     }
@@ -90,9 +90,10 @@ final class Sndh {
     }
 
     /**
-     * The file, from the tune files as subtunes 1 up, around the core
-     * carried: the one with the raster monitor in where the options ask
-     * for it, the plain one where not.
+     * The file, from the tune files as subtunes 1 up, around the core the
+     * options' two switches select: the raster monitor in where they ask
+     * to read the run, the lean tick where they ask for it, both where
+     * they ask for both, and the plain core where neither.
      *
      * @throws IllegalArgumentException where a tune file is not one this
      *     reads, the bound tunes are not of the version the core reads,
@@ -100,8 +101,7 @@ final class Sndh {
      *     holds
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
-        return of(options.monitor() ? Binaries.monitorCore()
-                : options.lean() ? Binaries.leanCore() : Binaries.core(), tuneFiles, options);
+        return of(Binaries.core(options.monitor(), options.lean()), tuneFiles, options);
     }
 
     /** The same, around the core given. */
@@ -154,13 +154,15 @@ final class Sndh {
 
     /**
      * The core's descriptor held to what this writes, and its flags to
-     * the core asked for: the flags word gives whether the raster
-     * monitor is in, and the file the core was read from does not.
+     * the switches asked for: the flags word gives whether the raster
+     * monitor is in and whether the ticks are the lean ones, and the file
+     * the core was read from does not.
      *
      * @throws IllegalArgumentException where the core is not one, is of
      *     another descriptor version, reads bound tunes of another
-     *     version than {@link Bound} writes, or has no raster monitor in
-     *     where {@code monitor} asks for one
+     *     version than {@link Bound} writes, has no raster monitor in
+     *     where {@code monitor} asks for one, or its ticks are not the
+     *     lean ones where {@code lean} does
      */
     static void checkCore(byte[] core, boolean monitor, boolean lean) {
         if (core.length < CORE_DESCRIPTOR || !Arrays.equals(CORE_MAGIC,
@@ -334,14 +336,16 @@ final class Sndh {
 
     /**
      * {@code ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER]
-     * [-nNAME]... [-perf]}: the SNDH file of the tune files, as subtunes
-     * in the order named. The title is the output's stem unless one is
-     * given. Where any name is given, each tune past the names given is
-     * named by its file's stem; where none is, the file has no names.
+     * [-nNAME]... [-perf] [-lean]}: the SNDH file of the tune files, as
+     * subtunes in the order named. The title is the output's stem unless
+     * one is given. Where any name is given, each tune past the names
+     * given is named by its file's stem; where none is, the file has no
+     * names.
      * {@code -lean} puts the core whose ticks neither drop the interrupt
      * level nor write their own end of interrupt under the tunes, and
-     * {@code -perf} puts the core with the raster monitor in under the
-     * entries, for reading a run.
+     * {@code -perf} puts the core with the raster monitor in there, for
+     * reading a run. The two are one switch each, and both together take
+     * the core that is both, which reads what a lean run costs.
      */
     public static void main(String[] args) throws IOException {
         @Nullable String title = null;
@@ -409,8 +413,10 @@ final class Sndh {
 
     private static void usage() {
         System.err.println("ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER] [-nNAME]..."
-                + " [-perf]");
+                + " [-perf] [-lean]");
         System.err.println("  -perf  the core with the raster monitor in, for reading a run");
+        System.err.println("  -lean  the core whose ticks neither drop the interrupt level nor"
+                + " write their own end of interrupt");
         System.exit(2);
     }
 }

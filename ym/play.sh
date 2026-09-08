@@ -36,6 +36,9 @@
 #              nest inside another and that the MFP's vector register be
 #              the player's (performance.md, BINARIES.md)
 #
+# The two are a switch each: both together take the core that is both,
+# and the bars a run paints are then the lean ticks' own.
+#
 # The run:
 #
 #   -vN        stop after N frames; the tune plays on without it
@@ -62,6 +65,10 @@
 #
 #   ym/play.sh -lean tune.ymxr
 #       a tune file already packed, on the core whose ticks cost less
+#
+#   ym/play.sh -perf -lean -v300 tune.ym lean.wav
+#       the lean core read on the monitor, against the bars the same
+#       run paints without -lean
 #
 #   TOS=~/tos206.rom HATARI=~/bin/hatari ym/play.sh tune.ym
 #       another emulator, and another TOS image
