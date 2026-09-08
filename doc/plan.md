@@ -47,6 +47,73 @@ the rest a gate reads the bit and finds the group set.
 
 ---
 
+## A square's tick has no place to step
+
+A tick costs more than a play call. The rig counts both, and over the
+ten tunes a frame's ticks come to:
+
+| tune | ticks a frame | the ticks | the call |
+|---|---|---|---|
+| Synergy Credits | 29.4 | 5,373 | 2,362 |
+| DBA 2 | 24.8 | 4,538 | 1,975 |
+| DBA 5 | 20.2 | 3,697 | 2,063 |
+| Turrican - world 4-3 | 12.3 | 2,245 | 1,621 |
+| Turrican 2 - world completed 1 | 9.8 | 1,797 | 1,920 |
+| Digidrum preempt, built | 9.2 | 1,685 | 1,638 |
+| Retrigger retune, built | 7.7 | 1,404 | 1,506 |
+
+A tick of a square costs 183 cycles: 108 of its own instructions on the
+row it writes and 130 on the marker, 20 for the `rte`, and 44 for the
+68000 entering the interrupt. Of the 108, forty are the two chip writes
+the YM asks for, sixteen the end of interrupt the MFP asks for, sixteen
+the level dropped so a faster timer can nest, eight the marker test, and
+**twenty-eight stepping the place**.
+
+A square's source is two rows repeating: a level and a marker that reads
+as 0. The place tells one from the other and nothing else, and the loop
+cell puts it back every second tick. A handler for that source needs
+neither:
+
+| | cycles |
+|---|---|
+| `move.b #8,YM_SELECT.w` | 16 |
+| `move.b #$0F,YM_SELECT+2.w`, the value an immediate | 16 |
+| `eori.b #$0F,(the immediate).l`, the level toggling it | 24 |
+| `move.b #$DF,$FFFA0F.w` | 16 |
+| `rte` | 20 |
+| the 68000 entering | 44 |
+| | **136** |
+
+47 cycles a tick, a quarter, and every one of them off a tune that runs
+a square: 1,382 a frame on Synergy Credits, 1,166 on DBA 2, 949 on DBA
+5. That is more than the five steps above took from the call, and it
+takes it from the larger of the two.
+
+What it asks: a second handler, and a start that aims a square's timer
+at it rather than at the general one. The phase this format holds in the
+place (1.9) is the immediate's own value, 0 or the level, so a start
+that moves no place writes the new level only where the immediate is not
+0, and one that moves the place writes it either way. The general handler
+stands for drums and for any source of other than two rows.
+
+Whether the level is dropped in it, at 16 more a tick, is the same
+choice the general handler makes: it lets a faster timer nest.
+
+## What a sample's tick costs
+
+A digidrum's source is many rows played once, so its tick is the row
+path every time, 172 cycles, and its place must step. Of the 108 its
+instructions cost, 40 are the chip writes, 28 the step, 16 the end of
+interrupt, 16 the level dropped and 8 the marker test. Nothing but the
+16 is removable without a register the player does not have: reading and
+stepping through an address register, `move.b (a0)+,YM_SELECT+2.w`, is
+16 against the 52 the two absolute longs cost, but a library cannot hold
+four registers of its host's.
+
+A sample's timer is near its floor. A square's is not.
+
+---
+
 ## What was measured and left
 
 **Two bits in columns the specification states zero.** A bit read before
