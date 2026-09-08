@@ -202,7 +202,11 @@ only under a host that asks for a subtune by number.
 | `-h` | the options and examples, which the script's own head holds |
 
 `-k`, `-m` and `-r` are the converter's, and a tune file, which is
-packed already, takes none of them. `HATARI` and `TOS` name the emulator
+packed already, takes none of them. A set whose tunes do not share a unit
+takes an image a unit and pays for DTX's reader twice, which the report
+names; `-k1` on every dump takes one image and packs the tables smaller,
+at about a fifth of the play call, and experiments.md has what that came
+to on twenty tunes. `HATARI` and `TOS` name the emulator
 and a TOS image, as they do for the rigs.
 
 ## The rigs

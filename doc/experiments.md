@@ -132,6 +132,48 @@ table of one-byte values holds (R1.1).
 
 ---
 
+## One unit across a set of subtunes
+
+A set of subtunes shares an image with every other subtune that agrees on
+what an image gives once, the unit among them (BINARIES.md 1), and a tune
+whose row count or repeat row is odd packs at unit 1 though the flags ask
+for another. So a set as it comes takes two images, one a unit, and `-k1` on
+every dump takes one.
+
+Twenty tunes off the corpus, every ninth, converted both ways:
+
+| | images | the file |
+|---|---|---|
+| as they come | 2 | 150,816 |
+| every dump at `-k1` | 1 | 136,668 |
+
+14,148 bytes, 9.4 per cent. The image the set stops paying for is 1,492
+of that and the tables are the rest: unit 1 packs smaller, which twenty
+eight tunes the defaults pack at unit 2, spread across the corpus, read
+at 14.4 per cent, 155,748 bytes against 133,340. One tune of them, Union
+Demo - Megadist 2, packs 43.6 per cent smaller and another, Masterblazer
+6, 0.8.
+
+What it costs is the play call. Four of those tunes under Hatari, at unit
+2 and then at unit 1:
+
+| tune | on average | at most |
+|---|---|---|
+| 5th Gear 1 title | 1,410 to 1,669 | 3,484 to 4,244 |
+| A Prehistoric Tale 5 | 1,439 to 1,695 | 2,556 to 5,156 |
+| A Prehistoric Tale 14 | 1,468 to 1,726 | 4,080 to 4,424 |
+| Ancient Zone | 1,446 to 1,707 | 3,168 to 4,600 |
+
+About a fifth on the average call, against the seventh performance.md
+measures on Turrican - world 4-3, and the costliest frame moves further
+and less evenly: one of the four doubles. Twelve more of them at unit 1
+read 3,016 to 5,496 in their costliest frame, and R4.5 budgets 6,656.
+
+So the trade is a tenth of the file for a fifth of the call, and the
+frame the budget binds moves toward it. The image is 1,492 bytes of the
+14,148, so what a set gains by taking one unit is mostly what any tune
+gains by it, and `-k1` stays a flag rather than what a set does.
+
 ## What a square does when it starts
 
 A SID voice is a volume register moving between a level and 0 at a

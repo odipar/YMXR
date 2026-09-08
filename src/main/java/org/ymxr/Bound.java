@@ -65,7 +65,8 @@ final class Bound {
      * @param image which image each tune's table stands in
      * @param table where each tune's table stands in it
      */
-    record Set(List<byte[]> images, List<byte[]> tunes, int[] image, int[] table) {
+    record Set(List<byte[]> images, List<String> shapes, List<byte[]> tunes,
+            int[] image, int[] table) {
     }
 
     /** The set of tunes bound with as few images as the figures allow. */
@@ -105,19 +106,20 @@ final class Bound {
             tunes.add(head(tuneFiles.get(i), table[i],
                     Tune.getLong(images.get(image[i]), FORMAT_AT + FORMAT_STATE_AT)));
         }
-        return new Set(images, tunes, image, table);
+        return new Set(images, keys, tunes, image, table);
     }
 
-    /** What an image gives once, as a key two tables are grouped by: the
-     *  variant, the width, and under DTX2 the unit, the copies flag and
-     *  the ring (DTX abi.md 1). The period follows the ring and C, which
-     *  the schema fixes. */
+    /** What an image gives once, as a key two tables are grouped by and as
+     *  a reader of the report sees it: the variant, the width, and under
+     *  DTX2 the unit, the copies flag and the ring (DTX abi.md 1). The
+     *  period follows the ring and C, which the schema fixes. */
     private static String shape(byte[] dtx2) {
         Dtx.Header header = Dtx.header(dtx2);
         int payload = header.length();
-        return header.variant() + "/" + header.width() + "/"
-                + (dtx2[payload + 2] & 0xFF) + "/" + (dtx2[payload + 3] & 0xFF)
-                + "/" + Tune.getWord(dtx2, payload);
+        return "DTX" + header.variant() + " at unit " + (dtx2[payload + 2] & 0xFF)
+                + ", a ring of " + Tune.getWord(dtx2, payload)
+                + ", values of " + header.width()
+                + ((dtx2[payload + 3] & 1) != 0 ? ", with copies" : "");
     }
 
     /** A bound tune with no image in it: the header, the state block's
