@@ -772,6 +772,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             if cycles:
                 cycles._settle(None)
                 kind = "square" if model.square(i) else then
+                if bin(tune.effects).count("1") == 1:
+                    kind += " alone"        # init took the level's drop out
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
             ticks += 1
             assert taken(m.psg) == taken([want]), "frame %d: tick of effect %d wrote %s, not %s" % (f, i, m.psg, [want])
@@ -1085,7 +1087,11 @@ def main():
             for then, name in (("on", "a row written, the place stepped"),
                                ("loop", "the marker, the place to row `RR`"),
                                ("stop", "the marker, the timer stopped"),
-                               ("square", "a square's two rows, no place stepped")):
+                               ("square", "a square's two rows, no place stepped"),
+                               ("on alone", "a row written, the tune running one effect"),
+                               ("loop alone", "the marker to row `RR`, one effect"),
+                               ("stop alone", "the marker and the stop, one effect"),
+                               ("square alone", "a square's two rows, one effect")):
                 if then in tick_cost:
                     tick = re.search(r"^\| %s \| (\d+) \|$" % re.escape(name),
                                      open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
