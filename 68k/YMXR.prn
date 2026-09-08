@@ -1,0 +1,1888 @@
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 1       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+    1                                   ; YMXR.S - the player: a tune's rows to the YM2149 and the MFP, one row a
+    2                                   ; frame, and a source's rows to one register at a timer's rate.
+    3                                   ;
+    4                                   ; doc/SPEC.md is the contract: section 4 is YMXR_play and section 5 the
+    5                                   ; tick handlers. What this player takes is the bound tune of
+    6                                   ; doc/BINARIES.md: the tune file's tables, and no code, bound by a tool
+    7                                   ; with the image DTX packaged the table with. The player calls that
+    8                                   ; image's slots (DTX, doc/abi.md) and reads the row they give.
+    9                                   ;
+   10                                   ; The calls, by the jump table at the top of the binary:
+   11                                   ;
+   12                                   ;   YMXR_init   a0 the bound tune, on an even address; a1 the workspace,
+   13                                   ;               on a long. d0 is 0, or -1 for one this player does not
+   14                                   ;               read.
+   15                                   ;   YMXR_play   a0 the workspace. One row. d0 is 0, or -1 where the tune
+   16                                   ;               has played its last row and does not repeat: nothing is
+   17                                   ;               written then.
+   18                                   ;   YMXR_stop   a0 the workspace. The claimed timers stopped, disabled and
+   19                                   ;               masked; the three volumes silenced.
+   20                                   ;
+   21                                   ; Every call clobbers d0-d5 and a0-a5 and leaves d6, d7 and a6 as they
+   22                                   ; were. YMXR_play runs in supervisor mode, at any interrupt level: every
+   23                                   ; write of a select and a value is one movep, which no tick lands inside.
+   24                                   ;
+   25                                   ; A call writes the row the call before it took, and takes the next when
+   26                                   ; its writes are made: the row's writes then leave a host's clock at one
+   27                                   ; offset, where an advance before them would move by what the refill of
+   28                                   ; the row costs. Init takes the first row.
+   29                                   ;
+   30                                   ; The workspace is YMXR_FIXED bytes, then the state block the image's
+   31                                   ; format block asks for, which the bound tune states at offset 12
+   32                                   ; (BINARIES.md): a host allocates YMXR_FIXED plus that.
+   33                                   ;
+   34                                   ; The host owns the machine. This player saves and restores no vector, no
+   35                                   ; timer control and no interrupt enable: around init and stop a host keeps
+   36                                   ; what it needs of the vectors at $134, $120, $114 and $110, of TACR, TBCR
+   37                                   ; and both nibbles of TCDCR, and of bits 5 and 0 of IERA and IMRA and bits
+   38                                   ; 5 and 4 of IERB and IMRB. A timer an effect does not run is never
+   39                                   ; touched. The MFP is taken in software end-of-interrupt mode, as TOS
+   40                                   ; leaves it, and the vectors are the 68000's at zero.
+   41                                   ;
+   42                                   ; The player patches itself: the row's displacements and the branches
+   43                                   ; over the effects the tune does not run at init, and the tick handlers'
+   44                                   ; operands at every start. It runs from RAM, and one loaded copy serves
+   45                                   ; one workspace.
+   46                                   ;
+   47                                   ; YMXR_PERF equ 1 assembles the raster monitor in: the play call paints
+   48                                   ; the background red for as long as its work runs, one scanline to 512
+   49                                   ; cycles, and each tick handler paints its own colour where the beam
+   50                                   ; stands. A tick's band is a few hundred cycles wide and hard to read,
+   51                                   ; so each handler adds a count of what its own instructions cost, which
+   52                                   ; the next call burns off as a yellow bar after its own work, the
+   53                                   ; register writes among them: the bar shows what the handlers cost the
+   54                                   ; frame, and no chip write moves for the bar. What a tick costs beyond
+   55                                   ; its handler, the 44 cycles the 68000 spends entering an interrupt and
+   56                                   ; the 20 on the rte, stands where the tick landed and is not counted
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 2       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+   57                                   ; here. The call waits for the display to start before it paints, since
+   58                                   ; the VBL fires far above the screen and an unsynced bar lands in the
+   59                                   ; top border; the wait stands before the red mark, so it costs the
+   60                                   ; figures nothing. Each count is an estimate, in turns of ten cycles,
+   61                                   ; and the monitor is for reading a run: with the switch off, the
+   62                                   ; default, no byte and no cycle of it stands.
+   63                                   
+   64           =594D5842               YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
+   65           =00000001               YMXR_VERSION    equ     $0001           ; its version
+   66           =0000001E               YMXR_COLUMNS    equ     30
+   67           =00000012               YMXR_SITES      equ     18              ; the other read sites (ymxr_sites)
+   68                                   
+   69                                   ; The raster monitor, off unless the assembly defines it (rmac
+   70                                   ; -dYMXR_PERF=1).
+   71                                                   .if     ^^defined YMXR_PERF
+   72                                 -                 .else
+   73           =00000000               YMXR_PERF       equ     0
+   74                                                   .endif
+   75           =00001F40               PERF_SYNC       equ     8000            ; the wait's ceiling, over a frame
+   76                                                                           ; of turns, so a call from
+   77                                                                           ; anywhere runs on
+   78           =00000700               PERF_FRAME      equ     $700            ; the call's own work
+   79           =00000770               PERF_BAR        equ     $770            ; the timers' burnt bar
+   80           =FFFF8240               PERF_COLOUR     equ     $FFFF8240       ; the background
+   81           =FFFF8209               PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
+   82                                                                           ; byte, which moves while the chip
+   83                                                                           ; fetches pixels
+   84                                   ; What a tick of each kind is counted at, in turns of ten cycles, beside
+   85                                   ; what performance.md measures each at: a row written 108 cycles, the
+   86                                   ; marker with the place to row RR 130, the marker with the timer stopped
+   87                                   ; 116. Each count stands within a twentieth of its measurement, and
+   88                                   ; PlayerTest holds the three to the document's figures.
+   89           =0000000B               PERF_ON         equ     11
+   90           =0000000D               PERF_LOOP       equ     13
+   91           =0000000C               PERF_STOP       equ     12
+   92                                   
+   93                                   ; The bound tune (BINARIES.md).
+   94           =00000004               TF_VERSION      equ     4
+   95           =00000006               TF_RATE         equ     6
+   96           =00000008               TF_EFFECTS      equ     8
+   97           =00000009               TF_SOURCES      equ     9
+   98           =0000000C               TF_STATE        equ     12
+   99           =00000010               TF_IMAGE        equ     16
+  100           =00000014               TF_INDEX        equ     20
+  101                                   
+  102                                   ; The image's format block (DTX, abi.md 1), and its slots.
+  103           =00000010               IM_FORMAT       equ     16
+  104           =00000013               IM_VARIANT      equ     19
+  105           =00000000               IM_INIT         equ     0
+  106           =00000004               IM_METADATA     equ     4
+  107           =0000000C               IM_ADVANCE      equ     12
+  108                                   
+  109                                   ; A DTX1 table's header, and where a source's rows begin (DTX, SPEC.md 1).
+  110           =00000004               DT_ROWS         equ     4
+  111           =0000000A               DT_REPEAT       equ     10
+  112           =00000010               DT_PAYLOAD      equ     16
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 3       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  113                                   
+  114                                   ; The workspace.
+  115           =00000000               WS_TUNE         equ     0               ; the bound tune
+  116           =00000004               WS_IMAGE        equ     4               ; the image in it
+  117           =00000008               WS_ROWS         equ     8               ; rows to the last, or to the wrap
+  118           =0000000C               WS_R            equ     12
+  119           =00000010               WS_RR           equ     16
+  120           =00000014               WS_EFFECTS      equ     20              ; a byte: the effects the tune runs
+  121           =00000018               WS_FX           equ     24              ; four effects, FX_SIZE each
+  122           =00000000               FX_TARGET       equ     0               ; the target the player holds
+  123           =00000001               FX_SELECT       equ     1               ; the select it last took
+  124           =00000002               FX_COUNT        equ     2               ; the count it last took
+  125           =00000004               FX_FIRST        equ     4               ; the running source's first row
+  126           =00000008               FX_SIZE         equ     8
+  127           =00000038               WS_ROW          equ     56              ; the row the next call writes
+  128           =0000003C               YMXR_FIXED      equ     60
+  129           =0000003C               WS_STATE        equ     60              ; the image's state block, on a long
+  130                                   
+  131                                   ; The chip.
+  132           =FFFF8800               YM_SELECT       equ     $FFFF8800
+  133           =000000C0               YM_PORTS        equ     $C0             ; R7's port directions, the ST's
+  134                                   
+  135                                   ; The MFP: the timers by effect (SPEC.md 2.3).
+  136                                   ;                       control   data      vector  IER     bit  keep  shift
+  137                                   ; effect 0, Timer A     $FFFA19   $FFFA1F   $134    $FFFA07 5    $F0   0
+  138                                   ; effect 1, Timer D     $FFFA1D   $FFFA25   $110    $FFFA09 4    $F0   0
+  139                                   ; effect 2, Timer B     $FFFA1B   $FFFA21   $120    $FFFA07 0    $F0   0
+  140                                   ; effect 3, Timer C     $FFFA1D   $FFFA23   $114    $FFFA09 5    $0F   4
+  141                                   ; IER+4 is the pending register, IER+8 the in-service, IER+12 the mask.
+  142                                   
+  143                                   ; A tick handler's operands, patched at a start, stand at fixed offsets
+  144                                   ; into it; the equates are below the handlers, since the raster monitor's
+  145                                   ; marks stand between the three blocks a handler is made of and the
+  146                                   ; assembler measures the distances.
+  147                                   
+  148                                   ; ---------------------------------------------------------------- macros
+  149                                   
+  150                                   ; A column into d1, or into d2. The displacement is i strides, patched at
+  151                                   ; init: rmac would fold a zero away, so a placeholder stands here.
+  152                                                   .macro  READ    col
+  153                                 . c\{col}:
+  154                                 .                 move.b  $7FFF(a1),d1
+  155                                 .                 .endm
+  156                                   
+  157                                                   .macro  READ2   col
+  158                                 . c\{col}:
+  159                                 .                 move.b  $7FFF(a1),d2
+  160                                 .                 .endm
+  161                                   
+  162                                   ; A second read of a column, or a column ored into d1, at a site of its
+  163                                   ; own that init patches from the table of sites (ymxr_sites).
+  164                                                   .macro  QREAD   col
+  165                                 . q\{col}:
+  166                                 .                 move.b  $7FFF(a1),d1
+  167                                 .                 .endm
+  168                                   
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 4       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  169                                                   .macro  QOR     col
+  170                                 . q\{col}:
+  171                                 .                 or.b    $7FFF(a1),d1
+  172                                 .                 .endm
+  173                                   
+  174                                   ; A column that fills its byte, on the row where the column beside it is
+  175                                   ; 0: written where it is not 0, and nothing else to test.
+  176                                                   .macro  PLAIN   col,select
+  177                                 .                 QREAD   \col
+  178                                 .                 beq.s   .no\~
+  179                                 .                 move.w  #\select,d0
+  180                                 .                 move.b  d1,d0
+  181                                 .                 movep.w d0,(a2)
+  182                                 . .no\~:
+  183                                 .                 .endm
+  184                                   
+  185                                   ; A column with a set bit, to its register: the column read, and where
+  186                                   ; it is set the select put above it and one movep for the pair.
+  187                                                   .macro  WRITE   col,select
+  188                                 .                 READ    \col
+  189                                 .                 bpl.s   .no\~
+  190                                 .                 move.w  #\select,d0
+  191                                 .                 move.b  d1,d0
+  192                                 .                 movep.w d0,(a2)
+  193                                 . .no\~:
+  194                                 .                 .endm
+  195                                   
+  196                                   ; A column that fills its byte, reserving 0: written where it is not 0,
+  197                                   ; or where the bit beside it, in d2, says 0 is the value.
+  198                                                   .macro  RESERVED col,bit,select
+  199                                 .                 READ    \col
+  200                                 .                 bne.s   .go\~
+  201                                 .                 btst    #\bit,d2
+  202                                 .                 beq.s   .no\~
+  203                                 . .go\~:          move.w  #\select,d0
+  204                                 .                 move.b  d1,d0
+  205                                 .                 movep.w d0,(a2)
+  206                                 . .no\~:
+  207                                 .                 .endm
+  208                                   
+  209                                   ; A tone period: the coarse column into d2, for its bit 6 and its own
+  210                                   ; value, then the fine column against it.
+  211                                                   .macro  TONE    fine,coarse,fsel,csel
+  212                                 .                 READ2   \coarse
+  213                                 .                 READ    \fine
+  214                                 .                 bne.s   .go\~
+  215                                 .                 tst.b   d2                      ; a coarse column of 0 has no
+  216                                 .                 beq.s   .nc\~                   ; set bit and no bit beside
+  217                                 .                 btst    #6,d2
+  218                                 .                 beq.s   .nf\~
+  219                                 . .go\~:          move.w  #\fsel,d0
+  220                                 .                 move.b  d1,d0
+  221                                 .                 movep.w d0,(a2)
+  222                                 . .nf\~:          tst.b   d2
+  223                                 .                 bpl.s   .nc\~
+  224                                 .                 move.w  #\csel,d1
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 5       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  225                                 .                 move.b  d2,d1
+  226                                 .                 movep.w d1,(a2)
+  227                                 . .nc\~:
+  228                                 .                 .endm
+  229                                   
+  230                                   ; One effect: the target kept, the source started or stopped, the timer's
+  231                                   ; count and select written, with the timer's and the place's reset.
+  232                                                   .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick
+  233                                 . \{tick}_over:
+  234                                 .                 bra.w   \{tick}_done             ; two nops where the tune
+  235                                 .                 QREAD   \ct                     ; runs this effect (init)
+  236                                 .                 QOR     \cs                     ; the three set bits at once
+  237                                 .                 QOR     \cc
+  238                                 .                 bmi.s   \{tick}_some
+  239                                 .                 QREAD   \cn                     ; the count alone, or nothing
+  240                                 .                 beq.w   \{tick}_done
+  241                                 .                 move.b  d1,\data.w              ; the count, the timer running on
+  242                                 .                 move.b  d1,\fx+FX_COUNT(a6)
+  243                                 .                 bra.w   \{tick}_done
+  244                                 . \{tick}_some:
+  245                                 .                 READ2   \cc
+  246                                 .                 tst.b   d2                      ; the timer's reset stops the
+  247                                 .                 bpl.s   .kept\~                 ; timer before the source is
+  248                                 .                 btst    #6,d2                   ; switched, so no tick of the
+  249                                 .                 beq.s   .kept\~                 ; old rate takes the new
+  250                                 .                 andi.b  #\keep,\ctrl.w          ; source, and the tick latched
+  251                                 .                 bclr    #\bit,(\ier+4).w        ; before the stop is dropped
+  252                                 . .kept\~:
+  253                                 .                 READ    \ct
+  254                                 .                 bpl.s   .t\~
+  255                                 .                 and.b   #$7F,d1
+  256                                 .                 move.b  d1,\fx+FX_TARGET(a6)
+  257                                 . .t\~:           READ    \cs
+  258                                 .                 bpl.s   .rate\~
+  259                                 .                 and.w   #$7F,d1
+  260                                 .                 beq.s   .stop\~
+  261                                 . ; a start: the source's rows through the index, the handler aimed at them
+  262                                 .                 movea.l WS_TUNE(a6),a3
+  263                                 .                 lsl.w   #2,d1
+  264                                 .                 move.l  TF_INDEX-4(a3,d1.w),d0
+  265                                 .                 adda.l  d0,a3                   ; the source's DTX1 table
+  266                                 .                 lea     DT_PAYLOAD(a3),a4       ; its first row
+  267                                 .                 move.l  DT_REPEAT(a3),d0        ; the loop cell: row RR, or 0
+  268                                 .                 cmp.l   DT_ROWS(a3),d0          ; where the source plays once
+  269                                 .                 beq.s   .once\~
+  270                                 .                 add.l   a4,d0
+  271                                 .                 bra.s   .aim\~
+  272                                 . .once\~:        moveq   #0,d0
+  273                                 . ; the handler's three operands stand under one mask, since the timer may
+  274                                 . ; run: a tick between the target register and the place writes the old
+  275                                 . ; source's row to the new target, and one between the place and the loop
+  276                                 . ; cell takes the new place against the cell the old source left
+  277                                 . .aim\~:         lea     \tick(pc),a5
+  278                                 . ; The three behind level 7, so a tick takes none of them half made. The
+  279                                 . ; window is three writes wide and costs no measurable jitter: the ticks
+  280                                 . ; of a tune running one effect keep their period to 0.31 per cent with
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 6       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  281                                 . ; it and to 0.31 without, where the reference player's keep 0.33. The
+  282                                 . ; place the row does not reset is read in the window too, since a tick
+  283                                 . ; between the read and the write steps it (1.9).
+  284                                 .                 move.w  sr,-(sp)
+  285                                 .                 ori.w   #$0700,sr
+  286                                 .                 move.b  \fx+FX_TARGET(a6),TICK_SEL(a5)
+  287                                 .                 move.l  a4,d1                   ; the place: the first row,
+  288                                 .                 btst    #5,d2                   ; or the row it stands on in
+  289                                 .                 bne.s   .put\~                  ; the rows it replaces
+  290                                 .                 add.l   TICK_PTR(a5),d1
+  291                                 .                 sub.l   \fx+FX_FIRST(a6),d1
+  292                                 . .put\~:         move.l  d1,TICK_PTR(a5)
+  293                                 .                 move.l  d0,TICK_CELL(a5)
+  294                                 .                 move.w  (sp)+,sr
+  295                                 .                 move.l  a4,\fx+FX_FIRST(a6)
+  296                                 . ; the start placed the source, so the row's place reset is made: a tick
+  297                                 . ; before the select steps the place on, and the reset below would undo it
+  298                                 .                 bclr    #5,d2
+  299                                 .                 bra.s   .rate\~
+  300                                 . .stop\~:        andi.b  #\keep,\ctrl.w      ; select 0: the timer stops
+  301                                 .                 bclr    #\bit,(\ier+4).w    ; and drops its latched tick
+  302                                 . .rate\~:        READ    \cn
+  303                                 .                 tst.b   d2
+  304                                 .                 bpl.s   .live\~
+  305                                 .                 btst    #6,d2
+  306                                 .                 beq.s   .set\~
+  307                                 . ; the timer's reset: stopped above, the count, then the select
+  308                                 .                 tst.b   d1
+  309                                 .                 bne.s   .cnt\~
+  310                                 .                 move.b  \fx+FX_COUNT(a6),d1
+  311                                 . .cnt\~:         move.b  d1,\data.w
+  312                                 .                 move.b  d1,\fx+FX_COUNT(a6)
+  313                                 .                 bra.s   .sel\~
+  314                                 . .live\~:        tst.b   d1
+  315                                 .                 beq.s   .done\~
+  316                                 .                 move.b  d1,\data.w            ; the count, the timer running on
+  317                                 .                 move.b  d1,\fx+FX_COUNT(a6)
+  318                                 .                 bra.s   .done\~
+  319                                 . .set\~:         tst.b   d1
+  320                                 .                 beq.s   .sel\~
+  321                                 .                 move.b  d1,\data.w
+  322                                 .                 move.b  d1,\fx+FX_COUNT(a6)
+  323                                 . .sel\~:         move.b  d2,d1
+  324                                 .                 and.b   #7,d1
+  325                                 .                 move.b  d1,\fx+FX_SELECT(a6)
+  326                                 .                 .if     \shift
+  327                                 .                 lsl.b   #\shift,d1
+  328                                 .                 .endif
+  329                                 . ; the control register takes one write: a select written to a running
+  330                                 . ; timer neither stops nor reloads the running count (SPEC.md 1.9), and
+  331                                 . ; select 0 in front of the new select stops the timer and costs it the
+  332                                 . ; prescaler's partial count. Timer A's and Timer B's control register is
+  333                                 . ; the timer's own, so one move writes it and no interrupt can fall
+  334                                 . ; inside an instruction; Timers C and D share theirs, and only there
+  335                                 . ; does the read, the mask and the or run at level 7.
+  336                                 .                 .if     \shared
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 7       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  337                                 .                 move.w  sr,-(sp)
+  338                                 .                 ori.w   #$0700,sr
+  339                                 .                 move.b  \ctrl.w,d0
+  340                                 .                 and.b   #\keep,d0
+  341                                 .                 or.b    d1,d0
+  342                                 .                 move.b  d0,\ctrl.w
+  343                                 .                 move.w  (sp)+,sr
+  344                                 .                 .else
+  345                                 .                 move.b  d1,\ctrl.w
+  346                                 .                 .endif
+  347                                 .                 btst    #5,d2
+  348                                 .                 beq.s   .done\~
+  349                                 .                 lea     \tick(pc),a5          ; the place's reset
+  350                                 .                 move.l  \fx+FX_FIRST(a6),TICK_PTR(a5)
+  351                                 . .done\~:
+  352                                 . \{tick}_done:
+  353                                 .                 .endm
+  354                                   
+  355                                   ; The branch over an effect's columns made two nops where the tune runs
+  356                                   ; the effect.
+  357                                                   .macro  RUNS    i,over
+  358                                 .                 btst    #\i,WS_EFFECTS(a6)
+  359                                 .                 beq.s   .no\~
+  360                                 .                 lea     \over(pc),a3
+  361                                 .                 move.l  #$4E714E71,(a3)
+  362                                 . .no\~:
+  363                                 .                 .endm
+  364                                   
+  365                                   ; One timer claimed, where the tune runs its effect: stopped, aimed at
+  366                                   ; its handler, enabled and unmasked.
+  367                                                   .macro  CLAIM   i,ctrl,keep,vector,ier,bit,tick
+  368                                 .                 btst    #\i,WS_EFFECTS(a6)
+  369                                 .                 beq.s   .no\~
+  370                                 .                 andi.b  #\keep,\ctrl.w
+  371                                 .                 lea     \tick(pc),a3
+  372                                 .                 move.l  a3,\vector.w
+  373                                 .                 bclr    #\bit,(\ier+4).w
+  374                                 .                 bset    #\bit,\ier.w
+  375                                 .                 bset    #\bit,(\ier+12).w
+  376                                 . .no\~:
+  377                                 .                 .endm
+  378                                   
+  379                                   ; One timer handed back: stopped, disabled, masked, its pending dropped.
+  380                                                   .macro  RELEASE i,ctrl,keep,ier,bit
+  381                                 .                 btst    #\i,WS_EFFECTS(a6)
+  382                                 .                 beq.s   .no\~
+  383                                 .                 andi.b  #\keep,\ctrl.w
+  384                                 .                 bclr    #\bit,\ier.w
+  385                                 .                 bclr    #\bit,(\ier+12).w
+  386                                 .                 bclr    #\bit,(\ier+4).w
+  387                                 . .no\~:
+  388                                 .                 .endm
+  389                                   
+  390                                   ; The monitor's mark: the background kept on the stack and this handler's
+  391                                   ; colour written.
+  392                                                   .macro  MARK    colour
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 8       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  393                                 .                 .if     YMXR_PERF
+  394                                 .                 move.w  PERF_COLOUR.w,-(sp)
+  395                                 .                 move.w  #\colour,PERF_COLOUR.w
+  396                                 .                 .endif
+  397                                 .                 .endm
+  398                                   
+  399                                   ; The other end of a mark: this tick's estimated cost counted, in turns
+  400                                   ; of ten cycles, and the background put back. It stands after the write
+  401                                   ; the tick makes and before the end of interrupt, so a nested tick of a
+  402                                   ; higher timer marks and unmarks inside it.
+  403                                                   .macro  COUNT   turns
+  404                                 .                 .if     YMXR_PERF
+  405                                 .                 move.l  a0,-(sp)
+  406                                 .                 lea     ymxr_perf_acc(pc),a0
+  407                                 .                 add.w   #\turns,(a0)
+  408                                 .                 movea.l (sp)+,a0
+  409                                 .                 move.w  (sp)+,PERF_COLOUR.w
+  410                                 .                 .endif
+  411                                 .                 .endm
+  412                                   
+  413                                   ; A tick (SPEC.md 5): the place's row to the target, the place advanced;
+  414                                   ; on the marker, the place to row RR, or the timer stopped. No register
+  415                                   ; is used: the place is the write's own operand, stepped in place. The
+  416                                   ; interrupt level drops once the select and the value are written, so a
+  417                                   ; higher timer may nest, and the in-service bit is cleared by hand, as
+  418                                   ; software end-of-interrupt mode asks.
+  419                                                   .macro  TICK    name,eoi,eoir,ctrl,keep,colour
+  420                                 . \name:
+  421                                 .                 MARK    \colour
+  422                                 . \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
+  423                                 .                 move.b  ($12345678).l,YM_SELECT+2.w ; +8: the place
+  424                                 .                 bmi.s   .last\~
+  425                                 .                 move.w  #$2500,sr
+  426                                 .                 addq.l  #1,($12345678).l        ; +22: the place, stepped
+  427                                 .                 COUNT   PERF_ON
+  428                                 .                 move.b  #\eoi,\eoir.w
+  429                                 .                 rte
+  430                                 . .last\~:
+  431                                 . \{name}_mark:   tst.l   ($12345678).l           ; +2: the loop cell
+  432                                 .                 beq.s   .stop\~
+  433                                 .                 move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
+  434                                 .                 COUNT   PERF_LOOP
+  435                                 .                 move.b  #\eoi,\eoir.w
+  436                                 .                 rte
+  437                                 . .stop\~:        andi.b  #\keep,\ctrl.w
+  438                                 .                 COUNT   PERF_STOP
+  439                                 .                 move.b  #\eoi,\eoir.w
+  440                                 .                 rte
+  441                                 . \{name}_cell:   dc.l    0                       ; the loop cell
+  442                                 .                 .endm
+  443                                   
+  444                                   ; ---------------------------------------------------------------- calls
+  445                                   
+  446  00000000  6000xxxx                               bra.w   YMXR_init
+  447  00000004  6000xxxx                               bra.w   YMXR_play
+  448  00000008  6000xxxx                               bra.w   YMXR_stop
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 9       11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  449                                   
+  450                                   YMXR_init:
+  451  0000000C  0C90594D5842                           cmp.l   #YMXR_MAGIC,(a0)
+  452  00000012  6600xxxx                               bne     .bad
+  453  00000016  0C6800010004                           cmp.w   #YMXR_VERSION,TF_VERSION(a0)
+  454  0000001C  6600xxxx                               bne     .bad
+  455  00000020  2F0E                                   move.l  a6,-(sp)
+  456  00000022  2C49                                   movea.l a1,a6
+  457  00000024  2D480000                               move.l  a0,WS_TUNE(a6)
+  458  00000028  2448                                   movea.l a0,a2
+  459  0000002A  D5E80010                               adda.l  TF_IMAGE(a0),a2
+  460  0000002E  2D4A0004                               move.l  a2,WS_IMAGE(a6)
+  461  00000032  1D6800080014                           move.b  TF_EFFECTS(a0),WS_EFFECTS(a6)
+  462  00000038  0C2A00020013                           cmp.b   #2,IM_VARIANT(a2)       ; a DTX2 image: its rows come
+  463  0000003E  6600xxxx                               bne     .bad6                   ; round on their own
+  464  00000042  41EE003C                               lea     WS_STATE(a6),a0
+  465  00000046  4EAA0000                               jsr     IM_INIT(a2)
+  466  0000004A  246E0004                               movea.l WS_IMAGE(a6),a2
+  467  0000004E  4EAA0004                               jsr     IM_METADATA(a2)         ; d0 R, d2 RR, d3 the stride
+  468  00000052  2D40000C                               move.l  d0,WS_R(a6)
+  469  00000056  2D400008                               move.l  d0,WS_ROWS(a6)
+  470  0000005A  2D420010                               move.l  d2,WS_RR(a6)
+  471                                   
+  472                                   ; The row's columns stand a stride apart (DTX, abi.md 2): column i's read
+  473                                   ; takes i strides as its displacement.
+  474  0000005E  47FAxxxx                               lea     ymxr_reads(pc),a3
+  475  00000062  49FAxxxx                               lea     ymxr_frame(pc),a4
+  476  00000066  7200                                   moveq   #0,d1
+  477  00000068  741D                                   moveq   #YMXR_COLUMNS-1,d2
+  478  0000006A  381B                   .patch:         move.w  (a3)+,d4
+  479  0000006C  39814000                               move.w  d1,(a4,d4.w)
+  480  00000070  D243                                   add.w   d3,d1
+  481  00000072  51CAFFF6                               dbra    d2,.patch
+  482  00000076  47FAxxxx                               lea     ymxr_sites(pc),a3
+  483  0000007A  7411                                   moveq   #YMXR_SITES-1,d2
+  484  0000007C  381B                   .site:          move.w  (a3)+,d4
+  485  0000007E  301B                                   move.w  (a3)+,d0
+  486  00000080  C0C3                                   mulu.w  d3,d0
+  487  00000082  39804000                               move.w  d0,(a4,d4.w)
+  488  00000086  51CAFFF4                               dbra    d2,.site
+  489                                   
+  490                                   ; The tick handlers: each one's step and loop operands name its own
+  491                                   ; cells, and its place is parked on a marker until a start.
+  492  0000008A  4BFAxxxx                               lea     ymxr_tick0(pc),a5
+  493  0000008E  6100xxxx                               bsr     ymxr_link
+  494  00000092  4BFAxxxx                               lea     ymxr_tick1(pc),a5
+  495  00000096  6100xxxx                               bsr     ymxr_link
+  496  0000009A  4BFAxxxx                               lea     ymxr_tick2(pc),a5
+  497  0000009E  6100xxxx                               bsr     ymxr_link
+  498  000000A2  4BFAxxxx                               lea     ymxr_tick3(pc),a5
+  499  000000A6  6100xxxx                               bsr     ymxr_link
+  500                                   
+  501                                   ; The effects' records: nothing held yet.
+  502  000000AA  41EE0018                               lea     WS_FX(a6),a0
+  503  000000AE  7007                                   moveq   #7,d0
+  504  000000B0  4298                   .clear:         clr.l   (a0)+
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 10      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  505  000000B2  51C8FFFC                               dbra    d0,.clear
+  506                                   
+  507                                   ; The effects the tune runs are read every row; the others are jumped
+  508                                   ; over, the branch at each macro's head standing where the tune does not
+  509                                   ; run its effect.
+                                                        RUNS    0,ymxr_tick0_over
+       000000B6  082E00000014         @                 btst    #$0,WS_EFFECTS(a6)
+       000000BC  67xx                 @                 beq.s   .noM0
+       000000BE  47FAxxxx             @                 lea     ymxr_tick0_over(pc),a3
+       000000C2  26BC4E714E71         @                 move.l  #$4E714E71,(a3)
+  510                                 @ .noM0:
+                                                        RUNS    1,ymxr_tick1_over
+       000000C8  082E00010014         @                 btst    #$1,WS_EFFECTS(a6)
+       000000CE  67xx                 @                 beq.s   .noM1
+       000000D0  47FAxxxx             @                 lea     ymxr_tick1_over(pc),a3
+       000000D4  26BC4E714E71         @                 move.l  #$4E714E71,(a3)
+  511                                 @ .noM1:
+                                                        RUNS    2,ymxr_tick2_over
+       000000DA  082E00020014         @                 btst    #$2,WS_EFFECTS(a6)
+       000000E0  67xx                 @                 beq.s   .noM2
+       000000E2  47FAxxxx             @                 lea     ymxr_tick2_over(pc),a3
+       000000E6  26BC4E714E71         @                 move.l  #$4E714E71,(a3)
+  512                                 @ .noM2:
+                                                        RUNS    3,ymxr_tick3_over
+       000000EC  082E00030014         @                 btst    #$3,WS_EFFECTS(a6)
+       000000F2  67xx                 @                 beq.s   .noM3
+       000000F4  47FAxxxx             @                 lea     ymxr_tick3_over(pc),a3
+       000000F8  26BC4E714E71         @                 move.l  #$4E714E71,(a3)
+  513                                 @ .noM3:
+  514                                   
+  515                                   ; The first row, taken here so that a call writes a row it already has
+  516                                   ; (SPEC.md 4): the writes then leave a host's clock at one offset,
+  517                                   ; whatever the advance for the next row costs.
+  518  000000FE  41EE003C                               lea     WS_STATE(a6),a0
+  519  00000102  246E0004                               movea.l WS_IMAGE(a6),a2
+  520  00000106  4EAA000C                               jsr     IM_ADVANCE(a2)          ; a1 the row
+  521  0000010A  2D490038                               move.l  a1,WS_ROW(a6)
+  522                                   
+  523                                   ; The timers the tune runs, claimed. The others stand as they are.
+  524  0000010E  40E7                                   move.w  sr,-(sp)
+  525  00000110  007C0700                               ori.w   #$0700,sr
+                                                        CLAIM   0,$FFFFFA19,$F0,$134,$FFFFFA07,5,ymxr_tick0
+       00000114  082E00000014         @                 btst    #$0,WS_EFFECTS(a6)
+       0000011A  67xx                 @                 beq.s   .noM4
+       0000011C  023800F0FA19         @                 andi.b  #$F0,$FFFFFA19.w
+       00000122  47FAxxxx             @                 lea     ymxr_tick0(pc),a3
+       00000126  21CB0134             @                 move.l  a3,$134.w
+       0000012A  08B80005FA0B         @                 bclr    #$5,($FFFFFA07+4).w
+       00000130  08F80005FA07         @                 bset    #$5,$FFFFFA07.w
+       00000136  08F80005FA13         @                 bset    #$5,($FFFFFA07+12).w
+  526                                 @ .noM4:
+                                                        CLAIM   1,$FFFFFA1D,$F0,$110,$FFFFFA09,4,ymxr_tick1
+       0000013C  082E00010014         @                 btst    #$1,WS_EFFECTS(a6)
+       00000142  67xx                 @                 beq.s   .noM5
+       00000144  023800F0FA1D         @                 andi.b  #$F0,$FFFFFA1D.w
+       0000014A  47FAxxxx             @                 lea     ymxr_tick1(pc),a3
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 11      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+       0000014E  21CB0110             @                 move.l  a3,$110.w
+       00000152  08B80004FA0D         @                 bclr    #$4,($FFFFFA09+4).w
+       00000158  08F80004FA09         @                 bset    #$4,$FFFFFA09.w
+       0000015E  08F80004FA15         @                 bset    #$4,($FFFFFA09+12).w
+  527                                 @ .noM5:
+                                                        CLAIM   2,$FFFFFA1B,$F0,$120,$FFFFFA07,0,ymxr_tick2
+       00000164  082E00020014         @                 btst    #$2,WS_EFFECTS(a6)
+       0000016A  67xx                 @                 beq.s   .noM6
+       0000016C  023800F0FA1B         @                 andi.b  #$F0,$FFFFFA1B.w
+       00000172  47FAxxxx             @                 lea     ymxr_tick2(pc),a3
+       00000176  21CB0120             @                 move.l  a3,$120.w
+       0000017A  08B80000FA0B         @                 bclr    #$0,($FFFFFA07+4).w
+       00000180  08F80000FA07         @                 bset    #$0,$FFFFFA07.w
+       00000186  08F80000FA13         @                 bset    #$0,($FFFFFA07+12).w
+  528                                 @ .noM6:
+                                                        CLAIM   3,$FFFFFA1D,$0F,$114,$FFFFFA09,5,ymxr_tick3
+       0000018C  082E00030014         @                 btst    #$3,WS_EFFECTS(a6)
+       00000192  67xx                 @                 beq.s   .noM7
+       00000194  0238000FFA1D         @                 andi.b  #$F,$FFFFFA1D.w
+       0000019A  47FAxxxx             @                 lea     ymxr_tick3(pc),a3
+       0000019E  21CB0114             @                 move.l  a3,$114.w
+       000001A2  08B80005FA0D         @                 bclr    #$5,($FFFFFA09+4).w
+       000001A8  08F80005FA09         @                 bset    #$5,$FFFFFA09.w
+       000001AE  08F80005FA15         @                 bset    #$5,($FFFFFA09+12).w
+  529                                 @ .noM7:
+  530  000001B4  46DF                                   move.w  (sp)+,sr
+  531  000001B6  2C5F                                   movea.l (sp)+,a6
+  532  000001B8  7000                                   moveq   #0,d0
+  533  000001BA  4E75                                   rts
+  534  000001BC  2C5F                   .bad6:          movea.l (sp)+,a6
+  535  000001BE  70FF                   .bad:           moveq   #-1,d0
+  536  000001C0  4E75                                   rts
+  537                                   
+  538                                   ; a5 a tick handler: its operands linked, its place parked.
+  539                                   ymxr_link:
+  540  000001C2  47EDxxxx                               lea     TICK_PTR(a5),a3
+  541  000001C6  2B4Bxxxx                               move.l  a3,TICK_STEP(a5)
+  542  000001CA  2B4Bxxxx                               move.l  a3,TICK_LOOPW(a5)
+  543  000001CE  47EDxxxx                               lea     TICK_CELL(a5),a3
+  544  000001D2  2B4Bxxxx                               move.l  a3,TICK_LOOPT(a5)
+  545  000001D6  2B4Bxxxx                               move.l  a3,TICK_LOOPR(a5)
+  546  000001DA  42ADxxxx                               clr.l   TICK_CELL(a5)
+  547  000001DE  47FAxxxx                               lea     ymxr_park(pc),a3
+  548  000001E2  2B4Bxxxx                               move.l  a3,TICK_PTR(a5)
+  549  000001E6  4E75                                   rts
+  550                                   
+  551                                   YMXR_stop:
+  552  000001E8  2F0E                                   move.l  a6,-(sp)
+  553  000001EA  2C48                                   movea.l a0,a6
+  554  000001EC  40E7                                   move.w  sr,-(sp)
+  555  000001EE  007C0700                               ori.w   #$0700,sr
+                                                        RELEASE 0,$FFFFFA19,$F0,$FFFFFA07,5
+       000001F2  082E00000014         @                 btst    #$0,WS_EFFECTS(a6)
+       000001F8  67xx                 @                 beq.s   .noM8
+       000001FA  023800F0FA19         @                 andi.b  #$F0,$FFFFFA19.w
+       00000200  08B80005FA07         @                 bclr    #$5,$FFFFFA07.w
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 12      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+       00000206  08B80005FA13         @                 bclr    #$5,($FFFFFA07+12).w
+       0000020C  08B80005FA0B         @                 bclr    #$5,($FFFFFA07+4).w
+  556                                 @ .noM8:
+                                                        RELEASE 1,$FFFFFA1D,$F0,$FFFFFA09,4
+       00000212  082E00010014         @                 btst    #$1,WS_EFFECTS(a6)
+       00000218  67xx                 @                 beq.s   .noM9
+       0000021A  023800F0FA1D         @                 andi.b  #$F0,$FFFFFA1D.w
+       00000220  08B80004FA09         @                 bclr    #$4,$FFFFFA09.w
+       00000226  08B80004FA15         @                 bclr    #$4,($FFFFFA09+12).w
+       0000022C  08B80004FA0D         @                 bclr    #$4,($FFFFFA09+4).w
+  557                                 @ .noM9:
+                                                        RELEASE 2,$FFFFFA1B,$F0,$FFFFFA07,0
+       00000232  082E00020014         @                 btst    #$2,WS_EFFECTS(a6)
+       00000238  67xx                 @                 beq.s   .noM10
+       0000023A  023800F0FA1B         @                 andi.b  #$F0,$FFFFFA1B.w
+       00000240  08B80000FA07         @                 bclr    #$0,$FFFFFA07.w
+       00000246  08B80000FA13         @                 bclr    #$0,($FFFFFA07+12).w
+       0000024C  08B80000FA0B         @                 bclr    #$0,($FFFFFA07+4).w
+  558                                 @ .noM10:
+                                                        RELEASE 3,$FFFFFA1D,$0F,$FFFFFA09,5
+       00000252  082E00030014         @                 btst    #$3,WS_EFFECTS(a6)
+       00000258  67xx                 @                 beq.s   .noM11
+       0000025A  0238000FFA1D         @                 andi.b  #$F,$FFFFFA1D.w
+       00000260  08B80005FA09         @                 bclr    #$5,$FFFFFA09.w
+       00000266  08B80005FA15         @                 bclr    #$5,($FFFFFA09+12).w
+       0000026C  08B80005FA0D         @                 bclr    #$5,($FFFFFA09+4).w
+  559                                 @ .noM11:
+  560  00000272  46DF                                   move.w  (sp)+,sr
+  561  00000274  21FC080000008800                       move.l  #$08000000,YM_SELECT.w
+  562  0000027C  21FC090000008800                       move.l  #$09000000,YM_SELECT.w
+  563  00000284  21FC0A0000008800                       move.l  #$0A000000,YM_SELECT.w
+  564  0000028C  2C5F                                   movea.l (sp)+,a6
+  565  0000028E  4E75                                   rts
+  566                                   
+  567                                   YMXR_play:
+  568  00000290  2F0E                                   move.l  a6,-(sp)
+  569  00000292  2C48                                   movea.l a0,a6
+  570  00000294  4AAE0008                               tst.l   WS_ROWS(a6)
+  571  00000298  6700xxxx                               beq     ymxr_over
+  572                                                   .if     YMXR_PERF
+  573                                 -                 move.w  PERF_COLOUR.w,-(sp)     ; the background, kept
+  574                                 -                 move.b  PERF_BEAM.w,d0          ; before a tick can paint
+  575                                 -                 move.w  #PERF_SYNC,d1           ; over it; then the wait for
+  576                                 - .beam:          cmp.b   PERF_BEAM.w,d0          ; the display, which the
+  577                                 -                 dbne    d1,.beam                ; counter marks by moving,
+  578                                 -                                                 ; and the ceiling ends where
+  579                                 -                                                 ; the counter stands still
+  580                                 -                 move.w  #PERF_FRAME,PERF_COLOUR.w
+  581                                 -                 .endif
+  582  0000029C  226E0038                               movea.l WS_ROW(a6),a1           ; the row this call writes,
+  583  000002A0  45F88800                               lea     YM_SELECT.w,a2          ; taken by the call before it
+  584                                   
+  585                                   ; ---------------------------------------------------------------- frame
+  586                                   
+  587                                   ; The frame procedure (SPEC.md 4), inline in the call: a1 the row, a2 the
+  588                                   ; chip's select register, a6 the workspace.
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 13      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  589                                   ymxr_frame:
+  590                                   ; 1 to 3: the effects, each its four columns.
+                                                        EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0
+                                      @ ymxr_tick0_over:
+       000002A4  6000xxxx             @                 bra.w   ymxr_tick0_done             
+                                      @                 QREAD   _14                     
+                                      @ q_14:
+       000002A8  12297FFF             @                 move.b  $7FFF(a1),d1
+                                      @                 QOR     _15                     
+                                      @ q_15:
+       000002AC  82297FFF             @                 or.b    $7FFF(a1),d1
+                                      @                 QOR     _16
+                                      @ q_16:
+       000002B0  82297FFF             @                 or.b    $7FFF(a1),d1
+       000002B4  6Bxx                 @                 bmi.s   ymxr_tick0_some
+                                      @                 QREAD   _17                     
+                                      @ q_17:
+       000002B6  12297FFF             @                 move.b  $7FFF(a1),d1
+       000002BA  6700xxxx             @                 beq.w   ymxr_tick0_done
+       000002BE  11C1FA1F             @                 move.b  d1,$FFFFFA1F.w              
+       000002C2  1D41001A             @                 move.b  d1,WS_FX+FX_COUNT(a6)
+       000002C6  6000xxxx             @                 bra.w   ymxr_tick0_done
+                                      @ ymxr_tick0_some:
+                                      @                 READ2   _16
+                                      @ c_16:
+       000002CA  14297FFF             @                 move.b  $7FFF(a1),d2
+       000002CE  4A02                 @                 tst.b   d2                      
+       000002D0  6Axx                 @                 bpl.s   .keptM12                 
+       000002D2  08020006             @                 btst    #6,d2                   
+       000002D6  67xx                 @                 beq.s   .keptM12                 
+       000002D8  023800F0FA19         @                 andi.b  #$F0,$FFFFFA19.w          
+       000002DE  08B80005FA0B         @                 bclr    #$5,($FFFFFA07+4).w        
+                                      @ .keptM12:
+                                      @                 READ    _14
+                                      @ c_14:
+       000002E4  12297FFF             @                 move.b  $7FFF(a1),d1
+       000002E8  6Axx                 @                 bpl.s   .tM12
+       000002EA  C23C007F             @                 and.b   #$7F,d1
+       000002EE  1D410018             @                 move.b  d1,WS_FX+FX_TARGET(a6)
+                                      @ .tM12:           READ    _15
+                                      @ c_15:
+       000002F2  12297FFF             @                 move.b  $7FFF(a1),d1
+       000002F6  6Axx                 @                 bpl.s   .rateM12
+       000002F8  C27C007F             @                 and.w   #$7F,d1
+       000002FC  67xx                 @                 beq.s   .stopM12
+                                      @ 
+       000002FE  266E0000             @                 movea.l WS_TUNE(a6),a3
+       00000302  E549                 @                 lsl.w   #2,d1
+       00000304  20331010             @                 move.l  TF_INDEX-4(a3,d1.w),d0
+       00000308  D7C0                 @                 adda.l  d0,a3                   
+       0000030A  49EB0010             @                 lea     DT_PAYLOAD(a3),a4       
+       0000030E  202B000A             @                 move.l  DT_REPEAT(a3),d0        
+       00000312  B0AB0004             @                 cmp.l   DT_ROWS(a3),d0          
+       00000316  67xx                 @                 beq.s   .onceM12
+       00000318  D08C                 @                 add.l   a4,d0
+       0000031A  60xx                 @                 bra.s   .aimM12
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 14      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+       0000031C  7000                 @ .onceM12:        moveq   #0,d0
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       0000031E  4BFAxxxx             @ .aimM12:         lea     ymxr_tick0(pc),a5
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       00000322  40E7                 @                 move.w  sr,-(sp)
+       00000324  007C0700             @                 ori.w   #$0700,sr
+       00000328  1B6E0018xxxx         @                 move.b  WS_FX+FX_TARGET(a6),TICK_SEL(a5)
+       0000032E  220C                 @                 move.l  a4,d1                   
+       00000330  08020005             @                 btst    #5,d2                   
+       00000334  66xx                 @                 bne.s   .putM12                  
+       00000336  D2ADxxxx             @                 add.l   TICK_PTR(a5),d1
+       0000033A  92AE001C             @                 sub.l   WS_FX+FX_FIRST(a6),d1
+       0000033E  2B41xxxx             @ .putM12:         move.l  d1,TICK_PTR(a5)
+       00000342  2B40xxxx             @                 move.l  d0,TICK_CELL(a5)
+       00000346  46DF                 @                 move.w  (sp)+,sr
+       00000348  2D4C001C             @                 move.l  a4,WS_FX+FX_FIRST(a6)
+                                      @ 
+                                      @ 
+       0000034C  08820005             @                 bclr    #5,d2
+       00000350  60xx                 @                 bra.s   .rateM12
+       00000352  023800F0FA19         @ .stopM12:        andi.b  #$F0,$FFFFFA19.w      
+       00000358  08B80005FA0B         @                 bclr    #$5,($FFFFFA07+4).w    
+                                      @ .rateM12:        READ    _17
+                                      @ c_17:
+       0000035E  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000362  4A02                 @                 tst.b   d2
+       00000364  6Axx                 @                 bpl.s   .liveM12
+       00000366  08020006             @                 btst    #6,d2
+       0000036A  67xx                 @                 beq.s   .setM12
+                                      @ 
+       0000036C  4A01                 @                 tst.b   d1
+       0000036E  66xx                 @                 bne.s   .cntM12
+       00000370  122E001A             @                 move.b  WS_FX+FX_COUNT(a6),d1
+       00000374  11C1FA1F             @ .cntM12:         move.b  d1,$FFFFFA1F.w
+       00000378  1D41001A             @                 move.b  d1,WS_FX+FX_COUNT(a6)
+       0000037C  60xx                 @                 bra.s   .selM12
+       0000037E  4A01                 @ .liveM12:        tst.b   d1
+       00000380  67xx                 @                 beq.s   .doneM12
+       00000382  11C1FA1F             @                 move.b  d1,$FFFFFA1F.w            
+       00000386  1D41001A             @                 move.b  d1,WS_FX+FX_COUNT(a6)
+       0000038A  60xx                 @                 bra.s   .doneM12
+       0000038C  4A01                 @ .setM12:         tst.b   d1
+       0000038E  67xx                 @                 beq.s   .selM12
+       00000390  11C1FA1F             @                 move.b  d1,$FFFFFA1F.w
+       00000394  1D41001A             @                 move.b  d1,WS_FX+FX_COUNT(a6)
+       00000398  1202                 @ .selM12:         move.b  d2,d1
+       0000039A  C23C0007             @                 and.b   #7,d1
+       0000039E  1D410019             @                 move.b  d1,WS_FX+FX_SELECT(a6)
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 15      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      @                 .if     $0
+                                      -                 lsl.b   #$0,d1
+                                      -                 .endif
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @                 .if     $0
+                                      -                 move.w  sr,-(sp)
+                                      -                 ori.w   #$0700,sr
+                                      -                 move.b  $FFFFFA19.w,d0
+                                      -                 and.b   #$F0,d0
+                                      -                 or.b    d1,d0
+                                      -                 move.b  d0,$FFFFFA19.w
+                                      -                 move.w  (sp)+,sr
+                                      -                 .else
+       000003A2  11C1FA19             @                 move.b  d1,$FFFFFA19.w
+                                      @                 .endif
+       000003A6  08020005             @                 btst    #5,d2
+       000003AA  67xx                 @                 beq.s   .doneM12
+       000003AC  4BFAxxxx             @                 lea     ymxr_tick0(pc),a5          
+       000003B0  2B6E001Cxxxx         @                 move.l  WS_FX+FX_FIRST(a6),TICK_PTR(a5)
+                                      @ .doneM12:
+  591                                 @ ymxr_tick0_done:
+                                                        EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1
+                                      @ ymxr_tick1_over:
+       000003B6  6000xxxx             @                 bra.w   ymxr_tick1_done             
+                                      @                 QREAD   _18                     
+                                      @ q_18:
+       000003BA  12297FFF             @                 move.b  $7FFF(a1),d1
+                                      @                 QOR     _19                     
+                                      @ q_19:
+       000003BE  82297FFF             @                 or.b    $7FFF(a1),d1
+                                      @                 QOR     _20
+                                      @ q_20:
+       000003C2  82297FFF             @                 or.b    $7FFF(a1),d1
+       000003C6  6Bxx                 @                 bmi.s   ymxr_tick1_some
+                                      @                 QREAD   _21                     
+                                      @ q_21:
+       000003C8  12297FFF             @                 move.b  $7FFF(a1),d1
+       000003CC  6700xxxx             @                 beq.w   ymxr_tick1_done
+       000003D0  11C1FA25             @                 move.b  d1,$FFFFFA25.w              
+       000003D4  1D410022             @                 move.b  d1,WS_FX+$8+FX_COUNT(a6)
+       000003D8  6000xxxx             @                 bra.w   ymxr_tick1_done
+                                      @ ymxr_tick1_some:
+                                      @                 READ2   _20
+                                      @ c_20:
+       000003DC  14297FFF             @                 move.b  $7FFF(a1),d2
+       000003E0  4A02                 @                 tst.b   d2                      
+       000003E2  6Axx                 @                 bpl.s   .keptM21                 
+       000003E4  08020006             @                 btst    #6,d2                   
+       000003E8  67xx                 @                 beq.s   .keptM21                 
+       000003EA  023800F0FA1D         @                 andi.b  #$F0,$FFFFFA1D.w          
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 16      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+       000003F0  08B80004FA0D         @                 bclr    #$4,($FFFFFA09+4).w        
+                                      @ .keptM21:
+                                      @                 READ    _18
+                                      @ c_18:
+       000003F6  12297FFF             @                 move.b  $7FFF(a1),d1
+       000003FA  6Axx                 @                 bpl.s   .tM21
+       000003FC  C23C007F             @                 and.b   #$7F,d1
+       00000400  1D410020             @                 move.b  d1,WS_FX+$8+FX_TARGET(a6)
+                                      @ .tM21:           READ    _19
+                                      @ c_19:
+       00000404  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000408  6Axx                 @                 bpl.s   .rateM21
+       0000040A  C27C007F             @                 and.w   #$7F,d1
+       0000040E  67xx                 @                 beq.s   .stopM21
+                                      @ 
+       00000410  266E0000             @                 movea.l WS_TUNE(a6),a3
+       00000414  E549                 @                 lsl.w   #2,d1
+       00000416  20331010             @                 move.l  TF_INDEX-4(a3,d1.w),d0
+       0000041A  D7C0                 @                 adda.l  d0,a3                   
+       0000041C  49EB0010             @                 lea     DT_PAYLOAD(a3),a4       
+       00000420  202B000A             @                 move.l  DT_REPEAT(a3),d0        
+       00000424  B0AB0004             @                 cmp.l   DT_ROWS(a3),d0          
+       00000428  67xx                 @                 beq.s   .onceM21
+       0000042A  D08C                 @                 add.l   a4,d0
+       0000042C  60xx                 @                 bra.s   .aimM21
+       0000042E  7000                 @ .onceM21:        moveq   #0,d0
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       00000430  4BFAxxxx             @ .aimM21:         lea     ymxr_tick1(pc),a5
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       00000434  40E7                 @                 move.w  sr,-(sp)
+       00000436  007C0700             @                 ori.w   #$0700,sr
+       0000043A  1B6E0020xxxx         @                 move.b  WS_FX+$8+FX_TARGET(a6),TICK_SEL(a5)
+       00000440  220C                 @                 move.l  a4,d1                   
+       00000442  08020005             @                 btst    #5,d2                   
+       00000446  66xx                 @                 bne.s   .putM21                  
+       00000448  D2ADxxxx             @                 add.l   TICK_PTR(a5),d1
+       0000044C  92AE0024             @                 sub.l   WS_FX+$8+FX_FIRST(a6),d1
+       00000450  2B41xxxx             @ .putM21:         move.l  d1,TICK_PTR(a5)
+       00000454  2B40xxxx             @                 move.l  d0,TICK_CELL(a5)
+       00000458  46DF                 @                 move.w  (sp)+,sr
+       0000045A  2D4C0024             @                 move.l  a4,WS_FX+$8+FX_FIRST(a6)
+                                      @ 
+                                      @ 
+       0000045E  08820005             @                 bclr    #5,d2
+       00000462  60xx                 @                 bra.s   .rateM21
+       00000464  023800F0FA1D         @ .stopM21:        andi.b  #$F0,$FFFFFA1D.w      
+       0000046A  08B80004FA0D         @                 bclr    #$4,($FFFFFA09+4).w    
+                                      @ .rateM21:        READ    _21
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 17      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      @ c_21:
+       00000470  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000474  4A02                 @                 tst.b   d2
+       00000476  6Axx                 @                 bpl.s   .liveM21
+       00000478  08020006             @                 btst    #6,d2
+       0000047C  67xx                 @                 beq.s   .setM21
+                                      @ 
+       0000047E  4A01                 @                 tst.b   d1
+       00000480  66xx                 @                 bne.s   .cntM21
+       00000482  122E0022             @                 move.b  WS_FX+$8+FX_COUNT(a6),d1
+       00000486  11C1FA25             @ .cntM21:         move.b  d1,$FFFFFA25.w
+       0000048A  1D410022             @                 move.b  d1,WS_FX+$8+FX_COUNT(a6)
+       0000048E  60xx                 @                 bra.s   .selM21
+       00000490  4A01                 @ .liveM21:        tst.b   d1
+       00000492  67xx                 @                 beq.s   .doneM21
+       00000494  11C1FA25             @                 move.b  d1,$FFFFFA25.w            
+       00000498  1D410022             @                 move.b  d1,WS_FX+$8+FX_COUNT(a6)
+       0000049C  60xx                 @                 bra.s   .doneM21
+       0000049E  4A01                 @ .setM21:         tst.b   d1
+       000004A0  67xx                 @                 beq.s   .selM21
+       000004A2  11C1FA25             @                 move.b  d1,$FFFFFA25.w
+       000004A6  1D410022             @                 move.b  d1,WS_FX+$8+FX_COUNT(a6)
+       000004AA  1202                 @ .selM21:         move.b  d2,d1
+       000004AC  C23C0007             @                 and.b   #7,d1
+       000004B0  1D410021             @                 move.b  d1,WS_FX+$8+FX_SELECT(a6)
+                                      @                 .if     $0
+                                      -                 lsl.b   #$0,d1
+                                      -                 .endif
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @                 .if     $1
+       000004B4  40E7                 @                 move.w  sr,-(sp)
+       000004B6  007C0700             @                 ori.w   #$0700,sr
+       000004BA  1038FA1D             @                 move.b  $FFFFFA1D.w,d0
+       000004BE  C03C00F0             @                 and.b   #$F0,d0
+       000004C2  8001                 @                 or.b    d1,d0
+       000004C4  11C0FA1D             @                 move.b  d0,$FFFFFA1D.w
+       000004C8  46DF                 @                 move.w  (sp)+,sr
+                                      @                 .else
+                                      -                 move.b  d1,$FFFFFA1D.w
+                                      -                 .endif
+       000004CA  08020005             @                 btst    #5,d2
+       000004CE  67xx                 @                 beq.s   .doneM21
+       000004D0  4BFAxxxx             @                 lea     ymxr_tick1(pc),a5          
+       000004D4  2B6E0024xxxx         @                 move.l  WS_FX+$8+FX_FIRST(a6),TICK_PTR(a5)
+                                      @ .doneM21:
+  592                                 @ ymxr_tick1_done:
+                                                        EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2
+                                      @ ymxr_tick2_over:
+       000004DA  6000xxxx             @                 bra.w   ymxr_tick2_done             
+                                      @                 QREAD   _22                     
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 18      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      @ q_22:
+       000004DE  12297FFF             @                 move.b  $7FFF(a1),d1
+                                      @                 QOR     _23                     
+                                      @ q_23:
+       000004E2  82297FFF             @                 or.b    $7FFF(a1),d1
+                                      @                 QOR     _24
+                                      @ q_24:
+       000004E6  82297FFF             @                 or.b    $7FFF(a1),d1
+       000004EA  6Bxx                 @                 bmi.s   ymxr_tick2_some
+                                      @                 QREAD   _25                     
+                                      @ q_25:
+       000004EC  12297FFF             @                 move.b  $7FFF(a1),d1
+       000004F0  6700xxxx             @                 beq.w   ymxr_tick2_done
+       000004F4  11C1FA21             @                 move.b  d1,$FFFFFA21.w              
+       000004F8  1D41002A             @                 move.b  d1,WS_FX+$10+FX_COUNT(a6)
+       000004FC  6000xxxx             @                 bra.w   ymxr_tick2_done
+                                      @ ymxr_tick2_some:
+                                      @                 READ2   _24
+                                      @ c_24:
+       00000500  14297FFF             @                 move.b  $7FFF(a1),d2
+       00000504  4A02                 @                 tst.b   d2                      
+       00000506  6Axx                 @                 bpl.s   .keptM30                 
+       00000508  08020006             @                 btst    #6,d2                   
+       0000050C  67xx                 @                 beq.s   .keptM30                 
+       0000050E  023800F0FA1B         @                 andi.b  #$F0,$FFFFFA1B.w          
+       00000514  08B80000FA0B         @                 bclr    #$0,($FFFFFA07+4).w        
+                                      @ .keptM30:
+                                      @                 READ    _22
+                                      @ c_22:
+       0000051A  12297FFF             @                 move.b  $7FFF(a1),d1
+       0000051E  6Axx                 @                 bpl.s   .tM30
+       00000520  C23C007F             @                 and.b   #$7F,d1
+       00000524  1D410028             @                 move.b  d1,WS_FX+$10+FX_TARGET(a6)
+                                      @ .tM30:           READ    _23
+                                      @ c_23:
+       00000528  12297FFF             @                 move.b  $7FFF(a1),d1
+       0000052C  6Axx                 @                 bpl.s   .rateM30
+       0000052E  C27C007F             @                 and.w   #$7F,d1
+       00000532  67xx                 @                 beq.s   .stopM30
+                                      @ 
+       00000534  266E0000             @                 movea.l WS_TUNE(a6),a3
+       00000538  E549                 @                 lsl.w   #2,d1
+       0000053A  20331010             @                 move.l  TF_INDEX-4(a3,d1.w),d0
+       0000053E  D7C0                 @                 adda.l  d0,a3                   
+       00000540  49EB0010             @                 lea     DT_PAYLOAD(a3),a4       
+       00000544  202B000A             @                 move.l  DT_REPEAT(a3),d0        
+       00000548  B0AB0004             @                 cmp.l   DT_ROWS(a3),d0          
+       0000054C  67xx                 @                 beq.s   .onceM30
+       0000054E  D08C                 @                 add.l   a4,d0
+       00000550  60xx                 @                 bra.s   .aimM30
+       00000552  7000                 @ .onceM30:        moveq   #0,d0
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       00000554  4BFAxxxx             @ .aimM30:         lea     ymxr_tick2(pc),a5
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 19      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       00000558  40E7                 @                 move.w  sr,-(sp)
+       0000055A  007C0700             @                 ori.w   #$0700,sr
+       0000055E  1B6E0028xxxx         @                 move.b  WS_FX+$10+FX_TARGET(a6),TICK_SEL(a5)
+       00000564  220C                 @                 move.l  a4,d1                   
+       00000566  08020005             @                 btst    #5,d2                   
+       0000056A  66xx                 @                 bne.s   .putM30                  
+       0000056C  D2ADxxxx             @                 add.l   TICK_PTR(a5),d1
+       00000570  92AE002C             @                 sub.l   WS_FX+$10+FX_FIRST(a6),d1
+       00000574  2B41xxxx             @ .putM30:         move.l  d1,TICK_PTR(a5)
+       00000578  2B40xxxx             @                 move.l  d0,TICK_CELL(a5)
+       0000057C  46DF                 @                 move.w  (sp)+,sr
+       0000057E  2D4C002C             @                 move.l  a4,WS_FX+$10+FX_FIRST(a6)
+                                      @ 
+                                      @ 
+       00000582  08820005             @                 bclr    #5,d2
+       00000586  60xx                 @                 bra.s   .rateM30
+       00000588  023800F0FA1B         @ .stopM30:        andi.b  #$F0,$FFFFFA1B.w      
+       0000058E  08B80000FA0B         @                 bclr    #$0,($FFFFFA07+4).w    
+                                      @ .rateM30:        READ    _25
+                                      @ c_25:
+       00000594  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000598  4A02                 @                 tst.b   d2
+       0000059A  6Axx                 @                 bpl.s   .liveM30
+       0000059C  08020006             @                 btst    #6,d2
+       000005A0  67xx                 @                 beq.s   .setM30
+                                      @ 
+       000005A2  4A01                 @                 tst.b   d1
+       000005A4  66xx                 @                 bne.s   .cntM30
+       000005A6  122E002A             @                 move.b  WS_FX+$10+FX_COUNT(a6),d1
+       000005AA  11C1FA21             @ .cntM30:         move.b  d1,$FFFFFA21.w
+       000005AE  1D41002A             @                 move.b  d1,WS_FX+$10+FX_COUNT(a6)
+       000005B2  60xx                 @                 bra.s   .selM30
+       000005B4  4A01                 @ .liveM30:        tst.b   d1
+       000005B6  67xx                 @                 beq.s   .doneM30
+       000005B8  11C1FA21             @                 move.b  d1,$FFFFFA21.w            
+       000005BC  1D41002A             @                 move.b  d1,WS_FX+$10+FX_COUNT(a6)
+       000005C0  60xx                 @                 bra.s   .doneM30
+       000005C2  4A01                 @ .setM30:         tst.b   d1
+       000005C4  67xx                 @                 beq.s   .selM30
+       000005C6  11C1FA21             @                 move.b  d1,$FFFFFA21.w
+       000005CA  1D41002A             @                 move.b  d1,WS_FX+$10+FX_COUNT(a6)
+       000005CE  1202                 @ .selM30:         move.b  d2,d1
+       000005D0  C23C0007             @                 and.b   #7,d1
+       000005D4  1D410029             @                 move.b  d1,WS_FX+$10+FX_SELECT(a6)
+                                      @                 .if     $0
+                                      -                 lsl.b   #$0,d1
+                                      -                 .endif
+                                      @ 
+                                      @ 
+                                      @ 
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 20      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @                 .if     $0
+                                      -                 move.w  sr,-(sp)
+                                      -                 ori.w   #$0700,sr
+                                      -                 move.b  $FFFFFA1B.w,d0
+                                      -                 and.b   #$F0,d0
+                                      -                 or.b    d1,d0
+                                      -                 move.b  d0,$FFFFFA1B.w
+                                      -                 move.w  (sp)+,sr
+                                      -                 .else
+       000005D8  11C1FA1B             @                 move.b  d1,$FFFFFA1B.w
+                                      @                 .endif
+       000005DC  08020005             @                 btst    #5,d2
+       000005E0  67xx                 @                 beq.s   .doneM30
+       000005E2  4BFAxxxx             @                 lea     ymxr_tick2(pc),a5          
+       000005E6  2B6E002Cxxxx         @                 move.l  WS_FX+$10+FX_FIRST(a6),TICK_PTR(a5)
+                                      @ .doneM30:
+  593                                 @ ymxr_tick2_done:
+                                                        EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3
+                                      @ ymxr_tick3_over:
+       000005EC  6000xxxx             @                 bra.w   ymxr_tick3_done             
+                                      @                 QREAD   _26                     
+                                      @ q_26:
+       000005F0  12297FFF             @                 move.b  $7FFF(a1),d1
+                                      @                 QOR     _27                     
+                                      @ q_27:
+       000005F4  82297FFF             @                 or.b    $7FFF(a1),d1
+                                      @                 QOR     _28
+                                      @ q_28:
+       000005F8  82297FFF             @                 or.b    $7FFF(a1),d1
+       000005FC  6Bxx                 @                 bmi.s   ymxr_tick3_some
+                                      @                 QREAD   _29                     
+                                      @ q_29:
+       000005FE  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000602  6700xxxx             @                 beq.w   ymxr_tick3_done
+       00000606  11C1FA23             @                 move.b  d1,$FFFFFA23.w              
+       0000060A  1D410032             @                 move.b  d1,WS_FX+$18+FX_COUNT(a6)
+       0000060E  6000xxxx             @                 bra.w   ymxr_tick3_done
+                                      @ ymxr_tick3_some:
+                                      @                 READ2   _28
+                                      @ c_28:
+       00000612  14297FFF             @                 move.b  $7FFF(a1),d2
+       00000616  4A02                 @                 tst.b   d2                      
+       00000618  6Axx                 @                 bpl.s   .keptM39                 
+       0000061A  08020006             @                 btst    #6,d2                   
+       0000061E  67xx                 @                 beq.s   .keptM39                 
+       00000620  0238000FFA1D         @                 andi.b  #$F,$FFFFFA1D.w          
+       00000626  08B80005FA0D         @                 bclr    #$5,($FFFFFA09+4).w        
+                                      @ .keptM39:
+                                      @                 READ    _26
+                                      @ c_26:
+       0000062C  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000630  6Axx                 @                 bpl.s   .tM39
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 21      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+       00000632  C23C007F             @                 and.b   #$7F,d1
+       00000636  1D410030             @                 move.b  d1,WS_FX+$18+FX_TARGET(a6)
+                                      @ .tM39:           READ    _27
+                                      @ c_27:
+       0000063A  12297FFF             @                 move.b  $7FFF(a1),d1
+       0000063E  6Axx                 @                 bpl.s   .rateM39
+       00000640  C27C007F             @                 and.w   #$7F,d1
+       00000644  67xx                 @                 beq.s   .stopM39
+                                      @ 
+       00000646  266E0000             @                 movea.l WS_TUNE(a6),a3
+       0000064A  E549                 @                 lsl.w   #2,d1
+       0000064C  20331010             @                 move.l  TF_INDEX-4(a3,d1.w),d0
+       00000650  D7C0                 @                 adda.l  d0,a3                   
+       00000652  49EB0010             @                 lea     DT_PAYLOAD(a3),a4       
+       00000656  202B000A             @                 move.l  DT_REPEAT(a3),d0        
+       0000065A  B0AB0004             @                 cmp.l   DT_ROWS(a3),d0          
+       0000065E  67xx                 @                 beq.s   .onceM39
+       00000660  D08C                 @                 add.l   a4,d0
+       00000662  60xx                 @                 bra.s   .aimM39
+       00000664  7000                 @ .onceM39:        moveq   #0,d0
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       00000666  4BFAxxxx             @ .aimM39:         lea     ymxr_tick3(pc),a5
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+       0000066A  40E7                 @                 move.w  sr,-(sp)
+       0000066C  007C0700             @                 ori.w   #$0700,sr
+       00000670  1B6E0030xxxx         @                 move.b  WS_FX+$18+FX_TARGET(a6),TICK_SEL(a5)
+       00000676  220C                 @                 move.l  a4,d1                   
+       00000678  08020005             @                 btst    #5,d2                   
+       0000067C  66xx                 @                 bne.s   .putM39                  
+       0000067E  D2ADxxxx             @                 add.l   TICK_PTR(a5),d1
+       00000682  92AE0034             @                 sub.l   WS_FX+$18+FX_FIRST(a6),d1
+       00000686  2B41xxxx             @ .putM39:         move.l  d1,TICK_PTR(a5)
+       0000068A  2B40xxxx             @                 move.l  d0,TICK_CELL(a5)
+       0000068E  46DF                 @                 move.w  (sp)+,sr
+       00000690  2D4C0034             @                 move.l  a4,WS_FX+$18+FX_FIRST(a6)
+                                      @ 
+                                      @ 
+       00000694  08820005             @                 bclr    #5,d2
+       00000698  60xx                 @                 bra.s   .rateM39
+       0000069A  0238000FFA1D         @ .stopM39:        andi.b  #$F,$FFFFFA1D.w      
+       000006A0  08B80005FA0D         @                 bclr    #$5,($FFFFFA09+4).w    
+                                      @ .rateM39:        READ    _29
+                                      @ c_29:
+       000006A6  12297FFF             @                 move.b  $7FFF(a1),d1
+       000006AA  4A02                 @                 tst.b   d2
+       000006AC  6Axx                 @                 bpl.s   .liveM39
+       000006AE  08020006             @                 btst    #6,d2
+       000006B2  67xx                 @                 beq.s   .setM39
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 22      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      @ 
+       000006B4  4A01                 @                 tst.b   d1
+       000006B6  66xx                 @                 bne.s   .cntM39
+       000006B8  122E0032             @                 move.b  WS_FX+$18+FX_COUNT(a6),d1
+       000006BC  11C1FA23             @ .cntM39:         move.b  d1,$FFFFFA23.w
+       000006C0  1D410032             @                 move.b  d1,WS_FX+$18+FX_COUNT(a6)
+       000006C4  60xx                 @                 bra.s   .selM39
+       000006C6  4A01                 @ .liveM39:        tst.b   d1
+       000006C8  67xx                 @                 beq.s   .doneM39
+       000006CA  11C1FA23             @                 move.b  d1,$FFFFFA23.w            
+       000006CE  1D410032             @                 move.b  d1,WS_FX+$18+FX_COUNT(a6)
+       000006D2  60xx                 @                 bra.s   .doneM39
+       000006D4  4A01                 @ .setM39:         tst.b   d1
+       000006D6  67xx                 @                 beq.s   .selM39
+       000006D8  11C1FA23             @                 move.b  d1,$FFFFFA23.w
+       000006DC  1D410032             @                 move.b  d1,WS_FX+$18+FX_COUNT(a6)
+       000006E0  1202                 @ .selM39:         move.b  d2,d1
+       000006E2  C23C0007             @                 and.b   #7,d1
+       000006E6  1D410031             @                 move.b  d1,WS_FX+$18+FX_SELECT(a6)
+                                      @                 .if     $4
+       000006EA  E909                 @                 lsl.b   #$4,d1
+                                      @                 .endif
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @ 
+                                      @                 .if     $1
+       000006EC  40E7                 @                 move.w  sr,-(sp)
+       000006EE  007C0700             @                 ori.w   #$0700,sr
+       000006F2  1038FA1D             @                 move.b  $FFFFFA1D.w,d0
+       000006F6  C03C000F             @                 and.b   #$F,d0
+       000006FA  8001                 @                 or.b    d1,d0
+       000006FC  11C0FA1D             @                 move.b  d0,$FFFFFA1D.w
+       00000700  46DF                 @                 move.w  (sp)+,sr
+                                      @                 .else
+                                      -                 move.b  d1,$FFFFFA1D.w
+                                      -                 .endif
+       00000702  08020005             @                 btst    #5,d2
+       00000706  67xx                 @                 beq.s   .doneM39
+       00000708  4BFAxxxx             @                 lea     ymxr_tick3(pc),a5          
+       0000070C  2B6E0034xxxx         @                 move.l  WS_FX+$18+FX_FIRST(a6),TICK_PTR(a5)
+                                      @ .doneM39:
+  594                                 @ ymxr_tick3_done:
+  595                                   ; 4: the tone periods.
+                                                        TONE    _0,_1,$0000,$0100
+                                      @                 READ2   _1
+                                      @ c_1:
+       00000712  14297FFF             @                 move.b  $7FFF(a1),d2
+                                      @                 READ    _0
+                                      @ c_0:
+       00000716  12297FFF             @                 move.b  $7FFF(a1),d1
+       0000071A  66xx                 @                 bne.s   .goM48
+       0000071C  4A02                 @                 tst.b   d2                      
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 23      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+       0000071E  67xx                 @                 beq.s   .ncM48                   
+       00000720  08020006             @                 btst    #6,d2
+       00000724  67xx                 @                 beq.s   .nfM48
+       00000726  303C0000             @ .goM48:          move.w  #$0,d0
+       0000072A  1001                 @                 move.b  d1,d0
+       0000072C  018A0000             @                 movep.w d0,(a2)
+       00000730  4A02                 @ .nfM48:          tst.b   d2
+       00000732  6Axx                 @                 bpl.s   .ncM48
+       00000734  323C0100             @                 move.w  #$100,d1
+       00000738  1202                 @                 move.b  d2,d1
+       0000073A  038A0000             @                 movep.w d1,(a2)
+  596                                 @ .ncM48:
+                                                        TONE    _2,_3,$0200,$0300
+                                      @                 READ2   _3
+                                      @ c_3:
+       0000073E  14297FFF             @                 move.b  $7FFF(a1),d2
+                                      @                 READ    _2
+                                      @ c_2:
+       00000742  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000746  66xx                 @                 bne.s   .goM51
+       00000748  4A02                 @                 tst.b   d2                      
+       0000074A  67xx                 @                 beq.s   .ncM51                   
+       0000074C  08020006             @                 btst    #6,d2
+       00000750  67xx                 @                 beq.s   .nfM51
+       00000752  303C0200             @ .goM51:          move.w  #$200,d0
+       00000756  1001                 @                 move.b  d1,d0
+       00000758  018A0000             @                 movep.w d0,(a2)
+       0000075C  4A02                 @ .nfM51:          tst.b   d2
+       0000075E  6Axx                 @                 bpl.s   .ncM51
+       00000760  323C0300             @                 move.w  #$300,d1
+       00000764  1202                 @                 move.b  d2,d1
+       00000766  038A0000             @                 movep.w d1,(a2)
+  597                                 @ .ncM51:
+                                                        TONE    _4,_5,$0400,$0500
+                                      @                 READ2   _5
+                                      @ c_5:
+       0000076A  14297FFF             @                 move.b  $7FFF(a1),d2
+                                      @                 READ    _4
+                                      @ c_4:
+       0000076E  12297FFF             @                 move.b  $7FFF(a1),d1
+       00000772  66xx                 @                 bne.s   .goM54
+       00000774  4A02                 @                 tst.b   d2                      
+       00000776  67xx                 @                 beq.s   .ncM54                   
+       00000778  08020006             @                 btst    #6,d2
+       0000077C  67xx                 @                 beq.s   .nfM54
+       0000077E  303C0400             @ .goM54:          move.w  #$400,d0
+       00000782  1001                 @                 move.b  d1,d0
+       00000784  018A0000             @                 movep.w d0,(a2)
+       00000788  4A02                 @ .nfM54:          tst.b   d2
+       0000078A  6Axx                 @                 bpl.s   .ncM54
+       0000078C  323C0500             @                 move.w  #$500,d1
+       00000790  1202                 @                 move.b  d2,d1
+       00000792  038A0000             @                 movep.w d1,(a2)
+  598                                 @ .ncM54:
+  599                                   ; 5: the noise period, and the envelope period beside the shape's bits:
+  600                                   ;    where the shape column is 0, no bit beside is set, and a period byte
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 24      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  601                                   ;    is written where it is not 0 and nothing else is tested.
+                                                        WRITE   _6,$0600
+                                      @                 READ    _6
+                                      @ c_6:
+       00000796  12297FFF             @                 move.b  $7FFF(a1),d1
+       0000079A  6Axx                 @                 bpl.s   .noM57
+       0000079C  303C0600             @                 move.w  #$600,d0
+       000007A0  1001                 @                 move.b  d1,d0
+       000007A2  018A0000             @                 movep.w d0,(a2)
+  602                                 @ .noM57:
+                                                        READ2   _13
+                                      @ c_13:
+  603  000007A6  14297FFF             @                 move.b  $7FFF(a1),d2
+  604  000007AA  67xx                                   beq.s   ymxr_plain
+                                                        RESERVED _11,6,$0B00
+                                      @                 READ    _11
+                                      @ c_11:
+       000007AC  12297FFF             @                 move.b  $7FFF(a1),d1
+       000007B0  66xx                 @                 bne.s   .goM60
+       000007B2  08020006             @                 btst    #$6,d2
+       000007B6  67xx                 @                 beq.s   .noM60
+       000007B8  303C0B00             @ .goM60:          move.w  #$B00,d0
+       000007BC  1001                 @                 move.b  d1,d0
+       000007BE  018A0000             @                 movep.w d0,(a2)
+  605                                 @ .noM60:
+                                                        RESERVED _12,5,$0C00
+                                      @                 READ    _12
+                                      @ c_12:
+       000007C2  12297FFF             @                 move.b  $7FFF(a1),d1
+       000007C6  66xx                 @                 bne.s   .goM62
+       000007C8  08020005             @                 btst    #$5,d2
+       000007CC  67xx                 @                 beq.s   .noM62
+       000007CE  303C0C00             @ .goM62:          move.w  #$C00,d0
+       000007D2  1001                 @                 move.b  d1,d0
+       000007D4  018A0000             @                 movep.w d0,(a2)
+  606                                 @ .noM62:
+  607  000007D8  60xx                                   bra.s   ymxr_volumes
+                                        ymxr_plain:     PLAIN   _11,$0B00
+                                      @                 QREAD   _11
+                                      @ q_11:
+       000007DA  12297FFF             @                 move.b  $7FFF(a1),d1
+       000007DE  67xx                 @                 beq.s   .noM64
+       000007E0  303C0B00             @                 move.w  #$B00,d0
+       000007E4  1001                 @                 move.b  d1,d0
+       000007E6  018A0000             @                 movep.w d0,(a2)
+  608                                 @ .noM64:
+                                                        PLAIN   _12,$0C00
+                                      @                 QREAD   _12
+                                      @ q_12:
+       000007EA  12297FFF             @                 move.b  $7FFF(a1),d1
+       000007EE  67xx                 @                 beq.s   .noM66
+       000007F0  303C0C00             @                 move.w  #$C00,d0
+       000007F4  1001                 @                 move.b  d1,d0
+       000007F6  018A0000             @                 movep.w d0,(a2)
+  609                                 @ .noM66:
+  610                                   ymxr_volumes:
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 25      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  611                                   ; 6: the volumes.
+                                                        WRITE   _8,$0800
+                                      @                 READ    _8
+                                      @ c_8:
+       000007FA  12297FFF             @                 move.b  $7FFF(a1),d1
+       000007FE  6Axx                 @                 bpl.s   .noM68
+       00000800  303C0800             @                 move.w  #$800,d0
+       00000804  1001                 @                 move.b  d1,d0
+       00000806  018A0000             @                 movep.w d0,(a2)
+  612                                 @ .noM68:
+                                                        WRITE   _9,$0900
+                                      @                 READ    _9
+                                      @ c_9:
+       0000080A  12297FFF             @                 move.b  $7FFF(a1),d1
+       0000080E  6Axx                 @                 bpl.s   .noM70
+       00000810  303C0900             @                 move.w  #$900,d0
+       00000814  1001                 @                 move.b  d1,d0
+       00000816  018A0000             @                 movep.w d0,(a2)
+  613                                 @ .noM70:
+                                                        WRITE   _10,$0A00
+                                      @                 READ    _10
+                                      @ c_10:
+       0000081A  12297FFF             @                 move.b  $7FFF(a1),d1
+       0000081E  6Axx                 @                 bpl.s   .noM72
+       00000820  303C0A00             @                 move.w  #$A00,d0
+       00000824  1001                 @                 move.b  d1,d0
+       00000826  018A0000             @                 movep.w d0,(a2)
+  614                                 @ .noM72:
+  615                                   ; 7: the mixer, with the host's port directions.
+                                                        READ    _7
+                                      @ c_7:
+  616  0000082A  12297FFF             @                 move.b  $7FFF(a1),d1
+  617  0000082E  6Axx                                   bpl.s   .no7
+  618  00000830  823C00C0                               or.b    #YM_PORTS,d1
+  619  00000834  303C0700                               move.w  #$0700,d0
+  620  00000838  1001                                   move.b  d1,d0
+  621  0000083A  018A0000                               movep.w d0,(a2)
+  622                                   .no7:
+  623                                   ; 8: the shape, read above into d2.
+  624  0000083E  4A02                                   tst.b   d2
+  625  00000840  6Axx                                   bpl.s   ymxr_played
+  626  00000842  323C0D00                               move.w  #$0D00,d1
+  627  00000846  1202                                   move.b  d2,d1
+  628  00000848  038A0000                               movep.w d1,(a2)
+  629                                   ; The row is written: the next one is taken now, after every write this
+  630                                   ; call makes, so nothing the advance costs stands between a host's clock
+  631                                   ; and the chip.
+  632                                   ymxr_played:
+  633  0000084C  53AE0008                               subq.l  #1,WS_ROWS(a6)
+  634  00000850  66xx                                   bne.s   ymxr_next
+  635  00000852  202E000C                               move.l  WS_R(a6),d0             ; the last row: the loop's
+  636  00000856  90AE0010                               sub.l   WS_RR(a6),d0            ; rows, or none
+  637  0000085A  2D400008                               move.l  d0,WS_ROWS(a6)
+  638  0000085E  67xx                                   beq.s   ymxr_return             ; none: no row to take
+  639  00000860  41EE003C               ymxr_next:      lea     WS_STATE(a6),a0
+  640  00000864  246E0004                               movea.l WS_IMAGE(a6),a2
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 26      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+  641  00000868  4EAA000C                               jsr     IM_ADVANCE(a2)
+  642  0000086C  2D490038                               move.l  a1,WS_ROW(a6)
+  643                                   ymxr_return:
+  644                                                   .if     YMXR_PERF
+  645                                 -                 move.w  #PERF_BAR,PERF_COLOUR.w ; the timers' bar, burnt
+  646                                 -                 lea     ymxr_perf_acc(pc),a0    ; after the writes this call
+  647                                 -                 move.w  (a0),d0                 ; makes, so none of them
+  648                                 -                 clr.w   (a0)                    ; moves for it
+  649                                 - .bar:           dbra    d0,.bar
+  650                                 -                 move.w  (sp)+,PERF_COLOUR.w
+  651                                 -                 .endif
+  652  00000870  7000                                   moveq   #0,d0
+  653  00000872  2C5F                                   movea.l (sp)+,a6
+  654  00000874  4E75                                   rts
+  655  00000876  70FF                   ymxr_over:      moveq   #-1,d0
+  656  00000878  2C5F                                   movea.l (sp)+,a6
+  657  0000087A  4E75                                   rts
+  658                                   
+  659                                                   .if     YMXR_PERF
+  660                                 - ymxr_perf_acc:  dc.w    0                       ; the ticks' counted cost
+  661                                 -                 .endif                          ; since the last call
+  662                                   
+  663                                   ; The reads' displacement words, one a column, in column order.
+  664                                   ymxr_reads:
+  665  0000087C  0474047004A0                           dc.w    c_0-ymxr_frame+2,c_1-ymxr_frame+2,c_2-ymxr_frame+2
+  666  00000882  049C04CC04C8                           dc.w    c_3-ymxr_frame+2,c_4-ymxr_frame+2,c_5-ymxr_frame+2
+  667  00000888  04F405880558                           dc.w    c_6-ymxr_frame+2,c_7-ymxr_frame+2,c_8-ymxr_frame+2
+  668  0000088E  05680578050A                           dc.w    c_9-ymxr_frame+2,c_10-ymxr_frame+2,c_11-ymxr_frame+2
+  669  00000894  052005040042                           dc.w    c_12-ymxr_frame+2,c_13-ymxr_frame+2,c_14-ymxr_frame+2
+  670  0000089A  0050002800BC                           dc.w    c_15-ymxr_frame+2,c_16-ymxr_frame+2,c_17-ymxr_frame+2
+  671  000008A0  01540162013A                           dc.w    c_18-ymxr_frame+2,c_19-ymxr_frame+2,c_20-ymxr_frame+2
+  672  000008A6  01CE02780286                           dc.w    c_21-ymxr_frame+2,c_22-ymxr_frame+2,c_23-ymxr_frame+2
+  673  000008AC  025E02F2038A                           dc.w    c_24-ymxr_frame+2,c_25-ymxr_frame+2,c_26-ymxr_frame+2
+  674  000008B2  039803700404                           dc.w    c_27-ymxr_frame+2,c_28-ymxr_frame+2,c_29-ymxr_frame+2
+  675                                   
+  676                                   ; The other sites a column is read at, each with its column: the effects'
+  677                                   ; one-pass tests, and the envelope period's plain path.
+  678                                   ymxr_sites:
+  679  000008B8  0006000E000A000F                       dc.w    q_14-ymxr_frame+2,14,q_15-ymxr_frame+2,15
+  680  000008C0  000E001000140011                       dc.w    q_16-ymxr_frame+2,16,q_17-ymxr_frame+2,17
+  681  000008C8  01180012011C0013                       dc.w    q_18-ymxr_frame+2,18,q_19-ymxr_frame+2,19
+  682  000008D0  0120001401260015                       dc.w    q_20-ymxr_frame+2,20,q_21-ymxr_frame+2,21
+  683  000008D8  023C001602400017                       dc.w    q_22-ymxr_frame+2,22,q_23-ymxr_frame+2,23
+  684  000008E0  02440018024A0019                       dc.w    q_24-ymxr_frame+2,24,q_25-ymxr_frame+2,25
+  685  000008E8  034E001A0352001B                       dc.w    q_26-ymxr_frame+2,26,q_27-ymxr_frame+2,27
+  686  000008F0  0356001C035C001D                       dc.w    q_28-ymxr_frame+2,28,q_29-ymxr_frame+2,29
+  687  000008F8  0538000B0548000C                       dc.w    q_11-ymxr_frame+2,11,q_12-ymxr_frame+2,12
+  688                                   
+  689                                   ; ---------------------------------------------------------------- ticks
+  690                                   
+                                                        TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$070
+                                      @ ymxr_tick0:
+                                      @                 MARK    $70
+                                      @                 .if     YMXR_PERF
+                                      -                 move.w  PERF_COLOUR.w,-(sp)
+                                      -                 move.w  #$70,PERF_COLOUR.w
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 27      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      -                 .endif
+       00000900  11FC00088800         @ ymxr_tick0_row:    move.b  #8,YM_SELECT.w          
+       00000906  11F9123456788802     @                 move.b  ($12345678).l,YM_SELECT+2.w 
+       0000090E  6Bxx                 @                 bmi.s   .lastM75
+       00000910  46FC2500             @                 move.w  #$2500,sr
+       00000914  52B912345678         @                 addq.l  #1,($12345678).l        
+                                      @                 COUNT   PERF_ON
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_ON,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       0000091A  11FC00DFFA0F         @                 move.b  #$DF,$FFFFFA0F.w
+       00000920  4E73                 @                 rte
+                                      @ .lastM75:
+       00000922  4AB912345678         @ ymxr_tick0_mark:   tst.l   ($12345678).l           
+       00000928  67xx                 @                 beq.s   .stopM75
+       0000092A  23F91234567812345678 @                 move.l  ($12345678).l,($12345678).l 
+                                      @                 COUNT   PERF_LOOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_LOOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000934  11FC00DFFA0F         @                 move.b  #$DF,$FFFFFA0F.w
+       0000093A  4E73                 @                 rte
+       0000093C  023800F0FA19         @ .stopM75:        andi.b  #$F0,$FFFFFA19.w
+                                      @                 COUNT   PERF_STOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_STOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000942  11FC00DFFA0F         @                 move.b  #$DF,$FFFFFA0F.w
+       00000948  4E73                 @                 rte
+  691  0000094A  00000000             @ ymxr_tick0_cell:   dc.l    0                       
+                                                        TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$007
+                                      @ ymxr_tick1:
+                                      @                 MARK    $7
+                                      @                 .if     YMXR_PERF
+                                      -                 move.w  PERF_COLOUR.w,-(sp)
+                                      -                 move.w  #$7,PERF_COLOUR.w
+                                      -                 .endif
+       0000094E  11FC00088800         @ ymxr_tick1_row:    move.b  #8,YM_SELECT.w          
+       00000954  11F9123456788802     @                 move.b  ($12345678).l,YM_SELECT+2.w 
+       0000095C  6Bxx                 @                 bmi.s   .lastM80
+       0000095E  46FC2500             @                 move.w  #$2500,sr
+       00000962  52B912345678         @                 addq.l  #1,($12345678).l        
+                                      @                 COUNT   PERF_ON
+                                      @                 .if     YMXR_PERF
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 28      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_ON,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000968  11FC00EFFA11         @                 move.b  #$EF,$FFFFFA11.w
+       0000096E  4E73                 @                 rte
+                                      @ .lastM80:
+       00000970  4AB912345678         @ ymxr_tick1_mark:   tst.l   ($12345678).l           
+       00000976  67xx                 @                 beq.s   .stopM80
+       00000978  23F91234567812345678 @                 move.l  ($12345678).l,($12345678).l 
+                                      @                 COUNT   PERF_LOOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_LOOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000982  11FC00EFFA11         @                 move.b  #$EF,$FFFFFA11.w
+       00000988  4E73                 @                 rte
+       0000098A  023800F0FA1D         @ .stopM80:        andi.b  #$F0,$FFFFFA1D.w
+                                      @                 COUNT   PERF_STOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_STOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000990  11FC00EFFA11         @                 move.b  #$EF,$FFFFFA11.w
+       00000996  4E73                 @                 rte
+  692  00000998  00000000             @ ymxr_tick1_cell:   dc.l    0                       
+                                                        TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$707
+                                      @ ymxr_tick2:
+                                      @                 MARK    $707
+                                      @                 .if     YMXR_PERF
+                                      -                 move.w  PERF_COLOUR.w,-(sp)
+                                      -                 move.w  #$707,PERF_COLOUR.w
+                                      -                 .endif
+       0000099C  11FC00088800         @ ymxr_tick2_row:    move.b  #8,YM_SELECT.w          
+       000009A2  11F9123456788802     @                 move.b  ($12345678).l,YM_SELECT+2.w 
+       000009AA  6Bxx                 @                 bmi.s   .lastM85
+       000009AC  46FC2500             @                 move.w  #$2500,sr
+       000009B0  52B912345678         @                 addq.l  #1,($12345678).l        
+                                      @                 COUNT   PERF_ON
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_ON,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       000009B6  11FC00FEFA0F         @                 move.b  #$FE,$FFFFFA0F.w
+       000009BC  4E73                 @                 rte
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 29      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      @ .lastM85:
+       000009BE  4AB912345678         @ ymxr_tick2_mark:   tst.l   ($12345678).l           
+       000009C4  67xx                 @                 beq.s   .stopM85
+       000009C6  23F91234567812345678 @                 move.l  ($12345678).l,($12345678).l 
+                                      @                 COUNT   PERF_LOOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_LOOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       000009D0  11FC00FEFA0F         @                 move.b  #$FE,$FFFFFA0F.w
+       000009D6  4E73                 @                 rte
+       000009D8  023800F0FA1B         @ .stopM85:        andi.b  #$F0,$FFFFFA1B.w
+                                      @                 COUNT   PERF_STOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_STOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       000009DE  11FC00FEFA0F         @                 move.b  #$FE,$FFFFFA0F.w
+       000009E4  4E73                 @                 rte
+  693  000009E6  00000000             @ ymxr_tick2_cell:   dc.l    0                       
+                                                        TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$077
+                                      @ ymxr_tick3:
+                                      @                 MARK    $77
+                                      @                 .if     YMXR_PERF
+                                      -                 move.w  PERF_COLOUR.w,-(sp)
+                                      -                 move.w  #$77,PERF_COLOUR.w
+                                      -                 .endif
+       000009EA  11FC00088800         @ ymxr_tick3_row:    move.b  #8,YM_SELECT.w          
+       000009F0  11F9123456788802     @                 move.b  ($12345678).l,YM_SELECT+2.w 
+       000009F8  6Bxx                 @                 bmi.s   .lastM90
+       000009FA  46FC2500             @                 move.w  #$2500,sr
+       000009FE  52B912345678         @                 addq.l  #1,($12345678).l        
+                                      @                 COUNT   PERF_ON
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_ON,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000A04  11FC00DFFA11         @                 move.b  #$DF,$FFFFFA11.w
+       00000A0A  4E73                 @                 rte
+                                      @ .lastM90:
+       00000A0C  4AB912345678         @ ymxr_tick3_mark:   tst.l   ($12345678).l           
+       00000A12  67xx                 @                 beq.s   .stopM90
+       00000A14  23F91234567812345678 @                 move.l  ($12345678).l,($12345678).l 
+                                      @                 COUNT   PERF_LOOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 30      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+
+
+                                      -                 add.w   #PERF_LOOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000A1E  11FC00DFFA11         @                 move.b  #$DF,$FFFFFA11.w
+       00000A24  4E73                 @                 rte
+       00000A26  0238000FFA1D         @ .stopM90:        andi.b  #$F,$FFFFFA1D.w
+                                      @                 COUNT   PERF_STOP
+                                      @                 .if     YMXR_PERF
+                                      -                 move.l  a0,-(sp)
+                                      -                 lea     ymxr_perf_acc(pc),a0
+                                      -                 add.w   #PERF_STOP,(a0)
+                                      -                 movea.l (sp)+,a0
+                                      -                 move.w  (sp)+,PERF_COLOUR.w
+                                      -                 .endif
+       00000A2C  11FC00DFFA11         @                 move.b  #$DF,$FFFFFA11.w
+       00000A32  4E73                 @                 rte
+  694  00000A34  00000000             @ ymxr_tick3_cell:   dc.l    0                       
+  695                                   
+  696                                   ; The offsets the patching writes at, measured off the first handler's
+  697                                   ; own labels: the row it writes, the marker it reads, and its loop cell.
+  698                                   ; A monitor's mark stands between those blocks, and the distances follow
+  699                                   ; it. Every handler is laid out by the one macro, so one handler's
+  700                                   ; offsets are all four handlers'. The rig reads them back.
+  701           =00000003               TICK_SEL        equ     ymxr_tick0_row-ymxr_tick0+3   ; the target register
+  702           =00000008               TICK_PTR        equ     ymxr_tick0_row-ymxr_tick0+8   ; the place: a tick's row
+  703           =00000016               TICK_STEP       equ     ymxr_tick0_row-ymxr_tick0+22  ; the place's own address
+  704           =00000024               TICK_LOOPT      equ     ymxr_tick0_mark-ymxr_tick0+2  ; the loop cell's address
+  705           =0000002C               TICK_LOOPR      equ     ymxr_tick0_mark-ymxr_tick0+10 ; the same
+  706           =00000030               TICK_LOOPW      equ     ymxr_tick0_mark-ymxr_tick0+14 ; the place's address
+  707           =0000004A               TICK_CELL       equ     ymxr_tick0_cell-ymxr_tick0    ; row RR, or 0 once
+  708                                   
+  709                                   ; A parked place: a marker with no loop cell, so a stray tick stops its
+  710                                   ; timer.
+  711  00000A38  80                     ymxr_park:      dc.b    $80
+  712  00000A39  00                                     .even
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 31      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+Symbol Table
+
+           .aimM12 000000000000031E  t             .noM72 000000000000082A  t          PERF_STOP 000000000000000C  a               c_26 000000000000062C  t 
+           .aimM21 0000000000000430  t              .noM8 0000000000000212  t          PERF_SYNC 0000000000001F40  a               c_27 000000000000063A  t 
+           .aimM30 0000000000000554  t              .noM9 0000000000000232  t         TF_EFFECTS 0000000000000008  a               c_28 0000000000000612  t 
+           .aimM39 0000000000000666  t           .onceM12 000000000000031C  t           TF_IMAGE 0000000000000010  a               c_29 00000000000006A6  t 
+              .bad 00000000000001BE  t           .onceM21 000000000000042E  t           TF_INDEX 0000000000000014  a                c_3 000000000000073E  t 
+             .bad6 00000000000001BC  t           .onceM30 0000000000000552  t            TF_RATE 0000000000000006  a                c_4 000000000000076E  t 
+            .clear 00000000000000B0  t           .onceM39 0000000000000664  t         TF_SOURCES 0000000000000009  a                c_5 000000000000076A  t 
+           .cntM12 0000000000000374  t             .patch 000000000000006A  t           TF_STATE 000000000000000C  a                c_6 0000000000000796  t 
+           .cntM21 0000000000000486  t            .putM12 000000000000033E  t         TF_VERSION 0000000000000004  a                c_7 000000000000082A  t 
+           .cntM30 00000000000005AA  t            .putM21 0000000000000450  t          TICK_CELL 000000000000004A  a                c_8 00000000000007FA  t 
+           .cntM39 00000000000006BC  t            .putM30 0000000000000574  t         TICK_LOOPR 000000000000002C  a                c_9 000000000000080A  t 
+          .doneM12 00000000000003B6  t            .putM39 0000000000000686  t         TICK_LOOPT 0000000000000024  a               q_11 00000000000007DA  t 
+          .doneM21 00000000000004DA  t           .rateM12 000000000000035E  t         TICK_LOOPW 0000000000000030  a               q_12 00000000000007EA  t 
+          .doneM30 00000000000005EC  t           .rateM21 0000000000000470  t           TICK_PTR 0000000000000008  a               q_14 00000000000002A8  t 
+          .doneM39 0000000000000712  t           .rateM30 0000000000000594  t           TICK_SEL 0000000000000003  a               q_15 00000000000002AC  t 
+            .goM48 0000000000000726  t           .rateM39 00000000000006A6  t          TICK_STEP 0000000000000016  a               q_16 00000000000002B0  t 
+            .goM51 0000000000000752  t            .selM12 0000000000000398  t         WS_EFFECTS 0000000000000014  a               q_17 00000000000002B6  t 
+            .goM54 000000000000077E  t            .selM21 00000000000004AA  t              WS_FX 0000000000000018  a               q_18 00000000000003BA  t 
+            .goM60 00000000000007B8  t            .selM30 00000000000005CE  t           WS_IMAGE 0000000000000004  a               q_19 00000000000003BE  t 
+            .goM62 00000000000007CE  t            .selM39 00000000000006E0  t               WS_R 000000000000000C  a               q_20 00000000000003C2  t 
+          .keptM12 00000000000002E4  t            .setM12 000000000000038C  t             WS_ROW 0000000000000038  a               q_21 00000000000003C8  t 
+          .keptM21 00000000000003F6  t            .setM21 000000000000049E  t            WS_ROWS 0000000000000008  a               q_22 00000000000004DE  t 
+          .keptM30 000000000000051A  t            .setM30 00000000000005C2  t              WS_RR 0000000000000010  a               q_23 00000000000004E2  t 
+          .keptM39 000000000000062C  t            .setM39 00000000000006D4  t           WS_STATE 000000000000003C  a               q_24 00000000000004E6  t 
+          .lastM75 0000000000000922  t              .site 000000000000007C  t            WS_TUNE 0000000000000000  a               q_25 00000000000004EC  t 
+          .lastM80 0000000000000970  t           .stopM12 0000000000000352  t       YMXR_COLUMNS 000000000000001E  a               q_26 00000000000005F0  t 
+          .lastM85 00000000000009BE  t           .stopM21 0000000000000464  t         YMXR_FIXED 000000000000003C  a               q_27 00000000000005F4  t 
+          .lastM90 0000000000000A0C  t           .stopM30 0000000000000588  t         YMXR_MAGIC 00000000594D5842  a               q_28 00000000000005F8  t 
+          .liveM12 000000000000037E  t           .stopM39 000000000000069A  t          YMXR_PERF 0000000000000000  a               q_29 00000000000005FE  t 
+          .liveM21 0000000000000490  t           .stopM75 000000000000093C  t         YMXR_SITES 0000000000000012  a         ymxr_frame 00000000000002A4  t 
+          .liveM30 00000000000005B4  t           .stopM80 000000000000098A  t       YMXR_VERSION 0000000000000001  a          ymxr_link 00000000000001C2  t 
+          .liveM39 00000000000006C6  t           .stopM85 00000000000009D8  t          YMXR_init 000000000000000C  t          ymxr_next 0000000000000860  t 
+            .ncM48 000000000000073E  t           .stopM90 0000000000000A26  t          YMXR_play 0000000000000290  t          ymxr_over 0000000000000876  t 
+            .ncM51 000000000000076A  t              .tM12 00000000000002F2  t          YMXR_stop 00000000000001E8  t          ymxr_park 0000000000000A38  t 
+            .ncM54 0000000000000796  t              .tM21 0000000000000404  t           YM_PORTS 00000000000000C0  a         ymxr_plain 00000000000007DA  t 
+            .nfM48 0000000000000730  t              .tM30 0000000000000528  t          YM_SELECT 00000000FFFF8800  a        ymxr_played 000000000000084C  t 
+            .nfM51 000000000000075C  t              .tM39 000000000000063A  t             _RMAC_ 0000000002040003  a         ymxr_reads 000000000000087C  t 
+            .nfM54 0000000000000788  t         DT_PAYLOAD 0000000000000010  a                c_0 0000000000000716  t        ymxr_return 0000000000000870  t 
+              .no7 000000000000083E  t          DT_REPEAT 000000000000000A  a                c_1 0000000000000712  t         ymxr_sites 00000000000008B8  t 
+             .noM0 00000000000000C8  t            DT_ROWS 0000000000000004  a               c_10 000000000000081A  t         ymxr_tick0 0000000000000900  t 
+             .noM1 00000000000000DA  t           FX_COUNT 0000000000000002  a               c_11 00000000000007AC  t    ymxr_tick0_cell 000000000000094A  t 
+            .noM10 0000000000000252  t           FX_FIRST 0000000000000004  a               c_12 00000000000007C2  t    ymxr_tick0_done 00000000000003B6  t 
+            .noM11 0000000000000272  t          FX_SELECT 0000000000000001  a               c_13 00000000000007A6  t    ymxr_tick0_mark 0000000000000922  t 
+             .noM2 00000000000000EC  t            FX_SIZE 0000000000000008  a               c_14 00000000000002E4  t    ymxr_tick0_over 00000000000002A4  t 
+             .noM3 00000000000000FE  t          FX_TARGET 0000000000000000  a               c_15 00000000000002F2  t     ymxr_tick0_row 0000000000000900  t 
+             .noM4 000000000000013C  t         IM_ADVANCE 000000000000000C  a               c_16 00000000000002CA  t    ymxr_tick0_some 00000000000002CA  t 
+             .noM5 0000000000000164  t          IM_FORMAT 0000000000000010  a               c_17 000000000000035E  t         ymxr_tick1 000000000000094E  t 
+            .noM57 00000000000007A6  t            IM_INIT 0000000000000000  a               c_18 00000000000003F6  t    ymxr_tick1_cell 0000000000000998  t 
+             .noM6 000000000000018C  t        IM_METADATA 0000000000000004  a               c_19 0000000000000404  t    ymxr_tick1_done 00000000000004DA  t 
+            .noM60 00000000000007C2  t         IM_VARIANT 0000000000000013  a                c_2 0000000000000742  t    ymxr_tick1_mark 0000000000000970  t 
+            .noM62 00000000000007D8  t           PERF_BAR 0000000000000770  a               c_20 00000000000003DC  t    ymxr_tick1_over 00000000000003B6  t 
+            .noM64 00000000000007EA  t          PERF_BEAM 00000000FFFF8209  a               c_21 0000000000000470  t     ymxr_tick1_row 000000000000094E  t 
+            .noM66 00000000000007FA  t        PERF_COLOUR 00000000FFFF8240  a               c_22 000000000000051A  t    ymxr_tick1_some 00000000000003DC  t 
+            .noM68 000000000000080A  t         PERF_FRAME 0000000000000700  a               c_23 0000000000000528  t         ymxr_tick2 000000000000099C  t 
+             .noM7 00000000000001B4  t          PERF_LOOP 000000000000000D  a               c_24 0000000000000500  t    ymxr_tick2_cell 00000000000009E6  t 
+            .noM70 000000000000081A  t            PERF_ON 000000000000000B  a               c_25 0000000000000594  t    ymxr_tick2_done 00000000000005EC  t 
+
+
+                                        /Users/rapido/git/YMXR/68k/YMXR.S Page 32      11:37:16 pm 7-Sep-2026        RMAC 2.4.03 (Linux/OSX)
+Symbol Table
+
+   ymxr_tick2_mark 00000000000009BE  t 
+   ymxr_tick2_over 00000000000004DA  t 
+    ymxr_tick2_row 000000000000099C  t 
+   ymxr_tick2_some 0000000000000500  t 
+        ymxr_tick3 00000000000009EA  t 
+   ymxr_tick3_cell 0000000000000A34  t 
+   ymxr_tick3_done 0000000000000712  t 
+   ymxr_tick3_mark 0000000000000A0C  t 
+   ymxr_tick3_over 00000000000005EC  t 
+    ymxr_tick3_row 00000000000009EA  t 
+   ymxr_tick3_some 0000000000000612  t 
+      ymxr_volumes 00000000000007FA  t 
+

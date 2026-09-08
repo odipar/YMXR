@@ -80,6 +80,7 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 | [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |
 | [doc/performance.md](doc/performance.md) | what a play call costs, in cycles |
 | [doc/experiments.md](doc/experiments.md) | ideas measured, and what the measurements said |
+| [doc/plan.md](doc/plan.md) | what a call could cost, and what each step is worth |
 | [doc/BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, and how a tool combines them |
 | [doc/RELEASES.md](doc/RELEASES.md) | what changed in each published set |
 | [doc/conformance/](doc/conformance) | the kit an independent reader is written against |
