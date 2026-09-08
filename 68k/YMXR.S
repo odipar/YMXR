@@ -87,9 +87,10 @@ PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
 ; What a tick of each kind is counted at, in turns of ten cycles, beside
 ; what performance.md measures each at: a row written 108 cycles, the
 ; marker with the place to row RR 130, the marker with the timer stopped
-; 116. Each count stands within a twentieth of its measurement, and
+; 116, and a square's own tick 88. Each count stands within a twentieth of its measurement, and
 ; PlayerTest holds the three to the document's figures.
 PERF_ON         equ     11
+PERF_SQ         equ     9
 PERF_LOOP       equ     13
 PERF_STOP       equ     12
 
@@ -127,6 +128,9 @@ WS_FX           equ     24              ; four effects, FX_SIZE each
 FX_TARGET       equ     0               ; the target the player holds
 FX_SELECT       equ     1               ; the select it last took
 FX_COUNT        equ     2               ; the count it last took
+FX_SQUARE       equ     3               ; not 0 where the timer's vector is
+                                        ; this effect's square handler, which
+                                        ; holds the place as its own immediate
 FX_FIRST        equ     4               ; the running source's first row
 FX_SIZE         equ     8
 YMXR_FIXED      equ     56
@@ -250,7 +254,7 @@ q\{col}:
 
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset.
-                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick
+                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick,sq,vector
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
 ; that tells them apart, and the word after it holds the read's
@@ -279,16 +283,20 @@ q\{ct}:         bra.w   \{tick}_done
                 and.b   #$7F,d1
                 move.b  d1,\fx+FX_TARGET(a0)
 .t\~:           READ    \cs
-                bpl.s   .rate\~
+                bpl.w   .rate\~
                 and.w   #$7F,d1
-                beq.s   .stop\~
+                beq.w   .stop\~
 ; a start: the source's rows through the index, the handler aimed at them
                 movea.l WS_TUNE(a0),a3
                 lsl.w   #2,d1
                 move.l  TF_INDEX-4(a3,d1.w),d0
                 adda.l  d0,a3                   ; the source's DTX1 table
                 lea     DT_PAYLOAD(a3),a4       ; its first row
-                move.l  DT_REPEAT(a3),d0        ; the loop cell: row RR, or 0
+                cmp.l   #2,DT_ROWS(a3)          ; two rows repeating to row 0
+                bne.s   .rows\~                 ; is a square, and its tick
+                tst.l   DT_REPEAT(a3)           ; holds the two as its own
+                beq.w   .square\~               ; immediate
+.rows\~:        move.l  DT_REPEAT(a3),d0        ; the loop cell: row RR, or 0
                 cmp.l   DT_ROWS(a3),d0          ; where the source plays once
                 beq.s   .once\~
                 add.l   a4,d0
@@ -310,17 +318,61 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
                 move.l  a4,d1                   ; the place: the first row,
                 btst    #5,d2                   ; or the row it stands on in
-                bne.s   .put\~                  ; the rows it replaces
-                add.l   TICK_PTR(a5),d1
+                bne.s   .put\~                  ; the rows it replaces, which
+                tst.b   \fx+FX_SQUARE(a0)       ; the square holds as bit 7 of
+                beq.s   .held\~                 ; its own immediate
+                lea     \sq(pc),a3
+                tst.b   SQ_VAL(a3)
+                bpl.s   .put\~
+                addq.l  #1,d1
+                bra.s   .put\~
+.held\~:        add.l   TICK_PTR(a5),d1
                 sub.l   \fx+FX_FIRST(a0),d1
 .put\~:         move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 move.w  (sp)+,sr
                 move.l  a4,\fx+FX_FIRST(a0)
+                move.l  a5,\vector.w
+                clr.b   \fx+FX_SQUARE(a0)
 ; the start placed the source, so the row's place reset is made: a tick
 ; before the select steps the place on, and the reset below would undo it
                 bclr    #5,d2
-                bra.s   .rate\~
+                bra.w   .rate\~
+
+; A square: the two rows into the handler's own immediate and the
+; difference of the two into the one instruction that moves between
+; them. The row the immediate stands at is the place, and a start that
+; moves none leaves the half it is in, which bit 7 gives.
+.square\~:      lea     \sq(pc),a5
+                move.b  (a4),d3                 ; the first row
+                move.b  1(a4),d4                ; the marker
+                move.b  d3,d5
+                eor.b   d4,d5
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                move.b  \fx+FX_TARGET(a0),SQ_SEL(a5)
+                move.b  d5,SQ_MASK(a5)
+                btst    #5,d2
+                bne.s   .first\~
+                tst.b   \fx+FX_SQUARE(a0)
+                beq.s   .fromrow\~
+                tst.b   SQ_VAL(a5)
+                bmi.s   .marked\~
+                bra.s   .first\~
+.fromrow\~:     lea     \tick(pc),a3
+                move.l  TICK_PTR(a3),d0
+                sub.l   \fx+FX_FIRST(a0),d0
+                btst    #0,d0
+                bne.s   .marked\~
+.first\~:       move.b  d3,SQ_VAL(a5)
+                bra.s   .aimed\~
+.marked\~:      move.b  d4,SQ_VAL(a5)
+.aimed\~:       move.l  a5,\vector.w
+                move.w  (sp)+,sr
+                move.l  a4,\fx+FX_FIRST(a0)
+                st      \fx+FX_SQUARE(a0)
+                bclr    #5,d2
+                bra.w   .rate\~
 .stop\~:        andi.b  #\keep,\ctrl.w      ; select 0: the timer stops
                 bclr    #\bit,(\ier+4).w    ; and drops its latched tick
 .rate\~:        READ    \cn
@@ -368,9 +420,15 @@ q\{ct}:         bra.w   \{tick}_done
                 .else
                 move.b  d1,\ctrl.w
                 .endif
-                btst    #5,d2
-                beq.s   .done\~
-                lea     \tick(pc),a5          ; the place's reset
+                btst    #5,d2                 ; the place's reset, on the
+                beq.s   .done\~                ; handler the effect runs
+                tst.b   \fx+FX_SQUARE(a0)
+                beq.s   .row\~
+                lea     \sq(pc),a5
+                movea.l \fx+FX_FIRST(a0),a3
+                move.b  (a3),SQ_VAL(a5)
+                bra.s   .done\~
+.row\~:         lea     \tick(pc),a5
                 move.l  \fx+FX_FIRST(a0),TICK_PTR(a5)
 .done\~:
 \{tick}_done:
@@ -455,6 +513,25 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_cell:   dc.l    0                       ; the loop cell
                 .endm
 
+; A square's tick: a source of two rows that repeats to row 0 holds two
+; values and nothing else, so this handler holds them as its own
+; immediate and moves between them by the difference of the two. It
+; steps no place, tests no marker and reads no row. The place SPEC.md
+; 1.9 gives a square is which of the two rows the immediate stands at,
+; and bit 7 tells them apart, the last row of a source being its marker
+; (3.2). A source of any other shape takes the handler above.
+                .macro  SQUARE  name,eoi,eoir,colour
+\name:
+                MARK    \colour
+\{name}_sel:    move.b  #8,YM_SELECT.w          ; +3: the target register
+\{name}_val:    move.b  #$0F,YM_SELECT+2.w      ; +3: the row it stands at
+                move.w  #$2500,sr
+\{name}_tog:    eori.b  #$0F,($12345678).l      ; +3 the two rows' difference,
+                COUNT   PERF_SQ                 ; +4 the row's own address
+                move.b  #\eoi,\eoir.w
+                rte
+                .endm
+
 ; ---------------------------------------------------------------- calls
 
                 bra.w   YMXR_init
@@ -511,6 +588,15 @@ YMXR_init:
                 bsr     ymxr_link
                 lea     ymxr_tick3(pc),a5
                 bsr     ymxr_link
+
+; A square's handler names the row it stands at in the one instruction
+; that moves between the two.
+                lea     ymxr_sq0(pc),a5
+                moveq   #3,d2
+.sq:            lea     SQ_VAL(a5),a3
+                move.l  a3,SQ_PTR(a5)
+                lea     SQ_SIZE(a5),a5
+                dbra    d2,.sq
 
 ; The effects' records: nothing held yet.
                 lea     WS_FX(a6),a0
@@ -628,10 +714,10 @@ YMXR_play:
 ; chip's select register, a0 the workspace.
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
-                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0
-                EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1
-                EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2
-                EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3
+                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,$134
+                EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,$110
+                EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,$120
+                EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,$114
 ; 4: the tone periods.
                 TONE    _0,_1,$0000,$0100
                 TONE    _2,_3,$0200,$0300
@@ -750,6 +836,11 @@ ymxr_sites:
                 TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$707
                 TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$077
 
+                SQUARE  ymxr_sq0,$DF,$FFFFFA0F,$070
+                SQUARE  ymxr_sq1,$EF,$FFFFFA11,$007
+                SQUARE  ymxr_sq2,$FE,$FFFFFA0F,$707
+                SQUARE  ymxr_sq3,$DF,$FFFFFA11,$077
+
 ; The offsets the patching writes at, measured off the first handler's
 ; own labels: the row it writes, the marker it reads, and its loop cell.
 ; A monitor's mark stands between those blocks, and the distances follow
@@ -762,6 +853,15 @@ TICK_LOOPT      equ     ymxr_tick0_mark-ymxr_tick0+2  ; the loop cell's address
 TICK_LOOPR      equ     ymxr_tick0_mark-ymxr_tick0+10 ; the same
 TICK_LOOPW      equ     ymxr_tick0_mark-ymxr_tick0+14 ; the place's address
 TICK_CELL       equ     ymxr_tick0_cell-ymxr_tick0    ; row RR, or 0 once
+
+; A square's handler, the same way: the register it selects, the row it
+; stands at, the two rows' difference, and the address of the row it
+; stands at, which init writes once.
+SQ_SEL          equ     ymxr_sq0_sel-ymxr_sq0+3
+SQ_VAL          equ     ymxr_sq0_val-ymxr_sq0+3
+SQ_MASK         equ     ymxr_sq0_tog-ymxr_sq0+3
+SQ_PTR          equ     ymxr_sq0_tog-ymxr_sq0+4
+SQ_SIZE         equ     ymxr_sq1-ymxr_sq0
 
 ; A parked place: a marker with no loop cell, so a stray tick stops its
 ; timer.

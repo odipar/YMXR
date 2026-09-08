@@ -17,13 +17,13 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Big - Samantha Fox Strip Poker 6 | 430 | 1548 | 2142 | 1062 | 1644 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1382 | 3408 | 842 | 2850 |
 | Circus Attractions 2 | 8 | 1458 | 1660 | 782 | 782 |
-| DBA 2 | 19442 | 1975 | 5534 | 1175 | 4910 |
-| DBA 5 | 22262 | 2063 | 5680 | 1247 | 4544 |
-| Digidrum preempt, built | 800 | 1638 | 2820 | 812 | 2042 |
-| Retrigger retune, built | 1200 | 1506 | 2302 | 818 | 1088 |
-| Synergy Credits | 10754 | 2362 | 6342 | 1256 | 4984 |
-| Turrican - world 4-3 | 3680 | 1621 | 4848 | 923 | 4166 |
-| Turrican 2 - world completed 1 | 179 | 1920 | 5656 | 1274 | 5052 |
+| DBA 2 | 19442 | 2000 | 5534 | 1175 | 4910 |
+| DBA 5 | 22262 | 2087 | 5758 | 1247 | 4544 |
+| Digidrum preempt, built | 800 | 1646 | 2854 | 812 | 1232 |
+| Retrigger retune, built | 1200 | 1508 | 2376 | 818 | 1088 |
+| Synergy Credits | 10754 | 2406 | 6420 | 1256 | 4984 |
+| Turrican - world 4-3 | 3680 | 1625 | 4848 | 923 | 4166 |
+| Turrican 2 - world completed 1 | 179 | 1923 | 5656 | 1274 | 5052 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
@@ -45,9 +45,9 @@ is the 4,166 the table above gives as Turrican's advance in its costliest
 frame. Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 (experiments.md) and costs more to decode: measured on Turrican - world 4-3,
 the advance 1,174 on average and 4,622 at most against 923 and 4,166, and the
-play call 1,871 and 5,252 against 1,621 and 4,848; `-k1` packs at it.
+play call 1,876 and 5,252 against 1,625 and 4,848; `-k1` packs at it.
 
-The frame procedure is the rest, from 486 to 1,106 cycles on average:
+The frame procedure is the rest, from 486 to 1,150 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
 effects' columns and the call's own entry and exit. An effect the tune
 does not run is jumped over, two nops standing at its columns' head
@@ -67,8 +67,9 @@ copy.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it: the
 averages by more than three fifths of it, and the costliest frame of every
-tune but one by 900 cycles or more. Synergy Credits' costliest frame, at
-unit 1, is 314 cycles under the budget.
+tune but two by 900 cycles or more. DBA 5's costliest frame is 898 cycles
+under the budget and Synergy Credits', at unit 1, 236. The ticks a frame
+takes stand beside the call and are counted in A tick below.
 
 ## The raster monitor
 
@@ -189,10 +190,23 @@ a test that forms the select only where it writes.
 | a row written, the place stepped | 108 |
 | the marker, the place to row `RR` | 130 |
 | the marker, the timer stopped | 116 |
+| a square's two rows, no place stepped | 88 |
 
 With the interrupt's entry and its `rte`, a tick is 172 cycles: at a
 digidrum's 6,000 a second, 13% of an 8 MHz 68000, and at the 25,600 a
 second terminology.md gives as the practical ceiling, 55%.
+
+A source of two rows repeating to row 0 takes a handler of its own
+(68k/YMXR.S, SQUARE), which holds both rows as its own immediate and
+moves between them by their difference: 88 cycles, 152 with the entry
+and the `rte`, against the 172 and 194 the two paths of the general
+handler cost. A tune whose effects are all such sources ticks 29.4 times
+a frame on Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 911, 769
+and 626 cycles a frame come off those tunes, against a play call of
+2,380, 1,985 and 2,073. A tune whose sources are of other shapes pays 2
+to 4 cycles a frame for the vector each start now writes, and a tune of
+squares pays 24 to 44 for the two values and the difference each start
+patches, against the 626 to 911 its ticks no longer cost.
 
 The rig reads every figure here back with `-cycles`, and `-hatari` plays
 the same tunes on a cycle-exact machine, where the MFP fires the ticks.
