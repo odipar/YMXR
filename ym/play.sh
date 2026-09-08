@@ -205,7 +205,11 @@ while [ "$left" -gt 0 ]; do
             file=$tune
             ;;
         *)
-            file=$work/tune$at.ymxr
+            # A directory a tune, so the file a dump converts into carries
+            # the tune's own name: the tools name a subtune by the file
+            # they were given, and two tunes may share a name.
+            mkdir -p "$work/$at"
+            file=$work/$at/${name%.*}.ymxr
             "$here/bin/ym-to-ymxr" "$tune" "$file" ${unit:+"$unit"} ${ring:+"$ring"} \
                 ${repeat:+"$repeat"} $silent >/dev/null
             ;;
