@@ -617,6 +617,29 @@ YMXR_init:
                 lea     ymxr_tick3(pc),a5
                 bsr     ymxr_link
 
+; A tune that runs one effect has nothing to nest inside a tick, so the
+; level that tick drops buys it nothing: two nops stand where the drop
+; would, in both of that effect's handlers. A tune running two or more
+; keeps the drop, and one running none reaches no handler at all.
+                move.b  WS_EFFECTS(a6),d0
+                move.b  d0,d1
+                subq.b  #1,d1
+                and.b   d1,d0                   ; more than one bit set
+                bne.s   .nests
+                lea     ymxr_tick0(pc),a5
+                lea     ymxr_sq0(pc),a4
+                moveq   #0,d4
+                moveq   #3,d2
+.alone:         btst    d4,WS_EFFECTS(a6)
+                beq.s   .quiet
+                move.l  #$4E714E71,TICK_SR(a5)
+                move.l  #$4E714E71,SQ_SR(a4)
+.quiet:         lea     TICK_SIZE(a5),a5
+                lea     SQ_SIZE(a4),a4
+                addq.w  #1,d4
+                dbra    d2,.alone
+.nests:
+
 ; A square's handler names the row it stands at in the one instruction
 ; that moves between the two.
                 lea     ymxr_sq0(pc),a5
@@ -881,6 +904,8 @@ TICK_LOOPT      equ     ymxr_tick0_mark-ymxr_tick0+2  ; the loop cell's address
 TICK_LOOPR      equ     ymxr_tick0_mark-ymxr_tick0+10 ; the same
 TICK_LOOPW      equ     ymxr_tick0_mark-ymxr_tick0+14 ; the place's address
 TICK_CELL       equ     ymxr_tick0_cell-ymxr_tick0    ; row RR, or 0 once
+TICK_SR         equ     ymxr_tick0_row-ymxr_tick0+16  ; the level it drops
+TICK_SIZE       equ     ymxr_tick1-ymxr_tick0
 
 ; A square's handler, the same way: the register it selects, the row it
 ; stands at, the two rows' difference, and the address of the row it
@@ -889,6 +914,7 @@ SQ_SEL          equ     ymxr_sq0_sel-ymxr_sq0+3
 SQ_VAL          equ     ymxr_sq0_val-ymxr_sq0+3
 SQ_MASK         equ     ymxr_sq0_tog-ymxr_sq0+3
 SQ_PTR          equ     ymxr_sq0_tog-ymxr_sq0+4
+SQ_SR           equ     ymxr_sq0_val-ymxr_sq0+6
 SQ_SIZE         equ     ymxr_sq1-ymxr_sq0
 
 ; A parked place: a marker with no loop cell, so a stray tick stops its

@@ -191,6 +191,10 @@ a test that forms the select only where it writes.
 | the marker, the place to row `RR` | 130 |
 | the marker, the timer stopped | 116 |
 | a square's two rows, no place stepped | 88 |
+| a row written, the tune running one effect | 100 |
+| the marker to row `RR`, one effect | 130 |
+| the marker and the stop, one effect | 116 |
+| a square's two rows, one effect | 80 |
 
 With the interrupt's entry and its `rte`, a tick is 172 cycles: at a
 digidrum's 6,000 a second, 13% of an 8 MHz 68000, and at the 25,600 a
@@ -203,7 +207,15 @@ and the `rte`, against the 172 and 194 the two paths of the general
 handler cost. A tune whose effects are all such sources ticks 29.4 times
 a frame on Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 911, 769
 and 626 cycles a frame come off those tunes, against a play call of
-2,380, 1,985 and 2,073. A tune whose sources are of other shapes pays 2
+2,380, 1,985 and 2,073. A tune that runs one effect has nothing to nest inside a tick, so init
+writes two nops where that effect's handlers drop the interrupt level:
+8 cycles a tick, the drop costing 16 and the nops 8. Only the row a
+tick writes drops it and the marker's two paths never did, so the last
+two rows above stand at what the four above them do. A tune running two
+or more effects keeps the drop, since a faster timer waits behind a
+slower one without it.
+
+A tune whose sources are of other shapes pays 2
 to 4 cycles a frame for the vector each start now writes, and a tune of
 squares 3 to 22 for the two values and the difference each start
 patches, against the 626 to 911 its ticks no longer cost.
