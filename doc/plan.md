@@ -148,11 +148,13 @@ Every step this document held is taken, each measured on the rig:
 | one branch over a run of effects | 19 | 30, 20 or 10 by the effects a tune runs |
 | an effect's head is its first read | 8 an effect | 16, 8 or 0 |
 | the shape's test dropped | 14 | 12 to 14, no tune more |
+| a square's own tick | 31 a tick | 88 against 108 and 130 |
+| every source resolved at init | 52 a start | 21 to 38 a frame |
 
 The first four were counted before they were built and each measured at
-its count. Synergy Credits reads 2,362 cycles a call against the 2,469
-this document opened at, and its costliest frame 6,342 against 6,450.
-performance.md holds what a call costs.
+its count. Synergy Credits reads 2,368 cycles a call against the 2,469
+this document opened at and 4,469 cycles of ticks against 5,380, so
+6,837 a frame against 7,849. performance.md holds both.
 
 What is left is where the costliest frame is. A refill parses at most
 one ST4 operation a unit and there are fifteen units, so the frame R4.5

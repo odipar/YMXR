@@ -133,8 +133,13 @@ FX_SQUARE       equ     3               ; not 0 where the timer's vector is
                                         ; holds the place as its own immediate
 FX_FIRST        equ     4               ; the running source's first row
 FX_SIZE         equ     8
-YMXR_FIXED      equ     56
-WS_STATE        equ     56              ; the image's state block, on a long
+WS_SOURCES      equ     56              ; a source's first row and its loop
+                                        ; cell, eight bytes each, resolved at
+                                        ; init: the source column's seven bits
+                                        ; reach 127, so the room stands whether
+                                        ; the tune names that many or one
+YMXR_FIXED      equ     1072
+WS_STATE        equ     1072            ; the image's state block, on a long
 
 ; The chip.
 YM_SELECT       equ     $FFFF8800
@@ -286,22 +291,12 @@ q\{ct}:         bra.w   \{tick}_done
                 bpl.w   .rate\~
                 and.w   #$7F,d1
                 beq.w   .stop\~
-; a start: the source's rows through the index, the handler aimed at them
-                movea.l WS_TUNE(a0),a3
-                lsl.w   #2,d1
-                move.l  TF_INDEX-4(a3,d1.w),d0
-                adda.l  d0,a3                   ; the source's DTX1 table
-                lea     DT_PAYLOAD(a3),a4       ; its first row
-                cmp.l   #2,DT_ROWS(a3)          ; two rows repeating to row 0
-                bne.s   .rows\~                 ; is a square, and its tick
-                tst.l   DT_REPEAT(a3)           ; holds the two as its own
-                beq.w   .square\~               ; immediate
-.rows\~:        move.l  DT_REPEAT(a3),d0        ; the loop cell: row RR, or 0
-                cmp.l   DT_ROWS(a3),d0          ; where the source plays once
-                beq.s   .once\~
-                add.l   a4,d0
-                bra.s   .aim\~
-.once\~:        moveq   #0,d0
+; a start: the source as init resolved it, the handler aimed at its rows
+                lsl.w   #3,d1
+                movea.l WS_SOURCES-8(a0,d1.w),a4    ; its first row
+                move.l  WS_SOURCES-4(a0,d1.w),d0    ; the loop cell: row RR,
+                bmi.w   .square\~                   ; 0 where it plays once,
+                                                    ; and -1 for a square
 ; the handler's three operands stand under one mask, since the timer may
 ; run: a tick between the target register and the place writes the old
 ; source's row to the new target, and one between the place and the loop
@@ -559,6 +554,39 @@ YMXR_init:
                 move.l  d0,WS_R(a6)
                 move.l  d0,WS_ROWS(a6)
                 move.l  d2,WS_RR(a6)
+
+; Every source resolved once: its first row, and its loop cell, which is
+; row RR where it repeats, 0 where it plays once, and -1 where it is two
+; rows repeating to row 0, the shape a square's own handler takes. A
+; start then reads two longs where it walked the index and read the
+; source's header.
+                movea.l WS_TUNE(a6),a1
+                moveq   #0,d1
+                move.b  TF_SOURCES(a1),d1
+                subq.w  #1,d1
+                bmi.s   .resolved
+                lea     WS_SOURCES(a6),a4
+                moveq   #0,d4
+.source:        movea.l WS_TUNE(a6),a3
+                move.l  TF_INDEX(a3,d4.w),d0
+                adda.l  d0,a3                   ; the source's DTX1 table
+                lea     DT_PAYLOAD(a3),a5       ; its first row
+                move.l  a5,(a4)+
+                move.l  DT_REPEAT(a3),d0
+                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
+                beq.s   .plays                  ; none where it plays once
+                add.l   a5,d0
+                cmp.l   #2,DT_ROWS(a3)          ; two rows repeating to row 0
+                bne.s   .cell                   ; is a square
+                tst.l   DT_REPEAT(a3)
+                bne.s   .cell
+                moveq   #-1,d0
+                bra.s   .cell
+.plays:         moveq   #0,d0
+.cell:          move.l  d0,(a4)+
+                addq.w  #4,d4
+                dbra    d1,.source
+.resolved:
 
 ; The row's columns stand a stride apart (DTX, abi.md 2): column i's read
 ; takes i strides as its displacement.
