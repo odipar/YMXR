@@ -607,9 +607,10 @@ YMXR_init:
                 move.l  d0,WS_R(a6)
                 move.l  d0,WS_ROWS(a6)
                 move.l  d2,WS_RR(a6)
-                lea     WS_STATE(a6),a0
-                jsr     IM_INIT(a2)             ; a1 the table's header
-                movea.l WS_IMAGE(a6),a2
+                lea     WS_STATE(a6),a6         ; the block, in a6 (DTX,
+                jsr     IM_INIT(a2)             ; abi.md 2); a1 the table's
+                lea     -WS_STATE(a6),a6        ; header, and the workspace
+                movea.l WS_IMAGE(a6),a2         ; back at a fixed offset of it
                 jsr     IM_METADATA(a2)         ; d3 the stride, which every
                                                 ; table of an image shares
 
@@ -760,8 +761,10 @@ YMXR_init:
 ; The first row, taken here so that a call writes a row it already has
 ; (SPEC.md 4): the writes then leave a host's clock at one offset,
 ; whatever the advance for the next row costs.
-                lea     WS_STATE(a6),a0
+                move.l  a6,-(sp)
+                lea     WS_STATE(a6),a6         ; the block, in a6
                 jsr     (a3)                    ; a1 the row
+                movea.l (sp)+,a6
 
 ; The timers the tune runs, claimed. The others stand as they are.
                 move.w  sr,-(sp)
@@ -894,9 +897,14 @@ ymxr_played:
                 sub.l   WS_RR(a0),d0            ; rows, or none
                 move.l  d0,WS_ROWS(a0)
                 beq.s   ymxr_return             ; none: no row to take
-ymxr_next:      lea     WS_STATE(a0),a0
+; The state block, which the advance takes in a6 (DTX, abi.md 2). This
+; call gives a6 back to its host, and the advance clobbers d0-d5 and
+; a0-a5, so the stack is where a6 waits.
+ymxr_next:      move.l  a6,-(sp)
+                lea     WS_STATE(a0),a6
 ymxr_call:      jsr     ($12345678).l           ; the advance's own address,
                                                 ; resolved at init
+                movea.l (sp)+,a6
 ymxr_return:
                 .if     YMXR_PERF
                 move.w  #PERF_BAR,PERF_COLOUR.w ; the timers' bar, burnt
