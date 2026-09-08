@@ -352,6 +352,7 @@ final class Sndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
+        boolean silent = false;
         List<String> names = new ArrayList<>();
         List<String> files = new ArrayList<>();
         for (String arg : args) {
@@ -359,6 +360,8 @@ final class Sndh {
                 monitor = true;
             } else if (arg.equals("-lean")) {
                 lean = true;
+            } else if (arg.equals(YmToYmxr.SILENT)) {
+                silent = true;
             } else if (arg.startsWith("-t")) {
                 title = arg.substring(2);
             } else if (arg.startsWith("-c")) {
@@ -390,18 +393,54 @@ final class Sndh {
         for (String file : files) {
             tunes.add(Files.readAllBytes(Path.of(file)));
         }
+        Report report = new Report(!silent);
+        Options options = new Options(title == null ? stem(out) : title, composer,
+                names.isEmpty() ? null : names, monitor, lean);
         byte[] sndh;
         try {
-            sndh = of(tunes, new Options(title == null ? stem(out) : title, composer,
-                    names.isEmpty() ? null : names, monitor, lean));
+            sndh = of(tunes, options);
         } catch (IllegalArgumentException wrong) {
             System.err.println("ymxr-sndh: " + wrong.getMessage());
             System.exit(1);
             return;
         }
         Files.write(Path.of(out), sndh);
+        made(report, options, files, tunes, sndh);
         System.out.println(out + ": " + sndh.length + " bytes, " + files.size()
                 + (files.size() == 1 ? " subtune" : " subtunes"));
+    }
+
+    /** What the file was made of: the core the switches picked, the tags
+     *  written, each subtune's bound tune, and the workspace under them. */
+    private static void made(Report report, Options options, List<String> files,
+                             List<byte[]> tunes, byte[] sndh) {
+        if (!report.says()) {
+            return;
+        }
+        Binaries.Binary binary = Binaries.binary(options.monitor(), options.lean());
+        int core = Binaries.core(options.monitor(), options.lean()).length;
+        report.say("the core: " + binary.name() + ", " + core + " bytes");
+        List<String> switches = new ArrayList<>();
+        if (options.monitor()) {
+            switches.add("-perf, the raster monitor in");
+        }
+        if (options.lean()) {
+            switches.add("-lean, ticks that neither drop the level nor end their own interrupt");
+        }
+        report.row("the switches", switches.isEmpty() ? "none, the plain core"
+                : String.join("; ", switches));
+        report.say("the tags: TITL " + options.title()
+                + (options.composer() == null ? "" : ", COMM " + options.composer())
+                + (options.names() == null ? "" : ", !#SN with " + options.names().size()
+                + " names"));
+        int bound = 0;
+        for (int i = 0; i < files.size(); i++) {
+            byte[] b = Bound.of(tunes.get(i));
+            bound += b.length;
+            report.row(stem(files.get(i)), tunes.get(i).length + " bytes bound to " + b.length);
+        }
+        report.say("the file: " + sndh.length + " bytes, the core " + core + ", the tunes "
+                + bound + ", the workspace and the rest " + (sndh.length - core - bound));
     }
 
     /** A file's name up to its last dot. */
@@ -413,7 +452,7 @@ final class Sndh {
 
     private static void usage() {
         System.err.println("ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER] [-nNAME]..."
-                + " [-perf] [-lean]");
+                + " [-perf] [-lean] [-silent]");
         System.err.println("  -perf  the core with the raster monitor in, for reading a run");
         System.err.println("  -lean  the core whose ticks neither drop the interrupt level nor"
                 + " write their own end of interrupt");

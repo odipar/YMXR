@@ -3,12 +3,35 @@
 Every tool's usage, flags and environment. The Java tree is the source of
 truth; the Go and C# trees are to follow it.
 
+## What a tool says
+
+A tool reports what it did, and `-silent` leaves it saying only what it
+wrote. The report goes to standard error and what the tool is for goes
+to standard output, so a run read through a pipe or into a file reads
+the same either way and the report stands on the terminal beside it.
+
+Every tool takes `-silent`, `ym/play.sh` and `ym/cost.sh` among them,
+which pass it to the tools they drive.
+
+| the tool says | what it holds |
+|---|---|
+| what it read | the dump's format, title and composer, its frames, rate and length, its loop frame, and its digidrums |
+| the flags it took | each flag's value and whether it was asked for or is the default |
+| what it found | the effects that run, and the sources by kind with their rows |
+| what it packed | a row a column: the rows in, the bytes out and the two as a percentage |
+| what it wrote | the file's bytes, and what the parts of it came to |
+| a note | a warning, which stands whether the report is on or off |
+
+A run of many files says how far through them it is on one line redrawn
+over itself. The line is drawn only where standard error is read on a
+terminal, so a redirected run holds no carriage returns.
+
 ## Convert
 
 A YM5!/YM6! register dump into a tune file (SPEC.md 3.3):
 
 ```
-bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r]
+bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-silent]
 ```
 
 | flag | gives |
@@ -18,10 +41,12 @@ bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r]
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
 
 The first file is unpacked where it is an LHA archive, as distributed
-`.ym` files are. The tool prints the frames, the sources, the effects
-run, the repeat row and the bytes written, then its notes: effects
-dropped, a unit other than the one asked for, and a ring other than the
-one asked for.
+`.ym` files are. Standard output is one line: the frames, the sources,
+the effects run, the repeat row and the bytes written. The report beside
+it holds the dump as it was read, the flags as they were taken, the
+sources by kind, a row a column of what it packed to, and the notes:
+effects dropped, a unit other than the one asked for, and a ring other
+than the one asked for.
 
 The table is the dump's frames row for row: the row it repeats to is
 the dump's loop frame, its rows are the dump's, and no row is added
@@ -61,7 +86,7 @@ against.
 ## Check
 
 ```
-bin/ymxr-check DUMP|DIR ...
+bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-silent] DUMP|DIR ...
 ```
 
 Every dump named, and every `.ym` under a directory named, converted at
@@ -81,7 +106,7 @@ dump as a tune that plays once.
 ## Trace
 
 ```
-bin/ymxr-trace TUNE [FRAMES]
+bin/ymxr-trace TUNE [FRAMES] [-silent]
 ```
 
 What a reader reports of a tune file (SPEC.md 7), on standard output:
@@ -112,10 +137,10 @@ header of the source gives the contract in full.
 ## Bind, SNDH file, program
 
 ```
-bin/ymxr-bind tune.ymxr tune.bin
+bin/ymxr-bind tune.ymxr tune.bin [-silent]
 bin/ymxr-sndh tune.ymxr [more.ymxr ...] tune.sndh [-tTITLE] [-cCOMPOSER]
-              [-nNAME ...] [-perf] [-lean]
-bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS]
+              [-nNAME ...] [-perf] [-lean] [-silent]
+bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS] [-silent]
 ```
 
 A tune file holds tables and no code. What the player takes is the bound
@@ -140,7 +165,7 @@ contract for every byte of them, and no assembler runs at combine time.
 
 ```
 ym/play.sh [-kK] [-mN] [-rRR | -r] [-tTITLE] [-cCOMPOSER] [-perf]
-           [-lean] [-vN] tune.ym [out.wav]
+           [-lean] [-vN] [-silent] tune.ym [out.wav]
 ym/play.sh -h
 ```
 
@@ -160,6 +185,7 @@ run's last frame beside it as a PNG.
 | `-lean` | the core whose ticks neither drop the interrupt level nor write their own end of interrupt (performance.md) |
 | `-perf -lean` | the core that is both, so the bars are the lean ticks' own |
 | `-vN` | the frames to run |
+| `-silent` | the tools it drives say only what they wrote |
 | `-h` | the options and examples, which the script's own head holds |
 
 `-k`, `-m` and `-r` are the converter's, and a tune file, which is
@@ -230,7 +256,7 @@ figures SPEC.md 1.2 and 1.7 give. `YM_CORPUS` names the corpus,
 convert at once, and `YMX_PAIRS` the tunes with a `.ymx` beside them.
 
 ```
-ym/cost.sh [-lean] tune.ymxr [more.ymxr ...]
+ym/cost.sh [-lean] [-silent] tune.ymxr [more.ymxr ...]
 VBLS=3000 ym/cost.sh tune.ymxr
 ```
 

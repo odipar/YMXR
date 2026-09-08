@@ -109,6 +109,29 @@ final class Prg {
         return prg;
     }
 
+    /** What the program was made of: the file under it, the stub's own
+     *  bytes, and what the stub was patched with. */
+    private static void made(Report report, byte[] sndh, byte[] prg, long rows) {
+        if (!report.says()) {
+            return;
+        }
+        Tags tags = tags(sndh);
+        int flags = Tune.getWord(prg, HEADER + STUB_FLAGS_AT);
+        report.say("the SNDH file: " + sndh.length + " bytes, " + tags.subtunes()
+                + (tags.subtunes() == 1 ? " subtune at " : " subtunes at ") + tags.rate()
+                + " Hz, FLAG " + tags.flag());
+        report.say("the stub: " + Binaries.stub().length + " bytes, patched");
+        report.row("the subtunes", String.valueOf(tags.subtunes()));
+        report.row("the rows to play", rows == 0 ? "0, as many as the tune gives"
+                : String.valueOf(rows));
+        report.row("it plays from", (flags & FLAG_VBL) != 0 ? "the VBL, the set claims Timer C"
+                : "the VBL where the screen's rate is the tune's, and Timer C where it is not");
+        report.row("the screen", (flags & FLAG_CLEAR) != 0
+                ? "cleared, the core has the raster monitor in"
+                : "left as the desktop drew it");
+        report.say("the program: " + prg.length + " bytes");
+    }
+
     /**
      * The stub's descriptor held to what this patches.
      *
@@ -297,11 +320,14 @@ final class Prg {
      */
     public static void main(String[] args) throws IOException {
         long rows = 0;
+        boolean silent = false;
         String in = null;
         String out = null;
         for (String arg : args) {
             if (arg.startsWith("-r") && arg.substring(2).matches("[0-9]+")) {
                 rows = Long.parseLong(arg.substring(2));
+            } else if (arg.equals(YmToYmxr.SILENT)) {
+                silent = true;
             } else if (arg.startsWith("-") || out != null) {
                 usage();
                 return;
@@ -315,20 +341,23 @@ final class Prg {
             usage();
             return;
         }
+        Report report = new Report(!silent);
+        byte[] sndh = Files.readAllBytes(Path.of(in));
         byte[] prg;
         try {
-            prg = of(Files.readAllBytes(Path.of(in)), rows);
+            prg = of(sndh, rows);
         } catch (IllegalArgumentException wrong) {
             System.err.println("ymxr-prg: " + wrong.getMessage());
             System.exit(1);
             return;
         }
         Files.write(Path.of(out), prg);
+        made(report, sndh, prg, rows);
         System.out.println(out + ": " + prg.length + " bytes");
     }
 
     private static void usage() {
-        System.err.println("ymxr-prg in.sndh out.prg [-rROWS]");
+        System.err.println("ymxr-prg in.sndh out.prg [-rROWS] [-silent]");
         System.exit(2);
     }
 }

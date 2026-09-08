@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.dtx.Table;
@@ -224,10 +225,13 @@ final class Check {
     }
 
     /**
-     * {@code ymxr-check [-kK] [-mN] [-rRR | -r] DUMP|DIR ...}: one line a
-     * file, the wrong frames under a tune that fails, and an exit of 1
-     * where any does; the flags are the converter's. A file that is not a
-     * YM5!/YM6! dump is said and not counted.
+     * {@code ymxr-check [-kK] [-mN] [-rRR | -r] [-silent] DUMP|DIR ...}:
+     * one line a file, the wrong frames under a tune that fails, and an
+     * exit of 1 where any does; the flags are the converter's. A file
+     * that is not a YM5!/YM6! dump is said and not counted. The tool says
+     * how many files it has and how far through them it is, which a run
+     * over a corpus of thousands takes minutes to reach the end of;
+     * {@code -silent} leaves the lines a file and the count.
      */
     public static void main(String[] args) throws IOException {
         List<String> flags = new ArrayList<>();
@@ -236,11 +240,21 @@ final class Check {
             (arg.startsWith("-") ? flags : named).add(arg);
         }
         if (named.isEmpty()) {
-            System.err.println("ymxr-check [-kK] [-mN] [-rRR | -r] DUMP|DIR ...");
+            System.err.println("ymxr-check [-kK] [-mN] [-rRR | -r] [-silent] DUMP|DIR ...");
             System.exit(2);
         }
-        List<Result> results = dumps(named.toArray(new String[0])).parallelStream()
-                .map(path -> of(path, flags)).toList();
+        Report report = new Report(!flags.contains(YmToYmxr.SILENT));
+        List<Path> files = dumps(named.toArray(new String[0]));
+        report.say(files.size() + (files.size() == 1 ? " file" : " files") + " to read"
+                + (flags.isEmpty() ? "" : ", at " + String.join(" ", flags)));
+        AtomicInteger read = new AtomicInteger();
+        List<Result> results = files.parallelStream()
+                .map(path -> {
+                    Result result = of(path, flags);
+                    report.progress("read", read.incrementAndGet(), files.size());
+                    return result;
+                }).toList();
+        report.clear();
         int dumps = 0;
         int failed = 0;
         for (Result result : results) {
