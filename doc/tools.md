@@ -53,8 +53,8 @@ tool binds them with DTX's reader into what the player takes.
 The tool runs out of `target/classes`, and builds first where a source,
 the pom or a 68000 source is newer than the last build, or the core is
 not assembled. Java 23, Maven and rmac, with which the build assembles
-both cores and the stub once (`-Drmac=PATH` names another), and DTX 0.6.0
-in the local Maven repository: `mvn install` at DTX's `v0.6.0` tag,
+the four cores and the stub once (`-Drmac=PATH` names another), and DTX
+0.6.0 in the local Maven repository: `mvn install` at DTX's `v0.6.0` tag,
 whose reader this player's frame figures (performance.md) are measured
 against.
 
@@ -114,7 +114,7 @@ header of the source gives the contract in full.
 ```
 bin/ymxr-bind tune.ymxr tune.bin
 bin/ymxr-sndh tune.ymxr [more.ymxr ...] tune.sndh [-tTITLE] [-cCOMPOSER]
-              [-nNAME ...] [-perf | -lean]
+              [-nNAME ...] [-perf] [-lean]
 bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS]
 ```
 
@@ -130,11 +130,11 @@ switches subtunes on 1 to 9, and hands the machine back. `-perf` puts
 the core with the raster monitor in (Measure), and the program then
 clears the screen so that its bars show; `-lean` puts the core whose
 ticks neither drop the interrupt level nor write their own end of
-interrupt, which asks two things of the host (performance.md). The three
-cores and the stub are assembled by the build with rmac, once, into the
-classpath;
-BINARIES.md is the contract for every byte of them, and no assembler
-runs at combine time.
+interrupt, which asks two things of the host (performance.md). The two
+are a switch each, and both together put the core that is both, whose
+bars are the lean ticks' own. The four cores and the stub are assembled
+by the build with rmac, once, into the classpath; BINARIES.md is the
+contract for every byte of them, and no assembler runs at combine time.
 
 ## Play
 
@@ -158,6 +158,7 @@ run's last frame beside it as a PNG.
 | `-tTITLE`, `-cCOMPOSER` | the tags; the title is the file's name by default |
 | `-perf` | the core with the raster monitor in, so the recorded frame shows the bars (Measure) |
 | `-lean` | the core whose ticks neither drop the interrupt level nor write their own end of interrupt (performance.md) |
+| `-perf -lean` | the core that is both, so the bars are the lean ticks' own |
 | `-vN` | the frames to run |
 | `-h` | the options and examples, which the script's own head holds |
 
@@ -229,7 +230,7 @@ figures SPEC.md 1.2 and 1.7 give. `YM_CORPUS` names the corpus,
 convert at once, and `YMX_PAIRS` the tunes with a `.ymx` beside them.
 
 ```
-ym/cost.sh tune.ymxr [more.ymxr ...]
+ym/cost.sh [-lean] tune.ymxr [more.ymxr ...]
 VBLS=3000 ym/cost.sh tune.ymxr
 ```
 
@@ -240,9 +241,12 @@ span back through `ym/cost.py`. The monitor is a build of the player
 (`68k/YMXR.S`, `YMXR_PERF`): the call paints the background red while
 its work runs, each tick handler paints its own colour, and the call
 burns a yellow bar for what the ticks it counted cost, after its own
-writes, so none of them moves for it. `HATARI`, `TOS` and `VBLS` name
-the emulator, a TOS image and the frames to run. performance.md has the
-figures and what the method leaves out.
+writes, so none of them moves for it. `-lean` builds the core whose
+ticks neither drop the interrupt level nor write their own end of
+interrupt, so what comes back is that core's cost against the plain
+one's. `HATARI`, `TOS` and `VBLS` name the emulator, a TOS image and the
+frames to run. performance.md has the figures and what the method leaves
+out.
 
 ```
 hatari --trace psg_write,video_vbl --trace-file trace.txt TUNE.PRG
@@ -258,3 +262,18 @@ player that writes the right values at the wrong times. Run it on the
 player and on another player's trace of the same tune before believing a
 square is right; experiments.md, What a square does when it starts, has
 what it caught and the figures it read.
+
+```
+hatari --trace psg_write,video_vbl --trace-file a.txt A.PRG
+python3 ym/writes.py a.txt b.txt
+```
+
+`ym/writes.py` holds two runs' chip writes against each other: for every
+register, whether the values come in the same order and where they part.
+The cores of BINARIES.md play one tune through the same player, so this
+is the measure of whether a switch changed the tune. It counts from the
+frame the player first writes in, since a program that clears the screen
+starts a frame later and 900 frames from the first VBL are then 900
+different rows, and a register whose values agree to the shorter run's
+end is the window's edge, not a difference. performance.md, A tick, has
+what it read off the four cores.

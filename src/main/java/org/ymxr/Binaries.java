@@ -12,14 +12,15 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * The three 68000 binaries the tools combine with bound tunes
+ * The 68000 binaries the tools combine with bound tunes
  * (doc/BINARIES.md): the SNDH core, which {@link Sndh} puts under an SNDH
- * file's entries, the same core with the player's raster monitor
- * assembled in, which {@link Sndh} puts there instead where a run is to
- * be read, and the program stub, which {@link Prg} puts in front of an
- * SNDH file. The build assembles each once from its source under
- * {@code 68k} and writes it into the classes, the one step rmac is needed
- * for; a tool reads them there and runs no assembler.
+ * file's entries, and the program stub, which {@link Prg} puts in front
+ * of an SNDH file. Two switches of the player's stand in the core, the
+ * raster monitor and the lean tick, and each of their four settings is a
+ * core of its own, so a file asked for both takes the core that is both.
+ * The build assembles each once from its source under {@code 68k} and
+ * writes it into the classes, the one step rmac is needed for; a tool
+ * reads them there and runs no assembler.
  */
 final class Binaries {
 
@@ -57,30 +58,42 @@ final class Binaries {
     static final Binary LEAN = new Binary("YMXR_sndh-lean.bin", "YMXR_sndh.S",
             List.of("-dYMXR_NEST=0", "-dYMXR_AEOI=1"));
 
+    /**
+     * The core with both switches set: the raster monitor reads what a
+     * run costs, and the ticks it reads are the lean ones. A file made
+     * for reading a lean run takes this core.
+     */
+    static final Binary MONITOR_LEAN = new Binary("YMXR_sndh-perf-lean.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1"));
+
     static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S", List.of());
 
     private Binaries() {
     }
 
-    /** All four, in the order the build writes them. */
+    /** All five, in the order the build writes them. */
     static List<Binary> all() {
-        return List.of(CORE, MONITOR, LEAN, STUB);
+        return List.of(CORE, MONITOR, LEAN, MONITOR_LEAN, STUB);
     }
 
-    /** The SNDH core as carried. */
+    /** The core with neither switch set, as carried. */
     static byte[] core() {
-        return carried(CORE.name());
+        return core(false, false);
     }
 
-    /** The core with the raster monitor in, as carried. */
-    static byte[] monitorCore() {
-        return carried(MONITOR.name());
+    /** The core of the two switches, as carried: the raster monitor in
+     *  where {@code monitor}, ticks that neither drop the interrupt level
+     *  nor write their own end of interrupt where {@code lean}. */
+    static byte[] core(boolean monitor, boolean lean) {
+        return carried(binary(monitor, lean).name());
     }
 
-    /** The SNDH core whose ticks neither drop the interrupt level nor
-     *  write their own end of interrupt (LEAN). */
-    static byte[] leanCore() {
-        return carried(LEAN.name());
+    /** The binary of the two switches. */
+    static Binary binary(boolean monitor, boolean lean) {
+        if (monitor) {
+            return lean ? MONITOR_LEAN : MONITOR;
+        }
+        return lean ? LEAN : CORE;
     }
 
     /** The program stub as carried. */
@@ -145,7 +158,7 @@ final class Binaries {
     }
 
     /**
-     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the two cores and the
+     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the four cores and the
      * stub assembled and written into each directory named, one line each
      * with its bytes. The assembler is {@code rmac} on the path unless
      * {@code -a} names another, and the sources are under {@code 68k}
@@ -190,7 +203,7 @@ final class Binaries {
             for (Path at : into) {
                 Files.write(at.resolve(binary.name()), code);
             }
-            System.out.printf("%-18s %5d bytes%n", binary.name(), code.length);
+            System.out.printf("%-24s %5d bytes%n", binary.name(), code.length);
         }
     }
 

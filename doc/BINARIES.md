@@ -16,11 +16,12 @@ Big-endian throughout; every offset and size in bytes.
 | `YMXR_sndh.bin` | the SNDH core: the player and its SNDH glue, assembled from `68k/YMXR_sndh.S` |
 | `YMXR_sndh-perf.bin` | the same core with the player's raster monitor assembled in (`YMXR_PERF`, performance.md), for reading a run |
 | `YMXR_sndh-lean.bin` | the same core whose ticks neither drop the interrupt level nor write their own end of interrupt (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md), 32 cycles a tick cheaper, for a host where no MFP interrupt of its own nests and the MFP's vector register is the player's |
+| `YMXR_sndh-perf-lean.bin` | the same core with both switches set: the raster monitor reads what a run costs, and the ticks it reads are the lean ones |
 | `YMXR_prg.bin` | the program stub, assembled from `68k/YMXR_prg.S` |
 | `DTX0.bin`, `DTX1-w1.bin`, `DTX2-w1-k1.bin` and the rest | DTX's reader code, twenty-two files: one for DTX0, one a width for DTX1, one a width, a unit and the copies flag for DTX2, at `org/dtx/68k/` in the dtx jar (DTX, doc/abi.md) |
 
-The build assembles both cores and the stub into `org/ymxr/68k/` on the
-classpath (pom.xml, the `binaries` step; `-Drmac=PATH` names the
+The build assembles the four cores and the stub into `org/ymxr/68k/` on
+the classpath (pom.xml, the `binaries` step; `-Drmac=PATH` names the
 assembler), and the tools of section 5 read them there.
 
 ## The stack
@@ -87,19 +88,28 @@ Position-independent. Its layout from its first byte:
 | 16 | 2 | the descriptor's version, 1 |
 | 18 | 2 | the bound tune's version this core reads |
 | 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block |
-| 22 | 2 | flags: bit 0 where the raster monitor is in |
+| 22 | 2 | flags: the bits are below |
 | 24 | 2 | where the core's state byte is |
 | 26 | 2 | zero |
 | 28 | 4 | the subtune table: written 0, patched by the tool |
 | 32 | 4 | the workspace: written 0, patched by the tool |
 
-Both patched offsets count from the core's first byte and are even. The
-flags word gives what the core was assembled with: a tool picks the core
-by name and holds it to the word, and stops where the two part. The
-state byte has bit 0 set while a tune plays and bit 1 set once the tune
-has played its last row and does not repeat; a host that has to know
-when a tune that plays once is over reads it, since play returns
-nothing.
+The flags word:
+
+| bit | set where the core was assembled with | which asks of the host |
+|---|---|---|
+| 0 | the player's raster monitor (`YMXR_PERF`, performance.md) | that it read the palette writes to have what the run cost, and clear the screen for the bars |
+| 1 | the lean tick (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md) | that no MFP interrupt of its own nest inside another, and that the MFP's vector register be the player's to set |
+
+The two bits are a switch each: a core is assembled with either, both or
+neither.
+
+Both patched offsets count from the core's first byte and are even. A
+tool picks the core by name and holds it to the flags word, and stops
+where the two part. The state byte has bit 0 set while a tune plays and
+bit 1 set once the tune has played its last row and does not repeat; a
+host that has to know when a tune that plays once is over reads it,
+since play returns nothing.
 
 The subtune table: a word count `N`, then `N` longs, each a bound tune's
 offset from the core's first byte, each even. Init with the subtune `s`
@@ -219,6 +229,7 @@ run.
 
 The tools: `bin/ymxr-bind tune.ymxr out.bin` writes the bound tune;
 `bin/ymxr-sndh tune.ymxr ... out.sndh` the SNDH file, with `-tTITLE`,
-`-cCOMPOSER`, `-nNAME` a subtune and `-perf` for the monitor's core;
+`-cCOMPOSER`, `-nNAME` a subtune, `-perf` for the monitor's core and
+`-lean` for the lean one, which are a switch each;
 `bin/ymxr-prg in.sndh out.prg` the program, with `-rROWS` for the rows.
 tools.md has them, and `ym/cost.sh` reads a monitor run back.

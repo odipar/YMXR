@@ -7,7 +7,12 @@ set -e
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 classes=$root/target/classes
 built=$classes/.built
-if [ ! -f "$built" ] || [ ! -f "$classes/org/ymxr/68k/YMXR_sndh.bin" ] || [ ! -f "$classes/org/ymxr/68k/YMXR_sndh-perf.bin" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]; then
+# This tool is asked for any of the four cores, so all four are looked for.
+missing=
+for core in YMXR_sndh.bin YMXR_sndh-perf.bin YMXR_sndh-lean.bin YMXR_sndh-perf-lean.bin; do
+    [ -f "$classes/org/ymxr/68k/$core" ] || missing=1
+done
+if [ ! -f "$built" ] || [ -n "$missing" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]; then
     (cd "$root" && mvn -q process-classes dependency:build-classpath -Dmdep.outputFile=target/classpath >/dev/null)
     : > "$built"
 fi

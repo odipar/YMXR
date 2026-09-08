@@ -65,7 +65,7 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 
 | what runs | what it checks |
 |---|---|
-| `mvn test` | the documents against themselves and the house style, every tune under `ym/test` converted, read back and replayed against its dump, the conformance kit converted again and compared byte for byte, and both cores and the stub assembled and their descriptors, an SNDH file and a program read back |
+| `mvn test` | the documents against themselves and the house style, every tune under `ym/test` converted, read back and replayed against its dump, the conformance kit converted again and compared byte for byte, and the four cores and the stub assembled and their descriptors, an SNDH file and a program read back |
 | `68k/test/emu/test_ymxr.py` | the player on an emulated 68000: every frame's writes, the timers' programming and every tick against the specification's model |
 | the same, `-hatari` | the SNDH file's program on a real MFP under Hatari, the trace of the player's writes against that model |
 | the same, `-kit` | the conformance kit's tunes on the player, each frame held to the reader's record |

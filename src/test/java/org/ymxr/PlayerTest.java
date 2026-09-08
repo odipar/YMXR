@@ -59,33 +59,47 @@ final class PlayerTest {
         assertEquals(Tune.MAX_RING, 32767 / (Columns.C - 1));
     }
 
-    /** Each tick kind as a pair: the text of its row in performance.md,
-     *  then the player's equate that gives the monitor's count for it. */
+    /** Each tick kind as a triple: the text of its row in
+     *  performance.md, the player's equate that gives what that path
+     *  costs, and the cycles the level drop adds to it, 16 on the two
+     *  paths that write a row's value and none on the two that end a
+     *  source. */
     private static final List<String> TICKS = List.of(
-            "a row written, the place stepped", "PERF_ON",
-            "the marker, the place to row `RR`", "PERF_LOOP",
-            "the marker, the timer stopped", "PERF_STOP",
-            "a square's two rows, no place stepped", "PERF_SQ");
+            "a row written, the place stepped", "PERF_ON", "16",
+            "the marker, the place to row `RR`", "PERF_LOOP", "0",
+            "the marker, the timer stopped", "PERF_STOP", "0",
+            "a square's two rows, no place stepped", "PERF_SQ", "16");
+
+    /** The cycles an end of interrupt written by hand adds to every
+     *  path (68k/YMXR.S, PERF_END). */
+    private static final int END = 16;
 
     @Test
     void theMonitorCountsATickAtWhatItCosts() throws IOException {
-        // The raster monitor burns a bar for the ticks' counted cost, in
-        // turns of ten cycles (68k/YMXR.S, YMXR_PERF). Each count stands
-        // within a twentieth of what performance.md measures that tick at,
-        // so the bar reads as the timers' share of the frame.
+        // The raster monitor burns a bar for the ticks' counted cost
+        // (68k/YMXR.S, YMXR_PERF), and a count is the path's cycles with
+        // what the two switches add, rounded to the nearest turn of ten.
+        // The player's figure for a path is what it costs with neither
+        // the level dropped nor an end of interrupt written, which is
+        // performance.md's lean column, and the two switches add back
+        // what its other column measures.
         Map<String, Integer> e = equates();
         String said = Files.readString(Path.of("doc/performance.md"));
-        for (int i = 0; i < TICKS.size(); i += 2) {
+        for (int i = 0; i < TICKS.size(); i += 3) {
             String row = TICKS.get(i);
-            int count = Objects.requireNonNull(e.get(TICKS.get(i + 1)),
+            int held = Objects.requireNonNull(e.get(TICKS.get(i + 1)),
                     TICKS.get(i + 1) + " is not an equate of the player");
-            Matcher m = Pattern.compile("^\\| " + Pattern.quote(row) + " \\| (\\d+) \\|$",
-                    Pattern.MULTILINE).matcher(said);
-            assertTrue(m.find(), "performance.md has no row for " + row);
-            int measured = Integer.parseInt(m.group(1));
-            assertTrue(Math.abs(count * 10 - measured) * 20 <= measured,
-                    row + " is measured at " + measured + " cycles, and the monitor counts "
-                            + count + " turns of ten");
+            int drop = Integer.parseInt(TICKS.get(i + 2));
+            Matcher m = Pattern.compile("^\\| " + Pattern.quote(row)
+                    + " \\| (\\d+) \\| (\\d+) \\|$", Pattern.MULTILINE).matcher(said);
+            assertTrue(m.find(), "performance.md's lean table has no row for " + row);
+            int full = Integer.parseInt(m.group(1));
+            int lean = Integer.parseInt(m.group(2));
+            assertEquals(lean, held, row + " is measured at " + lean
+                    + " cycles with neither switch, and the player holds " + held);
+            assertEquals(full, lean + drop + END, row + " is measured at " + full
+                    + " cycles as it stands, and the lean path plus the level and the end"
+                    + " of interrupt is " + (lean + drop + END));
         }
     }
 

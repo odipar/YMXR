@@ -13,13 +13,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * The three binaries as the build assembled them, and what the tools make
- * of them: the core's, the monitor core's and the stub's descriptors as
+ * The five binaries as the build assembled them, and what the tools make
+ * of them: each of the four cores' descriptors and the stub's as
  * BINARIES.md states them, an SNDH file from the kit's tunes read back
  * tag by tag and part by part, and a program around it.
  */
@@ -79,7 +81,7 @@ final class BinariesTest {
     @Test
     void theMonitorCoreIsTheSameCoreWithTheMonitorIn() throws IOException {
         byte[] core = Binaries.core();
-        byte[] monitor = Binaries.monitorCore();
+        byte[] monitor = Binaries.core(true, false);
         assertCore(monitor, Sndh.CORE_MONITOR);
         assertTrue(monitor.length > core.length, "the monitor core is " + monitor.length
                 + " bytes and the plain core " + core.length);
@@ -91,6 +93,34 @@ final class BinariesTest {
             assertEquals(reaches(core, entry), reaches(monitor, entry),
                     "the entry at " + entry);
         }
+    }
+
+    @Test
+    void eachOfTheTwoSwitchesFourSettingsIsACoreWhoseFlagsSayWhichItIs() throws IOException {
+        // The tool picks a core by the switches asked for and holds it to
+        // the flags word (Sndh.checkCore), so each of the four settings
+        // needs a core of its own whose word reads the setting back.
+        Set<String> named = new LinkedHashSet<>();
+        for (int setting = 0; setting < 4; setting++) {
+            boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
+            boolean lean = (setting & Sndh.CORE_LEAN) != 0;
+            byte[] core = Binaries.core(monitor, lean);
+            assertCore(core, setting);
+            Sndh.checkCore(core, monitor, lean);
+            named.add(Binaries.binary(monitor, lean).name());
+        }
+        assertEquals(4, named.size(), "the four settings are four binaries: " + named);
+    }
+
+    @Test
+    void theLeanTickIsTheSameBytesOffEitherCore() throws IOException {
+        // Both switches are the player's own, so the lean tick takes the
+        // same code off the core with the monitor in as off the plain one.
+        int off = Binaries.core().length - Binaries.core(false, true).length;
+        assertEquals(off, Binaries.core(true, false).length
+                - Binaries.core(true, true).length,
+                "the lean tick is " + off + " bytes off the plain core");
+        assertTrue(off > 0, "the lean core is smaller by " + off + " bytes");
     }
 
     @Test
@@ -362,11 +392,46 @@ final class BinariesTest {
         byte[] plain = Sndh.of(files, new Sndh.Options("Plain", null, null, false, false));
         byte[] watched = Sndh.of(files, new Sndh.Options("Watched", null, null, true, false));
         assertCombined(Binaries.core(), plain, files, tags(plain));
-        assertCombined(Binaries.monitorCore(), watched, files, tags(watched));
+        assertCombined(Binaries.core(true, false), watched, files, tags(watched));
         assertEquals(0, Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
                 "the plain core leaves the desktop's pixels where they are");
         assertEquals(Prg.FLAG_CLEAR, Tune.getWord(Prg.of(watched, 0), 28 + Prg.STUB_FLAGS_AT),
                 "the monitor core has the program clear the screen");
+    }
+
+    @Test
+    void aFileTakesTheCoreOfTheTwoSwitchesItIsAskedFor() throws IOException {
+        // The failure this covers: a file asked for the monitor and the
+        // lean tick took the monitor's core, whose flags say nothing of
+        // the lean tick, and checkCore refused it.
+        List<byte[]> files = List.of(tune("chambers"));
+        for (int setting = 0; setting < 4; setting++) {
+            boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
+            boolean lean = (setting & Sndh.CORE_LEAN) != 0;
+            byte[] sndh = Sndh.of(files, new Sndh.Options("Both", null, null, monitor, lean));
+            assertEquals(setting, Tune.getWord(sndh,
+                    Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
+                    "the file's core reads back the switches asked for");
+            assertCombined(Binaries.core(monitor, lean), sndh, files, tags(sndh));
+            assertEquals(monitor ? Prg.FLAG_CLEAR : 0,
+                    Tune.getWord(Prg.of(sndh, 0), 28 + Prg.STUB_FLAGS_AT),
+                    "the program clears the screen for the monitor's bars and not otherwise");
+        }
+    }
+
+    @Test
+    void aCoreWithoutTheLeanTickIsRejectedWhereTheLeanTickWasAskedFor() throws IOException {
+        List<byte[]> files = List.of(tune("chambers"));
+        Sndh.Options lean = new Sndh.Options("Lean", null, null, false, true);
+        Sndh.Options both = new Sndh.Options("Both", null, null, true, true);
+        for (Sndh.Options options : List.of(lean, both)) {
+            byte[] without = Binaries.core(options.monitor(), false);
+            IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                    () -> Sndh.of(without, files, options));
+            assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
+                    && said(wrong).contains("needs bit 1 set"), said(wrong));
+            Sndh.checkCore(Binaries.core(options.monitor(), true), options.monitor(), true);
+        }
     }
 
     @Test
@@ -378,7 +443,7 @@ final class BinariesTest {
                 () -> Sndh.of(core, files, options));
         assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
                 && said(wrong).contains("read 0"), said(wrong));
-        byte[] sndh = Sndh.of(Binaries.monitorCore(), files, options);
+        byte[] sndh = Sndh.of(Binaries.core(true, false), files, options);
         assertEquals(Sndh.CORE_MONITOR, Tune.getWord(sndh,
                 Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
                 "the monitor core passes the same check");
