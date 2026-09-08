@@ -14,16 +14,16 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 430 | 1616 | 2210 | 1072 | 1654 |
-| Chambers of Shaolin 5 - you blew it! | 1000 | 1450 | 3476 | 852 | 2860 |
-| Circus Attractions 2 | 8 | 1524 | 1720 | 792 | 792 |
-| DBA 2 | 19442 | 2041 | 5600 | 1185 | 4920 |
-| DBA 5 | 22262 | 2128 | 5746 | 1257 | 4554 |
-| Digidrum preempt, built | 800 | 1702 | 2884 | 822 | 2052 |
-| Retrigger retune, built | 1200 | 1572 | 2368 | 828 | 1098 |
-| Synergy Credits | 10754 | 2425 | 6406 | 1266 | 4994 |
-| Turrican - world 4-3 | 3680 | 1676 | 4904 | 933 | 4176 |
-| Turrican 2 - world completed 1 | 179 | 1976 | 5712 | 1284 | 5062 |
+| Big - Samantha Fox Strip Poker 6 | 430 | 1592 | 2186 | 1062 | 1644 |
+| Chambers of Shaolin 5 - you blew it! | 1000 | 1426 | 3452 | 842 | 2850 |
+| Circus Attractions 2 | 8 | 1500 | 1696 | 782 | 782 |
+| DBA 2 | 19442 | 2017 | 5576 | 1175 | 4910 |
+| DBA 5 | 22262 | 2104 | 5722 | 1247 | 4544 |
+| Digidrum preempt, built | 800 | 1678 | 2860 | 812 | 2042 |
+| Retrigger retune, built | 1200 | 1548 | 2344 | 818 | 1088 |
+| Synergy Credits | 10754 | 2401 | 6382 | 1256 | 4984 |
+| Turrican - world 4-3 | 3680 | 1652 | 4880 | 923 | 4166 |
+| Turrican 2 - world completed 1 | 179 | 1952 | 5688 | 1274 | 5052 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
@@ -32,7 +32,7 @@ Credits and Turrican 2 - world completed 1 among these, so a refill of theirs
 is thirty units of a byte. What those units cost depends on how the column
 packed: a run of long matches costs 12 cycles a unit to copy, and a short
 operation, a length and an offset read bit by bit, about 225 to 240 an
-operation to parse. The advance spends 496 cycles a refill outside the
+operation to parse. The advance spends 486 cycles a refill outside the
 decoder, loading and storing the decoder's eight registers, testing its mark
 and stepping to the next, and a refill that parses nothing new adds 334 on
 Turrican - world 4-3 at unit 2 and 578 on Synergy Credits at unit 1. The range
@@ -40,14 +40,14 @@ comes from the endpoints on Turrican - world 4-3: the 334 above and 3,680 at
 its heaviest are 3,346 over fourteen operations, about 239 each, and YMX's own
 slope is about 225 an operation. A least-squares fit over every refill reads
 higher, 285 to 342 an operation, since a refill that parses few operations is
-mostly the fixed part. A refill of 496 outside and the heaviest 3,680 inside
-is the 4,176 the table above gives as Turrican's advance in its costliest
+mostly the fixed part. A refill of 486 outside and the heaviest 3,680 inside
+is the 4,166 the table above gives as Turrican's advance in its costliest
 frame. Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 (experiments.md) and costs more to decode: measured on Turrican - world 4-3,
-the advance 1,184 on average and 4,632 at most against 933 and 4,176, and the
-play call 1,970 and 5,352 against 1,720 and 4,948; `-k1` packs at it.
+the advance 1,174 on average and 4,622 at most against 923 and 4,166, and the
+play call 1,946 and 5,328 against 1,652 and 4,880; `-k1` packs at it.
 
-The frame procedure is the rest, from 544 to 1,159 cycles on average:
+The frame procedure is the rest, from 530 to 1,145 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
 effects' columns and the call's own entry and exit. An effect the tune
 does not run is jumped over, two nops standing at its columns' head
@@ -68,7 +68,7 @@ copy.
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it: the
 averages by more than three fifths of it, and the costliest frame of every
 tune but one by 900 cycles or more. Synergy Credits' costliest frame, at
-unit 1, is 250 cycles under the budget.
+unit 1, is 274 cycles under the budget.
 
 ## The raster monitor
 

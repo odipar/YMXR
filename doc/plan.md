@@ -71,14 +71,6 @@ Reversing the branch alone, with neither, moves 2 cycles: the plain
 path's `beq` taken at 10 becomes a `bne` not taken at 8, and the row
 that sets the column pays the 2 back.
 
-## 3. The advance is called at its own address
-
-`movea.l WS_IMAGE(a6),a2` and `jsr IM_ADVANCE(a2)` reach a `bra.w` in
-the image's slot: 16 + 18 + 10, 44 cycles to arrive. Init resolves the
-slot once and writes the address into a `jsr (abs).l`, 20 cycles.
-Counted, 24 a frame; patching the slot's own address rather than the
-body's leaves the `bra.w` and saves 14.
-
 ## 4. One branch over a run of effects the tune does not run
 
 Each effect the tune does not run costs its own `bra.w` to its own end,
@@ -172,18 +164,18 @@ Taken in the order they cost the least to take:
 
 | step | saves a frame | the costliest frame | asks for |
 |---|---|---|---|
-| 3, the advance called direct | 24, counted | the same | nothing |
 | 4, one branch over a run | 19, counted | the same | nothing |
 | 5, the merged skip | 8 an effect, counted | the same | nothing |
 | 1, the shape's test dropped | 14 | 8 to 14 less | 58 bytes, or section 4's order |
 | 6, the two bits | 62, measured | 40 less | version $0003 |
 
-Steps 3 to 5 stand in `68k/YMXR.S` alone and take neither bytes nor
+Steps 4 and 5 stand in `68k/YMXR.S` alone and take neither bytes nor
 rule with them. Step 1 takes one of the two costs its own section
 gives. Step 6 takes the tune file's version. Together they read about
-125 cycles off a call of about 2,050, and about 50 off the frame the
+100 cycles off a call of about 2,000, and about 50 off the frame the
 budget binds.
 
-Step 2, the frame on `a0`, is taken: 44 cycles a frame and 44 off every
-costliest frame, on every one of the ten tunes, which is the figure it
-was counted at. performance.md holds what a call costs with it in.
+Two are taken, each at the figure it was counted at, on every one of
+the ten tunes and off every costliest frame: the frame on `a0` at 44,
+and the advance called at its own address at 24. performance.md holds
+what a call costs with them in.
