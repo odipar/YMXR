@@ -9,12 +9,19 @@ the player is checked against the specification and not against the
 converter.
 
 Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
+       test_ymxr.py -corpus [N]        a spread of the corpus in place of the
+                                       fixtures, 40 tunes unless N says
        test_ymxr.py -cycles [tunes]    the play call's cost as well
        test_ymxr.py -hatari [tunes]    the same tunes on a real MFP, under
                                        Hatari
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, held to the same model:
                                        the monitor moves no chip write
+
+The fixtures under ym/test are chosen for the shapes a tune takes, one
+of each; -corpus reads what the corpus holds instead, which no fixture
+was chosen for. A tune that fails is named and the rest are read, so one
+run says every tune that fails rather than the first.
 
 The player takes a bound tune (doc/BINARIES.md 1): each tune file is
 bound through bin/ymxr-bind before it is played, and a tune file of
@@ -179,6 +186,26 @@ def assemble(source="YMXR.S", defines=()):
                 except ValueError:
                     pass
     return open(out, "rb").read(), symbols
+
+
+CORPUS = os.environ.get("YM_CORPUS",
+                        os.path.expanduser("~/git/jatari/data/ym_format"))
+
+# How many tunes -corpus reads where it is given no count. Forty is about
+# eleven minutes, which is a net a reader runs and waits for.
+CORPUS_TUNES = 40
+
+
+def spread(most):
+    """A spread of `most` tunes off the corpus: every Nth file by name, so
+    a sample covers the corpus rather than one composer's run of it."""
+    if not os.path.isdir(CORPUS):
+        raise SystemExit("no corpus at " + CORPUS + ": YM_CORPUS names it")
+    every = sorted(os.path.join(CORPUS, f) for f in os.listdir(CORPUS)
+                   if f.lower().endswith(".ym"))
+    if not every:
+        raise SystemExit("no .ym file under " + CORPUS)
+    return every[::max(1, len(every) // most)][:most]
 
 
 def convert(ym, work):
@@ -1043,10 +1070,16 @@ def main():
     real = "-hatari" in sys.argv
     kit = "-kit" in sys.argv
     perf = PERF
+    wide = next((a for a in sys.argv[1:] if a.startswith("-corpus")), None)
     if kit:
         where = os.path.join(ROOT, "doc", "conformance", "tunes")
         tunes = args or sorted(os.path.join(where, f) for f in os.listdir(where)
                                if f.endswith(".ymxr"))
+    elif wide is not None:
+        said = wide[len("-corpus"):]
+        if said and not said.isdigit():
+            raise SystemExit("-corpus takes a count and not " + said)
+        tunes = args or spread(int(said or CORPUS_TUNES))
     else:
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
@@ -1074,61 +1107,74 @@ def main():
         with_movep(test_dtx)
         cycles_of = test_dtx
     stale = []
+    wrong = []
     for ym in tunes:
-        if real:
-            frames, ticks = hatari(ym, code, symbols, perf)
-            print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
-            continue
-        frames, ticks, cost, tick_cost, where = check(ym, code, symbols,
-                                                      cycles_of and CyclesOn(cycles_of), kit, perf)
-        line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
-        if kit:
-            line += ", the player's frames are the reader's entries"
-        if cost and perf:
-            line += ", no cost figures: the monitor's own cycles run inside the call"
-        if cost and not perf:
-            average = int(sum(cost) / len(cost))
-            adv = where[3]
-            line += ", play %5d cycles on average, %5d at most, at frame %d of R %d RR %d" % (
-                average, max(cost), where[0], where[1], where[2])
-            line += "; the advance %5d on average, %5d at most, %5d in the costliest frame" % (
-                sum(adv) / len(adv), max(adv), adv[where[0]])
-            for then in sorted(tick_cost):
-                line += ", a tick %s %s" % (then, "/".join(str(c) for c in sorted(tick_cost[then])))
-            stem = os.path.basename(ym)[:-3].replace("  ", " ")
-            row = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$"
-                            % re.escape(stem),
-                            open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
-            said = row and tuple(int(x) for x in row.groups())
-            counted = (frames, average, max(cost), int(sum(adv) / len(adv)), adv[where[0]])
-            if said != counted:
-                stale.append("performance.md says %s for %s, and the rig counts %s" % (
-                    said, stem, counted))
-            # A lean tick drops no interrupt level, so the row a tune of
-            # one effect takes is the row every other tune takes, and the
-            # four kinds read the lean table's second figure.
-            for then, name in (("on", "a row written, the place stepped"),
-                               ("loop", "the marker, the place to row `RR`"),
-                               ("stop", "the marker, the timer stopped"),
-                               ("square", "a square's two rows, no place stepped"),
-                               ("on alone", "a row written, the tune running one effect"),
-                               ("loop alone", "the marker to row `RR`, one effect"),
-                               ("stop alone", "the marker and the stop, one effect"),
-                               ("square alone", "a square's two rows, one effect")):
-                if then not in tick_cost:
-                    continue
-                if LEAN:
-                    name = LEAN_ROW[then.replace(" alone", "")]
-                    row = r"^\| %s \| \d+ \| (\d+) \|$" % re.escape(name)
-                else:
-                    row = r"^\| %s \| (\d+) \|$" % re.escape(name)
-                tick = re.search(row,
-                                 open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
-                if not tick or {int(tick.group(1))} != tick_cost[then]:
-                    stale.append("performance.md's tick %s is not %s" % (then, tick_cost[then]))
-        print(line)
+        try:
+            if real:
+                frames, ticks = hatari(ym, code, symbols, perf)
+                print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
+                continue
+            frames, ticks, cost, tick_cost, where = check(ym, code, symbols,
+                                                          cycles_of and CyclesOn(cycles_of), kit, perf)
+            line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
+            if kit:
+                line += ", the player's frames are the reader's entries"
+            if cost and perf:
+                line += ", no cost figures: the monitor's own cycles run inside the call"
+            if cost and not perf:
+                average = int(sum(cost) / len(cost))
+                adv = where[3]
+                line += ", play %5d cycles on average, %5d at most, at frame %d of R %d RR %d" % (
+                    average, max(cost), where[0], where[1], where[2])
+                line += "; the advance %5d on average, %5d at most, %5d in the costliest frame" % (
+                    sum(adv) / len(adv), max(adv), adv[where[0]])
+                for then in sorted(tick_cost):
+                    line += ", a tick %s %s" % (then, "/".join(str(c) for c in sorted(tick_cost[then])))
+                stem = os.path.basename(ym)[:-3].replace("  ", " ")
+                row = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$"
+                                % re.escape(stem),
+                                open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
+                said = row and tuple(int(x) for x in row.groups())
+                counted = (frames, average, max(cost), int(sum(adv) / len(adv)), adv[where[0]])
+                if said != counted:
+                    stale.append("performance.md says %s for %s, and the rig counts %s" % (
+                        said, stem, counted))
+                # A lean tick drops no interrupt level, so the row a tune of
+                # one effect takes is the row every other tune takes, and the
+                # four kinds read the lean table's second figure.
+                for then, name in (("on", "a row written, the place stepped"),
+                                   ("loop", "the marker, the place to row `RR`"),
+                                   ("stop", "the marker, the timer stopped"),
+                                   ("square", "a square's two rows, no place stepped"),
+                                   ("on alone", "a row written, the tune running one effect"),
+                                   ("loop alone", "the marker to row `RR`, one effect"),
+                                   ("stop alone", "the marker and the stop, one effect"),
+                                   ("square alone", "a square's two rows, one effect")):
+                    if then not in tick_cost:
+                        continue
+                    if LEAN:
+                        name = LEAN_ROW[then.replace(" alone", "")]
+                        row = r"^\| %s \| \d+ \| (\d+) \|$" % re.escape(name)
+                    else:
+                        row = r"^\| %s \| (\d+) \|$" % re.escape(name)
+                    tick = re.search(row,
+                                     open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
+                    if not tick or {int(tick.group(1))} != tick_cost[then]:
+                        stale.append("performance.md's tick %s is not %s" % (then, tick_cost[then]))
+            print(line)
+        except AssertionError as failed:
+            # A tune that fails is named and the rest are read, so one run
+            # says every tune that fails and not the first alone. One line
+            # a tune, as bin/ymxr-check gives: a reader takes the tune on
+            # its own to see the whole of what it says.
+            wrong.append(os.path.basename(ym))
+            said = str(failed).strip().split("\n")[0]
+            print("%-45s FAILED: %s" % (os.path.basename(ym), said[:120]))
     assert not stale, "\n".join(sorted(set(stale)))
-    print("every tune plays as the specification reads")
+    if wrong:
+        raise SystemExit("%d of %d tunes failed: %s"
+                         % (len(wrong), len(tunes), ", ".join(wrong)))
+    print("%d tunes play as the specification reads" % len(tunes))
 
 
 def with_movep(module):
