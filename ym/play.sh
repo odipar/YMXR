@@ -42,7 +42,8 @@
 # The run:
 #
 #   -vN        stop after N frames; the tune plays on without it
-#   -silent    the tools say only what they wrote; without it each says
+#   -silent    the tools say nothing but their notes: this script takes
+#              their standard output, and without the flag each says
 #              what it read, the flags it took and what it made, on
 #              standard error (tools.md)
 #   -h         this text
@@ -67,7 +68,7 @@
 #       and the timers cost
 #
 #   ym/play.sh -silent tune.ym
-#       the same run with the tools saying only what they wrote
+#       the same run with the tools saying nothing but their notes
 #
 #   ym/play.sh -lean tune.ymxr
 #       a tune file already packed, on the core whose ticks cost less

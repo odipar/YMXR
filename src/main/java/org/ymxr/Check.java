@@ -254,7 +254,6 @@ final class Check {
                     report.progress("read", read.incrementAndGet(), files.size());
                     return result;
                 }).toList();
-        report.clear();
         int dumps = 0;
         int failed = 0;
         for (Result result : results) {

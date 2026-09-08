@@ -1,5 +1,6 @@
 package org.ymxr;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -59,6 +60,36 @@ final class ConsistencyTest {
             rows.add(new Object[] {first, last, m.group(3).trim()});
         }
         return rows;
+    }
+
+    @Test
+    void everyColumnIsNamedAsTheSpecificationNamesIt() throws IOException {
+        // The report gives a row a column, and the name on it is the
+        // player's vocabulary for that column (AGENTS.md, one
+        // vocabulary), so SPEC.md's table is what it is held to.
+        List<Object[]> rows = columnTable(read(SPEC));
+        List<String> astray = new ArrayList<>();
+        for (Object[] r : rows) {
+            int first = (Integer) r[0];
+            int last = (Integer) r[1];
+            String holds = (String) r[2];
+            for (int c = first; c <= last; c++) {
+                String name = Tune.name(c);
+                // A row is the column's name, and where it says more it
+                // says it after a comma: "R0, voice A tone period, fine",
+                // "effect 0 timer control, Timer A's control register".
+                boolean named = holds.equals(name) || holds.startsWith(name + ",");
+                if (first == last && !named) {
+                    astray.add("column " + c + " is named " + name + " and holds " + holds);
+                } else if (first != last && (c - Columns.EFFECT) / 4
+                        != (first - Columns.EFFECT) / 4) {
+                    astray.add("column " + c + " falls outside the effect its row gives");
+                }
+            }
+        }
+        assertEquals(List.of(), astray, "a column's name is not the specification's");
+        assertEquals("R0", Tune.name(0));
+        assertEquals("effect 3 timer count", Tune.name(Columns.C - 1));
     }
 
     @Test

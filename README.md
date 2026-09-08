@@ -60,8 +60,8 @@ file (SPEC.md 7), which the conformance kit's references are.
 
 Each tool reports what it read, the flags it took and what it made, on
 standard error, and how far through a long run it is; what the tool is
-for goes to standard output. `-silent` leaves that one line
-(doc/tools.md).
+for goes to standard output. `-silent` leaves standard output and the
+notes (doc/tools.md).
 
 The shape follows [YMX](https://github.com/odipar/YMX): Java is the
 source of truth, and the Go and C# trees are to follow it byte for byte.

@@ -5,10 +5,11 @@ truth; the Go and C# trees are to follow it.
 
 ## What a tool says
 
-A tool reports what it did, and `-silent` leaves it saying only what it
-wrote. The report goes to standard error and what the tool is for goes
-to standard output, so a run read through a pipe or into a file reads
-the same either way and the report stands on the terminal beside it.
+A tool reports what it did, and `-silent` leaves it saying what it
+wrote and its notes. The report goes to standard error and what the tool
+is for goes to standard output, so a run read through a pipe or into a
+file reads the same either way and the report stands on the terminal
+beside it.
 
 Every tool takes `-silent`, `ym/play.sh` and `ym/cost.sh` among them,
 which pass it to the tools they drive.
@@ -22,9 +23,11 @@ which pass it to the tools they drive.
 | what it wrote | the file's bytes, and what the parts of it came to |
 | a note | a warning, which stands whether the report is on or off |
 
-A run of many files says how far through them it is on one line redrawn
-over itself. The line is drawn only where standard error is read on a
-terminal, so a redirected run holds no carriage returns.
+A run of many files says how far through them it is on lines of its
+own, held apart by a tenth of the run and by a second of the clock: a
+run that ends within a second says nothing of its progress, and one of
+minutes gives about ten such lines. They are ordinary lines, so a run read
+into a file holds them as it holds the rest.
 
 ## Convert
 
@@ -185,7 +188,7 @@ run's last frame beside it as a PNG.
 | `-lean` | the core whose ticks neither drop the interrupt level nor write their own end of interrupt (performance.md) |
 | `-perf -lean` | the core that is both, so the bars are the lean ticks' own |
 | `-vN` | the frames to run |
-| `-silent` | the tools it drives say only what they wrote |
+| `-silent` | the tools it drives say nothing but their notes, since this script takes their standard output |
 | `-h` | the options and examples, which the script's own head holds |
 
 `-k`, `-m` and `-r` are the converter's, and a tune file, which is

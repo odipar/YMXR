@@ -120,14 +120,22 @@ final class Trace {
         Report report = new Report(!silent);
         int calls = named.size() == 2 ? Integer.parseInt(named.get(1)) : -1;
         byte[] tune = Files.readAllBytes(Path.of(named.get(0)));
-        TuneFile file = TuneFile.read(tune);
-        report.say("the tune file: " + named.get(0) + ", " + tune.length + " bytes");
-        report.row("the table", file.table().rows() + " rows of " + file.table().columns()
-                + " columns, repeating at row " + file.table().repeat());
-        report.row("the frame rate", file.frameRate() + " Hz");
-        report.row("the sources", String.valueOf(file.sources().size()));
-        report.row("the rows to record", calls < 0 ? "one pass and the loop once"
-                : String.valueOf(calls));
+        // A file this reader does not read records nothing and says so
+        // (SPEC.md 6, R6.1), so the report reads the header under the
+        // same guard rather than throwing where the record would not.
+        try {
+            TuneFile file = TuneFile.read(tune);
+            report.say("the tune file: " + named.get(0) + ", " + tune.length + " bytes");
+            report.row("the table", file.table().rows() + " rows of " + file.table().columns()
+                    + " columns, repeating at row " + file.table().repeat());
+            report.row("the frame rate", file.frameRate() + " Hz");
+            report.row("the sources", String.valueOf(file.sources().size()));
+            report.row("the rows to record", calls < 0 ? "one pass and the loop once"
+                    : String.valueOf(calls));
+        } catch (IllegalArgumentException wrong) {
+            report.say("the tune file: " + named.get(0) + ", " + tune.length
+                    + " bytes, which this reader does not read: " + wrong.getMessage());
+        }
         byte[] rows = record(tune, calls);
         report.say("recorded: " + rows.length + " bytes of rows on standard output");
         System.out.write(rows);

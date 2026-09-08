@@ -81,9 +81,16 @@ final class Bind {
         }
         int state = Tune.getLong(bound, Bound.STATE_AT);
         int image = Tune.getLong(bound, Bound.IMAGE_AT);
+        // The image stands before the DTX1 source tables, so where there
+        // is a source the first one's offset ends the image, and where
+        // there is none the file does.
+        int sources = TuneFile.read(tune).sources().size();
+        int ends = sources > 0 ? Tune.getLong(bound, Bound.INDEX_AT) : bound.length;
         report.say("bound: DTX's reader for the table in place of the table");
-        report.row("the reader's image", "at " + image + ", " + (bound.length - image)
-                + " bytes");
+        report.row("the reader's image", "at " + image + ", " + (ends - image) + " bytes");
+        if (sources > 0) {
+            report.row("the source tables", sources + " of " + (bound.length - ends) + " bytes");
+        }
         report.row("the state block", state + " bytes, which the host finds the workspace for");
         report.row("in all", bound.length + " bytes, " + (bound.length - tune.length)
                 + " over the tune file");

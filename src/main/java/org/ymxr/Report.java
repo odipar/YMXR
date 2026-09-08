@@ -19,18 +19,20 @@ import java.util.Locale;
  * output is read through a pipe or a file reads the same with the report
  * on as with it off, and the report is on the terminal beside it.
  *
- * <p>The progress line is redrawn over itself with a carriage return,
- * which a terminal overwrites and a file keeps, so it is drawn only
- * where standard error is a terminal.
+ * <p>A long run says how far through it is on lines of its own, held
+ * apart by a tenth of the run and by a second of the clock: a run that
+ * ends within a second says nothing, and one of minutes gives about ten
+ * such lines. They are ordinary lines, so a run read into a file holds
+ * them as it holds the rest, and no run needs to know whether a
+ * terminal is reading it.
  */
 final class Report {
 
     /** How wide a name stands in a reported row. */
     private static final int NAME = 22;
 
-    /** How wide the progress line is drawn, so that a shorter one written
-     *  over a longer one leaves none of it behind. */
-    private static final int WIDE = 44;
+    /** How long a run says nothing more of its progress, in nanoseconds. */
+    private static final long APART = 1_000_000_000L;
 
     private final List<String> notes = new ArrayList<>();
 
@@ -39,15 +41,12 @@ final class Report {
 
     private final PrintStream to;
 
-    /** Whether the stream is read on a terminal, which the progress line
-     *  asks before it draws. */
-    private final boolean terminal;
+    /** The tenth of a run the last progress line gave, and the clock it
+     *  stood at. A run over many files counts them from several threads,
+     *  so progress takes this object's lock and both are read under it. */
+    private int tenth = -1;
 
-    /** Whether a progress line stands on the terminal, to be cleared.
-     *  A run over many files counts them from several threads, so the
-     *  three methods that draw and clear the line take this object's
-     *  lock and this field is read under it. */
-    private boolean drawn;
+    private long last;
 
     /** Frames on which a drum on a voice kept a SID there from running. */
     int preempted;
@@ -68,15 +67,9 @@ final class Report {
     }
 
     Report(boolean says, PrintStream to) {
-        this(says, to, atTerminal());
-    }
-
-    /** The same, told whether the stream is a terminal, which is what
-     *  decides the progress line and what a test names for itself. */
-    Report(boolean says, PrintStream to, boolean terminal) {
         this.says = says;
         this.to = to;
-        this.terminal = terminal;
+        this.last = System.nanoTime();
     }
 
     /** Whether anything printed here is read: a caller that builds a line
@@ -88,7 +81,6 @@ final class Report {
     /** One line, at the left margin. */
     synchronized void say(String line) {
         if (says) {
-            clear();
             to.println(line);
         }
     }
@@ -106,44 +98,38 @@ final class Report {
     }
 
     /**
-     * How far through a run of {@code of} steps this is, redrawn over the
-     * line before it. Nothing is drawn where the report is silent or the
-     * terminal is not where this is read, so a redirected run holds no
-     * carriage returns.
+     * How far through a run of {@code of} steps this is. A line is said
+     * where the tenth of the run it stands in has moved and a second has
+     * passed since the last, so a run that ends within a second says
+     * nothing of its progress and one of minutes gives about ten such
+     * lines.
      */
     synchronized void progress(String what, int done, int of) {
-        if (!says || of <= 0 || !terminal) {
+        if (!says || of <= 0) {
             return;
         }
-        to.printf(Locale.ROOT, "\r  %-" + WIDE + "s",
-                String.format(Locale.ROOT, "%s %d of %d (%d%%)",
-                        what, done, of, done * 100 / of));
-        to.flush();
-        drawn = true;
-    }
-
-    /** The progress line taken off, so the next line stands on its own. */
-    synchronized void clear() {
-        if (drawn) {
-            to.print("\r" + " ".repeat(WIDE + 2) + "\r");
-            to.flush();
-            drawn = false;
+        int now = done * 10 / of;
+        long clock = System.nanoTime();
+        if (now == tenth || clock - last < APART) {
+            return;
         }
-    }
-
-    /**
-     * Whether the terminal is where this is read. Since JDK 22 {@code
-     * System.console()} is an object whether or not the streams are a
-     * terminal, and {@code isTerminal()} is what says so.
-     */
-    static boolean atTerminal() {
-        java.io.Console console = System.console();
-        return console != null && console.isTerminal();
+        tenth = now;
+        last = clock;
+        say(String.format(Locale.ROOT, "  %s %d of %d (%d%%)", what, done, of,
+                done * 100 / of));
     }
 
     synchronized void note(String text) {
         notes.add(text);
         say("  note: " + text);
+    }
+
+    /** The notes a tool has still to print: the counted ones, which are
+     *  reached only here, and, where the report is off, the ones it
+     *  would have said where they happened. */
+    synchronized List<String> unsaid() {
+        List<String> all = notes();
+        return says ? all.subList(notes.size(), all.size()) : all;
     }
 
     synchronized List<String> notes() {

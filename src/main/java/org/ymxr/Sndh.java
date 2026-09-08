@@ -425,14 +425,15 @@ final class Sndh {
             switches.add("-perf, the raster monitor in");
         }
         if (options.lean()) {
-            switches.add("-lean, ticks that neither drop the level nor end their own interrupt");
+            switches.add("-lean, ticks that neither drop the interrupt level nor write"
+                    + " their own end of interrupt");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));
         report.say("the tags: TITL " + options.title()
                 + (options.composer() == null ? "" : ", COMM " + options.composer())
                 + (options.names() == null ? "" : ", !#SN with " + options.names().size()
-                + " names"));
+                + (options.names().size() == 1 ? " name" : " names")));
         int bound = 0;
         for (int i = 0; i < files.size(); i++) {
             byte[] b = Bound.of(tunes.get(i));

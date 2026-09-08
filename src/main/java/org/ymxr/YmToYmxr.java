@@ -186,12 +186,11 @@ public final class YmToYmxr {
         Files.write(Path.of(out), converted.written().file());
         report.say("written: " + out);
         System.out.println(converted.said());
-        if (true) {
-            // A note is a warning and stands whether the report is on or
-            // off; where it is on, it was said where it happened.
-            for (String note : report.notes()) {
-                System.out.println("  " + note);
-            }
+        // A note is a warning and stands whether the report is on or off.
+        // Where the report is on, a note it said where it happened is not
+        // said twice, and the counted ones are reached only here.
+        for (String note : report.unsaid()) {
+            System.err.println("  " + note);
         }
     }
 
