@@ -14,16 +14,16 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 430 | 1660 | 2254 | 1072 | 1654 |
-| Chambers of Shaolin 5 - you blew it! | 1000 | 1494 | 3520 | 852 | 2860 |
-| Circus Attractions 2 | 8 | 1568 | 1764 | 792 | 792 |
-| DBA 2 | 19442 | 2085 | 5644 | 1185 | 4920 |
-| DBA 5 | 22262 | 2172 | 5790 | 1257 | 4554 |
-| Digidrum preempt, built | 800 | 1746 | 2928 | 822 | 2052 |
-| Retrigger retune, built | 1200 | 1616 | 2412 | 828 | 1098 |
-| Synergy Credits | 10754 | 2469 | 6450 | 1266 | 4994 |
-| Turrican - world 4-3 | 3680 | 1720 | 4948 | 933 | 4176 |
-| Turrican 2 - world completed 1 | 179 | 2020 | 5756 | 1284 | 5062 |
+| Big - Samantha Fox Strip Poker 6 | 430 | 1616 | 2210 | 1072 | 1654 |
+| Chambers of Shaolin 5 - you blew it! | 1000 | 1450 | 3476 | 852 | 2860 |
+| Circus Attractions 2 | 8 | 1524 | 1720 | 792 | 792 |
+| DBA 2 | 19442 | 2041 | 5600 | 1185 | 4920 |
+| DBA 5 | 22262 | 2128 | 5746 | 1257 | 4554 |
+| Digidrum preempt, built | 800 | 1702 | 2884 | 822 | 2052 |
+| Retrigger retune, built | 1200 | 1572 | 2368 | 828 | 1098 |
+| Synergy Credits | 10754 | 2425 | 6406 | 1266 | 4994 |
+| Turrican - world 4-3 | 3680 | 1676 | 4904 | 933 | 4176 |
+| Turrican 2 - world completed 1 | 179 | 1976 | 5712 | 1284 | 5062 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
@@ -47,7 +47,7 @@ frame. Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 the advance 1,184 on average and 4,632 at most against 933 and 4,176, and the
 play call 1,970 and 5,352 against 1,720 and 4,948; `-k1` packs at it.
 
-The frame procedure is the rest, from 588 to 1,203 cycles on average:
+The frame procedure is the rest, from 544 to 1,159 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
 effects' columns and the call's own entry and exit. An effect the tune
 does not run is jumped over, two nops standing at its columns' head
@@ -67,8 +67,8 @@ copy.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it: the
 averages by more than three fifths of it, and the costliest frame of every
-tune but two by 900 cycles or more. DBA 5's costliest frame is 866 cycles
-under the budget and Synergy Credits', at unit 1, 206.
+tune but one by 900 cycles or more. Synergy Credits' costliest frame, at
+unit 1, is 250 cycles under the budget.
 
 ## The raster monitor
 

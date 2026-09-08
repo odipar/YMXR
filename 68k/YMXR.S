@@ -29,7 +29,10 @@
 ;
 ; The workspace is YMXR_FIXED bytes, then the state block the image's
 ; format block asks for, which the bound tune states at offset 12
-; (BINARIES.md): a host allocates YMXR_FIXED plus that.
+; (BINARIES.md): a host allocates YMXR_FIXED plus that. The row a call
+; writes is the image's own pointer, IM_POINTER of that state block
+; (DTX, abi.md 3), which an advance leaves at column 0's value, so the
+; player keeps no copy of it.
 ;
 ; The host owns the machine. This player saves and restores no vector, no
 ; timer control and no interrupt enable: around init and stop a host keeps
@@ -105,6 +108,8 @@ IM_VARIANT      equ     19
 IM_INIT         equ     0
 IM_METADATA     equ     4
 IM_ADVANCE      equ     12
+IM_POINTER      equ     8               ; the state block's row pointer, which
+                                        ; an advance leaves at column 0's value
 
 ; A DTX1 table's header, and where a source's rows begin (DTX, SPEC.md 1).
 DT_ROWS         equ     4
@@ -124,9 +129,8 @@ FX_SELECT       equ     1               ; the select it last took
 FX_COUNT        equ     2               ; the count it last took
 FX_FIRST        equ     4               ; the running source's first row
 FX_SIZE         equ     8
-WS_ROW          equ     56              ; the row the next call writes
-YMXR_FIXED      equ     60
-WS_STATE        equ     60              ; the image's state block, on a long
+YMXR_FIXED      equ     56
+WS_STATE        equ     56              ; the image's state block, on a long
 
 ; The chip.
 YM_SELECT       equ     $FFFF8800
@@ -239,7 +243,7 @@ q\{col}:
                 QREAD   \cn                     ; the count alone, or nothing
                 beq.w   \{tick}_done
                 move.b  d1,\data.w              ; the count, the timer running on
-                move.b  d1,\fx+FX_COUNT(a6)
+                move.b  d1,\fx+FX_COUNT(a0)
                 bra.w   \{tick}_done
 \{tick}_some:
                 READ2   \cc
@@ -253,13 +257,13 @@ q\{col}:
                 READ    \ct
                 bpl.s   .t\~
                 and.b   #$7F,d1
-                move.b  d1,\fx+FX_TARGET(a6)
+                move.b  d1,\fx+FX_TARGET(a0)
 .t\~:           READ    \cs
                 bpl.s   .rate\~
                 and.w   #$7F,d1
                 beq.s   .stop\~
 ; a start: the source's rows through the index, the handler aimed at them
-                movea.l WS_TUNE(a6),a3
+                movea.l WS_TUNE(a0),a3
                 lsl.w   #2,d1
                 move.l  TF_INDEX-4(a3,d1.w),d0
                 adda.l  d0,a3                   ; the source's DTX1 table
@@ -283,16 +287,16 @@ q\{col}:
 ; between the read and the write steps it (1.9).
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
-                move.b  \fx+FX_TARGET(a6),TICK_SEL(a5)
+                move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
                 move.l  a4,d1                   ; the place: the first row,
                 btst    #5,d2                   ; or the row it stands on in
                 bne.s   .put\~                  ; the rows it replaces
                 add.l   TICK_PTR(a5),d1
-                sub.l   \fx+FX_FIRST(a6),d1
+                sub.l   \fx+FX_FIRST(a0),d1
 .put\~:         move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 move.w  (sp)+,sr
-                move.l  a4,\fx+FX_FIRST(a6)
+                move.l  a4,\fx+FX_FIRST(a0)
 ; the start placed the source, so the row's place reset is made: a tick
 ; before the select steps the place on, and the reset below would undo it
                 bclr    #5,d2
@@ -307,22 +311,22 @@ q\{col}:
 ; the timer's reset: stopped above, the count, then the select
                 tst.b   d1
                 bne.s   .cnt\~
-                move.b  \fx+FX_COUNT(a6),d1
+                move.b  \fx+FX_COUNT(a0),d1
 .cnt\~:         move.b  d1,\data.w
-                move.b  d1,\fx+FX_COUNT(a6)
+                move.b  d1,\fx+FX_COUNT(a0)
                 bra.s   .sel\~
 .live\~:        tst.b   d1
                 beq.s   .done\~
                 move.b  d1,\data.w            ; the count, the timer running on
-                move.b  d1,\fx+FX_COUNT(a6)
+                move.b  d1,\fx+FX_COUNT(a0)
                 bra.s   .done\~
 .set\~:         tst.b   d1
                 beq.s   .sel\~
                 move.b  d1,\data.w
-                move.b  d1,\fx+FX_COUNT(a6)
+                move.b  d1,\fx+FX_COUNT(a0)
 .sel\~:         move.b  d2,d1
                 and.b   #7,d1
-                move.b  d1,\fx+FX_SELECT(a6)
+                move.b  d1,\fx+FX_SELECT(a0)
                 .if     \shift
                 lsl.b   #\shift,d1
                 .endif
@@ -347,7 +351,7 @@ q\{col}:
                 btst    #5,d2
                 beq.s   .done\~
                 lea     \tick(pc),a5          ; the place's reset
-                move.l  \fx+FX_FIRST(a6),TICK_PTR(a5)
+                move.l  \fx+FX_FIRST(a0),TICK_PTR(a5)
 .done\~:
 \{tick}_done:
                 .endm
@@ -518,7 +522,6 @@ YMXR_init:
                 lea     WS_STATE(a6),a0
                 movea.l WS_IMAGE(a6),a2
                 jsr     IM_ADVANCE(a2)          ; a1 the row
-                move.l  a1,WS_ROW(a6)
 
 ; The timers the tune runs, claimed. The others stand as they are.
                 move.w  sr,-(sp)
@@ -565,9 +568,7 @@ YMXR_stop:
                 rts
 
 YMXR_play:
-                move.l  a6,-(sp)
-                movea.l a0,a6
-                tst.l   WS_ROWS(a6)
+                tst.l   WS_ROWS(a0)
                 beq     ymxr_over
                 .if     YMXR_PERF
                 move.w  PERF_COLOUR.w,-(sp)     ; the background, kept
@@ -579,13 +580,14 @@ YMXR_play:
                                                 ; the counter stands still
                 move.w  #PERF_FRAME,PERF_COLOUR.w
                 .endif
-                movea.l WS_ROW(a6),a1           ; the row this call writes,
-                lea     YM_SELECT.w,a2          ; taken by the call before it
+                movea.l WS_STATE+IM_POINTER(a0),a1  ; the row this call
+                lea     YM_SELECT.w,a2          ; writes, where the advance
+                                                ; before it left the image
 
 ; ---------------------------------------------------------------- frame
 
 ; The frame procedure (SPEC.md 4), inline in the call: a1 the row, a2 the
-; chip's select register, a6 the workspace.
+; chip's select register, a0 the workspace.
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
                 EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0
@@ -630,16 +632,15 @@ ymxr_volumes:
 ; call makes, so nothing the advance costs stands between a host's clock
 ; and the chip.
 ymxr_played:
-                subq.l  #1,WS_ROWS(a6)
+                subq.l  #1,WS_ROWS(a0)
                 bne.s   ymxr_next
-                move.l  WS_R(a6),d0             ; the last row: the loop's
-                sub.l   WS_RR(a6),d0            ; rows, or none
-                move.l  d0,WS_ROWS(a6)
+                move.l  WS_R(a0),d0             ; the last row: the loop's
+                sub.l   WS_RR(a0),d0            ; rows, or none
+                move.l  d0,WS_ROWS(a0)
                 beq.s   ymxr_return             ; none: no row to take
-ymxr_next:      lea     WS_STATE(a6),a0
-                movea.l WS_IMAGE(a6),a2
+ymxr_next:      movea.l WS_IMAGE(a0),a2
+                lea     WS_STATE(a0),a0
                 jsr     IM_ADVANCE(a2)
-                move.l  a1,WS_ROW(a6)
 ymxr_return:
                 .if     YMXR_PERF
                 move.w  #PERF_BAR,PERF_COLOUR.w ; the timers' bar, burnt
@@ -650,10 +651,8 @@ ymxr_return:
                 move.w  (sp)+,PERF_COLOUR.w
                 .endif
                 moveq   #0,d0
-                movea.l (sp)+,a6
                 rts
 ymxr_over:      moveq   #-1,d0
-                movea.l (sp)+,a6
                 rts
 
                 .if     YMXR_PERF
