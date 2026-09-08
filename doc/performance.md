@@ -14,16 +14,16 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 430 | 1548 | 2142 | 1062 | 1644 |
-| Chambers of Shaolin 5 - you blew it! | 1000 | 1382 | 3408 | 842 | 2850 |
-| Circus Attractions 2 | 8 | 1458 | 1660 | 782 | 782 |
-| DBA 2 | 19442 | 1978 | 5534 | 1175 | 4910 |
-| DBA 5 | 22262 | 2066 | 5698 | 1247 | 4544 |
-| Digidrum preempt, built | 800 | 1639 | 2820 | 812 | 2042 |
-| Retrigger retune, built | 1200 | 1506 | 2282 | 818 | 1088 |
-| Synergy Credits | 10754 | 2368 | 6360 | 1256 | 4984 |
-| Turrican - world 4-3 | 3680 | 1620 | 4848 | 923 | 4166 |
-| Turrican 2 - world completed 1 | 179 | 1920 | 5656 | 1274 | 5052 |
+| Big - Samantha Fox Strip Poker 6 | 430 | 1536 | 2130 | 1026 | 1608 |
+| Chambers of Shaolin 5 - you blew it! | 1000 | 1370 | 3396 | 806 | 2814 |
+| Circus Attractions 2 | 8 | 1446 | 1648 | 746 | 746 |
+| DBA 2 | 19442 | 1966 | 5522 | 1139 | 4874 |
+| DBA 5 | 22262 | 2054 | 5686 | 1211 | 4508 |
+| Digidrum preempt, built | 800 | 1627 | 2808 | 776 | 2006 |
+| Retrigger retune, built | 1200 | 1494 | 2270 | 782 | 1052 |
+| Synergy Credits | 10754 | 2356 | 6348 | 1220 | 4948 |
+| Turrican - world 4-3 | 3680 | 1608 | 4836 | 887 | 4130 |
+| Turrican 2 - world completed 1 | 179 | 1908 | 5644 | 1238 | 5016 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
@@ -44,8 +44,8 @@ mostly the fixed part. A refill of 486 outside and the heaviest 3,680 inside
 is the 4,166 the table above gives as Turrican's advance in its costliest
 frame. Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 (experiments.md) and costs more to decode: measured on Turrican - world 4-3,
-the advance 1,174 on average and 4,622 at most against 923 and 4,166, and the
-play call 1,871 and 5,252 against 1,620 and 4,848; `-k1` packs at it.
+the advance 1,138 on average and 4,586 at most against 887 and 4,130, and the
+play call 1,859 and 5,240 against 1,608 and 4,836; `-k1` packs at it.
 
 The frame procedure is the rest, from 486 to 1,112 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
