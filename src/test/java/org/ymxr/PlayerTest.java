@@ -64,7 +64,8 @@ final class PlayerTest {
     private static final List<String> TICKS = List.of(
             "a row written, the place stepped", "PERF_ON",
             "the marker, the place to row `RR`", "PERF_LOOP",
-            "the marker, the timer stopped", "PERF_STOP");
+            "the marker, the timer stopped", "PERF_STOP",
+            "a square's two rows, no place stepped", "PERF_SQ");
 
     @Test
     void theMonitorCountsATickAtWhatItCosts() throws IOException {

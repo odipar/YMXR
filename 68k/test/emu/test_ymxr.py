@@ -144,9 +144,10 @@ def equate(name, symbols=None):
 
 
 # A tick handler's operands: the register it selects, and the place it
-# reads. Both offsets are measured off the handler's own labels, so they
-# stand once the player is assembled (main).
-TICK_SEL = TICK_PTR = 0
+# reads; and a square handler's, the register it selects and the row it
+# stands at. Every offset is measured off its handler's own labels, so
+# they stand once the player is assembled (main).
+TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = 0
 
 
 def assemble(source="YMXR.S", defines=()):
@@ -387,6 +388,21 @@ class Model:
             return write, "stop"
         fx["place"] += 1
         return write, "on"
+
+    def square(self, i):
+        """Whether effect i's source is two rows repeating to row 0, which
+        the player's own square handler takes (68k/YMXR.S, SQUARE)."""
+        fx = self.fx[i]
+        if fx["source"] == 0:
+            return False
+        at, R, RR, rows = self.tune.sources[fx["source"]]
+        return R == 2 and RR == 0
+
+    def value(self, i):
+        """The row a square's handler stands at, which is its place."""
+        fx = self.fx[i]
+        at, R, RR, rows = self.tune.sources[fx["source"]]
+        return rows[fx["place"]]
 
     def place_address(self, i):
         fx = self.fx[i]
@@ -731,9 +747,20 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                 assert timers.mode[i] == 0, "frame %d: effect %d's timer runs with no source" % (f, i)
             place = model.place_address(i)
             if place is not None and fx["running"]:
-                at = CODE + symbols["ymxr_tick%d" % i]
-                assert m.long(at + TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.long(at + TICK_PTR), place)
-                assert m.byte(at + TICK_SEL) == fx["using"], "frame %d: effect %d's handler selects R%d, not R%d" % (f, i, m.byte(at + TICK_SEL), fx["using"])
+                if model.square(i):
+                    at = CODE + symbols["ymxr_sq%d" % i]
+                    assert m.byte(at + SQ_VAL) == model.value(i), \
+                        "frame %d: effect %d's square stands at %02x, not %02x" % (
+                            f, i, m.byte(at + SQ_VAL), model.value(i))
+                    assert m.byte(at + SQ_SEL) == fx["using"], \
+                        "frame %d: effect %d's square selects R%d, not R%d" % (
+                            f, i, m.byte(at + SQ_SEL), fx["using"])
+                    assert m.long(TIMER[i]["vector"]) == at, \
+                        "frame %d: effect %d's vector is not its square's" % (f, i)
+                else:
+                    at = CODE + symbols["ymxr_tick%d" % i]
+                    assert m.long(at + TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.long(at + TICK_PTR), place)
+                    assert m.byte(at + TICK_SEL) == fx["using"], "frame %d: effect %d's handler selects R%d, not R%d" % (f, i, m.byte(at + TICK_SEL), fx["using"])
         for i in timers.due(clocks):
             fx = model.fx[i]
             assert fx["running"], "frame %d: a tick of effect %d with nothing running" % (f, i)
@@ -744,14 +771,20 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             m.interrupt(TIMER[i]["vector"])
             if cycles:
                 cycles._settle(None)
-                tick_cost.setdefault(then, set()).add(cycles.cycles - before)
+                kind = "square" if model.square(i) else then
+                tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
             ticks += 1
             assert taken(m.psg) == taken([want]), "frame %d: tick of effect %d wrote %s, not %s" % (f, i, m.psg, [want])
             timers.apply(m.mfp)
-            at = CODE + symbols["ymxr_tick%d" % i]
-            if then == "stop":
+            if model.square(i):
+                at = CODE + symbols["ymxr_sq%d" % i]
+                assert m.byte(at + SQ_VAL) == model.value(i), \
+                    "frame %d: after a tick effect %d's square stands at %02x, not %02x" % (
+                        f, i, m.byte(at + SQ_VAL), model.value(i))
+            elif then == "stop":
                 assert timers.mode[i] == 0, "frame %d: effect %d ran out and its timer runs on" % (f, i)
             else:
+                at = CODE + symbols["ymxr_tick%d" % i]
                 assert m.long(at + TICK_PTR) == model.place_address(i), "frame %d: after a tick effect %d's place is off" % (f, i)
     m.call("stop", a0=workspace)
     timers.apply(m.mfp)
@@ -817,6 +850,10 @@ def hatari(ym, code, symbols, perf=False):
     handler = symbols["ymxr_tick1"] - symbols["ymxr_tick0"]
     ticks = [(base + symbols["ymxr_tick%d" % i], base + symbols["ymxr_tick%d" % i] + handler)
              for i in range(4)]
+    # a square's handler stands beside the four, one an effect
+    square = symbols["ymxr_sq1"] - symbols["ymxr_sq0"]
+    squares = [(base + symbols["ymxr_sq%d" % i], base + symbols["ymxr_sq%d" % i] + square)
+               for i in range(4)]
 
     def where(pc):
         if frame[0] <= pc < frame[1]:
@@ -824,7 +861,7 @@ def hatari(ym, code, symbols, perf=False):
         if stop[0] <= pc < stop[1]:
             return "stop"
         for i in range(4):
-            if ticks[i][0] <= pc < ticks[i][1]:
+            if ticks[i][0] <= pc < ticks[i][1] or squares[i][0] <= pc < squares[i][1]:
                 return i
         return None
 
@@ -998,9 +1035,11 @@ def main():
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
     code, symbols = assemble(defines=["-dYMXR_PERF=1"] if perf else [])
-    global TICK_SEL, TICK_PTR
+    global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
+    SQ_SEL = equate("SQ_SEL", symbols)
+    SQ_VAL = equate("SQ_VAL", symbols)
     print("the player: %d bytes%s" % (len(code), ", the raster monitor in" if perf else ""))
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=["-dYMXR_PERF=1"] if perf else [])
@@ -1045,7 +1084,8 @@ def main():
                     said, stem, counted))
             for then, name in (("on", "a row written, the place stepped"),
                                ("loop", "the marker, the place to row `RR`"),
-                               ("stop", "the marker, the timer stopped")):
+                               ("stop", "the marker, the timer stopped"),
+                               ("square", "a square's two rows, no place stepped")):
                 if then in tick_cost:
                     tick = re.search(r"^\| %s \| (\d+) \|$" % re.escape(name),
                                      open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
