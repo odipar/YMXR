@@ -5,9 +5,9 @@ holds what it costs today; every figure below is against those, and each
 one says whether it was measured on the rig or counted from the 68000's
 manual.
 
-Two figures matter and they are not the same. A call is 1,396 to 2,375
-cycles on average by tune, and the costliest frame of a tune is 1,666 to
-6,356. R4.5 budgets 6,656 a frame, and what it binds is the costliest
+Two figures matter and they are not the same. A call is 1,382 to 2,362
+cycles on average by tune, and the costliest frame of a tune is 1,660 to
+6,342. R4.5 budgets 6,656 a frame, and what it binds is the costliest
 frame. Most of what follows moves the average; the steps that move the
 costliest frame are named where they are.
 
@@ -15,9 +15,9 @@ costliest frame are named where they are.
 
 ## Where the time is
 
-DTX's advance is 49 to 68 per cent of an average call and 78 to 86 per
-cent of the costliest frame: 4,166 of Turrican - world 4-3's 4,862 and
-4,984 of Synergy Credits' 6,356. A refill parses at most one ST4
+DTX's advance is 50 to 69 per cent of an average call and 79 to 86 per
+cent of the costliest frame: 4,166 of Turrican - world 4-3's 4,848 and
+4,984 of Synergy Credits' 6,342. A refill parses at most one ST4
 operation a unit at about 225 to 240 cycles each, and its unit count is
 the column count, so fifteen operations is a tune's costliest frame and
 the schema's thirty columns set that bound.
@@ -47,49 +47,117 @@ the rest a gate reads the bit and finds the group set.
 
 ---
 
-## 6. Two bits in columns the specification states zero
+## A square's tick has no place to step
 
-Steps 4 to 8 test each register column in turn. Two spare bits, read
-before the groups they stand for, skip the volumes and the envelope
-whole: bits SPEC.md 1.5 and 1.7 state as zero in columns 6 and 13,
-which the frame already reads on every row.
+A tick costs more than a play call. The rig counts both, and over the
+ten tunes a frame's ticks come to:
 
-Measured on the rig, on a player built with the gate:
+| tune | ticks a frame | the ticks | the call |
+|---|---|---|---|
+| Synergy Credits | 29.4 | 5,373 | 2,362 |
+| DBA 2 | 24.8 | 4,538 | 1,975 |
+| DBA 5 | 20.2 | 3,697 | 2,063 |
+| Turrican - world 4-3 | 12.3 | 2,245 | 1,621 |
+| Turrican 2 - world completed 1 | 9.8 | 1,797 | 1,920 |
+| Digidrum preempt, built | 9.2 | 1,685 | 1,638 |
+| Retrigger retune, built | 7.7 | 1,404 | 1,506 |
 
-| tune | saved a frame |
+A tick of a square costs 183 cycles: 108 of its own instructions on the
+row it writes and 130 on the marker, 20 for the `rte`, and 44 for the
+68000 entering the interrupt. Of the 108, forty are the two chip writes
+the YM asks for, sixteen the end of interrupt the MFP asks for, sixteen
+the level dropped so a faster timer can nest, eight the marker test, and
+**twenty-eight stepping the place**.
+
+A square's source is two rows repeating: a level and a marker that reads
+as 0. The place tells one from the other and nothing else, and the loop
+cell puts it back every second tick. A handler for that source needs
+neither:
+
+| | cycles |
 |---|---|
-| Big - Samantha Fox Strip Poker 6 | 97 |
-| Chambers of Shaolin 5 - you blew it! | 92 |
-| Circus Attractions 2 | 27 |
-| DBA 2 | 67 |
-| DBA 5 | 60 |
-| Retrigger retune, built | 16 |
-| Synergy Credits | 62 |
-| Turrican - world 4-3 | 58 |
-| Turrican 2 - world completed 1 | 49 |
-| the nine, weighted by frame | 62 |
+| `move.b #8,YM_SELECT.w` | 16 |
+| `move.b #$0F,YM_SELECT+2.w`, the value an immediate | 16 |
+| `eori.b #$0F,(the immediate).l`, the level toggling it | 24 |
+| `move.b #$DF,$FFFA0F.w` | 16 |
+| `rte` | 20 |
+| the 68000 entering | 44 |
+| | **136** |
 
-The bits ride in columns that stand already, so the column count, the
-period, the ring and a refill's unit count are what they were, and so
-is the bound of one operation a unit. The two columns pack to 1,368
-bytes more over the ten tunes, 3.36 per cent. Synergy Credits'
-costliest frame falls, 6,464 to 6,424 on the same measurement.
+47 cycles a tick, a quarter, and every one of them off a tune that runs
+a square: 1,382 a frame on Synergy Credits, 1,166 on DBA 2, 949 on DBA
+5. That is more than the five steps above took from the call, and it
+takes it from the larger of the two.
 
-What it asks for: the tune version goes from $0002 to $0003. A player
-holding the gate drops every write it gates when it reads a table
-without the bits, so an old player takes a new table and a new player
-does not take an old one. The reader of section 7 needs no change,
-since `Columns.MASK[6]` masks the bits away and the record is byte for
-byte what it was, and the rig's expected write order is unchanged.
+What it asks: a second handler, and a start that aims a square's timer
+at it rather than at the general one. The phase this format holds in the
+place (1.9) is the immediate's own value, 0 or the level, so a start
+that moves no place writes the new level only where the immediate is not
+0, and one that moves the place writes it either way. The general handler
+stands for drums and for any source of other than two rows.
 
-The figures above were measured against a baseline repacked from
-`ym/convert.py`'s columns rather than the converter's own tables, which
-differ by 0 to 7 cycles a frame; the saving is the difference of two
-runs on the same tables.
+Whether the level is dropped in it, at 16 more a tick, is the same
+choice the general handler makes: it lets a faster timer nest.
+
+## What a sample's tick costs
+
+A digidrum's source is many rows played once, so its tick is the row
+path every time, 172 cycles, and its place must step. Of the 108 its
+instructions cost, 40 are the chip writes, 28 the step, 16 the end of
+interrupt, 16 the level dropped and 8 the marker test. Nothing but the
+16 is removable without a register the player does not have: reading and
+stepping through an address register, `move.b (a0)+,YM_SELECT+2.w`, is
+16 against the 52 the two absolute longs cost, but a library cannot hold
+four registers of its host's.
+
+A sample's timer is near its floor. A square's is not.
 
 ---
 
 ## What was measured and left
+
+**Two bits in columns the specification states zero.** A bit read before
+a group of register columns, saying whether the row sets any of them,
+skips the group on one test. Measured at 62 cycles a frame weighted over
+nine tunes against the player of five steps ago, where it was the
+largest step in this document.
+
+Against the player as it stands it is worth 17, and it costs two tunes.
+The five steps above took the same work from another side: the row that
+sets no envelope column already skips step 8, and the four before that
+took the entry, the call, the effects' branches and their first reads.
+What is left to gate is the volume group's three columns, 66 cycles.
+
+The gate's bit has one place to sit. Only `d2` reaches step 6 holding
+anything the row set, and `d2` is column 13, so the bit is column 13's.
+A row that writes a volume then sets column 13, and a column 13 that is
+not 0 is the row that takes the longer of the two paths the step above
+gave it. Measured over 40,000 rows a tune, and counted at 20 cycles for
+a gate that skips and 18 for one that does not:
+
+| tune | rows that set no volume | net a frame |
+|---|---|---|
+| Digidrum preempt, built | 100% | -46 |
+| Retrigger retune, built | 98% | -44 |
+| Big - Samantha Fox Strip Poker 6 | 93% | -41 |
+| Chambers of Shaolin 5 - you blew it! | 86% | -35 |
+| Synergy Credits | 81% | -33 |
+| DBA 2 | 56% | -11 |
+| DBA 5 | 53% | -8 |
+| Turrican - world 4-3 | 40% | 0 |
+| Turrican 2 - world completed 1 | 0% | **+18** |
+| Circus Attractions 2 | 0% | **+29** |
+| the mean of the ten | | -17 |
+
+Putting the bit in column 6 instead, which costs a read of 12 on every
+row and leaves column 13 alone, reads -9 as the mean and costs Turrican
+- world 4-3 and the two above. Gating the tone group rather than the
+volumes reads -4: its six columns are idle on 0 to 58 per cent of rows,
+and 138 cycles saved on a quarter of them does not pay 18 on the rest.
+
+17 cycles a frame is the tune file's version at $0003, a bit's meaning
+in SPEC.md 1.5 and 1.7, the converter, the conformance kit's tunes, and
+two tunes that read slower. It is not taken.
 
 **A thirty-first column holding the same bits.** It saves more a row,
 216 where the row sets none of the three groups. The ring is 960 bytes
@@ -118,19 +186,22 @@ a pass of its own rather than these three repaired.
 
 ## The order
 
-Taken in the order they cost the least to take:
+Every step this document held is taken, each measured on the rig:
 
-| step | saves a frame | the costliest frame | asks for |
-|---|---|---|---|
-| 6, the two bits | 62, measured | 40 less | version $0003 |
+| step | counted | measured |
+|---|---|---|
+| the frame on `a0` | 44 | 44 on every tune |
+| the advance called at its own address | 24 | 24 on every tune |
+| one branch over a run of effects | 19 | 30, 20 or 10 by the effects a tune runs |
+| an effect's head is its first read | 8 an effect | 16, 8 or 0 |
+| the shape's test dropped | 14 | 12 to 14, no tune more |
 
-Step 6 takes the tune file's version. It reads 62 cycles off a call of
-about 1,950 and 40 off the frame the budget binds.
+The first four were counted before they were built and each measured at
+its count. Synergy Credits reads 2,362 cycles a call against the 2,469
+this document opened at, and its costliest frame 6,342 against 6,450.
+performance.md holds what a call costs.
 
-Five are taken: the frame on `a0` at 44 a frame, the advance called at
-its own address at 24, one branch over a run of effects at 19 as the
-mean of the ten, the skip merged into an effect's first read at 8 for
-each effect a tune runs, and the shape's test dropped at 12 to 14, no
-tune paying more. The first four were counted before they were built
-and each measured at its count. performance.md holds what a call costs
-with them in.
+What is left is where the costliest frame is. A refill parses at most
+one ST4 operation a unit and there are fifteen units, so the frame R4.5
+binds is fifteen operations at 225 to 240 apiece, and nothing above
+touches it. ST4 wants a pass of its own.
