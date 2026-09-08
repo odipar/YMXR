@@ -47,23 +47,29 @@ the rest a gate reads the bit and finds the group set.
 
 ---
 
-## 1. The envelope block falls through to its plain path
+## 1. The shape's test dropped on the row that sets no envelope column
 
-`68k/YMXR.S`, the block from `READ2 _13` to `ymxr_volumes`. The row
-that sets no envelope column takes a branch to reach `ymxr_plain`
-today; the branch polarity reversed puts the fall-through on that path
-and the branch on the row that sets one.
+`68k/YMXR.S`. Step 5 reads column 13 into `d2` and step 8 tests the
+same `d2` again, `tst.b` and `bpl`, 14 cycles. Where step 5 found the
+column 0 the answer at step 8 is known, and 62 to 100 per cent of the
+rows of seven of the ten tunes are that row.
 
-| | today | after |
+Steps 6 and 7 stand between the two, so the test goes only where the
+paths part after them, and they part two ways:
+
+| | saves a frame | asks for |
 |---|---|---|
-| column 13 is 0 | 36 | 22 |
-| set, bit 7 clear | 44 | 34 |
-| set, bit 7 set | 42 | 42 |
+| a second copy of steps 6 and 7 on the plain path | 14 | about 58 bytes, two more entries in `ymxr_sites`, a macro whose reads carry their own labels |
+| columns 11 and 12 written after steps 6 and 7 | 14 | SPEC.md section 4's step order, the reader's record, the rig's model and the kit's pinned rows |
 
-Measured on the rig over 59,755 frames of ten tunes: 14 cycles a frame
-on every tune, 8 to 14 off every tune's costliest frame, and no frame
-costs more. No bytes, no rule, no version. The costliest frame of
-Synergy Credits reads 6,436 against 6,450.
+The second was built and measured on the rig over 59,755 frames of ten
+tunes: 14 cycles a frame on every tune, 8 to 14 off every tune's
+costliest frame, and no frame costs more, with Synergy Credits' at
+6,436 against 6,450. The first is counted and not yet built.
+
+Reversing the branch alone, with neither, moves 2 cycles: the plain
+path's `beq` taken at 10 becomes a `bne` not taken at 8, and the row
+that sets the column pays the 2 back.
 
 ## 2. The frame runs on a0, and the row comes from DTX's own pointer
 
@@ -178,16 +184,19 @@ a pass of its own rather than these three repaired.
 
 ## The order
 
+Taken in the order they cost the least to take:
+
 | step | saves a frame | the costliest frame | asks for |
 |---|---|---|---|
-| 1, the envelope's fall-through | 14, measured | 8 to 14 less | nothing |
 | 2, the frame on a0 | 44, counted | the same | nothing |
 | 3, the advance called direct | 24, counted | the same | nothing |
 | 4, one branch over a run | 19, counted | the same | nothing |
 | 5, the merged skip | 8 an effect, counted | the same | nothing |
+| 1, the shape's test dropped | 14 | 8 to 14 less | 58 bytes, or section 4's order |
 | 6, the two bits | 62, measured | 40 less | version $0003 |
 
-Steps 1 to 5 stand in `68k/YMXR.S` alone and take no format with them.
-Step 6 takes the tune file's version with it. Together they read about
+Steps 2 to 5 stand in `68k/YMXR.S` alone and take neither bytes nor
+rule with them. Step 1 takes one of the two costs its own section
+gives. Step 6 takes the tune file's version. Together they read about
 170 cycles off a call of about 2,100, and about 50 off the frame the
 budget binds.
