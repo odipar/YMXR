@@ -220,11 +220,19 @@ the row its place stands on.
 
 ```
 python3 68k/test/emu/test_ymxr.py [tune.ym ...]
+python3 68k/test/emu/test_ymxr.py -corpus [N]
 python3 68k/test/emu/test_ymxr.py -cycles [tunes]
 python3 68k/test/emu/test_ymxr.py -hatari [tunes]
 python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
 python3 68k/test/emu/test_ymxr.py -lean [tunes]
 ```
+
+The tunes under `ym/test` are chosen for the shapes a tune takes, one of
+each, and `-corpus` reads what the corpus holds instead: every Nth file
+of it by name, forty tunes unless `-corpusN` gives another count, so a
+sample covers the corpus rather than one composer's run of it. Forty is
+about eleven minutes. A tune that fails is named and the rest are read,
+so one run says every tune that fails and not the first alone.
 
 A tune named as a `.ymxr` file plays as it stands, without the
 converter. A tune whose `RR` is `R` is played one frame past its last
