@@ -207,7 +207,27 @@ and the `rte`, against the 172 and 194 the two paths of the general
 handler cost. A tune whose effects are all such sources ticks 29.4 times
 a frame on Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 911, 769
 and 626 cycles a frame come off those tunes, against a play call of
-2,380, 1,985 and 2,073. A tune that runs one effect has nothing to nest inside a tick, so init
+2,380, 1,985 and 2,073. A tick drops the interrupt level and writes its own end of interrupt
+because the MFP is taken in software end-of-interrupt mode, as TOS
+leaves it, and because a faster timer may want to nest inside a slower
+one. A host that wants neither takes the core assembled with
+`YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md, `YMXR_sndh-lean.bin`),
+where a tick writes its two chip registers and returns:
+
+| tick | as it stands | lean |
+|---|---|---|
+| a square's two rows | 88 | 56 |
+| a row written, the place stepped | 108 | 76 |
+| the marker, the timer stopped | 116 | 100 |
+
+32 cycles a tick, and 24 where the tune runs one effect and the nops
+below already stand: 941 cycles a frame on Synergy Credits, 595 on DBA
+2, 485 on DBA 5 and 295 on Turrican - world 4-3. The two go together,
+since automatic end of interrupt sets no in-service bit and nothing but
+the level a tick holds keeps a lower timer out, and the player takes the
+MFP's vector register at init and puts it back at stop.
+
+A tune that runs one effect has nothing to nest inside a tick, so init
 writes two nops where that effect's handlers drop the interrupt level:
 8 cycles a tick, the drop costing 16 and the nops 8. Only the row a
 tick writes drops it and the marker's two paths never did, so the last

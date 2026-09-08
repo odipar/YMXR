@@ -173,6 +173,7 @@ python3 68k/test/emu/test_ymxr.py [tune.ym ...]
 python3 68k/test/emu/test_ymxr.py -cycles [tunes]
 python3 68k/test/emu/test_ymxr.py -hatari [tunes]
 python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
+python3 68k/test/emu/test_ymxr.py -lean [tunes]
 ```
 
 A tune named as a `.ymxr` file plays as it stands, without the
@@ -195,7 +196,9 @@ against the rates the trace shows the timers programmed at. `ym/cost.sh`
 measures the same program's cycles instead, through the raster monitor
 (Measure). `-perf` builds the player with that monitor in and holds it to the
 model under unicorn, so a band painted or a cost counted changes no register a
-frame writes, and none of the order it writes them in. `-kit` plays the
+frame writes, and none of the order it writes them in. `-lean` builds it with
+the two switches a tick reads, `YMXR_NEST=0` and `YMXR_AEOI=1`
+(performance.md), and holds that build to the same model. `-kit` plays the
 conformance kit's tunes, or the tune files named, and holds each frame the
 player makes to the reader's record of it through `bin/ymxr-trace`, and the
 record's first line to the tune's header, so the player, the rig's model and

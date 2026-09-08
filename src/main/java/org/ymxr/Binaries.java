@@ -45,14 +45,26 @@ final class Binaries {
     static final Binary MONITOR = new Binary("YMXR_sndh-perf.bin", "YMXR_sndh.S",
             List.of("-dYMXR_PERF=1"));
 
+    /**
+     * The core with the player's two tick switches the other way (the
+     * player's {@code YMXR_NEST} and {@code YMXR_AEOI},
+     * doc/performance.md): a tick neither drops the interrupt level nor
+     * writes its own end of interrupt, which takes 32 cycles off each of
+     * them. A host takes this core where no MFP interrupt of its own
+     * nests inside another and the MFP's vector register is the player's
+     * to set.
+     */
+    static final Binary LEAN = new Binary("YMXR_sndh-lean.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_NEST=0", "-dYMXR_AEOI=1"));
+
     static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S", List.of());
 
     private Binaries() {
     }
 
-    /** All three, in the order the build writes them. */
+    /** All four, in the order the build writes them. */
     static List<Binary> all() {
-        return List.of(CORE, MONITOR, STUB);
+        return List.of(CORE, MONITOR, LEAN, STUB);
     }
 
     /** The SNDH core as carried. */
@@ -63,6 +75,12 @@ final class Binaries {
     /** The core with the raster monitor in, as carried. */
     static byte[] monitorCore() {
         return carried(MONITOR.name());
+    }
+
+    /** The SNDH core whose ticks neither drop the interrupt level nor
+     *  write their own end of interrupt (LEAN). */
+    static byte[] leanCore() {
+        return carried(LEAN.name());
     }
 
     /** The program stub as carried. */

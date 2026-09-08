@@ -57,6 +57,11 @@ final class Sndh {
      *  (doc/performance.md). */
     static final int CORE_MONITOR = 1;
 
+    /** The core's flag bit 1: a tick neither drops the interrupt level
+     *  nor writes its own end of interrupt (the player's YMXR_NEST=0 and
+     *  YMXR_AEOI=1, doc/performance.md). */
+    static final int CORE_LEAN = 2;
+
     /** The word of a bra.w, before its displacement. */
     static final int BRA_W = 0x6000;
 
@@ -78,7 +83,7 @@ final class Sndh {
      *  takes, the one with the raster monitor in where {@code monitor} is
      *  set. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor) {
+            boolean monitor, boolean lean) {
     }
 
     private Sndh() {
@@ -95,13 +100,13 @@ final class Sndh {
      *     holds
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
-        return of(options.monitor() ? Binaries.monitorCore() : Binaries.core(), tuneFiles,
-                options);
+        return of(options.monitor() ? Binaries.monitorCore()
+                : options.lean() ? Binaries.leanCore() : Binaries.core(), tuneFiles, options);
     }
 
     /** The same, around the core given. */
     static byte[] of(byte[] core, List<byte[]> tuneFiles, Options options) {
-        checkCore(core, options.monitor());
+        checkCore(core, options.monitor(), options.lean());
         int n = tuneFiles.size();
         if (n == 0) {
             throw new IllegalArgumentException("no tune files: an SNDH file holds one subtune"
@@ -157,7 +162,7 @@ final class Sndh {
      *     version than {@link Bound} writes, or has no raster monitor in
      *     where {@code monitor} asks for one
      */
-    static void checkCore(byte[] core, boolean monitor) {
+    static void checkCore(byte[] core, boolean monitor, boolean lean) {
         if (core.length < CORE_DESCRIPTOR || !Arrays.equals(CORE_MAGIC,
                 Arrays.copyOfRange(core, CORE_MAGIC_AT, CORE_MAGIC_AT + 4))) {
             throw new IllegalArgumentException("not an SNDH core: no YMXS at " + CORE_MAGIC_AT);
@@ -176,6 +181,10 @@ final class Sndh {
         if (monitor && (flags & CORE_MONITOR) == 0) {
             throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
                     + flags + ", and the raster monitor asked for needs bit 0 set");
+        }
+        if (lean && (flags & CORE_LEAN) == 0) {
+            throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
+                    + flags + ", and the lean tick asked for needs bit 1 set");
         }
     }
 
@@ -329,6 +338,8 @@ final class Sndh {
      * in the order named. The title is the output's stem unless one is
      * given. Where any name is given, each tune past the names given is
      * named by its file's stem; where none is, the file has no names.
+     * {@code -lean} puts the core whose ticks neither drop the interrupt
+     * level nor write their own end of interrupt under the tunes, and
      * {@code -perf} puts the core with the raster monitor in under the
      * entries, for reading a run.
      */
@@ -336,11 +347,14 @@ final class Sndh {
         @Nullable String title = null;
         @Nullable String composer = null;
         boolean monitor = false;
+        boolean lean = false;
         List<String> names = new ArrayList<>();
         List<String> files = new ArrayList<>();
         for (String arg : args) {
             if (arg.equals("-perf")) {
                 monitor = true;
+            } else if (arg.equals("-lean")) {
+                lean = true;
             } else if (arg.startsWith("-t")) {
                 title = arg.substring(2);
             } else if (arg.startsWith("-c")) {
@@ -375,7 +389,7 @@ final class Sndh {
         byte[] sndh;
         try {
             sndh = of(tunes, new Options(title == null ? stem(out) : title, composer,
-                    names.isEmpty() ? null : names, monitor));
+                    names.isEmpty() ? null : names, monitor, lean));
         } catch (IllegalArgumentException wrong) {
             System.err.println("ymxr-sndh: " + wrong.getMessage());
             System.exit(1);

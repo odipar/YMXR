@@ -24,7 +24,11 @@
 ;   +18  the bound tune's version this core reads
 ;   +20  the workspace's bytes before the state block, YMXR_FIXED
 ;   +22  flags, a word: bit 0 where the raster monitor is assembled in
-;        (the player's YMXR_PERF, doc/performance.md)
+;        (the player's YMXR_PERF, doc/performance.md), bit 1 where a tick
+;        neither drops the interrupt level nor writes its own end of
+;        interrupt (YMXR_NEST=0 and YMXR_AEOI=1), which a host takes only
+;        where no MFP interrupt of its own nests and the vector register
+;        is the player's
 ;   +24  where the state byte is, a word: bit 0 set while a tune plays,
 ;        bit 1 once it has played its last row and does not repeat
 ;   +26  zero
@@ -45,7 +49,8 @@ sndh_core:
                 dc.w    1
                 dc.w    YMXR_VERSION
                 dc.w    YMXR_FIXED
-                dc.w    YMXR_PERF               ; the flags: the monitor
+                dc.w    YMXR_PERF|(YMXR_AEOI<<1) ; the flags: the monitor,
+                                        ; and the tick a host takes the MFP for
                 dc.w    sndh_state-sndh_core
                 dc.w    0
 sndh_table:     dc.l    0
