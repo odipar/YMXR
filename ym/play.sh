@@ -42,6 +42,10 @@
 # The run:
 #
 #   -vN        stop after N frames; the tune plays on without it
+#   -silent    the tools say nothing but their notes: this script takes
+#              their standard output, and without the flag each says
+#              what it read, the flags it took and what it made, on
+#              standard error (tools.md)
 #   -h         this text
 #
 # HATARI and TOS name the emulator and a TOS image. The emulator is asked
@@ -62,6 +66,9 @@
 #   ym/play.sh -perf -v300 tune.ym bars.wav
 #       the same on the monitor's core, so bars.png shows what the call
 #       and the timers cost
+#
+#   ym/play.sh -silent tune.ym
+#       the same run with the tools saying nothing but their notes
 #
 #   ym/play.sh -lean tune.ymxr
 #       a tune file already packed, on the core whose ticks cost less
@@ -87,12 +94,14 @@ composer=
 help=
 perf=
 lean=
+silent=
 vbls=
 for arg do
     case $arg in
         -h|-help|--help) help=1 ;;
         -perf) perf=-perf ;;
         -lean) lean=-lean ;;
+        -silent) silent=-silent ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
         -r*) repeat=$arg ;;
@@ -129,12 +138,12 @@ case $tune in
     *)
         file=$work/tune.ymxr
         "$here/bin/ym-to-ymxr" "$tune" "$file" ${unit:+"$unit"} ${ring:+"$ring"} \
-            ${repeat:+"$repeat"} >/dev/null
+            ${repeat:+"$repeat"} $silent >/dev/null
         ;;
 esac
-"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" $perf $lean \
+"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" $perf $lean $silent \
     "-t${title:-${name%.*}}" ${composer:+"-c$composer"} >/dev/null
-"$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" >/dev/null
+"$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" $silent >/dev/null
 set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \
     --compatible on --memsize 4 --sound 44100 --ym-mixing model \
     --log-level fatal

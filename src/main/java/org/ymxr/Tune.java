@@ -1,8 +1,10 @@
 package org.ymxr;
 
 import java.util.List;
+import java.util.Locale;
 import org.dtx.Dtx1;
 import org.dtx.Dtx2;
+import org.dtx.Packer;
 import org.dtx.St4;
 import org.dtx.Table;
 
@@ -81,13 +83,18 @@ final class Tune {
             report.note("the ring is " + at + " bytes: a multiple of the period within the"
                     + " player's reach");
         }
-        byte[] table = table(columns.column, frames, repeat, unit, at);
+        Watched packer = new Watched(report, Columns.C);
+        byte[] table = table(columns.column, frames, repeat, unit, at, packer);
         List<Sources.Source> all = sources.all();
         byte[][] tables = new byte[all.size()][];
+        int sourceRows = 0;
+        int sourceBytes = 0;
         for (int i = 0; i < tables.length; i++) {
             Sources.Source s = all.get(i);
             tables[i] = Dtx1.write(Table.of(s.rows().length, s.repeat(), 1,
                     new byte[][] {s.rows()}));
+            sourceRows += s.rows().length;
+            sourceBytes += tables[i].length;
         }
         int here = align(INDEX_AT + 4 * tables.length);
         int tableAt = here;
@@ -111,13 +118,89 @@ final class Tune {
         for (int i = 0; i < tables.length; i++) {
             System.arraycopy(tables[i], 0, file, sourceAt[i], tables[i].length);
         }
+        packed(report, packer, frames, table.length, tables.length, sourceRows, sourceBytes,
+                at, unit, file.length);
         return new Written(file, repeat < frames ? repeat : frames);
     }
 
     /** The columns as a DTX2 file, packed. */
-    private static byte[] table(byte[][] column, int frames, int repeat, int unit, int ring) {
+    private static byte[] table(byte[][] column, int frames, int repeat, int unit, int ring,
+                                Packer packer) {
         int rr = repeat < frames ? repeat : frames;
-        return Dtx2.write(Table.of(frames, rr, 1, column), new St4(), unit, ring);
+        return Dtx2.write(Table.of(frames, rr, 1, column), packer, unit, ring);
+    }
+
+    /**
+     * A packer that reports: it packs a column through the one the file
+     * takes, holds what each column came to, and says how far through the
+     * thirty it is. The packer is what {@link Dtx2#write} calls a column
+     * at a time, so this is where a column's packed bytes are to be had
+     * without unpacking the file again.
+     */
+    private static final class Watched implements Packer {
+
+        private final Packer inner = new St4();
+        private final Report report;
+        private final int[] bytes;
+        private int done;
+
+        Watched(Report report, int columns) {
+            this.report = report;
+            this.bytes = new int[columns];
+        }
+
+        @Override
+        public byte[] pack(byte[] column, int unit, int ring, int loop) {
+            report.progress("packing the columns", done, bytes.length);
+            byte[] out = inner.pack(column, unit, ring, loop);
+            if (done < bytes.length) {
+                bytes[done] = out.length;
+            }
+            done++;
+            return out;
+        }
+
+        @Override
+        public boolean copies() {
+            return inner.copies();
+        }
+    }
+
+    /** What the packing came to, a column at a time and in all. */
+    private static void packed(Report report, Watched packer, int frames, int table, int sources,
+                               int sourceRows, int sourceBytes, int ring, int unit, int file) {
+        if (!report.says()) {
+            return;
+        }
+        report.say("the table: " + Columns.C + " columns of " + frames + " rows, "
+                + Columns.C * frames + " bytes, packed at unit " + unit + " through a ring of "
+                + ring);
+        for (int c = 0; c < Columns.C; c++) {
+            int bytes = packer.bytes[c];
+            report.row(name(c), String.format(Locale.ROOT, "%7d -> %6d bytes  (%5.1f%%)",
+                    frames, bytes, 100.0 * bytes / frames));
+        }
+        report.say("the sources: " + sources + (sources == 1 ? " table of " : " tables of ")
+                + sourceRows + (sourceRows == 1 ? " row, " : " rows, ") + sourceBytes + " bytes");
+        int raw = Columns.C * frames;
+        report.say(String.format(Locale.ROOT,
+                "packed %d bytes into %d (%.1f%%), the file %d bytes",
+                raw, table, 100.0 * table / raw, file));
+    }
+
+    /** What a column holds, for a reported row: a register by its number,
+     *  an effect column by its effect and what of it it gives. */
+    static String name(int c) {
+        if (c < Columns.EFFECT) {
+            return "R" + c;
+        }
+        int effect = (c - Columns.EFFECT) / 4;
+        return "effect " + effect + " " + switch ((c - Columns.EFFECT) % 4) {
+            case 0 -> "target";
+            case 1 -> "source";
+            case 2 -> "timer control";
+            default -> "timer count";
+        };
     }
 
     /** The ring the table packs through: the multiple of `C` nearest `ring`,

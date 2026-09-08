@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.dtx.Table;
 
@@ -102,12 +104,41 @@ final class Trace {
      *  output, its first line and one line a frame, the kit's count of
      *  frames unless one is given. */
     public static void main(String[] args) throws IOException {
-        if (args.length < 1 || args.length > 2) {
-            System.err.println("ymxr-trace TUNE [FRAMES]");
+        List<String> named = new ArrayList<>();
+        boolean silent = false;
+        for (String arg : args) {
+            if (arg.equals(YmToYmxr.SILENT)) {
+                silent = true;
+            } else {
+                named.add(arg);
+            }
+        }
+        if (named.isEmpty() || named.size() > 2) {
+            System.err.println("ymxr-trace TUNE [FRAMES] [-silent]");
             System.exit(2);
         }
-        int calls = args.length == 2 ? Integer.parseInt(args[1]) : -1;
-        System.out.write(record(Files.readAllBytes(Path.of(args[0])), calls));
+        Report report = new Report(!silent);
+        int calls = named.size() == 2 ? Integer.parseInt(named.get(1)) : -1;
+        byte[] tune = Files.readAllBytes(Path.of(named.get(0)));
+        // A file this reader does not read records nothing and says so
+        // (SPEC.md 6, R6.1), so the report reads the header under the
+        // same guard rather than throwing where the record would not.
+        try {
+            TuneFile file = TuneFile.read(tune);
+            report.say("the tune file: " + named.get(0) + ", " + tune.length + " bytes");
+            report.row("the table", file.table().rows() + " rows of " + file.table().columns()
+                    + " columns, repeating at row " + file.table().repeat());
+            report.row("the frame rate", file.frameRate() + " Hz");
+            report.row("the sources", String.valueOf(file.sources().size()));
+            report.row("the rows to record", calls < 0 ? "one pass and the loop once"
+                    : String.valueOf(calls));
+        } catch (IllegalArgumentException wrong) {
+            report.say("the tune file: " + named.get(0) + ", " + tune.length
+                    + " bytes, which this reader does not read: " + wrong.getMessage());
+        }
+        byte[] rows = record(tune, calls);
+        report.say("recorded: " + rows.length + " bytes of rows on standard output");
+        System.out.write(rows);
         System.out.flush();
     }
 }

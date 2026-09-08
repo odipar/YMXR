@@ -232,4 +232,5 @@ The tools: `bin/ymxr-bind tune.ymxr out.bin` writes the bound tune;
 `-cCOMPOSER`, `-nNAME` a subtune, `-perf` for the monitor's core and
 `-lean` for the lean one, which are a switch each;
 `bin/ymxr-prg in.sndh out.prg` the program, with `-rROWS` for the rows.
+Each says what it made, on standard error, and `-silent` turns that off.
 tools.md has them, and `ym/cost.sh` reads a monitor run back.
