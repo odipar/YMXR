@@ -71,14 +71,6 @@ Reversing the branch alone, with neither, moves 2 cycles: the plain
 path's `beq` taken at 10 becomes a `bne` not taken at 8, and the row
 that sets the column pays the 2 back.
 
-## 4. One branch over a run of effects the tune does not run
-
-Each effect the tune does not run costs its own `bra.w` to its own end,
-10 cycles. Init walks the effects from 3 down to 0 keeping the head of
-the next one it runs, so a run of skipped effects costs one branch
-rather than one each. Counted, 30 a frame where the tune runs none, 20
-or 10 where it runs one or two, and 19 as the mean of the corpus.
-
 ## 5. The effect's patched skip merged into its first read
 
 The two nops init writes over the branch of an effect the tune runs
@@ -164,18 +156,17 @@ Taken in the order they cost the least to take:
 
 | step | saves a frame | the costliest frame | asks for |
 |---|---|---|---|
-| 4, one branch over a run | 19, counted | the same | nothing |
 | 5, the merged skip | 8 an effect, counted | the same | nothing |
 | 1, the shape's test dropped | 14 | 8 to 14 less | 58 bytes, or section 4's order |
 | 6, the two bits | 62, measured | 40 less | version $0003 |
 
-Steps 4 and 5 stand in `68k/YMXR.S` alone and take neither bytes nor
-rule with them. Step 1 takes one of the two costs its own section
-gives. Step 6 takes the tune file's version. Together they read about
-100 cycles off a call of about 2,000, and about 50 off the frame the
-budget binds.
+Step 5 stands in `68k/YMXR.S` alone and takes neither bytes nor rule
+with it. Step 1 takes one of the two costs its own section gives. Step
+6 takes the tune file's version. Together they read about 80 cycles off
+a call of about 1,970, and about 50 off the frame the budget binds.
 
-Two are taken, each at the figure it was counted at, on every one of
-the ten tunes and off every costliest frame: the frame on `a0` at 44,
-and the advance called at its own address at 24. performance.md holds
+Three are taken, each at the figure it was counted at: the frame on
+`a0` at 44 a frame, the advance called at its own address at 24, and
+one branch over a run of effects at 19 as the mean of the ten, 30 where
+a tune runs no effect and 10 where it runs two. performance.md holds
 what a call costs with them in.
