@@ -47,31 +47,6 @@ the rest a gate reads the bit and finds the group set.
 
 ---
 
-## 1. The shape's test dropped on the row that sets no envelope column
-
-`68k/YMXR.S`. Step 5 reads column 13 into `d2` and step 8 tests the
-same `d2` again, `tst.b` and `bpl`, 14 cycles. Where step 5 found the
-column 0 the answer at step 8 is known, and 62 to 100 per cent of the
-rows of seven of the ten tunes are that row.
-
-Steps 6 and 7 stand between the two, so the test goes only where the
-paths part after them, and they part two ways:
-
-| | saves a frame | asks for |
-|---|---|---|
-| a second copy of steps 6 and 7 on the plain path | 14 | about 58 bytes, two more entries in `ymxr_sites`, a macro whose reads carry their own labels |
-| columns 11 and 12 written after steps 6 and 7 | 14 | SPEC.md section 4's step order, the reader's record, the rig's model and the kit's pinned rows |
-
-The second was built and measured on the rig over 59,755 frames of ten
-tunes: 14 cycles a frame on every tune, 8 to 14 off every tune's
-costliest frame, and no frame costs more, with Synergy Credits' at
-6,436 against 6,450. The first is counted and not yet built.
-
-Reversing the branch alone, with neither, moves 2 cycles: the plain
-path's `beq` taken at 10 becomes a `bne` not taken at 8, and the row
-that sets the column pays the 2 back.
-
-
 ## 6. Two bits in columns the specification states zero
 
 Steps 4 to 8 test each register column in turn. Two spare bits, read
@@ -147,15 +122,15 @@ Taken in the order they cost the least to take:
 
 | step | saves a frame | the costliest frame | asks for |
 |---|---|---|---|
-| 1, the shape's test dropped | 14 | 8 to 14 less | 58 bytes, or section 4's order |
 | 6, the two bits | 62, measured | 40 less | version $0003 |
 
-Step 1 takes one of the two costs its own section gives, and step 6 the
-tune file's version. Together they read about 76 cycles off a call of
-about 1,960, and about 50 off the frame the budget binds.
+Step 6 takes the tune file's version. It reads 62 cycles off a call of
+about 1,950 and 40 off the frame the budget binds.
 
-Four are taken, each at the figure it was counted at: the frame on `a0`
-at 44 a frame, the advance called at its own address at 24, one branch
-over a run of effects at 19 as the mean of the ten, and the skip merged
-into an effect's first read at 8 for each effect a tune runs, 7 as that
-mean. performance.md holds what a call costs with them in.
+Five are taken: the frame on `a0` at 44 a frame, the advance called at
+its own address at 24, one branch over a run of effects at 19 as the
+mean of the ten, the skip merged into an effect's first read at 8 for
+each effect a tune runs, and the shape's test dropped at 12 to 14, no
+tune paying more. The first four were counted before they were built
+and each measured at its count. performance.md holds what a call costs
+with them in.

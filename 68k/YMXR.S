@@ -67,7 +67,7 @@
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
 YMXR_VERSION    equ     $0001           ; its version
 YMXR_COLUMNS    equ     30
-YMXR_SITES      equ     18              ; the other read sites (ymxr_sites)
+YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 
 ; The raster monitor, off unless the assembly defines it (rmac
 ; -dYMXR_PERF=1).
@@ -168,6 +168,23 @@ c\{col}:
                 .macro  QREAD   col
 q\{col}:
                 move.b  $7FFF(a1),d1
+                .endm
+
+; The same, at the third site a column takes: the copy of steps 6 and 7
+; the row that sets no envelope column falls into.
+                .macro  RREAD   col
+r\{col}:
+                move.b  $7FFF(a1),d1
+                .endm
+
+; A column with a set bit, written at that third site.
+                .macro  RWRITE  col,select
+                RREAD   \col
+                bpl.s   .no\~
+                move.w  #\select,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
+.no\~:
                 .endm
 
                 .macro  QOR     col
@@ -624,13 +641,9 @@ ymxr_frame:
 ;    is written where it is not 0 and nothing else is tested.
                 WRITE   _6,$0600
                 READ2   _13
-                beq.s   ymxr_plain
+                beq.w   ymxr_plain
                 RESERVED _11,6,$0B00
                 RESERVED _12,5,$0C00
-                bra.s   ymxr_volumes
-ymxr_plain:     PLAIN   _11,$0B00
-                PLAIN   _12,$0C00
-ymxr_volumes:
 ; 6: the volumes.
                 WRITE   _8,$0800
                 WRITE   _9,$0900
@@ -643,12 +656,29 @@ ymxr_volumes:
                 move.b  d1,d0
                 movep.w d0,(a2)
 .no7:
-; 8: the shape, read above into d2.
+; 8: the shape, read above into d2. Step 5 found the column set, so the
+; test here is of its own set bit alone.
                 tst.b   d2
                 bpl.s   ymxr_played
                 move.w  #$0D00,d1
                 move.b  d2,d1
                 movep.w d1,(a2)
+                bra.s   ymxr_played
+
+; Steps 6 and 7 again, for the row whose envelope column step 5 found 0:
+; step 8 has nothing to write on that row, and this copy ends without
+; the test that would say so.
+ymxr_plain:     PLAIN   _11,$0B00
+                PLAIN   _12,$0C00
+                RWRITE  _8,$0800
+                RWRITE  _9,$0900
+                RWRITE  _10,$0A00
+                RREAD   _7
+                bpl.s   ymxr_played
+                or.b    #YM_PORTS,d1
+                move.w  #$0700,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
 ; The row is written: the next one is taken now, after every write this
 ; call makes, so nothing the advance costs stands between a host's clock
 ; and the chip.
@@ -710,6 +740,8 @@ ymxr_sites:
                 dc.w    q_26-ymxr_frame+2,26,q_27-ymxr_frame+2,27
                 dc.w    q_28-ymxr_frame+2,28,q_29-ymxr_frame+2,29
                 dc.w    q_11-ymxr_frame+2,11,q_12-ymxr_frame+2,12
+                dc.w    r_8-ymxr_frame+2,8,r_9-ymxr_frame+2,9
+                dc.w    r_10-ymxr_frame+2,10,r_7-ymxr_frame+2,7
 
 ; ---------------------------------------------------------------- ticks
 
