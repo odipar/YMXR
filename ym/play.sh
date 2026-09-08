@@ -12,6 +12,9 @@
 #   -cCOMPOSER the composer in the tags
 #   -perf      the core with the raster monitor in, so the run paints
 #              what each call costs (performance.md)
+#   -lean      the core whose ticks neither drop the interrupt level nor
+#              write their own end of interrupt, 32 cycles a tick cheaper
+#              (performance.md, BINARIES.md)
 #   -vN        stop after N frames; the tune plays on without it
 #
 # -k, -m and -r are the converter's and a tune file takes none of them.
@@ -32,10 +35,12 @@ repeat=
 title=
 composer=
 perf=
+lean=
 vbls=
 for arg do
     case $arg in
         -perf) perf=-perf ;;
+        -lean) lean=-lean ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
         -r*) repeat=$arg ;;
@@ -71,7 +76,7 @@ case $tune in
             ${repeat:+"$repeat"} >/dev/null
         ;;
 esac
-"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" $perf \
+"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" $perf $lean \
     "-t${title:-${name%.*}}" ${composer:+"-c$composer"} >/dev/null
 "$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" >/dev/null
 set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \
