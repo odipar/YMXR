@@ -71,22 +71,6 @@ Reversing the branch alone, with neither, moves 2 cycles: the plain
 path's `beq` taken at 10 becomes a `bne` not taken at 8, and the row
 that sets the column pays the 2 back.
 
-## 2. The frame runs on a0, and the row comes from DTX's own pointer
-
-`YMXR_play` parks the caller's `a6`, takes `a0` into it, reads the row
-from `WS_ROW` and writes it back after the advance: 12 + 4 + 16 + 16 +
-12, 60 cycles. Nothing in the frame touches `a0`, and DTX writes the
-same pointer to `DTX_POINTER` at +8 of the state block on the same path
-(DTX abi.md 3).
-
-So the frame runs on `a0`, `a6` is never touched, `WS_ROW` and its two
-stores go, and the row comes from `WS_STATE+8(a0)`: 16 cycles. Counted
-from the 68000's manual, 44 a frame, every frame, every tune, and
-`YMXR_FIXED` falls from 60 to 56.
-
-The one order to hold: `WS_IMAGE` is read before the workspace base
-moves, or the advance's `jsr` goes through the image's state block.
-
 ## 3. The advance is called at its own address
 
 `movea.l WS_IMAGE(a6),a2` and `jsr IM_ADVANCE(a2)` reach a `bra.w` in
@@ -188,15 +172,18 @@ Taken in the order they cost the least to take:
 
 | step | saves a frame | the costliest frame | asks for |
 |---|---|---|---|
-| 2, the frame on a0 | 44, counted | the same | nothing |
 | 3, the advance called direct | 24, counted | the same | nothing |
 | 4, one branch over a run | 19, counted | the same | nothing |
 | 5, the merged skip | 8 an effect, counted | the same | nothing |
 | 1, the shape's test dropped | 14 | 8 to 14 less | 58 bytes, or section 4's order |
 | 6, the two bits | 62, measured | 40 less | version $0003 |
 
-Steps 2 to 5 stand in `68k/YMXR.S` alone and take neither bytes nor
+Steps 3 to 5 stand in `68k/YMXR.S` alone and take neither bytes nor
 rule with them. Step 1 takes one of the two costs its own section
 gives. Step 6 takes the tune file's version. Together they read about
-170 cycles off a call of about 2,100, and about 50 off the frame the
+125 cycles off a call of about 2,050, and about 50 off the frame the
 budget binds.
+
+Step 2, the frame on `a0`, is taken: 44 cycles a frame and 44 off every
+costliest frame, on every one of the ten tunes, which is the figure it
+was counted at. performance.md holds what a call costs with it in.
