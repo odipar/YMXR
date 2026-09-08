@@ -272,8 +272,8 @@ final class Sndh {
      * displacements are the header's bytes less 2.
      */
     static byte[] combine(byte[] core, List<byte[]> tunes, byte[] tags, int workspace) {
-        return combine(core, new Bound.Set(List.of(), tunes, new int[tunes.size()],
-                new int[tunes.size()]), tags, workspace);
+        return combine(core, new Bound.Set(List.of(), List.of(), tunes,
+                new int[tunes.size()], new int[tunes.size()]), tags, workspace);
     }
 
     /**
@@ -489,6 +489,18 @@ final class Sndh {
         report.say("the images: " + set.images().size()
                 + (set.images().size() == 1 ? " image of " : " images of ") + images
                 + " bytes, DTX's reader once a set of tunes that share one");
+        // What an image gives once is what splits a set into more than one,
+        // and the unit is what a flag moves: a tune whose row count or
+        // repeat row is odd packs at unit 1 though -k asks for another
+        // (tools.md, experiments.md).
+        for (int i = 0; i < set.images().size(); i++) {
+            int of = 0;
+            for (int which : set.image()) {
+                of += which == i ? 1 : 0;
+            }
+            report.row("image " + (i + 1), set.shapes().get(i) + ", "
+                    + of + (of == 1 ? " tune" : " tunes"));
+        }
         report.say("the file: " + sndh.length + " bytes, the core " + core + ", the images "
                 + images + ", the tunes " + bound + ", the workspace and the rest "
                 + (sndh.length - core - images - bound));
