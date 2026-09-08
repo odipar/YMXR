@@ -231,10 +231,12 @@ enable, mask and control registers, and turns every MFP interrupt off
 and stops the four timers; calls init with subtune 1 and plays from the
 VBL or Timer C; stops on SPACE or ESC, or once the rows patched in have
 played, or once the core's state byte says the tune is over; switches
-subtunes on 1 to 9; and hands the machine back, Timer C's count written
-as the 192 of the system's 200 Hz. The keyboard is read at its ACIA,
-every IKBD report taken whole, so that the mouse works when TOS has the
-keyboard back.
+subtunes on 1 to 9, offering in its banner the keys the set has; and
+hands the machine back with the mouse reporting again, Timer C's count
+written as the 192 of the system's 200 Hz. The keyboard is read at its
+ACIA, every IKBD report taken whole, and the mouse turned off at the
+chip while the program runs, so that TOS finds no packet half read when
+it has the keyboard back.
 
 ## 5. Driving play, the host's side
 
