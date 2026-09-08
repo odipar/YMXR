@@ -356,16 +356,6 @@ q\{col}:
 \{tick}_done:
                 .endm
 
-; The branch over an effect's columns made two nops where the tune runs
-; the effect.
-                .macro  RUNS    i,over
-                btst    #\i,WS_EFFECTS(a6)
-                beq.s   .no\~
-                lea     \over(pc),a3
-                move.l  #$4E714E71,(a3)
-.no\~:
-                .endm
-
 ; One timer claimed, where the tune runs its effect: stopped, aimed at
 ; its handler, enabled and unmasked.
                 .macro  CLAIM   i,ctrl,keep,vector,ier,bit,tick
@@ -511,10 +501,26 @@ YMXR_init:
 ; The effects the tune runs are read every row; the others are jumped
 ; over, the branch at each macro's head standing where the tune does not
 ; run its effect.
-                RUNS    0,ymxr_tick0_over
-                RUNS    1,ymxr_tick1_over
-                RUNS    2,ymxr_tick2_over
-                RUNS    3,ymxr_tick3_over
+; The branch at an effect's head: two nops where the tune runs the
+; effect, and where it does not, the branch's displacement moved to the
+; head of the next effect the tune does run, or past the last of them.
+; A run of effects the tune does not run then costs one branch.
+                lea     ymxr_frame(pc),a4
+                lea     ymxr_overs(pc),a3
+                lea     ymxr_tick3_done(pc),a5
+                moveq   #3,d2
+.over:          move.w  (a3)+,d4
+                lea     (a4,d4.w),a1
+                btst    d2,WS_EFFECTS(a6)
+                beq.s   .skip
+                move.l  #$4E714E71,(a1)
+                movea.l a1,a5
+                bra.s   .next
+.skip:          move.l  a5,d0
+                sub.l   a1,d0
+                subq.l  #2,d0
+                move.w  d0,2(a1)
+.next:          dbra    d2,.over
 
 ; The advance's own address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body stands two bytes past the slot
@@ -681,6 +687,11 @@ ymxr_reads:
                 dc.w    c_21-ymxr_frame+2,c_22-ymxr_frame+2,c_23-ymxr_frame+2
                 dc.w    c_24-ymxr_frame+2,c_25-ymxr_frame+2,c_26-ymxr_frame+2
                 dc.w    c_27-ymxr_frame+2,c_28-ymxr_frame+2,c_29-ymxr_frame+2
+
+; The four effects' heads, effect 3 first, as offsets into the frame.
+ymxr_overs:
+                dc.w    ymxr_tick3_over-ymxr_frame,ymxr_tick2_over-ymxr_frame
+                dc.w    ymxr_tick1_over-ymxr_frame,ymxr_tick0_over-ymxr_frame
 
 ; The other sites a column is read at, each with its column: the effects'
 ; one-pass tests, and the envelope period's plain path.
