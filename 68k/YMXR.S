@@ -108,15 +108,21 @@ PERF_COLOUR     equ     $FFFF8240       ; the background
 PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
                                         ; byte, which moves while the chip
                                         ; fetches pixels
-; What a tick of each kind is counted at, in turns of ten cycles, beside
-; what performance.md measures each at: a row written 108 cycles, the
-; marker with the place to row RR 130, the marker with the timer stopped
-; 116, and a square's own tick 88. Each count stands within a twentieth of its measurement, and
-; PlayerTest holds the three to the document's figures.
-PERF_ON         equ     11
-PERF_SQ         equ     9
-PERF_LOOP       equ     13
-PERF_STOP       equ     12
+; What a tick of each kind costs the frame, in cycles, with neither the
+; interrupt level dropped nor an end of interrupt written. The raster
+; monitor counts a tick at its kind's figure and what the two switches
+; add to that path, rounded to the nearest turn of ten cycles, and the
+; call burns a bar for the total. performance.md, A tick, measures each
+; of the four, and PlayerTest holds the four to the document's figures.
+PERF_ON         equ     76      ; a row written, the place stepped
+PERF_SQ         equ     56      ; a square's two rows, no place stepped
+PERF_LOOP       equ     114     ; the marker, the place to row RR
+PERF_STOP       equ     100     ; the marker, the timer stopped
+
+; What each switch adds to a path: the level is dropped on the two paths
+; that write a row's value, and an end of interrupt on all four.
+PERF_DROP       equ     16*YMXR_NEST
+PERF_END        equ     16*(1-YMXR_AEOI)
 
 ; The bound tune (BINARIES.md).
 TF_VERSION      equ     4
@@ -490,15 +496,17 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 .endm
 
-; The other end of a mark: this tick's estimated cost counted, in turns
-; of ten cycles, and the background put back. It stands after the write
-; the tick makes and before the end of interrupt, so a nested tick of a
-; higher timer marks and unmarks inside it.
-                .macro  COUNT   turns
+; The other end of a mark: this tick's cost counted, in turns of ten
+; cycles, and the background put back. The path's cycles are its kind's
+; figure, the end of interrupt every path writes, and the level the two
+; that write a row's value drop. It stands after the write the tick
+; makes and before the end of interrupt, so a nested tick of a higher
+; timer marks and unmarks inside it.
+                .macro  COUNT   cycles,drop
                 .if     YMXR_PERF
                 move.l  a0,-(sp)
                 lea     ymxr_perf_acc(pc),a0
-                add.w   #\turns,(a0)
+                add.w   #(\cycles+\drop+PERF_END+5)/10,(a0)
                 movea.l (sp)+,a0
                 move.w  (sp)+,PERF_COLOUR.w
                 .endif
@@ -520,7 +528,7 @@ q\{ct}:         bra.w   \{tick}_done
                 move.w  #$2500,sr
                 .endif
                 addq.l  #1,($12345678).l        ; +22: the place, stepped
-                COUNT   PERF_ON
+                COUNT   PERF_ON,PERF_DROP
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
@@ -529,13 +537,13 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_mark:   tst.l   ($12345678).l           ; +2: the loop cell
                 beq.s   .stop\~
                 move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
-                COUNT   PERF_LOOP
+                COUNT   PERF_LOOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
 .stop\~:        andi.b  #\keep,\ctrl.w
-                COUNT   PERF_STOP
+                COUNT   PERF_STOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
@@ -559,7 +567,7 @@ q\{ct}:         bra.w   \{tick}_done
                 move.w  #$2500,sr
                 .endif
 \{name}_tog:    eori.b  #$0F,($12345678).l      ; +3 the two rows' difference,
-                COUNT   PERF_SQ                 ; +4 the row's own address
+                COUNT   PERF_SQ,PERF_DROP       ; +4 the row's own address
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif

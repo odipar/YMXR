@@ -207,32 +207,43 @@ and the `rte`, against the 172 and 194 the two paths of the general
 handler cost. A tune whose effects are all such sources ticks 29.4 times
 a frame on Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 911, 769
 and 626 cycles a frame come off those tunes, against a play call of
-2,380, 1,985 and 2,073. A tick drops the interrupt level and writes its own end of interrupt
-because the MFP is taken in software end-of-interrupt mode, as TOS
-leaves it, and because a faster timer may want to nest inside a slower
-one. A host that wants neither takes the core assembled with
-`YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md, `YMXR_sndh-lean.bin`),
-where a tick writes its two chip registers and returns:
+2,380, 1,985 and 2,073. A tick drops the interrupt level and writes its
+own end of interrupt because the MFP is taken in software
+end-of-interrupt mode, as TOS leaves it, and because a faster timer may
+want to nest inside a slower one. A host that wants neither takes the
+core assembled with `YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md,
+`YMXR_sndh-lean.bin`), where a tick writes its two chip registers and
+returns:
 
 | tick | as it stands | lean |
 |---|---|---|
-| a square's two rows | 88 | 56 |
 | a row written, the place stepped | 108 | 76 |
+| the marker, the place to row `RR` | 130 | 114 |
 | the marker, the timer stopped | 116 | 100 |
+| a square's two rows, no place stepped | 88 | 56 |
 
-32 cycles a tick, and 24 where the tune runs one effect and the nops
-below already stand: 941 cycles a frame on Synergy Credits, 595 on DBA
-2, 485 on DBA 5 and 295 on Turrican - world 4-3. The two go together,
-since automatic end of interrupt sets no in-service bit and nothing but
-the level a tick holds keeps a lower timer out, and the player takes the
-MFP's vector register at init and puts it back at stop.
+The level is dropped on the two paths that write a row's value and the
+end of interrupt is written on all four, so those two lose 32 cycles and
+the two that end a source lose 16, and 24 where the tune runs one effect
+and the nops below already stand. A source ends once a pass and its rows
+are written many times, so 32 a tick bounds what comes off a frame: 941
+cycles on Synergy Credits, 595 on DBA 2, 485 on DBA 5 and 295 on
+Turrican - world 4-3. The two switches go together, since automatic end
+of interrupt sets no in-service bit and nothing but the level a tick
+holds keeps a lower timer out, and the player takes the MFP's vector
+register at init and puts it back at stop.
 
-The two cores write the same. Traced over 900 frames of Synergy
-Credits, every one of the fourteen registers takes the same values in
-the same order from both, 8,661 writes each; eight of the writes fall
-in another order between two registers, a tick that ends sooner
-returning inside the call at another point, which the chip reads the
-same either way.
+The four cores write one tune the same but for a square's edge. Traced
+under Hatari over 900 frames of Synergy Credits, counted from the frame
+the player first writes in, every register a row writes takes the same
+values in the same order from all four, to the row the window ends on.
+The two a timer drives part at a few of their writes: the plain and
+lean cores hold 2,036 of R9's values in common, of the 2,037 and 2,039
+they write, and the lean core and the one with both switches 6,621 of
+R10's, of 6,626 and 6,630. A parting is one toggle landing the other
+side of a frame's edge, a tick of another length returning inside the
+call at another point, which lengthens one half of the wave and
+shortens the next. `ym/writes.py` reads two traces back this way.
 
 A tune that runs one effect has nothing to nest inside a tick, so init
 writes two nops where that effect's handlers drop the interrupt level:

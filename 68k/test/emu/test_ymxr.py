@@ -113,6 +113,14 @@ def taken(writes):
 # an equate of the source reads as the assembly defines it.
 PERF = "-perf" in sys.argv
 LEAN = "-lean" in sys.argv
+
+# The row of performance.md's lean table each kind of tick reads, the
+# four kinds being what a lean tick has: it drops no interrupt level, so
+# the path a tune of one effect takes is the path every other tune takes.
+LEAN_ROW = {"on": "a row written, the place stepped",
+            "loop": "the marker, the place to row `RR`",
+            "stop": "the marker, the timer stopped",
+            "square": "a square's two rows, no place stepped"}
 DEFINED = {"YMXR_PERF": 1 if PERF else 0,
            "YMXR_NEST": 0 if LEAN else 1, "YMXR_AEOI": 1 if LEAN else 0}
 
@@ -1091,6 +1099,9 @@ def main():
             if said != counted:
                 stale.append("performance.md says %s for %s, and the rig counts %s" % (
                     said, stem, counted))
+            # A lean tick drops no interrupt level, so the row a tune of
+            # one effect takes is the row every other tune takes, and the
+            # four kinds read the lean table's second figure.
             for then, name in (("on", "a row written, the place stepped"),
                                ("loop", "the marker, the place to row `RR`"),
                                ("stop", "the marker, the timer stopped"),
@@ -1099,11 +1110,17 @@ def main():
                                ("loop alone", "the marker to row `RR`, one effect"),
                                ("stop alone", "the marker and the stop, one effect"),
                                ("square alone", "a square's two rows, one effect")):
-                if then in tick_cost:
-                    tick = re.search(r"^\| %s \| (\d+) \|$" % re.escape(name),
-                                     open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
-                    if not tick or {int(tick.group(1))} != tick_cost[then]:
-                        stale.append("performance.md's tick %s is not %s" % (then, tick_cost[then]))
+                if then not in tick_cost:
+                    continue
+                if LEAN:
+                    name = LEAN_ROW[then.replace(" alone", "")]
+                    row = r"^\| %s \| \d+ \| (\d+) \|$" % re.escape(name)
+                else:
+                    row = r"^\| %s \| (\d+) \|$" % re.escape(name)
+                tick = re.search(row,
+                                 open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
+                if not tick or {int(tick.group(1))} != tick_cost[then]:
+                    stale.append("performance.md's tick %s is not %s" % (then, tick_cost[then]))
         print(line)
     assert not stale, "\n".join(sorted(set(stale)))
     print("every tune plays as the specification reads")
