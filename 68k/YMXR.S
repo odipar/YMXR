@@ -516,12 +516,22 @@ YMXR_init:
                 RUNS    2,ymxr_tick2_over
                 RUNS    3,ymxr_tick3_over
 
+; The advance's own address, written into the call that plays: a slot is
+; a bra.w (DTX, abi.md 1), so the body stands two bytes past the slot
+; plus the branch's displacement, and a play call reaches it in one jsr.
+                movea.l WS_IMAGE(a6),a2
+                lea     IM_ADVANCE(a2),a3
+                move.w  2(a3),d0
+                ext.l   d0
+                lea     2(a3,d0.l),a3
+                lea     ymxr_call+2(pc),a4
+                move.l  a3,(a4)
+
 ; The first row, taken here so that a call writes a row it already has
 ; (SPEC.md 4): the writes then leave a host's clock at one offset,
 ; whatever the advance for the next row costs.
                 lea     WS_STATE(a6),a0
-                movea.l WS_IMAGE(a6),a2
-                jsr     IM_ADVANCE(a2)          ; a1 the row
+                jsr     (a3)                    ; a1 the row
 
 ; The timers the tune runs, claimed. The others stand as they are.
                 move.w  sr,-(sp)
@@ -638,9 +648,9 @@ ymxr_played:
                 sub.l   WS_RR(a0),d0            ; rows, or none
                 move.l  d0,WS_ROWS(a0)
                 beq.s   ymxr_return             ; none: no row to take
-ymxr_next:      movea.l WS_IMAGE(a0),a2
-                lea     WS_STATE(a0),a0
-                jsr     IM_ADVANCE(a2)
+ymxr_next:      lea     WS_STATE(a0),a0
+ymxr_call:      jsr     ($12345678).l           ; the advance's own address,
+                                                ; resolved at init
 ymxr_return:
                 .if     YMXR_PERF
                 move.w  #PERF_BAR,PERF_COLOUR.w ; the timers' bar, burnt
