@@ -75,6 +75,30 @@ YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
                 .else
 YMXR_PERF       equ     0
                 .endif
+; A tick drops the interrupt level once its writes are made, so a faster
+; timer nests inside a slower one; and it clears its own in-service bit,
+; the MFP being taken in software end-of-interrupt mode as TOS leaves it.
+; A host that wants neither assembles the player with YMXR_NEST=0 and
+; YMXR_AEOI=1 (rmac -dYMXR_NEST=0 -dYMXR_AEOI=1), which takes 32 cycles
+; off every tick and asks two things of it: no MFP interrupt nests inside
+; another, and the MFP's vector register is the player's to set, which it
+; keeps over a call and puts back at stop. The two go together: automatic
+; end-of-interrupt sets no in-service bit, so nothing but the level the
+; tick holds keeps a lower timer out.
+                .if     ^^defined YMXR_NEST
+                .else
+YMXR_NEST       equ     1
+                .endif
+                .if     ^^defined YMXR_AEOI
+                .else
+YMXR_AEOI       equ     0
+                .endif
+                .if     YMXR_AEOI&YMXR_NEST
+                .error  "YMXR_AEOI=1 asks for YMXR_NEST=0"
+                .endif
+MFP_VECTOR      equ     $FFFFFA17       ; bits 7 to 4 the vector's high half,
+                                        ; bit 3 the software end of interrupt
+
 PERF_SYNC       equ     8000            ; the wait's ceiling, over a frame
                                         ; of turns, so a call from
                                         ; anywhere runs on
@@ -124,6 +148,9 @@ WS_ROWS         equ     8               ; rows to the last, or to the wrap
 WS_R            equ     12
 WS_RR           equ     16
 WS_EFFECTS      equ     20              ; a byte: the effects the tune runs
+WS_VECTOR       equ     21              ; a byte: the MFP's vector register as
+                                        ; init found it, kept where the player
+                                        ; takes automatic end of interrupt
 WS_FX           equ     24              ; four effects, FX_SIZE each
 FX_TARGET       equ     0               ; the target the player holds
 FX_SELECT       equ     1               ; the select it last took
@@ -489,21 +516,29 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
                 move.b  ($12345678).l,YM_SELECT+2.w ; +8: the place
                 bmi.s   .last\~
+                .if     YMXR_NEST
                 move.w  #$2500,sr
+                .endif
                 addq.l  #1,($12345678).l        ; +22: the place, stepped
                 COUNT   PERF_ON
+                .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
+                .endif
                 rte
 .last\~:
 \{name}_mark:   tst.l   ($12345678).l           ; +2: the loop cell
                 beq.s   .stop\~
                 move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
                 COUNT   PERF_LOOP
+                .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
+                .endif
                 rte
 .stop\~:        andi.b  #\keep,\ctrl.w
                 COUNT   PERF_STOP
+                .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
+                .endif
                 rte
 \{name}_cell:   dc.l    0                       ; the loop cell
                 .endm
@@ -520,10 +555,14 @@ q\{ct}:         bra.w   \{tick}_done
                 MARK    \colour
 \{name}_sel:    move.b  #8,YM_SELECT.w          ; +3: the target register
 \{name}_val:    move.b  #$0F,YM_SELECT+2.w      ; +3: the row it stands at
+                .if     YMXR_NEST
                 move.w  #$2500,sr
+                .endif
 \{name}_tog:    eori.b  #$0F,($12345678).l      ; +3 the two rows' difference,
                 COUNT   PERF_SQ                 ; +4 the row's own address
+                .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
+                .endif
                 rte
                 .endm
 
@@ -617,6 +656,12 @@ YMXR_init:
                 lea     ymxr_tick3(pc),a5
                 bsr     ymxr_link
 
+                .if     YMXR_AEOI
+                move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
+                bclr    #3,MFP_VECTOR.w             ; MFP ending its own
+                .endif
+
+                .if     YMXR_NEST
 ; A tune that runs one effect has nothing to nest inside a tick, so the
 ; level that tick drops buys it nothing: two nops stand where the drop
 ; would, in both of that effect's handlers. A tune running two or more
@@ -639,6 +684,7 @@ YMXR_init:
                 addq.w  #1,d4
                 dbra    d2,.alone
 .nests:
+                .endif
 
 ; A square's handler names the row it stands at in the one instruction
 ; that moves between the two.
@@ -739,6 +785,9 @@ YMXR_stop:
                 move.l  #$08000000,YM_SELECT.w
                 move.l  #$09000000,YM_SELECT.w
                 move.l  #$0A000000,YM_SELECT.w
+                .if     YMXR_AEOI
+                move.b  WS_VECTOR(a6),MFP_VECTOR.w
+                .endif
                 movea.l (sp)+,a6
                 rts
 
@@ -899,7 +948,10 @@ ymxr_sites:
 ; offsets are all four handlers'. The rig reads them back.
 TICK_SEL        equ     ymxr_tick0_row-ymxr_tick0+3   ; the target register
 TICK_PTR        equ     ymxr_tick0_row-ymxr_tick0+8   ; the place: a tick's row
-TICK_STEP       equ     ymxr_tick0_row-ymxr_tick0+22  ; the place's own address
+TICK_STEP       equ     ymxr_tick0_row-ymxr_tick0+18+(YMXR_NEST*4)
+                                        ; the place's own address, which the
+                                        ; level's drop stands in front of
+                                        ; where a tick drops it
 TICK_LOOPT      equ     ymxr_tick0_mark-ymxr_tick0+2  ; the loop cell's address
 TICK_LOOPR      equ     ymxr_tick0_mark-ymxr_tick0+10 ; the same
 TICK_LOOPW      equ     ymxr_tick0_mark-ymxr_tick0+14 ; the place's address

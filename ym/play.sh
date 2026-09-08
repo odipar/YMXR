@@ -1,25 +1,71 @@
 #!/bin/sh
 # A tune played, or recorded: a dump or a tune file into an SNDH file and
-# a program around it, and the program run under Hatari with its sound on.
-# tools.md has the tools this drives and BINARIES.md the files they write.
+# a program around it, and the program run under Hatari with its sound
+# on. tools.md has the tools this drives and BINARIES.md the files they
+# write.
 #
 #   ym/play.sh [options] tune.ym [out.wav]
+#   ym/play.sh [options] tune.ymxr [out.wav]
 #
-#   -kK        the unit the table packs at, 2 by default
-#   -mN        the ring in bytes, 960
+# The first name is a YM dump or a tune file. A second name records the
+# run instead of playing it: Hatari writes an AVI, video and sound, which
+# ym/avi.py reads back as a WAV, with the run's last frame beside it as a
+# PNG of the same name.
+#
+# The converter's options, which a tune file is packed already and takes
+# none of:
+#
+#   -kK        the unit the table packs at, 1 or 2; 2 by default, and a
+#              tune whose row count or repeat row is odd packs at 1
+#   -mN        the ring in bytes, 960 by default
 #   -rRR       the row the tune repeats to; -r alone plays it once
-#   -tTITLE    the title in the tags, the file's name by default
-#   -cCOMPOSER the composer in the tags
-#   -perf      the core with the raster monitor in, so the run paints
-#              what each call costs (performance.md)
-#   -vN        stop after N frames; the tune plays on without it
 #
-# -k, -m and -r are the converter's and a tune file takes none of them.
-# A second name records the run instead of playing it: Hatari writes an
-# AVI, video and sound, which ym/avi.py reads back as a WAV, with the
-# run's last frame beside it as a PNG. The emulator is asked for its
-# modelled YM mixing, which is what a voice whose volume a timer moves is
-# heard through. HATARI and TOS name the emulator and a TOS image.
+# The tags:
+#
+#   -tTITLE    the title, the dump's own or the file's name by default
+#   -cCOMPOSER the composer
+#
+# The core the file takes, the plain one by default:
+#
+#   -perf      the core with the raster monitor in, so the run paints
+#              what each call costs and the program clears the screen
+#              for it (performance.md, Measure)
+#   -lean      the core whose ticks neither drop the interrupt level nor
+#              write their own end of interrupt, 32 cycles a tick
+#              cheaper, which asks that no MFP interrupt of the host's
+#              nest inside another and that the MFP's vector register be
+#              the player's (performance.md, BINARIES.md)
+#
+# The run:
+#
+#   -vN        stop after N frames; the tune plays on without it
+#   -h         this text
+#
+# HATARI and TOS name the emulator and a TOS image. The emulator is asked
+# for its modelled YM mixing, which is what a voice whose volume a timer
+# moves is heard through.
+#
+# Examples:
+#
+#   ym/play.sh "ym/test/Turrican - world 4-3.ym"
+#       the dump converted at the defaults and played until SPACE
+#
+#   ym/play.sh -k1 -tTurrican -cHippel tune.ym
+#       packed a byte a unit, and the two tags set
+#
+#   ym/play.sh -v3000 tune.ym run.wav
+#       sixty seconds recorded to run.wav, with run.png beside it
+#
+#   ym/play.sh -perf -v300 tune.ym bars.wav
+#       the same on the monitor's core, so bars.png shows what the call
+#       and the timers cost
+#
+#   ym/play.sh -lean tune.ymxr
+#       a tune file already packed, on the core whose ticks cost less
+#
+#   TOS=~/tos206.rom HATARI=~/bin/hatari ym/play.sh tune.ym
+#       another emulator, and another TOS image
+#
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}
@@ -31,11 +77,15 @@ ring=
 repeat=
 title=
 composer=
+help=
 perf=
+lean=
 vbls=
 for arg do
     case $arg in
+        -h|-help|--help) help=1 ;;
         -perf) perf=-perf ;;
+        -lean) lean=-lean ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
         -r*) repeat=$arg ;;
@@ -46,8 +96,12 @@ for arg do
         *) if [ -z "$tune" ]; then tune=$arg; else out=$arg; fi ;;
     esac
 done
-if [ -z "$tune" ]; then
-    sed -n '2,22p' "$0" | cut -c3-
+if [ -n "$help" ] || [ -z "$tune" ]; then
+    # the head of this file, to the first line that is not a comment
+    sed -n '2,/^[^#]/p' "$0" | sed '$d' | cut -c3-
+    if [ -n "$help" ]; then
+        exit 0
+    fi
     exit 2
 fi
 case $tune in /*) ;; *) tune=$(pwd)/$tune ;; esac
@@ -71,7 +125,7 @@ case $tune in
             ${repeat:+"$repeat"} >/dev/null
         ;;
 esac
-"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" $perf \
+"$here/bin/ymxr-sndh" "$file" "$work/TUNE.SND" $perf $lean \
     "-t${title:-${name%.*}}" ${composer:+"-c$composer"} >/dev/null
 "$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" >/dev/null
 set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \

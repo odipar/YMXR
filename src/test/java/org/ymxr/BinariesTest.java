@@ -244,7 +244,7 @@ final class BinariesTest {
     void anSndhFileFromTwoTunesReadsBack() throws IOException {
         List<byte[]> files = List.of(tune("chambers"), tune("circus"));
         byte[] sndh = Sndh.of(files, new Sndh.Options("Two of the kit", "Jochen Hippel",
-                List.of("Chambers", "Circus"), false));
+                List.of("Chambers", "Circus"), false, false));
         Tags tags = tags(sndh);
         assertEquals(List.of("TITL", "COMM", "CONV", "##", "TC", "FLAG", "FRMS", "!#SN", "HDNS"),
                 tags.order());
@@ -262,7 +262,7 @@ final class BinariesTest {
     @Test
     void aFileWithoutNamesOrComposerHasNeitherTag() throws IOException {
         List<byte[]> files = List.of(tune("plays-once"));
-        byte[] sndh = Sndh.of(files, new Sndh.Options("Once", null, null, false));
+        byte[] sndh = Sndh.of(files, new Sndh.Options("Once", null, null, false, false));
         Tags tags = tags(sndh);
         assertEquals(List.of("TITL", "CONV", "##", "TC", "FLAG", "FRMS", "HDNS"), tags.order());
         assertEquals(1, tags.subtunes());
@@ -274,7 +274,7 @@ final class BinariesTest {
         byte[] file = tune("plays-once");
         org.dtx.Table table = TuneFile.read(file).table();
         assertEquals(table.rows(), table.repeat(), "plays-once has RR at R");
-        Tags tags = tags(Sndh.of(List.of(file), new Sndh.Options("Once", null, null, false)));
+        Tags tags = tags(Sndh.of(List.of(file), new Sndh.Options("Once", null, null, false, false)));
         assertArrayEquals(new int[] {table.rows()}, tags.frames());
         assertEquals(4, tags.frames()[0]);
     }
@@ -282,7 +282,7 @@ final class BinariesTest {
     @Test
     void theFlagTagListsTheTimersTheSetClaims() throws IOException {
         Tags tags = tags(Sndh.of(List.of(tune("four-timers"), tune("four-timers")),
-                new Sndh.Options("Four", null, null, false)));
+                new Sndh.Options("Four", null, null, false, false)));
         assertEquals("abcdy", tags.flag());
         assertEquals(60, tags.rate());
         // effects 0 to 3 run Timers A, D, B and C
@@ -297,7 +297,7 @@ final class BinariesTest {
     void twoRatesInOneSetAreRejected() throws IOException {
         List<byte[]> files = List.of(tune("four-timers"), tune("chambers"));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(files, new Sndh.Options("Mixed", null, null, false)));
+                () -> Sndh.of(files, new Sndh.Options("Mixed", null, null, false, false)));
         assertTrue(said(wrong).contains("50 Hz") && said(wrong).contains("60"), said(wrong));
     }
 
@@ -305,24 +305,24 @@ final class BinariesTest {
     void moreSubtunesThanTheCountHoldsAreRejected() throws IOException {
         List<byte[]> files = Collections.nCopies(Sndh.MAX_SUBTUNES + 1, tune("circus"));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(files, new Sndh.Options("Many", null, null, false)));
+                () -> Sndh.of(files, new Sndh.Options("Many", null, null, false, false)));
         assertTrue(said(wrong).contains("99"), said(wrong));
         assertEquals(99, tags(Sndh.of(files.subList(0, Sndh.MAX_SUBTUNES),
-                new Sndh.Options("Many", null, null, false))).subtunes());
+                new Sndh.Options("Many", null, null, false, false))).subtunes());
     }
 
     @Test
     void aTuneOfAnotherVersionIsRejected() throws IOException {
         List<byte[]> files = List.of(tune("chambers"), tune("wrong-version"));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(files, new Sndh.Options("Wrong", null, null, false)));
+                () -> Sndh.of(files, new Sndh.Options("Wrong", null, null, false, false)));
         assertEquals("subtune 2: version 3 is not 2", wrong.getMessage());
     }
 
     @Test
     void aProgramIsTheHeaderTheStubTheFileAndAZeroLong() throws IOException {
         List<byte[]> files = List.of(tune("chambers"), tune("circus"));
-        byte[] sndh = Sndh.of(files, new Sndh.Options("Two of the kit", null, null, false));
+        byte[] sndh = Sndh.of(files, new Sndh.Options("Two of the kit", null, null, false, false));
         byte[] stub = Binaries.stub();
         byte[] prg = Prg.of(sndh, 0);
         assertEquals(28 + stub.length + sndh.length + 4, prg.length);
@@ -359,8 +359,8 @@ final class BinariesTest {
     @Test
     void theMonitorInTheCoreSetsTheStubsClearBit() throws IOException {
         List<byte[]> files = List.of(tune("chambers"));
-        byte[] plain = Sndh.of(files, new Sndh.Options("Plain", null, null, false));
-        byte[] watched = Sndh.of(files, new Sndh.Options("Watched", null, null, true));
+        byte[] plain = Sndh.of(files, new Sndh.Options("Plain", null, null, false, false));
+        byte[] watched = Sndh.of(files, new Sndh.Options("Watched", null, null, true, false));
         assertCombined(Binaries.core(), plain, files, tags(plain));
         assertCombined(Binaries.monitorCore(), watched, files, tags(watched));
         assertEquals(0, Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
@@ -372,7 +372,7 @@ final class BinariesTest {
     @Test
     void aCoreWithoutTheMonitorIsRejectedWhereTheMonitorWasAskedFor() throws IOException {
         List<byte[]> files = List.of(tune("chambers"));
-        Sndh.Options options = new Sndh.Options("Watched", null, null, true);
+        Sndh.Options options = new Sndh.Options("Watched", null, null, true, false);
         byte[] core = Binaries.core();
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(core, files, options));
@@ -387,7 +387,7 @@ final class BinariesTest {
     @Test
     void aSetClaimingTimerCAtAnotherRateMakesNoProgram() throws IOException {
         byte[] sndh = Sndh.of(List.of(tune("four-timers")),
-                new Sndh.Options("Four", null, null, false));
+                new Sndh.Options("Four", null, null, false, false));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Prg.of(sndh, 0));
         assertEquals("the set claims Timer C and plays at 60 Hz: the stub then plays from the"
@@ -398,7 +398,7 @@ final class BinariesTest {
     void aSetClaimingTimerCAtFiftyHertzPlaysFromTheVbl() throws IOException {
         byte[] file = tune("four-timers").clone();
         Tune.putWord(file, Tune.FRAME_RATE_AT, 50);
-        byte[] sndh = Sndh.of(List.of(file), new Sndh.Options("Four at fifty", null, null, false));
+        byte[] sndh = Sndh.of(List.of(file), new Sndh.Options("Four at fifty", null, null, false, false));
         assertEquals("abcdy", tags(sndh).flag());
         byte[] prg = Prg.of(sndh, 0);
         assertEquals(Prg.FLAG_VBL, Tune.getWord(prg, 28 + Prg.STUB_FLAGS_AT), "Timer C claimed");
@@ -409,7 +409,7 @@ final class BinariesTest {
     void aSetWithoutTimerCLeavesBitOneClear() throws IOException {
         byte[] file = tune("chambers").clone();
         Tune.putWord(file, Tune.FRAME_RATE_AT, 60);
-        byte[] prg = Prg.of(Sndh.of(List.of(file), new Sndh.Options("Sixty", null, null, false)),
+        byte[] prg = Prg.of(Sndh.of(List.of(file), new Sndh.Options("Sixty", null, null, false, false)),
                 0);
         assertEquals(0, Tune.getWord(prg, 28 + Prg.STUB_FLAGS_AT), "neither flag");
         assertEquals(60, Tune.getWord(prg, 28 + Prg.STUB_RATE_AT));
@@ -418,7 +418,7 @@ final class BinariesTest {
     @Test
     void aTitleThatReadsLikeATagPatchesNothing() throws IOException {
         byte[] sndh = Sndh.of(List.of(tune("chambers")),
-                new Sndh.Options("TC##HDNS FLAG~c", "##99", null, false));
+                new Sndh.Options("TC##HDNS FLAG~c", "##99", null, false, false));
         Tags tags = tags(sndh);
         assertEquals("TC##HDNS FLAG~c", tags.text().get("TITL"));
         assertEquals("##99", tags.text().get("COMM"));
@@ -438,7 +438,7 @@ final class BinariesTest {
                     () -> Prg.of(file, 0));
             assertTrue(said(wrong).contains("no SNDH at 12"), said(wrong));
         }
-        byte[] sndh = Sndh.of(List.of(tune("circus")), new Sndh.Options("Cut", null, null, false));
+        byte[] sndh = Sndh.of(List.of(tune("circus")), new Sndh.Options("Cut", null, null, false, false));
         byte[] cut = Arrays.copyOf(sndh, tags(sndh).end() - 4);
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Prg.of(cut, 0));

@@ -112,7 +112,9 @@ def taken(writes):
 # What the player is assembled with: the raster monitor's switch, which
 # an equate of the source reads as the assembly defines it.
 PERF = "-perf" in sys.argv
-DEFINED = {"YMXR_PERF": 1 if PERF else 0}
+LEAN = "-lean" in sys.argv
+DEFINED = {"YMXR_PERF": 1 if PERF else 0,
+           "YMXR_NEST": 0 if LEAN else 1, "YMXR_AEOI": 1 if LEAN else 0}
 
 
 def equate(name, symbols=None):
@@ -1036,15 +1038,20 @@ def main():
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
-    code, symbols = assemble(defines=["-dYMXR_PERF=1"] if perf else [])
+    defines = ["-dYMXR_PERF=1"] if perf else []
+    if LEAN:
+        defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
+    code, symbols = assemble(defines=defines)
     global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
     SQ_SEL = equate("SQ_SEL", symbols)
     SQ_VAL = equate("SQ_VAL", symbols)
-    print("the player: %d bytes%s" % (len(code), ", the raster monitor in" if perf else ""))
+    print("the player: %d bytes%s%s" % (len(code),
+                                       ", the raster monitor in" if perf else "",
+                                       ", the lean tick" if LEAN else ""))
     if real:
-        code, symbols = assemble("YMXR_sndh.S", defines=["-dYMXR_PERF=1"] if perf else [])
+        code, symbols = assemble("YMXR_sndh.S", defines=defines)
         print("the SNDH core: %d bytes%s" % (len(code),
                                              ", the raster monitor in" if perf else ""))
     cycles_of = None

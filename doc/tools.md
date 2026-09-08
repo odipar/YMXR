@@ -114,7 +114,7 @@ header of the source gives the contract in full.
 ```
 bin/ymxr-bind tune.ymxr tune.bin
 bin/ymxr-sndh tune.ymxr [more.ymxr ...] tune.sndh [-tTITLE] [-cCOMPOSER]
-              [-nNAME ...] [-perf]
+              [-nNAME ...] [-perf | -lean]
 bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS]
 ```
 
@@ -128,16 +128,20 @@ TOS program that takes the machine over under Supexec, plays the file
 from the VBL or Timer C, stops on SPACE or ESC or after `ROWS` rows,
 switches subtunes on 1 to 9, and hands the machine back. `-perf` puts
 the core with the raster monitor in (Measure), and the program then
-clears the screen so that its bars show. The core, that core and the
-stub are assembled by the build with rmac, once, into the classpath;
+clears the screen so that its bars show; `-lean` puts the core whose
+ticks neither drop the interrupt level nor write their own end of
+interrupt, which asks two things of the host (performance.md). The three
+cores and the stub are assembled by the build with rmac, once, into the
+classpath;
 BINARIES.md is the contract for every byte of them, and no assembler
 runs at combine time.
 
 ## Play
 
 ```
-ym/play.sh [-kK] [-mN] [-rRR | -r] [-tTITLE] [-cCOMPOSER] [-perf] [-vN]
-           tune.ym [out.wav]
+ym/play.sh [-kK] [-mN] [-rRR | -r] [-tTITLE] [-cCOMPOSER] [-perf]
+           [-lean] [-vN] tune.ym [out.wav]
+ym/play.sh -h
 ```
 
 `ym/play.sh` runs the three tools above and hands the program to Hatari
@@ -153,7 +157,9 @@ run's last frame beside it as a PNG.
 | `-rRR`, `-r` | the row the tune repeats to, or a tune that plays once |
 | `-tTITLE`, `-cCOMPOSER` | the tags; the title is the file's name by default |
 | `-perf` | the core with the raster monitor in, so the recorded frame shows the bars (Measure) |
+| `-lean` | the core whose ticks neither drop the interrupt level nor write their own end of interrupt (performance.md) |
 | `-vN` | the frames to run |
+| `-h` | the options and examples, which the script's own head holds |
 
 `-k`, `-m` and `-r` are the converter's, and a tune file, which is
 packed already, takes none of them. `HATARI` and `TOS` name the emulator
@@ -173,6 +179,7 @@ python3 68k/test/emu/test_ymxr.py [tune.ym ...]
 python3 68k/test/emu/test_ymxr.py -cycles [tunes]
 python3 68k/test/emu/test_ymxr.py -hatari [tunes]
 python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
+python3 68k/test/emu/test_ymxr.py -lean [tunes]
 ```
 
 A tune named as a `.ymxr` file plays as it stands, without the
@@ -195,7 +202,9 @@ against the rates the trace shows the timers programmed at. `ym/cost.sh`
 measures the same program's cycles instead, through the raster monitor
 (Measure). `-perf` builds the player with that monitor in and holds it to the
 model under unicorn, so a band painted or a cost counted changes no register a
-frame writes, and none of the order it writes them in. `-kit` plays the
+frame writes, and none of the order it writes them in. `-lean` builds it with
+the two switches a tick reads, `YMXR_NEST=0` and `YMXR_AEOI=1`
+(performance.md), and holds that build to the same model. `-kit` plays the
 conformance kit's tunes, or the tune files named, and holds each frame the
 player makes to the reader's record of it through `bin/ymxr-trace`, and the
 record's first line to the tune's header, so the player, the rig's model and
