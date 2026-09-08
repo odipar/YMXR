@@ -435,10 +435,15 @@ final class Sndh {
                 + (options.names() == null ? "" : ", !#SN with " + options.names().size()
                 + (options.names().size() == 1 ? " name" : " names")));
         int bound = 0;
+        List<String> names = options.names();
         for (int i = 0; i < files.size(); i++) {
             byte[] b = Bound.of(tunes.get(i));
             bound += b.length;
-            report.row(stem(files.get(i)), tunes.get(i).length + " bytes bound to " + b.length);
+            // A subtune is called what its name gives, where names are
+            // given: a tool that packs into a file of its own naming has
+            // the tune's name and not the file's.
+            report.row(names == null ? stem(files.get(i)) : names.get(i),
+                    tunes.get(i).length + " bytes bound to " + b.length);
         }
         report.say("the file: " + sndh.length + " bytes, the core " + core + ", the tunes "
                 + bound + ", the workspace and the rest " + (sndh.length - core - bound));

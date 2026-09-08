@@ -41,9 +41,11 @@ A tune converts and plays like this:
 ym/play.sh tune.ym
 ```
 
-That converts, combines and plays it under Hatari; named a second file it
-records the run to a WAV instead, and its options reach the tools it
-drives, `-perf` among them for the raster monitor. The three are these:
+That converts, combines and plays it under Hatari. Several tunes go into
+one file as subtunes the program picks between on the keys 1 to 9, and a
+name that is not a tune records the run to a WAV instead. Its options
+reach the tools it drives, `-perf` among them for the raster monitor.
+The three are these:
 
 ```bash
 bin/ym-to-ymxr tune.ym tune.ymxr
