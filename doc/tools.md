@@ -141,6 +141,7 @@ runs at combine time.
 ```
 ym/play.sh [-kK] [-mN] [-rRR | -r] [-tTITLE] [-cCOMPOSER] [-perf]
            [-lean] [-vN] tune.ym [out.wav]
+ym/play.sh -h
 ```
 
 `ym/play.sh` runs the three tools above and hands the program to Hatari
@@ -158,6 +159,7 @@ run's last frame beside it as a PNG.
 | `-perf` | the core with the raster monitor in, so the recorded frame shows the bars (Measure) |
 | `-lean` | the core whose ticks neither drop the interrupt level nor write their own end of interrupt (performance.md) |
 | `-vN` | the frames to run |
+| `-h` | the options and examples, which the script's own head holds |
 
 `-k`, `-m` and `-r` are the converter's, and a tune file, which is
 packed already, takes none of them. `HATARI` and `TOS` name the emulator
