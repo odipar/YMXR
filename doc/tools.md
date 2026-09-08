@@ -82,11 +82,11 @@ The tool runs out of `target/classes`, and builds first where a source,
 the pom or a 68000 source is newer than the last build, or the core is
 not assembled. Java 23, Maven and rmac, with which the build assembles
 the four cores and the stub once (`-Drmac=PATH` names another), and DTX
-0.7-SNAPSHOT in the local Maven repository: `mvn install` on DTX's main,
+0.7.0 in the local Maven repository: `mvn install` at DTX's `v0.7.0` tag,
 whose reader this player's frame figures (performance.md) are measured
-against. The player takes the table to read from that reader's init, and
-a set of subtunes shares one image (BINARIES.md 1), which 0.6.0 does not
-have.
+against. The player names the table to read at that reader's init, and a
+set of subtunes shares one image (BINARIES.md 1), neither of which 0.6.0
+reads.
 
 ## Check
 
