@@ -8,17 +8,16 @@
 #   ym/play.sh [options] tune.ymxr [more.ymxr ...] [out.wav]
 #
 # The first name is a YM dump or a tune file. After it, a name ending in
-# .ym or .ymxr is another tune and any other name records the run
-# instead of playing it: Hatari writes an AVI, video and sound, which
-# ym/avi.py reads back as a WAV, with the run's last frame beside it as a
-# PNG of the same name.
+# .ym or .ymxr, in either case, is another tune, and any other name
+# records the run instead of playing it: Hatari writes an AVI, video and
+# sound, which ym/avi.py reads back as a WAV, with the run's last frame
+# beside it as a PNG of the same name.
 #
 # Several tunes go into one file, a subtune each in the order named, and
 # the program picks between them on the keys 1 to 9. Each is named by its
 # file, and an SNDH file states one rate, so a set whose tunes do not
-# share one gets a line on stderr and no file. The keys reach nine, and a
-# tenth tune and past it play only under a host that asks for a subtune
-# by number.
+# share one gets a line on stderr and no file. A tenth tune and past it
+# play only under a host that asks for a subtune by number.
 #
 # The converter's options, which a tune file is packed already and takes
 # none of:
@@ -165,6 +164,25 @@ done
 if [ -n "$out" ]; then
     case $out in /*) ;; *) out=$(pwd)/$out ;; esac
 fi
+# A tune file is packed already, so the converter's flags have nothing to
+# pack. Said over every name before any dump is converted, so the same
+# mistake costs the same whichever name it stands under.
+if [ -n "$unit$ring$repeat" ]; then
+    left=$#
+    while [ "$left" -gt 0 ]; do
+        arg=$1
+        shift
+        left=$((left - 1))
+        case $arg in
+            *.ymxr|*.YMXR)
+                echo "ym/play.sh: $(basename "$arg") is a tune file, and -k, -m and -r" \
+                    "pack one" >&2
+                exit 2
+                ;;
+        esac
+        set -- "$@" "$arg"
+    done
+fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 # Each tune converted where it is a dump, and the tune files left as they
@@ -184,10 +202,6 @@ while [ "$left" -gt 0 ]; do
     [ -n "$stem" ] || stem=${name%.*}
     case $tune in
         *.ymxr|*.YMXR)
-            if [ -n "$unit$ring$repeat" ]; then
-                echo "ym/play.sh: $name is a tune file, and -k, -m and -r pack one" >&2
-                exit 2
-            fi
             file=$tune
             ;;
         *)
@@ -220,5 +234,9 @@ if [ -n "$out" ]; then
 fi
 (cd "$work" && "$HATARI" "$@" TUNE.PRG >/dev/null 2>&1) || true
 if [ -n "$out" ]; then
-    python3 "$here/ym/avi.py" "$work/run.avi" "$out" "${out%.*}.png"
+    # The name's own stem, not the path's: a name with no dot in a
+    # directory whose path holds one would otherwise put the PNG above
+    # the run's own directory.
+    said=${out##*/}
+    python3 "$here/ym/avi.py" "$work/run.avi" "$out" "${out%/*}/${said%.*}.png"
 fi

@@ -175,7 +175,8 @@ ym/play.sh -h
 `ym/play.sh` runs the three tools above and hands the program to Hatari
 with its sound on. SPACE stops the tune, and `-vN` stops the run after
 `N` frames. The first name is a tune; after it a name ending in `.ym` or
-`.ymxr` is another tune and any other name records the run instead:
+`.ymxr`, in either case, is another tune and any other name records the
+run instead:
 Hatari writes an AVI, video and sound, which `ym/avi.py` reads back as a
 WAV, with the run's last frame beside it as a PNG.
 
