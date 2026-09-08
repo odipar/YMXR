@@ -234,9 +234,12 @@ q\{col}:
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset.
                 .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick
+; The head is the effect's first read where the tune runs the effect, and
+; a branch over its columns where it does not: init writes the one word
+; that tells them apart, and the word after it holds the read's
+; displacement or the branch's, whichever the head takes.
 \{tick}_over:
-                bra.w   \{tick}_done             ; two nops where the tune
-                QREAD   \ct                     ; runs this effect (init)
+q\{ct}:         bra.w   \{tick}_done
                 QOR     \cs                     ; the three set bits at once
                 QOR     \cc
                 bmi.s   \{tick}_some
@@ -501,10 +504,12 @@ YMXR_init:
 ; The effects the tune runs are read every row; the others are jumped
 ; over, the branch at each macro's head standing where the tune does not
 ; run its effect.
-; The branch at an effect's head: two nops where the tune runs the
-; effect, and where it does not, the branch's displacement moved to the
-; head of the next effect the tune does run, or past the last of them.
-; A run of effects the tune does not run then costs one branch.
+; The head of each effect: the effect's own first read where the tune
+; runs it, and where it does not, the branch it holds already, its
+; displacement moved to the head of the next effect the tune does run or
+; past the last of them. A run of effects the tune does not run then
+; costs one branch. This stands after the sites above, which write the
+; read's displacement into the word a skipped effect's branch takes.
                 lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
                 lea     ymxr_tick3_done(pc),a5
@@ -513,8 +518,8 @@ YMXR_init:
                 lea     (a4,d4.w),a1
                 btst    d2,WS_EFFECTS(a6)
                 beq.s   .skip
-                move.l  #$4E714E71,(a1)
-                movea.l a1,a5
+                move.w  #$1229,(a1)             ; move.b d16(a1),d1: the
+                movea.l a1,a5                   ; effect's first read
                 bra.s   .next
 .skip:          move.l  a5,d0
                 sub.l   a1,d0
