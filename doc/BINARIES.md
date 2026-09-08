@@ -59,21 +59,33 @@ and nothing in the rows moves.
 | offset | bytes | gives |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0001 |
+| 4 | 2 | the version, $0002 |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
 | 10 | 2 | zero |
 | 12 | 4 | the state block's bytes: the image's format block gives them |
-| 16 | 4 | where the image begins |
-| 20 | 4`S` | the source index: where the table of source 1 to `S` begins |
-| | | the image, on a long |
+| 16 | 4 | where the image begins, signed |
+| 20 | 4 | where this tune's table stands, from the image's first byte |
+| 24 | 4`S` | the source index: where the table of source 1 to `S` begins |
+| | | the image, on a long, where this tune has one of its own |
 | | | the DTX1 tables, each on a long, as the tune file has them |
 
+**One image, one table or several.** An image holds the reader's code
+once, and DTX's init takes the header of the table to read (DTX, abi.md
+2), so tunes that agree on what an image gives once - the variant, the
+width, the unit, the copies flag and the ring - go into one image and the
+code stands once for them. A bound tune written on its own has its image
+in it and reaches it forwards; one of a set reaches the set's image,
+which stands before it, so the offset at +16 is negative there. The field
+at +20 names this tune's table either way.
+
 The player reads the magic and the version at init and rejects another
-of either, reads the effects byte, the image and the index, and never
-reads the state block's bytes: a host reads them, to give the player a
-workspace of `YMXR_FIXED` plus that many bytes, on a long.
+of either, reads the effects byte, the image, the table and the index,
+and never reads the state block's bytes: a host reads them, to give the
+player a workspace of `YMXR_FIXED` plus that many bytes, on a long. `R`
+and `RR` it reads out of the table's own header (DTX, SPEC.md 1), since
+`DTX_metadata` gives the image's first table and a set shares one.
 
 ## 2. The SNDH core
 
@@ -152,12 +164,20 @@ In order:
    `HDNS`.
 3. **The core**, with its two offsets patched.
 4. **The subtune table** (2).
-5. **The bound tunes**, each on an even address.
-6. **The workspace** (2), last.
+5. **The images**, each on a long: one a group of subtunes that agree on
+   what an image gives once (1), so DTX's reader code stands once for the
+   group rather than once a subtune.
+6. **The bound tunes**, each on an even address, each reaching its image
+   backwards from its own first byte.
+7. **The workspace** (2), last.
 
 Rules the tool keeps: every bound tune is of the version the core reads,
 one rate across the set for the `TC` tag, and at most 99 subtunes, the
 two digits of `##`.
+
+The images are what a set of subtunes saves. Ten of the tunes under
+`ym/test` fall into two groups, one a unit, so eight copies of the reader
+come off the file: 88,288 bytes against the 100,160 a copy a subtune took.
 
 ## 4. The program stub
 

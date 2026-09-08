@@ -63,7 +63,7 @@ TOS = os.environ.get("TOS", os.path.expanduser("~/hatari-2.6.1_macos/tos-2.06.ro
 STUB_FRAMES = 2000
 # The tune file's version (SPEC.md 3.3) and the bound tune's (BINARIES.md 1).
 TUNE_VERSION = 2
-BOUND_VERSION = 1
+BOUND_VERSION = 2
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209
@@ -254,10 +254,15 @@ class Tune:
         count = file[9]
         self.state = long_at(file, 12)
         self.image_at = long_at(file, 16)
-        index = [long_at(file, 20 + 4 * i) for i in range(count)]
+        # Where this tune's table stands in the image that holds it: an
+        # image of one names it in its own format block, and one shared by
+        # several names the first, so a bound tune carries its own
+        # (BINARIES.md 2, DTX abi.md 1).
+        self.table_at = long_at(file, 20)
+        index = [long_at(file, 24 + 4 * i) for i in range(count)]
         end = index[0] if count else len(file)
         image = file[self.image_at:end]
-        table_at = long_at(image, 16 + 8)
+        table_at = self.table_at
         dtx = os.path.join(work, "table.dtx")
         csv = os.path.join(work, "table.csv")
         open(dtx, "wb").write(image[table_at:])

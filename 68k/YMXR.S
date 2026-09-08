@@ -65,7 +65,7 @@
 ; default, no byte and no cycle of it stands.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
-YMXR_VERSION    equ     $0001           ; its version
+YMXR_VERSION    equ     $0002           ; its version
 YMXR_COLUMNS    equ     30
 YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 
@@ -131,7 +131,8 @@ TF_EFFECTS      equ     8
 TF_SOURCES      equ     9
 TF_STATE        equ     12
 TF_IMAGE        equ     16
-TF_INDEX        equ     20
+TF_TABLE        equ     20              ; where this tune's table stands in it
+TF_INDEX        equ     24
 
 ; The image's format block (DTX, abi.md 1), and its slots.
 IM_FORMAT       equ     16
@@ -594,13 +595,23 @@ YMXR_init:
                 move.b  TF_EFFECTS(a0),WS_EFFECTS(a6)
                 cmp.b   #2,IM_VARIANT(a2)       ; a DTX2 image: its rows come
                 bne     .bad6                   ; round on their own
-                lea     WS_STATE(a6),a0
-                jsr     IM_INIT(a2)
-                movea.l WS_IMAGE(a6),a2
-                jsr     IM_METADATA(a2)         ; d0 R, d2 RR, d3 the stride
+; The table to read, which the image may hold beside others: subtunes that
+; agree on what an image gives once share one, so the code in it stands
+; once for them and every bound tune names its own table (DTX abi.md 1).
+; R and RR come out of that table's own header (DTX SPEC.md 1) and not out
+; of the metadata call, which gives the image's first table.
+                movea.l a2,a1
+                adda.l  TF_TABLE(a0),a1
+                move.l  DT_ROWS(a1),d0
+                move.l  DT_REPEAT(a1),d2
                 move.l  d0,WS_R(a6)
                 move.l  d0,WS_ROWS(a6)
                 move.l  d2,WS_RR(a6)
+                lea     WS_STATE(a6),a0
+                jsr     IM_INIT(a2)             ; a1 the table's header
+                movea.l WS_IMAGE(a6),a2
+                jsr     IM_METADATA(a2)         ; d3 the stride, which every
+                                                ; table of an image shares
 
 ; Every source resolved once: its first row, and its loop cell, which is
 ; row RR where it repeats, 0 where it plays once, and -1 where it is two

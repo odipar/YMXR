@@ -248,13 +248,26 @@ final class BinariesTest {
         assertArrayEquals(core, patched, "the core as assembled, its two offsets aside");
         assertEquals(Sndh.even(core.length), tableAt);
         assertEquals(files.size(), Tune.getWord(sndh, header + tableAt));
+        // The images stand between the subtune table and the tunes: those
+        // that agree on what an image gives once share one, so the reader's
+        // code stands once for them (DTX abi.md 1, BINARIES.md 2).
+        Bound.Set set = Bound.of(files);
         int state = 0;
         int next = tableAt + 2 + 4 * files.size();
+        int[] imageAt = new int[set.images().size()];
+        for (int i = 0; i < imageAt.length; i++) {
+            next = Tune.align(next);
+            imageAt[i] = next;
+            next += set.images().get(i).length;
+        }
         for (int i = 0; i < files.size(); i++) {
             int at = Tune.getLong(sndh, header + tableAt + 2 + 4 * i);
             assertEquals(0, at & 1, "subtune " + (i + 1) + " on an even address");
             assertEquals(next, at, "subtune " + (i + 1) + " follows what stands before it");
-            byte[] bound = Bound.of(files.get(i));
+            byte[] bound = set.tunes().get(i).clone();
+            // The tune reaches its image from its own first byte, which the
+            // combine put in and the set left at zero.
+            Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - at);
             assertArrayEquals(bound, Arrays.copyOfRange(sndh, header + at,
                     header + at + bound.length), "subtune " + (i + 1) + " is its bound tune");
             assertEquals("YMXB", ascii(sndh, header + at, 4));
