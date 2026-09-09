@@ -81,6 +81,7 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 | the same, `-hatari` | the SNDH file's program on a real MFP under Hatari, the trace of the player's writes against that model |
 | the same, `-kit` | the conformance kit's tunes on the player, each frame held to the reader's record |
 | the same, `-perf` | the player built with the raster monitor in, held to the same model: every frame's writes are the ones the specification gives |
+| `ym/parity.py` | one tune packed by YMX and by this repository, both played under Hatari, and every frame's registers read against the other run's |
 
 | | |
 |---|---|
