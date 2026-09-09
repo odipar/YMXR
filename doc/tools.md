@@ -299,8 +299,15 @@ wave right still part (performance.md). Those partings are counted and
 named. A frame differing on a register no effect drives is what fails the
 run.
 
+The tunes under `ym/test` are one of each shape, which is what the rig
+asks of them. This reads eleven of the corpus's own besides, six whose
+effects are square waves on a volume register and five whose sources are
+recordings played once, so the shapes an ST tune is driven with are read
+against the other player rather than assumed.
+
 | variable | gives |
 |---|---|
+| `YM_CORPUS` | the corpus those eleven stand in |
 | `YMX_REPO` | the YMX checkout, `../YMX` by default |
 | `YMX_BIN` | its built Go tools, `$YMX_REPO/go/bin` by default |
 | `HATARI`, `TOS`, `VBLS` | the emulator, a TOS image and the frames to run |

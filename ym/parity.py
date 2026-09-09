@@ -35,6 +35,18 @@ HATARI = os.environ.get("HATARI", "hatari")
 TOS = os.environ.get("TOS", os.path.expanduser("~/hatari-2.6.1_macos/tos-2.06.rom"))
 VBLS = int(os.environ.get("VBLS", "700"))
 WHOLE = "-whole" in sys.argv
+CORPUS = os.environ.get("YM_CORPUS", os.path.expanduser("~/git/jatari/data/ym_format"))
+
+# The tunes under ym/test are one of each shape, which is what the rig
+# asks of them. A comparison against another player wants the shapes an
+# ST tune is driven with besides: these are the corpus's own, six tunes
+# whose effects are square waves on a volume register and five whose
+# sources are recordings played once (experiments.md counts both).
+SID = ["Sid Music #1", "Sid Music #2", "Synergy Odyssey",
+       "Synergy Wicked Polygons 1", "DBA 4", "A Prehistoric Tale 16 - intro"]
+SAMPLES = ["Chambers of Shaolin - Mega Pock Olipse", "Lethal Xcess 3 - level 2",
+           "Ooh Crikey - main menu", "Turrican 2 - world 1-1 The Desert rocks",
+           "Seven Gates of Jambala  - level 11 digidrums"]
 
 # What each register takes of the byte written to it, so that a value the
 # chip drops is not a difference (68k/test/emu/test_ymxr.py, TAKES).
@@ -162,9 +174,18 @@ def compare(ym):
 
 
 def main():
-    tunes = [a for a in sys.argv[1:] if not a.startswith("-")] or sorted(
-        os.path.join(ROOT, "ym", "test", f)
-        for f in os.listdir(os.path.join(ROOT, "ym", "test")) if f.endswith(".ym"))
+    tunes = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if not tunes:
+        tunes = sorted(os.path.join(ROOT, "ym", "test", f)
+                       for f in os.listdir(os.path.join(ROOT, "ym", "test"))
+                       if f.endswith(".ym"))
+        missing = []
+        for named in SID + SAMPLES:
+            at = os.path.join(CORPUS, named + ".ym")
+            (tunes if os.path.exists(at) else missing).append(at)
+        if missing:
+            print("%d corpus tunes are not under %s, so the shapes they carry"
+                  " go unread" % (len(missing), CORPUS))
     if not os.path.isdir(YMX_BIN):
         raise SystemExit("no YMX tools at " + YMX_BIN + ": YMX_BIN names them")
     wrong = []
