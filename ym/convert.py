@@ -145,7 +145,7 @@ def rows(nf, g, ym6):
             rate_held[i] = (pre, cnt)
         for c in range(C):
             cols[c].append(out[c])
-    return cols, len(sources)
+    return cols, len(sources), {k for k, _ in sources}
 
 def is_set(cols, c, f):
     """Whether row f sets column c: its set bit, or for a column that
@@ -251,7 +251,7 @@ def one(args):
         nf, g, ym6 = got
         out = {"name": os.path.basename(path), "nf": nf, "ym6": ym6}
         if mode in ("corpus", "pairs"):
-            cols, out["sources"] = rows(nf, g, ym6)
+            cols, out["sources"], out["kinds"] = rows(nf, g, ym6)
             out["files"] = {}
             for k in (1, 2, 4):
                 pc, rn = padded(cols, nf, k)
@@ -262,7 +262,7 @@ def one(args):
             out["spec"] = sum(dtx2(spec, nf, 1, work)[1])
             out["hosted"] = sum(dtx2(hosted, nf, 1, work)[1])
         elif mode == "frame":
-            cols, _ = rows(nf, g, ym6)
+            cols, _, _ = rows(nf, g, ym6)
             out["frames"] = frame_work(cols, nf)
         return out
     finally:
@@ -296,11 +296,17 @@ def main():
         padded_frames = {k: 0 for k in (1, 2, 4)}
         per = [0] * C
         sources = []
+        # which kinds a tune's effects name, a tune counted once a kind
+        kinds = {k: 0 for k in (1, 2, 3, 4)}
+        named = 0
         ym5 = ym6 = 0
         for got in each(corpus(), "corpus"):
             n += 1; frames += got["nf"]
             ym6 += got["ym6"]; ym5 += not got["ym6"]
             sources.append(got["sources"])
+            named += bool(got["kinds"])
+            for k in got["kinds"]:
+                kinds[k] += 1
             for k, (size, pad, spans) in got["files"].items():
                 total[k] += size
                 padded_tunes[k] += pad > 0
@@ -333,6 +339,10 @@ def main():
               + ", ".join(f"{per[c]:,}" for c in range(22, 30)))
         print(f"  sources a tune needs: most {max(sources)},"
               f" {sum(1 for x in sources if x > 127)} tunes over 127")
+        print(f"  {named} tunes name a source: " + ", ".join(
+            f"{kinds[k]} {name}" for k, name in
+            ((1, "a square wave"), (2, "a digidrum"),
+             (3, "a sinus SID"), (4, "a sync buzzer"))))
     elif mode == "pairs":
         pairs = []
         for f in sorted(os.listdir(PAIRS)):

@@ -62,14 +62,15 @@ final class PlayerTest {
 
     /** Each tick kind as a triple: the text of its row in
      *  performance.md, the player's equate that gives what that path
-     *  costs, and the cycles the level drop adds to it, 16 on the two
-     *  paths that write a row's value and none on the two that end a
-     *  source. */
+     *  costs, and the cycles the level drop adds to it, 16 on the
+     *  three paths that write a row's value and none on the two that
+     *  end a source. */
     private static final List<String> TICKS = List.of(
             "a row written, the place stepped", "PERF_ON", "16",
             "the marker, the place to row `RR`", "PERF_LOOP", "0",
             "the marker, the timer stopped", "PERF_STOP", "0",
-            "a square's two rows, no place stepped", "PERF_SQ", "16");
+            "a square's two rows, no place stepped", "PERF_SQ", "16",
+            "a source of one row, no place stepped", "PERF_ONEROW", "16");
 
     /** The cycles an end of interrupt written by hand adds to every
      *  path (68k/YMXR.S, PERF_END). */

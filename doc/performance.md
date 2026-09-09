@@ -17,11 +17,11 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Big - Samantha Fox Strip Poker 6 | 430 | 1536 | 2130 | 1026 | 1608 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1370 | 3396 | 806 | 2814 |
 | Circus Attractions 2 | 8 | 1446 | 1648 | 746 | 746 |
-| DBA 2 | 19442 | 1966 | 5522 | 1139 | 4874 |
-| DBA 5 | 22262 | 2054 | 5686 | 1211 | 4508 |
+| DBA 2 | 19442 | 1969 | 5522 | 1139 | 4874 |
+| DBA 5 | 22262 | 2057 | 5694 | 1211 | 4508 |
 | Digidrum preempt, built | 800 | 1627 | 2808 | 776 | 2006 |
-| Retrigger retune, built | 1200 | 1494 | 2270 | 782 | 1052 |
-| Synergy Credits | 10754 | 2356 | 6348 | 1220 | 4948 |
+| Retrigger retune, built | 1200 | 1493 | 2228 | 782 | 1052 |
+| Synergy Credits | 10754 | 2361 | 6356 | 1220 | 4948 |
 | Turrican - world 4-3 | 3680 | 1608 | 4836 | 887 | 4130 |
 | Turrican 2 - world completed 1 | 179 | 1908 | 5644 | 1238 | 5016 |
 
@@ -32,7 +32,7 @@ Credits and Turrican 2 - world completed 1 among these, so a refill of theirs
 is thirty units of a byte. What those units cost depends on how the column
 packed: a run of long matches costs 12 cycles a unit to copy, and a short
 operation, a length and an offset read bit by bit, about 225 to 240 an
-operation to parse. The advance spends 486 cycles a refill outside the
+operation to parse. The advance spends 450 cycles a refill outside the
 decoder, loading and storing the decoder's eight registers, testing its mark
 and stepping to the next, and a refill that parses nothing new adds 334 on
 Turrican - world 4-3 at unit 2 and 578 on Synergy Credits at unit 1. The range
@@ -40,14 +40,14 @@ comes from the endpoints on Turrican - world 4-3: the 334 above and 3,680 at
 its heaviest are 3,346 over fourteen operations, about 239 each, and YMX's own
 slope is about 225 an operation. A least-squares fit over every refill reads
 higher, 285 to 342 an operation, since a refill that parses few operations is
-mostly the fixed part. A refill of 486 outside and the heaviest 3,680 inside
-is the 4,166 the table above gives as Turrican's advance in its costliest
+mostly the fixed part. A refill of 450 outside and the heaviest 3,680 inside
+is the 4,130 the table above gives as Turrican's advance in its costliest
 frame. Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 (experiments.md) and costs more to decode: measured on Turrican - world 4-3,
 the advance 1,138 on average and 4,586 at most against 887 and 4,130, and the
 play call 1,859 and 5,240 against 1,608 and 4,836; `-k1` packs at it.
 
-The frame procedure is the rest, from 486 to 1,112 cycles on average:
+The frame procedure is the rest, from 510 to 1,141 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
 effects' columns and the call's own entry and exit. An effect the tune
 does not run is jumped over, two nops standing at its columns' head
@@ -191,10 +191,12 @@ a test that forms the select only where it writes.
 | the marker, the place to row `RR` | 130 |
 | the marker, the timer stopped | 136 |
 | a square's two rows, no place stepped | 88 |
+| a source of one row, no place stepped | 64 |
 | a row written, the tune running one effect | 100 |
 | the marker to row `RR`, one effect | 130 |
 | the marker and the stop, one effect | 136 |
 | a square's two rows, one effect | 80 |
+| a source of one row, one effect | 56 |
 
 With the interrupt's entry and its `rte`, a tick is 172 cycles: at a
 digidrum's 6,000 a second, 13% of an 8 MHz 68000, and at the 25,600 a
@@ -221,17 +223,17 @@ returns:
 | the marker, the place to row `RR` | 130 | 114 |
 | the marker, the timer stopped | 136 | 120 |
 | a square's two rows, no place stepped | 88 | 56 |
+| a source of one row, no place stepped | 64 | 32 |
 
-The level is dropped on the two paths that write a row's value and the
-end of interrupt is written on all four, so those two lose 32 cycles and
-the two that end a source lose 16, and 24 where the tune runs one effect
-and the nops below already stand. A source ends once a pass and its rows
-are written many times, so 32 a tick bounds what comes off a frame: 941
-cycles on Synergy Credits, 595 on DBA 2, 485 on DBA 5 and 295 on
-Turrican - world 4-3. The two switches go together, since automatic end
-of interrupt sets no in-service bit and nothing but the level a tick
-holds keeps a lower timer out, and the player takes the MFP's vector
-register at init and puts it back at stop.
+The level is dropped on the three paths that write a row's value and the end
+of interrupt is written on all five, so those three lose 32 cycles and the two
+that end a source lose 16, and 24 where the tune runs one effect and the nops
+below already stand. A source ends once a pass and its rows are written many
+times, so 32 a tick bounds what comes off a frame: 941 cycles on Synergy
+Credits, 595 on DBA 2, 485 on DBA 5 and 295 on Turrican - world 4-3. The two
+switches go together, since automatic end of interrupt sets no in-service bit
+and nothing but the level a tick holds keeps a lower timer out, and the player
+takes the MFP's vector register at init and puts it back at stop.
 
 The four cores write one tune the same but for a square's edge. Traced
 under Hatari over 900 frames of Synergy Credits, counted from the frame
@@ -247,16 +249,39 @@ shortens the next. `ym/writes.py` reads two traces back this way.
 
 A tune that runs one effect has nothing to nest inside a tick, so init
 writes two nops where that effect's handlers drop the interrupt level:
-8 cycles a tick, the drop costing 16 and the nops 8. Only the row a
-tick writes drops it and the marker's two paths never did, so the last
-two rows above stand at what the four above them do. A tune running two
-or more effects keeps the drop, since a faster timer waits behind a
-slower one without it.
+8 cycles a tick, the drop costing 16 and the nops 8. Only a path that
+writes a row's value drops it and the marker's two never did, so the two
+marker rows of the second five stand at what the first five's do. A tune
+running two or more effects keeps the drop, since a faster timer waits
+behind a slower one without it.
 
 A tune whose sources are of other shapes pays 2
 to 4 cycles a frame for the vector each start now writes, and a tune of
 squares 3 to 22 for the two values and the difference each start
 patches, against the 626 to 911 its ticks no longer cost.
+
+A source of one row repeating takes a handler of its own the same way
+(68k/YMXR.S, ONEROW). A source of one row is the marker alone (SPEC.md 3.2)
+and its place stands at row 0, so the handler holds that row as its own
+immediate, writes it, and moves nothing: 56 cycles against the 130 the general
+handler's marker path cost, and 64 against 130 where the tune runs more than
+one effect. The kit's `retune` ticks 7.7 times a frame, a 383 Hz buzzer, so
+568 cycles a frame come off it against a play call of 1,493. `retune` is a
+built tune: no corpus file names a source of this shape, 83 of them naming a
+source at all (experiments.md), so what the handler saves is measured here and
+on the conformance kit and nowhere else. The target is the effect's on all
+three handlers, patched at a start out of the effect's own record, so a
+source's shape picks the handler and the register it drives does not.
+
+A start tells three shapes apart off one cell, which would cost every start 16
+cycles. Init already walks every source to resolve it, so it reads there which
+of the two shapes the tune's sources hold and settles the branch that leaves
+the general handler's path: a tune using one of them and not the other jumps
+straight to that shape's block and pays the test nothing. The two tests left
+are the ones that tell a square's kept place from a one-row source's, 3 cycles
+a frame on DBA 2 and DBA 5 and 5 on Synergy Credits, and 8 on the costliest
+frame of DBA 5 and Synergy Credits. The handler, its start and init's reading
+of the shapes are 400 bytes, the SNDH core going to 4,600 from 4,200.
 
 Init resolves every source the tune names into its first row and its
 loop cell, eight bytes each in the workspace, so a start reads two longs
