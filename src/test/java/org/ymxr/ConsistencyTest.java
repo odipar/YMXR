@@ -7,9 +7,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.ToLongFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -33,6 +37,8 @@ final class ConsistencyTest {
     private static final Path GLO = Path.of("doc/glossary.md");
     private static final Path TERM = Path.of("doc/terminology.md");
     private static final Path EXP = Path.of("doc/experiments.md");
+    private static final Path PERF = Path.of("doc/performance.md");
+    private static final Path PLAN = Path.of("doc/plan.md");
 
     private static final List<Path> DOCUMENTS =
             List.of(Path.of("README.md"), SPEC, REQ, GLO, TERM, EXP);
@@ -407,6 +413,155 @@ final class ConsistencyTest {
         assertTrue(held >= 4, () -> "only " + held
                 + " ratios parsed; the check is half asleep");
         assertTrue(wrong.isEmpty(), () -> String.join("\n", wrong));
+    }
+
+    /**
+     * performance.md's play-call table by tune: the call on average, the
+     * call at most, the advance on average, and the advance in the
+     * costliest frame. The rig writes these figures and fails where the
+     * table is not what it counts, so the table is the measurement and
+     * the four checks below read the prose against it.
+     */
+    private static Map<String, long[]> playCalls(String perf) {
+        Map<String, long[]> calls = new LinkedHashMap<>();
+        Pattern row = Pattern.compile("^\\| ([^|]+?) \\| \\d+"
+                + " \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\|$");
+        boolean inside = false;
+        for (String line : perf.split("\n")) {
+            if (line.startsWith("| tune | frames | on average |")) {
+                inside = true;
+            } else if (inside && !line.startsWith("|---")) {
+                Matcher of = row.matcher(line);
+                if (!of.matches()) {
+                    break;
+                }
+                calls.put(of.group(1), new long[] {
+                    Long.parseLong(of.group(2)), Long.parseLong(of.group(3)),
+                    Long.parseLong(of.group(4)), Long.parseLong(of.group(5))});
+            }
+        }
+        return calls;
+    }
+
+    /** The least and the greatest of one figure over that table. */
+    private static long[] range(Map<String, long[]> calls,
+            ToLongFunction<long[]> of) {
+        long least = Long.MAX_VALUE;
+        long most = Long.MIN_VALUE;
+        for (long[] call : calls.values()) {
+            least = Math.min(least, of.applyAsLong(call));
+            most = Math.max(most, of.applyAsLong(call));
+        }
+        return new long[] {least, most};
+    }
+
+    /**
+     * plan.md's two opening ranges against performance.md's table. plan.md
+     * states that every figure in it is against those, and no check read
+     * the one document against the other: both ranges sat three commits
+     * behind the player.
+     */
+    @Test
+    void thePlanReadsTheCallRangesMeasured() throws IOException {
+        Map<String, long[]> calls = playCalls(read(PERF));
+        assertTrue(calls.size() >= 10, () -> "performance.md's play-call table"
+                + " read as " + calls.size() + " rows");
+        Matcher said = wrapped("A call is ([\\d,]+) to ([\\d,]+) cycles on"
+                + " average by tune, and the costliest frame of a tune is"
+                + " ([\\d,]+) to ([\\d,]+)").matcher(read(PLAN));
+        assertTrue(said.find(), "plan.md gives no call range");
+        long[] average = range(calls, call -> call[0]);
+        long[] most = range(calls, call -> call[1]);
+        assertEquals(string(average[0]), said.group(1), "the least call on average");
+        assertEquals(string(average[1]), said.group(2), "the greatest call on average");
+        assertEquals(string(most[0]), said.group(3), "the least costliest frame");
+        assertEquals(string(most[1]), said.group(4), "the greatest costliest frame");
+    }
+
+    /**
+     * The frame procedure is the call less the advance, in both documents.
+     * DTX taking its state block in a6 took 36 cycles off the advance and
+     * 12 off the call, so this figure rose 24 where the others fell.
+     */
+    @Test
+    void theFrameProcedureIsTheCallLessTheAdvance() throws IOException {
+        Map<String, long[]> calls = playCalls(read(PERF));
+        long[] rest = range(calls, call -> call[0] - call[2]);
+        Matcher perf = wrapped("The frame procedure is the rest, from"
+                + " ([\\d,]+) to ([\\d,]+) cycles on average").matcher(read(PERF));
+        assertTrue(perf.find(), "performance.md gives no frame procedure range");
+        assertEquals(string(rest[0]), perf.group(1), "performance.md's least");
+        assertEquals(string(rest[1]), perf.group(2), "performance.md's greatest");
+        Matcher plan = wrapped("The frame procedure is the rest,"
+                + " ([\\d,]+) to ([\\d,]+)\\.").matcher(read(PLAN));
+        assertTrue(plan.find(), "plan.md gives no frame procedure range");
+        assertEquals(string(rest[0]), plan.group(1), "plan.md's least");
+        assertEquals(string(rest[1]), plan.group(2), "plan.md's greatest");
+    }
+
+    /**
+     * The share plan.md gives the advance, and the two tunes it names, against
+     * the table. The percentages round the table's own figures, so a figure
+     * that moves without its percentage moving is caught here.
+     */
+    @Test
+    void thePlanReadsTheAdvanceShareMeasured() throws IOException {
+        Map<String, long[]> calls = playCalls(read(PERF));
+        Matcher said = wrapped("DTX's advance is (\\d+) to (\\d+) per cent of"
+                + " an average call and (\\d+) to (\\d+) per cent of the"
+                + " costliest frame: ([\\d,]+) of Turrican - world 4-3's"
+                + " ([\\d,]+) and ([\\d,]+) of Synergy Credits' ([\\d,]+)")
+                .matcher(read(PLAN));
+        assertTrue(said.find(), "plan.md gives no advance share");
+        long[] share = range(calls, call -> Math.round(100.0 * call[2] / call[0]));
+        assertEquals(share[0], Long.parseLong(said.group(1)), "the least share");
+        assertEquals(share[1], Long.parseLong(said.group(2)), "the greatest share");
+        long[] turrican = Objects.requireNonNull(calls.get("Turrican - world 4-3"),
+                "performance.md's table names no Turrican - world 4-3");
+        long[] synergy = Objects.requireNonNull(calls.get("Synergy Credits"),
+                "performance.md's table names no Synergy Credits");
+        assertEquals(string(turrican[3]), said.group(5), "Turrican's advance");
+        assertEquals(string(turrican[1]), said.group(6), "Turrican's costliest frame");
+        assertEquals(string(synergy[3]), said.group(7), "Synergy Credits' advance");
+        assertEquals(string(synergy[1]), said.group(8),
+                "Synergy Credits' costliest frame");
+        long one = Math.round(100.0 * turrican[3] / turrican[1]);
+        long two = Math.round(100.0 * synergy[3] / synergy[1]);
+        assertEquals(Math.min(one, two), Long.parseLong(said.group(3)),
+                "the least share of a costliest frame");
+        assertEquals(Math.max(one, two), Long.parseLong(said.group(4)),
+                "the greatest share of a costliest frame");
+    }
+
+    /**
+     * performance.md's refill parts against its own table: the fixed part
+     * outside the decoder and the heaviest parse inside make the advance in
+     * Turrican's costliest frame. The sentence gave the sum from before DTX
+     * took its state block in a6, and the table gave the figure after it.
+     */
+    @Test
+    void theRefillPartsAddUpToTheAdvanceMeasured() throws IOException {
+        String perf = read(PERF);
+        Matcher parts = wrapped("A refill of ([\\d,]+) outside and the heaviest"
+                + " ([\\d,]+) inside is the ([\\d,]+) the table above gives")
+                .matcher(perf);
+        assertTrue(parts.find(), "performance.md gives no refill parts");
+        long outside = number(parts.group(1));
+        long inside = number(parts.group(2));
+        long whole = number(parts.group(3));
+        assertEquals(whole, outside + inside, () -> outside + " outside and "
+                + inside + " inside make " + (outside + inside)
+                + ", and the sentence gives " + whole);
+        long[] turrican = Objects.requireNonNull(
+                playCalls(perf).get("Turrican - world 4-3"),
+                "performance.md's table names no Turrican - world 4-3");
+        assertEquals(string(turrican[3]), string(whole),
+                "the table gives another advance in the costliest frame");
+        Matcher spends = wrapped("The advance spends ([\\d,]+) cycles a refill"
+                + " outside the decoder").matcher(perf);
+        assertTrue(spends.find(), "performance.md gives no fixed part");
+        assertEquals(string(outside), string(number(spends.group(1))),
+                "the two sentences give the fixed part differently");
     }
 
     @Test

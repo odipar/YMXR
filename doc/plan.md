@@ -5,9 +5,9 @@ holds what it costs today; every figure below is against those, and each
 one says whether it was measured on the rig or counted from the 68000's
 manual.
 
-Two figures matter and they are not the same. A call is 1,382 to 2,362
-cycles on average by tune, and the costliest frame of a tune is 1,660 to
-6,342. R4.5 budgets 6,656 a frame, and what it binds is the costliest
+Two figures matter and they are not the same. A call is 1,370 to 2,356
+cycles on average by tune, and the costliest frame of a tune is 1,648 to
+6,348. R4.5 budgets 6,656 a frame, and what it binds is the costliest
 frame. Most of what follows moves the average; the steps that move the
 costliest frame are named where they are.
 
@@ -15,14 +15,14 @@ costliest frame are named where they are.
 
 ## Where the time is
 
-DTX's advance is 50 to 69 per cent of an average call and 79 to 86 per
-cent of the costliest frame: 4,166 of Turrican - world 4-3's 4,848 and
-4,984 of Synergy Credits' 6,342. A refill parses at most one ST4
+DTX's advance is 48 to 67 per cent of an average call and 78 to 85 per
+cent of the costliest frame: 4,130 of Turrican - world 4-3's 4,836 and
+4,948 of Synergy Credits' 6,348. A refill parses at most one ST4
 operation a unit at about 225 to 240 cycles each, and its unit count is
 the column count, so fifteen operations is a tune's costliest frame and
 the schema's thirty columns set that bound.
 
-The frame procedure is the rest, 500 to 1,119. A column the row leaves
+The frame procedure is the rest, 510 to 1,136. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset:
 a row sets 0.6 to 13.0 of the fourteen register columns, 3.2 on the
 median tune. Whole groups go unset, which is what a gate can skip,
@@ -123,11 +123,6 @@ against the budget's 6,656, where the model fitted to read it has
 residuals of ±367. SPEC.md R3.5 also has it that a column holds one
 value, and a mask column holds none.
 
-**DTX's state block passed in a6.** The park is 16 + 4 + 16, 36 cycles
-a frame. It changes DTX's abi.md sections 2 and 3, the `DTX_PARK`
-field three packagers print, a test, and the one ABI DTX0 and DTX1
-share with DTX2.
-
 **Three fusions in ST4's decoder**: a one-unit literal run, a one-unit
 rep match, and a two-unit new-offset match, each fused at the gamma's
 exit. All three were counted and all three were wrong as written. ST4
@@ -150,6 +145,7 @@ Every step this document held is taken, each measured on the rig:
 | the shape's test dropped | 14 | 12 to 14, no tune more |
 | a square's own tick | 31 a tick | 88 against 108 and 130 |
 | every source resolved at init | 52 a start | 21 to 38 a frame |
+| DTX's state block in a6 | 36 | 36 off the advance, 12 off the call |
 
 The first four were counted before they were built and each measured at
 its count. Synergy Credits reads 2,356 cycles a call against the 2,469

@@ -32,7 +32,7 @@ Credits and Turrican 2 - world completed 1 among these, so a refill of theirs
 is thirty units of a byte. What those units cost depends on how the column
 packed: a run of long matches costs 12 cycles a unit to copy, and a short
 operation, a length and an offset read bit by bit, about 225 to 240 an
-operation to parse. The advance spends 486 cycles a refill outside the
+operation to parse. The advance spends 450 cycles a refill outside the
 decoder, loading and storing the decoder's eight registers, testing its mark
 and stepping to the next, and a refill that parses nothing new adds 334 on
 Turrican - world 4-3 at unit 2 and 578 on Synergy Credits at unit 1. The range
@@ -40,14 +40,14 @@ comes from the endpoints on Turrican - world 4-3: the 334 above and 3,680 at
 its heaviest are 3,346 over fourteen operations, about 239 each, and YMX's own
 slope is about 225 an operation. A least-squares fit over every refill reads
 higher, 285 to 342 an operation, since a refill that parses few operations is
-mostly the fixed part. A refill of 486 outside and the heaviest 3,680 inside
-is the 4,166 the table above gives as Turrican's advance in its costliest
+mostly the fixed part. A refill of 450 outside and the heaviest 3,680 inside
+is the 4,130 the table above gives as Turrican's advance in its costliest
 frame. Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 (experiments.md) and costs more to decode: measured on Turrican - world 4-3,
 the advance 1,138 on average and 4,586 at most against 887 and 4,130, and the
 play call 1,859 and 5,240 against 1,608 and 4,836; `-k1` packs at it.
 
-The frame procedure is the rest, from 486 to 1,112 cycles on average:
+The frame procedure is the rest, from 510 to 1,136 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
 effects' columns and the call's own entry and exit. An effect the tune
 does not run is jumped over, two nops standing at its columns' head
