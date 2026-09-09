@@ -25,7 +25,7 @@ the schema's thirty columns set that bound.
 The frame procedure is the rest, 510 to 1,141. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset:
 a row sets 0.6 to 13.0 of the fourteen register columns, 3.2 on the
-median tune. Whole groups go unset, which is what a gate can skip,
+median tune. Whole groups go unset, which a gate can skip,
 measured over 40,000 rows a tune:
 
 | tune | sets no tone | no volume | no envelope | columns a row |
@@ -127,7 +127,7 @@ value, and a mask column holds none.
 rep match, and a two-unit new-offset match, each fused at the gamma's
 exit. All three were counted and all three were wrong as written. ST4
 is where the costliest frame is - fifteen operations at 225 to 240 -
-and it is the only place with room to move that frame far, so it wants
+and it is the only place with room to move that frame far, so it needs
 a pass of its own rather than these three repaired.
 
 ---
@@ -157,4 +157,4 @@ this document opened at and 4,463 cycles of ticks against 5,380, so
 What is left is where the costliest frame is. A refill parses at most
 one ST4 operation a unit and there are fifteen units, so the frame R4.5
 binds is fifteen operations at 225 to 240 apiece, and nothing above
-touches it. ST4 wants a pass of its own.
+touches it. ST4 needs a pass of its own.

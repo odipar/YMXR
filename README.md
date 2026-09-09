@@ -4,8 +4,7 @@ YMXR is a chiptune format for the Atari ST, and one use of a data format
 called DTX.
 
 It takes the name YMX when it is done. Until then,
-[YMX](https://github.com/odipar/YMX) is what plays today, and YMXR is what
-replaces it.
+[YMX](https://github.com/odipar/YMX) plays today, and YMXR replaces it.
 
 **DTX** is a data format: a table of rows and columns, where every value
 takes one width, 1, 2 or 4 bytes, and the rows repeat at a row of the
@@ -17,11 +16,15 @@ the readers of the format as this one holds a player.
 method serves the whole of that: a clock advances a table one row, and a
 procedure writes that row to the chips. The tune's clock advances the tune's
 table, and a timer advances a table of its own at an effect's rate.
-Nothing here says how a row is stored or unpacked, and nothing in DTX knows
-a sound chip exists.
+Nothing here says how a row is stored or unpacked, and DTX names no sound
+chip.
 
 [doc/requirements.md](doc/requirements.md) comes first. Nothing else is
 written until it says what YMXR has to do.
+
+A tracker or any other tool that makes tune files starts at
+[doc/writing.md](doc/writing.md), which gives the order to read the
+specification in and how to check what comes out.
 
 ## What's here
 
@@ -83,6 +86,7 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 |---|---|
 | [doc/requirements.md](doc/requirements.md) | what the encoding has to do |
 | [doc/SPEC.md](doc/SPEC.md) | the format specification |
+| [doc/writing.md](doc/writing.md) | writing a tune file: for a tracker targeting the format |
 | [doc/glossary.md](doc/glossary.md) | every term, one line each |
 | [doc/terminology.md](doc/terminology.md) | the machine, and the terms for it |
 | [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |

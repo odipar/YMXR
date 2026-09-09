@@ -61,7 +61,7 @@ its loop begin on a unit (DTX's R5.6 and R5.11), so a tune whose row
 count or repeat row is odd packs at unit 1, which the tool notes. The
 table packs at a period of thirty rows, the column count and the
 smallest DTX allows, since a refill decodes a period's rows of one
-column at once and the period is what a refill costs (performance.md);
+column at once and a refill costs the period (performance.md);
 the ring is the multiple of thirty nearest the one asked for, at least
 sixty and at most 1,110. A loop longer than the ring is replayed at its
 exact rows by DTX's reader, at any period.

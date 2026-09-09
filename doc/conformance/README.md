@@ -6,6 +6,9 @@ The kit is 11 tunes, and what a reader of SPEC.md reports of each:
 never seen this repository, and see whether the document alone is enough
 to read the tunes.
 
+A writer is a third role again, and writing.md gives its path; the tunes
+here are valid files a writer reads as examples.
+
 It tests the **reader** of SPEC.md 7 and requirements.md R2.4: what reads
 a tune and reports what it holds, writing to no chip. A reader needs
 neither a machine nor section 5's ticks, since it reports one entry a

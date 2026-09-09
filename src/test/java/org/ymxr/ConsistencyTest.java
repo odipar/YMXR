@@ -40,8 +40,21 @@ final class ConsistencyTest {
     private static final Path PERF = Path.of("doc/performance.md");
     private static final Path PLAN = Path.of("doc/plan.md");
 
-    private static final List<Path> DOCUMENTS =
-            List.of(Path.of("README.md"), SPEC, REQ, GLO, TERM, EXP);
+    /** Every document of the repository, which every check here reads. */
+    private static final List<Path> DOCUMENTS = documents();
+
+    private static List<Path> documents() {
+        try (java.util.stream.Stream<Path> tree = Files.walk(Path.of("."))) {
+            return tree.filter(Files::isRegularFile)
+                    .filter(at -> at.toString().endsWith(".md"))
+                    .filter(at -> !at.toString().contains("/target/"))
+                    .filter(at -> !at.toString().contains("/.git"))
+                    .sorted()
+                    .toList();
+        } catch (IOException unreadable) {
+            throw new IllegalStateException(unreadable);
+        }
+    }
 
     private static String read(Path p) throws IOException {
         return Files.readString(p);
@@ -143,8 +156,13 @@ final class ConsistencyTest {
             defined.add(d.group(1));
         }
         List<String> dangling = new ArrayList<>();
+        // A citation a document qualifies with DTX is DTX's requirements and
+        // not this repository's: tools.md cites DTX's R5.6 and R5.11 for
+        // what a unit asks of a column's bytes. Those are read out first.
+        Pattern theirs = Pattern.compile("DTX'?s?\\s+R\\d+\\.\\d+(\\s+and\\s+R\\d+\\.\\d+)*");
         for (Path p : DOCUMENTS) {
-            Matcher c = Pattern.compile("\\bR\\d+\\.\\d+\\b").matcher(read(p));
+            Matcher c = Pattern.compile("\\bR\\d+\\.\\d+\\b")
+                    .matcher(theirs.matcher(read(p)).replaceAll(""));
             while (c.find()) {
                 if (!defined.contains(c.group())) {
                     dangling.add(p + " cites " + c.group());
@@ -620,6 +638,8 @@ final class ConsistencyTest {
                 }
             }
         }
+        assertTrue(DOCUMENTS.size() > 12, () -> "only " + DOCUMENTS.size()
+                + " documents read; the check is asleep");
         assertTrue(wide.isEmpty(), () -> String.join("\n", wide)
                 + "\nAGENTS.md asks one width, held.");
     }

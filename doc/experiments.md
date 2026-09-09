@@ -136,7 +136,7 @@ select written to a running timer (SPEC 1.9).
 
 The worst frame is `Synergy Odyssey`, which sets twelve registers and
 starts both its effects, each a source, a control and a count. Fourteen
-is the ceiling for register writes in any format at all, since the chip
+is the ceiling for register writes in any format, since the chip
 holds fourteen sound registers, and a start adds the three writes a
 timer's reset costs.
 
@@ -252,7 +252,7 @@ voice's own edges over 1,575 frames of DBA 5:
 | moves no place and writes nothing | 16,625 | 5 | 29 | 0.2% |
 | the reference player | 16,625 | 4 | 28 | 0.2% |
 
-The middle row is what stood before the write of 0 was added: a start
+The middle row stood before the write of 0 was added: a start
 whose place moved to the loud row while the voice was loud wrote that
 level again, so no edge fell between the two ticks and the half ran to
 twice its length. Adding the write of 0 turned 313 long halves into 351
