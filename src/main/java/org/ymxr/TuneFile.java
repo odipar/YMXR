@@ -32,7 +32,18 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
         for (int i = 0; i < count; i++) {
             int at = Tune.getLong(file, Tune.INDEX_AT + 4 * i);
             int to = i + 1 < count ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1)) : file.length;
-            sources.add(Dtx.read(Arrays.copyOfRange(file, at, to)));
+            Table source = Dtx.read(Arrays.copyOfRange(file, at, to));
+            // SPEC.md 3.1: a source is one column of one byte at this
+            // version, the row 2.1's procedures take. A wider one or one of
+            // more columns is a later version's, and the player would read
+            // its rows a byte at a time and play something else, so it is
+            // rejected here as a tune of another version is.
+            if (source.columns() != 1 || source.width() != 1) {
+                throw new IllegalArgumentException("source " + (i + 1) + " is "
+                        + source.columns() + " columns of " + source.width()
+                        + " bytes, and a source is one column of one (SPEC.md 3.1)");
+            }
+            sources.add(source);
         }
         return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT),
                 file[Tune.EFFECTS_AT] & 0xFF, dtx2, table, sources);

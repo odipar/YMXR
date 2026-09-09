@@ -378,11 +378,12 @@ or 4, and a row `RR` it repeats to once the last row is done. That is the
 shape DTX's own table has (R1.1), one layer down. At every tick the source
 advances one row, and its target takes that row.
 
-Typically a source is one column of one byte, which is what 2.1's
-procedures take. A source of two byte values serves a procedure taking a
-word, a tone period being twelve bits, and more columns serve a source
-driving more than one target. How an entry describes either is not yet
-written (section 8).
+A source is one column of one byte at this version, which is what 2.1's
+procedures take. A source of two byte values would serve a procedure
+taking a word, a tone period being twelve bits, and more columns a source
+driving more than one target; the table states `C` and `W` in its own
+header already (3.1), and the procedure that takes such a row is a later
+version's (2.1, R6.2).
 
 A tune holds its sources and an index of them (3.1), and an effect column
 names one. Source 0 names none.
@@ -439,10 +440,16 @@ Section 3.3 gives the bytes.
 
 An effect's source column gives a source number, 1 to 127, and the index
 entry at that number gives where the source's table stands. A source is a
-DTX1 table (DTX, SPEC.md 2.2): one column of one-byte values, its rows
-from byte 16 of the table, and its header giving `R` at bytes 4 to
-7 and `RR` at bytes 10 to 13, each most significant byte first (R1.1),
-`RR` equal to `R` where the source does not repeat, as DTX has it.
+DTX1 table (DTX, SPEC.md 2.2), its rows from byte 16 of the table, and
+its header giving `R` at bytes 4 to 7, `C` at bytes 8 and 9, `RR` at
+bytes 10 to 13 and `W` at byte 14, each most significant byte first
+(R1.1), `RR` equal to `R` where the source does not repeat, as DTX has
+it.
+
+`C` is 1 and `W` is 1 at this version: one column of one-byte values, the
+row 2.1's procedures take. A reader reads a source of that shape and
+rejects one of another, as it rejects a tune of another version (R6.1).
+A row of more columns or of another width is a later version's (2.1).
 
 Source 0 has no index entry. The index runs from source 1.
 
@@ -683,6 +690,3 @@ one that does not.
 
 What a player does with a tune of a version it was not built for beyond
 rejecting it (R6.1).
-
-How a target takes a row of a DTX1 table of more than one column, or of
-another width (2.2).

@@ -73,9 +73,10 @@ the first, where a DTX2 file here does not repeat.
 
 YMXR holds the same music in 8% fewer bytes at `k` = 2, the unit the
 converter packs at (tools.md), and in 21% fewer at `k` = 1. Both sides
-are whole files, but a `.ymx` holds its sample tables and a DTX2 file
-holds no sources yet, since where a tune places them is not written
-(SPEC 8). That margin flatters the DTX2 side.
+are whole files, but a `.ymx` holds its sample tables and a DTX2 file is
+the tune's table alone: a tune file holds its sources beside it (SPEC.md
+3.3) and the figures here leave them out. That margin flatters the DTX2
+side.
 
 ## Copies from the literal stream
 

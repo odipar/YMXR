@@ -70,6 +70,30 @@ final class ConversionTest {
     }
 
     @Test
+    void aSourceOfAnotherShapeIsRejected() throws IOException {
+        // SPEC.md 3.1: a source is one column of one byte at this version,
+        // the row 2.1's procedures take, and a reader rejects one of another
+        // shape as it rejects a tune of another version. The player reads a
+        // source's rows a byte at a time from byte 16 of its table, so a
+        // width of 2 read as this version reads it plays something else.
+        byte[] file = YmToYmxr.convert(
+                Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym")),
+                List.of(), new Report()).written().file();
+        assertEquals(1, TuneFile.read(file).sources().get(0).width(),
+                "the converter writes a source of one byte");
+        int at = Tune.getLong(file, Tune.INDEX_AT);
+        // the DTX header states W at byte 14 and C at bytes 8 and 9
+        byte[] wide = file.clone();
+        wide[at + 14] = 2;
+        assertThrows(IllegalArgumentException.class, () -> TuneFile.read(wide),
+                "a source of two-byte values is not read");
+        byte[] many = file.clone();
+        many[at + 9] = 2;
+        assertThrows(IllegalArgumentException.class, () -> TuneFile.read(many),
+                "a source of two columns is not read");
+    }
+
+    @Test
     void theCopiesFlagIsTakenAndStatedInTheTable() throws IOException {
         // -copies packs a match beyond the ring as a copy from the column's
         // own literal stream, which packs a small ring far smaller (DTX,
