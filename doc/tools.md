@@ -225,6 +225,10 @@ the run and several tunes go into one file as subtunes, as they do there.
 is `ym/play.sh`'s. `YMX_DUMP` names YMX's `ymx-dump`, and with neither it
 nor `YMX_REPO` set `../YMX/go/bin/ymx-dump` is taken.
 
+The tune file each `.ymx` converts to is kept, and the directory holding
+them is said on stderr, so a conversion can be read back with
+`bin/ymxr-trace` or played on its own.
+
 ## The rigs
 
 `68k/test/emu/test_ymxr.py` plays every tune under `ym/test`, or the

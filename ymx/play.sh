@@ -23,6 +23,10 @@
 # YMX_DUMP names YMX's ymx-dump, which reads a .ymx out. With neither it
 # nor YMX_REPO set, ../YMX/go/bin/ymx-dump is taken.
 #
+# The tune file each .ymx converts to is kept, and the directory holding
+# them is said on stderr, so a conversion can be read back with
+# bin/ymxr-trace or played on its own.
+#
 #   ymx/play.sh ymx/test/Deeper.ymx
 #   ymx/play.sh -v600 ymx/test/*.ymx run.wav
 set -e
@@ -59,8 +63,11 @@ if [ "$tunes" -eq 0 ]; then
     sed -n '2,/^[^#]/p' "$0" | sed '$d' | cut -c3-
     exit 2
 fi
+# The tune files stay: the last thing this does is exec ym/play.sh,
+# which replaces the shell, so nothing here runs afterwards to clear
+# them. Said on stderr rather than left to be found.
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT INT TERM
+echo "ymx/play.sh: the tune files are under $work" >&2
 # A directory a tune, so the file a conversion writes carries the tune's
 # own name: ym/play.sh names a subtune by the file it is given, and two
 # tunes may share a name.
