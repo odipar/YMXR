@@ -236,6 +236,12 @@ final class YmxToYmxr {
         // control column, and select 0 there would stop the timer, so a
         // row that only reloads a source writes the select it is running.
         int[] select = {0, 0, 0, 0};
+        // Whether each channel's timer runs. Bit 6 moves a running timer
+        // and a stopped one starts on the select with it or without
+        // (1.9), so a start sets the bit where the timer is stopped, as
+        // section 6 rule 5 has it, and a start over a running stream
+        // leaves it clear rather than restarting the period.
+        boolean[] running = {false, false, false, false};
         List<String> left = new ArrayList<>();
         for (int f = 0; f < read.frames(); f++) {
             int master = read.streams()[STREAM_M][f] & 0xFF;
@@ -265,22 +271,28 @@ final class YmxToYmxr {
                         column[at][f] = (byte) (0x80 | target[c]);
                         column[at + 1][f] = (byte) (0x80 | built.number(
                                 Effects.SID, volume, toggle(volume), 0));
-                        column[at + 2][f] = (byte) (0x80 | Columns.TIMER_RESET
+                        column[at + 2][f] = (byte) (0x80
+                                | (running[c] ? 0 : Columns.TIMER_RESET)
                                 | Columns.PLACE_RESET | low);
                         column[at + 3][f] = (byte) count;
                         select[c] = low;
+                        running[c] = true;
                         used |= 1 << c;
                     }
                     case START_RETRIGGER -> {
-                        int shape = read.streams()[STREAM_X][f] & 0x0F;
+                        // X bits 7 to 4 give the shape and 3 to 0 the
+                        // channels a preempt stops (YMX, SPEC.md 2.2)
+                        int shape = (read.streams()[STREAM_X][f] >> 4) & 0x0F;
                         target[c] = 13;
                         column[at][f] = (byte) (0x80 | 13);
                         column[at + 1][f] = (byte) (0x80 | built.number(
                                 Effects.BUZZER, shape, retrigger(shape), 0));
-                        column[at + 2][f] = (byte) (0x80 | Columns.TIMER_RESET
+                        column[at + 2][f] = (byte) (0x80
+                                | (running[c] ? 0 : Columns.TIMER_RESET)
                                 | Columns.PLACE_RESET | low);
                         column[at + 3][f] = (byte) count;
                         select[c] = low;
+                        running[c] = true;
                         used |= 1 << c;
                     }
                     case START_PCM, START_PCM_PREEMPT -> {
@@ -296,17 +308,22 @@ final class YmxToYmxr {
                         column[at + 1][f] = (byte) (0x80 | built.number(
                                 Effects.DRUM, volume, rows,
                                 loop == 0xFFFF ? rows.length : loop));
-                        column[at + 2][f] = (byte) (0x80 | Columns.TIMER_RESET
+                        column[at + 2][f] = (byte) (0x80
+                                | (running[c] ? 0 : Columns.TIMER_RESET)
                                 | Columns.PLACE_RESET | low);
                         column[at + 3][f] = (byte) count;
                         select[c] = low;
+                        running[c] = true;
                         used |= 1 << c;
                         if (opcode == START_PCM_PREEMPT) {
                             preempted |= (read.streams()[STREAM_X][f] & 0x0F)
                                     & ~(1 << c);
                         }
                     }
-                    case RELEASE -> column[at + 1][f] = (byte) 0x80;
+                    case RELEASE -> {
+                        column[at + 1][f] = (byte) 0x80;
+                        running[c] = false;
+                    }
                     case RETUNE -> {
                         // A new rate on a running stream, its place kept.
                         // Addressed to a voice it repatches the volume from
@@ -335,7 +352,7 @@ final class YmxToYmxr {
                             source = built.number(Effects.SID, volume,
                                     toggle(volume), 0);
                         } else if ((low & 4) != 0) {
-                            int shape = read.streams()[STREAM_X][f] & 0x0F;
+                            int shape = (read.streams()[STREAM_X][f] >> 4) & 0x0F;
                             source = built.number(Effects.BUZZER, shape,
                                     retrigger(shape), 0);
                         }
@@ -362,6 +379,7 @@ final class YmxToYmxr {
                     column[at + 1][f] = (byte) 0x80;
                     column[at + 2][f] = 0;
                     column[at + 3][f] = 0;
+                    running[other] = false;
                 }
             }
         }

@@ -314,6 +314,12 @@ the frame before it, acting on no channel, on an even count. A tune whose
 own last frame reads that way loses it, and a file packed at a wider unit
 keeps the pad past the first.
 
+A start sets bit 6 where the channel's timer is stopped and leaves it clear
+over a running stream, since bit 6 moves a running timer and a stopped one
+starts on the select either way (1.9, section 6 rule 5). The shape a
+retrigger start restarts stands in X's bits 7 to 4, and the channels a
+preempt stops in its bits 3 to 0.
+
 `RESUME` is not read, and a frame that runs it gets a note on stderr.
 Which timer a channel runs on is YMX's `T` stream and this schema's 2.3,
 so the map is not carried: channel 0 becomes effect 0.
