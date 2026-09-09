@@ -118,6 +118,11 @@ def taken(writes):
 
 # What the player is assembled with: the raster monitor's switch, which
 # an equate of the source reads as the assembly defines it.
+# The 68000's interrupt entry and its rte, which the cycle counter here
+# does not reach: 44 and 20 from the manual. performance.md's 172 for a
+# tick is its 108 and these.
+ENTRY = 64
+
 PERF = "-perf" in sys.argv
 LEAN = "-lean" in sys.argv
 
@@ -716,7 +721,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init took a bound tune of version %d" % (BOUND_VERSION + 1)
-        return 0, 0, [], {}, (0, 0, 0, [])
+        return 0, 0, [], {}, 0, (0, 0, 0, [])
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
@@ -739,6 +744,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                 "effect %d's vector" % i
     ticks = 0
     tick_cost = {}
+    tick_cycles = 0                     # every tick's own instructions
     costliest = [0]
     advance = []
     clocks = MFP_CLOCK / tune.rate
@@ -860,6 +866,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                 if bin(tune.effects).count("1") == 1:
                     kind += " alone"        # init took the level's drop out
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
+                tick_cycles += cycles.cycles - before
             ticks += 1
             assert taken(m.psg) == taken([want]), "frame %d: tick of effect %d wrote %s, not %s" % (f, i, m.psg, [want])
             timers.apply(m.mfp)
@@ -884,7 +891,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
         if tune.effects & 1 << i:
             assert timers.mode[i] == 0 or i == 3, "stop left effect %d's timer running" % i
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "stop moved Timer C's nibble"
-    return frames, ticks, cost, tick_cost, (costliest[0], tune.R, tune.RR, advance)
+    return (frames, ticks, cost, tick_cost, tick_cycles,
+            (costliest[0], tune.R, tune.RR, advance))
 
 
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+) .* pc=([0-9a-f]+)")
@@ -1175,8 +1183,8 @@ def main():
                 frames, ticks = hatari(ym, code, symbols, perf)
                 print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
                 continue
-            frames, ticks, cost, tick_cost, where = check(ym, code, symbols,
-                                                          cycles_of and CyclesOn(cycles_of), kit, perf)
+            frames, ticks, cost, tick_cost, tick_cycles, where = check(
+                ym, code, symbols, cycles_of and CyclesOn(cycles_of), kit, perf)
             line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
             if kit:
                 line += ", the player's frames are the reader's entries"
@@ -1189,6 +1197,14 @@ def main():
                     average, max(cost), where[0], where[1], where[2])
                 line += "; the advance %5d on average, %5d at most, %5d in the costliest frame" % (
                     sum(adv) / len(adv), max(adv), adv[where[0]])
+                # A tick costs the frame its own instructions and the
+                # 68000's entry and rte besides, which no emulated cycle
+                # here counts: 44 and 20 from the manual, the 64 that
+                # separates performance.md's 108 from its 172.
+                ticked = int(round((tick_cycles + ENTRY * ticks) / float(frames)))
+                if ticks:
+                    line += "; the ticks %5d cycles a frame, %5d with the call" % (
+                        ticked, average + ticked)
                 for then in sorted(tick_cost):
                     line += ", a tick %s %s" % (then, "/".join(str(c) for c in sorted(tick_cost[then])))
                 stem = os.path.basename(ym)[:-3].replace("  ", " ")
@@ -1200,6 +1216,26 @@ def main():
                 if said != counted:
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
+                # plan.md's closing figures, on the tune it names. Nothing
+                # reached them: its call had moved twice and its ticks once,
+                # while performance.md's table beside them stayed held. The
+                # figures are the core the document reckons against, whose
+                # ticks drop the level and write their own end of interrupt,
+                # so the lean core reads its own ticks and not these.
+                if stem == "Synergy Credits" and not LEAN:
+                    plan = " ".join(open(os.path.join(ROOT, "doc", "plan.md")).read().split())
+                    closing = re.search(
+                        r"Synergy Credits reads ([\d,]+) cycles a call against the"
+                        r" [\d,]+ this document opened at and ([\d,]+) cycles of"
+                        r" ticks against [\d,]+, so ([\d,]+) a frame", plan)
+                    if not closing:
+                        stale.append("plan.md gives no closing figures for Synergy Credits")
+                    else:
+                        was = tuple(int(x.replace(",", "")) for x in closing.groups())
+                        got = (average, ticked, average + ticked)
+                        if was != got:
+                            stale.append("plan.md says %s for Synergy Credits, and the"
+                                         " rig counts %s" % (was, got))
                 # A lean tick drops no interrupt level, so the row a tune of
                 # one effect takes is the row every other tune takes, and the
                 # five kinds read the lean table's second figure.
