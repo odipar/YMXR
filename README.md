@@ -36,6 +36,7 @@ specification in and how to check what comes out.
 | `68k/YMXR_sndh.S`, `68k/YMXR_prg.S` | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool (doc/BINARIES.md) |
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
 | `ym/` | the measurements behind the figures, and `ym/test` ten tunes the tests run on |
+| `ymx/` | a YMX file converted and played, and `ymx/test` three tunes that have no dump |
 | `bin/` | the converter, the check, the trace, the binder and the SNDH and program combiners, run out of a build |
 
 A tune converts and plays like this:

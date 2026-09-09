@@ -211,6 +211,20 @@ at about a fifth of the play call, and experiments.md has what that came
 to on twenty tunes. `HATARI` and `TOS` name the emulator
 and a TOS image, as they do for the rigs.
 
+## Playing a YMX file
+
+```
+ymx/play.sh [options] tune.ymx [more.ymx ...] [out.wav]
+```
+
+A `.ymx` converted and played: `bin/ymx-to-ymxr` makes a tune file of
+each, and `ym/play.sh` takes those, so a name that is not a tune records
+the run and several tunes go into one file as subtunes, as they do there.
+
+`-kK`, `-mN` and `-copies[S]` reach the converter and every other option
+is `ym/play.sh`'s. `YMX_DUMP` names YMX's `ymx-dump`, and with neither it
+nor `YMX_REPO` set `../YMX/go/bin/ymx-dump` is taken.
+
 ## The rigs
 
 `68k/test/emu/test_ymxr.py` plays every tune under `ym/test`, or the
