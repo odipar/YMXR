@@ -122,12 +122,13 @@ PERF = "-perf" in sys.argv
 LEAN = "-lean" in sys.argv
 
 # The row of performance.md's lean table each kind of tick reads, the
-# four kinds being what a lean tick has: it drops no interrupt level, so
+# five kinds being what a lean tick has: it drops no interrupt level, so
 # the path a tune of one effect takes is the path every other tune takes.
 LEAN_ROW = {"on": "a row written, the place stepped",
             "loop": "the marker, the place to row `RR`",
             "stop": "the marker, the timer stopped",
-            "square": "a square's two rows, no place stepped"}
+            "square": "a square's two rows, no place stepped",
+            "one": "a source of one row, no place stepped"}
 DEFINED = {"YMXR_PERF": 1 if PERF else 0,
            "YMXR_NEST": 0 if LEAN else 1, "YMXR_AEOI": 1 if LEAN else 0}
 
@@ -161,10 +162,11 @@ def equate(name, symbols=None):
 
 
 # A tick handler's operands: the register it selects, and the place it
-# reads; and a square handler's, the register it selects and the row it
-# stands at. Every offset is measured off its handler's own labels, so
-# they stand once the player is assembled (main).
-TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = 0
+# reads; a square handler's, the register it selects and the row it
+# stands at; and a one-row source handler's, the same two. Every offset
+# is measured off its handler's own labels, so they stand once the
+# player is assembled (main).
+TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = ONE_SEL = ONE_VAL = 0
 
 
 def assemble(source="YMXR.S", defines=()):
@@ -450,8 +452,18 @@ class Model:
         at, R, RR, rows = self.tune.sources[fx["source"]]
         return R == 2 and RR == 0
 
+    def onerow(self, i):
+        """Whether effect i's source is one row repeating, which the
+        player's own one-row handler takes (68k/YMXR.S, ONEROW)."""
+        fx = self.fx[i]
+        if fx["source"] == 0:
+            return False
+        at, R, RR, rows = self.tune.sources[fx["source"]]
+        return R == 1 and RR == 0
+
     def value(self, i):
-        """The row a square's handler stands at, which is its place."""
+        """The row a handler holding its place as an immediate stands
+        at, which is its place."""
         fx = self.fx[i]
         at, R, RR, rows = self.tune.sources[fx["source"]]
         return rows[fx["place"]]
@@ -816,6 +828,16 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                             f, i, m.byte(at + SQ_SEL), fx["using"])
                     assert m.long(TIMER[i]["vector"]) == at, \
                         "frame %d: effect %d's vector is not its square's" % (f, i)
+                elif model.onerow(i):
+                    at = CODE + symbols["ymxr_one%d" % i]
+                    assert m.byte(at + ONE_VAL) == model.value(i), \
+                        "frame %d: effect %d's one row is %02x, not %02x" % (
+                            f, i, m.byte(at + ONE_VAL), model.value(i))
+                    assert m.byte(at + ONE_SEL) == fx["using"], \
+                        "frame %d: effect %d's one row selects R%d, not R%d" % (
+                            f, i, m.byte(at + ONE_SEL), fx["using"])
+                    assert m.long(TIMER[i]["vector"]) == at, \
+                        "frame %d: effect %d's vector is not its one row's" % (f, i)
                 else:
                     at = CODE + symbols["ymxr_tick%d" % i]
                     assert m.long(at + TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.long(at + TICK_PTR), place)
@@ -830,7 +852,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             m.interrupt(TIMER[i]["vector"])
             if cycles:
                 cycles._settle(None)
-                kind = "square" if model.square(i) else then
+                kind = then
+                if model.square(i):
+                    kind = "square"
+                elif model.onerow(i):
+                    kind = "one"
                 if bin(tune.effects).count("1") == 1:
                     kind += " alone"        # init took the level's drop out
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
@@ -842,6 +868,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                 assert m.byte(at + SQ_VAL) == model.value(i), \
                     "frame %d: after a tick effect %d's square stands at %02x, not %02x" % (
                         f, i, m.byte(at + SQ_VAL), model.value(i))
+            elif model.onerow(i):
+                at = CODE + symbols["ymxr_one%d" % i]
+                assert m.byte(at + ONE_VAL) == model.value(i), \
+                    "frame %d: after a tick effect %d's one row is %02x, not %02x" % (
+                        f, i, m.byte(at + ONE_VAL), model.value(i))
             elif then == "stop":
                 assert timers.mode[i] == 0, "frame %d: effect %d ran out and its timer runs on" % (f, i)
             else:
@@ -916,10 +947,14 @@ def hatari(ym, code, symbols, perf=False):
     handler = symbols["ymxr_tick1"] - symbols["ymxr_tick0"]
     ticks = [(base + symbols["ymxr_tick%d" % i], base + symbols["ymxr_tick%d" % i] + handler)
              for i in range(4)]
-    # a square's handler stands beside the four, one an effect
+    # a square's handler stands beside the four, one an effect, and a
+    # one-row source's beside those
     square = symbols["ymxr_sq1"] - symbols["ymxr_sq0"]
     squares = [(base + symbols["ymxr_sq%d" % i], base + symbols["ymxr_sq%d" % i] + square)
                for i in range(4)]
+    one = symbols["ymxr_one1"] - symbols["ymxr_one0"]
+    ones = [(base + symbols["ymxr_one%d" % i], base + symbols["ymxr_one%d" % i] + one)
+            for i in range(4)]
 
     def where(pc):
         if frame[0] <= pc < frame[1]:
@@ -927,7 +962,9 @@ def hatari(ym, code, symbols, perf=False):
         if stop[0] <= pc < stop[1]:
             return "stop"
         for i in range(4):
-            if ticks[i][0] <= pc < ticks[i][1] or squares[i][0] <= pc < squares[i][1]:
+            if (ticks[i][0] <= pc < ticks[i][1]
+                    or squares[i][0] <= pc < squares[i][1]
+                    or ones[i][0] <= pc < ones[i][1]):
                 return i
         return None
 
@@ -1110,11 +1147,13 @@ def main():
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
     code, symbols = assemble(defines=defines)
-    global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL
+    global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL, ONE_SEL, ONE_VAL
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
     SQ_SEL = equate("SQ_SEL", symbols)
     SQ_VAL = equate("SQ_VAL", symbols)
+    ONE_SEL = equate("ONE_SEL", symbols)
+    ONE_VAL = equate("ONE_VAL", symbols)
     print("the player: %d bytes%s%s" % (len(code),
                                        ", the raster monitor in" if perf else "",
                                        ", the lean tick" if LEAN else ""))
@@ -1163,15 +1202,17 @@ def main():
                         said, stem, counted))
                 # A lean tick drops no interrupt level, so the row a tune of
                 # one effect takes is the row every other tune takes, and the
-                # four kinds read the lean table's second figure.
+                # five kinds read the lean table's second figure.
                 for then, name in (("on", "a row written, the place stepped"),
                                    ("loop", "the marker, the place to row `RR`"),
                                    ("stop", "the marker, the timer stopped"),
                                    ("square", "a square's two rows, no place stepped"),
+                                   ("one", "a source of one row, no place stepped"),
                                    ("on alone", "a row written, the tune running one effect"),
                                    ("loop alone", "the marker to row `RR`, one effect"),
                                    ("stop alone", "the marker and the stop, one effect"),
-                                   ("square alone", "a square's two rows, one effect")):
+                                   ("square alone", "a square's two rows, one effect"),
+                                   ("one alone", "a source of one row, one effect")):
                     if then not in tick_cost:
                         continue
                     if LEAN:

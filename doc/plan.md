@@ -5,9 +5,9 @@ holds what it costs today; every figure below is against those, and each
 one says whether it was measured on the rig or counted from the 68000's
 manual.
 
-Two figures matter and they are not the same. A call is 1,370 to 2,356
+Two figures matter and they are not the same. A call is 1,370 to 2,361
 cycles on average by tune, and the costliest frame of a tune is 1,648 to
-6,348. R4.5 budgets 6,656 a frame, and what it binds is the costliest
+6,356. R4.5 budgets 6,656 a frame, and what it binds is the costliest
 frame. Most of what follows moves the average; the steps that move the
 costliest frame are named where they are.
 
@@ -17,12 +17,12 @@ costliest frame are named where they are.
 
 DTX's advance is 48 to 67 per cent of an average call and 78 to 85 per
 cent of the costliest frame: 4,130 of Turrican - world 4-3's 4,836 and
-4,948 of Synergy Credits' 6,348. A refill parses at most one ST4
+4,948 of Synergy Credits' 6,356. A refill parses at most one ST4
 operation a unit at about 225 to 240 cycles each, and its unit count is
 the column count, so fifteen operations is a tune's costliest frame and
 the schema's thirty columns set that bound.
 
-The frame procedure is the rest, 510 to 1,136. A column the row leaves
+The frame procedure is the rest, 510 to 1,141. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset:
 a row sets 0.6 to 13.0 of the fourteen register columns, 3.2 on the
 median tune. Whole groups go unset, which is what a gate can skip,
@@ -146,6 +146,7 @@ Every step this document held is taken, each measured on the rig:
 | a square's own tick | 31 a tick | 88 against 108 and 130 |
 | every source resolved at init | 52 a start | 21 to 38 a frame |
 | DTX's state block in a6 | 36 | 36 off the advance, 12 off the call |
+| a one-row source's own tick | 74 a tick | 568 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
 its count. Synergy Credits reads 2,356 cycles a call against the 2,469
