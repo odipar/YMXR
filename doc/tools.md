@@ -299,6 +299,14 @@ reloaded, and `RELEASE` source 0. `START_PCM_PREEMPT` stops the channels
 its operand names, taking their whole row: a select left standing there
 would start the timer the stop just stopped (SPEC.md 1.9).
 
+YMX fits a tune to its unit by padding it, where this conversion drops to
+a unit of 1 instead, so a dump of an odd frame count is one frame longer
+through YMX. A dump's rows are what a tune has (`ym-to-ymxr` prevails
+where the two readings differ), so a pad comes off: one frame, repeating
+the frame before it, acting on no channel, on an even count. A tune whose
+own last frame reads that way loses it, and a file packed at a wider unit
+keeps the pad past the first.
+
 `RESUME` is not read, and a frame that runs it gets a note on stderr.
 Which timer a channel runs on is YMX's `T` stream and this schema's 2.3,
 so the map is not carried: channel 0 becomes effect 0.

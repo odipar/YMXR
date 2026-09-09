@@ -113,6 +113,38 @@ final class YmxToYmxr {
         return new Dumped(frames, rate, loop, value, samples, loops);
     }
 
+    /**
+     * The frames of a dumped file, its packing's padding off the end.
+     *
+     * <p>YMX fits a tune to its unit by padding it (YMX, ymx), where the
+     * conversion here drops to a unit of 1 instead, so a dump of an odd
+     * frame count is one frame longer through YMX than through the dump.
+     * The dump is what a tune's rows are, so the padding comes off and
+     * this format makes its own reckoning of the unit.
+     *
+     * <p>A pad at YMX's unit of 2 is one frame, it repeats the frame
+     * before it and it acts on no channel, and a padded count is even.
+     * One frame comes off where all three hold. A tune whose own last
+     * frame reads that way loses it, which is a frame writing what the
+     * frame before it wrote; a file packed at a wider unit keeps the pad
+     * past the first.
+     */
+    static int frames(Dumped read) {
+        int last = read.frames() - 1;
+        if (read.frames() % 2 != 0 || last <= read.loopFrame()) {
+            return read.frames();
+        }
+        if ((read.streams()[STREAM_M][last] & 0xFF) != 0) {
+            return read.frames();
+        }
+        for (int r = 0; r < REGISTERS; r++) {
+            if (read.streams()[r][last] != read.streams()[r][last - 1]) {
+                return read.frames();
+            }
+        }
+        return last;
+    }
+
     /** The frames a dumped file's script acts on, which this version
      *  leaves behind: M is 0 on a frame that starts nothing (YMX,
      *  SPEC.md 2.1). */
@@ -130,6 +162,9 @@ final class YmxToYmxr {
      *  the converter takes as it takes a dump's. */
     static YmDump.Song song(Dumped read, String name) {
         byte[][] registers = new byte[YmDump.Song.YM_REGISTERS][read.frames()];
+        for (int r = 0; r < YmDump.Song.YM_REGISTERS; r++) {
+            registers[r] = new byte[read.frames()];
+        }
         for (int r = 0; r < REGISTERS; r++) {
             System.arraycopy(read.streams()[r], 0, registers[r], 0, read.frames());
         }
@@ -357,6 +392,14 @@ final class YmxToYmxr {
                 ring = Integer.parseInt(flag.substring(2));
             }
         }
+        int frames = frames(read);
+        if (frames != read.frames()) {
+            report.note((read.frames() - frames) + " frame of YMX's own padding"
+                    + " comes off the end: a dump's rows are what a tune has,"
+                    + " and this conversion picks its own unit");
+        }
+        read = new Dumped(frames, read.rate(), read.loopFrame(), read.streams(),
+                read.samples(), read.loops());
         int repeat = Math.min(read.loopFrame(), read.frames());
         String stem = Path.of(in).getFileName().toString();
         YmDump.Song song = song(read, stem.endsWith(".ymx")
