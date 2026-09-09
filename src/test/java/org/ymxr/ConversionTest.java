@@ -1,6 +1,7 @@
 package org.ymxr;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -66,6 +67,40 @@ final class ConversionTest {
         assertEquals(1, tune.dtx2()[Dtx.HEADER + 2] & 0xFF, "the table's unit");
         assertTrue(report.notes().stream().anyMatch(n -> n.contains("packed at unit 1")),
                 "the tool says why: " + report.notes());
+    }
+
+    @Test
+    void theCopiesFlagIsTakenAndStatedInTheTable() throws IOException {
+        // -copies packs a match beyond the ring as a copy from the column's
+        // own literal stream, which packs a small ring far smaller (DTX,
+        // dtx-write). The format block's byte 3 states it, and the binder
+        // reads that byte to pick the reader that reads such a table, so a
+        // table packed one way and read the other is what this holds apart.
+        byte[] dump = Files.readAllBytes(Path.of("ym/test/DBA 5.ym"));
+        byte[] plain = YmToYmxr.convert(dump, List.of(), new Report()).written().file();
+        byte[] copies = YmToYmxr.convert(dump, List.of("-copies"), new Report())
+                .written().file();
+        assertEquals(0, TuneFile.read(plain).dtx2()[Dtx.HEADER + 3] & 1,
+                "the default packs no copies");
+        assertEquals(1, TuneFile.read(copies).dtx2()[Dtx.HEADER + 3] & 1,
+                "-copies states it in the table");
+        assertTrue(copies.length < plain.length, () -> "DBA 5 packs to " + copies.length
+                + " bytes with copies and " + plain.length + " without");
+    }
+
+    @Test
+    void aSecondsOfSearchIsTakenAndAnythingElseIsNot() throws IOException {
+        // -copiesS searches S seconds beyond the opening passes. The flag is
+        // the packer's, so the tool takes the number and rejects what is not
+        // one rather than packing at a default nobody asked for.
+        byte[] dump = Files.readAllBytes(Path.of("ym/test/Big - Samantha Fox Strip Poker 6.ym"));
+        byte[] searched = YmToYmxr.convert(dump, List.of("-copies0"), new Report())
+                .written().file();
+        assertEquals(1, TuneFile.read(searched).dtx2()[Dtx.HEADER + 3] & 1,
+                "-copies0 packs copies, the opening passes alone");
+        assertThrows(NumberFormatException.class,
+                () -> YmToYmxr.convert(dump, List.of("-copiesnow"), new Report()),
+                "a search of what is not a number is not taken");
     }
 
     @Test

@@ -6,12 +6,13 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.dtx.St4;
 
 /**
  * A YM5!/YM6! dump into a tune file.
  *
  * <pre>
- * ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR] [-silent]
+ * ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR] [-copies[S]] [-silent]
  * </pre>
  *
  * {@code -k} is the unit the table packs at, 2 by default; {@code -m} the
@@ -40,7 +41,8 @@ public final class YmToYmxr {
     }
 
     /** The dump converted with the tool's flags, {@code -kK}, {@code -mN},
-     *  {@code -rRR} or {@code -r}, as the tool does it. */
+     *  {@code -rRR} or {@code -r}, {@code -copies[S]}, as the tool does
+     *  it. */
     static Converted convert(byte[] dump, List<String> flags, Report report) {
         return convert(YmDump.read(dump), flags, report);
     }
@@ -50,11 +52,20 @@ public final class YmToYmxr {
         int ring = Tune.RING;
         int repeat = -1;
         boolean once = false;
+        boolean copies = false;
+        double seconds = 0;
         for (String flag : flags) {
             if (flag.startsWith("-k")) {
                 unit = Integer.parseInt(flag.substring(2));
             } else if (flag.startsWith("-m")) {
                 ring = Integer.parseInt(flag.substring(2));
+            } else if (flag.startsWith("-copies")) {
+                // the packer's own, spelled as DTX's dtx-write spells it:
+                // a match beyond the ring copies from the column's own
+                // literal stream, which packs a small ring far smaller,
+                // and -copiesS searches S seconds for a better parse
+                copies = true;
+                seconds = flag.length() > 7 ? Double.parseDouble(flag.substring(7)) : 0;
             } else if (flag.equals("-r")) {
                 once = true;
             } else if (flag.startsWith("-r")) {
@@ -76,11 +87,12 @@ public final class YmToYmxr {
             }
         }
         read(report, song);
-        taken(report, flags, unit, ring, repeat, once);
+        taken(report, flags, unit, ring, repeat, once, copies, seconds);
         Sources sources = new Sources(song);
         Columns columns = new Columns(song, sources, repeat, report);
         found(report, sources, columns);
-        Tune.Written written = Tune.write(columns, sources, song.playerHz(), unit, ring, report);
+        Tune.Written written = Tune.write(columns, sources, song.playerHz(), unit, ring,
+                copies ? new St4(true, seconds) : new St4(), report);
         String said = song.frames() + " frames at " + song.playerHz() + " Hz, "
                 + sources.count() + " sources, effects " + Integer.toBinaryString(columns.effects)
                 + ", repeats at " + (repeat < song.frames() ? "row " + written.repeat() : "no row")
@@ -110,7 +122,7 @@ public final class YmToYmxr {
 
     /** The flags the tool was given and what each came to. */
     private static void taken(Report report, List<String> flags, int unit, int ring, int repeat,
-                              boolean once) {
+                              boolean once, boolean copies, double seconds) {
         report.say("the flags: " + (flags.isEmpty() ? "none, so the defaults below"
                 : String.join(" ", flags)));
         report.row("-k, the unit", unit + (unit == UNIT ? ", the default" : ", asked for"));
@@ -119,6 +131,9 @@ public final class YmToYmxr {
         report.row("-r, the repeat row", once ? "none, the tune plays once"
                 : repeat + (flags.stream().anyMatch(f -> f.startsWith("-r")) ? ", asked for"
                 : ", the dump's loop frame"));
+        report.row("-copies", !copies ? "no, the default: a match beyond the ring is not packed"
+                : seconds == 0 ? "yes, the opening passes alone"
+                : "yes, " + seconds + " seconds of search, which packs another parse a run");
     }
 
     /** The sources and the effects the dump's frames came to. */
@@ -195,6 +210,7 @@ public final class YmToYmxr {
     }
 
     private static void usage() {
-        System.err.println("ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-silent]");
+        System.err.println("ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r]"
+                + " [-copies[S]] [-silent]");
     }
 }

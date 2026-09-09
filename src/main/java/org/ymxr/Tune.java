@@ -71,6 +71,12 @@ final class Tune {
      *  ring is replayed at its exact rows by DTX's reader. */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          Report report) {
+        return write(columns, sources, frameRate, unit, ring, new St4(), report);
+    }
+
+    /** The same, packed by the packer the tool's flags asked for. */
+    static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
+                         Packer packer, Report report) {
         int frames = columns.column[0].length;
         int repeat = columns.repeat;
         if (unit > 1 && (frames % unit != 0 || (repeat < frames && repeat % unit != 0))) {
@@ -83,8 +89,8 @@ final class Tune {
             report.note("the ring is " + at + " bytes: a multiple of the period within the"
                     + " player's reach");
         }
-        Watched packer = new Watched(report, Columns.C);
-        byte[] table = table(columns.column, frames, repeat, unit, at, packer);
+        Watched watched = new Watched(report, Columns.C, packer);
+        byte[] table = table(columns.column, frames, repeat, unit, at, watched);
         List<Sources.Source> all = sources.all();
         byte[][] tables = new byte[all.size()][];
         int sourceRows = 0;
@@ -118,7 +124,7 @@ final class Tune {
         for (int i = 0; i < tables.length; i++) {
             System.arraycopy(tables[i], 0, file, sourceAt[i], tables[i].length);
         }
-        packed(report, packer, frames, table.length, tables.length, sourceRows, sourceBytes,
+        packed(report, watched, frames, table.length, tables.length, sourceRows, sourceBytes,
                 at, unit, file.length);
         return new Written(file, repeat < frames ? repeat : frames);
     }
@@ -139,14 +145,15 @@ final class Tune {
      */
     private static final class Watched implements Packer {
 
-        private final Packer inner = new St4();
+        private final Packer inner;
         private final Report report;
         private final int[] bytes;
         private int done;
 
-        Watched(Report report, int columns) {
+        Watched(Report report, int columns, Packer inner) {
             this.report = report;
             this.bytes = new int[columns];
+            this.inner = inner;
         }
 
         @Override

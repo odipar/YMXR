@@ -225,7 +225,7 @@ final class Check {
     }
 
     /**
-     * {@code ymxr-check [-kK] [-mN] [-rRR | -r] [-silent] DUMP|DIR ...}:
+     * {@code ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] DUMP|DIR ...}:
      * one line a file, the wrong frames under a tune that fails, and an
      * exit of 1 where any does; the flags are the converter's. A file
      * that is not a YM5!/YM6! dump is said and not counted. The tool says
@@ -240,7 +240,8 @@ final class Check {
             (arg.startsWith("-") ? flags : named).add(arg);
         }
         if (named.isEmpty()) {
-            System.err.println("ymxr-check [-kK] [-mN] [-rRR | -r] [-silent] DUMP|DIR ...");
+            System.err.println("ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]"
+                    + " DUMP|DIR ...");
             System.exit(2);
         }
         Report report = new Report(!flags.contains(YmToYmxr.SILENT));

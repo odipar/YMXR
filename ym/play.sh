@@ -26,6 +26,10 @@
 #              tune whose row count or repeat row is odd packs at 1
 #   -mN        the ring in bytes, 960 by default
 #   -rRR       the row the tune repeats to; -r alone plays it once
+#   -copies[S] a match beyond the ring packs as a copy from the column's
+#              own literal stream, which packs a small ring far smaller;
+#              -copiesS searches S seconds for a better parse, and a
+#              search of some seconds packs another parse every run
 #
 # The tags:
 #
@@ -100,6 +104,7 @@ out=
 unit=
 ring=
 repeat=
+copies=
 title=
 composer=
 help=
@@ -124,6 +129,7 @@ while [ "$left" -gt 0 ]; do
         -m*) ring=$arg ;;
         -r*) repeat=$arg ;;
         -t*) title=${arg#-t} ;;
+        -copies*) copies=$arg ;;
         -c*) composer=${arg#-c} ;;
         -v*) vbls=${arg#-v} ;;
         -*) echo "ym/play.sh does not read $arg" >&2; exit 2 ;;
@@ -168,7 +174,7 @@ fi
 # A tune file is packed already, so the converter's flags have nothing to
 # pack. Said over every name before any dump is converted, so the same
 # mistake costs the same whichever name it stands under.
-if [ -n "$unit$ring$repeat" ]; then
+if [ -n "$unit$ring$repeat$copies" ]; then
     left=$#
     while [ "$left" -gt 0 ]; do
         arg=$1
@@ -212,7 +218,7 @@ while [ "$left" -gt 0 ]; do
             mkdir -p "$work/$at"
             file=$work/$at/${name%.*}.ymxr
             "$here/bin/ym-to-ymxr" "$tune" "$file" ${unit:+"$unit"} ${ring:+"$ring"} \
-                ${repeat:+"$repeat"} $silent >/dev/null
+                ${repeat:+"$repeat"} ${copies:+"$copies"} $silent >/dev/null
             ;;
     esac
     if [ "$tunes" -gt 1 ]; then
