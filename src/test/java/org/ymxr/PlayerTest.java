@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,6 +28,8 @@ final class PlayerTest {
 
     private static final Path PLAYER = Path.of("68k/YMXR.S");
 
+    private static final Path BINARIES = Path.of("doc/BINARIES.md");
+
     /** Every {@code NAME equ VALUE} in the player, decimal or hex. */
     static Map<String, Integer> equates() throws IOException {
         Map<String, Integer> out = new HashMap<>();
@@ -38,6 +41,130 @@ final class PlayerTest {
                     : Integer.parseInt(value));
         }
         return out;
+    }
+
+    /**
+     * The offset rows one section of BINARIES.md states, by what the row
+     * gives: the first table under that heading, which opens
+     * {@code | offset | bytes | gives |}. Three sections state a layout
+     * and each names its fields the same way, so one reader serves all
+     * three.
+     */
+    private static Map<String, Integer> layout(String said, String section) {
+        int at = said.indexOf("## " + section);
+        assertTrue(at >= 0, "BINARIES.md states no section " + section);
+        int table = said.indexOf("| offset | bytes | gives |", at);
+        assertTrue(table >= 0, section + " states no layout");
+        Map<String, Integer> out = new LinkedHashMap<>();
+        Pattern cells = Pattern.compile("^\\| (\\d+) \\| [^|]+ \\| ([^|]+) \\|$");
+        for (String line : said.substring(table).split("\n")) {
+            if (!line.startsWith("|")) {
+                break;
+            }
+            Matcher row = cells.matcher(line);
+            if (row.matches()) {
+                out.put(row.group(2).trim(), Integer.parseInt(row.group(1)));
+            }
+        }
+        assertTrue(out.size() >= 8, () -> section + " read as " + out.size() + " rows");
+        return out;
+    }
+
+    /** The bit numbers of the flags table under one section, by what sets them. */
+    private static Map<String, Integer> flags(String said, String section) {
+        int at = said.indexOf("## " + section);
+        assertTrue(at >= 0, "BINARIES.md states no section " + section);
+        int table = said.indexOf("The flags word:", at);
+        assertTrue(table >= 0, section + " states no flags word");
+        Map<String, Integer> out = new LinkedHashMap<>();
+        Pattern cells = Pattern.compile("^\\| (\\d+) \\| ([^|]+) \\| [^|]+ \\|$");
+        for (String line : said.substring(table).split("\n")) {
+            Matcher row = cells.matcher(line);
+            if (row.matches()) {
+                out.put(row.group(2).trim(), Integer.parseInt(row.group(1)));
+            } else if (!out.isEmpty() && !line.startsWith("|")) {
+                break;
+            }
+        }
+        assertTrue(out.size() == 2, () -> section + "'s flags word read as " + out.size());
+        return out;
+    }
+
+    /** The one row of a table whose text opens with the words given. */
+    private static Map.Entry<String, Integer> row(Map<String, Integer> table, String opens) {
+        for (Map.Entry<String, Integer> one : table.entrySet()) {
+            if (one.getKey().startsWith(opens)) {
+                return one;
+            }
+        }
+        throw new AssertionError("no row gives \"" + opens + "\", of " + table.keySet());
+    }
+
+    /**
+     * The bound tune's layout as BINARIES.md 1 states it, against the
+     * player's equates and the binder's constants. A host reads a bound
+     * tune by that table, so a field that moves in one of the three moves
+     * in all three or the three disagree.
+     */
+    @Test
+    void theBoundTuneIsLaidOutAsBinariesStates() throws IOException {
+        Map<String, Integer> said = layout(Files.readString(BINARIES), "1. The bound tune");
+        Map<String, Integer> e = equates();
+        assertEquals(0, row(said, "`YMXB`").getValue(), "the magic stands first");
+        assertEquals(e.get("TF_VERSION"), row(said, "the version").getValue());
+        assertEquals(e.get("TF_RATE"), row(said, "the frame rate").getValue());
+        assertEquals(e.get("TF_EFFECTS"), row(said, "effects used").getValue());
+        assertEquals(e.get("TF_SOURCES"), row(said, "`S`, the source count").getValue());
+        assertEquals(Bound.STATE_AT, row(said, "the state block's bytes").getValue());
+        assertEquals(Bound.IMAGE_AT, row(said, "where the image begins").getValue());
+        assertEquals(Bound.TABLE_AT, row(said, "where this tune's table stands").getValue());
+        assertEquals(Bound.INDEX_AT, row(said, "the source index").getValue());
+        Matcher version = Pattern.compile("\\$([0-9A-Fa-f]+)")
+                .matcher(row(said, "the version").getKey());
+        assertTrue(version.find(), "the version row gives no version");
+        assertEquals(Bound.VERSION, Integer.parseInt(version.group(1), 16),
+                "BINARIES.md 1 states another version than the binder writes");
+    }
+
+    /**
+     * The SNDH core's descriptor and its flags word as BINARIES.md 2
+     * states them, against the packager that writes them.
+     */
+    @Test
+    void theSndhCoreIsLaidOutAsBinariesStates() throws IOException {
+        String binaries = Files.readString(BINARIES);
+        Map<String, Integer> said = layout(binaries, "2. The SNDH core");
+        assertEquals(Sndh.CORE_MAGIC_AT, row(said, "`YMXS`").getValue());
+        assertEquals(Sndh.CORE_VERSION_AT, row(said, "the descriptor's version").getValue());
+        assertEquals(Sndh.CORE_READS_AT, row(said, "the bound tune's version").getValue());
+        assertEquals(Sndh.CORE_FIXED_AT, row(said, "`YMXR_FIXED`").getValue());
+        assertEquals(Sndh.CORE_FLAGS_AT, row(said, "flags").getValue());
+        assertEquals(Sndh.CORE_STATE_AT, row(said, "where the core's state byte").getValue());
+        assertEquals(Sndh.CORE_TABLE_AT, row(said, "the subtune table").getValue());
+        assertEquals(Sndh.CORE_WORK_AT, row(said, "the workspace").getValue());
+        Map<String, Integer> bits = flags(binaries, "2. The SNDH core");
+        assertEquals(Sndh.CORE_MONITOR, 1 << row(bits, "the player's raster monitor").getValue());
+        assertEquals(Sndh.CORE_LEAN, 1 << row(bits, "the lean tick").getValue());
+    }
+
+    /**
+     * The program stub's descriptor and its flags word as BINARIES.md 4
+     * states them, against the tool that patches them.
+     */
+    @Test
+    void theProgramStubIsLaidOutAsBinariesStates() throws IOException {
+        String binaries = Files.readString(BINARIES);
+        Map<String, Integer> said = layout(binaries, "4. The program stub");
+        assertEquals(Prg.STUB_MAGIC_AT, row(said, "`YMXT`").getValue());
+        assertEquals(Prg.STUB_VERSION_AT, row(said, "the descriptor's version").getValue());
+        assertEquals(Prg.STUB_SUBTUNES_AT, row(said, "the subtunes").getValue());
+        assertEquals(Prg.STUB_FLAGS_AT, row(said, "flags").getValue());
+        assertEquals(Prg.STUB_RATE_AT, row(said, "the rate, rows a second").getValue());
+        assertEquals(Prg.STUB_ROWS_AT, row(said, "the rows to play").getValue());
+        assertEquals(Prg.STUB_CORE_AT, row(said, "the core's offset").getValue());
+        Map<String, Integer> bits = flags(binaries, "4. The program stub");
+        assertEquals(Prg.FLAG_CLEAR, 1 << row(bits, "the core has the raster monitor").getValue());
+        assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the set claims Timer C").getValue());
     }
 
     @Test
