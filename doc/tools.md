@@ -289,12 +289,19 @@ YMX's streams 0 to 13 are the sound registers holding what the chip
 receives, its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen
 values go through the conversion a YM dump's do and take the same flags.
 
-Streams 14 to 24 are the script that drives YMX's four timer channels.
-**This version reads the registers and not the script**: a tune whose
-script acts on no frame converts whole, and one that acts converts to its
-frame values with a note on stderr counting the frames left behind. A
-tune of square waves converts to the levels its voices hold between
-ticks, which is not the wave.
+Streams 14 to 24 are the script that drives YMX's four timer channels,
+and a channel there is an effect here: a source on a target at a timer's
+rate. Six of YMX's eight opcodes convert. `START_TOGGLE` is two rows on a
+volume register, `START_RETRIGGER` one row on R13, `START_PCM` the
+sample's own bytes with the end marker YMX writes as this format's
+marker, `RETUNE` a rate with no place reset, `HOLD` a count or a source
+reloaded, and `RELEASE` source 0. `START_PCM_PREEMPT` stops the channels
+its operand names, taking their whole row: a select left standing there
+would start the timer the stop just stopped (SPEC.md 1.9).
+
+`RESUME` is not read, and a frame that runs it gets a note on stderr.
+Which timer a channel runs on is YMX's `T` stream and this schema's 2.3,
+so the map is not carried: channel 0 becomes effect 0.
 
 ## Against YMX
 
