@@ -149,7 +149,7 @@ on.
 
 A tune restarts a shape it is already sounding more often than it changes
 to another. Such a row sets the column to the four bits it already held,
-which is what R3.6 allows: the set bit says take this value, and says
+which R3.6 allows: the set bit says take this value, and says
 nothing about the value having changed.
 
 "Do not write" is the clear set bit, so no value of this column is
@@ -226,7 +226,7 @@ runs the source it names on the target the player holds for this effect,
 at the rate the two columns beside them give (1.9). The row moves the
 place to the source's first row where bit 5 of the control column is set.
 A stopped timer starts on the select the row writes, bit 6 set or clear,
-since a select is what runs an MFP timer; what bit 6 gives is a stop
+since a select runs an MFP timer; what bit 6 gives is a stop
 before the writes, which a running timer takes and a stopped one has
 already (1.9, section 6).
 
@@ -253,7 +253,7 @@ set, and not again while the source runs.
 A timer runs one effect, and holds one at a time. The schema has four
 effects and the MFP has four timers, so four sound at once and there is no
 fifth. A tune that needs another stops one of the four on the row that
-starts it, which is the writer's work and not a player's (R3.3).
+starts it, the writer's work and not a player's (R3.3).
 
 A register takes writes from as many timers as name it, and each of those
 timers runs its own effect.
@@ -312,13 +312,13 @@ count and the select it writes are the row's, or where the row leaves a
 column unset, the ones the player keeps (R4.6).
 
 What bit 6 gives is that stop, so it moves a running timer and not a
-stopped one. A stopped timer starts on the select whether the row sets
-bit 6 or leaves it clear: the count reaches it while it is stopped and
-the select starts it from that count, which is the same start either
-way. So a writer that sets the bit where the timer runs on gets a whole
-period at the new count, and one that leaves it clear gets the new count
-at the running count's next zero; where the timer is stopped the two
-read alike, and a writer that cannot tell which it is (section 6 rule 5)
+stopped one. A stopped timer starts on the select whether the row sets bit 6
+or leaves it clear: the count reaches it while it is stopped and the select
+starts it from that count, the same start either way. So a writer that sets
+the bit where the timer runs on gets a whole period at the new count, and
+one that leaves it clear gets the new count at the running count's next
+zero; where the timer is stopped the two read alike, and a writer that
+cannot tell which it is (section 6 rule 5)
 loses nothing by the bit it picks.
 
 The place is a row number into the source's rows. Bit 5 moves it to 0,
@@ -349,7 +349,7 @@ own onto these (R3.2).
 
 A target is a procedure. It takes a source's row and writes it, and the
 schema names fourteen, one a YM2149 register. Each writes one register
-from a row of one byte, which is the typical source (2.2); a procedure
+from a row of one byte, the typical source (2.2); a procedure
 taking a row of more columns, or of a wider one, is a later version's
 (R6.2).
 
@@ -378,11 +378,12 @@ or 4, and a row `RR` it repeats to once the last row is done. That is the
 shape DTX's own table has (R1.1), one layer down. At every tick the source
 advances one row, and its target takes that row.
 
-Typically a source is one column of one byte, which is what 2.1's
-procedures take. A source of two byte values serves a procedure taking a
-word, a tone period being twelve bits, and more columns serve a source
-driving more than one target. How an entry describes either is not yet
-written (section 8).
+A source is one column of one byte at this version, the row 2.1's
+procedures take. A source of two byte values would serve a procedure
+taking a word, a tone period being twelve bits, and more columns a source
+driving more than one target; the table states `C` and `W` in its own
+header already (3.1), and the procedure that takes such a row is a later
+version's (2.1, R6.2).
 
 A tune holds its sources and an index of them (3.1), and an effect column
 names one. Source 0 names none.
@@ -391,9 +392,9 @@ Two effects may name one source. Each timer advancing it holds its own
 place, so one starting or stopping leaves the other where it was.
 
 The shapes a tune uses are shapes, not kinds the format names. One row
-repeating writes its byte on every tick, which is what a sync buzzer asks
-of R13. Two rows alternating a level and 0 are a square wave at the
-timer's rate, which is a SID voice on a volume register. Many rows are a
+repeating writes its byte on every tick, which a sync buzzer asks of
+R13. Two rows alternating a level and 0 are a square wave at the
+timer's rate, a SID voice on a volume register. Many rows are a
 recording or a cycle, and whether they repeat is the entry's to give.
 
 Because a source holds its own values, two SID voices at two levels are
@@ -439,17 +440,23 @@ Section 3.3 gives the bytes.
 
 An effect's source column gives a source number, 1 to 127, and the index
 entry at that number gives where the source's table stands. A source is a
-DTX1 table (DTX, SPEC.md 2.2): one column of one-byte values, its rows
-from byte 16 of the table, and its header giving `R` at bytes 4 to
-7 and `RR` at bytes 10 to 13, each most significant byte first (R1.1),
-`RR` equal to `R` where the source does not repeat, as DTX has it.
+DTX1 table (DTX, SPEC.md 2.2), its rows from byte 16 of the table, and
+its header giving `R` at bytes 4 to 7, `C` at bytes 8 and 9, `RR` at
+bytes 10 to 13 and `W` at byte 14, each most significant byte first
+(R1.1), `RR` equal to `R` where the source does not repeat, as DTX has
+it.
+
+`C` is 1 and `W` is 1 at this version: one column of one-byte values, the
+row 2.1's procedures take. A reader reads a source of that shape and
+rejects one of another, as it rejects a tune of another version (R6.1).
+A row of more columns or of another width is a later version's (2.1).
 
 Source 0 has no index entry. The index runs from source 1.
 
 A start resolves the number through the index once, and the ticks advance
 rows from there on; nothing is looked up while the effect runs (R3.3).
 
-The repeat is what the last row does. Where `RR` is below `R` the next tick
+`RR` gives what the last row does. Where `RR` is below `R` the next tick
 takes row `RR`; where it is `R` the source has no next row (section 5). A
 source of two rows repeating is a square wave, and one of many rows
 playing once is a drum; a loop returns to `RR`, which is where the loop
@@ -527,8 +534,8 @@ The effects go first, then the registers.
    or not the row sets the source column, so that no tick of the old
    rate takes the new source. A source of 0 stops the timer: select 0 to
    its control register. Any other is resolved through the index (3.1)
-   on the target the player keeps, and is what the timer's ticks advance
-   from here on.
+   on the target the player keeps, and the timer's ticks advance it from
+   here on.
 3. Columns 16, 20, 24 and 28, the controls, each with the count column
    beside it, to its timer's two registers as 1.9 gives: the count,
    where the row sets it or bit 6 is set; then the select, where the row
@@ -545,8 +552,8 @@ The effects go first, then the registers.
    bits 7 and 6 as the host holds them, which it does not change.
 8. Column 13 to R13. Any write to R13 restarts the envelope.
 
-The effects stop before the registers are written, and that order is what
-makes a restore hold. The row that stops an effect sets its register's
+The effects stop before the registers are written, and that order makes
+a restore hold. The row that stops an effect sets its register's
 column too (1.3); were the register written first, a tick of the effect
 still running would write over it. A start needs no such order, because
 the row that starts an effect leaves that register's column unset
@@ -645,7 +652,7 @@ frame:
   upward, each its rows as the table holds them, the marker in the last
   row's bit 7 (3.2), and the row it repeats to, `R` where it does not
   (3.1).
-- `result` is what the frame reports (section 4): 0, or -1 for the frame
+- `result` gives what the frame reports (section 4): 0, or -1 for the frame
   after the last row of a tune whose `RR` is `R`. That entry holds
   `result` alone, and the record ends with it.
 - `w` holds the YM2149 registers steps 4 to 8 write, by number in
@@ -683,6 +690,3 @@ one that does not.
 
 What a player does with a tune of a version it was not built for beyond
 rejecting it (R6.1).
-
-How a target takes a row of a DTX1 table of more than one column, or of
-another width (2.2).

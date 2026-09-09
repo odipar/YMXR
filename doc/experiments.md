@@ -73,9 +73,10 @@ the first, where a DTX2 file here does not repeat.
 
 YMXR holds the same music in 8% fewer bytes at `k` = 2, the unit the
 converter packs at (tools.md), and in 21% fewer at `k` = 1. Both sides
-are whole files, but a `.ymx` holds its sample tables and a DTX2 file
-holds no sources yet, since where a tune places them is not written
-(SPEC 8). That margin flatters the DTX2 side.
+are whole files, but a `.ymx` holds its sample tables and a DTX2 file is
+the tune's table alone: a tune file holds its sources beside it (SPEC.md
+3.3) and the figures here leave them out. That margin flatters the DTX2
+side.
 
 ## Copies from the literal stream
 
@@ -135,7 +136,7 @@ select written to a running timer (SPEC 1.9).
 
 The worst frame is `Synergy Odyssey`, which sets twelve registers and
 starts both its effects, each a source, a control and a count. Fourteen
-is the ceiling for register writes in any format at all, since the chip
+is the ceiling for register writes in any format, since the chip
 holds fourteen sound registers, and a start adds the three writes a
 timer's reset costs.
 
@@ -251,7 +252,7 @@ voice's own edges over 1,575 frames of DBA 5:
 | moves no place and writes nothing | 16,625 | 5 | 29 | 0.2% |
 | the reference player | 16,625 | 4 | 28 | 0.2% |
 
-The middle row is what stood before the write of 0 was added: a start
+The middle row stood before the write of 0 was added: a start
 whose place moved to the loud row while the voice was loud wrote that
 level again, so no edge fell between the two ticks and the half ran to
 twice its length. Adding the write of 0 turned 313 long halves into 351

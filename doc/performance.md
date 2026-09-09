@@ -152,8 +152,8 @@ columns' tests and the writes they admit, the effects' columns and the call's
 own entry and exit, where YMX writes its fourteen registers unconditionally,
 one `movep` each, and its whole call with nothing to decode is 908, the writes
 included. Fourteen tests and a few writes cost what fourteen writes cost,
-which YMX's own measurement found and its design took; the effects' columns
-and the entry are what the schema adds. So YMXR's frame procedure costs less
+which YMX's own measurement found and its design took; the schema adds
+the effects' columns and the entry. So YMXR's frame procedure costs less
 on the rows that set few columns, 787 on average on that tune against YMX's
 908, and the average lands a thirteenth under.
 
@@ -212,7 +212,7 @@ and 626 cycles a frame come off those tunes, against a play call of
 2,380, 1,985 and 2,073. A tick drops the interrupt level and writes its
 own end of interrupt because the MFP is taken in software
 end-of-interrupt mode, as TOS leaves it, and because a faster timer may
-want to nest inside a slower one. A host that wants neither takes the
+nest inside a slower one. A host that needs neither takes the
 core assembled with `YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md,
 `YMXR_sndh-lean.bin`), where a tick writes its two chip registers and
 returns:

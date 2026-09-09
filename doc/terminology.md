@@ -88,7 +88,7 @@ The ladder spans about 54 dB top to bottom, the bottom step being a jump of
 top keeps the most detail.
 
 **Writing the envelope shape restarts the envelope.** Writing the same shape
-twice is a restart, which is the mechanism behind the sync buzzer. A format
+twice is a restart, the mechanism behind the sync buzzer. A format
 therefore needs a way to say "leave the shape alone" on a row that must not
 restart it.
 
@@ -99,7 +99,7 @@ restart it.
 The **MFP** (MC68901) has four timers, A to D. All four are reachable, and
 two cost more than the others. Timer C is the operating system's 200 Hz
 clock, so a tune that takes it stops that clock and cannot be hosted from a
-Timer C hook. Timer B counts the display's lines, which is the timer a demo
+Timer C hook. Timer B counts the display's lines, the timer a demo
 uses for its own raster work.
 
 So a tune takes A and D first, then B, and C last of all.
@@ -125,8 +125,8 @@ reaches zero; one written while it is stopped is taken at once, and the
 select that follows starts the timer from it.
 
 The slowest rate is 48 a second and the fastest 614,400. Above about 25,600
-the interrupt alone takes a quarter of an 8 MHz 68000, which is the
-practical ceiling. For scale, 69 tunes of the 543-tune corpus play
+the interrupt alone takes a quarter of an 8 MHz 68000, the practical
+ceiling. For scale, 69 tunes of the 543-tune corpus play
 samples, mostly between 5,000 and 6,100 a second.
 
 ---

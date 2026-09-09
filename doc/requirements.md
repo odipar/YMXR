@@ -2,7 +2,7 @@
 
 ## R0. The house style and the terms
 
-The specification is what this repository produces. How it is written comes
+This repository produces the specification. How it is written comes
 before what it describes, and what things are called comes before both.
 
 - **R0.1** `AGENTS.md` gives the rules, for every document, code comment
@@ -85,8 +85,8 @@ against them, and they change in that repository rather than this one.
   compiled into the data, which costs columns, and a column is cheap.
 - **R3.4** At most 32 columns.
 - **R3.5** A column holds one value, and every column is one byte: a
-  table's values take one width (R1.1), and a byte is what a register
-  takes. A register's value comes from one column, a column names its own
+  table's values take one width (R1.1), and a register takes a
+  byte. A register's value comes from one column, a column names its own
   target, and a value wider than a byte is a column a byte: a period's two
   halves, a timer's prescaler and its count.
 - **R3.6** Most columns carry a set bit, their top bit: 1 sets the value,

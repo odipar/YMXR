@@ -17,8 +17,8 @@ effects; `wrong-version` is `chambers` with another version word.
 Beside every `NAME.ymxr` stands `NAME.rows`: the tune's table as a DTX0
 file, its header giving `R` and `RR` and then row 0 to `R` minus one,
 each its thirty columns in order (DTX, SPEC.md 2.1), so that a reader
-takes the table without reading the DTX2 table's packing, which is DTX's
-and not this specification's. A file of another version has no rows.
+takes the table without reading the DTX2 table's packing, DTX's and not
+this specification's. A file of another version has no rows.
 
 | tune | dump | name | author | options | bytes | sha256 | exercises |
 |---|---|---|---|---|---|---|---|
