@@ -274,6 +274,66 @@ not its own.
 | `DTX_REPO` | the DTX checkout, `../DTX` by default, for the cycle counter under `68k/test/emu` |
 | `HATARI`, `TOS` | the emulator and a TOS image, `hatari` and `~/hatari-2.6.1_macos/tos-2.06.rom` by default |
 
+## From a YMX file
+
+```
+bin/ymx-to-ymxr in.ymx out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+```
+
+A `.ymx` into a tune file, for moving a library of them across. It reads
+the file through YMX's own `ymx-dump`, which `YMX_DUMP` names, rather than
+reading the container here: what a `.ymx` holds is then read by the tree
+that writes them.
+
+YMX's streams 0 to 13 are the sound registers holding what the chip
+receives, its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen
+values go through the conversion a YM dump's do and take the same flags.
+
+Streams 14 to 24 are the script that drives YMX's four timer channels.
+**This version reads the registers and not the script**: a tune whose
+script acts on no frame converts whole, and one that acts converts to its
+frame values with a note on stderr counting the frames left behind. A
+tune of square waves converts to the levels its voices hold between
+ticks, which is not the wave.
+
+## Against YMX
+
+```
+ym/parity.py [-whole] [tune.ym ...]
+```
+
+One tune packed both ways and played twice: through YMX's `ymx` and
+`mkprg` into a program, and through this repository's three tools into
+another. Both run under Hatari with their chip writes traced and cut into
+frames at the VBL, and each frame's fourteen registers are read against
+the other run's, each masked to what the register takes.
+
+The frames are aligned on the first write to a sound register other than
+R7, which TOS writes at boot before a program runs. A pass of the music is
+what it compares, the tune's own row count from that frame; past the wrap
+a tune starts over at the row each tree read out of the dump, which is the
+converters' reading and not a thing a player does. `-whole` reads the run
+to its end.
+
+A register an effect drives is sampled at the frame's edge, where a
+toggle lands one side or the other and two players that both play the
+wave right still part (performance.md). Those partings are counted and
+named. A frame differing on a register no effect drives is what fails the
+run.
+
+The tunes under `ym/test` are one of each shape, which is what the rig
+asks of them. This reads eleven of the corpus's own besides, six whose
+effects are square waves on a volume register and five whose sources are
+recordings played once, so the shapes an ST tune is driven with are read
+against the other player rather than assumed.
+
+| variable | gives |
+|---|---|
+| `YM_CORPUS` | the corpus those eleven stand in |
+| `YMX_REPO` | the YMX checkout, `../YMX` by default |
+| `YMX_BIN` | its built Go tools, `$YMX_REPO/go/bin` by default |
+| `HATARI`, `TOS`, `VBLS` | the emulator, a TOS image and the frames to run |
+
 ## Measure
 
 `ym/convert.py` runs the corpus through the specification and prints the
