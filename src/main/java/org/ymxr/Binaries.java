@@ -50,10 +50,10 @@ final class Binaries {
      * The core with the player's two tick switches the other way (the
      * player's {@code YMXR_NEST} and {@code YMXR_AEOI},
      * doc/performance.md): a tick neither drops the interrupt level nor
-     * writes its own end of interrupt, which takes 32 cycles off each of
-     * them. A host takes this core where no MFP interrupt of its own
-     * nests inside another and the MFP's vector register is the player's
-     * to set.
+     * writes its own end of interrupt, so one that writes a row costs 32
+     * cycles less and one that ends a source 16. A host takes this core
+     * where no MFP interrupt of its own nests inside another and the
+     * MFP's vector register is the player's to set.
      */
     static final Binary LEAN = new Binary("YMXR_sndh-lean.bin", "YMXR_sndh.S",
             List.of("-dYMXR_NEST=0", "-dYMXR_AEOI=1"));

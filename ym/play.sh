@@ -38,10 +38,11 @@
 #              what each call costs and the program clears the screen
 #              for it (performance.md, Measure)
 #   -lean      the core whose ticks neither drop the interrupt level nor
-#              write their own end of interrupt, 32 cycles a tick
-#              cheaper, which asks that no MFP interrupt of the host's
-#              nest inside another and that the MFP's vector register be
-#              the player's (performance.md, BINARIES.md)
+#              write their own end of interrupt, 32 cycles cheaper on a
+#              tick that writes a row and 16 on one that ends a source,
+#              which asks that no MFP interrupt of the host's nest inside
+#              another and that the MFP's vector register be the player's
+#              (performance.md, BINARIES.md)
 #
 # The two are a switch each: both together take the core that is both,
 # and the bars a run paints are then the lean ticks' own.

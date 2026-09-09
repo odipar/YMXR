@@ -15,7 +15,7 @@ Big-endian throughout; every offset and size in bytes.
 |---|---|
 | `YMXR_sndh.bin` | the SNDH core: the player and its SNDH glue, assembled from `68k/YMXR_sndh.S` |
 | `YMXR_sndh-perf.bin` | the same core with the player's raster monitor assembled in (`YMXR_PERF`, performance.md), for reading a run |
-| `YMXR_sndh-lean.bin` | the same core whose ticks neither drop the interrupt level nor write their own end of interrupt (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md), 32 cycles a tick cheaper, for a host where no MFP interrupt of its own nests and the MFP's vector register is the player's |
+| `YMXR_sndh-lean.bin` | the same core whose ticks neither drop the interrupt level nor write their own end of interrupt (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md), 32 cycles cheaper on a tick that writes a row and 16 on one that ends a source, for a host where no MFP interrupt of its own nests and the MFP's vector register is the player's |
 | `YMXR_sndh-perf-lean.bin` | the same core with both switches set: the raster monitor reads what a run costs, and the ticks it reads are the lean ones |
 | `YMXR_prg.bin` | the program stub, assembled from `68k/YMXR_prg.S` |
 | `DTX0.bin`, `DTX1-w1.bin`, `DTX2-w1-k1.bin` and the rest | DTX's reader code, twenty-two files: one for DTX0, one a width for DTX1, one a width, a unit and the copies flag for DTX2, at `org/dtx/68k/` in the dtx jar (DTX, doc/abi.md) |

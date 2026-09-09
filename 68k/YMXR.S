@@ -80,11 +80,12 @@ YMXR_PERF       equ     0
 ; the MFP being taken in software end-of-interrupt mode as TOS leaves it.
 ; A host that wants neither assembles the player with YMXR_NEST=0 and
 ; YMXR_AEOI=1 (rmac -dYMXR_NEST=0 -dYMXR_AEOI=1), which takes 32 cycles
-; off every tick and asks two things of it: no MFP interrupt nests inside
-; another, and the MFP's vector register is the player's to set, which it
-; keeps over a call and puts back at stop. The two go together: automatic
-; end-of-interrupt sets no in-service bit, so nothing but the level the
-; tick holds keeps a lower timer out.
+; off a tick that writes a row and 16 off one that ends a source, and
+; asks two things of it: no MFP interrupt nests inside another, and the
+; MFP's vector register is the player's to set, which it keeps over a
+; call and puts back at stop. The two go together, since automatic end
+; of interrupt sets no in-service bit and nothing but the level the tick
+; holds keeps a lower timer out.
                 .if     ^^defined YMXR_NEST
                 .else
 YMXR_NEST       equ     1
