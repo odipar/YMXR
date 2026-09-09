@@ -866,7 +866,8 @@ def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
     trace holds, checked against the model, and the ticks counted. code
     and symbols are the SNDH core's, the player's symbols among them; with
-    perf the core with the raster monitor in, which the SNDH file takes."""
+    perf the core with the raster monitor in: the switches that chose the
+    core here choose the SNDH file's core too."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
     bound = bind(file, work)
@@ -878,8 +879,12 @@ def hatari(ym, code, symbols, perf=False):
     path = os.path.join(work, "TUNE.YMXR")
     open(path, "wb").write(file)
     sndh = os.path.join(work, "TUNE.SND")
+    # These switches select the core in the file; the rig assembled the same
+    # core, and the comparison below fails where the two differ. A switch
+    # missed here fails there rather than running the plain core.
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), path, sndh,
-                        "-t" + os.path.basename(ym)] + (["-perf"] if perf else []),
+                        "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
+                       + (["-lean"] if LEAN else []),
                        capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     prg = os.path.join(work, "YMXR.PRG")
