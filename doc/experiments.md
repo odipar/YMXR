@@ -27,6 +27,12 @@ is 16. A source holds at most 32,768 rows, and the longest the corpus
 plays is a digidrum of a few thousand. A row that does not set a value
 zero-fills it (R3.6).
 
+83 tunes name a source at all: 14 a square wave and 69 a digidrum, and
+none a sinus SID or a sync buzzer. The shapes those take are two rows
+repeating to row 0 and many rows played once (SPEC.md 1.9), so the third
+shape the format states, one row repeating, is named by no file here.
+`ym/convert.py` counts them, a tune once a kind.
+
 ---
 
 ## What it packs to

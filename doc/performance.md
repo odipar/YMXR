@@ -266,10 +266,12 @@ and its place stands at row 0, so the handler holds that row as its own
 immediate, writes it, and moves nothing: 56 cycles against the 130 the general
 handler's marker path cost, and 64 against 130 where the tune runs more than
 one effect. The kit's `retune` ticks 7.7 times a frame, a 383 Hz buzzer, so
-568 cycles a frame come off it against a play call of 1,493. The target is the
-effect's on all three handlers, patched at a start out of the effect's own
-record, so a source's shape picks the handler and the register it drives does
-not.
+568 cycles a frame come off it against a play call of 1,493. `retune` is a
+built tune: no corpus file names a source of this shape, 83 of them naming a
+source at all (experiments.md), so what the handler saves is measured here and
+on the conformance kit and nowhere else. The target is the effect's on all
+three handlers, patched at a start out of the effect's own record, so a
+source's shape picks the handler and the register it drives does not.
 
 A start tells three shapes apart off one cell, which would cost every start 16
 cycles. Init already walks every source to resolve it, so it reads there which
