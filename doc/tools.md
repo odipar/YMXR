@@ -211,6 +211,25 @@ at about a fifth of the play call, and experiments.md has what that came
 to on twenty tunes. `HATARI` and `TOS` name the emulator
 and a TOS image, as they do for the rigs.
 
+## Playing a YMX file
+
+```
+ymx/play.sh [options] tune.ymx [more.ymx ...] [out.wav]
+```
+
+A `.ymx` converted and played: `bin/ymx-to-ymxr` makes a tune file of
+each, and `ym/play.sh` takes those, so a name that is not a tune records
+the run and several tunes go into one file as subtunes, as they do there.
+
+`-kK`, `-mN` and `-copies[S]` reach the converter and every other option
+is `ym/play.sh`'s. `YMX_DUMP` names YMX's `ymx-dump`, and with neither it
+nor `YMX_REPO` set `../YMX/go/bin/ymx-dump` is taken.
+
+The tune file each `.ymx` converts to is kept, and the directory holding
+them is said on stderr, so a conversion can be read back with
+`bin/ymxr-trace` or played on its own. `ym/play.sh` says where it left
+the SNDH file and the program the same way.
+
 ## The rigs
 
 `68k/test/emu/test_ymxr.py` plays every tune under `ym/test`, or the
@@ -289,12 +308,40 @@ YMX's streams 0 to 13 are the sound registers holding what the chip
 receives, its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen
 values go through the conversion a YM dump's do and take the same flags.
 
-Streams 14 to 24 are the script that drives YMX's four timer channels.
-**This version reads the registers and not the script**: a tune whose
-script acts on no frame converts whole, and one that acts converts to its
-frame values with a note on stderr counting the frames left behind. A
-tune of square waves converts to the levels its voices hold between
-ticks, which is not the wave.
+Streams 14 to 24 are the script that drives YMX's four timer channels,
+and a channel there is an effect here: a source on a target at a timer's
+rate. Six of YMX's eight opcodes convert. `START_TOGGLE` is two rows on a
+volume register, `START_RETRIGGER` one row on R13, `START_PCM` the
+sample's own bytes with the end marker YMX writes as this format's
+marker, `RETUNE` a rate with the voice's volume repatched, `HOLD` a count or a
+source reloaded, and `RELEASE` source 0.
+
+A `RETUNE` at a voice and a `HOLD` that reloads a parameter change the
+source without moving the place: the stream keeps its phase and the half it
+stands in (YMX, SPEC.md 3.1). Section 6 rule 5 allows exactly that, since
+the source they start has the row count the effect already runs, so the row
+leaves bit 5 clear. The row the tune repeats to stops every effect it does
+not start, so a wrap lands on a known state. `START_PCM_PREEMPT` stops the
+channels its operand names, taking their whole row: a select left standing
+there would start the timer the stop just stopped (SPEC.md 1.9).
+
+YMX fits a tune to its unit by padding it, where this conversion drops to
+a unit of 1 instead, so a dump of an odd frame count is one frame longer
+through YMX. A dump's rows are what a tune has (`ym-to-ymxr` prevails
+where the two readings differ), so a pad comes off: one frame, repeating
+the frame before it, acting on no channel, on an even count. A tune whose
+own last frame reads that way loses it, and a file packed at a wider unit
+keeps the pad past the first.
+
+A start sets bit 6 where the channel's timer is stopped and leaves it clear
+over a running stream, since bit 6 moves a running timer and a stopped one
+starts on the select either way (1.9, section 6 rule 5). The shape a
+retrigger start restarts stands in X's bits 7 to 4, and the channels a
+preempt stops in its bits 3 to 0.
+
+`RESUME` is not read, and a frame that runs it gets a note on stderr.
+Which timer a channel runs on is YMX's `T` stream and this schema's 2.3,
+so the map is not carried: channel 0 becomes effect 0.
 
 ## Against YMX
 
@@ -326,6 +373,11 @@ asks of them. This reads eleven of the corpus's own besides, six whose
 effects are square waves on a volume register and five whose sources are
 recordings played once, so the shapes an ST tune is driven with are read
 against the other player rather than assumed.
+
+A name ending `.ymx` is a tune that has no dump. YMX plays the file
+itself, and this tree plays what `bin/ymx-to-ymxr` makes of it, so what
+the run reads is the move across rather than two packings of one dump.
+`ymx/test` holds three, and the default reads them.
 
 | variable | gives |
 |---|---|
