@@ -149,9 +149,10 @@ Every step this document held is taken, each measured on the rig:
 | a one-row source's own tick | 74 a tick | 568 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
-its count. Synergy Credits reads 2,356 cycles a call against the 2,469
-this document opened at and 4,469 cycles of ticks against 5,380, so
-6,825 a frame against 7,849. performance.md holds both.
+its count. Synergy Credits reads 2,361 cycles a call against the 2,469
+this document opened at and 4,463 cycles of ticks against 5,380, so
+6,824 a frame against 7,849. performance.md holds the call, and
+`-cycles` reads all three back.
 
 What is left is where the costliest frame is. A refill parses at most
 one ST4 operation a unit and there are fifteen units, so the frame R4.5

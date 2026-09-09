@@ -564,6 +564,46 @@ final class ConsistencyTest {
                 "the two sentences give the fixed part differently");
     }
 
+    /**
+     * Every glossary row names the document that explains its term, and
+     * nothing opened that document. requirements.md R0.7 allows no second
+     * word for a thing that has one, so the document explaining a term
+     * names it: SPEC.md 3.1 wrote "the index's entry" where the glossary
+     * lists "index entry".
+     *
+     * <p>A term of a letter or two is found in any prose, so those rows
+     * pass on anything; the check reaches the rest.
+     */
+    @Test
+    void everyGlossaryTermIsNamedWhereItIsExplained() throws IOException {
+        List<String> quiet = new ArrayList<>();
+        int opened = 0;
+        for (String[] row : glossaryRows(read(GLO))) {
+            String file = row[1].split("[ ,;]")[0];
+            if (!file.endsWith(".md")) {
+                continue;
+            }
+            Path at = Files.exists(Path.of("doc", file))
+                    ? Path.of("doc", file) : Path.of(file);
+            if (!Files.exists(at)) {
+                continue;
+            }
+            opened++;
+            String said = read(at).toLowerCase();
+            String term = row[0].replace("`", "").trim().toLowerCase();
+            String one = term.endsWith("s")
+                    ? term.substring(0, term.length() - 1) : term;
+            if (!said.contains(term) && !said.contains(one)) {
+                quiet.add(row[0] + " is explained in " + file
+                        + ", which never names it");
+            }
+        }
+        final int all = opened;
+        assertTrue(all > 20, () -> "only " + all + " rows opened; the check is asleep");
+        assertTrue(quiet.isEmpty(), () -> String.join("\n", quiet)
+                + "\nR0.7 allows no second word for a thing that has one.");
+    }
+
     @Test
     void everyDocumentHoldsOneWrapWidth() throws IOException {
         List<String> wide = new ArrayList<>();

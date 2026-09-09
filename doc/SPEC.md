@@ -437,14 +437,14 @@ Section 3.3 gives the bytes.
 
 ### 3.1 The source index
 
-An effect's source column gives a source number, 1 to 127, and the index's
+An effect's source column gives a source number, 1 to 127, and the index
 entry at that number gives where the source's table stands. A source is a
 DTX1 table (DTX, SPEC.md 2.2): one column of one-byte values, its rows
 from byte 16 of the table, and its header giving `R` at bytes 4 to
 7 and `RR` at bytes 10 to 13, each most significant byte first (R1.1),
 `RR` equal to `R` where the source does not repeat, as DTX has it.
 
-Source 0 has no entry. The index runs from source 1.
+Source 0 has no index entry. The index runs from source 1.
 
 A start resolves the number through the index once, and the ticks advance
 rows from there on; nothing is looked up while the effect runs (R3.3).
