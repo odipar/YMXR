@@ -1,0 +1,13 @@
+#!/bin/sh
+# A YMX file into a tune file, run out of target/classes; builds
+# first where a source, the pom or a 68000 source is newer than the last
+# build, or the core is not assembled. doc/tools.md, Convert.
+set -e
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+classes=$root/target/classes
+built=$classes/.built
+if [ ! -f "$built" ] || [ ! -f "$classes/org/ymxr/68k/YMXR_sndh.bin" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]; then
+    (cd "$root" && mvn -q process-classes dependency:build-classpath -Dmdep.outputFile=target/classpath >/dev/null)
+    : > "$built"
+fi
+exec java -ea -cp "$classes:$(cat "$root/target/classpath")" org.ymxr.YmxToYmxr "$@"

@@ -274,6 +274,28 @@ not its own.
 | `DTX_REPO` | the DTX checkout, `../DTX` by default, for the cycle counter under `68k/test/emu` |
 | `HATARI`, `TOS` | the emulator and a TOS image, `hatari` and `~/hatari-2.6.1_macos/tos-2.06.rom` by default |
 
+## From a YMX file
+
+```
+bin/ymx-to-ymxr in.ymx out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+```
+
+A `.ymx` into a tune file, for moving a library of them across. It reads
+the file through YMX's own `ymx-dump`, which `YMX_DUMP` names, rather than
+reading the container here: what a `.ymx` holds is then read by the tree
+that writes them.
+
+YMX's streams 0 to 13 are the sound registers holding what the chip
+receives, its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen
+values go through the conversion a YM dump's do and take the same flags.
+
+Streams 14 to 24 are the script that drives YMX's four timer channels.
+**This version reads the registers and not the script**: a tune whose
+script acts on no frame converts whole, and one that acts converts to its
+frame values with a note on stderr counting the frames left behind. A
+tune of square waves converts to the levels its voices hold between
+ticks, which is not the wave.
+
 ## Against YMX
 
 ```
