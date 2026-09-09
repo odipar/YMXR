@@ -124,10 +124,18 @@ def trace(prg, work, name):
 
 
 def both(ym, work):
-    """One tune through each tree, into two programs."""
-    stem = os.path.basename(ym)[:-3]
+    """One tune through each tree, into two programs.
+
+    A .ym is packed by each tree from the dump. A .ymx is a tune that has
+    no dump: YMX plays the file itself and this tree plays what
+    ymx-to-ymxr makes of it, which is what moving a library across
+    comes to."""
+    stem = os.path.basename(ym).rsplit(".", 1)[0]
     ymx = os.path.join(work, "t.ymx")
-    run([os.path.join(YMX_BIN, "ymx"), "-f", ym, ymx])
+    if ym.lower().endswith(".ymx"):
+        run(["cp", ym, ymx])
+    else:
+        run([os.path.join(YMX_BIN, "ymx"), "-f", ym, ymx])
     theirs = os.path.join(work, "THEIRS.PRG")
     # mkprg finds YMX's prebuilt cores through YMX_REPO
     made = subprocess.run([os.path.join(YMX_BIN, "mkprg"), theirs, ymx],
@@ -136,7 +144,9 @@ def both(ym, work):
     if made.returncode:
         raise SystemExit("mkprg failed:\n" + made.stderr.decode()[:400])
     tune = os.path.join(work, "t.ymxr")
-    run([os.path.join(ROOT, "bin", "ym-to-ymxr"), ym, tune, "-silent"])
+    run([os.path.join(ROOT, "bin", "ymx-to-ymxr" if ym.lower().endswith(".ymx")
+                      else "ym-to-ymxr"),
+         ymx if ym.lower().endswith(".ymx") else ym, tune, "-silent"])
     sndh = os.path.join(work, "t.snd")
     run([os.path.join(ROOT, "bin", "ymxr-sndh"), tune, sndh, "-t" + stem, "-silent"])
     ours = os.path.join(work, "OURS.PRG")
@@ -146,7 +156,9 @@ def both(ym, work):
 
 def compare(ym):
     """One tune's two runs, read against each other."""
-    work = tempfile.mkdtemp()
+    work = os.environ.get("PARITY_KEEP") and os.path.join(
+        os.environ["PARITY_KEEP"], os.path.basename(ym)) or tempfile.mkdtemp()
+    os.makedirs(work, exist_ok=True)
     tune, theirs, ours = both(ym, work)
     on = driven(tune)
     a, first_a = frames(trace(theirs, work, "ymx"))
@@ -156,6 +168,8 @@ def compare(ym):
     off = first_b - first_a
     last = len(a) if WHOLE else min(len(a), first_a + rows(tune))
     same = read = parted = 0
+    # the registers a frame actually parted on, which is what the run
+    # names: the set an effect drives is what it is judged against
     where = set()
     for i in range(last):
         j = i + off
@@ -170,7 +184,7 @@ def compare(ym):
         if differ <= on:
             parted += 1
     plain = sorted(where - on)
-    return os.path.basename(ym), (read, same, parted, plain, sorted(on)), None
+    return os.path.basename(ym), (read, same, parted, plain, sorted(where & on)), None
 
 
 def main():
@@ -179,6 +193,12 @@ def main():
         tunes = sorted(os.path.join(ROOT, "ym", "test", f)
                        for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                        if f.endswith(".ym"))
+        # the tunes that have no dump: YMX plays the file and this tree
+        # plays what the converter makes of it, which is the migration
+        at = os.path.join(ROOT, "ymx", "test")
+        if os.path.isdir(at):
+            tunes += sorted(os.path.join(at, f) for f in os.listdir(at)
+                            if f.lower().endswith(".ymx"))
         missing = []
         for named in SID + SAMPLES:
             at = os.path.join(CORPUS, named + ".ym")
@@ -195,10 +215,11 @@ def main():
             print("%-40s %s" % (name[:40], why))
             wrong.append(name)
             continue
-        read, same, parted, plain, on = got
+        read, same, parted, plain, parting = got
         line = "%-40s %4d/%4d frames alike" % (name[:40], same, read)
         if parted:
-            line += ", %d parted on R%s" % (parted, ",R".join(str(r) for r in on))
+            line += ", %d parted on R%s" % (
+                parted, ",R".join(str(r) for r in parting))
         if plain:
             line += ", and %d frames differ on R%s no effect drives" % (
                 read - same - parted, ",R".join(str(r) for r in plain))

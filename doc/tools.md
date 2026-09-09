@@ -355,6 +355,11 @@ effects are square waves on a volume register and five whose sources are
 recordings played once, so the shapes an ST tune is driven with are read
 against the other player rather than assumed.
 
+A name ending `.ymx` is a tune that has no dump. YMX plays the file
+itself, and this tree plays what `bin/ymx-to-ymxr` makes of it, so what
+the run reads is the move across rather than two packings of one dump.
+`ymx/test` holds three, and the default reads them.
+
 | variable | gives |
 |---|---|
 | `YM_CORPUS` | the corpus those eleven stand in |
