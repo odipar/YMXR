@@ -224,8 +224,11 @@ The two columns and the timer this effect runs on (2.3) are the
 connection. A row setting the source column connects the three: the timer
 runs the source it names on the target the player holds for this effect,
 at the rate the two columns beside them give (1.9). The row moves the
-place to the source's first row where bit 5 of the control column is set,
-and starts a stopped timer through bit 6 (1.9, section 6).
+place to the source's first row where bit 5 of the control column is set.
+A stopped timer starts on the select the row writes, bit 6 set or clear,
+since a select is what runs an MFP timer; what bit 6 gives is a stop
+before the writes, which a running timer takes and a stopped one has
+already (1.9, section 6).
 
 A row setting source 0 stops the timer. It moves no place: the place
 holds the row number the last tick read, and a source that starts on that
@@ -306,8 +309,17 @@ writes select 0, then the count, then the select. A count written to a
 stopped timer is taken at once, and the select that follows starts the
 timer from it, so the timer begins a whole period at the count. The
 count and the select it writes are the row's, or where the row leaves a
-column unset, the ones the player keeps (R4.6). A stopped timer is
-started this way, on the row that starts its effect (section 6).
+column unset, the ones the player keeps (R4.6).
+
+What bit 6 gives is that stop, so it moves a running timer and not a
+stopped one. A stopped timer starts on the select whether the row sets
+bit 6 or leaves it clear: the count reaches it while it is stopped and
+the select starts it from that count, which is the same start either
+way. So a writer that sets the bit where the timer runs on gets a whole
+period at the new count, and one that leaves it clear gets the new count
+at the running count's next zero; where the timer is stopped the two
+read alike, and a writer that cannot tell which it is (section 6 rule 5)
+loses nothing by the bit it picks.
 
 The place is a row number into the source's rows. Bit 5 moves it to 0,
 and the next tick reads row 0; without the bit the row moves it nowhere,
@@ -589,11 +601,14 @@ once and tests nothing.
    control column with it, unless the source it starts has the row count
    of the last source this effect ran on the target it holds, where the
    row may leave the bit clear and move no place (1.9); a row between
-   them setting source 0 makes no difference. It sets bit 6
-   where the timer is stopped, which a row setting source 0 leaves it.
-   The place goes to the first row and the timer starts for those bits
-   alone. A row that sets the source column to 0 leaves the control and
-   count columns unset.
+   them setting source 0 makes no difference. Bit 5 puts the place at
+   the first row. It sets bit 6 where the timer is stopped, which a row
+   setting source 0 leaves it; a writer that cannot tell whether a
+   source that plays once has run out by this row reads the same either
+   way, since a stopped timer starts on the select with the bit or
+   without it and the bit moves a running timer alone (1.9). A row that
+   sets the source column to 0 leaves the control and count columns
+   unset.
 6. A row sets a rate column (1.9) on the row that starts its effect, or
    while the effect runs, and not before its first start. The row that
    starts an effect for the first time sets its count column, because

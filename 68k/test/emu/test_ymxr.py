@@ -351,6 +351,10 @@ class Model:
         if r[t] & 0x80:
             fx["target"] = r[t] & 0x7F
         fx["restart"] = False
+        # Whether this row gives the timer a select. A stopped timer starts
+        # on one, bit 6 set or clear (SPEC.md 1.9), so a restart is due for
+        # a stopped timer on the select alone.
+        fx["selected"] = False
         fx["reset_place"] = False
         fx["touched"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
         if r[t + 1] & 0x80:
@@ -368,6 +372,11 @@ class Model:
                 if r[t + 2] & 0x20 or fx["place"] is None:
                     fx["place"] = 0
                 fx["using"] = fx["target"]
+                # The effect runs from here: a stopped timer starts on the
+                # select the row writes, bit 6 set or clear, and select 0 is
+                # unassigned in that column, so a row naming a source gives
+                # its timer a select that runs it (SPEC.md 1.9).
+                fx["running"] = True
         if r[t + 2] & 0x80:
             if r[t + 2] & 0x40:
                 fx["restart"] = True
@@ -375,6 +384,7 @@ class Model:
             if r[t + 3]:
                 fx["count"] = r[t + 3]
             fx["select"] = r[t + 2] & 7
+            fx["selected"] = bool(r[t + 2] & 7)
             if r[t + 2] & 0x20:
                 fx["reset_place"] = True
                 fx["place"] = 0
@@ -770,15 +780,22 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             assert entries[f] == entry(model, want), "frame %d: the reader reports %s, the player %s" % (
                 f, entries[f], entry(model, want))
         restarts = list(timers.restarts)
+        stopped = [mode == 0 for mode in timers.mode]
         timers.apply(m.mfp)
         for i in range(4):
             fx = model.fx[i]
-            if fx["restart"]:
+            # A restart is due where the row sets bit 6, and where the timer
+            # stood stopped and the row gives it a select: a select is what
+            # runs an MFP timer, so a stopped one starts on it either way
+            # (SPEC.md 1.9). A source that plays once stops its own timer at
+            # its last row, so a writer cannot always tell which it is
+            # (section 6 rule 5).
+            if fx["restart"] or (stopped[i] and fx["selected"]):
                 assert timers.restarts[i] == restarts[i] + 1, \
                     "frame %d: effect %d's timer was not restarted" % (f, i)
             else:
-                # bit 6 clear: a row that retunes or reaims a running
-                # effect leaves the count the timer is running (1.9)
+                # bit 6 clear and the timer running: a row that retunes or
+                # reaims a running effect leaves the count it is running (1.9)
                 assert timers.restarts[i] == restarts[i], \
                     "frame %d: effect %d's timer restarted where the row sets no bit 6" % (f, i)
             if fx["running"]:

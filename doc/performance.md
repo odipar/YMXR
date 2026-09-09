@@ -189,11 +189,11 @@ a test that forms the select only where it writes.
 |---|---|
 | a row written, the place stepped | 108 |
 | the marker, the place to row `RR` | 130 |
-| the marker, the timer stopped | 116 |
+| the marker, the timer stopped | 136 |
 | a square's two rows, no place stepped | 88 |
 | a row written, the tune running one effect | 100 |
 | the marker to row `RR`, one effect | 130 |
-| the marker and the stop, one effect | 116 |
+| the marker and the stop, one effect | 136 |
 | a square's two rows, one effect | 80 |
 
 With the interrupt's entry and its `rte`, a tick is 172 cycles: at a
@@ -219,7 +219,7 @@ returns:
 |---|---|---|
 | a row written, the place stepped | 108 | 76 |
 | the marker, the place to row `RR` | 130 | 114 |
-| the marker, the timer stopped | 116 | 100 |
+| the marker, the timer stopped | 136 | 120 |
 | a square's two rows, no place stepped | 88 | 56 |
 
 The level is dropped on the two paths that write a row's value and the
