@@ -117,7 +117,7 @@ PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
 PERF_ON         equ     76      ; a row written, the place stepped
 PERF_SQ         equ     56      ; a square's two rows, no place stepped
 PERF_LOOP       equ     114     ; the marker, the place to row RR
-PERF_STOP       equ     100     ; the marker, the timer stopped
+PERF_STOP       equ     120     ; the marker, the timer stopped
 
 ; What each switch adds to a path: the level is dropped on the two paths
 ; that write a row's value, and an end of interrupt on all four.
@@ -519,7 +519,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; interrupt level drops once the select and the value are written, so a
 ; higher timer may nest, and the in-service bit is cleared by hand, as
 ; software end-of-interrupt mode asks.
-                .macro  TICK    name,eoi,eoir,ctrl,keep,colour
+                .macro  TICK    name,eoi,eoir,ctrl,keep,ier,bit,colour
 \name:
                 MARK    \colour
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
@@ -544,6 +544,12 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 rte
 .stop\~:        andi.b  #\keep,\ctrl.w
+; The timer may have counted to zero again while this handler ran, which
+; latches a tick the stop above does not take back: at a rate whose
+; period is near the handler's cost the two race, and that tick would
+; read a place past the source's last row. The row that stops an effect
+; drops it the same way (EFFECT, .stop).
+                bclr    #\bit,(\ier+4).w
                 COUNT   PERF_STOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
@@ -958,10 +964,10 @@ ymxr_sites:
 
 ; ---------------------------------------------------------------- ticks
 
-                TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$070
-                TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$007
-                TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$707
-                TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$077
+                TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
+                TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
+                TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
+                TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
 
                 SQUARE  ymxr_sq0,$DF,$FFFFFA0F,$070
                 SQUARE  ymxr_sq1,$EF,$FFFFFA11,$007
