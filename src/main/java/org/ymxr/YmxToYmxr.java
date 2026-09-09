@@ -227,7 +227,8 @@ final class YmxToYmxr {
      * and 1.9 here, so the walk below reads one and writes the other.
      */
     private static int script(Dumped read, byte[][] column, Built built,
-                              byte[][] samples, int[] loops, Report report) {
+                              byte[][] samples, int[] loops, int repeat,
+                              Report report) {
         int used = 0;
         int[] target = {-1, -1, -1, -1};
         // The select each channel runs at. A row that sets the source
@@ -307,8 +308,17 @@ final class YmxToYmxr {
                     }
                     case RELEASE -> column[at + 1][f] = (byte) 0x80;
                     case RETUNE -> {
-                        // a new rate on a running stream, its place kept:
-                        // the count and the select, and no bit 5 (1.9)
+                        // A new rate on a running stream, its place kept.
+                        // Addressed to a voice it repatches the volume from
+                        // the voice's byte first (YMX, SPEC.md 3.1), which
+                        // is a source of the row count the effect already
+                        // runs, so rule 5 lets the row leave bit 5 clear
+                        // and move no place: the toggle keeps its phase and
+                        // the half it stands in.
+                        if (voice != NO_VOICE && target[c] >= 8 && target[c] <= 10) {
+                            column[at + 1][f] = (byte) (0x80 | built.number(
+                                    Effects.SID, volume, toggle(volume), 0));
+                        }
                         column[at + 2][f] = (byte) (0x80 | low);
                         column[at + 3][f] = (byte) count;
                         select[c] = low;
@@ -330,9 +340,14 @@ final class YmxToYmxr {
                                     retrigger(shape), 0);
                         }
                         if (source != 0) {
+                            // The parameter is repatched and the stream runs
+                            // on, so the place stands: the source has the row
+                            // count the effect already runs and rule 5 lets
+                            // the row leave bit 5 clear. The select it is
+                            // running goes back, since select 0 there would
+                            // stop the timer.
                             column[at + 1][f] = (byte) (0x80 | source);
-                            column[at + 2][f] = (byte) (0x80
-                                    | Columns.PLACE_RESET | select[c]);
+                            column[at + 2][f] = (byte) (0x80 | select[c]);
                         }
                     }
                     case RESUME -> left.add("frame " + f + " resumes channel " + c
@@ -347,6 +362,19 @@ final class YmxToYmxr {
                     column[at + 1][f] = (byte) 0x80;
                     column[at + 2][f] = 0;
                     column[at + 3][f] = 0;
+                }
+            }
+        }
+        // The row a tune repeats to stops every effect it does not start,
+        // so the wrap lands on a known state whatever ran into it, as a
+        // dump's own conversion has it (Columns). Only the effects the tune
+        // runs: a row sets no column of one it does not state (section 6
+        // rule 2), so this waits until the walk says which run.
+        if (repeat < read.frames()) {
+            for (int c = 0; c < 4; c++) {
+                int at = Columns.EFFECT + 4 * c;
+                if ((used & (1 << c)) != 0 && column[at + 1][repeat] == 0) {
+                    column[at + 1][repeat] = (byte) 0x80;
                 }
             }
         }
@@ -428,7 +456,8 @@ final class YmxToYmxr {
         }
 
         Built built = new Built(new ArrayList<>());
-        int used = script(read, column, built, read.samples(), read.loops(), report);
+        int used = script(read, column, built, read.samples(), read.loops(),
+                repeat, report);
         Sources sources = new Sources(List.copyOf(built.list()));
         Columns columns = new Columns(column, repeat, used);
         report.row("the effects", Integer.bitCount(used) + " of 4 run, "

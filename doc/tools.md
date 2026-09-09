@@ -294,10 +294,17 @@ and a channel there is an effect here: a source on a target at a timer's
 rate. Six of YMX's eight opcodes convert. `START_TOGGLE` is two rows on a
 volume register, `START_RETRIGGER` one row on R13, `START_PCM` the
 sample's own bytes with the end marker YMX writes as this format's
-marker, `RETUNE` a rate with no place reset, `HOLD` a count or a source
-reloaded, and `RELEASE` source 0. `START_PCM_PREEMPT` stops the channels
-its operand names, taking their whole row: a select left standing there
-would start the timer the stop just stopped (SPEC.md 1.9).
+marker, `RETUNE` a rate with the voice's volume repatched, `HOLD` a count or a
+source reloaded, and `RELEASE` source 0.
+
+A `RETUNE` at a voice and a `HOLD` that reloads a parameter change the
+source without moving the place: the stream keeps its phase and the half it
+stands in (YMX, SPEC.md 3.1). Section 6 rule 5 allows exactly that, since
+the source they start has the row count the effect already runs, so the row
+leaves bit 5 clear. The row the tune repeats to stops every effect it does
+not start, so a wrap lands on a known state. `START_PCM_PREEMPT` stops the
+channels its operand names, taking their whole row: a select left standing
+there would start the timer the stop just stopped (SPEC.md 1.9).
 
 YMX fits a tune to its unit by padding it, where this conversion drops to
 a unit of 1 instead, so a dump of an odd frame count is one frame longer
