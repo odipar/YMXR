@@ -34,7 +34,7 @@ into a file holds them as it holds the rest.
 A YM5!/YM6! register dump into a tune file (SPEC.md 3.3):
 
 ```
-bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-silent]
+bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
 ```
 
 | flag | gives |
@@ -42,6 +42,7 @@ bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-silent]
 | `-kK` | the unit the table packs at, 2 by default, and 1 where the repeat row or the row count does not divide by it |
 | `-mN` | the ring a column unpacks through, in bytes, 960 by default and at most 1129: the player reaches column 29 through a 16-bit displacement |
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
+| `-copies[S]` | a match beyond the ring packs as a copy from the column's own literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
 
 The first file is unpacked where it is an LHA archive, as distributed
 `.ym` files are. Standard output is one line: the frames, the sources,
@@ -91,7 +92,7 @@ reads.
 ## Check
 
 ```
-bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-silent] DUMP|DIR ...
+bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] DUMP|DIR ...
 ```
 
 Every dump named, and every `.ym` under a directory named, converted at
@@ -169,8 +170,8 @@ contract for every byte of them, and no assembler runs at combine time.
 ## Play
 
 ```
-ym/play.sh [-kK] [-mN] [-rRR | -r] [-tTITLE] [-cCOMPOSER] [-perf]
-           [-lean] [-vN] [-silent] tune.ym [more.ym ...] [out.wav]
+ym/play.sh [-kK] [-mN] [-rRR | -r] [-copies[S]] [-tTITLE] [-cCOMPOSER]
+           [-perf] [-lean] [-vN] [-silent] tune.ym [more.ym ...] [out.wav]
 ym/play.sh -h
 ```
 
@@ -193,6 +194,7 @@ only under a host that asks for a subtune by number.
 | `-kK` | the unit the table packs at, 2 by default |
 | `-mN` | the ring in bytes, 960 |
 | `-rRR`, `-r` | the row the tune repeats to, or a tune that plays once |
+| `-copies[S]` | a match beyond the ring packs as a copy from the column's own literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
 | `-tTITLE`, `-cCOMPOSER` | the tags; the title is the file's name by default |
 | `-perf` | the core with the raster monitor in, so the recorded frame shows the bars (Measure) |
 | `-lean` | the core whose ticks neither drop the interrupt level nor write their own end of interrupt (performance.md) |
@@ -277,7 +279,8 @@ not its own.
 `ym/convert.py` runs the corpus through the specification and prints the
 figures experiments.md holds, and `ym/measure.py` the register-level
 figures SPEC.md 1.2 and 1.7 give. `YM_CORPUS` names the corpus,
-`DTX_WRITE` the DTX writer, `DTX_RING` the ring, `JOBS` how many tunes
+`DTX_WRITE` the DTX writer, `DTX_RING` the ring, `DTX_COPIES` the copies
+flag, `JOBS` how many tunes
 convert at once, and `YMX_PAIRS` the tunes with a `.ymx` beside them.
 
 ```

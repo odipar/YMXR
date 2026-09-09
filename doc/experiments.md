@@ -77,6 +77,38 @@ are whole files, but a `.ymx` holds its sample tables and a DTX2 file
 holds no sources yet, since where a tune places them is not written
 (SPEC 8). That margin flatters the DTX2 side.
 
+## Copies from the literal stream
+
+DTX2 packs a match beyond the ring as a copy from the column's own
+literal stream where the packer is asked for it (`-copies`, tools.md),
+and the format block states which way the table was packed, so the
+binder picks the reader that reads it. It is off by default.
+
+What it is worth grows as the ring shrinks, since a smaller ring is
+what puts a match beyond it. DBA 5 at `k` = 1, the tune file's bytes,
+against the state block the ring asks a host for:
+
+| ring | packed | with copies | saved | the state block |
+|---|---|---|---|---|
+| 960 | 13,908 | 13,484 | 424 | 31,272 |
+| 480 | 16,856 | 16,352 | 504 | 16,872 |
+| 240 | 19,272 | 18,420 | 852 | 9,672 |
+| 120 | 21,596 | 20,580 | 1,016 | 6,072 |
+
+So it pays most where a host has the least to spare. The reader that
+reads copies is 32 bytes larger, 1,512 against 1,480, which the table
+takes back at every ring above.
+
+At the default ring it is a tune's own switch and not a default. Six
+tunes read -4.08% on 5th Gear 1 title and -3.33% on Last Ninja, both of
+them long; 0.00% on Big - Delta 6 and Spaceball 1, both short; -0.48%
+on DBA 2; and **+0.26%** on Crapman level 3, which packs larger with
+copies than without. Packing costs 4 to 38 times as long, and
+`-copiesS` searches S seconds beyond the opening passes, which packs
+another parse every run.
+
+---
+
 At `k` = 1, the three tone periods, fine and coarse together, take 21.9%,
 18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen
 effect columns take 15.7%, and the envelope shape 1.4%. No corpus tune

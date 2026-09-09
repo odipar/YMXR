@@ -37,6 +37,9 @@ TIMER_RESET, PLACE_RESET = 0x40, 0x20
 YM_KIND = {0x00: 1, 0x40: 2, 0x80: 3, 0xC0: 4}
 DTX_WRITE = os.environ.get("DTX_WRITE", "dtx-write")
 RING = int(os.environ.get("DTX_RING", "960"))
+# DTX2 packs copies from the literal stream where this names the flag,
+# "-copies" or "-copiesS" for S seconds of search (DTX, dtx-write).
+COPIES = os.environ.get("DTX_COPIES", "")
 JOBS = int(os.environ.get("JOBS", str(os.cpu_count() or 1)))
 PAIRS = os.environ.get("YMX_PAIRS", os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "YMX", "ym", "test")))
@@ -230,7 +233,8 @@ def dtx2(cols, rn, k, work):
             out.write(",".join(map(str, row)))
             out.write("\n")
     r = subprocess.run([DTX_WRITE, src, dst, "-v2", "-w1", f"-k{k}",
-                        f"-m{RING}"], capture_output=True)
+                        f"-m{RING}"] + ([COPIES] if COPIES else []),
+                       capture_output=True)
     if r.returncode or not os.path.exists(dst):
         raise SystemExit(f"dtx-write did not run: {r.stderr.decode()[:300]}")
     d = open(dst, "rb").read()
