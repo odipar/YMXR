@@ -54,6 +54,9 @@
 # The run:
 #
 #   -vN        stop after N frames; the tune plays on without it
+#   The SNDH file and the program stay under a directory this says on
+#   stderr, so either can be read back or run again.
+#
 #   -silent    the tools say nothing but their notes: this script takes
 #              their standard output, and without the flag each says
 #              what it read, the flags it took and what it made, on
@@ -190,8 +193,12 @@ if [ -n "$unit$ring$repeat$copies" ]; then
         set -- "$@" "$arg"
     done
 fi
+# The SNDH file and the program are kept, and where they stand is said
+# on stderr: a run is often the start of reading one of them, with
+# bin/ymxr-trace or a debugger or another host, and a path that has been
+# cleared says nothing.
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT HUP INT TERM
+echo "ym/play.sh: TUNE.SND and TUNE.PRG are under $work" >&2
 # Each tune converted where it is a dump, and the tune files left as they
 # are, into the arguments ymxr-sndh takes: one subtune a name given, in
 # the order given, each named by its file where there is more than one.

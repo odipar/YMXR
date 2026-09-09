@@ -227,7 +227,8 @@ nor `YMX_REPO` set `../YMX/go/bin/ymx-dump` is taken.
 
 The tune file each `.ymx` converts to is kept, and the directory holding
 them is said on stderr, so a conversion can be read back with
-`bin/ymxr-trace` or played on its own.
+`bin/ymxr-trace` or played on its own. `ym/play.sh` says where it left
+the SNDH file and the program the same way.
 
 ## The rigs
 
