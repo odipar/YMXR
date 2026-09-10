@@ -1,16 +1,14 @@
 package org.ymxr;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import org.dtx.Table;
 import org.jspecify.annotations.Nullable;
+import org.ymxs.tool.Tool;
 
 /**
  * An SNDH file from tune files (doc/BINARIES.md 3): the entry triple, the
@@ -372,84 +370,76 @@ final class Sndh {
     }
 
     /**
-     * {@code ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER]
-     * [-nNAME]... [-perf] [-lean]}: the SNDH file of the tune files, as
-     * subtunes in the order named. The title is the output's stem unless
-     * the caller passes one. Where the caller passes any name, each tune
-     * past those names is named by its file's stem; where it passes none,
-     * the file has no names. {@code -lean} puts the core whose ticks
-     * neither drop the interrupt level nor write an end of interrupt under
-     * the tunes, and {@code -perf} puts the core with the raster monitor in
-     * there, for reading a run. The two are one switch each, and both
-     * together select the core that is both, which reads what a lean run
-     * costs.
+     * {@code ymxr-sndh}: a tune file or a multi file (doc/BINARIES.md 0)
+     * on standard input, an SNDH file on standard output. A multi file's
+     * tunes are subtunes 1 up in its order, each named by the name the
+     * multi file records for it. The title is the first tune's name unless
+     * {@code -tTITLE} names another. {@code -lean} puts the core whose
+     * ticks neither drop the interrupt level nor write an end of interrupt
+     * under the tunes, and {@code -perf} puts the core with the raster
+     * monitor in there, for reading a run. The two are one switch each,
+     * and both together select the core that is both, which reads what a
+     * lean run costs.
      */
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
+        List<String> flags = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ymxr-sndh", flags, Ymxs.TAGS);
+        Ymxs.only(tool, flags, Ymxs.TAGS);
         @Nullable String title = null;
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
-        boolean silent = false;
-        List<String> names = new ArrayList<>();
-        List<String> files = new ArrayList<>();
-        for (String arg : args) {
-            if (arg.equals("-perf")) {
+        for (String flag : flags) {
+            if (flag.equals("-perf")) {
                 monitor = true;
-            } else if (arg.equals("-lean")) {
+            } else if (flag.equals("-lean")) {
                 lean = true;
-            } else if (arg.equals(YmToYmxr.SILENT)) {
-                silent = true;
-            } else if (arg.startsWith("-t")) {
-                title = arg.substring(2);
-            } else if (arg.startsWith("-c")) {
-                composer = arg.substring(2);
-            } else if (arg.startsWith("-n")) {
-                names.add(arg.substring(2));
-            } else if (arg.startsWith("-")) {
-                usage();
-                return;
-            } else {
-                files.add(arg);
+            } else if (flag.startsWith("-copies")) {
+                throw tool.usage("not a flag of the tool: " + flag
+                        + "; a tune file is packed already");
+            } else if (flag.startsWith("-t")) {
+                title = flag.substring(2);
+            } else if (flag.startsWith("-c")) {
+                composer = flag.substring(2);
             }
         }
-        if (files.size() < 2) {
-            usage();
-            return;
+        Report report = new Report(tool.reports());
+        byte[] file = tool.bytes();
+        List<byte[]> tunes;
+        List<String> names;
+        if (Multi.is(file)) {
+            Multi.Read read;
+            try {
+                read = Multi.read(file);
+            } catch (IllegalArgumentException wrong) {
+                throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+            }
+            tunes = read.tunes();
+            names = read.names();
+        } else {
+            tunes = List.of(file);
+            names = List.of("");
         }
-        String out = files.remove(files.size() - 1);
-        if (names.size() > files.size()) {
-            System.err.println("ymxr-sndh: " + names.size() + " names for " + files.size()
-                    + " tune files");
-            System.exit(1);
-            return;
+        if (title == null) {
+            title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
-        for (int i = names.size(); !names.isEmpty() && i < files.size(); i++) {
-            names.add(stem(files.get(i)));
-        }
-        List<byte[]> tunes = new ArrayList<>();
-        for (String file : files) {
-            tunes.add(Files.readAllBytes(Path.of(file)));
-        }
-        Report report = new Report(!silent);
-        Options options = new Options(title == null ? stem(out) : title, composer,
-                names.isEmpty() ? null : names, monitor, lean);
+        Options options = new Options(title, composer,
+                tunes.size() > 1 ? names : null, monitor, lean);
         byte[] sndh;
         try {
             sndh = of(tunes, options);
         } catch (IllegalArgumentException wrong) {
-            System.err.println("ymxr-sndh: " + wrong.getMessage());
-            System.exit(1);
-            return;
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
-        Files.write(Path.of(out), sndh);
-        made(report, options, files, tunes, sndh);
-        System.out.println(out + ": " + sndh.length + " bytes, " + files.size()
-                + (files.size() == 1 ? " subtune" : " subtunes"));
+        made(report, options, names, tunes, sndh);
+        tool.report(sndh.length + " bytes, " + tunes.size()
+                + (tunes.size() == 1 ? " subtune" : " subtunes"));
+        Out.write(tool, sndh);
     }
 
     /** What the file was made of: the core the switches picked, the tags
      *  written, each subtune's bound tune, and the workspace under them. */
-    private static void made(Report report, Options options, List<String> files,
+    private static void made(Report report, Options options, List<String> names,
                              List<byte[]> tunes, byte[] sndh) {
         if (!report.says()) {
             return;
@@ -477,14 +467,12 @@ final class Sndh {
         for (byte[] image : set.images()) {
             images += image.length;
         }
-        List<String> names = options.names();
-        for (int i = 0; i < files.size(); i++) {
+        for (int i = 0; i < tunes.size(); i++) {
             byte[] b = set.tunes().get(i);
             bound += b.length;
-            // A subtune is called by the name passed for it, where the
-            // caller passes names: a tool that packs into a file it names
-            // itself has the tune's name and not the file's.
-            report.row(names == null ? stem(files.get(i)) : names.get(i),
+            // A subtune is called by the name the multi file records for
+            // it; a tune file records none, and one tune is one subtune.
+            report.row(names.get(i).isBlank() ? "the tune" : names.get(i),
                     tunes.get(i).length + " bytes bound to " + b.length + ", its table in "
                     + "image " + (set.image()[i] + 1));
         }
@@ -508,19 +496,4 @@ final class Sndh {
                 + (sndh.length - core - images - bound));
     }
 
-    /** A file's name up to its last dot. */
-    static String stem(String file) {
-        String name = Path.of(file).getFileName().toString();
-        int dot = name.lastIndexOf('.');
-        return dot < 0 ? name : name.substring(0, dot);
-    }
-
-    private static void usage() {
-        System.err.println("ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER] [-nNAME]..."
-                + " [-perf] [-lean] [-silent]");
-        System.err.println("  -perf  the core with the raster monitor in, for reading a run");
-        System.err.println("  -lean  the core whose ticks neither drop the interrupt level nor"
-                + " write an end of interrupt");
-        System.exit(2);
-    }
 }

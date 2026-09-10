@@ -109,8 +109,8 @@ measures the two against each other.
 Four checks, each reading more of the file than the one above it:
 
 ```bash
-bin/ymxr-trace tune.ymxr 4          # what a reader reports of it (SPEC.md 7)
-bin/ymxr-bind tune.ymxr tune.bin    # bound with DTX's reader, or rejected
+bin/ymxr-trace -r4 < tune.ymxr      # what a reader reports of it (SPEC.md 7)
+bin/ymxr-bind < tune.ymxr > tune.bin   # bound with DTX's reader, or rejected
 python3 68k/test/emu/test_ymxr.py tune.ymxr
 ym/play.sh tune.ymxr                # under Hatari, with its sound on
 ```

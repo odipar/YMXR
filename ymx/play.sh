@@ -85,7 +85,7 @@ while [ "$left" -gt 0 ]; do
             mkdir -p "$work/$at"
             file=$work/$at/${name%.*}.ymxr
             # shellcheck disable=SC2086
-            "$here/bin/ymx-to-ymxr" "$arg" "$file" $mine -silent >/dev/null
+            "$here/bin/ymx-to-ymxr" $mine -silent < "$arg" > "$file"
             set -- "$@" "$file"
             ;;
         *)

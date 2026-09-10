@@ -1,10 +1,10 @@
 package org.ymxr;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import org.ymxs.tool.Tool;
 
 /**
  * A TOS program around an SNDH file (doc/BINARIES.md 4): the PRG header,
@@ -313,51 +313,28 @@ final class Prg {
     }
 
     /**
-     * {@code ymxr-prg in.sndh out.prg [-rROWS]}: the program around an
-     * SNDH file, playing {@code ROWS} rows, or the tune's row count
-     * without. The stub's flag bit 0 follows the file's core: the screen
+     * {@code ymxr-prg}: an SNDH file on standard input, the program
+     * around it on standard output, playing {@code -rROWS} rows, or the
+     * tune's row count without. The stub's flag bit 0 follows the file's core: the screen
      * is cleared where that core has the raster monitor in.
      */
-    public static void main(String[] args) throws IOException {
-        long rows = 0;
-        boolean silent = false;
-        String in = null;
-        String out = null;
-        for (String arg : args) {
-            if (arg.startsWith("-r") && arg.substring(2).matches("[0-9]+")) {
-                rows = Long.parseLong(arg.substring(2));
-            } else if (arg.equals(YmToYmxr.SILENT)) {
-                silent = true;
-            } else if (arg.startsWith("-") || out != null) {
-                usage();
-                return;
-            } else if (in == null) {
-                in = arg;
-            } else {
-                out = arg;
-            }
-        }
-        if (in == null || out == null) {
-            usage();
-            return;
-        }
-        Report report = new Report(!silent);
-        byte[] sndh = Files.readAllBytes(Path.of(in));
+    public static void main(String[] args) {
+        List<String> flags = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ymxr-prg", flags, Ymxs.ROWS);
+        Ymxs.only(tool, flags, Ymxs.ROWS);
+        long rows = Ymxs.rows(tool, flags, 0);
+        Report report = new Report(tool.reports());
+        byte[] sndh = tool.bytes();
         byte[] prg;
         try {
             prg = of(sndh, rows);
         } catch (IllegalArgumentException wrong) {
-            System.err.println("ymxr-prg: " + wrong.getMessage());
-            System.exit(1);
-            return;
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
-        Files.write(Path.of(out), prg);
         made(report, sndh, prg, rows);
-        System.out.println(out + ": " + prg.length + " bytes");
+        tool.report(prg.length + " bytes, "
+                + (rows == 0 ? "the tune's row count" : rows + " rows"));
+        Out.write(tool, prg);
     }
 
-    private static void usage() {
-        System.err.println("ymxr-prg in.sndh out.prg [-rROWS] [-silent]");
-        System.exit(2);
-    }
 }

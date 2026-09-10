@@ -1,12 +1,11 @@
 package org.ymxr;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import org.dtx.St4;
+import org.ymxs.tool.Tool;
 
 /**
  * A YM5!/YM6! dump into a tune file.
@@ -89,9 +88,10 @@ public final class YmToYmxr {
         read(report, song);
         flagsRead(report, flags, unit, ring, repeat, once, copies, seconds);
         Sources sources = new Sources(song);
-        Columns columns = new Columns(song, sources, repeat, report);
+        Schema.Made made = Schema.of(Ym.read(song, sources, repeat, report));
+        Columns columns = made.columns();
         found(report, sources, columns);
-        Tune.Written written = Tune.write(columns, sources, song.playerHz(), unit, ring,
+        Tune.Written written = Tune.write(columns, made.sources(), song.playerHz(), unit, ring,
                 copies ? new St4(true, seconds) : new St4(), report);
         String said = song.frames() + " frames at " + song.playerHz() + " Hz, "
                 + sources.count() + " sources, effects " + Integer.toBinaryString(columns.effects)
@@ -169,48 +169,28 @@ public final class YmToYmxr {
         };
     }
 
-    public static void main(String[] args) throws IOException {
-        List<String> flags = new ArrayList<>();
-        String in = null;
-        String out = null;
-        for (String arg : args) {
-            if (arg.startsWith("-")) {
-                flags.add(arg);
-            } else if (in == null) {
-                in = arg;
-            } else if (out == null) {
-                out = arg;
-            } else {
-                usage();
-                return;
-            }
-        }
-        if (in == null || out == null) {
-            usage();
-            return;
-        }
-        Report report = new Report(!flags.contains(SILENT));
+    public static void main(String[] args) {
+        List<String> flags = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ym-to-ymxr", flags, "-k", "-m", "-copies", "-r");
+        Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.ROWS);
+        // The call is read before the input is, so a flag that is not a
+        // number is an exit of 2 and standard input is left unread.
+        Ymxs.numbers(tool, flags);
+        Report report = new Report(tool.reports());
         Converted converted;
         try {
-            converted = convert(Files.readAllBytes(Path.of(in)), flags, report);
-        } catch (IllegalArgumentException wrong) {
-            System.err.println(wrong.getMessage());
-            usage();
-            return;
+            converted = convert(tool.bytes(), flags, report);
+        } catch (YmDump.FormatException | IllegalArgumentException | IllegalStateException no) {
+            throw tool.wrong(Tool.WRONG, String.valueOf(no.getMessage()));
         }
-        Files.write(Path.of(out), converted.written().file());
-        report.say("written: " + out);
-        System.out.println(converted.said());
+        tool.report(converted.said());
         // A note is a warning and stands whether the report is on or off.
         // Where the report is on, a note it said where it happened is not
         // said twice, and the counted ones are reached only here.
         for (String note : report.unsaid()) {
             System.err.println("  " + note);
         }
+        Out.write(tool, converted.written().file());
     }
 
-    private static void usage() {
-        System.err.println("ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r]"
-                + " [-copies[S]] [-silent]");
-    }
 }

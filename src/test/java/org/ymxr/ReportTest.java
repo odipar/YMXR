@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -192,38 +194,39 @@ final class ReportTest {
     }
 
     @Test
-    void aToolSaysItsAccountOnStandardErrorAndWhatItIsForOnStandardOutput(@TempDir Path work)
+    void aToolSaysItsAccountOnStandardErrorAndWritesItsFileOnStandardOutput()
             throws Exception {
         // The account, the progress and the notes go to standard error,
-        // and what the tool is for goes to standard output, so a run read
-        // through a pipe reads the same with the report on as with it off
-        // (doc/tools.md, What a tool says).
-        String dump = "ym/test/Turrican 2 - world completed 1.ym";
-        String[] out = new String[2];
+        // and the file the tool is for goes to standard output, so a run
+        // read through a pipe reads the same with the report on as with it
+        // off (doc/tools.md, What a tool reports).
+        byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican 2 - world completed 1.ym"));
+        byte[][] out = new byte[2][];
         String[] err = new String[2];
         for (int i = 0; i < 2; i++) {
             ByteArrayOutputStream o = new ByteArrayOutputStream();
             ByteArrayOutputStream e = new ByteArrayOutputStream();
             PrintStream wasOut = System.out;
             PrintStream wasErr = System.err;
+            InputStream wasIn = System.in;
             try {
                 System.setOut(new PrintStream(o, true, StandardCharsets.UTF_8));
                 System.setErr(new PrintStream(e, true, StandardCharsets.UTF_8));
-                String[] args = i == 0
-                        ? new String[] {dump, work.resolve("a.ymxr").toString()}
-                        : new String[] {dump, work.resolve("b.ymxr").toString(),
-                            YmToYmxr.SILENT};
-                YmToYmxr.main(args);
+                System.setIn(new ByteArrayInputStream(dump));
+                YmToYmxr.main(i == 0 ? new String[0] : new String[] {YmToYmxr.SILENT});
             } finally {
                 System.setOut(wasOut);
                 System.setErr(wasErr);
+                System.setIn(wasIn);
             }
-            out[i] = o.toString(StandardCharsets.UTF_8);
+            out[i] = o.toByteArray();
             err[i] = e.toString(StandardCharsets.UTF_8);
         }
-        assertEquals(out[1], out[0], "standard output reads the same with the report on");
-        assertEquals(1, out[0].lines().count(), "and is the summary line alone: " + out[0]);
-        assertTrue(out[0].contains("178 frames at 50 Hz"), out[0]);
+        assertArrayEquals(out[1], out[0], "standard output reads the same with the report on");
+        assertEquals("YMXR", new String(out[0], 0, 4, StandardCharsets.UTF_8),
+                "and is the tune file alone");
+        assertTrue(err[0].contains("ym-to-ymxr: 178 frames at 50 Hz"),
+                "the summary names the tool, on standard error: " + err[0]);
         assertTrue(err[0].contains("the flags:") && err[0].contains("the table: "),
                 "the account is on standard error: " + err[0]);
         assertEquals("", err[1].replace("  packed at unit 1: the repeat row 177 does not"

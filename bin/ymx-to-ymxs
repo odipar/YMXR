@@ -1,0 +1,3 @@
+#!/bin/sh
+# A YMX file into the structure, on standard output. doc/ymxs.md.
+exec "$(dirname -- "$0")/run" org.ymxr.YmxToYmxs "$@"

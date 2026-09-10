@@ -21,6 +21,7 @@ built Go tools, `$YMX_REPO/go/bin`. HATARI, TOS and VBLS are the rig's
 (68k/test/emu/test_ymxr.py).
 """
 
+import contextlib
 import json
 import os
 import re
@@ -56,10 +57,16 @@ WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+)")
 VBL = re.compile(r"^VBL=(\d+)")
 
 
-def run(args, where=None):
-    r = subprocess.run(args, cwd=where, capture_output=True)
+def run(args, where=None, stdin=None, out=None):
+    """One tool, which reads standard input and writes standard output;
+    `stdin` names the file it reads and `out` the file its output goes
+    to."""
+    with open(stdin, "rb") if stdin else contextlib.nullcontext() as source:
+        r = subprocess.run(args, cwd=where, stdin=source, capture_output=True)
     if r.returncode:
         raise SystemExit(" ".join(args) + " failed:\n" + r.stderr.decode()[:400])
+    if out:
+        open(out, "wb").write(r.stdout)
     return r
 
 
@@ -96,7 +103,7 @@ def driven(tune):
     """The registers an effect of the tune ever runs on, read out of what
     a reader reports of it (SPEC.md 7). Those are the registers a timer
     writes between frames."""
-    r = run([os.path.join(ROOT, "bin", "ymxr-trace"), tune, "-silent"])
+    r = run([os.path.join(ROOT, "bin", "ymxr-trace"), "-silent"], stdin=tune)
     on = set()
     for line in r.stdout.decode().splitlines():
         if not line.startswith('{"result"'):
@@ -145,12 +152,13 @@ def both(ym, work):
         raise SystemExit("mkprg failed:\n" + made.stderr.decode()[:400])
     tune = os.path.join(work, "t.ymxr")
     run([os.path.join(ROOT, "bin", "ymx-to-ymxr" if ym.lower().endswith(".ymx")
-                      else "ym-to-ymxr"),
-         ymx if ym.lower().endswith(".ymx") else ym, tune, "-silent"])
+                      else "ym-to-ymxr"), "-silent"],
+        stdin=ymx if ym.lower().endswith(".ymx") else ym, out=tune)
     sndh = os.path.join(work, "t.snd")
-    run([os.path.join(ROOT, "bin", "ymxr-sndh"), tune, sndh, "-t" + stem, "-silent"])
+    run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-t" + stem, "-silent"],
+        stdin=tune, out=sndh)
     ours = os.path.join(work, "OURS.PRG")
-    run([os.path.join(ROOT, "bin", "ymxr-prg"), sndh, ours, "-silent"])
+    run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent"], stdin=sndh, out=ours)
     return tune, theirs, ours
 
 

@@ -58,8 +58,9 @@ final class ConversionTest {
                 whole.drums(), whole.name(), whole.author(), whole.comment(), registers);
         Report report = new Report();
         Sources sources = new Sources(song);
-        Columns columns = new Columns(song, sources, frames, report);
-        Tune.Written written = Tune.write(columns, sources, song.playerHz(), 2, Tune.RING, report);
+        Schema.Made made = Schema.of(Ym.read(song, sources, frames, report));
+        Tune.Written written = Tune.write(made.columns(), made.sources(), song.playerHz(),
+                2, Tune.RING, report);
         TuneFile tune = TuneFile.read(written.file());
         assertEquals(31, tune.table().rows(), "the rows are the frames");
         assertEquals(31, tune.table().repeat(), "a tune that plays once repeats at its row count");

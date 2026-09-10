@@ -4,11 +4,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
-
 import org.dtx.Table;
+import org.ymxs.tool.Tool;
 
 /**
  * A dump converted and replayed against itself: the tune file's table
@@ -188,6 +189,11 @@ final class Check {
         } catch (IOException failed) {
             return new Result(path, true, List.of("unreadable: " + failed.getMessage()));
         }
+        return of(data, path, flags);
+    }
+
+    /** The dump in {@code data}, under the name it is reported by. */
+    static Result of(byte[] data, Path path, List<String> flags) {
         if (Lha.isArchive(data)) {
             try {
                 data = Lha.unpack(data);
@@ -225,27 +231,41 @@ final class Check {
     }
 
     /**
-     * {@code ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] DUMP|DIR ...}:
-     * one line a file, the wrong frames under a tune that fails, and an
-     * exit of 1 where any does; the flags are the converter's. A file
-     * that is not a YM5!/YM6! dump is said and not counted. The tool says
-     * how many files it has and how far through them it is, which a run
-     * over a corpus of thousands runs for minutes;
-     * {@code -silent} leaves the lines a file and the count.
+     * {@code ymxr-check}: a YM5!/YM6! dump on standard input, one line on
+     * standard output saying whether the tune it converts to replays to
+     * that dump, and the wrong frames under it where it does not. The
+     * flags are the converter's, and an exit of 1 says a dump does not
+     * replay.
+     *
+     * <p>A corpus is read by naming files and directories instead:
+     * {@code ymxr-check corpus/} reads every {@code .ym} under it, in
+     * parallel, one line a file and a count at the end. The tool says how
+     * far through it is on standard error, which a run of thousands runs
+     * for minutes.
      */
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
+        List<String> args2 = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ymxr-check", args2, "-k", "-m", "-r", "-copies");
         List<String> flags = new ArrayList<>();
         List<String> named = new ArrayList<>();
-        for (String arg : args) {
+        for (String arg : args2) {
             (arg.startsWith("-") ? flags : named).add(arg);
         }
+        Ymxs.numbers(tool, flags);
+        Report report = new Report(tool.reports());
         if (named.isEmpty()) {
-            System.err.println("ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]"
-                    + " DUMP|DIR ...");
-            System.exit(2);
+            Result result = of(tool.bytes(), Path.of("standard input"), flags);
+            said(result);
+            System.out.flush();
+            System.exit(result.dump() && result.wrong().isEmpty() ? Tool.DONE : Tool.WRONG);
+            return;
         }
-        Report report = new Report(!flags.contains(YmToYmxr.SILENT));
-        List<Path> files = dumps(named.toArray(new String[0]));
+        List<Path> files;
+        try {
+            files = dumps(named.toArray(new String[0]));
+        } catch (IOException failed) {
+            throw tool.wrong(Tool.FAILED, String.valueOf(failed.getMessage()));
+        }
         report.say(files.size() + (files.size() == 1 ? " file" : " files") + " to read"
                 + (flags.isEmpty() ? "" : ", at " + String.join(" ", flags)));
         AtomicInteger read = new AtomicInteger();
@@ -258,25 +278,33 @@ final class Check {
         int dumps = 0;
         int failed = 0;
         for (Result result : results) {
-            String name = result.file().getFileName().toString();
-            if (!result.dump()) {
-                System.out.println(name + ": not a YM5!/YM6! dump");
-            } else if (result.wrong().isEmpty()) {
+            if (result.dump()) {
                 dumps++;
-                System.out.println(name + ": replays to its dump");
-            } else {
-                dumps++;
-                failed++;
-                System.out.println(name + ":");
-                for (String line : result.wrong()) {
-                    System.out.println("  " + line);
-                }
+                failed += result.wrong().isEmpty() ? 0 : 1;
             }
+            said(result);
         }
         int others = results.size() - dumps;
         System.out.println(dumps + (dumps == 1 ? " dump, " : " dumps, ") + failed + " wrong"
                 + (others == 0 ? "" : ", " + others + (others == 1 ? " file" : " files")
                 + " not a dump"));
-        System.exit(failed == 0 ? 0 : 1);
+        System.out.flush();
+        System.exit(failed == 0 ? Tool.DONE : Tool.WRONG);
+    }
+
+    /** One file's verdict, on standard output, which is what the tool is
+     *  for. */
+    private static void said(Result result) {
+        String name = result.file().getFileName().toString();
+        if (!result.dump()) {
+            System.out.println(name + ": not a YM5!/YM6! dump");
+        } else if (result.wrong().isEmpty()) {
+            System.out.println(name + ": replays to its dump");
+        } else {
+            System.out.println(name + ":");
+            for (String line : result.wrong()) {
+                System.out.println("  " + line);
+            }
+        }
     }
 }

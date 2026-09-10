@@ -1,0 +1,168 @@
+package org.ymxr;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.dtx.St4;
+import org.ymxs.Check;
+import org.ymxs.Text;
+import org.ymxs.YMXS.Multi;
+import org.ymxs.tool.Tool;
+
+/**
+ * What the tools that read a YMXS file share: the flags they take, the
+ * structure read off standard input, and the tune files it maps to
+ * (doc/ymxs.md).
+ *
+ * <p>A YMXS multi of several tunes is a set of subtunes: one tune file
+ * each, which {@link Sndh} puts behind one core.
+ */
+final class Ymxs {
+
+    /** What the packer reads: the unit, the ring, and the search for a
+     *  better parse. */
+    record Packing(int unit, int ring, boolean copies, double seconds) {
+
+        static Packing of(Tool tool, List<String> flags) {
+            int unit = YmToYmxr.UNIT;
+            int ring = Tune.RING;
+            boolean copies = false;
+            double seconds = 0;
+            for (String flag : flags) {
+                if (flag.startsWith("-copies")) {
+                    copies = true;
+                    seconds = flag.length() > 7 ? decimal(tool, flag.substring(7), flag) : 0;
+                } else if (flag.startsWith("-k")) {
+                    unit = number(tool, flag.substring(2), flag);
+                } else if (flag.startsWith("-m")) {
+                    ring = number(tool, flag.substring(2), flag);
+                }
+            }
+            return new Packing(unit, ring, copies, seconds);
+        }
+
+        org.dtx.Packer packer() {
+            return copies ? new St4(true, seconds) : new St4();
+        }
+    }
+
+    private Ymxs() {
+    }
+
+    /** The multi standard input carries, read and checked.
+     *
+     * @throws RuntimeException where the text is not this form, or is a
+     *     structure no player plays: the tool exits 1 and says what
+     */
+    static Multi read(Tool tool) {
+        Multi multi;
+        try {
+            multi = Text.read(tool.text());
+        } catch (IllegalArgumentException wrong) {
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+        }
+        List<String> faults = Check.of(multi);
+        if (!faults.isEmpty()) {
+            throw tool.wrong(Tool.WRONG, String.join("\n", faults));
+        }
+        return multi;
+    }
+
+    /** One tune file a tune, in the multi's order. */
+    static List<byte[]> tuneFiles(Tool tool, Multi multi, Packing packing, Report report) {
+        List<byte[]> out = new ArrayList<>();
+        for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
+            out.add(tuneFile(tool, tune, packing, report));
+        }
+        return out;
+    }
+
+    /** One tune file: the structure mapped onto the columns and packed. */
+    static byte[] tuneFile(Tool tool, org.ymxs.YMXS.Tune tune, Packing packing, Report report) {
+        Schema.Made made;
+        try {
+            made = Schema.of(tune);
+        } catch (IllegalArgumentException wrong) {
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+        }
+        Tune.Written written = Tune.write(made.columns(), made.sources(), made.rate(),
+                packing.unit(), packing.ring(), packing.packer(), report);
+        report.row(title(tune), org.ymxs.Tunes.size(tune.table()) + " rows at " + made.rate()
+                + " Hz, " + made.sources().count() + " sources: "
+                + written.file().length + " bytes");
+        return written.file();
+    }
+
+    /** What a tune is called, its writer where it has no title. */
+    static String title(org.ymxs.YMXS.Tune tune) {
+        return tune.title().isBlank() ? "(untitled)" : tune.title().strip();
+    }
+
+    /** The flags a tool reads beyond {@code -silent}, so that
+     *  {@link Tool#of} leaves them for the tool. */
+    static final String[] PACKING = {"-k", "-m", "-copies"};
+
+    /** The tags {@code ymxs-to-sndh} reads, and the two cores it selects
+     *  between. */
+    static final String[] TAGS = {"-t", "-c", "-perf", "-lean"};
+
+    /** The row count {@code ymxs-to-prg} reads. */
+    static final String[] ROWS = {"-r"};
+
+    /** Every argument checked against the flags the tool reads: a call
+     *  that passes another, or a file name, is wrong (exit 2). */
+    static void only(Tool tool, List<String> flags, String[]... reads) {
+        for (String flag : flags) {
+            boolean read = false;
+            for (String[] set : reads) {
+                for (String one : set) {
+                    read |= flag.startsWith(one);
+                }
+            }
+            if (!read) {
+                throw tool.usage("not a flag of the tool: " + flag);
+            }
+        }
+    }
+
+    /** Every flag with a number in it read, so a call this cannot read is
+     *  an exit of 2 before standard input is read. */
+    static void numbers(Tool tool, List<String> flags) {
+        Packing.of(tool, flags);
+        for (String flag : flags) {
+            if (flag.startsWith("-r") && !flag.equals("-r")) {
+                rows(tool, List.of(flag), 0);
+            }
+        }
+    }
+
+    /** The row count {@code -rROWS} names, {@code none} where the call
+     *  names none. */
+    static long rows(Tool tool, List<String> flags, long none) {
+        for (String flag : flags) {
+            if (flag.startsWith("-r")) {
+                try {
+                    return Long.parseLong(flag.substring(2));
+                } catch (NumberFormatException no) {
+                    throw tool.usage("not a row count: " + flag);
+                }
+            }
+        }
+        return none;
+    }
+
+    private static int number(Tool tool, String said, String flag) {
+        try {
+            return Integer.parseInt(said);
+        } catch (NumberFormatException no) {
+            throw tool.usage("not a number: " + flag);
+        }
+    }
+
+    private static double decimal(Tool tool, String said, String flag) {
+        try {
+            return Double.parseDouble(said);
+        } catch (NumberFormatException no) {
+            throw tool.usage("not a number: " + flag);
+        }
+    }
+}

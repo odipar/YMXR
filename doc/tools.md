@@ -28,12 +28,18 @@ second reports no progress, and one of minutes produces about ten such
 lines. They are ordinary lines, so a run read into a file contains them
 with the rest.
 
+Every script in `bin/` is one line through `bin/run`, which builds where a
+source, the pom or a 68000 source is newer than the last build, or a core
+is not assembled, and then runs the class it is handed. All tool behaviour
+is Java.
+
 ## Convert
 
 A YM5!/YM6! register dump into a tune file (SPEC.md 3.3):
 
 ```
-bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+bin/ym-to-ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+               < in.ym > out.ymxr
 ```
 
 | flag | what it sets |
@@ -43,13 +49,13 @@ bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
 | `-copies[S]` | a match beyond the ring packs as a copy from the column's separate literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
 
-The first file is unpacked where it is an LHA archive, as distributed
-`.ym` files are. Standard output is one line: the frames, the sources, the
-effects run, the repeat row and the bytes written. The report beside it
-covers the dump as it was read, the flags as they were read, the sources by
-kind, a row a column of what it packed to, and the notes: effects dropped,
-a unit other than the one requested, and a ring other than the one
-requested.
+The dump is unpacked where it is an LHA archive, as distributed `.ym`
+files are. Standard output is the tune file, and the report on standard
+error covers the dump as it was read, the flags as they were read, the
+sources by kind, a row a column of what it packed to, one closing line of
+the frames, the sources, the effects run, the repeat row and the bytes
+written, and the notes: effects dropped, a unit other than the one
+requested, and a ring other than the one requested.
 
 The table is the dump's frames row for row: the row it repeats to is
 the dump's loop frame, its rows are the dump's, and no row is added
@@ -84,19 +90,22 @@ The tool runs out of `target/classes`, and builds first where a source,
 the pom or a 68000 source is newer than the last build, or the core is
 not assembled. Java 23, Maven and rmac, with which the build assembles
 the four cores and the stub once (`-Drmac=PATH` names another), and DTX
-0.7.0 in the local Maven repository: `mvn install` at DTX's `v0.7.0` tag,
-whose reader this player's frame figures (performance.md) are measured
-against. The player names the table to read at that reader's init, and a
-set of subtunes shares one image (BINARIES.md 1), neither of which 0.6.0
-reads.
+and YMXS in the local Maven repository: `mvn install` at DTX's `v0.7.0`
+tag, whose reader this player's frame figures (performance.md) are
+measured against, and `mvn install` in the YMXS checkout, whose records
+every conversion passes through (doc/ymxs.md). The player names the table
+to read at that reader's init, and a set of subtunes shares one image
+(BINARIES.md 1), neither of which DTX 0.6.0 reads.
 
 ## Check
 
 ```
-bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] DUMP|DIR ...
+bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] < in.ym
+bin/ymxr-check [flags] DUMP|DIR ...
 ```
 
-Every dump named, and every `.ym` under a directory named, converted at
+The dump on standard input, or every dump named and every `.ym` under a
+directory named, converted at
 the tool's defaults and replayed against itself: the tune file's table
 stepped frame by frame by the reader in `Replay`, every frame's registers
 checked against the dump's except those an effect owns, and every effect's
@@ -114,15 +123,67 @@ as a tune that plays once.
 ## Trace
 
 ```
-bin/ymxr-trace TUNE [FRAMES] [-silent]
+bin/ymxr-trace [-rROWS] [-silent] < tune.ymxr
 ```
 
 What a reader reports of a tune file (SPEC.md 7), on standard output: the
-first line the tune's fixed values, then one line a frame, `FRAMES` of them
+first line the tune's fixed values, then one line a frame, `ROWS` of them
 or the count the kit uses for the tune, one pass and the loop once, or the
-pass and the frame that reports its end. A file of another version prints
-no report. The conformance kit's references are the output of this tool
-(doc/conformance/README.md).
+pass and the frame that reports its end. A file of another version reports
+none, which is an exit of 1. The conformance kit's references are the
+output of this tool (doc/conformance/README.md).
+
+## The structure
+
+Every conversion passes through YMXS, the tune data structure
+(doc/ymxs.md). These five tools are the stages of it, each a filter:
+standard input, standard output, the report on standard error, and no file
+between them.
+
+```
+bin/ym-to-ymxs   [-rRR | -r] [-silent]              < in.ym   > out.ymxs
+bin/ymx-to-ymxs  [-rRR | -r] [-silent]              < in.ymx  > out.ymxs
+bin/ymxs-to-ymxr [-kK] [-mN] [-copies[S]] [-silent] < in.ymxs > out.ymxr
+bin/ymxs-to-sndh [-tTITLE] [-cCOMPOSER] [-perf] [-lean] ...   > out.sndh
+bin/ymxs-to-prg  [-rROWS] ...                                 > OUT.PRG
+```
+
+| tool | reads | writes |
+|---|---|---|
+| `ym-to-ymxs` | a YM register dump, packed or not | the structure as JSON |
+| `ymx-to-ymxs` | a YMX file, through YMX's `ymx-dump` | the structure as JSON |
+| `ymxs-to-ymxr` | the structure | a tune file (SPEC.md 3.3) |
+| `ymxs-to-sndh` | the structure | an SNDH file any SNDH host plays |
+| `ymxs-to-prg` | the structure | a TOS program |
+
+`ym-to-ymxs | ymxs-to-ymxr` writes the file `ym-to-ymxr` writes, byte for
+byte, and `ymxs-to-sndh` and `ymxs-to-prg` write what `ymxr-sndh` and
+`ymxr-prg` write of it. `YmxsTest` reads the first back on every tune under
+`ym/test`.
+
+A multi of several tunes is a set of subtunes: `ymxs-to-sndh` and
+`ymxs-to-prg` put one tune file each behind one core, in the multi's
+order, and a tune's title names its subtune. The title and the composer
+are the first tune's unless `-t` and `-c` name others. `ymxs-to-ymxr`
+writes a tune file of one tune and a multi file (BINARIES.md 0) of
+several, which `ymxr-sndh` reads as those subtunes.
+
+The packer's flags are the converter's: `-kK` the unit, `-mN` the ring,
+`-copies[S]` the copies from a column's separate literal stream.
+
+A run ends in one of three exits:
+
+| exit | what it means |
+|---|---|
+| 0 | the tool completed, and standard output has the file |
+| 1 | the input is wrong: not this format, or a structure this format cannot encode (ymxs.md, What is an error) |
+| 2 | the call is wrong, or a stream failed |
+
+The call is read before the input, so a flag a tool does not read is an
+exit of 2 and the input is left unread. A fault is one line on standard
+error, named by the tool that found it, and never a stack trace.
+`FilterTest` runs the tools and reads their exits, their two streams and
+`-silent` back.
 
 ## The player
 
@@ -145,10 +206,11 @@ of the source defines the contract in full.
 ## Bind, SNDH file, program
 
 ```
-bin/ymxr-bind tune.ymxr tune.bin [-silent]
-bin/ymxr-sndh tune.ymxr [more.ymxr ...] tune.sndh [-tTITLE] [-cCOMPOSER]
-              [-nNAME ...] [-perf] [-lean] [-silent]
-bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS] [-silent]
+bin/ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME ...] [-silent] > tunes.ymxr
+bin/ymxr-bind  [-silent] < tune.ymxr > tune.bin
+bin/ymxr-sndh  [-tTITLE] [-cCOMPOSER] [-perf] [-lean] [-silent]
+               < tune.ymxr > tune.sndh
+bin/ymxr-prg   [-rROWS] [-silent] < tune.sndh > TUNE.PRG
 ```
 
 A tune file contains tables and no code. The player reads the bound tune,
@@ -159,7 +221,16 @@ SNDH host plays, with the tags from the flags; and `bin/ymxr-prg` puts the
 program stub in front of an SNDH file, making a TOS program that claims the
 machine under Supexec, plays the file from the VBL or Timer C, stops on
 SPACE or ESC or after `ROWS` rows, switches subtunes on 1 to 9, and
-releases the machine. `-perf` selects the core with the raster monitor in
+releases the machine.
+
+Subtunes come from a multi file (BINARIES.md 0): several tune files in
+one, a name each, which `bin/ymxr-multi` writes from the tune files named
+and `bin/ymxs-to-ymxr` from a structure of several tunes. `bin/ymxr-sndh`
+reads a tune file as one subtune and a multi file as its tunes in order,
+each named by the name the multi file records for it. The title is the
+first tune's name unless `-tTITLE` names another.
+
+`-perf` selects the core with the raster monitor in
 (Measure), and the program then clears the screen so that its bars show;
 `-lean` selects the core whose ticks neither drop the interrupt level nor
 write an end of interrupt, which requires two things of the host
@@ -177,7 +248,7 @@ ym/play.sh [-kK] [-mN] [-rRR | -r] [-copies[S]] [-tTITLE] [-cCOMPOSER]
 ym/play.sh -h
 ```
 
-`ym/play.sh` runs the three tools above and passes the program to Hatari
+`ym/play.sh` runs the tools above and passes the program to Hatari
 with its sound on. SPACE stops the tune, and `-vN` stops the run after
 `N` frames. The first name is a tune; after it a name ending in `.ym` or
 `.ymxr`, in either case, is another tune and any other name records the
@@ -213,6 +284,10 @@ about a fifth of the play call, and experiments.md has the result on twenty
 tunes. `HATARI` and `TOS` name the emulator
 and a TOS image, as they do for the rigs.
 
+`ym/hatari.sh WORK [VBLS] [out.wav]` runs the `TUNE.PRG` under `WORK`, and
+both play scripts end in it, so the emulator's flags and the recording
+stand in one place.
+
 ## Playing a YMX file
 
 ```
@@ -231,6 +306,36 @@ The tune file each `.ymx` converts to is kept, and the directory
 containing them is reported on stderr, so a conversion can be read back
 with `bin/ymxr-trace` or played by itself. `ym/play.sh` reports where it
 left the SNDH file and the program the same way.
+
+## Playing a YMXS file
+
+```
+ym/play-ymxs.sh [-kK] [-mN] [-copies[S]] [-tTITLE] [-cCOMPOSER] [-perf]
+                [-lean] [-rROWS] [-vN] [-silent] [tune.ymxs] [out.wav]
+ym/play-ymxs.sh -h
+```
+
+The structure played: `bin/ymxs-to-prg` writes the program and Hatari
+runs it, as `ym/play.sh` does with a dump. With no `.ymxs` name the
+structure comes from standard input, so a dump plays with no file
+between:
+
+```bash
+bin/ym-to-ymxs < tune.ym | ym/play-ymxs.sh
+```
+
+A name that is not a `.ymxs` records the run instead, as `ym/play.sh`
+does, and the program stays under a directory reported on stderr.
+
+One name is what it reads, since a multi of several tunes is a set of
+subtunes, each named by its title, which the program selects on the keys 1
+to 9. An SNDH file records one rate, so a multi whose tunes do not share
+one produces a line on stderr and no program, and a tenth tune and past it
+play only under a host that selects a subtune by number.
+
+`-rROWS` stops the program after that many rows; the packer's flags and the
+tags are `bin/ymxs-to-prg`'s, and `-vN`, `-silent` and `-h` are
+`ym/play.sh`'s.
 
 ## The rigs
 
@@ -299,13 +404,14 @@ and the reader, and the player rejects a bound tune of another version.
 ## From a YMX file
 
 ```
-bin/ymx-to-ymxr in.ymx out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+bin/ymx-to-ymxr [-kK] [-mN] [-copies[S]] [-silent] < in.ymx > out.ymxr
 ```
 
-A `.ymx` into a tune file, for moving a library of them across. It reads
-the file through YMX's `ymx-dump`, which `YMX_DUMP` names, rather than
-reading the container here: the contents of a `.ymx` are then read by the
-tree that writes them.
+A `.ymx` into a tune file, for moving a library of them across, through
+the structure (doc/ymxs.md): `ymx-to-ymxs | ymxs-to-ymxr` writes the same
+file. It reads the `.ymx` through YMX's `ymx-dump`, which `YMX_DUMP` names,
+rather than reading the container here: the contents of a `.ymx` are then
+read by the tree that writes them.
 
 YMX's streams 0 to 13 are the sound registers as the chip receives them,
 its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen values go
@@ -346,6 +452,16 @@ preempt stops in its bits 3 to 0.
 `RESUME` is not read, and a frame that runs it produces a note on stderr.
 Which timer a channel runs on is YMX's `T` stream and this schema's 2.3, so
 the map does not cross: channel 0 becomes effect 0.
+
+**Two readings the structure corrected.** Reading a `.ymx` as a structure
+rather than as columns exposed two places where the columns this tool wrote
+broke SPEC.md. A sample whose bytes run past YMX's end marker put a second
+marker inside a source, where 3.2 allows one and a tick ends on the first:
+the source now ends at that marker. A `RETUNE` whose low bits are 0 wrote
+select 0 to the control column, which 1.9 defines as a stop: a count or a
+select of 0 is now read as the rate the effect already runs at, and the
+tool counts those rows in a note. Both change what a `.ymx` converts to,
+by a few bytes either way; `ym-to-ymxr` is untouched by them.
 
 ## Against YMX
 

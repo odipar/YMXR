@@ -1,0 +1,3 @@
+#!/bin/sh
+# A YM5!/YM6! dump into the structure, on standard output. doc/ymxs.md.
+exec "$(dirname -- "$0")/run" org.ymxr.YmToYmxs "$@"
