@@ -26,6 +26,7 @@ public final class YmxsToPrg {
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymxs-to-prg", flags, Ymxs.PACKING);
+        Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.TAGS, Ymxs.ROWS);
         Report report = new Report(tool.reports());
         long rows = 0;
         for (String flag : flags) {

@@ -29,6 +29,7 @@ public final class YmxsToSndh {
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymxs-to-sndh", flags, Ymxs.PACKING);
+        Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.TAGS);
         Report report = new Report(tool.reports());
         Multi multi = Ymxs.read(tool);
         Out.write(tool, of(tool, multi, flags, report));
@@ -52,9 +53,6 @@ public final class YmxsToSndh {
                 monitor = true;
             } else if (flag.equals("-lean")) {
                 lean = true;
-            } else if (!flag.startsWith("-k") && !flag.startsWith("-m")
-                    && !flag.startsWith("-copies") && !flag.startsWith("-r")) {
-                throw tool.usage("not a flag of the tool: " + flag);
             }
         }
         org.ymxs.YMXS.Tune first = multi.tunes().get(0);
@@ -68,7 +66,7 @@ public final class YmxsToSndh {
         for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
             names.add(Ymxs.title(tune));
         }
-        List<byte[]> tunes = Ymxs.tuneFiles(tool, multi, Ymxs.Packing.of(flags), report);
+        List<byte[]> tunes = Ymxs.tuneFiles(tool, multi, Ymxs.Packing.of(tool, flags), report);
         try {
             return Sndh.of(tunes, new Sndh.Options(title, composer,
                     tunes.size() > 1 ? names : null, monitor, lean));

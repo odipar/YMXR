@@ -22,19 +22,19 @@ final class Ymxs {
      *  better parse. */
     record Packing(int unit, int ring, boolean copies, double seconds) {
 
-        static Packing of(List<String> flags) {
+        static Packing of(Tool tool, List<String> flags) {
             int unit = YmToYmxr.UNIT;
             int ring = Tune.RING;
             boolean copies = false;
             double seconds = 0;
             for (String flag : flags) {
-                if (flag.startsWith("-k")) {
-                    unit = number(flag.substring(2), flag);
-                } else if (flag.startsWith("-m")) {
-                    ring = number(flag.substring(2), flag);
-                } else if (flag.startsWith("-copies")) {
+                if (flag.startsWith("-copies")) {
                     copies = true;
-                    seconds = flag.length() > 7 ? decimal(flag.substring(7), flag) : 0;
+                    seconds = flag.length() > 7 ? decimal(tool, flag.substring(7), flag) : 0;
+                } else if (flag.startsWith("-k")) {
+                    unit = number(tool, flag.substring(2), flag);
+                } else if (flag.startsWith("-m")) {
+                    ring = number(tool, flag.substring(2), flag);
                 }
             }
             return new Packing(unit, ring, copies, seconds);
@@ -101,19 +101,42 @@ final class Ymxs {
      *  {@link Tool#of} leaves them for the tool. */
     static final String[] PACKING = {"-k", "-m", "-copies"};
 
-    private static int number(String said, String flag) {
-        try {
-            return Integer.parseInt(said);
-        } catch (NumberFormatException no) {
-            throw new IllegalArgumentException("not a number: " + flag);
+    /** The tags {@code ymxs-to-sndh} reads, and the two cores it selects
+     *  between. */
+    static final String[] TAGS = {"-t", "-c", "-perf", "-lean"};
+
+    /** The row count {@code ymxs-to-prg} reads. */
+    static final String[] ROWS = {"-r"};
+
+    /** Every argument checked against the flags the tool reads: a call
+     *  that passes another, or a file name, is wrong (exit 2). */
+    static void only(Tool tool, List<String> flags, String[]... reads) {
+        for (String flag : flags) {
+            boolean read = false;
+            for (String[] set : reads) {
+                for (String one : set) {
+                    read |= flag.startsWith(one);
+                }
+            }
+            if (!read) {
+                throw tool.usage("not a flag of the tool: " + flag);
+            }
         }
     }
 
-    private static double decimal(String said, String flag) {
+    private static int number(Tool tool, String said, String flag) {
+        try {
+            return Integer.parseInt(said);
+        } catch (NumberFormatException no) {
+            throw tool.usage("not a number: " + flag);
+        }
+    }
+
+    private static double decimal(Tool tool, String said, String flag) {
         try {
             return Double.parseDouble(said);
         } catch (NumberFormatException no) {
-            throw new IllegalArgumentException("not a number: " + flag);
+            throw tool.usage("not a number: " + flag);
         }
     }
 }

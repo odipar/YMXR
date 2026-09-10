@@ -95,10 +95,10 @@ final class Ymx {
             rows.add(new Row(sets, effects.get(f)));
         }
         // The row a tune repeats to stops every effect it does not start,
-        // so the wrap resumes from a known setting whatever ran into it, as
-        // a dump's conversion does it ({@link Ym}). Only the effects the
-        // tune runs: a row sets no column of one it does not run (section 6
-        // rule 2), so this waits until the walk says which run.
+        // so the wrap resumes from a known setting, as a dump's conversion
+        // does it ({@link Ym}). Only the effects the tune runs: a row sets
+        // no column of one it does not run (section 6 rule 2), so this
+        // waits until the walk says which run.
         if (repeat < frames) {
             Map<Timer, Effect> at = new EnumMap<>(rows.get(repeat).effects());
             for (int c = 0; c < 4; c++) {

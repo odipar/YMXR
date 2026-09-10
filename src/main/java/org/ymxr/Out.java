@@ -1,6 +1,6 @@
 package org.ymxr;
 
-import java.io.IOException;
+import java.io.PrintStream;
 import org.ymxs.tool.Tool;
 
 /**
@@ -12,14 +12,16 @@ final class Out {
     private Out() {
     }
 
-    /** {@code file} on standard output, which is what the tool is for. */
+    /** {@code file} on standard output, which is what the tool is for. A
+     *  write that fails, a closed pipe among them, is an exit of 2: the
+     *  stream records the fault in a flag rather than throwing it, so the
+     *  flag is read, as {@code Tool.write} reads it after text. */
     static void write(Tool tool, byte[] file) {
-        try {
-            System.out.write(file);
-            System.out.flush();
-        } catch (IOException failed) {
-            throw tool.wrong(Tool.FAILED, "cannot write standard output: "
-                    + failed.getMessage());
+        PrintStream out = System.out;
+        out.write(file, 0, file.length);
+        out.flush();
+        if (out.checkError()) {
+            throw tool.wrong(Tool.FAILED, "cannot write standard output");
         }
     }
 }

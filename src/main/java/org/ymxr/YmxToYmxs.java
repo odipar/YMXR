@@ -1,11 +1,10 @@
 package org.ymxr;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.OptionalInt;
 import org.ymxs.Text;
 import org.ymxs.Tunes;
 import org.ymxs.tool.Tool;
@@ -17,28 +16,31 @@ import org.ymxs.tool.Tool;
  * <p>The first stage of a YMX conversion (doc/ymxs.md), so
  * {@code ymx-to-ymxs | ymxs-to-ymxr} writes the tune file
  * {@code ymx-to-ymxr} writes. The file is read through YMX's own
- * {@code ymx-dump}, which {@code YMX_DUMP} names, and that reads a file
- * rather than a stream, so standard input is written to a temporary file
- * first.
+ * {@code ymx-dump}, which {@code YMX_DUMP} names, and that opens a file
+ * name rather than a stream, so it is called with the name of this tool's
+ * standard input, on that input. No copy of the file is written.
  */
 public final class YmxToYmxs {
 
     private YmxToYmxs() {
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymx-to-ymxs", flags, "-r");
+        // The call is read before the input is, as ym-to-ymxs reads it.
+        OptionalInt asked = YmToYmxs.asked(tool, flags);
         Report report = new Report(tool.reports());
-        Path at = Files.createTempFile("ymx-to-ymxs", ".ymx");
         String text;
         try {
-            Files.write(at, tool.bytes());
-            text = convert(tool, at, flags, report);
+            text = convert(tool, asked, report);
         } catch (IllegalArgumentException | IllegalStateException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
-        } finally {
-            Files.deleteIfExists(at);
+        } catch (YmxToYmxr.FormatException wrong) {
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+        } catch (IOException failed) {
+            // Running ymx-dump failed, which is the call and not the file.
+            throw tool.wrong(Tool.FAILED, String.valueOf(failed.getMessage()));
         }
         for (String note : report.unsaid()) {
             System.err.println("  " + note);
@@ -46,9 +48,9 @@ public final class YmxToYmxs {
         tool.write(text);
     }
 
-    private static String convert(Tool tool, Path at, List<String> flags, Report report)
+    private static String convert(Tool tool, OptionalInt asked, Report report)
             throws IOException {
-        YmxToYmxr.Dumped read = YmxToYmxr.dumped(at);
+        YmxToYmxr.Dumped read = YmxToYmxr.standardInput();
         int frames = YmxToYmxr.frames(read);
         if (frames != read.frames()) {
             report.note((read.frames() - frames) + " frame of YMX's padding comes off the"
@@ -56,27 +58,18 @@ public final class YmxToYmxs {
         }
         read = new YmxToYmxr.Dumped(frames, read.rate(), read.loopFrame(), read.streams(),
                 read.samples(), read.loops());
-        int repeat = repeat(tool, flags, read);
+        int repeat = repeat(asked, read);
         YmDump.Song song = YmxToYmxr.song(read, "");
         tool.report("YMX!: " + read.frames() + " rows at " + read.rate() + " Hz");
         return Text.write(Tunes.multi(Ymx.read(read, song, repeat, report)));
     }
 
-    /** The row the tune repeats to: {@code -rROW}, the file's loop frame,
-     *  or its frame count where {@code -r} makes it play once. */
-    private static int repeat(Tool tool, List<String> flags, YmxToYmxr.Dumped read) {
-        for (String flag : flags) {
-            if (flag.equals("-r")) {
-                return read.frames();
-            }
-            if (flag.startsWith("-r")) {
-                try {
-                    return Integer.parseInt(flag.substring(2));
-                } catch (NumberFormatException no) {
-                    throw tool.usage("not a row number: " + flag);
-                }
-            }
-            throw tool.usage("not a flag of the tool: " + flag);
+    /** The row the tune repeats to: the row the call asks for, the file's
+     *  loop frame, or its frame count where the tune plays once. */
+    private static int repeat(OptionalInt asked, YmxToYmxr.Dumped read) {
+        if (asked.isPresent()) {
+            int at = asked.getAsInt();
+            return at == YmToYmxs.ONCE ? read.frames() : at;
         }
         return Math.min(read.loopFrame(), read.frames());
     }

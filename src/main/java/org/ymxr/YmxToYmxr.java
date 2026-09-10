@@ -29,6 +29,9 @@ final class YmxToYmxr {
     private static final String DUMP =
             System.getenv().getOrDefault("YMX_DUMP", "ymx-dump");
 
+    /** The name this process's standard input opens under. */
+    private static final String STANDARD_INPUT = "/dev/stdin";
+
     /** The streams a frame's registers stand in (YMX, SPEC.md 2). */
     private static final int REGISTERS = 14;
 
@@ -53,8 +56,34 @@ final class YmxToYmxr {
 
     /** The file read out through ymx-dump. */
     static Dumped dumped(Path file) throws IOException {
-        ProcessBuilder run = new ProcessBuilder(DUMP, file.toString());
+        return dumped(file.toString(), false);
+    }
+
+    /** Standard input read out through ymx-dump. The tool opens a file
+     *  name, so it is called with the name of this process's standard
+     *  input, on that input, and no copy of the file is written. */
+    static Dumped standardInput() throws IOException {
+        return dumped(STANDARD_INPUT, true);
+    }
+
+    /** The input is not a file ymx-dump reads: its exit of 1, and the
+     *  fault itself on standard error, from ymx-dump. */
+    static final class FormatException extends IOException {
+
+        private static final long serialVersionUID = 1L;
+
+        FormatException(String said) {
+            super(said);
+        }
+    }
+
+    private static Dumped dumped(String file, boolean input) throws IOException {
+        String named = input ? "standard input" : file;
+        ProcessBuilder run = new ProcessBuilder(DUMP, file);
         run.redirectError(ProcessBuilder.Redirect.INHERIT);
+        if (input) {
+            run.redirectInput(ProcessBuilder.Redirect.INHERIT);
+        }
         Process ymx;
         try {
             ymx = run.start();
@@ -103,12 +132,16 @@ final class YmxToYmxr {
             }
         }
         try {
-            if (ymx.waitFor() != 0) {
-                throw new IOException(DUMP + " did not read " + file);
+            int exit = ymx.waitFor();
+            if (exit == 1) {
+                throw new FormatException(named + " is not a file " + DUMP + " reads");
+            }
+            if (exit != 0) {
+                throw new IOException(DUMP + " did not read " + named);
             }
         } catch (InterruptedException stopped) {
             Thread.currentThread().interrupt();
-            throw new IOException("interrupted reading " + file, stopped);
+            throw new IOException("interrupted reading " + named, stopped);
         }
         return new Dumped(frames, rate, loop, value, samples, loops);
     }

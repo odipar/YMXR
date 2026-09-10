@@ -76,8 +76,13 @@ reading it exits 1 and says which row:
 ## The tools
 
 Each is a filter: standard input, standard output, and the report on
-standard error (tools.md). A YMXS multi of several tunes is a set of
-subtunes, one tune file each, which `ymxs-to-sndh` puts behind one core.
+standard error (tools.md). No stage writes a file between them: a tune
+passes from one to the next as bytes on a pipe. YMX's `ymx-dump` opens a
+file name rather than a stream, so `ymx-to-ymxs` calls it with
+`/dev/stdin` and reads its input through it.
+
+A YMXS multi of several tunes is a set of subtunes, one tune file each,
+which `ymxs-to-sndh` puts behind one core.
 
 ```bash
 bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG

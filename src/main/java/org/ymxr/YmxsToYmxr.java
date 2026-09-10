@@ -1,6 +1,5 @@
 package org.ymxr;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -20,9 +19,10 @@ public final class YmxsToYmxr {
     private YmxsToYmxr() {
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymxs-to-ymxr", flags, Ymxs.PACKING);
+        Ymxs.only(tool, flags, Ymxs.PACKING);
         Report report = new Report(tool.reports());
         Multi multi = Ymxs.read(tool);
         if (multi.tunes().size() != 1) {
@@ -30,7 +30,8 @@ public final class YmxsToYmxr {
                     + " tunes, and a tune file carries one: ymxs-to-sndh reads several"
                     + " as subtunes");
         }
-        byte[] file = Ymxs.tuneFile(tool, multi.tunes().get(0), Ymxs.Packing.of(flags), report);
+        byte[] file = Ymxs.tuneFile(tool, multi.tunes().get(0),
+                Ymxs.Packing.of(tool, flags), report);
         for (String note : report.unsaid()) {
             System.err.println("  " + note);
         }

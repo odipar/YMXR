@@ -134,7 +134,8 @@ no report. The conformance kit's references are the output of this tool
 
 Every conversion passes through YMXS, the tune data structure
 (doc/ymxs.md). These five tools are the stages of it, each a filter:
-standard input, standard output, the report on standard error.
+standard input, standard output, the report on standard error, and no file
+between them.
 
 ```
 bin/ym-to-ymxs   [-rRR | -r] [-silent]              < in.ym   > out.ymxs
@@ -165,6 +166,20 @@ writes one tune file, so a multi of several is an error there.
 
 The packer's flags are the converter's: `-kK` the unit, `-mN` the ring,
 `-copies[S]` the copies from a column's separate literal stream.
+
+A run ends in one of three exits:
+
+| exit | what it means |
+|---|---|
+| 0 | the tool completed, and standard output has the file |
+| 1 | the input is wrong: not this format, or a structure this format cannot encode (ymxs.md, What is an error) |
+| 2 | the call is wrong, or a stream failed |
+
+The call is read before the input, so a flag a tool does not read is an
+exit of 2 and the input is left unread. A fault is one line on standard
+error, named by the tool that found it, and never a stack trace.
+`FilterTest` runs the tools and reads their exits, their two streams and
+`-silent` back.
 
 ## The player
 
