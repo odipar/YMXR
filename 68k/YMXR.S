@@ -2,10 +2,10 @@
 ; frame, and a source's rows to one register at a timer's rate.
 ;
 ; doc/SPEC.md is the contract: section 4 is YMXR_play and section 5 the
-; tick handlers. What this player takes is the bound tune of
-; doc/BINARIES.md: the tune file's tables, and no code, bound by a tool
-; with the image DTX packaged the table with. The player calls that
-; image's slots (DTX, doc/abi.md) and reads the row they give.
+; tick handlers. This player reads the bound tune of doc/BINARIES.md: the
+; tune file's tables, and no code, bound by a tool with the image DTX
+; packaged the table with. The player calls that image's slots (DTX,
+; doc/abi.md) and reads the row they return.
 ;
 ; The calls, by the jump table at the top of the binary:
 ;
@@ -13,8 +13,8 @@
 ;               on a long. d0 is 0, or -1 for one this player does not
 ;               read.
 ;   YMXR_play   a0 the workspace. One row. d0 is 0, or -1 where the tune
-;               has played its last row and does not repeat: nothing is
-;               written then.
+;               has played its last row and does not repeat: no register
+;               is written then.
 ;   YMXR_stop   a0 the workspace. The claimed timers stopped, disabled and
 ;               masked; the three volumes silenced.
 ;
@@ -22,15 +22,15 @@
 ; were. YMXR_play runs in supervisor mode, at any interrupt level: every
 ; write of a select and a value is one movep, which no tick lands inside.
 ;
-; A call writes the row the call before it took, and takes the next when
+; A call writes the row the call before it read, and reads the next when
 ; its writes are made: the row's writes then leave a host's clock at one
 ; offset, where an advance before them would move by what the refill of
-; the row costs. Init takes the first row.
+; the row costs. Init reads the first row.
 ;
 ; The workspace is YMXR_FIXED bytes, then the state block the image's
-; format block asks for, which the bound tune states at offset 12
+; format block requires, which the bound tune records at offset 12
 ; (BINARIES.md): a host allocates YMXR_FIXED plus that. The row a call
-; writes is the image's own pointer, IM_POINTER of that state block
+; writes is the image's pointer, IM_POINTER of that state block
 ; (DTX, abi.md 3), which an advance leaves at column 0's value, so the
 ; player keeps no copy of it.
 ;
@@ -39,8 +39,8 @@
 ; what it needs of the vectors at $134, $120, $114 and $110, of TACR, TBCR
 ; and both nibbles of TCDCR, and of bits 5 and 0 of IERA and IMRA and bits
 ; 5 and 4 of IERB and IMRB. A timer an effect does not run is never
-; touched. The MFP is taken in software end-of-interrupt mode, as TOS
-; leaves it, and the vectors are the 68000's at zero.
+; touched. The MFP runs in software end-of-interrupt mode, as TOS leaves
+; it, and the vectors are the 68000's at zero.
 ;
 ; The player patches itself: the row's displacements and the branches
 ; over the effects the tune does not run at init, and the tick handlers'
@@ -49,18 +49,18 @@
 ;
 ; YMXR_PERF equ 1 assembles the raster monitor in: the play call paints
 ; the background red for as long as its work runs, one scanline to 512
-; cycles, and each tick handler paints its own colour where the beam
-; stands. A tick's band is a few hundred cycles wide and hard to read,
-; so each handler adds a count of what its own instructions cost, which
-; the next call burns off as a yellow bar after its own work, the
-; register writes among them: the bar shows what the handlers cost the
-; frame, and no chip write moves for the bar. What a tick costs beyond
+; cycles, and each tick handler paints a separate colour where the beam
+; stands. A tick's band is a few hundred cycles wide and hard to read, so
+; each handler adds a count of what its instructions cost, which the next
+; call burns off as a yellow bar after its work, the register writes among
+; them: the bar shows what the handlers cost the frame, and no chip write
+; moves for the bar. What a tick costs beyond
 ; its handler, the 44 cycles the 68000 spends entering an interrupt and
 ; the 20 on the rte, stands where the tick landed and is not counted
 ; here. The call waits for the display to start before it paints, since
 ; the VBL fires far above the screen and an unsynced bar lands in the
-; top border; the wait stands before the red mark, so it costs the
-; figures nothing. Each count is an estimate, in turns of ten cycles,
+; top border; the wait stands before the red mark, so it is outside the
+; figures. Each count is an estimate, in turns of ten cycles,
 ; and the monitor is for reading a run: with the switch off, the
 ; default, no byte and no cycle of it stands.
 
@@ -76,16 +76,16 @@ YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 YMXR_PERF       equ     0
                 .endif
 ; A tick drops the interrupt level once its writes are made, so a faster
-; timer nests inside a slower one; and it clears its own in-service bit,
-; the MFP being taken in software end-of-interrupt mode as TOS leaves it.
-; A host that wants neither assembles the player with YMXR_NEST=0 and
-; YMXR_AEOI=1 (rmac -dYMXR_NEST=0 -dYMXR_AEOI=1), which takes 32 cycles
-; off a tick that writes a row and 16 off one that ends a source, and
-; asks two things of it: no MFP interrupt nests inside another, and the
-; MFP's vector register is the player's to set, which it keeps over a
-; call and puts back at stop. The two go together, since automatic end
-; of interrupt sets no in-service bit and nothing but the level the tick
-; holds keeps a lower timer out.
+; timer nests inside a slower one; and it clears its in-service bit, the
+; MFP running in software end-of-interrupt mode as TOS leaves it. A host
+; that requires neither assembles the player with YMXR_NEST=0 and
+; YMXR_AEOI=1 (rmac -dYMXR_NEST=0 -dYMXR_AEOI=1), which cuts 32 cycles
+; from a tick that writes a row and 16 from one that ends a source, and
+; requires two things of it: no MFP interrupt nests inside another, and
+; the MFP's vector register is the player's to set, which it keeps over a
+; call and restores at stop. The two go together, since automatic end of
+; interrupt sets no in-service bit and only the level the tick sets keeps
+; a lower timer out.
                 .if     ^^defined YMXR_NEST
                 .else
 YMXR_NEST       equ     1
@@ -95,7 +95,7 @@ YMXR_NEST       equ     1
 YMXR_AEOI       equ     0
                 .endif
                 .if     YMXR_AEOI&YMXR_NEST
-                .error  "YMXR_AEOI=1 asks for YMXR_NEST=0"
+                .error  "YMXR_AEOI=1 requires YMXR_NEST=0"
                 .endif
 MFP_VECTOR      equ     $FFFFFA17       ; bits 7 to 4 the vector's high half,
                                         ; bit 3 the software end of interrupt
@@ -103,7 +103,7 @@ MFP_VECTOR      equ     $FFFFFA17       ; bits 7 to 4 the vector's high half,
 PERF_SYNC       equ     8000            ; the wait's ceiling, over a frame
                                         ; of turns, so a call from
                                         ; anywhere runs on
-PERF_FRAME      equ     $700            ; the call's own work
+PERF_FRAME      equ     $700            ; the work of the call itself
 PERF_BAR        equ     $770            ; the timers' burnt bar
 PERF_COLOUR     equ     $FFFF8240       ; the background
 PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
@@ -114,7 +114,7 @@ PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
 ; monitor counts a tick at its kind's figure and what the two switches
 ; add to that path, rounded to the nearest turn of ten cycles, and the
 ; call burns a bar for the total. performance.md, A tick, measures each
-; of the five, and PlayerTest holds the five to the document's figures.
+; of the five, and PlayerTest checks the five against those figures.
 PERF_ON         equ     76      ; a row written, the place stepped
 PERF_SQ         equ     56      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     32      ; a source of one row, no place stepped
@@ -159,16 +159,16 @@ WS_RR           equ     16
 WS_EFFECTS      equ     20              ; a byte: the effects the tune runs
 WS_VECTOR       equ     21              ; a byte: the MFP's vector register as
                                         ; init found it, kept where the player
-                                        ; takes automatic end of interrupt
+                                        ; runs automatic end of interrupt
 WS_FX           equ     24              ; four effects, FX_SIZE each
-FX_TARGET       equ     0               ; the target the player holds
-FX_SELECT       equ     1               ; the select it last took
-FX_COUNT        equ     2               ; the count it last took
+FX_TARGET       equ     0               ; the target the player keeps
+FX_SELECT       equ     1               ; the select it last read
+FX_COUNT        equ     2               ; the count it last read
 FX_SHAPE        equ     3               ; which handler the timer's vector
-                                        ; holds: 0 the general one, $FF the
-                                        ; square's, 1 the one-row source's.
-                                        ; The last two hold the place as their
-                                        ; own immediate
+                                        ; points at: 0 the general one, $FF
+                                        ; the square's, 1 the one-row
+                                        ; source's. The last two encode the
+                                        ; place as an immediate
 FX_FIRST        equ     4               ; the running source's first row
 FX_SIZE         equ     8
 WS_SOURCES      equ     56              ; a source's first row and its loop
@@ -210,15 +210,15 @@ c\{col}:
                 move.b  $7FFF(a1),d2
                 .endm
 
-; A second read of a column, or a column ored into d1, at a site of its
-; own that init patches from the table of sites (ymxr_sites).
+; A second read of a column, or a column ored into d1, at a separate site
+; that init patches from the table of sites (ymxr_sites).
                 .macro  QREAD   col
 q\{col}:
                 move.b  $7FFF(a1),d1
                 .endm
 
-; The same, at the third site a column takes: the copy of steps 6 and 7
-; the row that sets no envelope column falls into.
+; The same, at a column's third site: the copy of steps 6 and 7 the row
+; that sets no envelope column falls into.
                 .macro  RREAD   col
 r\{col}:
                 move.b  $7FFF(a1),d1
@@ -240,7 +240,7 @@ q\{col}:
                 .endm
 
 ; A column that fills its byte, on the row where the column beside it is
-; 0: written where it is not 0, and nothing else to test.
+; 0: written where it is not 0, with no further test.
                 .macro  PLAIN   col,select
                 QREAD   \col
                 beq.s   .no\~
@@ -300,14 +300,14 @@ q\{col}:
                 .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,vector
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
-; that tells them apart, and the word after it holds the read's
-; displacement or the branch's, whichever the head takes.
+; that separates them, and the word after it carries the read's
+; displacement or the branch's, by which head it is.
 \{tick}_over:
 q\{ct}:         bra.w   \{tick}_done
                 QOR     \cs                     ; the three set bits at once
                 QOR     \cc
                 bmi.s   \{tick}_some
-                QREAD   \cn                     ; the count alone, or nothing
+                QREAD   \cn                     ; the count alone, or no column
                 beq.w   \{tick}_done
                 move.b  d1,\data.w              ; the count, the timer running on
                 move.b  d1,\fx+FX_COUNT(a0)
@@ -317,7 +317,7 @@ q\{ct}:         bra.w   \{tick}_done
                 tst.b   d2                      ; the timer's reset stops the
                 bpl.s   .kept\~                 ; timer before the source is
                 btst    #6,d2                   ; switched, so no tick of the
-                beq.s   .kept\~                 ; old rate takes the new
+                beq.s   .kept\~                 ; old rate reads the new
                 andi.b  #\keep,\ctrl.w          ; source, and the tick latched
                 bclr    #\bit,(\ier+4).w        ; before the stop is dropped
 .kept\~:
@@ -339,9 +339,9 @@ q\{ct}:         bra.w   \{tick}_done
 ; the handler's three operands stand under one mask, since the timer may
 ; run: a tick between the target register and the place writes the old
 ; source's row to the new target, and one between the place and the loop
-; cell takes the new place against the cell the old source left
+; cell reads the new place against the cell the old source left
 .aim\~:         lea     \tick(pc),a5
-; The three behind level 7, so a tick takes none of them half made. The
+; The three behind level 7, so a tick reads none of them half made. The
 ; window is three writes wide and costs no measurable jitter: the ticks
 ; of a tune running one effect keep their period to 0.31 per cent with
 ; it and to 0.31 without, where the reference player's keep 0.33. The
@@ -353,15 +353,15 @@ q\{ct}:         bra.w   \{tick}_done
                 move.l  a4,d1                   ; the place: the first row,
                 btst    #5,d2                   ; or the row it stands on in
                 bne.s   .put\~                  ; the rows it replaces, which
-                tst.b   \fx+FX_SHAPE(a0)        ; the square holds as bit 7 of
-                beq.s   .held\~                 ; its own immediate, and a
+                tst.b   \fx+FX_SHAPE(a0)        ; the square keeps in bit 7 of
+                beq.s   .same\~                 ; its immediate, and a
                 bpl.s   .put\~                  ; source of one row stands at
                 lea     \sq(pc),a3              ; row 0
                 tst.b   SQ_VAL(a3)
                 bpl.s   .put\~
                 addq.l  #1,d1
                 bra.s   .put\~
-.held\~:        add.l   TICK_PTR(a5),d1
+.same\~:        add.l   TICK_PTR(a5),d1
                 sub.l   \fx+FX_FIRST(a0),d1
 .put\~:         move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
@@ -374,15 +374,15 @@ q\{ct}:         bra.w   \{tick}_done
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 
-; The cell tells the two shapes apart: -1 two rows alternating, -2 one
+; The cell separates the two shapes: -1 two rows alternating, -2 one
 ; row repeating. Init drops this test where the tune uses one of the two
 ; and not the other, the branch above going straight to that shape.
 .shaped\~:      addq.l  #1,d0
                 bne.s   \{tick}_one
-; A square: the two rows into the handler's own immediate and the
-; difference of the two into the one instruction that moves between
-; them. The row the immediate stands at is the place, and a start that
-; moves none leaves the half it is in, which bit 7 gives.
+; A square: the two rows into the handler's immediate and the difference
+; of the two into the one instruction that moves between them. The row the
+; immediate stands at is the place, and a start that moves no place leaves
+; the half it is in, which bit 7 marks.
 \{tick}_square: lea     \sq(pc),a5
                 move.b  (a4),d3                 ; the first row
                 move.b  1(a4),d4                ; the marker
@@ -415,7 +415,7 @@ q\{ct}:         bra.w   \{tick}_done
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 
-; A source of one row: the row into the handler's own immediate. The
+; A source of one row: the row into the handler's immediate. The
 ; handler moves no place, so a start resets none.
 \{tick}_one:    lea     \one(pc),a5
                 move.w  sr,-(sp)
@@ -457,7 +457,7 @@ q\{ct}:         bra.w   \{tick}_done
                 .if     \shift
                 lsl.b   #\shift,d1
                 .endif
-; the control register takes one write: a select written to a running
+; the control register needs one write: a select written to a running
 ; timer neither stops nor reloads the running count (SPEC.md 1.9), and
 ; select 0 in front of the new select stops the timer and costs it the
 ; prescaler's partial count. Timer A's and Timer B's control register is
@@ -542,7 +542,7 @@ q\{ct}:         bra.w   \{tick}_done
 
 ; A tick (SPEC.md 5): the place's row to the target, the place advanced;
 ; on the marker, the place to row RR, or the timer stopped. No register
-; is used: the place is the write's own operand, stepped in place. The
+; is used: the place is the write's operand, stepped in place. The
 ; interrupt level drops once the select and the value are written, so a
 ; higher timer may nest, and the in-service bit is cleared by hand, as
 ; software end-of-interrupt mode asks.
@@ -572,7 +572,7 @@ q\{ct}:         bra.w   \{tick}_done
                 rte
 .stop\~:        andi.b  #\keep,\ctrl.w
 ; The timer may have counted to zero again while this handler ran, which
-; latches a tick the stop above does not take back: at a rate whose
+; latches a tick the stop above does not withdraw: at a rate whose
 ; period is near the handler's cost the two race, and that tick would
 ; read a place past the source's last row. The row that stops an effect
 ; drops it the same way (EFFECT, .stop).
@@ -585,13 +585,13 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_cell:   dc.l    0                       ; the loop cell
                 .endm
 
-; A square's tick: a source of two rows that repeats to row 0 holds two
-; values and nothing else, so this handler holds them as its own
+; A square's tick: a source of two rows that repeats to row 0 is two
+; values and no more, so this handler encodes them as its
 ; immediate and moves between them by the difference of the two. It
 ; steps no place, tests no marker and reads no row. The place SPEC.md
-; 1.9 gives a square is which of the two rows the immediate stands at,
+; 1.9 defines for a square is which of the two rows the immediate stands at,
 ; and bit 7 tells them apart, the last row of a source being its marker
-; (3.2). A source of any other shape takes the handler above.
+; (3.2). A source of any other shape runs the handler above.
                 .macro  SQUARE  name,eoi,eoir,colour
 \name:
                 MARK    \colour
@@ -601,7 +601,7 @@ q\{ct}:         bra.w   \{tick}_done
                 move.w  #$2500,sr
                 .endif
 \{name}_tog:    eori.b  #$0F,($12345678).l      ; +3 the two rows' difference,
-                COUNT   PERF_SQ,PERF_DROP       ; +4 the row's own address
+                COUNT   PERF_SQ,PERF_DROP       ; +4 the row's address
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
@@ -609,12 +609,12 @@ q\{ct}:         bra.w   \{tick}_done
                 .endm
 
 ; A source of one row repeating writes that row on every tick and moves
-; no place (SPEC.md 1.9, 3.2), so this handler holds the row as its own
+; no place (SPEC.md 1.9, 3.2), so this handler encodes the row as its
 ; immediate and writes it. It steps no place, tests no marker, reads no
-; row and reads no loop cell. The place SPEC.md 1.9 gives such a source
+; row and reads no loop cell. The place SPEC.md 1.9 defines for such a source
 ; is row 0, which it stands at from the start, so bit 5 of the control
-; column asks nothing of it. The target is the effect's, as the two
-; handlers above take theirs: a start writes the register into the
+; column places no requirement on it. The target belongs to the effect, as in
+; the two handlers above: a start writes the register into the
 ; select, and the source's shape picks the handler where the register
 ; does not.
                 .macro  ONEROW  name,eoi,eoir,colour
@@ -652,11 +652,11 @@ YMXR_init:
                 move.b  TF_EFFECTS(a0),WS_EFFECTS(a6)
                 cmp.b   #2,IM_VARIANT(a2)       ; a DTX2 image: its rows come
                 bne     .bad6                   ; round on their own
-; The table to read, which the image may hold beside others: subtunes that
-; agree on what an image gives once share one, so the code in it stands
-; once for them and every bound tune names its own table (DTX abi.md 1).
-; R and RR come out of that table's own header (DTX SPEC.md 1) and not out
-; of the metadata call, which gives the image's first table.
+; The table to read, which the image may carry beside others: subtunes
+; that agree on what an image fixes once share one, so the code in it
+; stands once for them and every bound tune names its table (DTX abi.md
+; 1). R and RR come out of that table's header (DTX SPEC.md 1) and not out
+; of the metadata call, which returns the image's first table.
                 movea.l a2,a1
                 adda.l  TF_TABLE(a0),a1
                 move.l  DT_ROWS(a1),d0
@@ -713,7 +713,7 @@ YMXR_init:
 .resolved:
 
 ; The row's columns stand a stride apart (DTX, abi.md 2): column i's read
-; takes i strides as its displacement.
+; uses i strides as its displacement.
                 lea     ymxr_reads(pc),a3
                 lea     ymxr_frame(pc),a4
                 moveq   #0,d1
@@ -747,8 +747,9 @@ YMXR_init:
                 .endif
 
                 .if     YMXR_NEST
-; A tune that runs one effect has nothing to nest inside a tick, so the
-; level that tick drops buys it nothing: two nops stand where the drop
+; A tune that runs one effect has no second timer to nest inside a tick,
+; so the level that tick drops buys it no safety: two nops stand where the
+; drop
 ; would, in all three of that effect's handlers. A tune running two or
 ; more keeps the drop, and one running none reaches no handler at all.
                 move.b  WS_EFFECTS(a6),d0
@@ -783,7 +784,7 @@ YMXR_init:
                 lea     SQ_SIZE(a5),a5
                 dbra    d2,.sq
 
-; The effects' records: nothing held yet.
+; The effects' records: empty until a start.
                 lea     WS_FX(a6),a0
                 moveq   #7,d0
 .clear:         clr.l   (a0)+
@@ -792,12 +793,12 @@ YMXR_init:
 ; The effects the tune runs are read every row; the others are jumped
 ; over, the branch at each macro's head standing where the tune does not
 ; run its effect.
-; The head of each effect: the effect's own first read where the tune
-; runs it, and where it does not, the branch it holds already, its
+; The head of each effect: the effect's first read where the tune runs
+; it, and where it does not, the branch already there, its
 ; displacement moved to the head of the next effect the tune does run or
 ; past the last of them. A run of effects the tune does not run then
 ; costs one branch. This stands after the sites above, which write the
-; read's displacement into the word a skipped effect's branch takes.
+; read's displacement into the word a skipped effect's branch occupies.
                 lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
                 lea     ymxr_tick3_done(pc),a5
@@ -816,9 +817,9 @@ YMXR_init:
 .next:          dbra    d2,.over
 
 ; The start tells three shapes apart off one cell, and a tune using one
-; of the two shapes with a handler of its own and not the other needs no
+; of the two shapes with a separate handler and not the other needs no
 ; test: the branch that leaves the general handler's path goes straight
-; to that shape's block, and the start pays nothing for the shape it
+; to that shape's block, and the start pays no test for the shape it
 ; does not use. A tune using both keeps the test.
                 move.b  d5,d0
                 beq.s   .picked
@@ -837,7 +838,7 @@ YMXR_init:
                 dbra    d2,.pick
 .picked:
 
-; The advance's own address, written into the call that plays: a slot is
+; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body stands two bytes past the slot
 ; plus the branch's displacement, and a play call reaches it in one jsr.
                 movea.l WS_IMAGE(a6),a2
@@ -848,7 +849,7 @@ YMXR_init:
                 lea     ymxr_call+2(pc),a4
                 move.l  a3,(a4)
 
-; The first row, taken here so that a call writes a row it already has
+; The first row, read here so that a call writes a row it already has
 ; (SPEC.md 4): the writes then leave a host's clock at one offset,
 ; whatever the advance for the next row costs.
                 move.l  a6,-(sp)
@@ -936,7 +937,7 @@ ymxr_frame:
                 TONE    _4,_5,$0400,$0500
 ; 5: the noise period, and the envelope period beside the shape's bits:
 ;    where the shape column is 0, no bit beside is set, and a period byte
-;    is written where it is not 0 and nothing else is tested.
+;    is written where it is not 0, with no further test.
                 WRITE   _6,$0600
                 READ2   _13
                 beq.w   ymxr_plain
@@ -955,7 +956,7 @@ ymxr_frame:
                 movep.w d0,(a2)
 .no7:
 ; 8: the shape, read above into d2. Step 5 found the column set, so the
-; test here is of its own set bit alone.
+; test here is of its set bit alone.
                 tst.b   d2
                 bpl.s   ymxr_played
                 move.w  #$0D00,d1
@@ -964,7 +965,7 @@ ymxr_frame:
                 bra.s   ymxr_played
 
 ; Steps 6 and 7 again, for the row whose envelope column step 5 found 0:
-; step 8 has nothing to write on that row, and this copy ends without
+; step 8 writes no register on that row, and this copy ends without
 ; the test that would say so.
 ymxr_plain:     PLAIN   _11,$0B00
                 PLAIN   _12,$0C00
@@ -977,8 +978,8 @@ ymxr_plain:     PLAIN   _11,$0B00
                 move.w  #$0700,d0
                 move.b  d1,d0
                 movep.w d0,(a2)
-; The row is written: the next one is taken now, after every write this
-; call makes, so nothing the advance costs stands between a host's clock
+; The row is written: the next one is read now, after every write this
+; call makes, so no part of the advance's cost stands between a host's clock
 ; and the chip.
 ymxr_played:
                 subq.l  #1,WS_ROWS(a0)
@@ -986,13 +987,13 @@ ymxr_played:
                 move.l  WS_R(a0),d0             ; the last row: the loop's
                 sub.l   WS_RR(a0),d0            ; rows, or none
                 move.l  d0,WS_ROWS(a0)
-                beq.s   ymxr_return             ; none: no row to take
-; The state block, which the advance takes in a6 (DTX, abi.md 2). This
-; call gives a6 back to its host, and the advance clobbers d0-d5 and
+                beq.s   ymxr_return             ; none: no row to read
+; The state block, which the advance reads from a6 (DTX, abi.md 2). This
+; call restores a6 to its host, and the advance clobbers d0-d5 and
 ; a0-a5, so the stack is where a6 waits.
 ymxr_next:      move.l  a6,-(sp)
                 lea     WS_STATE(a0),a6
-ymxr_call:      jsr     ($12345678).l           ; the advance's own address,
+ymxr_call:      jsr     ($12345678).l           ; the advance's address,
                                                 ; resolved at init
                 movea.l (sp)+,a6
 ymxr_return:
@@ -1064,14 +1065,14 @@ ymxr_sites:
                 ONEROW  ymxr_one3,$DF,$FFFFFA11,$077
 
 ; The offsets the patching writes at, measured off the first handler's
-; own labels: the row it writes, the marker it reads, and its loop cell.
+; labels of its own: the row it writes, the marker it reads, and its loop cell.
 ; A monitor's mark stands between those blocks, and the distances follow
 ; it. Every handler is laid out by the one macro, so one handler's
 ; offsets are all four handlers'. The rig reads them back.
 TICK_SEL        equ     ymxr_tick0_row-ymxr_tick0+3   ; the target register
 TICK_PTR        equ     ymxr_tick0_row-ymxr_tick0+8   ; the place: a tick's row
 TICK_STEP       equ     ymxr_tick0_row-ymxr_tick0+18+(YMXR_NEST*4)
-                                        ; the place's own address, which the
+                                        ; the place's address, which the
                                         ; level's drop stands in front of
                                         ; where a tick drops it
 TICK_LOOPT      equ     ymxr_tick0_mark-ymxr_tick0+2  ; the loop cell's address
@@ -1092,17 +1093,17 @@ SQ_SR           equ     ymxr_sq0_val-ymxr_sq0+6
 SQ_SIZE         equ     ymxr_sq1-ymxr_sq0
 
 ; A one-row source's handler: the register it selects and the row it
-; writes, both immediates a start puts there. It holds nothing else.
+; writes, both immediates a start puts there, and no other field.
 ONE_SEL         equ     ymxr_one0_sel-ymxr_one0+3
 ONE_VAL         equ     ymxr_one0_val-ymxr_one0+3
 ONE_SR          equ     ymxr_one0_val-ymxr_one0+6
 ONE_SIZE        equ     ymxr_one1-ymxr_one0
 
 ; The start's dispatch: where the branch that leaves the general
-; handler's path holds its displacement, and where the two shapes with a
-; handler of their own stand from it. One macro lays out every effect and
-; nothing of a timer's own stands between the three, so one effect's
-; distances are all four's.
+; handler's path carries its displacement, and where the two shapes with
+; a separate handler stand from it. One macro lays out every effect and no
+; timer's field stands between the three, so one effect's distances are
+; all four's.
 PICK_AT         equ     ymxr_tick0_pick-ymxr_tick0_over+2
 PICK_SQ         equ     ymxr_tick0_square-ymxr_tick0_pick-2
 PICK_ONE        equ     ymxr_tick0_one-ymxr_tick0_pick-2

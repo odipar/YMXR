@@ -3,7 +3,7 @@
 
 A player with the monitor in (68k/YMXR.S, YMXR_PERF) paints the
 background red while a call's work runs and yellow while it burns the
-timers' counted cost, and each tick handler paints its own colour and
+timers' counted cost, and each tick handler paints a separate colour and
 puts back what stood before it. This reads a Hatari trace of the writes
 to the background back: the red mark to the yellow one is the call's own
 work, less every tick band inside it, and the yellow to the write that
@@ -26,7 +26,7 @@ ROM = 0xE00000
 
 def read(path):
     """Every palette write the program made, in order: its colour and the
-    cycle it landed on. A write from the operating system's own code is
+    cycle it landed on. A write from the operating system's code is
     not the monitor's and is left out."""
     out = []
     for line in open(path, errors="replace"):
@@ -37,13 +37,13 @@ def read(path):
 
 
 def span(at, to):
-    """The cycles between two marks, a frame's wrap taken."""
+    """The cycles between two marks, a frame's wrap included."""
     return to - at + (FRAME if to < at else 0)
 
 
 def bands(writes, at, under):
     """The tick bands from writes[at] on, while they nest under a mark of
-    colour under: (the cycles each band's own tick took, the cycles the
+    colour under: (the cycles each band's tick cost, the cycles the
     outermost bands took together, the write the nesting ends at). A tick
     marks its colour and puts back the colour it found, so a write of the
     colour under the top of the nest closes one band."""
@@ -98,7 +98,7 @@ def main():
         return 2
     work, ticks, bars = spans(read(sys.argv[1]))
     if not work:
-        print("the trace holds no call")
+        print("the trace has no call")
         return 1
     work.sort()
     n = len(work)

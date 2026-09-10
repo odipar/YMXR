@@ -4,10 +4,11 @@ The prebuilt binaries, and how a tool combines them with a tune file
 without an assembler: the SNDH core, the player under SNDH's three
 entries, and the program stub, a block that drives an SNDH file as a TOS
 program, each assembled once by the build and kept in the jar; DTX's
-reader code, in the dtx jar; and the tune file, which holds the tune's
+reader code, in the dtx jar; and the tune file, which contains the tune's
 tables and no code. Combined they make a bound tune, an SNDH file any
 SNDH host plays, and a program around it. Any tool that follows this
-document writes files of the same layout; what stays each tool's own is
+document writes files of the same layout; what remains particular to each
+tool is
 the tag text, and the workspace above the floor of section 2.
 Big-endian throughout; every offset and size in bytes.
 
@@ -15,7 +16,7 @@ Big-endian throughout; every offset and size in bytes.
 |---|---|
 | `YMXR_sndh.bin` | the SNDH core: the player and its SNDH glue, assembled from `68k/YMXR_sndh.S` |
 | `YMXR_sndh-perf.bin` | the same core with the player's raster monitor assembled in (`YMXR_PERF`, performance.md), for reading a run |
-| `YMXR_sndh-lean.bin` | the same core whose ticks neither drop the interrupt level nor write their own end of interrupt (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md), 32 cycles cheaper on a tick that writes a row and 16 on one that ends a source, for a host where no MFP interrupt of its own nests and the MFP's vector register is the player's |
+| `YMXR_sndh-lean.bin` | the same core whose ticks neither drop the interrupt level nor write an end of interrupt (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md), 32 cycles cheaper on a tick that writes a row and 16 on one that ends a source, for a host where no MFP interrupt of the host nests and the MFP's vector register belongs to the player |
 | `YMXR_sndh-perf-lean.bin` | the same core with both switches set: the raster monitor reads what a run costs, and the ticks it reads are the lean ones |
 | `YMXR_prg.bin` | the program stub, assembled from `68k/YMXR_prg.S` |
 | `DTX0.bin`, `DTX1-w1.bin`, `DTX2-w1-k1.bin` and the rest | DTX's reader code, twenty-two files: one for DTX0, one a width for DTX1, one a width, a unit and the copies flag for DTX2, at `org/dtx/68k/` in the dtx jar (DTX, doc/abi.md) |
@@ -49,14 +50,14 @@ core and the stub; every other byte is the tool's or the tune's.
 
 ## 1. The bound tune
 
-What the player takes: the tune file's tables, with DTX's image for the
+What the player reads: the tune file's tables, with DTX's image for the
 DTX2 table in place of the table. The tune file (SPEC.md 3.3) has the
 tables and no code; the image is the table with DTX's reader code and
 its column table in front, which DTX's packager makes for the table's
 unit and copies flag (DTX, abi.md 1). Binding is the packager's combine,
-and nothing in the rows moves.
+and no row moves.
 
-| offset | bytes | gives |
+| offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
 | 4 | 2 | the version, $0002 |
@@ -64,36 +65,36 @@ and nothing in the rows moves.
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
 | 10 | 2 | zero |
-| 12 | 4 | the state block's bytes: the image's format block gives them |
+| 12 | 4 | the state block's bytes, from the image's format block |
 | 16 | 4 | where the image begins, signed |
 | 20 | 4 | where this tune's table stands, from the image's first byte |
 | 24 | 4`S` | the source index: where the table of source 1 to `S` begins |
-| | | the image, on a long, where this tune has one of its own |
+| | | the image, on a long, where this tune has a separate one |
 | | | the DTX1 tables, each on a long, as the tune file has them |
 
-**One image, one table or several.** An image holds the reader's code
-once, and DTX's init takes the header of the table to read (DTX, abi.md
-2), so tunes that agree on what an image gives once - the variant, the
+**One image, one table or several.** An image contains the reader's code
+once, and DTX's init reads the header of the table to read (DTX, abi.md
+2), so tunes that agree on what an image fixes once - the variant, the
 width, the unit, the copies flag and the ring - go into one image and the
-code stands once for them. A bound tune written on its own has its image
+code stands once for them. A bound tune written by itself has its image
 in it and reaches it forwards; one of a set reaches the set's image,
 which stands before it, so the offset at +16 is negative there. The field
 at +20 names this tune's table either way.
 
 The player reads the magic and the version at init and rejects another
 of either, reads the effects byte, the image, the table and the index,
-and never reads the state block's bytes: a host reads them, to give the
+and never reads the state block's bytes: a host reads them, to size the
 player a workspace of `YMXR_FIXED` plus that many bytes, on a long. `R`
-and `RR` it reads out of the table's own header (DTX, SPEC.md 1), since
-`DTX_metadata` gives the image's first table and a set shares one.
+and `RR` it reads out of the table's header (DTX, SPEC.md 1), since
+`DTX_metadata` reports the image's first table and a set shares one.
 
 ## 2. The SNDH core
 
 Position-independent. Its layout from its first byte:
 
-| offset | bytes | gives |
+| offset | bytes | what it is |
 |---|---|---|
-| 0 | 4 | `bra.w` to init: the entry an SNDH file's own triple reaches |
+| 0 | 4 | `bra.w` to init: the entry an SNDH file's triple reaches |
 | 4 | 4 | `bra.w` to exit |
 | 8 | 4 | `bra.w` to play |
 | 12 | 4 | `YMXS` |
@@ -111,17 +112,18 @@ The flags word:
 | bit | set where the core was assembled with | which asks of the host |
 |---|---|---|
 | 0 | the player's raster monitor (`YMXR_PERF`, performance.md) | that it read the palette writes to have what the run cost, and clear the screen for the bars |
-| 1 | the lean tick (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md) | that no MFP interrupt of its own nest inside another, and that the MFP's vector register be the player's to set |
+| 1 | the lean tick (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md) | that no MFP interrupt of the host nest inside another, and that the MFP's vector register be the player's to set |
 
 The two bits are a switch each: a core is assembled with either, both or
 neither.
 
 Both patched offsets count from the core's first byte and are even. A
-tool picks the core by name and holds it to the flags word, and stops
+tool selects the core by name and checks it against the flags word, and
+stops
 where the two part. The state byte has bit 0 set while a tune plays and
 bit 1 set once the tune has played its last row and does not repeat; a
 host that has to know when a tune that plays once is over reads it,
-since play returns nothing.
+since play returns no value.
 
 The subtune table: a word count `N`, then `N` longs, each a bound tune's
 offset from the core's first byte, each even. Init with the subtune `s`
@@ -130,9 +132,9 @@ first.
 
 The workspace: `YMXR_FIXED` plus the largest state block over the set's
 bound tunes, rounded up to a long, plus two bytes, zero bytes, last in
-the file. The player takes its workspace on a long and an SNDH host
+the file. The player requires its workspace on a long and an SNDH host
 loads the file on an even address, so the core rounds the workspace's
-address up to a long, and the two bytes give it room.
+address up to a long, and the two bytes leave room for that.
 
 Init keeps the four timers' vectors, control, enable and mask bits as it
 finds them, calls the player's init on the subtune's bound tune and the
@@ -153,22 +155,25 @@ In order:
    three entries, each the word `$6000` and a displacement, which is the
    core's offset less 2 for all three.
 2. **The tag block**, `SNDH` through `HDNS`: `TITL` and the title, `COMM`
-   and the composer where one is given, `CONV` and the converter's name,
+   and the composer where the file has one, `CONV` and the converter's
+   name,
    `##` and two digits, the subtunes, `TC` and the rate in decimal, `FLAG`
    and `~`, a letter for each timer the set claims, `a` to `d`, and `y`,
    each text ended by a zero byte and the block padded to an even length,
    `FRMS` and a long a subtune: the rows of a tune that plays once, 0 for
-   one that repeats, `!#SN` and a word a subtune, where a name is given,
-   each the offset of that subtune's name from the tag's own first byte,
+   one that repeats, `!#SN` and a word a subtune, where the file names
+   them, each the offset of that subtune's name from the tag's first
+   byte,
    the names each ended by a zero byte, a pad to an even length, and
    `HDNS`.
 3. **The core**, with its two offsets patched.
 4. **The subtune table** (2).
 5. **The images**, each on a long: one a group of subtunes that agree on
-   what an image gives once (1), so DTX's reader code stands once for the
+   what an image fixes once (1), so DTX's reader code stands once for
+   the
    group rather than once a subtune.
 6. **The bound tunes**, each on an even address, each reaching its image
-   backwards from its own first byte.
+   backwards from its first byte.
 7. **The workspace** (2), last.
 
 Rules the tool keeps: every bound tune is of the version the core reads,
@@ -184,7 +189,7 @@ come off the file: 88,288 bytes against the 100,160 a copy a subtune took.
 Position-independent, raw and even-sized; the SNDH file begins after
 the stub's last byte. Its layout from its first byte:
 
-| offset | bytes | gives |
+| offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `bra.w` to the program |
 | 4 | 4 | `YMXT` |
@@ -192,7 +197,7 @@ the stub's last byte. Its layout from its first byte:
 | 10 | 2 | the subtunes: patched by the tool |
 | 12 | 2 | flags: patched; the bits are below |
 | 14 | 2 | the rate, rows a second: patched from the `TC` tag |
-| 16 | 4 | the rows to play: patched; 0 plays as many as the tune gives |
+| 16 | 4 | the rows to play: patched; 0 plays the tune's row count |
 | 20 | 4 | the core's offset from the SNDH file's first byte: patched |
 
 The flags word:
@@ -202,12 +207,13 @@ The flags word:
 | 0 | the core has the raster monitor in | clears the screen before the banner, so that the monitor's bars stand where the desktop's pixels were |
 | 1 | the set claims Timer C | plays from the VBL; with the bit clear, from the VBL where the screen's rate is the tune's and from Timer C where it is not |
 
-The VBL is the screen's own clock: 50 or 60 Hz by the sync bit, 71 in
+The VBL is the screen's clock: 50 or 60 Hz by the sync bit, 71 in
 high resolution. A set that claims Timer C leaves the stub no timer to
-play from, so it plays from the VBL, and the tool holds such a set to
+play from, so it plays from the VBL, and the tool checks such a set
+against
 50 Hz, the rate of the screen the tune is written for; on another
 screen it plays at that screen's rate. With the bit clear the stub reads
-the screen's rate, takes the VBL where it is the tune's, and otherwise
+the screen's rate, uses the VBL where it is the tune's, and otherwise
 runs Timer C at 200 Hz, counts the rate against 200 and plays a row for
 every 200 the count reaches, the remainder carried, so a rate that does
 not divide 200 lands its rows over the second without drift, and a rate
@@ -219,13 +225,14 @@ A program from the stub, in order:
    SNDH file together, then the data, bss, symbol, reserved and flags
    longs, all 0, and a zero absflag word.
 2. **The stub**, with its descriptor patched: the subtunes and the rate
-   out of the SNDH file's own `##` and `TC` tags, the core's offset
+   out of the SNDH file's `##` and `TC` tags, the core's offset
    found by its `YMXS`.
 3. **The SNDH file.**
-4. **The relocation table**: one zero long, since nothing in the stub or
+4. **The relocation table**: one zero long, since no address in the stub
+   or
    the SNDH file is relocated.
 
-The program prints the SNDH file's address, takes the machine over under
+The program prints the SNDH file's address, claims the machine under
 Supexec, keeping the VBL vector, the four timers' vectors and the
 enable, mask and control registers, and turns every MFP interrupt off
 and stops the four timers; calls init with subtune 1 and plays from the
@@ -234,7 +241,7 @@ played, or once the core's state byte says the tune is over; switches
 subtunes on 1 to 9, offering in its banner the keys the set has; and
 hands the machine back with the mouse reporting again, Timer C's count
 written as the 192 of the system's 200 Hz. The keyboard is read at its
-ACIA, every IKBD report taken whole, and the mouse turned off at the
+ACIA, every IKBD report read whole, and the mouse turned off at the
 chip while the program runs, so that TOS finds no packet half read when
 it has the keyboard back.
 
@@ -242,7 +249,7 @@ it has the keyboard back.
 
 An SNDH file is passive: init sets the tune up and claims the timers its
 effects run, and something outside the file calls play at the tune's
-rate. The `TC` tag addresses that caller: it gives the rate, and names
+rate. The `TC` tag addresses that caller: it fixes the rate, and names
 Timer C as the interrupt a desktop host makes the calls from, by the
 convention that a host chains the operating system's 200 Hz Timer C and
 counts the rate against 200. The `FLAG` letters list the timers the set

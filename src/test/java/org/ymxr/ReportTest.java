@@ -16,7 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * What a tool says while it works: the account a report prints, the
- * lines a long run gives of its progress, and the conversion's own
+ * progress lines of a long run, and the conversion's
  * account against the file it wrote. {@code -silent} turns the account
  * off and leaves the notes, and no account reaches standard output,
  * which is what a tool is for.
@@ -41,11 +41,11 @@ final class ReportTest {
         Caught c = caught(false);
         c.report().say("a line");
         c.report().step("a step");
-        c.report().row("a name", "what it holds");
+        c.report().row("a name", "its value");
         c.report().progress("read", 1, 2);
         c.report().note("a note");
-        assertEquals("", c.said(), "a silent report prints nothing");
-        assertEquals(List.of("a note"), c.report().notes(), "and holds the note for its caller");
+        assertEquals("", c.said(), "a silent report prints no line");
+        assertEquals(List.of("a note"), c.report().notes(), "and keeps the note for its caller");
         assertFalse(c.report().says());
     }
 
@@ -70,15 +70,15 @@ final class ReportTest {
         for (int done = 1; done <= 400; done++) {
             c.report().progress("read", done, 400);
         }
-        assertEquals("", c.said(), "400 steps in no time at all say nothing");
+        assertEquals("", c.said(), "400 steps in no time at all print no line");
     }
 
     @Test
     void aLongRunSaysHowFarThroughItIsOnceATenth() throws Exception {
         Caught c = caught(true);
         // A tenth of the run and a second of the clock both have to pass,
-        // so the four steps below give three lines and not four: the
-        // first stands at the report's own start.
+        // so the four steps below produce three lines and not four: the
+        // first stands at the report's start.
         for (int done = 1; done <= 4; done++) {
             Thread.sleep(1100);
             c.report().progress("read", done, 4);
@@ -98,7 +98,7 @@ final class ReportTest {
         Caught c = caught(true);
         YmToYmxr.Converted converted = YmToYmxr.convert(dump, List.of(), c.report());
         String said = c.said();
-        // Every figure the account gives is the conversion's own, so a
+        // Every figure in the account comes from the conversion, so a
         // change in either shows here.
         assertTrue(said.contains("YM6!: Chambers of Shaolin"), said);
         assertTrue(said.contains("500 at 50 Hz (0:10)"), said);
@@ -123,7 +123,7 @@ final class ReportTest {
         Caught silent = caught(false);
         Caught saying = caught(true);
         // Every tool reads -silent, and the tools that pass the converter's
-        // flags on pass it too, so the converter takes it; and a report
+        // flags on pass it too, so the converter reads it; and a report
         // says what a conversion did without changing what it wrote.
         YmToYmxr.Converted with = YmToYmxr.convert(dump, List.of(YmToYmxr.SILENT),
                 silent.report());
@@ -131,9 +131,9 @@ final class ReportTest {
         assertEquals(said.said(), with.said());
         assertArrayEquals(said.written().file(), with.written().file(),
                 "a reporting conversion writes the file a silent one writes");
-        assertEquals("", silent.said(), "the flag it names leaves nothing printed");
+        assertEquals("", silent.said(), "the flag it names leaves the output empty");
         assertFalse(saying.said().isEmpty(), "and without it the account stands");
-        assertFalse(new Report().says(), "the report the library's own callers take is silent");
+        assertFalse(new Report().says(), "the report a library caller passes is silent");
     }
 
     @Test
@@ -143,7 +143,7 @@ final class ReportTest {
         Caught c = caught(true);
         YmToYmxr.convert(dump, List.of("-k1", "-m1920", "-r10"), c.report());
         String said = c.said();
-        // A flag given reads as asked for, and a source of a kind is
+        // A flag passed reads as requested, and a source of a kind is
         // counted with its rows.
         assertTrue(said.contains("the flags: -k1 -m1920 -r10"), said);
         assertTrue(said.contains("-k, the unit           1, asked for"), said);
@@ -159,11 +159,11 @@ final class ReportTest {
                 + " you blew it!.ym"));
         Caught c = caught(true);
         byte[] file = YmToYmxr.convert(dump, List.of(), c.report()).written().file();
-        // The account gives a row a column; the file gives each column's
-        // data set at an offset of its own, so the two are held together.
+        // The account has a row a column; the file has each column's
+        // data set at a separate offset, so the two are compared.
         int table = Tune.getLong(file, Tune.TABLE_AT);
         // A DTX2 file is its header, then a payload whose offsets count
-        // from the payload's own first byte (DTX abi.md 2.3).
+        // from the payload's first byte (DTX abi.md 2.3).
         int payload = table + org.dtx.Dtx.HEADER;
         int[] at = new int[Columns.C];
         for (int i = 0; i < Columns.C; i++) {
@@ -228,7 +228,7 @@ final class ReportTest {
                 "the account is on standard error: " + err[0]);
         assertEquals("", err[1].replace("  packed at unit 1: the repeat row 177 does not"
                 + " divide by 2" + System.lineSeparator(), ""),
-                "a silent run says its notes and nothing else: " + err[1]);
+                "a silent run prints its notes alone: " + err[1]);
         assertTrue(err[0].contains("note: packed at unit 1"),
                 "the note stands either way: " + err[0]);
         assertEquals(1, err[0].lines().filter(l -> l.contains("note: packed at unit 1")).count(),

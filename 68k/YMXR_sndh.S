@@ -25,19 +25,19 @@
 ;   +20  the workspace's bytes before the state block, YMXR_FIXED
 ;   +22  flags, a word: bit 0 where the raster monitor is assembled in
 ;        (the player's YMXR_PERF, doc/performance.md), bit 1 where a tick
-;        neither drops the interrupt level nor writes its own end of
-;        interrupt (YMXR_NEST=0 and YMXR_AEOI=1), which a host takes only
-;        where no MFP interrupt of its own nests and the vector register
+;        neither drops the interrupt level nor writes an end of
+;        interrupt (YMXR_NEST=0 and YMXR_AEOI=1), which a host uses only
+;        where no MFP interrupt of the host nests and the vector register
 ;        is the player's
 ;   +24  where the state byte is, a word: bit 0 set while a tune plays,
 ;        bit 1 once it has played its last row and does not repeat
 ;   +26  zero
 ;   +28  the subtune table, a long: a word count, then a long an entry,
 ;        each the bound tune's offset. Patched by the tool.
-;   +32  the workspace, a long. Patched by the tool. The player takes
+;   +32  the workspace, a long. Patched by the tool. The player requires
 ;        its workspace on a long and an SNDH host loads the file on an
 ;        even address, so the core rounds the address up to a long, and
-;        the tool gives the workspace two bytes more than the state needs.
+;        the tool allows the workspace two bytes more than the state needs.
 ;
 ; Every offset counts from the core's first byte.
 
@@ -50,7 +50,7 @@ sndh_core:
                 dc.w    YMXR_VERSION
                 dc.w    YMXR_FIXED
                 dc.w    YMXR_PERF|(YMXR_AEOI<<1) ; the flags: the monitor,
-                                        ; and the tick a host takes the MFP for
+                                        ; and the tick a host claims the MFP for
                 dc.w    sndh_state-sndh_core
                 dc.w    0
 sndh_table:     dc.l    0
@@ -63,7 +63,7 @@ SAV_IER         equ     19              ; IERA, IERB
 SAV_IMR         equ     21              ; IMRA, IMRB
 SAV_SIZE        equ     24
 
-; A timer put back where d2 has its bit: its vector, its own bits of its
+; A timer restored where d2 has its bit: its vector, its bits of its
 ; control register (keep is the other timer's), and its enable and mask
 ; bits as they were kept. slot is its byte's place in the kept control
 ; bytes, and ier the enable register, IERA or IERB, with the kept byte at

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Every document against the house style's ban list.
  *
- * <p>{@code AGENTS.md} states the rules - nothing acts on its own, and no
+ * <p>{@code AGENTS.md} defines the rules - a program does not intend, and no
  * flourish - and this test holds the phrases struck in review under them.
  * Each entry is one struck phrase or the stem of one; a hit names the file
  * and line. A phrase that is legitimate in a new context comes off the list
@@ -25,9 +25,9 @@ import org.junit.jupiter.api.Test;
  */
 final class HouseStyleTest {
 
-    /** The two documents that state the rules, and so quote what they
-     * strike. Every other Markdown file in the tree is held. */
-    private static final List<String> STATES_THE_RULES =
+    /** The two documents that define the rules, and so quote what they
+     * strike. Every other Markdown file in the tree is read. */
+    private static final List<String> DEFINES_THE_RULES =
             List.of("AGENTS.md", "CLAUDE.md");
 
     /** Struck in review, lowercase; matched as substrings. */
@@ -41,20 +41,20 @@ final class HouseStyleTest {
             "can be told",
             "roles stand",
             // a format does not rule, and does not measure: a measurement
-            // is taken of it, and its specification states what it states
+            // is made of it, and its specification defines it
             "it ruled",
             "it measured",
             // a format does not answer a constraint: a choice is what
             // it was, and the constraint is what bound it
             "answered",
-            // a specification defines; a tune and a build carry, and keep
-            // the verb for what a thing holds
+            // a specification defines; a tune and a build carry, and the
+            // verb belongs to what a thing does
             "carries",
-            // a column holds a value; nothing sits anywhere
+            // a column is one value a row; a thing does not sit anywhere
             "sits in",
             "stand apart",
-            // a place is a row number, and bit 5 moves it: nothing keeps
-            // one, and a thing that has not moved needs no sentence
+            // a place is a row number, and bit 5 moves it: a thing that
+            // has not moved needs no sentence
             "keeps its place",
             "keeps the place",
             "stands where it",
@@ -115,15 +115,39 @@ final class HouseStyleTest {
             "the ones that matter",
             "the whole point",
             // filler: cut unless the word carries the meaning
-            "actually");
+            "actually",
+            // the five stand-ins for the action, struck in YMXS and here:
+            // what a tune holds is the tune data structure, the rate a
+            // tune states is the tune's rate, what the two chips give is
+            // the figures of the two chips, a value a register takes is a
+            // value that fits it, and a negation stands where the sentence
+            // belongs. This vocabulary defines the noun "state" (a state
+            // block, a register of YM2149 state), so only its verb forms
+            // are struck. YMX's opcode `HOLD` is a name, so the entries
+            // here are the verb forms rather than the bare stem.
+            " hold ",
+            "holds",
+            "holding",
+            "held",
+            "states",
+            "stated",
+            "stating",
+            "giv",
+            "tak",
+            "nothing",
+            // possessive decoration: a table of its own is a table
+            " own ",
+            " own.",
+            // a person's viewpoint in a sentence about a file
+            "would rather");
 
-    /** Every Markdown file in the tree but the two that state the rules. */
+    /** Every Markdown file in the tree but the two that define the rules. */
     private static List<Path> documents() throws IOException {
         try (Stream<Path> tree = Files.walk(Path.of("."))) {
             return tree.filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".md"))
                     .filter(path -> !path.toString().contains("/target/"))
-                    .filter(path -> !STATES_THE_RULES
+                    .filter(path -> !DEFINES_THE_RULES
                             .contains(path.getFileName().toString()))
                     .sorted()
                     .toList();
@@ -153,14 +177,14 @@ final class HouseStyleTest {
         }
         assertTrue(hits.isEmpty(), () -> String.join("\n", hits)
                 + "\nAGENTS.md has the rule each phrase was struck under;"
-                + " reword the line, or take the entry off this list in the"
+                + " reword the line, or drop the entry from this list in the"
                 + " same change.");
     }
 
     /**
      * The hits a line wrap hides. A phrase broken across two lines stands in
      * neither of them, so every paragraph is read joined as well, and what
-     * the joined text holds beyond what its own lines hold is reported at
+     * the joined text has beyond the hits in its lines is reported at
      * the line the paragraph begins on. A table row, an indented block and a
      * fence break a paragraph: joining those would put words side by side
      * that no sentence puts there.

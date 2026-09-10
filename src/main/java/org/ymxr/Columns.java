@@ -4,20 +4,20 @@ import java.util.Arrays;
 
 /**
  * The thirty columns of a tune, one byte a column a frame (SPEC.md 1),
- * from a YM dump. A column is set where its value differs from what the
- * player holds; an unset value is 0, which R3.6 does not read.
+ * from a YM dump. A column is set where its value differs from the value
+ * the player keeps; an unset value is 0, which R3.6 does not read.
  *
  * <p>An effect starts on the frame the dump flags it, with the place's
  * reset and, where the timer is stopped, the timer's (1.9, section 6 rule
  * 5): a source that changes under a running timer reloads the count, and
- * the timer takes it at its next zero. An effect runs on while the dump
+ * the timer loads it at its next zero. An effect runs on while the dump
  * flags the same voice at the same value, its rate moving where the dump's
- * moves. A digidrum runs for the frames its rows take at its rate, the dump
+ * moves. A digidrum runs for the frames its rows run at its rate, the dump
  * flagging only the trigger, and the row it ends on stops it and sets the
  * voice's volume again (1.3). A SID voice or a digidrum owns its volume
- * register while it runs (section 6); a sync buzzer owns nothing, the
- * frame's own write to R13 restarting the envelope beside its ticks, as the
- * reference player has it.
+ * register while it runs (section 6); a sync buzzer owns no register, the
+ * frame's write to R13 restarting the envelope alongside its ticks, as the
+ * reference player does.
  *
  * <p>The row the tune repeats to sets every register but R13 and the ones
  * an effect owns there, and every effect, so the wrap lands on a known
@@ -34,7 +34,7 @@ final class Columns {
     static final int TIMER_RESET = 0x40;
     static final int PLACE_RESET = 0x20;
 
-    /** The register bits a YM dump keeps for its own flags, masked off. */
+    /** The register bits a YM dump uses for its flags, masked off. */
     static final int[] MASK = {0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0x3F,
                                0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F};
 
@@ -55,7 +55,7 @@ final class Columns {
     /** Bits 3 to 0: the effects the tune ever runs. */
     final int effects;
 
-    /** Columns given whole, {@code column[c][frame]}, for a tune built
+    /** Columns passed whole, {@code column[c][frame]}, for a tune built
      *  rather than converted: the row it repeats to, or the frame count
      *  where it plays once, and the effects it runs. */
     Columns(byte[][] column, int repeat, int effects) {
@@ -68,8 +68,8 @@ final class Columns {
         int frames = song.frames();
         this.repeat = repeat;
         column = new byte[C][frames];
-        int[] held = new int[14];
-        Arrays.fill(held, -1);
+        int[] wrote = new int[14];
+        Arrays.fill(wrote, -1);
         Effects.Slot[] running = {Effects.Slot.EMPTY, Effects.Slot.EMPTY};
         int[] runningNumber = {0, 0};
         int[] targetHeld = {-1, -1};
@@ -90,7 +90,7 @@ final class Columns {
             // it.
             boolean keyframe = f == repeat;
             if (keyframe) {
-                Arrays.fill(held, -1);
+                Arrays.fill(wrote, -1);
                 Arrays.fill(targetHeld, -1);
                 Arrays.fill(lastKind, 0);
                 Arrays.fill(lastTarget, -1);
@@ -162,30 +162,30 @@ final class Columns {
                     }
                     if (starting) {
                         // Bit 6 stops the timer, writes the count and starts
-                        // it, so the timer takes a whole period and loses
+                        // it, so the timer runs a whole period and loses
                         // what it had run of the last one. Section 6 rule 5
                         // sets the bit where the timer is stopped; where the
-                        // timer runs, the count this row writes is taken
-                        // when the running count reaches zero, which moves
-                        // the pitch without a break (1.9). A timer is
+                        // timer runs, the count this row writes loads when
+                        // the running count reaches zero, which moves the
+                        // pitch without a break (1.9). A timer is
                         // stopped where no effect runs on it, the row that
                         // stopped the effect having written select 0, and
                         // where a digidrum's source has run out: that source
                         // does not repeat, so its last tick stops the timer
                         // (section 5). A SID voice's source and a sync
                         // buzzer's repeat, and run until a row stops them.
-                        // The keyframe sets the bit whatever the wrap left.
+                        // The keyframe sets the bit in either case.
                         boolean stopped = keyframe || !running[i].on()
                                 || running[i].kind() == Effects.DRUM && f >= drumEnd[i];
                         // Where a square replaces a square on the same
                         // target the row leaves bit 5 clear and moves no
-                        // place: the row number the place holds counts into
-                        // the new source's rows (1.9). Every level is its
-                        // own source, so a square whose level moves starts
-                        // one each time, and its two ticks either side of
-                        // the start fall a whole period apart. A drum struck
-                        // again reads its first row, so it takes bit 5 as
-                        // any other start does.
+                        // place: the row number in the place counts into
+                        // the new source's rows (1.9). Every level is a
+                        // separate source, so a square whose level moves
+                        // starts one each time, and its two ticks either
+                        // side of the start fall a whole period apart. A
+                        // drum struck again reads its first row, so it sets
+                        // bit 5 as any other start does.
                         boolean unmoved = !keyframe && slot[i].kind() == Effects.SID
                                 && lastKind[i] == Effects.SID
                                 && lastTarget[i] == slot[i].target();
@@ -222,18 +222,18 @@ final class Columns {
             }
             for (int c = 0; c < 13; c++) {
                 if (BESIDE_COLUMN[c] >= 0) {
-                    if (reg[c] != held[c]) {
+                    if (reg[c] != wrote[c]) {
                         out[c] = (byte) reg[c];
                         if (reg[c] == 0) {
                             out[BESIDE_COLUMN[c]] |= (byte) BESIDE_BIT[c];
                         }
-                        held[c] = reg[c];
+                        wrote[c] = reg[c];
                     }
                 } else if ((owned & 1 << c) != 0) {
-                    held[c] = -1;                   // the effect's register,
-                } else if (reg[c] != held[c]) {     // and no row's
+                    wrote[c] = -1;                   // the effect's register,
+                } else if (reg[c] != wrote[c]) {     // and no row's
                     out[c] |= (byte) (0x80 | reg[c]);
-                    held[c] = reg[c];
+                    wrote[c] = reg[c];
                 }
             }
             if (reg[13] >= 0) {
@@ -273,9 +273,10 @@ final class Columns {
         return out;
     }
 
-    /** The frames a source of `rows` rows takes at a rate, rounded up, with
-     *  a sixteenth of a frame added for the start running into its own
-     *  frame: the reckoning YMX's player was measured against. */
+    /** The frames a source of `rows` rows runs for at a rate, rounded up,
+     *  with a sixteenth of a frame added for a start that falls inside the
+     *  frame it begins in: the reckoning YMX's player was measured
+     *  against. */
     static int duration(int rows, int select, int count, int frameRate) {
         long divisor = (long) PRESCALER[select] * count;
         long scaled = (long) rows * divisor * frameRate + MFP / 16;

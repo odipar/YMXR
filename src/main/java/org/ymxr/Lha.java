@@ -11,7 +11,7 @@ package org.ymxr;
  * the wild carries - verifies its checksum, and inflates the {@code -lh5-}
  * method; {@code -lh0-} members are stored uncompressed and copied out.
  *
- * <p>YM archives hold exactly one member, so this returns the first member's
+ * <p>YM archives contain exactly one member, so this returns the first member's
  * data and ignores anything after it.
  */
 final class Lha {

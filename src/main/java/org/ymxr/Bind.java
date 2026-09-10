@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * {@code ymxr-bind in.ymxr out.bin}: the bound tune of a tune file
- * ({@link Bound}), what the player takes, as a file. A tune file this
+ * ({@link Bound}), the layout the player reads, as a file. A tune file this
  * does not bind, one of another version for one, gets a line on stderr
  * beginning {@code ymxr-bind: } and an exit of 1; a file that does not
  * read or write gets the same line and an exit of 2, as does a wrong

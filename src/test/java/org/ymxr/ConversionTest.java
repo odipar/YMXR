@@ -21,7 +21,7 @@ import org.junit.jupiter.api.TestFactory;
  * Every tune under ym/test, converted, read back and replayed against the
  * dump it came from: the register a row leaves is the dump's, an effect
  * runs where the dump flags one, and a digidrum runs for the frames its
- * rows take.
+ * rows run.
  */
 final class ConversionTest {
 
@@ -72,7 +72,7 @@ final class ConversionTest {
     @Test
     void aSourceOfAnotherShapeIsRejected() throws IOException {
         // SPEC.md 3.1: a source is one column of one byte at this version,
-        // the row 2.1's procedures take, and a reader rejects one of another
+        // the row shape 2.1's procedures read, and a reader rejects another
         // shape as it rejects a tune of another version. The player reads a
         // source's rows a byte at a time from byte 16 of its table, so a
         // width of 2 read as this version reads it plays something else.
@@ -82,7 +82,7 @@ final class ConversionTest {
         assertEquals(1, TuneFile.read(file).sources().get(0).width(),
                 "the converter writes a source of one byte");
         int at = Tune.getLong(file, Tune.INDEX_AT);
-        // the DTX header states W at byte 14 and C at bytes 8 and 9
+        // the DTX header carries W at byte 14 and C at bytes 8 and 9
         byte[] wide = file.clone();
         wide[at + 14] = 2;
         assertThrows(IllegalArgumentException.class, () -> TuneFile.read(wide),
@@ -96,10 +96,10 @@ final class ConversionTest {
     @Test
     void theCopiesFlagIsTakenAndStatedInTheTable() throws IOException {
         // -copies packs a match beyond the ring as a copy from the column's
-        // own literal stream, which packs a small ring far smaller (DTX,
-        // dtx-write). The format block's byte 3 states it, and the binder
+        // separate literal stream, which packs a small ring far smaller
+        // (DTX, dtx-write). The format block's byte 3 records it, and the binder
         // reads that byte to pick the reader that reads such a table, so a
-        // table packed one way and read the other is what this holds apart.
+        // table packed one way and read the other is what this separates.
         byte[] dump = Files.readAllBytes(Path.of("ym/test/DBA 5.ym"));
         byte[] plain = YmToYmxr.convert(dump, List.of(), new Report()).written().file();
         byte[] copies = YmToYmxr.convert(dump, List.of("-copies"), new Report())
@@ -107,7 +107,7 @@ final class ConversionTest {
         assertEquals(0, TuneFile.read(plain).dtx2()[Dtx.HEADER + 3] & 1,
                 "the default packs no copies");
         assertEquals(1, TuneFile.read(copies).dtx2()[Dtx.HEADER + 3] & 1,
-                "-copies states it in the table");
+                "-copies records it in the table");
         assertTrue(copies.length < plain.length, () -> "DBA 5 packs to " + copies.length
                 + " bytes with copies and " + plain.length + " without");
     }
@@ -115,7 +115,7 @@ final class ConversionTest {
     @Test
     void aSecondsOfSearchIsTakenAndAnythingElseIsNot() throws IOException {
         // -copiesS searches S seconds beyond the opening passes. The flag is
-        // the packer's, so the tool takes the number and rejects what is not
+        // the packer's, so the tool reads the number and rejects what is not
         // one rather than packing at a default nobody asked for.
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Big - Samantha Fox Strip Poker 6.ym"));
         byte[] searched = YmToYmxr.convert(dump, List.of("-copies0"), new Report())
@@ -124,7 +124,7 @@ final class ConversionTest {
                 "-copies0 packs copies, the opening passes alone");
         assertThrows(NumberFormatException.class,
                 () -> YmToYmxr.convert(dump, List.of("-copiesnow"), new Report()),
-                "a search of what is not a number is not taken");
+                "a search of what is not a number is rejected");
     }
 
     @Test
@@ -133,24 +133,24 @@ final class ConversionTest {
         // the control column where the timer is stopped, and bit 5 unless
         // the source it starts is a square replacing a square on the same
         // target. Effect 1 of Synergy Credits starts on row 12, where
-        // nothing runs on its timer, and takes another source at another
+        // no source runs on its timer, and starts another source at another
         // count on row 36, where the timer has run since. The count row 36
-        // gives is taken when the running count reaches zero (1.9), so the
-        // pitch moves and the phase holds; the row moves no place with it,
+        // writes loads when the running count reaches zero (1.9), so the
+        // pitch moves and the phase stands; the row moves no place with it,
         // so its two ticks fall a whole period apart.
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym"));
         Table table = TuneFile.read(YmToYmxr.convert(dump, List.of(), new Report())
                 .written().file()).table();
         int t = Columns.EFFECT + 4;
         int t2 = Columns.EFFECT;
-        assertEquals(0x80 | 10, table.column(t)[12] & 0xFF, "row 12 gives effect 1 R10");
+        assertEquals(0x80 | 10, table.column(t)[12] & 0xFF, "row 12 sets effect 1 to R10");
         assertEquals(0x80 | 3, table.column(t + 1)[12] & 0xFF, "row 12 starts source 3");
         assertEquals(0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET | 5,
                 table.column(t + 2)[12] & 0xFF, "row 12 starts the stopped timer");
         assertEquals(0xE7, table.column(t + 3)[12] & 0xFF, "row 12's count");
-        assertEquals(0x80 | 1, table.column(t + 1)[36] & 0xFF, "row 36 takes source 1");
+        assertEquals(0x80 | 1, table.column(t + 1)[36] & 0xFF, "row 36 starts source 1");
         assertEquals(0x80 | 5, table.column(t + 2)[36] & 0xFF,
-                "row 36 takes the source without stopping the timer or the place");
+                "row 36 starts the source without stopping the timer or moving the place");
         assertEquals(0xEB, table.column(t + 3)[36] & 0xFF, "row 36's count");
         // Effect 0's source column goes to 0 on row 1944 and row 1950 starts
         // a square on the target it last ran one on. The timer stopped, so
@@ -167,19 +167,19 @@ final class ConversionTest {
             byte[] target = table.column(Columns.EFFECT + 4 * i);
             byte[] source = table.column(Columns.EFFECT + 4 * i + 1);
             byte[] control = table.column(Columns.EFFECT + 4 * i + 2);
-            int held = -1;
+            int target0 = -1;
             int last = -2;
             int unmoved = 0;
             for (int f = 0; f < table.rows(); f++) {
                 if ((target[f] & 0x80) != 0) {
-                    held = target[f] & 0x7F;
+                    target0 = target[f] & 0x7F;
                 }
                 if ((source[f] & 0xFF) > 0x80) {
-                    int want = held == last ? 0 : Columns.PLACE_RESET;
+                    int want = target0 == last ? 0 : Columns.PLACE_RESET;
                     assertEquals(want, control[f] & Columns.PLACE_RESET,
                             "row " + f + " starts effect " + i + " on the wrong place bit");
                     unmoved += want == 0 ? 1 : 0;
-                    last = held;
+                    last = target0;
                 }
             }
             assertTrue(unmoved > 100, "effect " + i + " moves no place on "

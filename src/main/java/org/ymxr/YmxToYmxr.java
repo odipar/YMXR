@@ -14,12 +14,12 @@ import java.util.List;
  *
  * <p>ymx-dump reads a .ymx out (YMX, SPEC.md 2): its header, and every
  * stream decoded to one byte a frame. Streams 0 to 13 are the sound
- * registers holding what the chip receives, the effect bits stripped, so
+ * registers as the chip receives them, the effect bits stripped, so
  * they are a frame's fourteen values and go through the same conversion a
  * YM dump does.
  *
  * <p>Streams 14 to 24 are the script that drives YMX's four timer
- * channels. A tune whose script starts nothing converts whole here. One
+ * channels. A tune whose script starts no effect converts whole here. One
  * that starts something converts to its frame values without it, which
  * this says on standard error rather than leaving to a listener.
  */
@@ -33,7 +33,7 @@ final class YmxToYmxr {
     private static final int REGISTERS = 14;
 
     /** Stream 14, M, the master byte (YMX, SPEC.md 2.1): bits 0 to 3 mark
-     *  the timer channels that act this frame, and bits 4 to 7 hold which
+     *  the timer channels that act this frame, and bits 4 to 7 name which
      *  voices the frame leaves its volume register unwritten for, which is
      *  what SPEC.md 6 rule 1 asks of a row here. */
     private static final int STREAM_M = 14;
@@ -120,11 +120,11 @@ final class YmxToYmxr {
      * conversion here drops to a unit of 1 instead, so a dump of an odd
      * frame count is one frame longer through YMX than through the dump.
      * The dump is what a tune's rows are, so the padding comes off and
-     * this format makes its own reckoning of the unit.
+     * this format reckons the unit separately.
      *
      * <p>A pad at YMX's unit of 2 is one frame, it repeats the frame
      * before it and it acts on no channel, and a padded count is even.
-     * One frame comes off where all three hold. A tune whose own last
+     * One frame comes off where all three apply. A tune whose last
      * frame reads that way loses it, which is a frame writing what the
      * frame before it wrote; a file packed at a wider unit keeps the pad
      * past the first.
@@ -146,7 +146,7 @@ final class YmxToYmxr {
     }
 
     /** The frames a dumped file's script acts on, which this version
-     *  leaves behind: M is 0 on a frame that starts nothing (YMX,
+     *  leaves behind: M is 0 on a frame that starts no effect (YMX,
      *  SPEC.md 2.1). */
     static int acting(Dumped read) {
         int frames = 0;
@@ -159,7 +159,7 @@ final class YmxToYmxr {
     }
 
     /** A dumped file as a YM song of its fourteen register streams, which
-     *  the converter takes as it takes a dump's. */
+     *  the converter reads as it reads a dump's. */
     static YmDump.Song song(Dumped read, String name) {
         byte[][] registers = new byte[YmDump.Song.YM_REGISTERS][read.frames()];
         for (int r = 0; r < YmDump.Song.YM_REGISTERS; r++) {
@@ -172,7 +172,7 @@ final class YmxToYmxr {
                 read.loopFrame(), false, 0L, new byte[0][], name, "", "", registers);
     }
 
-    /** The opcodes an action byte's top three bits give (YMX, SPEC.md 3). */
+    /** The opcodes an action byte's top three bits select (YMX, SPEC.md 3). */
     private static final int RESUME = 0;
     private static final int HOLD = 1;
     private static final int RELEASE = 2;
@@ -247,8 +247,8 @@ final class YmxToYmxr {
             int master = read.streams()[STREAM_M][f] & 0xFF;
             // A preempt stops other channels (SPEC.md 3, opcode 7). The
             // channels act in channel order, so one that acts before the
-            // preempt has written its row already: the stops are taken
-            // after the frame's channels, and a stop takes the whole row.
+            // preempt has written its row already: the stops are applied
+            // after the frame's channels, and a stop fills the whole row.
             // A select left standing there would start the timer the stop
             // just stopped, since a stopped timer starts on the select
             // whether the row sets bit 6 or not (1.9).
@@ -280,7 +280,7 @@ final class YmxToYmxr {
                         used |= 1 << c;
                     }
                     case START_RETRIGGER -> {
-                        // X bits 7 to 4 give the shape and 3 to 0 the
+                        // X bits 7 to 4 are the shape and 3 to 0 the
                         // channels a preempt stops (YMX, SPEC.md 2.2)
                         int shape = (read.streams()[STREAM_X][f] >> 4) & 0x0F;
                         target[c] = 13;
@@ -385,7 +385,7 @@ final class YmxToYmxr {
         }
         // The row a tune repeats to stops every effect it does not start,
         // so the wrap lands on a known state whatever ran into it, as a
-        // dump's own conversion has it (Columns). Only the effects the tune
+        // dump's conversion does it (Columns). Only the effects the tune
         // runs: a row sets no column of one it does not state (section 6
         // rule 2), so this waits until the walk says which run.
         if (repeat < read.frames()) {
@@ -440,9 +440,9 @@ final class YmxToYmxr {
         }
         int frames = frames(read);
         if (frames != read.frames()) {
-            report.note((read.frames() - frames) + " frame of YMX's own padding"
+            report.note((read.frames() - frames) + " frame of YMX's padding"
                     + " comes off the end: a dump's rows are what a tune has,"
-                    + " and this conversion picks its own unit");
+                    + " and this conversion selects its unit separately");
         }
         read = new Dumped(frames, read.rate(), read.loopFrame(), read.streams(),
                 read.samples(), read.loops());
@@ -452,8 +452,8 @@ final class YmxToYmxr {
                 ? stem.substring(0, stem.length() - 4) : stem);
 
         // The fourteen register streams first, through the columns a YM
-        // dump's registers make: the streams hold what the chip receives
-        // and no effect bits, so nothing of the script reaches them here.
+        // dump's registers make: the streams are the chip's registers
+        // without the effect bits, so no part of the script reaches them here.
         Columns registers = new Columns(song, new Sources(List.of()), repeat, report);
         byte[][] column = registers.column;
 

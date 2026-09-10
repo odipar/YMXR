@@ -5,7 +5,7 @@ import org.dtx.Table;
 
 /**
  * The frame procedure of SPEC.md section 4, as a model: what the fourteen
- * registers hold after each row, and what each effect runs. A reader in
+ * registers are after each row, and what each effect runs. A reader in
  * the sense of R2.4, writing to no chip.
  *
  * <p>A register the model has not seen set is -1, and so is a register an
@@ -14,13 +14,13 @@ import org.dtx.Table;
  * what the rows gave, and its place is not followed.
  *
  * <p>What the last step wrote stands beside the state: {@code written}
- * gives each register's value where the row wrote it and -1 where not,
+ * reports each register's value where the row wrote it and -1 where not,
  * and each effect says whether the row touched it and which control bits
  * the row set. That is what a reader reports (SPEC.md 7).
  */
 final class Replay {
 
-    /** What one effect runs after a row: source 0 where it runs nothing.
+    /** What one effect runs after a row: source 0 where it runs no source.
      *  {@code touched} says the row set one of its columns, {@code timer}
      *  that the row's control column had bit 6 and {@code place} bit 5. */
     record Effect(int target, int source, int select, int count, boolean started,
@@ -41,7 +41,7 @@ final class Replay {
         Arrays.fill(effect, Effect.NONE);
     }
 
-    /** The row number the next step takes, following the table's repeat. */
+    /** The row number the next step reads, following the table's repeat. */
     int row() {
         return row;
     }
@@ -60,7 +60,7 @@ final class Replay {
             int t = Columns.EFFECT + 4 * i;
             Effect was = effect[i];
             // A row leaves the column of a volume register an effect runs
-            // on unset (SPEC.md 6 rule 1), so the model holds no value for
+            // on unset (SPEC.md 6 rule 1), so the model has no value for
             // it: the row that stops the effect sets the register again.
             if (was.source() != 0 && was.target() < 13) {
                 registers[was.target()] = -1;

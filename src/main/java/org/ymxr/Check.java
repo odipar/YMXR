@@ -12,9 +12,9 @@ import org.dtx.Table;
 
 /**
  * A dump converted and replayed against itself: the tune file's table
- * stepped frame by frame by {@link Replay}, every frame's registers held to
- * the dump's, a volume register an effect owns held to an unset column
- * instead, and every effect's source, target, rate and count held to what
+ * stepped frame by frame by {@link Replay}, every frame's registers against
+ * the dump's, a volume register an effect owns checked against an unset column
+ * instead, and every effect's source, target, rate and count checked against what
  * the dump flags. {@code ConversionTest} runs it on the tunes under
  * {@code ym/test}, and {@code bin/ymxr-check} on any dumps, the corpus
  * among them.
@@ -28,16 +28,16 @@ final class Check {
     }
 
     /** What is wrong with the dump's conversion at the tool's defaults, or
-     *  nothing where every frame replays to the dump. */
+     *  an empty list where every frame replays to the dump. */
     static List<String> of(YmDump.Song song) {
         return of(song, List.of());
     }
 
     /**
      * What is wrong with the dump's conversion at the tool's flags, or
-     * nothing where every frame replays to the dump: the tune's rows are
+     * an empty list where every frame replays to the dump: the tune's rows are
      * stepped through one pass and the loop once, as the kit's record runs
-     * (SPEC.md 7), each row held to its frame of the dump.
+     * (SPEC.md 7), each row checked against its frame of the dump.
      */
     static List<String> of(YmDump.Song song, List<String> flags) {
         List<String> wrong = new ArrayList<>();
@@ -59,21 +59,21 @@ final class Check {
                     + written.repeat());
         }
         if (tune.sources().size() != sources.count()) {
-            wrong.add("the file holds " + tune.sources().size() + " sources, not "
+            wrong.add("the file has " + tune.sources().size() + " sources, not "
                     + sources.count());
         }
         for (int i = 0; i < Math.min(sources.count(), tune.sources().size()); i++) {
             Table s = tune.sources().get(i);
-            byte[] held = s.column(0);
+            byte[] values = s.column(0);
             int want = sources.get(i + 1).rows().length;
-            if (s.columns() != 1 || held.length != want) {
+            if (s.columns() != 1 || values.length != want) {
                 wrong.add("source " + (i + 1) + " is " + s.columns() + " columns of "
-                        + held.length + " rows, not one of " + want);
+                        + values.length + " rows, not one of " + want);
                 continue;
             }
-            for (int r = 0; r < held.length; r++) {
-                boolean marker = (held[r] & 0x80) != 0;
-                if (marker != (r == held.length - 1)) {
+            for (int r = 0; r < values.length; r++) {
+                boolean marker = (values[r] & 0x80) != 0;
+                if (marker != (r == values.length - 1)) {
                     wrong.add("source " + (i + 1) + " row " + r + (marker ? " is a marker"
                             : " is not the marker"));
                 }
@@ -101,7 +101,7 @@ final class Check {
                 Effects.Slot slot = slots[i];
                 // A drum on a voice preempts a SID there: while the other
                 // effect runs a drum on this slot's voice, the SID the dump
-                // flags runs nothing.
+                // flags runs no source.
                 Replay.Effect o = model.effect[1 - i];
                 boolean preempted = slot.on() && slot.kind() == Effects.SID && o.source() != 0
                         && sources.get(o.source()).kind() == Effects.DRUM
@@ -114,7 +114,7 @@ final class Check {
                 } else if (slot.on() && sources.number(slot, new Report()) != 0) {
                     int number = sources.number(slot, new Report());
                     if (e.source() == 0) {
-                        wrong.add(f + ": effect " + i + " runs nothing where the dump flags kind "
+                        wrong.add(f + ": effect " + i + " runs no source where the dump flags kind "
                                 + slot.kind());
                     } else {
                         Sources.Source s = sources.get(e.source());
@@ -141,7 +141,7 @@ final class Check {
                     boolean drum = s.kind() == Effects.DRUM;
                     if (!drum || r >= drumEnd[i]) {
                         wrong.add(f + ": effect " + i + " runs source " + e.source()
-                                + " where the dump flags nothing");
+                                + " where the dump flags no effect");
                     }
                 }
                 if (e.source() != 0 && e.target() < 13) {
@@ -161,7 +161,7 @@ final class Check {
                                 + " while an effect runs on it");
                     }
                 } else if (model.registers[c] != want) {
-                    wrong.add(f + ": R" + c + " holds " + model.registers[c] + ", not " + want);
+                    wrong.add(f + ": R" + c + " is " + model.registers[c] + ", not " + want);
                 }
             }
             if (model.envelopeWritten != (dump[13] >= 0)
@@ -175,7 +175,7 @@ final class Check {
     }
 
     /** What one line of the tool says of a file: no dump where the file is
-     *  not a YM5!/YM6! dump, and otherwise nothing wrong, or what is. */
+     *  not a YM5!/YM6! dump, and otherwise an empty list, or the faults. */
     record Result(Path file, boolean dump, List<String> wrong) {
     }
 
@@ -230,7 +230,7 @@ final class Check {
      * exit of 1 where any does; the flags are the converter's. A file
      * that is not a YM5!/YM6! dump is said and not counted. The tool says
      * how many files it has and how far through them it is, which a run
-     * over a corpus of thousands takes minutes to reach the end of;
+     * over a corpus of thousands runs for minutes;
      * {@code -silent} leaves the lines a file and the count.
      */
     public static void main(String[] args) throws IOException {

@@ -19,10 +19,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The player's equates against the bound tune's constants: the bound
- * tune's offsets, its version and the column count are stated in both,
- * and this fails where the two differ. The tune file's own constants are
- * held to what SPEC.md 3.3 states, and the bound tune to what the file it
- * is bound from states.
+ * tune's offsets, its version and the column count appear in both, and
+ * this fails where the two differ. The tune file's constants are checked
+ * against SPEC.md 3.3, and the bound tune against the file it is bound
+ * from.
  */
 final class PlayerTest {
 
@@ -44,17 +44,18 @@ final class PlayerTest {
     }
 
     /**
-     * The offset rows one section of BINARIES.md states, by what the row
-     * gives: the first table under that heading, which opens
-     * {@code | offset | bytes | gives |}. Three sections state a layout
+     * The offset rows of one section of BINARIES.md, keyed by the row's
+     * text: the first table under that heading, which opens
+     * {@code | offset | bytes | what it is |}. Three sections define a
+     * layout
      * and each names its fields the same way, so one reader serves all
      * three.
      */
     private static Map<String, Integer> layout(String said, String section) {
         int at = said.indexOf("## " + section);
-        assertTrue(at >= 0, "BINARIES.md states no section " + section);
-        int table = said.indexOf("| offset | bytes | gives |", at);
-        assertTrue(table >= 0, section + " states no layout");
+        assertTrue(at >= 0, "BINARIES.md has no section " + section);
+        int table = said.indexOf("| offset | bytes | what it is |", at);
+        assertTrue(table >= 0, section + " has no layout");
         Map<String, Integer> out = new LinkedHashMap<>();
         Pattern cells = Pattern.compile("^\\| (\\d+) \\| [^|]+ \\| ([^|]+) \\|$");
         for (String line : said.substring(table).split("\n")) {
@@ -73,9 +74,9 @@ final class PlayerTest {
     /** The bit numbers of the flags table under one section, by what sets them. */
     private static Map<String, Integer> flags(String said, String section) {
         int at = said.indexOf("## " + section);
-        assertTrue(at >= 0, "BINARIES.md states no section " + section);
+        assertTrue(at >= 0, "BINARIES.md has no section " + section);
         int table = said.indexOf("The flags word:", at);
-        assertTrue(table >= 0, section + " states no flags word");
+        assertTrue(table >= 0, section + " has no flags word");
         Map<String, Integer> out = new LinkedHashMap<>();
         Pattern cells = Pattern.compile("^\\| (\\d+) \\| ([^|]+) \\| [^|]+ \\|$");
         for (String line : said.substring(table).split("\n")) {
@@ -90,18 +91,18 @@ final class PlayerTest {
         return out;
     }
 
-    /** The one row of a table whose text opens with the words given. */
+    /** The one row of a table whose text opens with those words. */
     private static Map.Entry<String, Integer> row(Map<String, Integer> table, String opens) {
         for (Map.Entry<String, Integer> one : table.entrySet()) {
             if (one.getKey().startsWith(opens)) {
                 return one;
             }
         }
-        throw new AssertionError("no row gives \"" + opens + "\", of " + table.keySet());
+        throw new AssertionError("no row opens \"" + opens + "\", of " + table.keySet());
     }
 
     /**
-     * The bound tune's layout as BINARIES.md 1 states it, against the
+     * The bound tune's layout as BINARIES.md 1 defines it, against the
      * player's equates and the binder's constants. A host reads a bound
      * tune by that table, so a field that moves in one of the three moves
      * in all three or the three disagree.
@@ -121,14 +122,14 @@ final class PlayerTest {
         assertEquals(Bound.INDEX_AT, row(said, "the source index").getValue());
         Matcher version = Pattern.compile("\\$([0-9A-Fa-f]+)")
                 .matcher(row(said, "the version").getKey());
-        assertTrue(version.find(), "the version row gives no version");
+        assertTrue(version.find(), "the version row has no version");
         assertEquals(Bound.VERSION, Integer.parseInt(version.group(1), 16),
-                "BINARIES.md 1 states another version than the binder writes");
+                "BINARIES.md 1 has another version than the binder writes");
     }
 
     /**
      * The SNDH core's descriptor and its flags word as BINARIES.md 2
-     * states them, against the packager that writes them.
+     * defines them, against the packager that writes them.
      */
     @Test
     void theSndhCoreIsLaidOutAsBinariesStates() throws IOException {
@@ -149,7 +150,7 @@ final class PlayerTest {
 
     /**
      * The program stub's descriptor and its flags word as BINARIES.md 4
-     * states them, against the tool that patches them.
+     * defines them, against the tool that patches them.
      */
     @Test
     void theProgramStubIsLaidOutAsBinariesStates() throws IOException {
@@ -188,7 +189,7 @@ final class PlayerTest {
     }
 
     /** Each tick kind as a triple: the text of its row in
-     *  performance.md, the player's equate that gives what that path
+     *  performance.md, the player's equate for what that path
      *  costs, and the cycles the level drop adds to it, 16 on the
      *  three paths that write a row's value and none on the two that
      *  end a source. */
@@ -216,7 +217,7 @@ final class PlayerTest {
         String said = Files.readString(Path.of("doc/performance.md"));
         for (int i = 0; i < TICKS.size(); i += 3) {
             String row = TICKS.get(i);
-            int held = Objects.requireNonNull(e.get(TICKS.get(i + 1)),
+            int equate = Objects.requireNonNull(e.get(TICKS.get(i + 1)),
                     TICKS.get(i + 1) + " is not an equate of the player");
             int drop = Integer.parseInt(TICKS.get(i + 2));
             Matcher m = Pattern.compile("^\\| " + Pattern.quote(row)
@@ -224,8 +225,8 @@ final class PlayerTest {
             assertTrue(m.find(), "performance.md's lean table has no row for " + row);
             int full = Integer.parseInt(m.group(1));
             int lean = Integer.parseInt(m.group(2));
-            assertEquals(lean, held, row + " is measured at " + lean
-                    + " cycles with neither switch, and the player holds " + held);
+            assertEquals(lean, equate, row + " is measured at " + lean
+                    + " cycles with neither switch, and the player has " + equate);
             assertEquals(full, lean + drop + END, row + " is measured at " + full
                     + " cycles as it stands, and the lean path plus the level and the end"
                     + " of interrupt is " + (lean + drop + END));
@@ -252,7 +253,7 @@ final class PlayerTest {
         byte[] bound = Bound.of(file);
         assertArrayEquals(Bound.MAGIC, Arrays.copyOf(bound, 4));
         assertEquals(Bound.VERSION, Tune.getWord(bound, 4));
-        // the header the file states, from the frame rate to the count
+        // the header the file carries, from the frame rate to the count
         assertArrayEquals(Arrays.copyOfRange(file, Tune.FRAME_RATE_AT, Tune.TABLE_AT),
                 Arrays.copyOfRange(bound, Tune.FRAME_RATE_AT, Tune.TABLE_AT));
         int count = tune.sources().size();
@@ -262,7 +263,7 @@ final class PlayerTest {
         assertEquals(Tune.getLong(bound, imageAt + Bound.FORMAT_AT + Bound.FORMAT_STATE_AT),
                 Tune.getLong(bound, Bound.STATE_AT));
         // the DTX1 tables stand past the image, each on a long, as the file
-        // holds them
+        // has them
         int end = bound.length;
         for (int i = count - 1; i >= 0; i--) {
             int at = Tune.getLong(bound, Bound.INDEX_AT + 4 * i);

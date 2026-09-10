@@ -15,15 +15,15 @@
 #   -kK        the unit the table packs at, 1 or 2; 2 by default
 #   -mN        the ring in bytes, 960 by default
 #   -copies[S] a match beyond the ring packs as a copy from the column's
-#              own literal stream (tools.md)
+#              separate literal stream (tools.md)
 #
 # Every other option is ym/play.sh's and is passed to it: -tTITLE,
 # -cCOMPOSER, -perf, -lean, -vN, -silent and -h among them.
 #
 # YMX_DUMP names YMX's ymx-dump, which reads a .ymx out. With neither it
-# nor YMX_REPO set, ../YMX/go/bin/ymx-dump is taken.
+# nor YMX_REPO set, the default is ../YMX/go/bin/ymx-dump.
 #
-# The tune file each .ymx converts to is kept, and the directory holding
+# The tune file each .ymx converts to is kept, and the directory with
 # them is said on stderr, so a conversion can be read back with
 # bin/ymxr-trace or played on its own.
 #
@@ -40,10 +40,10 @@ if [ ! -x "$YMX_DUMP" ]; then
     exit 2
 fi
 # The converter's flags read off, and ym/play.sh's kept for it. A name
-# may hold a space, so the names stay in the positional parameters and no
+# may contain a space, so the names stay in the positional parameters and no
 # string of them is built: each is shifted off and the file it converts
 # to is put back at the end, so what remains is the tunes in the order
-# given.
+# passed.
 mine=
 theirs=
 recording=
@@ -64,12 +64,12 @@ if [ "$tunes" -eq 0 ]; then
     exit 2
 fi
 # The tune files stay: the last thing this does is exec ym/play.sh,
-# which replaces the shell, so nothing here runs afterwards to clear
+# which replaces the shell, so no line here runs afterwards to clear
 # them. Said on stderr rather than left to be found.
 work=$(mktemp -d)
 echo "ymx/play.sh: the tune files are under $work" >&2
 # A directory a tune, so the file a conversion writes carries the tune's
-# own name: ym/play.sh names a subtune by the file it is given, and two
+# name of its own: ym/play.sh names a subtune by the file it is passed, and two
 # tunes may share a name.
 at=0
 left=$#

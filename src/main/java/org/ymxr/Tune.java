@@ -9,13 +9,13 @@ import org.dtx.St4;
 import org.dtx.Table;
 
 /**
- * A tune file (SPEC.md 3.3): the values a tune states once, the tune's
- * table as a DTX2 file, and one DTX1 table a source. The file holds the
+ * A tune file (SPEC.md 3.3): a tune's fixed values, the tune's table as a
+ * DTX2 file, and one DTX1 table a source. The file contains the
  * tune's tables and no code; a tool binds them with DTX's reader into what
- * the player takes (doc/BINARIES.md, {@link Bound}).
+ * the player reads (doc/BINARIES.md, {@link Bound}).
  *
  * <pre>
- *  offset  bytes  gives
+ *  offset  bytes  what it is
  *  0       4      YMXR
  *  4       2      the version, $0002
  *  6       2      the frame rate, in Hz
@@ -40,7 +40,7 @@ final class Tune {
     static final int TABLE_AT = 12;
     static final int INDEX_AT = 16;
 
-    /** The ring a column unpacks through, dtx-write's own default. */
+    /** The ring a column unpacks through, dtx-write's default. */
     static final int RING = 960;
 
     /** The widest ring the player reads: column 29's value stands 29 rings
@@ -138,7 +138,7 @@ final class Tune {
 
     /**
      * A packer that reports: it packs a column through the one the file
-     * takes, holds what each column came to, and says how far through the
+     * reads, records what each column came to, and reports how far through the
      * thirty it is. The packer is what {@link Dtx2#write} calls a column
      * at a time, so this is where a column's packed bytes are to be had
      * without unpacking the file again.
@@ -195,8 +195,8 @@ final class Tune {
                 raw, table, 100.0 * table / raw, file));
     }
 
-    /** What a column holds, for a reported row: a register by its number,
-     *  an effect column by its effect and what of it it gives. */
+    /** What a column is, for a reported row: a register by its number, and
+     *  an effect column by its effect and its part of it. */
     static String name(int c) {
         if (c < Columns.EFFECT) {
             return "R" + c;

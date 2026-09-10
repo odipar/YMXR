@@ -1,42 +1,42 @@
 """The player under emulation, against a model of SPEC.md 4 and 5.
 
 Every tune under ym/test is converted, then played row by row on an
-emulated 68000: the chip writes of every frame are held to the frame
-procedure's, the timers' programming to the rate columns', the place each
-handler holds to the source's rows, and every tick's write to the row the
-place stands on. The model is written here from the tune's own tables, so
-the player is checked against the specification and not against the
-converter.
+emulated 68000: the chip writes of every frame against the frame
+procedure's, the timers' programming against the rate columns', the place
+each handler keeps against the source's rows, and every tick's write
+against the row its place stands on. The model is built here from the
+tune's tables, so the player is checked against the specification and not
+against the converter.
 
 Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -corpus [N]        a spread of the corpus in place of the
-                                       fixtures, 40 tunes unless N says
+                                       fixtures, 40 tunes unless N sets it
        test_ymxr.py -cycles [tunes]    the play call's cost as well
        test_ymxr.py -hatari [tunes]    the same tunes on a real MFP, under
                                        Hatari
        test_ymxr.py -perf [tunes]      the player built with the raster
-                                       monitor in, held to the same model:
+                                       monitor in, against the same model:
                                        the monitor moves no chip write
 
-The fixtures under ym/test are chosen for the shapes a tune takes, one
-of each; -corpus reads what the corpus holds instead, which no fixture
-was chosen for. A tune that fails is named and the rest are read, so one
-run says every tune that fails rather than the first.
+The fixtures under ym/test are chosen for the shapes a tune has, one of
+each; -corpus reads the corpus instead, which no fixture was chosen for. A
+tune that fails is named and the rest are read, so one run reports every
+tune that fails rather than the first.
 
-The player takes a bound tune (doc/BINARIES.md 1): each tune file is
-bound through bin/ymxr-bind before it is played, and a tune file of
-another version is held to be rejected by the binder, the reader and, its
-bound form's version moved, the player.
+The player reads a bound tune (doc/BINARIES.md 1): each tune file is bound
+through bin/ymxr-bind before it is played, and a tune file of another
+version is checked to be rejected by the binder, the reader and, its bound
+form's version moved, the player.
 
 Under unicorn the timers are modelled here, since it raises no interrupt:
-every tick is fired by hand at the time the model gives. Under Hatari the
+every tick is fired here at the time the model computes. Under Hatari the
 MFP fires them: the tune goes into an SNDH file and a program around it
 through bin/ymxr-sndh and bin/ymxr-prg (BINARIES.md 3 and 4), the program
-takes the machine over and plays the tune on the VBL, since the screen's
-rate is the tune's 50 Hz, and the trace of every chip write is read
-against the same model, the frames cut at the VBL and the ticks counted
-against the rates the trace shows the timers programmed at. So -hatari
-takes tunes at 50 Hz.
+claims the machine and plays the tune on the VBL, since the screen's rate
+is the tune's 50 Hz, and the trace of every chip write is read against the
+same model, the frames cut at the VBL and the ticks counted against the
+rates the trace shows the timers programmed at. So -hatari requires tunes
+at 50 Hz.
 
 Needs rmac (RMAC, or on the path), DTX's dtx-write (DTX_WRITE, or on the
 path) to read the table back, unicorn (pip install unicorn), and the
@@ -79,7 +79,7 @@ PALETTE = 0xFFFF8240
 PERF_FRAME = 0x0700
 PERF_BAR = 0x0770
 
-# The memory map: the player, the tune two bytes past a long so nothing
+# The memory map: the player, the tune two bytes past a long so no field
 # assumes one, the workspace on a long, a stack, and a sentinel a call
 # returns to.
 CODE = 0x1000
@@ -102,18 +102,18 @@ TIMER = [dict(ctrl=0xFFFFFA19, shift=0, data=0xFFFFFA1F, ier=0xFFFFFA07, bit=5, 
          dict(ctrl=0xFFFFFA1D, shift=4, data=0xFFFFFA23, ier=0xFFFFFA09, bit=5, vector=0x114)]
 # The effects each of those registers belongs to, in effect order, so a
 # trace of the MFP says which effect the frame procedure has stepped.
-# Timers C and D share a control register, and that one gives two.
+# Timers C and D share a control register, and that one carries two.
 OWNS = {reg: [i for i in range(4) if reg in (TIMER[i]["ctrl"], TIMER[i]["data"])]
         for t in TIMER for reg in (t["ctrl"], t["data"])}
 C = 30
 EFFECT = 14
-# What each register takes of a byte written to it: the rest the chip
+# The bits each register reads of a byte written to it: the rest the chip
 # ignores, and the player leaves the set bit and the bits beside in.
-TAKES = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
+FITS = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
 
 
-def taken(writes):
-    return [(reg, value & TAKES[reg]) for reg, value in writes]
+def masked(writes):
+    return [(reg, value & FITS[reg]) for reg, value in writes]
 
 
 # What the player is assembled with: the raster monitor's switch, which
@@ -128,7 +128,7 @@ LEAN = "-lean" in sys.argv
 
 # The row of performance.md's lean table each kind of tick reads, the
 # five kinds being what a lean tick has: it drops no interrupt level, so
-# the path a tune of one effect takes is the path every other tune takes.
+# the path a tune of one effect runs is the path every other tune runs.
 LEAN_ROW = {"on": "a row written, the place stepped",
             "loop": "the marker, the place to row `RR`",
             "stop": "the marker, the timer stopped",
@@ -142,8 +142,8 @@ def equate(name, symbols=None):
     """An equate out of the player's source, so the rig reads what the
     player reads. A term that names another equate is read through to its
     figures, one that names a label is the address the assembly gave it,
-    and a name the assembly defines takes the value it was defined with.
-    A tick's offsets are measured off the handler's own labels, so they
+    and a name the assembly defines reads as the value it was defined
+    with. A tick's offsets are measured off the handler's labels, so they
     are read with the symbols the assembly gave."""
     if name in DEFINED:
         return DEFINED[name]
@@ -169,7 +169,7 @@ def equate(name, symbols=None):
 # A tick handler's operands: the register it selects, and the place it
 # reads; a square handler's, the register it selects and the row it
 # stands at; and a one-row source handler's, the same two. Every offset
-# is measured off its handler's own labels, so they stand once the
+# is measured off its handler's labels, so they stand once the
 # player is assembled (main).
 TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = ONE_SEL = ONE_VAL = 0
 
@@ -198,7 +198,7 @@ def assemble(source="YMXR.S", defines=()):
 CORPUS = os.environ.get("YM_CORPUS",
                         os.path.expanduser("~/git/jatari/data/ym_format"))
 
-# How many tunes -corpus reads where it is given no count. Forty is about
+# How many tunes -corpus reads where no count follows it. Forty is about
 # eleven minutes, which is a net a reader runs and waits for.
 CORPUS_TUNES = 40
 
@@ -230,7 +230,7 @@ def convert(ym, work):
 
 def bind(file, work):
     """The bound tune of a tune file, through bin/ymxr-bind; None where the
-    binder rejects the file, which it says on its own line."""
+    binder rejects the file, which it reports on a line of its own."""
     path, out = os.path.join(work, "bound.ymxr"), os.path.join(work, "bound.bin")
     open(path, "wb").write(file)
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), path, out], capture_output=True)
@@ -253,10 +253,10 @@ def trace(file, work, calls):
 
 def entry(model, writes):
     """The reader's entry for a frame the model just stepped: the writes
-    the chip takes, and the effects the row touched."""
+    the chip reads, and the effects the row touched."""
     w = {}
-    for reg, value in taken(writes):
-        # R7's two host bits are no tune's: the reader gives bits 5 to 0
+    for reg, value in masked(writes):
+        # R7's two host bits belong to the host: the reader reports bits 5 to 0
         w[str(reg)] = value & 0x3F if reg == 7 else value
     e = {}
     for i in range(4):
@@ -288,8 +288,8 @@ class Tune:
         count = file[9]
         self.state = long_at(file, 12)
         self.image_at = long_at(file, 16)
-        # Where this tune's table stands in the image that holds it: an
-        # image of one names it in its own format block, and one shared by
+        # Where this tune's table stands in the image that carries it: an
+        # image of one names it in its format block, and one shared by
         # several names the first, so a bound tune carries its own
         # (BINARIES.md 2, DTX abi.md 1).
         self.table_at = long_at(file, 20)
@@ -325,11 +325,11 @@ class Model:
     def __init__(self, tune):
         self.tune = tune
         self.row = 0
-        # the row the frame plays, taken by begin and read by the steps
+        # the row the frame plays, read by begin and used by the steps
         # and the writes below
         self.playing = None
-        # target is what the player holds after step 1, and using the
-        # target the running effect writes: the one held at its start
+        # target is the one the player keeps after step 1, and using the
+        # target the running effect writes: the one kept at its start
         self.fx = [dict(target=0, using=0, source=0, select=0, count=0, place=None,
                         running=False) for _ in range(4)]
 
@@ -341,7 +341,7 @@ class Model:
         return self.writes()
 
     def begin(self):
-        """The row this frame plays, taken and the next one placed."""
+        """The row this frame plays, read and the next one placed."""
         self.playing = self.tune.rows[self.row]
         self.row += 1
         if self.row == self.tune.R:
@@ -358,7 +358,7 @@ class Model:
         if r[t] & 0x80:
             fx["target"] = r[t] & 0x7F
         fx["restart"] = False
-        # Whether this row gives the timer a select. A stopped timer starts
+        # Whether this row writes the timer a select. A stopped timer starts
         # on one, bit 6 set or clear (SPEC.md 1.9), so a restart is due for
         # a stopped timer on the select alone.
         fx["selected"] = False
@@ -374,14 +374,14 @@ class Model:
             else:
                 at, R, RR, rows = self.tune.sources[source]
                 # row 0 where the row sets bit 5 of the control column, and
-                # where it does not, the row number the place already holds
+                # where it does not, the row number already in the place
                 # (SPEC.md 1.9)
                 if r[t + 2] & 0x20 or fx["place"] is None:
                     fx["place"] = 0
                 fx["using"] = fx["target"]
                 # The effect runs from here: a stopped timer starts on the
                 # select the row writes, bit 6 set or clear, and select 0 is
-                # unassigned in that column, so a row naming a source gives
+                # unassigned in that column, so a row naming a source writes
                 # its timer a select that runs it (SPEC.md 1.9).
                 fx["running"] = True
         if r[t + 2] & 0x80:
@@ -400,7 +400,7 @@ class Model:
 
     def sets_select(self, i):
         """Whether effect i's step writes the timer's control register:
-        the row gives the select, or the source column stops the effect.
+        the row writes the select, or the source column stops the effect.
         Timers C and D share the register, and a write to it is read
         against this."""
         r = self.playing
@@ -450,7 +450,7 @@ class Model:
 
     def square(self, i):
         """Whether effect i's source is two rows repeating to row 0, which
-        the player's own square handler takes (68k/YMXR.S, SQUARE)."""
+        the player's square handler uses (68k/YMXR.S, SQUARE)."""
         fx = self.fx[i]
         if fx["source"] == 0:
             return False
@@ -459,7 +459,7 @@ class Model:
 
     def onerow(self, i):
         """Whether effect i's source is one row repeating, which the
-        player's own one-row handler takes (68k/YMXR.S, ONEROW)."""
+        player's one-row handler uses (68k/YMXR.S, ONEROW)."""
         fx = self.fx[i]
         if fx["source"] == 0:
             return False
@@ -467,7 +467,7 @@ class Model:
         return R == 1 and RR == 0
 
     def value(self, i):
-        """The row a handler holding its place as an immediate stands
+        """The row a handler that keeps its place as an immediate stands
         at, which is its place."""
         fx = self.fx[i]
         at, R, RR, rows = self.tune.sources[fx["source"]]
@@ -512,7 +512,7 @@ class Machine:
         mu.hook_add(UC_HOOK_CODE, self._code)
         # the video address counter, which moves while the chip fetches
         # pixels: the raster monitor waits for it, and a value that never
-        # moved would hold the wait to its ceiling
+        # moved would run the wait to its ceiling
         mu.hook_add(UC_HOOK_MEM_READ, self._beam, begin=VIDEO, end=VIDEO + 1)
 
     def _beam(self, mu, access, address, size, value, data):
@@ -626,7 +626,7 @@ class Timers:
         """The MFP writes of a call, in order.
 
         The main counter runs on through a stop: a control register of 0
-        holds it where it stands and a select written back resumes from
+        leaves it where it stands and a select written back resumes from
         there, so a select alone moves the prescaler and no more. The
         data register written while the control register is 0 loads the
         counter, and the select after that is the start this counts."""
@@ -685,7 +685,7 @@ class Timers:
 
     def expected(self, i, clocks):
         """How many ticks of effect i the next `clocks` hold, the phase
-        advanced: the count the real MFP fires, give or take one."""
+        advanced: the count the real MFP fires, within one."""
         if not self.live(i):
             return 0
         n = 0
@@ -700,8 +700,8 @@ class Timers:
 
 
 def check(ym, code, symbols, cycles=None, kit=False, perf=False):
-    """The tune on the player, held to the model frame by frame and tick
-    by tick; with kit, each frame is held to the reader's entry as well,
+    """The tune on the player, against the model frame by frame and tick
+    by tick; with kit, each frame against the reader's entry as well,
     and a tune that plays once to the call that reports its end."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
@@ -709,12 +709,12 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
     version = struct.unpack(">H", file[4:6])[0]
     if version != TUNE_VERSION:
         # the binder and the reader reject the file; the player, which never
-        # sees it, rejects a bound tune whose own version word is moved
+        # sees it, rejects a bound tune whose version word is moved
         assert bind(file, work) is None, "the binder took a tune file of version %d" % version
         if kit:
             assert trace(file, work, 1) == [], "the reader reports something of version %d" % version
         bound = bind(file[:4] + struct.pack(">H", TUNE_VERSION) + file[6:], work)
-        assert bound is not None, "the file is not a tune of the version it states"
+        assert bound is not None, "the file is not a tune of the version it records"
         assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) == 0, \
             "init rejected the bound tune before its version was moved"
         moved = bound[:4] + struct.pack(">H", BOUND_VERSION + 1) + bound[6:]
@@ -744,7 +744,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                 "effect %d's vector" % i
     ticks = 0
     tick_cost = {}
-    tick_cycles = 0                     # every tick's own instructions
+    tick_cycles = 0                     # every tick's instructions
     costliest = [0]
     advance = []
     clocks = MFP_CLOCK / tune.rate
@@ -752,10 +752,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
     frames = tune.R + 1 if once else min(tune.R + tune.R - tune.RR, 4 * tune.R)
     entries = trace(file, work, frames) if kit else None
     if kit:
-        assert len(entries) == frames + 1, "the reader gives %d lines, not %d" % (len(entries), frames + 1)
+        assert len(entries) == frames + 1, "the reader writes %d lines, not %d" % (len(entries), frames + 1)
         first = {"rate": tune.rate, "effects": tune.effects,
                  "sources": [{"rows": rows, "repeat": rr} for _, r_, rr, rows in tune.sources[1:]]}
-        assert entries[0] == first, "the reader's first line is %s, the tune states %s" % (entries[0], first)
+        assert entries[0] == first, "the reader's first line is %s, the tune header is %s" % (entries[0], first)
         entries = entries[1:]
     cost = []
     for f in range(frames):
@@ -771,7 +771,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             if cost[-1] == max(cost):
                 costliest[0] = f
         if once and f == tune.R:
-            # the call after the last row: the end reported, nothing written
+            # the call after the last row: the end reported, no register written
             assert d0 & 0xFFFFFFFF == 0xFFFFFFFF, \
                 "play gave %d after the last row of a tune that plays once" % d0
             assert not m.psg, "the call after the last row wrote %s" % m.psg
@@ -793,7 +793,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                 "frame %d: the yellow mark falls on chip write %d of %d, not after the last" % (
                     f, yellow, len(m.psg))
         want = model.frame()
-        assert taken(m.psg) == taken(want), "frame %d writes %s, not %s" % (f, m.psg, want)
+        assert masked(m.psg) == masked(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
             assert entries[f] == entry(model, want), "frame %d: the reader reports %s, the player %s" % (
                 f, entries[f], entry(model, want))
@@ -803,10 +803,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
         for i in range(4):
             fx = model.fx[i]
             # A restart is due where the row sets bit 6, and where the timer
-            # stood stopped and the row gives it a select: a select is what
+            # stood stopped and the row writes it a select: a select is what
             # runs an MFP timer, so a stopped one starts on it either way
-            # (SPEC.md 1.9). A source that plays once stops its own timer at
-            # its last row, so a writer cannot always tell which it is
+            # (SPEC.md 1.9). A source that plays once stops its timer at
+            # its last row, so a writer cannot always determine which
             # (section 6 rule 5).
             if fx["restart"] or (stopped[i] and fx["selected"]):
                 assert timers.restarts[i] == restarts[i] + 1, \
@@ -850,7 +850,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                     assert m.byte(at + TICK_SEL) == fx["using"], "frame %d: effect %d's handler selects R%d, not R%d" % (f, i, m.byte(at + TICK_SEL), fx["using"])
         for i in timers.due(clocks):
             fx = model.fx[i]
-            assert fx["running"], "frame %d: a tick of effect %d with nothing running" % (f, i)
+            assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, i)
             want, then = model.tick(i)
             if cycles:
                 cycles._settle(None)
@@ -868,7 +868,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
                 tick_cycles += cycles.cycles - before
             ticks += 1
-            assert taken(m.psg) == taken([want]), "frame %d: tick of effect %d wrote %s, not %s" % (f, i, m.psg, [want])
+            assert masked(m.psg) == masked([want]), "frame %d: tick of effect %d wrote %s, not %s" % (f, i, m.psg, [want])
             timers.apply(m.mfp)
             if model.square(i):
                 at = CODE + symbols["ymxr_sq%d" % i]
@@ -903,7 +903,7 @@ ROM = 0xE00000
 
 def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
-    trace holds, checked against the model, and the ticks counted. code
+    trace carries, checked against the model, and the ticks counted. code
     and symbols are the SNDH core's, the player's symbols among them; with
     perf the core with the raster monitor in: the switches that chose the
     core here choose the SNDH file's core too."""
@@ -914,7 +914,7 @@ def hatari(ym, code, symbols, perf=False):
     tune = Tune(bound, work)
     # the frames are cut at the VBL, which the program plays from where the
     # screen's rate is the tune's: Hatari's ST here refreshes at 50 Hz
-    assert tune.rate == 50, "-hatari takes tunes at 50 Hz, and this one plays at %d" % tune.rate
+    assert tune.rate == 50, "-hatari requires tunes at 50 Hz, and this one plays at %d" % tune.rate
     path = os.path.join(work, "TUNE.YMXR")
     open(path, "wb").write(file)
     sndh = os.path.join(work, "TUNE.SND")
@@ -1003,7 +1003,7 @@ def hatari(ym, code, symbols, perf=False):
             pc = int(w.group(4), 16)
             if pc < ROM:
                 # a handler's write, a timer stopping itself on the marker,
-                # comes after the frame's ticks; the frame's own come before
+                # comes after the frame's ticks; the frame's ticks come before
                 reg, value = 0xFF000000 | int(w.group(1), 16), int(w.group(2), 16)
                 at = where(pc)
                 kind = "mfp_tick" if at in (0, 1, 2, 3) else "mfp"
@@ -1026,15 +1026,15 @@ def hatari(ym, code, symbols, perf=False):
     # between, and reads the effects stepped before it as the row leaves
     # them and the ones after it as they were, so the model is stepped one
     # effect at a time and the trace says how far the procedure has got.
-    # Each step programs its own timer, so a write to an effect's control
+    # Each step programs one timer, so a write to an effect's control
     # or data register places that step, and the frame's first chip write
     # places all four.
     # Two ticks the trace does not place: one on a row that programs no
     # timer for its effect, before the frame's first chip write, and one
-    # inside its own effect's step, since the step aims the handler at the
+    # inside that effect's step, since the step aims the handler at the
     # new source before it writes the timer. Both are read against the
     # source the effect was running and, on a mismatch, against the source
-    # the step gives.
+    # the step writes.
     def replay(events, f):
         """The frame's events against the model. The model is left as the
         frame leaves it."""
@@ -1044,7 +1044,7 @@ def hatari(ym, code, symbols, perf=False):
         want = None
 
         def upto(i):
-            """Effects 0 to i stepped, in the order the frame takes them."""
+            """Effects 0 to i stepped, in the order the frame runs them."""
             for j in range(i + 1):
                 if not stepped[j]:
                     model.step(j)
@@ -1061,7 +1061,7 @@ def hatari(ym, code, symbols, perf=False):
                 return of[0]
             # the register Timers C and D share, written by both effects:
             # the first write is effect 1's, and the writes after it stand
-            # for either, so they place nothing
+            # for either, so they place no source
             return of[0] if of and not stepped[of[0]] else None
 
         for kind, reg, value in events:
@@ -1076,26 +1076,26 @@ def hatari(ym, code, symbols, perf=False):
                 writes.append((reg, value))
             elif kind in (0, 1, 2, 3):
                 if not stepped[kind] and not model.fx[kind]["running"]:
-                    # nothing ran before the step, so the tick is after it
+                    # no source ran before the step, so the tick is after it
                     upto(kind)
                 fx = model.fx[kind]
-                assert fx["running"], "frame %d: a tick of effect %d with nothing running" % (f, kind)
-                held = dict(fx)
+                assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, kind)
+                before = dict(fx)
                 w, then = model.tick(kind)
-                if not stepped[kind] and taken([(reg, value)]) != taken([w]):
-                    model.fx[kind] = held      # the tick came after the effect step
+                if not stepped[kind] and masked([(reg, value)]) != masked([w]):
+                    model.fx[kind] = before    # the tick came after the effect step
                     upto(kind)
                     assert model.fx[kind]["running"], \
-                        "frame %d: a tick of effect %d with nothing running" % (f, kind)
+                        "frame %d: a tick of effect %d with no source running" % (f, kind)
                     w, then = model.tick(kind)
-                assert taken([(reg, value)]) == taken([w]), \
+                assert masked([(reg, value)]) == masked([w]), \
                     "frame %d: a tick of effect %d wrote %s, not %s; the frame's events %s; the row %s" % (
                         f, kind, (reg, value), w, events, model.playing)
                 counted[kind] += 1
         upto(3)
         if want is None:
             want = model.writes()
-        assert taken(writes) == taken(want), "frame %d writes %s, not %s" % (f, writes, want)
+        assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
     for f, (events, clocks, stops) in enumerate(frames[first:first + STUB_FRAMES]):
         replay(events, f)
@@ -1110,13 +1110,13 @@ def hatari(ym, code, symbols, perf=False):
                 print("frame %d: effect %d ticked %d, the rates say %d; mode %s count %s" % (
                     f, i, got, want_ticks, timers.mode, timers.count))
         timers.apply([(reg, value) for kind, reg, value in events if kind == "mfp_tick"])
-    # The count holds the rates, not the phase: a timer stopped or restarted
+    # The count fixes the rates, not the phase: a timer stopped or restarted
     # inside a frame is counted for the frame whole, so five in a hundred
     # are allowed, where a wrong prescaler would be off by half or more.
-    # Every tick's value is held to its row above. YMXR_TICKS=1 prints the
+    # Every tick's value is checked against its row above. YMXR_TICKS=1 prints the
     # frames where the two part. The monitor's build costs time, a mark at
     # each end of a handler and the bar burnt in the call, so a real MFP
-    # drops ticks of a fast timer: with perf the count is held under the
+    # drops ticks of a fast timer: with perf the count stays under the
     # rates, not to them.
     for i in range(4):
         if expected[i] or counted[i]:
@@ -1127,7 +1127,7 @@ def hatari(ym, code, symbols, perf=False):
                 "effect %d ticked %d times, the rates say %d" % (i, counted[i], expected[i])
     stopped = [(reg, value) for events, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
                for kind, reg, value in events if kind == "stop"]
-    assert taken(stopped) == [(8, 0), (9, 0), (10, 0)], "the stop wrote %s" % stopped
+    assert masked(stopped) == [(8, 0), (9, 0), (10, 0)], "the stop wrote %s" % stopped
     return played, sum(counted)
 
 
@@ -1145,7 +1145,7 @@ def main():
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():
-            raise SystemExit("-corpus takes a count and not " + said)
+            raise SystemExit("-corpus reads a count and not " + said)
         tunes = args or spread(int(said or CORPUS_TUNES))
     else:
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
@@ -1189,7 +1189,7 @@ def main():
             if kit:
                 line += ", the player's frames are the reader's entries"
             if cost and perf:
-                line += ", no cost figures: the monitor's own cycles run inside the call"
+                line += ", no cost figures: the monitor's cycles run inside the call"
             if cost and not perf:
                 average = int(sum(cost) / len(cost))
                 adv = where[3]
@@ -1197,7 +1197,7 @@ def main():
                     average, max(cost), where[0], where[1], where[2])
                 line += "; the advance %5d on average, %5d at most, %5d in the costliest frame" % (
                     sum(adv) / len(adv), max(adv), adv[where[0]])
-                # A tick costs the frame its own instructions and the
+                # A tick costs the frame its instructions and the
                 # 68000's entry and rte besides, which no emulated cycle
                 # here counts: 44 and 20 from the manual, the 64 that
                 # separates performance.md's 108 from its 172.
@@ -1218,10 +1218,10 @@ def main():
                         said, stem, counted))
                 # plan.md's closing figures, on the tune it names. Nothing
                 # reached them: its call had moved twice and its ticks once,
-                # while performance.md's table beside them stayed held. The
+                # while performance.md's table beside them stayed fixed. The
                 # figures are the core the document reckons against, whose
-                # ticks drop the level and write their own end of interrupt,
-                # so the lean core reads its own ticks and not these.
+                # ticks drop the level and write an end of interrupt, so
+                # the lean core reads its ticks and not these.
                 if stem == "Synergy Credits" and not LEAN:
                     plan = " ".join(open(os.path.join(ROOT, "doc", "plan.md")).read().split())
                     closing = re.search(
@@ -1229,7 +1229,7 @@ def main():
                         r" [\d,]+ this document opened at and ([\d,]+) cycles of"
                         r" ticks against [\d,]+, so ([\d,]+) a frame", plan)
                     if not closing:
-                        stale.append("plan.md gives no closing figures for Synergy Credits")
+                        stale.append("plan.md has no closing figures for Synergy Credits")
                     else:
                         was = tuple(int(x.replace(",", "")) for x in closing.groups())
                         got = (average, ticked, average + ticked)
@@ -1237,7 +1237,7 @@ def main():
                             stale.append("plan.md says %s for Synergy Credits, and the"
                                          " rig counts %s" % (was, got))
                 # A lean tick drops no interrupt level, so the row a tune of
-                # one effect takes is the row every other tune takes, and the
+                # one effect runs is the row every other tune runs, and the
                 # five kinds read the lean table's second figure.
                 for then, name in (("on", "a row written, the place stepped"),
                                    ("loop", "the marker, the place to row `RR`"),
@@ -1264,8 +1264,8 @@ def main():
         except AssertionError as failed:
             # A tune that fails is named and the rest are read, so one run
             # says every tune that fails and not the first alone. One line
-            # a tune, as bin/ymxr-check gives: a reader takes the tune on
-            # its own to see the whole of what it says.
+            # a tune, as bin/ymxr-check reports: a reader reads the tune by
+            # itself to see the whole of it.
             wrong.append(os.path.basename(ym))
             said = str(failed).strip().split("\n")[0]
             print("%-45s FAILED: %s" % (os.path.basename(ym), said[:120]))

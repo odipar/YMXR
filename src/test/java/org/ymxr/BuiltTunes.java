@@ -6,7 +6,7 @@ import java.util.List;
  * The two YM dumps under {@code ym/test} that are built rather than
  * recorded, and the effects they carry that no recorded file does. Carried
  * from YMX's {@code org.ymx.rig.BuiltTunes}: the files are byte for byte
- * what YMX's builder gives, and {@code BuiltTunesTest} holds them to this
+ * what YMX's builder writes, and {@code BuiltTunesTest} checks them against this
  * one.
  *
  * <p>A YM6 frame files an effect in two slots, each three fields spread
@@ -14,7 +14,7 @@ import java.util.List;
  * R6 bits 7-5 and its count R14; slot 2's are R3, R8 and R15. A code's
  * bits 7-6 select the kind, 00 SID, 01 DigiDrum, 11 Sync-Buzzer, and its
  * bits 5-4 the voice plus one, so 00 leaves the slot idle. The parameter
- * sits in the voice's own volume register: a SID's maximum volume, a
+ * stands in that voice's volume register: a SID's maximum volume, a
  * drum's sample number, a buzzer's envelope shape.
  */
 final class BuiltTunes {
@@ -55,7 +55,7 @@ final class BuiltTunes {
     /**
      * A drum arriving on the voice a SID runs on, which no recorded file
      * does: both slots address voice A, and the SID stays flagged on the
-     * frame the drum lands, so it is running when the drum takes the
+     * frame the drum lands, so it is running when the drum claims the
      * voice. The drum's start stops the SID first, and the SID starts
      * again when the drum ends.
      */
@@ -92,17 +92,17 @@ final class BuiltTunes {
      * alone with the select it has, bit 5 alone with a new source on the
      * running timer, bit 6 alone with the count column 0, a stop with the
      * volume set, the same source started again, its target set to R1
-     * while it runs and taken at the next start. Effect 1, Timer D, a
+     * while it runs and read at the next start. Effect 1, Timer D, a
      * drum of 40 rows on R10 at select 7 from row 5, ending by its
      * marker, its closing row 5. Effect 2, Timer B, a one-row buzzer on
      * R13 from row 3, a row setting R13 beside it, restarted with a new
      * rate. Effect 3, Timer C, a five-row source repeating to its row 2 on
      * R9 from row 30 while effect 1 runs at another select, a count
-     * change, a stop, and a stop with nothing running. Rows 12 and 13
+     * change, a stop, and a stop with no source running. Rows 12 and 13
      * write a tone fine byte 0 and one that is not 0 with the coarse
      * column's bit 6, with and without the coarse set bit; rows 14 and 16
      * an envelope period byte 0 and one that is not 0 by the bit beside it
-     * with R13 unset. Unset columns hold what 1.1 lets them hold: values
+     * with R13 unset. Unset columns carry the arbitrary bits 1.1 allows: values
      * under a clear bit 7.
      */
     static Tune.Written fourTimers() {
@@ -211,7 +211,7 @@ final class BuiltTunes {
         c[e3 + 3][50] = (byte) 120;                      // the count alone
         c[e3 + 1][100] = (byte) 0x80;                    // a stop, R9 set
         c[9][100] = (byte) (0x80 | 12);
-        c[e3 + 1][105] = (byte) 0x80;                    // a stop with nothing running
+        c[e3 + 1][105] = (byte) 0x80;                    // a stop with no source running
         byte[] sid = {12, (byte) 0x80};
         byte[] drum = new byte[40];
         for (int i = 0; i < 39; i++) {

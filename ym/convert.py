@@ -4,13 +4,13 @@ Usage: convert.py corpus   - every corpus tune as whole DTX2 files at each
                              unit, the per-column breakdown, the ceilings
        convert.py pairs    - the tunes with a .ymx beside them, against it
        convert.py envelope - the envelope columns, the reserved 0 against
-                             set bits held in the shape column
+                             set bits in the shape column
        convert.py frame    - what a frame procedure has to do, per frame
 
 The corpus comes from YM_CORPUS (measure.py). The DTX2 files are written
 by DTX's dtx-write, named by DTX_WRITE or found on the path, and built
-from DTX's go/cmd/dtx-write; DTX_RING gives the ring in bytes, 960 being
-dtx-write's own default. JOBS tunes are converted at once.
+from DTX's go/cmd/dtx-write; DTX_RING sets the ring in bytes, 960 being
+dtx-write's default. JOBS tunes are converted at once.
 """
 import collections, os, struct, subprocess, sys, tempfile, shutil
 from concurrent.futures import ProcessPoolExecutor
@@ -55,10 +55,10 @@ def load(path, tmp):
 
 def effect_slots(r, ym6):
     """The two YM effect slots of one frame: (kind, target, data, select,
-    count), kind 0 for an empty slot. YM6 gives each slot a kind in the
+    count), kind 0 for an empty slot. YM6 files each slot's kind in the
     code's bits 7-6; YM5 has no kind bits, its first slot is a SID voice
     and its second a digidrum (YMX, YmEffects.java). The dump's prescaler
-    select is the MFP's own, 1 to 7, which is what SPEC 1.9 takes."""
+    select is the MFP's, 1 to 7, as SPEC 1.9 reads it."""
     out = []
     for slot, (code_r, pre_r, cnt_r) in enumerate(((1, 6, 14), (3, 8, 15))):
         code = r[code_r] & 0xF0
@@ -81,14 +81,14 @@ def registers(r):
 def rows(nf, g, ym6):
     """The thirty column streams of one tune, one byte a frame each, and
     how many sources it names. A column is set where its value differs
-    from what the player holds; an unset value is 0, which R3.6 does not
+    from the value the player keeps; an unset value is 0, which R3.6 does not
     read and which packs smallest of the fills tried.
 
     A YM dump names an effect by kind and by a value out of a volume
     register, so each distinct pair becomes a source of the tune's own,
     numbered from 1 as it is first met."""
     cols = [bytearray() for _ in range(C)]
-    held = [None] * 14               # what the player holds of R0 to R13
+    kept = [None] * 14               # what the player keeps of R0 to R13
     fx_held = [None] * 4             # the (target, source) an effect runs
     target_held = [None] * 4
     rate_held = [None] * 4           # the (select, count) a timer runs at
@@ -102,21 +102,21 @@ def rows(nf, g, ym6):
         # the columns that fill their byte: written where they move, and
         # a move to 0 sets the bit beside them (SPEC 1.1)
         for c, (beside, bit) in BESIDE.items():
-            if reg[c] != held[c]:
+            if reg[c] != kept[c]:
                 out[c] = reg[c]
                 if reg[c] == 0:
                     out[beside] |= bit
-                held[c] = reg[c]
+                kept[c] = reg[c]
         # the columns with a set bit: coarse, noise, mixing, volumes. A row
         # leaves a register an effect owns (section 6), and the row that
         # stops the effect sets it again (1.3)
         for c in (1, 3, 5, 6, 7, 8, 9, 10):
             if c in owned:
-                held[c] = None
+                kept[c] = None
                 continue
-            if reg[c] != held[c]:
+            if reg[c] != kept[c]:
                 out[c] |= 0x80 | reg[c]
-                held[c] = reg[c]
+                kept[c] = reg[c]
         # the shape: set where the dump writes R13, which restarts the
         # envelope (1.6), unless an effect owns R13
         if reg[13] is not None and 13 not in owned:
@@ -192,11 +192,11 @@ def frame_work(cols, nf):
 def envelope_designs(nf, g, ym6):
     """The three envelope columns twice, shape first: as SPEC.md has them,
     the two period bytes reserving 0 with a bit beside them in the shape
-    (1.7), and with the shape holding a set bit for each byte instead. The
+    (1.7), and with a set bit for each byte in the shape column instead. The
     period bytes are the same bytes under both; only the shape differs."""
     spec = [bytearray() for _ in range(3)]
     hosted = [bytearray() for _ in range(3)]
-    held = [None, None]
+    kept = [None, None]
     for f in range(nf):
         r = [g(i, f) for i in range(16)]
         owned = {t for k, t, _, _, _ in effect_slots(r, ym6) if k}
@@ -204,12 +204,12 @@ def envelope_designs(nf, g, ym6):
         a = b = (0x80 | shape) if shape is not None and 13 not in owned else 0
         period = [0, 0]
         for j, (v, bit) in enumerate(((r[11], 0x40), (r[12], 0x20))):
-            if v != held[j]:
+            if v != kept[j]:
                 period[j] = v
                 b |= bit
                 if v == 0:
                     a |= bit
-                held[j] = v
+                kept[j] = v
         spec[0].append(a); hosted[0].append(b)
         for j in range(2):
             spec[j + 1].append(period[j]); hosted[j + 1].append(period[j])
@@ -285,7 +285,7 @@ def corpus():
 
 def table(rows, frames, raw=None):
     """A packing table's rows: label, bytes, a frame, and the ratio against
-    raw where raw is given, else against the first row."""
+    raw where the caller passes raw, else against the first row."""
     first = rows[0][1]
     for label, size in rows:
         ratio = (f"{raw / size:.1f}x" if raw else f"{size / first:.2f}x")
@@ -370,7 +370,7 @@ def main():
             spec += got["spec"]; hosted += got["hosted"]
         print(f"{n} tunes, {frames:,} frames, ring {RING}, k = 1")
         print(f"  envelope columns, 0 reserved and the bits beside  {spec:>10,}")
-        print(f"  envelope columns, set bits held in the shape      {hosted:>10,}")
+        print(f"  envelope columns, set bits in the shape column   {hosted:>10,}")
         print(f"  the reserved value saves                          {hosted - spec:>10,}")
     elif mode == "frame":
         hist = collections.Counter()

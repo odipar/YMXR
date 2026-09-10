@@ -9,14 +9,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A bound tune: a tune file's tables bound with DTX's reader into what the
- * player takes. doc/BINARIES.md is the contract. The layout is the tune
- * file's ({@link Tune}) under its own magic and version, with the image DTX
+ * player reads. doc/BINARIES.md is the contract. The layout is the tune
+ * file's ({@link Tune}) under its magic and version, with the image DTX
  * packages the DTX2 table with where the file has the table, and the bytes
- * of the state block the image's reader needs stated in the header, so
+ * of the state block the image's reader needs recorded in the header, so
  * that a host allocates them without reading the image.
  *
  * <pre>
- *  offset  bytes  gives
+ *  offset  bytes  what it is
  *  0       4      YMXB
  *  4       2      the version, $0002
  *  6       2      the frame rate, in Hz
@@ -53,12 +53,12 @@ final class Bound {
 
     /**
      * A set of tunes bound together: the images their tables were packaged
-     * into, and a bound tune for each, in the order given. A bound tune
+     * into, and a bound tune for each, in the order named. A bound tune
      * here carries no image of its own, and its {@code IMAGE_AT} stands at
      * 0 for the caller that lays them out to patch (SPEC.md's files are
      * laid out by {@link Sndh}).
      *
-     * <p>The tunes are grouped by what an image gives once (DTX abi.md 1),
+     * <p>The tunes are grouped by what an image fixes once (DTX abi.md 1),
      * so tunes that agree on those share one image and the reader's code
      * stands once for the group.
      *
@@ -71,7 +71,7 @@ final class Bound {
 
     /** The set of tunes bound with as few images as the figures allow. */
     static Set of(List<byte[]> tuneFiles) {
-        // A tune joins the first group whose image would take its table:
+        // A tune joins the first group whose image would carry its table:
         // the packager reads a table that does not fit, so the key is what
         // it reads it against.
         List<List<Integer>> groups = new ArrayList<>();
@@ -109,7 +109,7 @@ final class Bound {
         return new Set(images, keys, tunes, image, table);
     }
 
-    /** What an image gives once, as a key two tables are grouped by and as
+    /** What an image fixes once, as a key two tables are grouped by and as
      *  a reader of the report sees it: the variant, the width, and under
      *  DTX2 the unit, the copies flag and the ring (DTX abi.md 1). The
      *  period follows the ring and C, which the schema fixes. */
@@ -124,7 +124,7 @@ final class Bound {
 
     /** A bound tune with no image in it: the header, the state block's
      *  bytes off the image the table went into, the table's place, and the
-     *  file's DTX1 tables. The image's own place is the caller's to put in. */
+     *  file's DTX1 tables. The caller places the image itself. */
     private static byte[] head(byte[] tuneFile, int table, int state) {
         return build(tuneFile, null, table, state);
     }
@@ -142,8 +142,8 @@ final class Bound {
 
     /**
      * The bound tune: the header, the state block's bytes, the table's
-     * place in the image that holds it, the source index, then the image
-     * where one is given and the file's DTX1 tables.
+     * place in the image that carries it, the source index, then the image
+     * where the tune has one and the file's DTX1 tables.
      *
      * @param image the image to carry, or null where the tunes share one
      *     the caller lays out and patches {@code IMAGE_AT} for
@@ -175,8 +175,8 @@ final class Bound {
         Tune.putWord(bound, 4, VERSION);
         Tune.putLong(bound, STATE_AT, state);
         Tune.putLong(bound, IMAGE_AT, imageAt);
-        // Where this tune's table stands in the image that holds it. An
-        // image of one names it in its own format block; one of several
+        // Where this tune's table stands in the image that carries it. An
+        // image of one names it in its format block; one of several
         // names the first, so a tune past the first carries its own.
         Tune.putLong(bound, TABLE_AT, table);
         for (int i = 0; i < count; i++) {

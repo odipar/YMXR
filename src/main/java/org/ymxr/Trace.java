@@ -12,7 +12,7 @@ import org.dtx.Table;
 /**
  * What a reader reports of a tune (SPEC.md 7): one line a play call, the
  * call's result, the registers the frame writes and the effects the row
- * touched. The kit's references are what this gives, and the rig holds
+ * touched. The kit's references are the output of this tool, and the rig checks
  * the 68000 player to it.
  */
 final class Trace {
@@ -20,7 +20,7 @@ final class Trace {
     private Trace() {
     }
 
-    /** The calls the kit takes of a tune: one pass and the loop once, or
+    /** The calls the kit uses for a tune: one pass and the loop once, or
      *  the pass and the call that reports its end. */
     static int calls(Table table) {
         int rows = table.rows();
@@ -28,7 +28,7 @@ final class Trace {
         return repeat < rows ? rows + rows - repeat : rows + 1;
     }
 
-    /** The record's first line: what the tune states once. */
+    /** The record's first line: the tune's fixed values. */
     static String header(TuneFile tune) {
         StringBuilder line = new StringBuilder("{\"rate\":").append(tune.frameRate())
                 .append(",\"effects\":").append(tune.effects()).append(",\"sources\":[");
@@ -84,7 +84,7 @@ final class Trace {
         }
     }
 
-    /** The record of a tune file as bytes, and nothing of a file whose
+    /** The record of a tune file as bytes, and no byte for a file whose
      *  version is not the one this reads (R6.1). */
     static byte[] record(byte[] file, int calls) {
         TuneFile tune;
@@ -102,7 +102,7 @@ final class Trace {
 
     /** {@code ymxr-trace TUNE [FRAMES]}: the tune's record on standard
      *  output, its first line and one line a frame, the kit's count of
-     *  frames unless one is given. */
+     *  frames unless the caller names one. */
     public static void main(String[] args) throws IOException {
         List<String> named = new ArrayList<>();
         boolean silent = false;
@@ -120,7 +120,7 @@ final class Trace {
         Report report = new Report(!silent);
         int calls = named.size() == 2 ? Integer.parseInt(named.get(1)) : -1;
         byte[] tune = Files.readAllBytes(Path.of(named.get(0)));
-        // A file this reader does not read records nothing and says so
+        // A file this reader does not read produces no record, and says so
         // (SPEC.md 6, R6.1), so the report reads the header under the
         // same guard rather than throwing where the record would not.
         try {

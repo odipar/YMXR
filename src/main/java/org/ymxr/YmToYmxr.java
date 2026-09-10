@@ -28,7 +28,7 @@ public final class YmToYmxr {
     static final int UNIT = 2;
 
     /** The flag that turns a tool's report off. Every tool reads it, and
-     *  the tools that take the converter's flags pass it through. */
+     *  the tools that accept the converter's flags pass it through. */
     static final String SILENT = "-silent";
 
     private YmToYmxr() {
@@ -87,7 +87,7 @@ public final class YmToYmxr {
             }
         }
         read(report, song);
-        taken(report, flags, unit, ring, repeat, once, copies, seconds);
+        flagsRead(report, flags, unit, ring, repeat, once, copies, seconds);
         Sources sources = new Sources(song);
         Columns columns = new Columns(song, sources, repeat, report);
         found(report, sources, columns);
@@ -120,8 +120,8 @@ public final class YmToYmxr {
         }
     }
 
-    /** The flags the tool was given and what each came to. */
-    private static void taken(Report report, List<String> flags, int unit, int ring, int repeat,
+    /** The flags the tool read and what each came to. */
+    private static void flagsRead(Report report, List<String> flags, int unit, int ring, int repeat,
                               boolean once, boolean copies, double seconds) {
         report.say("the flags: " + (flags.isEmpty() ? "none, so the defaults below"
                 : String.join(" ", flags)));

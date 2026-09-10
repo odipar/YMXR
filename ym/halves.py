@@ -18,7 +18,7 @@ DBA 5 came out at 2.4 per cent against the reference player's 0.2
 (SPEC.md 1.9, experiments.md).
 
 The register a digidrum owns moves through a recording's levels and its
-halves mean nothing. The tool marks the registers only a row writes,
+halves mean little. The tool marks the registers only a row writes,
 which no timer drives, and reports the halves of the rest.
 """
 import re
@@ -84,13 +84,13 @@ def main(argv):
             continue
         places = sorted({w[3] for w in of})
         edges, spans = halves(all, reg)
-        # a voice a timer drives takes writes far faster than a frame; one
-        # a row writes takes one a frame at most, and its spans are notes
+        # a voice a timer drives receives writes far faster than a frame;
+        # one a row writes receives one a frame at most, and its spans are notes
         driven = len(of) > 4 * frames
         head = "R%d: %d writes from %s, %d edges" % (
             reg, len(of), " ".join("%06x" % p for p in places), len(edges))
         if not driven or len(spans) < 8:
-            print(head + ", a row's own writes" if not driven else head)
+            print(head + ", a row's writes" if not driven else head)
             continue
         median = statistics.median(spans)
         short = sum(1 for d in spans if d < median * 0.6)

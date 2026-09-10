@@ -1,8 +1,8 @@
 # plan
 
 What a play call could cost, and what each step is worth. performance.md
-holds what it costs today; every figure below is against those, and each
-one says whether it was measured on the rig or counted from the 68000's
+has what it costs today; every figure below is against those, and each one
+records whether it was measured on the rig or counted from the 68000's
 manual.
 
 Two figures matter and they are not the same. A call is 1,370 to 2,361
@@ -49,19 +49,19 @@ the rest a gate reads the bit and finds the group set.
 
 ## What a sample's tick costs
 
-A square's tick is taken: 88 cycles of its own instructions against 108
-and 130, and 152 with the 68000's entry and the `rte` against 172 and
-194. Measured on the rig, and performance.md holds it.
+A square's tick is in place: 88 cycles of instructions against 108 and
+130, and 152 with the 68000's entry and the `rte` against 172 and 194.
+Measured on the rig, and performance.md has the figure.
 
 
-A digidrum's source is many rows played once, so its tick is the row
-path every time, 172 cycles, and its place must step. Of the 108 its
+A digidrum's source is many rows played once, so its tick is the row path
+every time, 172 cycles, and its place must step. Of the 108 its
 instructions cost, 40 are the chip writes, 28 the step, 16 the end of
-interrupt, 16 the level dropped and 8 the marker test. Nothing but the
+interrupt, 16 the level dropped and 8 the marker test. Only the
 16 is removable without a register the player does not have: reading and
-stepping through an address register, `move.b (a0)+,YM_SELECT+2.w`, is
-16 against the 52 the two absolute longs cost, but a library cannot hold
-four registers of its host's.
+stepping through an address register, `move.b (a0)+,YM_SELECT+2.w`, is 16
+against the 52 the two absolute longs cost, but a library cannot claim four
+of its host's registers.
 
 A sample's timer is near its floor. A square's is not.
 
@@ -69,24 +69,25 @@ A sample's timer is near its floor. A square's is not.
 
 ## What was measured and left
 
-**Two bits in columns the specification states zero.** A bit read before
+**Two bits in columns the specification fixes at zero.** A bit read
+before
 a group of register columns, saying whether the row sets any of them,
 skips the group on one test. Measured at 62 cycles a frame weighted over
 nine tunes against the player of five steps ago, where it was the
 largest step in this document.
 
 Against the player as it stands it is worth 17, and it costs two tunes.
-The five steps above took the same work from another side: the row that
-sets no envelope column already skips step 8, and the four before that
-took the entry, the call, the effects' branches and their first reads.
-What is left to gate is the volume group's three columns, 66 cycles.
+The five steps above removed the same work from another side: the row that
+sets no envelope column already skips step 8, and the four before that cut
+the entry, the call, the effects' branches and their first reads. What is
+left to gate is the volume group's three columns, 66 cycles.
 
-The gate's bit has one place to sit. Only `d2` reaches step 6 holding
-anything the row set, and `d2` is column 13, so the bit is column 13's.
-A row that writes a volume then sets column 13, and a column 13 that is
-not 0 is the row that takes the longer of the two paths the step above
-gave it. Measured over 40,000 rows a tune, and counted at 20 cycles for
-a gate that skips and 18 for one that does not:
+The gate's bit has one place to sit. Only `d2` reaches step 6 with anything
+the row set, and `d2` is column 13, so the bit belongs to column 13. A row
+that writes a volume then sets column 13, and a column 13 that is not 0 is
+the row that follows the longer of the two paths the step above left it.
+Measured over 40,000 rows a tune, and counted at 20 cycles for a gate that
+skips and 18 for one that does not:
 
 | tune | rows that set no volume | net a frame |
 |---|---|---|
@@ -110,9 +111,9 @@ and 138 cycles saved on a quarter of them does not pay 18 on the rest.
 
 17 cycles a frame is the tune file's version at $0003, a bit's meaning
 in SPEC.md 1.5 and 1.7, the converter, the conformance kit's tunes, and
-two tunes that read slower. It is not taken.
+two tunes that read slower. It is not adopted.
 
-**A thirty-first column holding the same bits.** It saves more a row,
+**A thirty-first column of the same bits.** It saves more a row,
 216 where the row sets none of the three groups. The ring is 960 bytes
 and 960 does not divide by 31, so the period goes from 30 to 32: a
 refill grows one unit at unit 2 and two at unit 1, the state block
@@ -120,41 +121,41 @@ grows 1,056 to 1,088 bytes, and the packed table grows 2.7 to 12.4 per
 cent. Every refill window is redrawn, and DBA 2's heaviest refill goes
 from 18 operations to 21, its costliest call to about 6,150 to 6,330
 against the budget's 6,656, where the model fitted to read it has
-residuals of ±367. SPEC.md R3.5 also has it that a column holds one
-value, and a mask column holds none.
+residuals of ±367. SPEC.md R3.5 also requires that a column be one value,
+and a mask column is not one.
 
 **Three fusions in ST4's decoder**: a one-unit literal run, a one-unit
 rep match, and a two-unit new-offset match, each fused at the gamma's
 exit. All three were counted and all three were wrong as written. ST4
 is where the costliest frame is - fifteen operations at 225 to 240 -
 and it is the only place with room to move that frame far, so it needs
-a pass of its own rather than these three repaired.
+a separate pass rather than these three repaired.
 
 ---
 
 ## The order
 
-Every step this document held is taken, each measured on the rig:
+Every step this document listed is in place, each measured on the rig:
 
 | step | counted | measured |
 |---|---|---|
 | the frame on `a0` | 44 | 44 on every tune |
-| the advance called at its own address | 24 | 24 on every tune |
+| the advance called at its address | 24 | 24 on every tune |
 | one branch over a run of effects | 19 | 30, 20 or 10 by the effects a tune runs |
 | an effect's head is its first read | 8 an effect | 16, 8 or 0 |
 | the shape's test dropped | 14 | 12 to 14, no tune more |
-| a square's own tick | 31 a tick | 88 against 108 and 130 |
+| a separate tick for a square | 31 a tick | 88 against 108 and 130 |
 | every source resolved at init | 52 a start | 21 to 38 a frame |
 | DTX's state block in a6 | 36 | 36 off the advance, 12 off the call |
-| a one-row source's own tick | 74 a tick | 568 a frame on the kit's retune |
+| a separate tick for a one-row source | 74 a tick | 568 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
 its count. Synergy Credits reads 2,361 cycles a call against the 2,469
 this document opened at and 4,463 cycles of ticks against 5,380, so
-6,824 a frame against 7,849. performance.md holds the call, and
-`-cycles` reads all three back.
+6,824 a frame against 7,849. performance.md has the call, and `-cycles`
+reads all three back.
 
 What is left is where the costliest frame is. A refill parses at most
 one ST4 operation a unit and there are fifteen units, so the frame R4.5
-binds is fifteen operations at 225 to 240 apiece, and nothing above
-touches it. ST4 needs a pass of its own.
+binds is fifteen operations at 225 to 240 apiece, and no step above
+touches it. ST4 needs a separate pass.
