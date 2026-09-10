@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
  * A YM6! dump written from register vectors, for the tunes built rather
  * than recorded. Carried from YMX's {@code org.ymx.rig.GenYm}, the part of
  * it that writes a file: the two built dumps under {@code ym/test} are
- * byte for byte what YMX's builder gives, and this keeps them so here.
+ * byte for byte what YMX's builder writes, and this keeps them so here.
  */
 final class GenYm {
 

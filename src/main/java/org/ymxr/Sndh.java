@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * <p>The core's descriptor, from the core's first byte:
  *
  * <pre>
- *  offset  bytes  gives
+ *  offset  bytes  what it is
  *  0       12     three bra.w, to init, exit and play
  *  12      4      YMXS
  *  16      2      the descriptor's version, 1
@@ -58,14 +58,14 @@ final class Sndh {
     static final int CORE_MONITOR = 1;
 
     /** The core's flag bit 1: a tick neither drops the interrupt level
-     *  nor writes its own end of interrupt (the player's YMXR_NEST=0 and
+     *  nor writes an end of interrupt (the player's YMXR_NEST=0 and
      *  YMXR_AEOI=1, doc/performance.md). */
     static final int CORE_LEAN = 2;
 
     /** The word of a bra.w, before its displacement. */
     static final int BRA_W = 0x6000;
 
-    /** The workspace's bytes past what the state needs: the player takes
+    /** The workspace's bytes past what the state needs: the player uses
      *  its workspace on a long, an SNDH host loads the file on an even
      *  address, and init rounds the workspace's address up to a long. */
     static final int WORK_ROUNDING = 2;
@@ -79,8 +79,8 @@ final class Sndh {
     private static final int[] TIMER_OF_EFFECT = {0, 3, 1, 2};
 
     /** The tag block's text: the title, the composer where there is one,
-     *  and a name a subtune where names are given; and the core the file
-     *  takes, which {@code monitor} and {@code lean} select a switch
+     *  and a name a subtune where the caller names them; and the core the
+     *  file uses, which {@code monitor} and {@code lean} select a switch
      *  each. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
             boolean monitor, boolean lean) {
@@ -92,24 +92,24 @@ final class Sndh {
     /**
      * The file, from the tune files as subtunes 1 up, around the core the
      * options' two switches select: the raster monitor in where they ask
-     * to read the run, the lean tick where they ask for it, both where
-     * they ask for both, and the plain core where neither.
+     * to read the run, the lean tick where the options select it, both
+     * where they select both, and the plain core where neither.
      *
      * @throws IllegalArgumentException where a tune file is not one this
      *     reads, the bound tunes are not of the version the core reads,
      *     two tunes' rates differ, or there are more tunes than '##'
-     *     holds
+     *     numbers
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
         return of(Binaries.core(options.monitor(), options.lean()), tuneFiles, options);
     }
 
-    /** The same, around the core given. */
+    /** The same, around the core named. */
     static byte[] of(byte[] core, List<byte[]> tuneFiles, Options options) {
         checkCore(core, options.monitor(), options.lean());
         int n = tuneFiles.size();
         if (n == 0) {
-            throw new IllegalArgumentException("no tune files: an SNDH file holds one subtune"
+            throw new IllegalArgumentException("no tune files: an SNDH file has one subtune"
                     + " at least");
         }
         if (n > MAX_SUBTUNES) {
@@ -136,14 +136,14 @@ final class Sndh {
             } else if (tune.frameRate() != rate) {
                 throw new IllegalArgumentException("subtune " + (i + 1) + " plays at "
                         + tune.frameRate() + " Hz and subtune 1 at " + rate + ": an SNDH file"
-                        + " states one rate");
+                        + " records one rate");
             }
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
         }
         // The tunes are bound as a set, so those that agree on what an
-        // image gives once share one and the reader's code stands once for
+        // image fixes once share one and the reader's code stands once for
         // them (DTX abi.md 1, doc/BINARIES.md 2).
         Bound.Set set = Bound.of(tuneFiles);
         int state = 0;
@@ -156,8 +156,9 @@ final class Sndh {
     }
 
     /**
-     * The core's descriptor held to what this writes, and its flags to
-     * the switches asked for: the flags word gives whether the raster
+     * The core's descriptor checked against what this writes, and its flags
+     * against the switches requested: the flags word records whether the
+     * raster
      * monitor is in and whether the ticks are the lean ones, and the file
      * the core was read from does not.
      *
@@ -220,7 +221,8 @@ final class Sndh {
      * The tag block, 'SNDH' through 'HDNS': TITL, COMM where there is a
      * composer, CONV, '##' and two digits, TC and the rate, FLAG, each
      * text ended by a zero byte, a pad to an even length, FRMS with a long
-     * a subtune, '!#SN' where names are given with a word a subtune, the
+     * a subtune, '!#SN' where the caller names them with a word a subtune,
+     * the
      * name's offset from the tag's first byte, then the names each ended
      * by a zero byte, a pad to an even length, and HDNS. The '##' count
      * stands before FRMS and the names, since a reader sizes both by it.
@@ -268,7 +270,7 @@ final class Sndh {
      * The file: the entry triple, the tag block padded even, the core with
      * its offsets patched, the subtune table, the bound tunes each on an
      * even address, and {@code workspace} zero bytes. Each entry is a
-     * bra.w to the same entry of the core's own triple, so all three
+     * bra.w to the same entry of the core's triple, so all three
      * displacements are the header's bytes less 2.
      */
     static byte[] combine(byte[] core, List<byte[]> tunes, byte[] tags, int workspace) {
@@ -279,9 +281,9 @@ final class Sndh {
     /**
      * The same, of a set whose tunes share their images: the images stand
      * behind the subtune table and every bound tune's {@code IMAGE_AT} is
-     * patched to reach the one that holds its table, from its own first
+     * patched to reach the one with its table in it, from its first
      * byte. A tune whose set has no image carries its own, as a bound tune
-     * written on its own does.
+     * written by itself does.
      */
     static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace) {
         List<byte[]> tunes = set.tunes();
@@ -294,7 +296,7 @@ final class Sndh {
         int tableAt = even(core.length);
         int at = tableAt + 2 + 4 * n;
         // The images first, each on a long: the reader's code stands once a
-        // set of tunes that agree on what an image gives once (DTX abi.md
+        // set of tunes that agree on what an image fixes once (DTX abi.md
         // 1), and every bound tune of that set reaches it.
         int[] imageAt = new int[set.images().size()];
         for (int i = 0; i < imageAt.length; i++) {
@@ -326,7 +328,7 @@ final class Sndh {
             Tune.putLong(file, header + tableAt + 2 + 4 * i, offsets[i]);
             System.arraycopy(tunes.get(i), 0, file, header + offsets[i], tunes.get(i).length);
             if (imageAt.length > 0) {
-                // The bound tune reaches its image from its own first byte,
+                // The bound tune reaches its image from its first byte,
                 // and the images stand before it, so the reach is negative.
                 Tune.putLong(file, header + offsets[i] + Bound.IMAGE_AT,
                         imageAt[set.image()[i]] - offsets[i]);
@@ -358,7 +360,7 @@ final class Sndh {
     }
 
     /** The printable ASCII of a text: a title comes out of a dump's
-     *  header, which holds any bytes. */
+     *  header, which accepts any bytes. */
     static String clean(String text) {
         StringBuilder out = new StringBuilder();
         for (char c : text.toCharArray()) {
@@ -373,14 +375,14 @@ final class Sndh {
      * {@code ymxr-sndh in.ymxr... out.sndh [-tTITLE] [-cCOMPOSER]
      * [-nNAME]... [-perf] [-lean]}: the SNDH file of the tune files, as
      * subtunes in the order named. The title is the output's stem unless
-     * one is given. Where any name is given, each tune past the names
-     * given is named by its file's stem; where none is, the file has no
-     * names.
-     * {@code -lean} puts the core whose ticks neither drop the interrupt
-     * level nor write their own end of interrupt under the tunes, and
-     * {@code -perf} puts the core with the raster monitor in there, for
-     * reading a run. The two are one switch each, and both together take
-     * the core that is both, which reads what a lean run costs.
+     * the caller passes one. Where the caller passes any name, each tune
+     * past those names is named by its file's stem; where it passes none,
+     * the file has no names. {@code -lean} puts the core whose ticks
+     * neither drop the interrupt level nor write an end of interrupt under
+     * the tunes, and {@code -perf} puts the core with the raster monitor in
+     * there, for reading a run. The two are one switch each, and both
+     * together select the core that is both, which reads what a lean run
+     * costs.
      */
     public static void main(String[] args) throws IOException {
         @Nullable String title = null;
@@ -461,7 +463,7 @@ final class Sndh {
         }
         if (options.lean()) {
             switches.add("-lean, ticks that neither drop the interrupt level nor write"
-                    + " their own end of interrupt");
+                    + " an end of interrupt");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));
@@ -479,9 +481,9 @@ final class Sndh {
         for (int i = 0; i < files.size(); i++) {
             byte[] b = set.tunes().get(i);
             bound += b.length;
-            // A subtune is called what its name gives, where names are
-            // given: a tool that packs into a file of its own naming has
-            // the tune's name and not the file's.
+            // A subtune is called by the name passed for it, where the
+            // caller passes names: a tool that packs into a file it names
+            // itself has the tune's name and not the file's.
             report.row(names == null ? stem(files.get(i)) : names.get(i),
                     tunes.get(i).length + " bytes bound to " + b.length + ", its table in "
                     + "image " + (set.image()[i] + 1));
@@ -489,7 +491,7 @@ final class Sndh {
         report.say("the images: " + set.images().size()
                 + (set.images().size() == 1 ? " image of " : " images of ") + images
                 + " bytes, DTX's reader once a set of tunes that share one");
-        // What an image gives once is what splits a set into more than one,
+        // What an image fixes once is what splits a set into more than one,
         // and the unit is what a flag moves: a tune whose row count or
         // repeat row is odd packs at unit 1 though -k asks for another
         // (tools.md, experiments.md).
@@ -518,7 +520,7 @@ final class Sndh {
                 + " [-perf] [-lean] [-silent]");
         System.err.println("  -perf  the core with the raster monitor in, for reading a run");
         System.err.println("  -lean  the core whose ticks neither drop the interrupt level nor"
-                + " write their own end of interrupt");
+                + " write an end of interrupt");
         System.exit(2);
     }
 }

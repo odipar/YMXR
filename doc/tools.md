@@ -3,31 +3,30 @@
 Every tool's usage, flags and environment. The Java tree is the source of
 truth; the Go and C# trees are to follow it.
 
-## What a tool says
+## What a tool reports
 
-A tool reports what it did, and `-silent` leaves it saying what it
-wrote and its notes. The report goes to standard error and what the tool
-is for goes to standard output, so a run read through a pipe or into a
-file reads the same either way and the report stands on the terminal
-beside it.
+A tool reports what it did, and `-silent` reduces that to what it wrote
+and its notes. The report goes to standard error and the output of the tool
+to standard output, so a run read through a pipe or into a file is the same
+either way, with the report on the terminal beside it.
 
-Every tool takes `-silent`, `ym/play.sh` and `ym/cost.sh` among them,
+Every tool accepts `-silent`, `ym/play.sh` and `ym/cost.sh` among them,
 which pass it to the tools they drive.
 
-| the tool says | what it holds |
+| the report | what it covers |
 |---|---|
 | what it read | the dump's format, title and composer, its frames, rate and length, its loop frame, and its digidrums |
-| the flags it took | each flag's value and whether it was asked for or is the default |
+| the flags it read | each flag's value and whether it was passed or is the default |
 | what it found | the effects that run, and the sources by kind with their rows |
 | what it packed | a row a column: the rows in, the bytes out and the two as a percentage |
 | what it wrote | the file's bytes, and what the parts of it came to |
 | a note | a warning, which stands whether the report is on or off |
 
-A run of many files says how far through them it is on lines of its
-own, held apart by a tenth of the run and by a second of the clock: a
-run that ends within a second says nothing of its progress, and one of
-minutes gives about ten such lines. They are ordinary lines, so a run read
-into a file holds them as it holds the rest.
+A run of many files reports its progress on separate lines, spaced by a
+tenth of the run and by a second of the clock: a run that ends within a
+second reports no progress, and one of minutes produces about ten such
+lines. They are ordinary lines, so a run read into a file contains them
+with the rest.
 
 ## Convert
 
@@ -37,26 +36,26 @@ A YM5!/YM6! register dump into a tune file (SPEC.md 3.3):
 bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
 ```
 
-| flag | gives |
+| flag | what it sets |
 |---|---|
 | `-kK` | the unit the table packs at, 2 by default, and 1 where the repeat row or the row count does not divide by it |
 | `-mN` | the ring a column unpacks through, in bytes, 960 by default and at most 1129: the player reaches column 29 through a 16-bit displacement |
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
-| `-copies[S]` | a match beyond the ring packs as a copy from the column's own literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
+| `-copies[S]` | a match beyond the ring packs as a copy from the column's separate literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
 
 The first file is unpacked where it is an LHA archive, as distributed
-`.ym` files are. Standard output is one line: the frames, the sources,
-the effects run, the repeat row and the bytes written. The report beside
-it holds the dump as it was read, the flags as they were taken, the
-sources by kind, a row a column of what it packed to, and the notes:
-effects dropped, a unit other than the one asked for, and a ring other
-than the one asked for.
+`.ym` files are. Standard output is one line: the frames, the sources, the
+effects run, the repeat row and the bytes written. The report beside it
+covers the dump as it was read, the flags as they were read, the sources by
+kind, a row a column of what it packed to, and the notes: effects dropped,
+a unit other than the one requested, and a ring other than the one
+requested.
 
 The table is the dump's frames row for row: the row it repeats to is
 the dump's loop frame, its rows are the dump's, and no row is added
 anywhere. A table packs at unit 2: unit 1 packs the corpus to 0.69 bytes
 a frame against 0.81, and costs the play call about a seventh more on
-average (performance.md), and `-k1` asks for it. A column's bytes and
+average (performance.md); `-k1` selects it. A column's bytes and
 its loop begin on a unit (DTX's R5.6 and R5.11), so a tune whose row
 count or repeat row is odd packs at unit 1, which the tool notes. The
 table packs at a period of thirty rows, the column count and the
@@ -66,18 +65,20 @@ the ring is the multiple of thirty nearest the one asked for, at least
 sixty and at most 1,110. A loop longer than the ring is replayed at its
 exact rows by DTX's reader, at any period.
 
-What the converter does with a dump's effects: a SID voice is a source of two
-rows, its level and 0; a sync buzzer one row, its shape; a digidrum the
+What the converter does with a dump's effects: a SID voice is a source of
+two rows, its level and 0; a sync buzzer one row, its shape; a digidrum the
 recording's 4-bit levels and a closing row at mid-scale, which owns the
-voice's volume for the frames its rows take at its rate and sets the mixer's
-bits for the voice meanwhile. A sinus SID is dropped, as the reference player
-runs an empty handler for it. The row the tune repeats to sets every register
-but R13 and the ones an effect owns there, and every effect that ran up to it
-or runs into the wrap, so the wrap lands on a known state. `ConversionTest`
-replays every tune under `ym/test` against its dump.
+voice's volume for the frames its rows run at its rate and sets the mixer's
+bits for the voice meanwhile. A sinus SID is dropped, since the reference
+player runs an empty handler for it. The row the tune repeats to sets every
+register except R13 and the ones an effect owns there, and every effect
+that ran up to it or runs into the wrap, so the wrap resumes from a known
+setting. `ConversionTest` replays every tune under `ym/test` against its
+dump.
 
-The tune file holds the tune's tables and no code: BINARIES.md says how a
-tool binds them with DTX's reader into what the player takes.
+The tune file contains the tune's tables and no code: BINARIES.md defines
+how a tool binds them with DTX's reader into the layout the player
+reads.
 
 The tool runs out of `target/classes`, and builds first where a source,
 the pom or a 68000 source is newer than the last build, or the core is
@@ -98,16 +99,17 @@ bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] DUMP|DIR ...
 Every dump named, and every `.ym` under a directory named, converted at
 the tool's defaults and replayed against itself: the tune file's table
 stepped frame by frame by the reader in `Replay`, every frame's registers
-held to the dump's but those an effect owns, and every effect's source,
-target, rate and count held to what the dump flags. One line a tune, the
-first twenty wrong frames under a tune that fails, and an exit of 1 where
-any does; a file that is not a YM5!/YM6! dump is said and not counted.
+checked against the dump's except those an effect owns, and every effect's
+source, target, rate and count checked against the dump's flags. One line a
+tune, the first twenty wrong frames under a tune that fails, and an exit of
+1 where any does; a file that is not a YM5!/YM6! dump is reported and not
+counted.
 `ConversionTest` runs the same check on the tunes under `ym/test`, and
 the corpus (Measure, `YM_CORPUS`) runs through it whole in under two
 minutes: 543 dumps replay to their dumps, and one file is not a dump.
-The check steps one pass and the loop once, as a reader's record runs,
-and takes the converter's flags: `bin/ymxr-check -r DIR` replays every
-dump as a tune that plays once.
+The check steps one pass and the loop once, as a reader's record runs, and
+accepts the converter's flags: `bin/ymxr-check -r DIR` replays every dump
+as a tune that plays once.
 
 ## Trace
 
@@ -115,19 +117,19 @@ dump as a tune that plays once.
 bin/ymxr-trace TUNE [FRAMES] [-silent]
 ```
 
-What a reader reports of a tune file (SPEC.md 7), on standard output:
-the first line what the tune states once, then one line a frame,
-`FRAMES` of them or the count the kit takes of the tune, one pass and
-the loop once, or the pass and the frame that reports its end. Of a file of
-another version it prints nothing. The conformance kit's references are
-what this gives (doc/conformance/README.md).
+What a reader reports of a tune file (SPEC.md 7), on standard output: the
+first line the tune's fixed values, then one line a frame, `FRAMES` of them
+or the count the kit uses for the tune, one pass and the loop once, or the
+pass and the frame that reports its end. A file of another version prints
+no report. The conformance kit's references are the output of this tool
+(doc/conformance/README.md).
 
 ## The player
 
 `68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is 2,564 bytes. Its
 first three longs are the calls:
 
-| call | takes | gives |
+| call | in | out |
 |---|---|---|
 | `YMXR_init` | `a0` the bound tune (BINARIES.md), on an even address; `a1` the workspace, on a long | `d0` 0, or -1 for one the player does not read |
 | `YMXR_play` | `a0` the workspace | `d0` 0, or -1 where the tune has played its last row and does not repeat |
@@ -135,10 +137,10 @@ first three longs are the calls:
 
 Every call clobbers `d0` to `d5` and `a0` to `a5`, and leaves `d6`, `d7`
 and `a6` as they were. The workspace is `YMXR_FIXED`, 60 bytes, then the
-state block the bound tune states at offset 12 (BINARIES.md). The host
+state block the bound tune records at offset 12 (BINARIES.md). The host
 owns the machine: the player saves and restores no vector, timer control
-or interrupt enable, and touches no timer the tune does not run. The
-header of the source gives the contract in full.
+or interrupt enable, and touches no timer the tune does not run. The header
+of the source defines the contract in full.
 
 ## Bind, SNDH file, program
 
@@ -149,23 +151,23 @@ bin/ymxr-sndh tune.ymxr [more.ymxr ...] tune.sndh [-tTITLE] [-cCOMPOSER]
 bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS] [-silent]
 ```
 
-A tune file holds tables and no code. What the player takes is the bound
-tune, the file with DTX's image for its table in place of the table,
-which `bin/ymxr-bind` writes; `bin/ymxr-sndh` puts one bound tune or
-more behind the SNDH core, the player under SNDH's three entries, into
-an SNDH file any SNDH host plays, with the tags the flags give; and
-`bin/ymxr-prg` puts the program stub in front of an SNDH file, making a
-TOS program that takes the machine over under Supexec, plays the file
-from the VBL or Timer C, stops on SPACE or ESC or after `ROWS` rows,
-switches subtunes on 1 to 9, and hands the machine back. `-perf` puts
-the core with the raster monitor in (Measure), and the program then
-clears the screen so that its bars show; `-lean` puts the core whose
-ticks neither drop the interrupt level nor write their own end of
-interrupt, which asks two things of the host (performance.md). The two
-are a switch each, and both together put the core that is both, whose
-bars are the lean ticks' own. The four cores and the stub are assembled
-by the build with rmac, once, into the classpath; BINARIES.md is the
-contract for every byte of them, and no assembler runs at combine time.
+A tune file contains tables and no code. The player reads the bound tune,
+the file with DTX's image for its table in place of the table, which
+`bin/ymxr-bind` writes; `bin/ymxr-sndh` puts one bound tune or more behind
+the SNDH core, the player under SNDH's three entries, into an SNDH file any
+SNDH host plays, with the tags from the flags; and `bin/ymxr-prg` puts the
+program stub in front of an SNDH file, making a TOS program that claims the
+machine under Supexec, plays the file from the VBL or Timer C, stops on
+SPACE or ESC or after `ROWS` rows, switches subtunes on 1 to 9, and
+releases the machine. `-perf` selects the core with the raster monitor in
+(Measure), and the program then clears the screen so that its bars show;
+`-lean` selects the core whose ticks neither drop the interrupt level nor
+write an end of interrupt, which requires two things of the host
+(performance.md). The two are a switch each, and both together select the
+core that is both, whose bars are those of the lean ticks. The four cores
+and the stub are assembled by the build with rmac, once, into the
+classpath; BINARIES.md is the contract for every byte of them, and no
+assembler runs at combine time.
 
 ## Play
 
@@ -175,7 +177,7 @@ ym/play.sh [-kK] [-mN] [-rRR | -r] [-copies[S]] [-tTITLE] [-cCOMPOSER]
 ym/play.sh -h
 ```
 
-`ym/play.sh` runs the three tools above and hands the program to Hatari
+`ym/play.sh` runs the three tools above and passes the program to Hatari
 with its sound on. SPACE stops the tune, and `-vN` stops the run after
 `N` frames. The first name is a tune; after it a name ending in `.ym` or
 `.ymxr`, in either case, is another tune and any other name records the
@@ -183,32 +185,32 @@ run instead:
 Hatari writes an AVI, video and sound, which `ym/avi.py` reads back as a
 WAV, with the run's last frame beside it as a PNG.
 
-Several tunes go into one file, a subtune each in the order named and
-each named by its file, which the program picks between on the keys 1 to
-9. An SNDH file states one rate, so a set whose tunes do not share one
-gets a line on stderr and no file, and a tenth tune and past it play
-only under a host that asks for a subtune by number.
+Several tunes go into one file, a subtune each in the order named and each
+named by its file, which the program selects on the keys 1 to 9. An SNDH
+file records one rate, so a set whose tunes do not share one produces a
+line on stderr and no file, and a tenth tune and past it play only under a
+host that selects a subtune by number.
 
-| option | gives |
+| option | what it sets |
 |---|---|
 | `-kK` | the unit the table packs at, 2 by default |
 | `-mN` | the ring in bytes, 960 |
 | `-rRR`, `-r` | the row the tune repeats to, or a tune that plays once |
-| `-copies[S]` | a match beyond the ring packs as a copy from the column's own literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
+| `-copies[S]` | a match beyond the ring packs as a copy from the column's separate literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
 | `-tTITLE`, `-cCOMPOSER` | the tags; the title is the file's name by default |
 | `-perf` | the core with the raster monitor in, so the recorded frame shows the bars (Measure) |
-| `-lean` | the core whose ticks neither drop the interrupt level nor write their own end of interrupt (performance.md) |
-| `-perf -lean` | the core that is both, so the bars are the lean ticks' own |
+| `-lean` | the core whose ticks neither drop the interrupt level nor write an end of interrupt (performance.md) |
+| `-perf -lean` | the core that is both, so the bars are those of the lean ticks |
 | `-vN` | the frames to run |
-| `-silent` | the tools it drives say nothing but their notes, since this script takes their standard output |
-| `-h` | the options and examples, which the script's own head holds |
+| `-silent` | the tools it drives report their notes alone, since this script reads their standard output |
+| `-h` | the options and examples, from the head of the script |
 
-`-k`, `-m` and `-r` are the converter's, and a tune file, which is
-packed already, takes none of them. A set whose tunes do not share a unit
-takes an image a unit and pays for DTX's reader twice, which the report
-names; `-k1` on every dump takes one image and packs the tables smaller,
-at about a fifth of the play call, and experiments.md has what that came
-to on twenty tunes. `HATARI` and `TOS` name the emulator
+`-k`, `-m` and `-r` belong to the converter, and a tune file, which is
+packed already, accepts none of them. A set whose tunes do not share a unit
+needs an image a unit and pays for DTX's reader twice, which the report
+names; `-k1` on every dump needs one image and packs the tables smaller, at
+about a fifth of the play call, and experiments.md has the result on twenty
+tunes. `HATARI` and `TOS` name the emulator
 and a TOS image, as they do for the rigs.
 
 ## Playing a YMX file
@@ -218,26 +220,26 @@ ymx/play.sh [options] tune.ymx [more.ymx ...] [out.wav]
 ```
 
 A `.ymx` converted and played: `bin/ymx-to-ymxr` makes a tune file of
-each, and `ym/play.sh` takes those, so a name that is not a tune records
+each, and `ym/play.sh` reads those, so a name that is not a tune records
 the run and several tunes go into one file as subtunes, as they do there.
 
 `-kK`, `-mN` and `-copies[S]` reach the converter and every other option
-is `ym/play.sh`'s. `YMX_DUMP` names YMX's `ymx-dump`, and with neither it
-nor `YMX_REPO` set `../YMX/go/bin/ymx-dump` is taken.
+belongs to `ym/play.sh`. `YMX_DUMP` names YMX's `ymx-dump`, and with
+neither it nor `YMX_REPO` set the default is `../YMX/go/bin/ymx-dump`.
 
-The tune file each `.ymx` converts to is kept, and the directory holding
-them is said on stderr, so a conversion can be read back with
-`bin/ymxr-trace` or played on its own. `ym/play.sh` says where it left
-the SNDH file and the program the same way.
+The tune file each `.ymx` converts to is kept, and the directory
+containing them is reported on stderr, so a conversion can be read back
+with `bin/ymxr-trace` or played by itself. `ym/play.sh` reports where it
+left the SNDH file and the program the same way.
 
 ## The rigs
 
-`68k/test/emu/test_ymxr.py` plays every tune under `ym/test`, or the
-tunes named, on an emulated 68000 and holds the player to a model of
-SPEC.md 4 and 5 written from the tune's own tables: every frame's chip
-writes in order, the timers' programming against the rate columns, each
-handler's place against the source's rows, and every tick's write against
-the row its place stands on.
+`68k/test/emu/test_ymxr.py` plays every tune under `ym/test`, or the tunes
+named, on an emulated 68000 and checks the player against a model of
+SPEC.md 4 and 5 built from the tune's tables: every frame's chip writes in
+order, the timers' programming against the rate columns, each handler's
+place against the source's rows, and every tick's write against the row its
+place stands on.
 
 ```
 python3 68k/test/emu/test_ymxr.py [tune.ym ...]
@@ -248,45 +250,46 @@ python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
 python3 68k/test/emu/test_ymxr.py -lean [tunes]
 ```
 
-The tunes under `ym/test` are chosen for the shapes a tune takes, one of
-each, and `-corpus` reads what the corpus holds instead: every Nth file
-of it by name, forty tunes unless `-corpusN` gives another count, so a
-sample covers the corpus rather than one composer's run of it. Forty is
-about eleven minutes. A tune that fails is named and the rest are read,
-so one run says every tune that fails and not the first alone.
+The tunes under `ym/test` are chosen for the shapes a tune has, one of
+each, and `-corpus` reads the corpus instead: every Nth file of it by name,
+forty tunes unless `-corpusN` sets another count, so a sample covers the
+corpus rather than one composer's run of it. Forty is about eleven minutes.
+A tune that fails is named and the rest are read, so one run reports every
+tune that fails rather than the first alone.
 
-A tune named as a `.ymxr` file plays as it stands, without the
-converter. A tune whose `RR` is `R` is played one frame past its last
-row, where the call reports -1 and writes nothing. `-hatari` takes tunes
-at 50 Hz: it cuts the trace into frames at the VBL, which the program
-plays from where the screen's rate is the tune's, and Hatari's ST
-refreshes at 50 Hz.
+A tune named as a `.ymxr` file plays as it stands, without the converter. A
+tune whose `RR` is `R` is played one frame past its last row, where the
+call reports -1 and writes no register. `-hatari` requires tunes at 50 Hz:
+it cuts the trace into frames at the VBL, which the program plays from
+where the screen's rate is the tune's, and Hatari's ST refreshes at 50
+Hz.
 
-Under unicorn, which raises no interrupt, the rig models the four timers and
-fires every tick by hand at the time the model gives. `-cycles` counts the
-play call, the share of it spent in DTX's advance, and the tick handlers, with
-DTX's cycle counter, whose tables this rig adds `movep` to, and fails where
-performance.md's figures are not what it counts. `-hatari` puts the tune into
-an SNDH file and a program around it through `bin/ymxr-sndh` and
-`bin/ymxr-prg`, with 2,000 rows to play, runs it under a cycle-exact Hatari,
-and reads the trace of every chip write against the same model, so the ticks
-are the MFP's own: the frames are told apart by the VBL, and the ticks counted
-against the rates the trace shows the timers programmed at. `ym/cost.sh`
-measures the same program's cycles instead, through the raster monitor
-(Measure). `-perf` builds the player with that monitor in and holds it to the
-model under unicorn, so a band painted or a cost counted changes no register a
-frame writes, and none of the order it writes them in. `-lean` builds it with
-the two switches a tick reads, `YMXR_NEST=0` and `YMXR_AEOI=1`
-(performance.md), and holds that build to the same model. `-kit` plays the
-conformance kit's tunes, or the tune files named, and holds each frame the
-player makes to the reader's record of it through `bin/ymxr-trace`, and the
-record's first line to the tune's header, so the player, the rig's model and
-the reader agree line by line. Every tune is bound through `bin/ymxr-bind`
-before the player takes it; a tune file of another version is one the binder
-and the reader reject, and the player rejects a bound tune whose version is
-not its own.
+Under unicorn, which raises no interrupt, the rig models the four timers
+and fires every tick itself at the time the model computes. `-cycles`
+counts the play call, the share of it spent in DTX's advance, and the tick
+handlers, with DTX's cycle counter, whose tables this rig adds `movep` to,
+and fails where performance.md's figures differ from what it counts.
+`-hatari` puts the tune into an SNDH file and a program around it through
+`bin/ymxr-sndh` and `bin/ymxr-prg`, with 2,000 rows to play, runs it under
+a cycle-exact Hatari,
+and reads the trace of every chip write against the same model, so the
+ticks come from the MFP itself: the frames are separated by the VBL, and
+the ticks counted against the rates the trace shows the timers programmed
+at. `ym/cost.sh` measures the same program's cycles instead, through the
+raster monitor (Measure). `-perf` builds the player with that monitor in
+and checks it against the model under unicorn, so a band painted or a cost
+counted changes no register a frame writes, and none of the order it writes
+them in. `-lean` builds it with the two switches a tick reads,
+`YMXR_NEST=0` and `YMXR_AEOI=1` (performance.md), and checks that build
+against the same model. `-kit` plays the conformance kit's tunes, or the
+tune files named, and checks each frame the player produces against the
+reader's record of it through `bin/ymxr-trace`, and the record's first line
+against the tune's header, so the player, the rig's model and the reader
+agree line by line. Every tune is bound through `bin/ymxr-bind` before the
+player reads it; a tune file of another version is rejected by the binder
+and the reader, and the player rejects a bound tune of another version.
 
-| variable | gives |
+| variable | what it names |
 |---|---|
 | `RMAC` | the assembler, `rmac` on the path by default |
 | `DTX_WRITE` | DTX's `dtx-write`, which reads the table back out of the bound tune's image; built from DTX's `go/cmd/dtx-write` |
@@ -300,48 +303,49 @@ bin/ymx-to-ymxr in.ymx out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
 ```
 
 A `.ymx` into a tune file, for moving a library of them across. It reads
-the file through YMX's own `ymx-dump`, which `YMX_DUMP` names, rather than
-reading the container here: what a `.ymx` holds is then read by the tree
-that writes them.
+the file through YMX's `ymx-dump`, which `YMX_DUMP` names, rather than
+reading the container here: the contents of a `.ymx` are then read by the
+tree that writes them.
 
-YMX's streams 0 to 13 are the sound registers holding what the chip
-receives, its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen
-values go through the conversion a YM dump's do and take the same flags.
+YMX's streams 0 to 13 are the sound registers as the chip receives them,
+its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen values go
+through the conversion a YM dump's do and accept the same flags.
 
 Streams 14 to 24 are the script that drives YMX's four timer channels,
 and a channel there is an effect here: a source on a target at a timer's
 rate. Six of YMX's eight opcodes convert. `START_TOGGLE` is two rows on a
-volume register, `START_RETRIGGER` one row on R13, `START_PCM` the
-sample's own bytes with the end marker YMX writes as this format's
-marker, `RETUNE` a rate with the voice's volume repatched, `HOLD` a count or a
-source reloaded, and `RELEASE` source 0.
+volume register, `START_RETRIGGER` one row on R13, `START_PCM` the sample's
+bytes with the end marker YMX writes as this format's marker, `RETUNE` a
+rate with the voice's volume repatched, `HOLD` a reloaded count or
+source, and `RELEASE` source 0.
 
 A `RETUNE` at a voice and a `HOLD` that reloads a parameter change the
 source without moving the place: the stream keeps its phase and the half it
 stands in (YMX, SPEC.md 3.1). Section 6 rule 5 allows exactly that, since
 the source they start has the row count the effect already runs, so the row
 leaves bit 5 clear. The row the tune repeats to stops every effect it does
-not start, so a wrap lands on a known state. `START_PCM_PREEMPT` stops the
-channels its operand names, taking their whole row: a select left standing
-there would start the timer the stop just stopped (SPEC.md 1.9).
+not start, so a wrap resumes from a known setting. `START_PCM_PREEMPT`
+stops the channels its operand names, filling their whole row: a select
+left standing there would start the timer the stop just stopped (SPEC.md
+1.9).
 
-YMX fits a tune to its unit by padding it, where this conversion drops to
-a unit of 1 instead, so a dump of an odd frame count is one frame longer
-through YMX. A dump's rows are what a tune has (`ym-to-ymxr` prevails
-where the two readings differ), so a pad comes off: one frame, repeating
-the frame before it, acting on no channel, on an even count. A tune whose
-own last frame reads that way loses it, and a file packed at a wider unit
-keeps the pad past the first.
+YMX fits a tune to its unit by padding it, where this conversion drops to a
+unit of 1 instead, so a dump of an odd frame count is one frame longer
+through YMX. A dump's rows are the tune's rows (`ym-to-ymxr` prevails where
+the two readings differ), so a pad comes off: one frame, repeating the
+frame before it, acting on no channel, on an even count. A tune whose last
+frame reads that way loses it, and a file packed at a wider unit keeps the
+pad past the first.
 
 A start sets bit 6 where the channel's timer is stopped and leaves it clear
-over a running stream, since bit 6 moves a running timer and a stopped one
-starts on the select either way (1.9, section 6 rule 5). The shape a
+over a running stream, since bit 6 affects a running timer and a stopped
+one starts on the select either way (1.9, section 6 rule 5). The shape a
 retrigger start restarts stands in X's bits 7 to 4, and the channels a
 preempt stops in its bits 3 to 0.
 
-`RESUME` is not read, and a frame that runs it gets a note on stderr.
-Which timer a channel runs on is YMX's `T` stream and this schema's 2.3,
-so the map is not carried: channel 0 becomes effect 0.
+`RESUME` is not read, and a frame that runs it produces a note on stderr.
+Which timer a channel runs on is YMX's `T` stream and this schema's 2.3, so
+the map does not cross: channel 0 becomes effect 0.
 
 ## Against YMX
 
@@ -353,13 +357,13 @@ One tune packed both ways and played twice: through YMX's `ymx` and
 `mkprg` into a program, and through this repository's three tools into
 another. Both run under Hatari with their chip writes traced and cut into
 frames at the VBL, and each frame's fourteen registers are read against
-the other run's, each masked to what the register takes.
+the other run's, each masked to the register's bits.
 
 The frames are aligned on the first write to a sound register other than
-R7, which TOS writes at boot before a program runs. A pass of the music is
-what it compares, the tune's own row count from that frame; past the wrap
-a tune starts over at the row each tree read out of the dump, which is the
-converters' reading and not a thing a player does. `-whole` reads the run
+R7, which TOS writes at boot before a program runs. It compares one pass of
+the music, the tune's row count from that frame; past the wrap a tune
+starts over at the row each tree read out of the dump, which is the
+converters' reading rather than a player's behaviour. `-whole` reads the run
 to its end.
 
 A register an effect drives is sampled at the frame's edge, where a
@@ -369,17 +373,17 @@ named. A frame differing on a register no effect drives is what fails the
 run.
 
 The tunes under `ym/test` are one of each shape, which is what the rig
-asks of them. This reads eleven of the corpus's own besides, six whose
+requires of them. This reads eleven from the corpus besides, six whose
 effects are square waves on a volume register and five whose sources are
 recordings played once, so the shapes an ST tune is driven with are read
 against the other player rather than assumed.
 
-A name ending `.ymx` is a tune that has no dump. YMX plays the file
-itself, and this tree plays what `bin/ymx-to-ymxr` makes of it, so what
-the run reads is the move across rather than two packings of one dump.
-`ymx/test` holds three, and the default reads them.
+A name ending `.ymx` is a tune with no dump behind it. YMX plays the file
+itself, and this tree plays what `bin/ymx-to-ymxr` makes of it, so the run
+reads the move across rather than two packings of one dump.
+`ymx/test` has three of them, and the default reads those.
 
-| variable | gives |
+| variable | what it names |
 |---|---|
 | `YM_CORPUS` | the corpus those eleven stand in |
 | `YMX_REPO` | the YMX checkout, `../YMX` by default |
@@ -389,8 +393,8 @@ the run reads is the move across rather than two packings of one dump.
 ## Measure
 
 `ym/convert.py` runs the corpus through the specification and prints the
-figures experiments.md holds, and `ym/measure.py` the register-level
-figures SPEC.md 1.2 and 1.7 give. `YM_CORPUS` names the corpus,
+figures in experiments.md, and `ym/measure.py` the register-level figures
+in SPEC.md 1.2 and 1.7. `YM_CORPUS` names the corpus,
 `DTX_WRITE` the DTX writer, `DTX_RING` the ring, `DTX_COPIES` the copies
 flag, `JOBS` how many tunes
 convert at once, and `YMX_PAIRS` the tunes with a `.ymx` beside them.
@@ -404,15 +408,14 @@ VBLS=3000 ym/cost.sh tune.ymxr
 a program with the raster monitor's core for each tune, runs it under
 Hatari tracing the writes to the background, and reads every call's
 span back through `ym/cost.py`. The monitor is a build of the player
-(`68k/YMXR.S`, `YMXR_PERF`): the call paints the background red while
-its work runs, each tick handler paints its own colour, and the call
-burns a yellow bar for what the ticks it counted cost, after its own
-writes, so none of them moves for it. `-lean` builds the core whose
-ticks neither drop the interrupt level nor write their own end of
-interrupt, so what comes back is that core's cost against the plain
-one's. `HATARI`, `TOS` and `VBLS` name the emulator, a TOS image and the
-frames to run. performance.md has the figures and what the method leaves
-out.
+(`68k/YMXR.S`, `YMXR_PERF`): the call paints the background red while its
+work runs, each tick handler paints a colour of its own, and the call burns
+a yellow bar for the cost of the ticks it counted, after its writes, so
+none of them moves for it. `-lean` builds the core whose ticks neither drop
+the interrupt level nor write an end of interrupt, so the result is that
+core's cost against the plain one's. `HATARI`, `TOS` and `VBLS` name the
+emulator, a TOS image and the frames to run. performance.md has the figures
+and what the method leaves out.
 
 ```
 hatari --trace psg_write,video_vbl --trace-file trace.txt TUNE.PRG
@@ -434,7 +437,7 @@ hatari --trace psg_write,video_vbl --trace-file a.txt A.PRG
 python3 ym/writes.py a.txt b.txt
 ```
 
-`ym/writes.py` holds two runs' chip writes against each other: for every
+`ym/writes.py` reads two runs' chip writes against each other: for every
 register, whether the values come in the same order and where they part.
 The cores of BINARIES.md play one tune through the same player, so this
 is the measure of whether a switch changed the tune. It counts from the

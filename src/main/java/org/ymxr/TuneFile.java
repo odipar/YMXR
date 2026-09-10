@@ -7,8 +7,8 @@ import org.dtx.Dtx;
 import org.dtx.Table;
 
 /**
- * A tune file read back: what its header states, its DTX2 table as the
- * bytes the file holds and as the table unpacked out of them, and its
+ * A tune file read back: its header fields, its DTX2 table as the bytes
+ * in the file and as the table unpacked out of them, and its
  * sources. What a reader reports (R2.4).
  */
 record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table table,
@@ -34,7 +34,7 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
             int to = i + 1 < count ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1)) : file.length;
             Table source = Dtx.read(Arrays.copyOfRange(file, at, to));
             // SPEC.md 3.1: a source is one column of one byte at this
-            // version, the row 2.1's procedures take. A wider one or one of
+            // version, the row shape 2.1's procedures read. A wider one or one of
             // more columns is a later version's, and the player would read
             // its rows a byte at a time and play something else, so it is
             // rejected here as a tune of another version is.

@@ -17,7 +17,7 @@ import java.util.stream.Stream;
  * file's entries, and the program stub, which {@link Prg} puts in front
  * of an SNDH file. Two switches of the player's stand in the core, the
  * raster monitor and the lean tick, and each of their four settings is a
- * core of its own, so a file asked for both takes the core that is both.
+ * a separate core, so a file that requests both uses the core that is both.
  * The build assembles each once from its source under {@code 68k} and
  * writes it into the classes, the one step rmac is needed for; a tool
  * reads them there and runs no assembler.
@@ -39,8 +39,8 @@ final class Binaries {
      * player's {@code YMXR_PERF}, doc/performance.md): the play call
      * paints the background red while its work runs and burns a yellow
      * bar for the timers' counted cost, and each tick handler paints its
-     * own colour. A trace of the palette writes gives what the run cost,
-     * and a file made for reading a run takes this core in place of the
+     * colour of its own. A trace of the palette writes reports what the run
+     * cost, and a file made for reading a run uses this core in place of the
      * plain one.
      */
     static final Binary MONITOR = new Binary("YMXR_sndh-perf.bin", "YMXR_sndh.S",
@@ -50,9 +50,9 @@ final class Binaries {
      * The core with the player's two tick switches the other way (the
      * player's {@code YMXR_NEST} and {@code YMXR_AEOI},
      * doc/performance.md): a tick neither drops the interrupt level nor
-     * writes its own end of interrupt, so one that writes a row costs 32
-     * cycles less and one that ends a source 16. A host takes this core
-     * where no MFP interrupt of its own nests inside another and the
+     * writes its end of interrupt, so one that writes a row costs 32
+     * cycles less and one that ends a source 16. A host uses this core
+     * where no MFP interrupt of the host nests inside another and the
      * MFP's vector register is the player's to set.
      */
     static final Binary LEAN = new Binary("YMXR_sndh-lean.bin", "YMXR_sndh.S",
@@ -61,7 +61,7 @@ final class Binaries {
     /**
      * The core with both switches set: the raster monitor reads what a
      * run costs, and the ticks it reads are the lean ones. A file made
-     * for reading a lean run takes this core.
+     * for reading a lean run uses this core.
      */
     static final Binary MONITOR_LEAN = new Binary("YMXR_sndh-perf-lean.bin", "YMXR_sndh.S",
             List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1"));
@@ -83,7 +83,7 @@ final class Binaries {
 
     /** The core of the two switches, as carried: the raster monitor in
      *  where {@code monitor}, ticks that neither drop the interrupt level
-     *  nor write their own end of interrupt where {@code lean}. */
+     *  nor write their end of interrupt where {@code lean}. */
     static byte[] core(boolean monitor, boolean lean) {
         return carried(binary(monitor, lean).name());
     }
@@ -121,7 +121,7 @@ final class Binaries {
     /**
      * rmac's assembly of one source under {@code sources}, raw, for the
      * 68000, with {@code sources} on the include path for the player the
-     * core includes and the binary's own switches after it.
+     * core includes and the binary's switches after it.
      *
      * @throws IllegalStateException where rmac does not run or fails
      */

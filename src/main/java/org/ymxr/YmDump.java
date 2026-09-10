@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
  * Reads a YM5!/YM6! register dump, as
  * <a href="http://leonard.oxg.free.fr/ymformat.html">the YM format page</a>
  * describes it. Carried from YMX's {@code org.ym6.Ym6Reader}, where the
- * format's own words are used because they name the bytes read: digidrums,
+ * format's words are used because they name the bytes read: digidrums,
  * effect slots, TP and TC. The schema's vocabulary begins downstream, in
  * {@link Columns}.
  *
@@ -15,12 +15,12 @@ import java.nio.charset.StandardCharsets;
  * register each (the interleaved option) or one 16-byte record per frame. Both
  * come out as 16 register vectors.
  *
- * <p>Distributed {@code .ym} files are usually LHA archives holding this data;
+ * <p>Distributed {@code .ym} files are usually LHA archives containing this data;
  * the reader unpacks them itself, through {@link Lha}.
  */
 public final class YmDump {
 
-    /** One parsed tune, in the file's own terms and nothing else's: what the
+    /** One parsed tune, in the terms of the file alone: what the
      *  header said, the frames as read, and the samples as stored.
      *
      *  <p>{@code registers[r][frame]} is R{@code r}'s raw value, all sixteen
@@ -34,7 +34,7 @@ public final class YmDump {
         /** Register count in the file: R0..R15, the last two being the I/O ports. */
         public static final int YM_REGISTERS = 16;
 
-        /** Attribute bit 2: drum samples hold 4-bit values, one per byte. */
+        /** Attribute bit 2: drum samples are 4-bit values, one per byte. */
         public static final int A_DRUM4BITS = 4;
 
         /** The digidrum samples exactly as stored: 8-bit unsigned by default,

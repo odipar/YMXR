@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The five binaries as the build assembled them, and what the tools make
  * of them: each of the four cores' descriptors and the stub's as
- * BINARIES.md states them, an SNDH file from the kit's tunes read back
+ * BINARIES.md defines them, an SNDH file from the kit's tunes read back
  * tag by tag and part by part, and a program around it.
  */
 final class BinariesTest {
@@ -49,7 +49,7 @@ final class BinariesTest {
     }
 
     /** One core's descriptor: YMXS at 12, the two versions, YMXR_FIXED,
-     *  the flags word given at 22, a zero word at 26, the state byte in
+     *  the flags word at 22, a zero word at 26, the state byte in
      *  the core, the two offsets it is written with unpatched, and three
      *  entries that reach even addresses in the core. */
     private static void assertCore(byte[] core, int flags) throws IOException {
@@ -97,9 +97,9 @@ final class BinariesTest {
 
     @Test
     void eachOfTheTwoSwitchesFourSettingsIsACoreWhoseFlagsSayWhichItIs() throws IOException {
-        // The tool picks a core by the switches asked for and holds it to
+        // The tool selects a core by the switches passed and checks it against
         // the flags word (Sndh.checkCore), so each of the four settings
-        // needs a core of its own whose word reads the setting back.
+        // needs a separate core whose word reads the setting back.
         Set<String> named = new LinkedHashSet<>();
         for (int setting = 0; setting < 4; setting++) {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
@@ -114,7 +114,7 @@ final class BinariesTest {
 
     @Test
     void theLeanTickIsTheSameBytesOffEitherCore() throws IOException {
-        // Both switches are the player's own, so the lean tick takes the
+        // Both switches belong to the player, so the lean tick uses the
         // same code off the core with the monitor in as off the plain one.
         int off = Binaries.core().length - Binaries.core(false, true).length;
         assertEquals(off, Binaries.core(true, false).length
@@ -231,8 +231,8 @@ final class BinariesTest {
         return new Tags(order, text, subtunes, rate, flag, frames, names, at);
     }
 
-    /** The file's parts past the tags: the core given, the subtune table,
-     *  the bound tunes and the workspace, each held to its place. */
+    /** The file's parts past the tags: the core named, the subtune table,
+     *  the bound tunes and the workspace, each checked against its place. */
     private static void assertCombined(byte[] core, byte[] sndh, List<byte[]> files, Tags tags)
             throws IOException {
         int header = Sndh.even(tags.end());
@@ -249,7 +249,7 @@ final class BinariesTest {
         assertEquals(Sndh.even(core.length), tableAt);
         assertEquals(files.size(), Tune.getWord(sndh, header + tableAt));
         // The images stand between the subtune table and the tunes: those
-        // that agree on what an image gives once share one, so the reader's
+        // that agree on what an image fixes once share one, so the reader's
         // code stands once for them (DTX abi.md 1, BINARIES.md 2).
         Bound.Set set = Bound.of(files);
         int state = 0;
@@ -265,7 +265,7 @@ final class BinariesTest {
             assertEquals(0, at & 1, "subtune " + (i + 1) + " on an even address");
             assertEquals(next, at, "subtune " + (i + 1) + " follows what stands before it");
             byte[] bound = set.tunes().get(i).clone();
-            // The tune reaches its image from its own first byte, which the
+            // The tune reaches its image from its first byte, which the
             // combine put in and the set left at zero.
             Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - at);
             assertArrayEquals(bound, Arrays.copyOfRange(sndh, header + at,
@@ -379,7 +379,7 @@ final class BinariesTest {
         assertEquals("YMXT", ascii(patched, 4, 4));
         assertEquals(2, Tune.getWord(patched, Prg.STUB_SUBTUNES_AT));
         assertEquals(0, Tune.getWord(patched, Prg.STUB_FLAGS_AT),
-                "no Timer C claimed: the stub takes the screen's rate");
+                "no Timer C claimed: the stub plays at the screen's rate");
         assertEquals(50, Tune.getWord(patched, Prg.STUB_RATE_AT));
         assertEquals(0, Tune.getLong(patched, Prg.STUB_ROWS_AT));
         int core = Tune.getLong(patched, Prg.STUB_CORE_AT);
@@ -415,7 +415,7 @@ final class BinariesTest {
     @Test
     void aFileTakesTheCoreOfTheTwoSwitchesItIsAskedFor() throws IOException {
         // The failure this covers: a file asked for the monitor and the
-        // lean tick took the monitor's core, whose flags say nothing of
+        // lean tick used the monitor's core, whose flags record no
         // the lean tick, and checkCore refused it.
         List<byte[]> files = List.of(tune("chambers"));
         for (int setting = 0; setting < 4; setting++) {

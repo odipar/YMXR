@@ -5,12 +5,12 @@
 This repository produces the specification. How it is written comes
 before what it describes, and what things are called comes before both.
 
-- **R0.1** `AGENTS.md` gives the rules, for every document, code comment
+- **R0.1** `AGENTS.md` defines the rules, for every document, code comment
   and commit message.
 - **R0.2** A test reads every document against a list of phrases struck in
   review, and names the file and line of each hit.
-- **R0.3** The test walks the tree for documents. A document is held because
-  it is there, not because someone listed it.
+- **R0.3** The test walks the tree for documents. A document is read
+  because it is there, not because someone listed it.
 - **R0.4** Striking a phrase adds it to the list, in the same change.
 - **R0.5** Using a struck phrase again removes it from the list, in the same
   change.
@@ -29,24 +29,24 @@ before what it describes, and what things are called comes before both.
 
 ## DTX and YMXR
 
-**DTX** is a data format, and a repository of its own. It holds a table of
-`R` rows and `C` columns, and says nothing about what a column holds. The
-table is data: a compile step or a calling convention is a reader's, not
-the format's.
+**DTX** is a data format, and a separate repository. It defines a table of
+`R` rows and `C` columns, and no meaning for a column. The table is data: a
+compile step or a calling convention belongs to a reader, not to the
+format.
 
-**YMXR** is one use of DTX. Its columns hold what an Atari ST's sound chip
-and timers are set to, and its player turns each row into writes to them.
-YMXR defines what a column holds, and how it reaches the hardware. It
-says nothing about how a row is stored, packed or unpacked.
+**YMXR** is one use of DTX. Its columns are the settings of an Atari ST's
+sound chip and timers, and its player turns each row into writes to them.
+YMXR defines the meaning of each column, and how it reaches the hardware.
+How a row is stored, packed or unpacked is outside YMXR.
 
-The two meet at the table and nowhere else. DTX gives it a shape, and YMXR
-says what its columns hold.
+The two meet at the table and nowhere else. DTX defines its shape, and
+YMXR defines the meaning of its columns.
 
-YMXR takes the name YMX when it is done. R1 to R6 are requirements of that
-format, and bind anyone who writes or plays a tune. R0 binds this
+YMXR assumes the name YMX when it is done. R1 to R6 are requirements of
+that format, and bind anyone who writes or plays a tune. R0 binds this
 repository.
 
-## R1. What DTX gives
+## R1. What DTX defines
 
 DTX's specification defines these, and 0.4.0 is the release this
 repository reads them from. They are recorded here because YMXR is written
@@ -55,21 +55,21 @@ against them, and they change in that repository rather than this one.
 - **R1.1** A tune's data is a table: `R` rows and `C` columns, every value
   `W` bytes, 1, 2 or 4, and a row `RR` it repeats to once the last row is
   done. Those four are its metadata.
-- **R1.2** How the table is laid out, row by row or column by column, and
-  how a row is read from it, are the format's and stated in that
+- **R1.2** The layout of the table, row by row or column by column, and
+  how a row is read from it, belong to that format and are defined in that
   repository.
-- **R1.3** DTX says nothing about what a column holds.
+- **R1.3** DTX defines no meaning for a column.
 
 ## R2. What YMXR defines
 
-- **R2.1** What each column holds.
+- **R2.1** The meaning of each column.
 - **R2.2** How a column reaches the YM2149 and the MFP.
 - **R2.3** A tune's sources and their index, and the values fixed for a
-  whole tune, neither of which DTX holds.
+  whole tune, neither of which DTX defines.
 - **R2.4** The two roles that read a tune: a player, which writes to the
-  two chips as it goes, and a reader, which reports what a tune holds and
+  two chips as it goes, and a reader, which reports the result and
   writes to no chip.
-- **R2.5** Nothing about the table's layout or its packing.
+- **R2.5** No part of the table's layout or its packing.
 
 ## R3. The schema
 
@@ -81,76 +81,76 @@ against them, and they change in that repository rather than this one.
 - **R3.2** The schema is an abstraction over those effects rather than one
   tracker's arrangement of them. It is the ubiquitous language trackers map
   onto.
-- **R3.3** A player works nothing out while a tune plays. Every choice is
-  compiled into the data, which costs columns, and a column is cheap.
+- **R3.3** A player computes no decision while a tune plays. Every choice
+  is compiled into the data, which costs columns, and a column is cheap.
 - **R3.4** At most 32 columns.
-- **R3.5** A column holds one value, and every column is one byte: a
-  table's values take one width (R1.1), and a register takes a
-  byte. A register's value comes from one column, a column names its own
-  target, and a value wider than a byte is a column a byte: a period's two
-  halves, a timer's prescaler and its count.
-- **R3.6** Most columns carry a set bit, their top bit: 1 sets the value,
-  0 does not, and a value not set is not read - its bits may hold
-  anything. Some columns carry a bit for another column, and such a bit
-  is read on every row. A row may set a value the register already holds:
-  the bit marks what to take, not what changed.
-- **R3.7** Each column holds its own bit. One column holding all of them
-  would move for every reason any column moves, where a bit beside its own
+- **R3.5** A column is one value, and every column is one byte: a table's
+  values are one width (R1.1), and a register is a byte. A register's value
+  comes from one column, a column names its target, and a value wider than
+  a byte is a column a byte: a period's two halves, a timer's prescaler and
+  its count.
+- **R3.6** Most columns define a set bit, their top bit: 1 sets the value,
+  0 does not, and a value not set is not read - its bits are arbitrary.
+  Some columns define a bit for another column, and such a bit is read on
+  every row. A row may set a value the register already has: the bit marks
+  what to write, not what changed.
+- **R3.7** Each column defines its set bit. One column of all the set bits
+  would move for every reason any column moves, where a bit beside its
   value moves with that value and packs with it. A column whose value fills
   its width reserves a value for the same purpose, and where the reserved
-  value needs a qualifying bit, another column holds it (R3.6).
+  value needs a qualifying bit, another column defines it (R3.6).
 
 ## R4. The player
 
 - **R4.1** A player runs one method at two rates: a clock advances a table
   one row and a procedure writes that row. The frame clock advances the
   tune's table, once a frame for every table it runs, and a timer advances
-  a source of its own.
-- **R4.2** A column the row does not set costs a player the test and
-  nothing more.
+  a separate source.
+- **R4.2** A column the row does not set costs a player the test and no
+  more.
 - **R4.3** The mapping is the player's work: the frame's procedure for a
   row of the tune's table, a target's for a row of a source.
 - **R4.4** A frame costs the row it reads and what that row sets. It does
   not grow with the count of columns. R3.6 puts what a row sets in the
   writer's hands, and the frame's cost with it.
 - **R4.5** The worst frame stays near YMX 0.8.3's, which 13 scanlines
-  cover over every shape it produces. That is the call's own work, with
-  what the timers take counted apart. R4.4 spends the average; a demo
-  budgets for the worst frame, and it does not move.
-- **R4.6** A player keeps what it needs of a value it took. The row is not
-  that store: R3.6 leaves an unset value uninterpreted.
+  cover over every shape it produces. That is the work of the call itself,
+  with the cost of the timers counted apart. R4.4 spends the average; a
+  demo budgets for the worst frame, and it does not move.
+- **R4.6** A player keeps what it requires of a value it read. The row is
+  not that store: R3.6 leaves an unset value uninterpreted.
 
 ## R5. Outside the DTX table
 
 R3 sits behind R2.1 and R4 behind R2.2. This sits behind R2.3, and lists
-what a tune needs that no row gives.
+what a tune requires beyond a row.
 
-- **R5.1** A tune holds its sources outside the DTX table. Their rows are
+- **R5.1** A tune keeps its sources outside the DTX table. Their rows are
   read at a tick's rate rather than a row's, so a row that did not change
   still feeds them.
 - **R5.2** Which source plays, on which target, and at what rate, comes
   from the columns.
-- **R5.3** A source's rows hold what the register its target writes takes.
-  A recording is linear amplitudes and a volume register takes a
+- **R5.3** A source's rows are values that fit the register its target
+  writes. A recording is linear amplitudes and a volume register is a
   logarithmic level, so the conversion is the writer's work under R3.3.
-- **R5.4** The sources are the tune's. A player holds none of its own.
-- **R5.5** How many sources a tune holds, how large one is, and what an
-  index entry holds are SPEC.md's.
+- **R5.4** The sources belong to the tune. A player defines none.
+- **R5.5** How many sources a tune runs, how large one is, and the content
+  of an index entry are SPEC.md's.
 - **R5.6** A value fixed for a whole tune is not a column. It would set a
-  column once and hold it for every row after it.
+  column once and repeat it on every row after it.
 - **R5.7** How often a player is called, and which timers it claims before
   the first row, are the tune's. A player reads one row at a time, so it
   finds neither by reading ahead.
 
 ## R6. Version and extension
 
-- **R6.1** A tune states the version it was written for. Where it states
+- **R6.1** A tune records the version it was written for. Where it records
   it, and what a player does with a version it was not built for, are
   SPEC.md's.
-- **R6.2** A meaning holds once assigned: a column's, a bit's within its
+- **R6.2** A meaning is fixed once assigned: a column's, a bit's within its
   column, a value's within its field. A later version assigns what this one
   leaves unassigned, and redefines none.
-- **R6.3** R3.4's ceiling of 32 holds at this version and at every later
+- **R6.3** R3.4's ceiling of 32 stands at this version and at every later
   one.
 - **R6.4** A schema outgrowing 32 columns runs a second DTX table beside
   the first, a row of each a frame. The ceiling is one table's.

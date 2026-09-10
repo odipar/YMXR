@@ -5,9 +5,9 @@ package org.ymxr;
  * the target its ticks write, the value its source is built from, and the
  * timer's select and count (SPEC.md 1.8, 1.9).
  *
- * <p>YM6 gives each slot a kind in its code's bits 7 and 6; YM5 has no kind
+ * <p>YM6 files each slot's kind in its code's bits 7 and 6; YM5 has no kind
  * bits, its first slot being a SID voice and its second a digidrum. A slot's
- * select is the MFP's own, 1 to 7, which is what the control column takes; a
+ * select is the MFP's, 1 to 7, as the control column carries it; a
  * slot whose select or count is 0 is empty, as the reference player reads it.
  */
 final class Effects {

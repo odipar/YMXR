@@ -22,9 +22,9 @@ import org.junit.jupiter.api.Test;
  * The documents against themselves: every reference that can be followed,
  * every figure that can be recomputed.
  *
- * <p>{@code HouseStyleTest} holds the prose to {@code AGENTS.md} and
- * {@code GlossaryTest} holds the terms to the glossary. This holds the
- * numbers and the pointers, which drift on their own as a document is
+ * <p>{@code HouseStyleTest} checks the prose against {@code AGENTS.md} and
+ * {@code GlossaryTest} the terms against the glossary. This checks the
+ * numbers and the pointers, which drift as a document is
  * edited: a requirement renumbered, a section renamed, a column added, a
  * ratio left over from the figures before it.
  *
@@ -65,9 +65,9 @@ final class ConsistencyTest {
         return Pattern.compile(claim.replace(" ", "\\s+"));
     }
 
-    /** The rows of the column table: first index, last index, what it holds. */
+    /** The rows of the column table: first index, last index, its text. */
     private static List<Object[]> columnTable(String spec) {
-        int at = spec.indexOf("| column | holds |");
+        int at = spec.indexOf("| column | what it reaches |");
         assertTrue(at >= 0, "SPEC.md has no column table");
         String block = spec.substring(at, spec.indexOf("\n\n", at));
         Matcher m = Pattern.compile("^\\| (\\d+)(?: to (\\d+))? \\| ([^|]+) \\|$",
@@ -83,26 +83,27 @@ final class ConsistencyTest {
 
     @Test
     void everyColumnIsNamedAsTheSpecificationNamesIt() throws IOException {
-        // The report gives a row a column, and the name on it is the
-        // player's vocabulary for that column (AGENTS.md, one
-        // vocabulary), so SPEC.md's table is what it is held to.
+        // The report names a column on every row, in the player's
+        // vocabulary for that column (AGENTS.md, one vocabulary), so
+        // SPEC.md's table is the reference for it.
         List<Object[]> rows = columnTable(read(SPEC));
         List<String> astray = new ArrayList<>();
         for (Object[] r : rows) {
             int first = (Integer) r[0];
             int last = (Integer) r[1];
-            String holds = (String) r[2];
+            String reaches = (String) r[2];
             for (int c = first; c <= last; c++) {
                 String name = Tune.name(c);
-                // A row is the column's name, and where it says more it
-                // says it after a comma: "R0, voice A tone period, fine",
+                // A row is the column's name, and anything further
+                // follows a comma: "R0, voice A tone period, fine",
                 // "effect 0 timer control, Timer A's control register".
-                boolean named = holds.equals(name) || holds.startsWith(name + ",");
+                boolean named = reaches.equals(name) || reaches.startsWith(name + ",");
                 if (first == last && !named) {
-                    astray.add("column " + c + " is named " + name + " and holds " + holds);
+                    astray.add("column " + c + " is named " + name
+                            + " and the table reads " + reaches);
                 } else if (first != last && (c - Columns.EFFECT) / 4
                         != (first - Columns.EFFECT) / 4) {
-                    astray.add("column " + c + " falls outside the effect its row gives");
+                    astray.add("column " + c + " falls outside the effect of its row");
                 }
             }
         }
@@ -127,7 +128,7 @@ final class ConsistencyTest {
             }
             // columns 0 to 13 reach R0 to R13, one a register
             if (first <= 13 && !((String) r[2]).startsWith("R" + first + ",")) {
-                astray.add("column " + first + " holds " + r[2]);
+                astray.add("column " + first + " reads " + r[2]);
             }
             next = last + 1;
             columns += last - first + 1;
@@ -138,13 +139,13 @@ final class ConsistencyTest {
 
         Matcher m = wrapped("(\\d+) columns of the 32 R\\d+\\.\\d+ allows, each"
                 + " one byte, so a row is (\\d+) bytes").matcher(spec);
-        assertTrue(m.find(), "SPEC.md does not state its column and byte count");
+        assertTrue(m.find(), "SPEC.md has no column and byte count");
         int saidColumns = Integer.parseInt(m.group(1));
         int saidBytes = Integer.parseInt(m.group(2));
         int c = columns;
         assertTrue(saidColumns == c && saidBytes == c,
-                () -> "the table holds " + c + " columns of one byte; the prose"
-                        + " says " + saidColumns + " and " + saidBytes);
+                () -> "the table has " + c + " columns of one byte; the prose"
+                        + " reads " + saidColumns + " and " + saidBytes);
     }
 
     @Test
@@ -256,7 +257,7 @@ final class ConsistencyTest {
             }
         }
         assertTrue(bad.isEmpty(), () -> String.join("\n", bad)
-                + "\nterminology.md holds " + sections);
+                + "\nterminology.md has " + sections);
     }
 
     @Test
@@ -281,15 +282,15 @@ final class ConsistencyTest {
     }
 
     /**
-     * The tone periods' share against the three the same sentence gives.
+     * The tone periods' share against the three in the same sentence.
      * Prose again, so the table check above does not reach it.
      */
     @Test
-    void theToneShareIsTheSumOfTheThreeItStates() throws IOException {
-        Matcher share = wrapped("take (\\d+\\.\\d)%, (\\d+\\.\\d)% and"
+    void theToneShareIsTheSumOfTheThreeParts() throws IOException {
+        Matcher share = wrapped("are (\\d+\\.\\d)%, (\\d+\\.\\d)% and"
                 + " (\\d+\\.\\d)% of the packed bytes, (\\d+\\.\\d)% between"
                 + " them").matcher(read(EXP));
-        assertTrue(share.find(), "experiments.md gives no tone shares");
+        assertTrue(share.find(), "experiments.md has no tone shares");
         double sum = 0;
         for (int i = 1; i <= 3; i++) {
             sum += Double.parseDouble(share.group(i));
@@ -297,11 +298,11 @@ final class ConsistencyTest {
         double said = Double.parseDouble(share.group(4));
         double got = Math.round(sum * 10.0) / 10.0;
         assertTrue(Math.abs(got - said) < 0.05, () -> "the three shares make "
-                + got + "%, and the sentence says " + said + '%');
+                + got + "%, and the sentence reads " + said + '%');
     }
 
     /**
-     * The envelope saving against the two figures the same sentence gives,
+     * The envelope saving against the two figures in the same sentence,
      * and against what the corpus packs to. The figures are prose rather
      * than a table row, so the check above does not reach them.
      */
@@ -310,26 +311,26 @@ final class ConsistencyTest {
         String experiments = read(EXP);
         Matcher both = wrapped("cost ([\\d,]+) bytes as SPEC\\.md has them, and"
                 + " ([\\d,]+) under").matcher(experiments);
-        assertTrue(both.find(), "experiments.md gives no envelope pair");
+        assertTrue(both.find(), "experiments.md has no envelope pair");
         Matcher saved = wrapped("saves ([\\d,]+) bytes, (\\d+\\.\\d)% of the"
                 + " ([\\d,]+) the corpus").matcher(experiments);
-        assertTrue(saved.find(), "experiments.md gives no envelope saving");
+        assertTrue(saved.find(), "experiments.md has no envelope saving");
         long mine = number(both.group(1));
         long other = number(both.group(2));
         long says = number(saved.group(1));
-        assertTrue(other - mine == says, () -> "the saving is stated as "
+        assertTrue(other - mine == says, () -> "the saving is written as "
                 + says + ", and " + other + " less " + mine + " is "
                 + (other - mine));
         long whole = number(saved.group(3));
         double percent = Math.round(says * 1000.0 / whole) / 10.0;
         assertTrue(Double.parseDouble(saved.group(2)) == percent,
-                () -> "the saving is stated as " + saved.group(2) + "% and is "
+                () -> "the saving is written as " + saved.group(2) + "% and is "
                         + percent + "% of " + whole);
         Matcher row = Pattern.compile("^\\| DTX2 files at `k` = 1 \\| ([\\d,]+) \\|",
                 Pattern.MULTILINE).matcher(experiments);
         assertTrue(row.find(), "experiments.md has no row for k = 1");
         assertTrue(number(row.group(1)) == whole, () -> string(whole)
-                + " is not what the packing table gives at k = 1, "
+                + " is not the packing table's figure at k = 1, "
                 + row.group(1));
     }
 
@@ -425,10 +426,10 @@ final class ConsistencyTest {
             }
         }
         int seen = checked;
-        int held = ratios;
+        int found = ratios;
         assertTrue(seen >= 5, () -> "only " + seen
                 + " figures parsed; the check is asleep");
-        assertTrue(held >= 4, () -> "only " + held
+        assertTrue(found >= 4, () -> "only " + found
                 + " ratios parsed; the check is half asleep");
         assertTrue(wrong.isEmpty(), () -> String.join("\n", wrong));
     }
@@ -475,7 +476,7 @@ final class ConsistencyTest {
 
     /**
      * plan.md's two opening ranges against performance.md's table. plan.md
-     * states that every figure in it is against those, and no check read
+     * records that every figure in it is against those, and no check read
      * the one document against the other: both ranges sat three commits
      * behind the player.
      */
@@ -487,7 +488,7 @@ final class ConsistencyTest {
         Matcher said = wrapped("A call is ([\\d,]+) to ([\\d,]+) cycles on"
                 + " average by tune, and the costliest frame of a tune is"
                 + " ([\\d,]+) to ([\\d,]+)").matcher(read(PLAN));
-        assertTrue(said.find(), "plan.md gives no call range");
+        assertTrue(said.find(), "plan.md has no call range");
         long[] average = range(calls, call -> call[0]);
         long[] most = range(calls, call -> call[1]);
         assertEquals(string(average[0]), said.group(1), "the least call on average");
@@ -498,7 +499,7 @@ final class ConsistencyTest {
 
     /**
      * The frame procedure is the call less the advance, in both documents.
-     * DTX taking its state block in a6 took 36 cycles off the advance and
+     * DTX reading its state block from a6 cut 36 cycles from the advance and
      * 12 off the call, so this figure rose 24 where the others fell.
      */
     @Test
@@ -507,19 +508,19 @@ final class ConsistencyTest {
         long[] rest = range(calls, call -> call[0] - call[2]);
         Matcher perf = wrapped("The frame procedure is the rest, from"
                 + " ([\\d,]+) to ([\\d,]+) cycles on average").matcher(read(PERF));
-        assertTrue(perf.find(), "performance.md gives no frame procedure range");
+        assertTrue(perf.find(), "performance.md has no frame procedure range");
         assertEquals(string(rest[0]), perf.group(1), "performance.md's least");
         assertEquals(string(rest[1]), perf.group(2), "performance.md's greatest");
         Matcher plan = wrapped("The frame procedure is the rest,"
                 + " ([\\d,]+) to ([\\d,]+)\\.").matcher(read(PLAN));
-        assertTrue(plan.find(), "plan.md gives no frame procedure range");
+        assertTrue(plan.find(), "plan.md has no frame procedure range");
         assertEquals(string(rest[0]), plan.group(1), "plan.md's least");
         assertEquals(string(rest[1]), plan.group(2), "plan.md's greatest");
     }
 
     /**
-     * The share plan.md gives the advance, and the two tunes it names, against
-     * the table. The percentages round the table's own figures, so a figure
+     * The share plan.md reads for the advance, and the two tunes it names,
+     * against the table. The percentages round the table's figures, so a figure
      * that moves without its percentage moving is caught here.
      */
     @Test
@@ -530,7 +531,7 @@ final class ConsistencyTest {
                 + " costliest frame: ([\\d,]+) of Turrican - world 4-3's"
                 + " ([\\d,]+) and ([\\d,]+) of Synergy Credits' ([\\d,]+)")
                 .matcher(read(PLAN));
-        assertTrue(said.find(), "plan.md gives no advance share");
+        assertTrue(said.find(), "plan.md has no advance share");
         long[] share = range(calls, call -> Math.round(100.0 * call[2] / call[0]));
         assertEquals(share[0], Long.parseLong(said.group(1)), "the least share");
         assertEquals(share[1], Long.parseLong(said.group(2)), "the greatest share");
@@ -552,7 +553,7 @@ final class ConsistencyTest {
     }
 
     /**
-     * performance.md's refill parts against its own table: the fixed part
+     * performance.md's refill parts against its table: the fixed part
      * outside the decoder and the heaviest parse inside make the advance in
      * Turrican's costliest frame. The sentence gave the sum from before DTX
      * took its state block in a6, and the table gave the figure after it.
@@ -561,30 +562,30 @@ final class ConsistencyTest {
     void theRefillPartsAddUpToTheAdvanceMeasured() throws IOException {
         String perf = read(PERF);
         Matcher parts = wrapped("A refill of ([\\d,]+) outside and the heaviest"
-                + " ([\\d,]+) inside is the ([\\d,]+) the table above gives")
+                + " ([\\d,]+) inside is the ([\\d,]+) the table above reads")
                 .matcher(perf);
-        assertTrue(parts.find(), "performance.md gives no refill parts");
+        assertTrue(parts.find(), "performance.md has no refill parts");
         long outside = number(parts.group(1));
         long inside = number(parts.group(2));
         long whole = number(parts.group(3));
         assertEquals(whole, outside + inside, () -> outside + " outside and "
                 + inside + " inside make " + (outside + inside)
-                + ", and the sentence gives " + whole);
+                + ", and the sentence reads " + whole);
         long[] turrican = Objects.requireNonNull(
                 playCalls(perf).get("Turrican - world 4-3"),
                 "performance.md's table names no Turrican - world 4-3");
         assertEquals(string(turrican[3]), string(whole),
-                "the table gives another advance in the costliest frame");
+                "the table reads another advance in the costliest frame");
         Matcher spends = wrapped("The advance spends ([\\d,]+) cycles a refill"
                 + " outside the decoder").matcher(perf);
-        assertTrue(spends.find(), "performance.md gives no fixed part");
+        assertTrue(spends.find(), "performance.md has no fixed part");
         assertEquals(string(outside), string(number(spends.group(1))),
-                "the two sentences give the fixed part differently");
+                "the two sentences read the fixed part differently");
     }
 
     /**
      * Every glossary row names the document that explains its term, and
-     * nothing opened that document. requirements.md R0.7 allows no second
+     * and no check opened that document. requirements.md R0.7 allows no second
      * word for a thing that has one, so the document explaining a term
      * names it: SPEC.md 3.1 wrote "the index's entry" where the glossary
      * lists "index entry".
@@ -641,6 +642,6 @@ final class ConsistencyTest {
         assertTrue(DOCUMENTS.size() > 12, () -> "only " + DOCUMENTS.size()
                 + " documents read; the check is asleep");
         assertTrue(wide.isEmpty(), () -> String.join("\n", wide)
-                + "\nAGENTS.md asks one width, held.");
+                + "\nAGENTS.md requires one width.");
     }
 }

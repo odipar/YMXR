@@ -21,7 +21,7 @@ final class Sources {
     static final int MARK = 0x80;
 
     /** The level a digidrum's last row leaves its register at: mid-scale,
-     *  so the frame write that takes the register back does not click. */
+     *  so the frame write that sets the register back does not click. */
     static final int PARK = 13;
 
     /** One source: its rows, and the row it repeats to, `R` where it does
@@ -33,15 +33,15 @@ final class Sources {
     private final Map<Integer, Integer> numbers = new HashMap<>();
     private final byte[][] drums;
 
-    /** Sources given whole, numbered 1 upward in the order given: what a
-     *  tune built rather than converted holds. */
-    Sources(List<Source> given) {
-        list.addAll(given);
+    /** Sources passed whole, numbered 1 upward in that order: what a tune
+     *  built rather than converted uses. */
+    Sources(List<Source> passed) {
+        list.addAll(passed);
         drums = new byte[0][];
     }
 
     /** The song's digidrums as 4-bit levels: the high nibble of an 8-bit
-     *  sample, or the byte as it stands where the file holds 4-bit values. */
+     *  sample, or the byte as it stands where the file has 4-bit values. */
     Sources(YmDump.Song song) {
         boolean fourBit = (song.attributes() & YmDump.Song.A_DRUM4BITS) != 0;
         byte[][] source = song.drums();
@@ -85,7 +85,7 @@ final class Sources {
         switch (kind) {
             case Effects.SID:
                 // The level then the silence. The row that starts the square
-                // writes no level of its own, so the voice holds what the
+                // writes no level, so the voice keeps the value the
                 // last row set for a timer's period and the first tick opens
                 // the loud half.
                 return new Source(kind, data, new byte[] {(byte) data, (byte) MARK}, 0);

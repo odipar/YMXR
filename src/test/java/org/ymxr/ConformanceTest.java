@@ -23,13 +23,13 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * The conformance kit is what the converter gives: every tune under
+ * The conformance kit is what the converter writes: every tune under
  * {@code doc/conformance/tunes} is the dump its SOURCES.md row names,
  * converted with the row's options, or the tune its builder builds, and
  * every reference is what the reader reports of it (SPEC.md 7). This
  * makes each again and compares, so a change to the converter or the
  * reader that moved a byte of the kit fails here, and writes what is
- * missing beside the kit for the writer to take.
+ * missing beside the kit.
  */
 final class ConformanceTest {
 
@@ -52,7 +52,7 @@ final class ConformanceTest {
         }
     }
 
-    /** The version word {@code wrong-version} holds: one past the version
+    /** The version word in {@code wrong-version}: one past the version
      *  the reader reads. */
     static final int WRONG_VERSION = Tune.VERSION + 1;
 
@@ -65,11 +65,11 @@ final class ConformanceTest {
             Fixture.of("plays-once", "Circus Attractions  2.ym", "-r",
                     "four frames whose RR is R: the frame after the last row reports -1"),
             Fixture.of("turrican", "Turrican - world 4-3.ym", "",
-                    "three drums on Timer D, each ending by its marker; RR at 160, a loop longer than the ring replayed at its exact rows; R13 restated"),
+                    "three drums on Timer D, each ending by its marker; RR at 160, a loop longer than the ring replayed at its exact rows; R13 rewritten"),
             Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "",
                     "a loop of one row, RR at 177, odd, so the table packs at unit 1; six drums before it, the last stopped by a row"),
             Fixture.of("synergy", "Synergy Credits.ym", "",
-                    "nine SIDs on Timers A and D at once, six of them named by both; a square replacing a square on the target its effect holds, its place standing where it was; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so the table packs at unit 1"),
+                    "nine SIDs on Timers A and D at once, six of them named by both; a square replacing a square on the target of its effect, its place unmoved; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so the table packs at unit 1"),
             Fixture.of("preempt", "Digidrum preempt, built.ym", "",
                     "a drum starting on the voice a SID runs on stops the SID first, and the SID starts again when the drum ends; R8 passed between them with its column unset"),
             Fixture.of("retune", "Retrigger retune, built.ym", "",
@@ -77,13 +77,13 @@ final class ConformanceTest {
             Fixture.of("fine-zero", "Big - Samantha Fox Strip Poker 6.ym", "",
                     "a tone fine byte moving to 0: on voice A without the coarse set bit, on B and C with it"),
             Fixture.built("four-timers", "`BuiltTunes.fourTimers`", BuiltTunes::fourTimers,
-                    "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump gives: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and taken at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with nothing running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
+                    "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump produces: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with no source running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
-                            + " reports nothing of it", WRONG_VERSION)));
+                            + " produces no report of it", WRONG_VERSION)));
 
     /** chambers with another version in its header: what a reader reports
-     *  nothing of (R6.1). */
+     *  no report of (R6.1). */
     static Tune.Written wrongVersion() {
         try {
             byte[] dump = Files.readAllBytes(Path.of("ym", "test", "Chambers of Shaolin 5 - you blew it!.ym"));
@@ -96,7 +96,7 @@ final class ConformanceTest {
         }
     }
 
-    /** The tune a fixture gives: converted from its dump, or built. */
+    /** The tune of a fixture: converted from its dump, or built. */
     static Tune.Written make(Fixture f) throws IOException {
         if (f.built() != null) {
             return f.built().get();
@@ -105,8 +105,8 @@ final class ConformanceTest {
         return YmToYmxr.convert(dump, f.options(), new Report()).written();
     }
 
-    /** The dump's own header name and author, the only attribution the
-     *  file holds, as two cells; none for a tune built without a dump. */
+    /** The name and author from the dump's header, the only attribution in
+     *  the file, as two cells; none for a tune built without a dump. */
     static String credit(Fixture f) throws IOException {
         if (f.built() != null) {
             return "none | none";
@@ -120,9 +120,9 @@ final class ConformanceTest {
         return Trace.record(tune, -1);
     }
 
-    /** The tune's table as a DTX0 file: the sixteen-byte header giving R
+    /** The tune's table as a DTX0 file: the sixteen-byte header carrying R
      *  and RR (SPEC.md 3.1), then row 0 to R minus one, each its thirty
-     *  columns in order (DTX, SPEC.md 2.1); what a reader takes the table
+     *  columns in order (DTX, SPEC.md 2.1); what a reader reads the table
      *  from, since the DTX2 table's packing is DTX's and not this
      *  specification's. Empty for a file of another version. */
     static byte[] rows(byte[] tune) {
@@ -176,7 +176,7 @@ final class ConformanceTest {
                 missing.add(at + " written");
             } else {
                 assertArrayEquals(Files.readAllBytes(at), tune,
-                        at + " is not what its SOURCES.md row gives");
+                        at + " does not match its SOURCES.md row");
             }
             Path rowsAt = TUNES.resolve(f.name() + ".rows");
             if (!Files.exists(rowsAt)) {
@@ -196,7 +196,7 @@ final class ConformanceTest {
             Files.writeString(KIT.resolve("SOURCES.generated.md"), String.join("\n", rows) + "\n");
         }
         assertTrue(missing.isEmpty(), () -> String.join("\n", missing)
-                + "\nSOURCES.generated.md holds every row; take the rows into SOURCES.md");
+                + "\nSOURCES.generated.md has every row; copy the rows into SOURCES.md");
     }
 
     @Test
@@ -212,7 +212,7 @@ final class ConformanceTest {
             Files.writeString(KIT.resolve("MANIFEST.generated.txt"), want.toString());
         }
         assertEquals(want.toString(), have,
-                "MANIFEST.txt is not what the tunes and the reader give; MANIFEST.generated.txt is");
+                "MANIFEST.txt does not match the tunes and the reader; MANIFEST.generated.txt does");
     }
 
     @Test
@@ -236,7 +236,7 @@ final class ConformanceTest {
         assertTrue(count.find(), "README.md does not count the entries");
         assertEquals(entries, Long.parseLong(count.group(1).replace(",", "")), "README.md's entry count");
         Matcher version = Pattern.compile("version word \\$([0-9A-Fa-f]{4})").matcher(readme);
-        assertTrue(version.find(), "README.md does not give wrong-version's version word");
+        assertTrue(version.find(), "README.md has no version word for wrong-version");
         assertEquals(Tune.getWord(Files.readAllBytes(TUNES.resolve("wrong-version.ymxr")), 4),
                 Integer.parseInt(version.group(1), 16), "README.md's version word for wrong-version");
     }

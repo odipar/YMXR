@@ -14,14 +14,14 @@ import java.util.Arrays;
  * <p>The stub's descriptor, from the stub's first byte:
  *
  * <pre>
- *  offset  bytes  gives
+ *  offset  bytes  what it is
  *  0       4      bra.w to the program
  *  4       4      YMXT
  *  8       2      the descriptor's version, 1
  *  10      2      the subtunes, patched here from the '##' tag
  *  12      2      flags, patched here
  *  14      2      the rate, rows a second, patched here from the TC tag
- *  16      4      the rows to play, patched here; 0 plays as many as the tune gives
+ *  16      4      the rows to play, patched here; 0 plays the tune's row count
  *  20      4      the core's offset from the SNDH file's first byte, patched here
  * </pre>
  */
@@ -59,7 +59,7 @@ final class Prg {
      *  its SNDH, then the tags. */
     private static final int TAGS_AT = 12;
 
-    /** What the tag block gives the stub: the '##' count, the TC rate, the
+    /** What the tag block passes the stub: the '##' count, the TC rate, the
      *  FLAG letters after its '~', and where HDNS stands. */
     record Tags(int subtunes, int rate, String flag, int end) {
     }
@@ -70,7 +70,7 @@ final class Prg {
     /**
      * The program around an SNDH file, from the stub carried.
      *
-     * @param rows the rows to play, 0 for as many as the tune gives
+     * @param rows the rows to play, 0 for the tune's row count
      * @throws IllegalArgumentException where the file is not an SNDH file
      *     around this player's core, or the set claims Timer C at a rate
      *     other than 50
@@ -79,7 +79,7 @@ final class Prg {
         return of(Binaries.stub(), sndh, rows);
     }
 
-    /** The same, from the stub given. */
+    /** The same, from the stub named. */
     static byte[] of(byte[] stub, byte[] sndh, long rows) {
         checkStub(stub);
         if (rows < 0 || rows > 0xFFFFFFFFL) {
@@ -122,7 +122,7 @@ final class Prg {
                 + " Hz, FLAG " + tags.flag());
         report.say("the stub: " + Binaries.stub().length + " bytes, patched");
         report.row("the subtunes", String.valueOf(tags.subtunes()));
-        report.row("the rows to play", rows == 0 ? "0, as many as the tune gives"
+        report.row("the rows to play", rows == 0 ? "0, the tune's row count"
                 : String.valueOf(rows));
         report.row("it plays from", (flags & FLAG_VBL) != 0 ? "the VBL, the set claims Timer C"
                 : "the VBL where the screen's rate is the tune's, and Timer C where it is not");
@@ -133,7 +133,7 @@ final class Prg {
     }
 
     /**
-     * The stub's descriptor held to what this patches.
+     * The stub's descriptor checked against what this patches.
      *
      * @throws IllegalArgumentException where the stub is not one, is of
      *     another descriptor version, or is odd-sized, since the SNDH
@@ -163,8 +163,8 @@ final class Prg {
      * past; FRMS is 4 + 4 bytes a subtune, and '!#SN' 4 + 2 bytes a
      * subtune, then a name a subtune, each to its zero byte and one past.
      * The subtunes, the rate and the FLAG letters come from those tags
-     * alone, so a title or a composer that reads like a tag patches
-     * nothing.
+     * alone, so a title or a composer that reads like a tag patches no
+     * field.
      *
      * @throws IllegalArgumentException where the file has no SNDH at 12,
      *     no HDNS ends its tags, a tag is not one {@link Sndh} writes,
@@ -189,7 +189,7 @@ final class Prg {
             }
             if (name.startsWith("##")) {
                 if (!digit(sndh[at + 2]) || !digit(sndh[at + 3])) {
-                    throw new IllegalArgumentException("the SNDH file's tags give no '##'"
+                    throw new IllegalArgumentException("the SNDH file's tags have no '##'"
                             + " subtune count");
                 }
                 subtunes = (sndh[at + 2] - '0') * 10 + sndh[at + 3] - '0';
@@ -201,7 +201,7 @@ final class Prg {
                     rate = rate * 10 + sndh[i] - '0';
                 }
                 if (rate == 0) {
-                    throw new IllegalArgumentException("the SNDH file's tags give no TC rate");
+                    throw new IllegalArgumentException("the SNDH file's tags have no TC rate");
                 }
                 at = to + 1;
             } else if (name.equals("FRMS")) {
@@ -226,10 +226,10 @@ final class Prg {
             }
         }
         if (subtunes < 0) {
-            throw new IllegalArgumentException("the SNDH file's tags give no '##' subtune count");
+            throw new IllegalArgumentException("the SNDH file's tags have no '##' subtune count");
         }
         if (rate < 0) {
-            throw new IllegalArgumentException("the SNDH file's tags give no TC rate");
+            throw new IllegalArgumentException("the SNDH file's tags have no TC rate");
         }
         return new Tags(subtunes, rate, flag, at);
     }
@@ -275,7 +275,7 @@ final class Prg {
         int at = find(sndh, new String(Sndh.CORE_MAGIC, StandardCharsets.ISO_8859_1), from,
                 sndh.length);
         if (at < 0) {
-            throw new IllegalArgumentException("the SNDH file holds no core: no YMXS past"
+            throw new IllegalArgumentException("the SNDH file has no core: no YMXS past"
                     + " its tags");
         }
         int core = at - Sndh.CORE_MAGIC_AT;
@@ -314,7 +314,7 @@ final class Prg {
 
     /**
      * {@code ymxr-prg in.sndh out.prg [-rROWS]}: the program around an
-     * SNDH file, playing {@code ROWS} rows, as many as the tune gives
+     * SNDH file, playing {@code ROWS} rows, or the tune's row count
      * without. The stub's flag bit 0 follows the file's core: the screen
      * is cleared where that core has the raster monitor in.
      */
