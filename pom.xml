@@ -119,6 +119,7 @@
                     <execution>
                         <!-- The SNDH core and the program stub, assembled
                              from 68k/ into the classes the jar is made of
+                             and into go/binaries/data, which go:embed reads
                              (doc/BINARIES.md). This is the one step rmac is
                              needed for: name another with -Drmac=PATH. -->
                         <id>binaries</id>
@@ -128,7 +129,7 @@
                         </goals>
                         <configuration>
                             <executable>java</executable>
-                            <commandlineArgs>-ea -cp %classpath org.ymxr.Binaries "${project.build.outputDirectory}/org/ymxr/68k" "-a${rmac}" "-s${project.basedir}/68k"</commandlineArgs>
+                            <commandlineArgs>-ea -cp %classpath org.ymxr.Binaries "${project.build.outputDirectory}/org/ymxr/68k" "${project.basedir}/go/binaries/data" "-a${rmac}" "-s${project.basedir}/68k"</commandlineArgs>
                         </configuration>
                     </execution>
                 </executions>

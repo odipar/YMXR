@@ -48,6 +48,21 @@ build/
 # an assembler run by hand leaves an object file beside the source
 *.o
 
+# a go build run by hand leaves the executables beside the module
+/go/ym-to-ymxs
+/go/ym-to-ymxr
+/go/ymx-to-ymxs
+/go/ymx-to-ymxr
+/go/ymxs-to-ymxr
+/go/ymxs-to-sndh
+/go/ymxs-to-prg
+/go/ymxr-multi
+/go/ymxr-bind
+/go/ymxr-sndh
+/go/ymxr-prg
+/go/ymxr-trace
+/go/ymxr-check
+
 # rig scratch: assembled builds, packed tunes, the SNDH build
 ymx/test/.work/
 

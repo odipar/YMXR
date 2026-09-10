@@ -44,6 +44,7 @@ specification in and the checks on what comes out.
 | `ym/` | the measurements behind the figures, and `ym/test` ten tunes the tests run on |
 | `ymx/` | a YMX file converted and played, and `ymx/test` three tunes that have no dump |
 | `bin/` | the tools, each reading standard input and writing standard output: the converters, the structure's five filters, the check, the trace, the binder, the multi file's maker and the SNDH and program combiners, run out of a build |
+| `go/` | the same thirteen tools in Go, executables a release ships ([tools.md](doc/tools.md)) |
 
 A tune converts and plays like this:
 
