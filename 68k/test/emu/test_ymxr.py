@@ -295,11 +295,13 @@ class Tune:
         end = index[0] if count else len(file)
         image = file[self.image_at:end]
         table_at = self.table_at
-        dtx = os.path.join(work, "table.dtx")
         csv = os.path.join(work, "table.csv")
-        open(dtx, "wb").write(image[table_at:])
-        r = subprocess.run([DTX_WRITE, dtx, csv], capture_output=True)
+        # dtx-write reads its input on standard input and writes its
+        # output on standard output (DTX, doc/tools.md).
+        r = subprocess.run([DTX_WRITE, "-text"], input=image[table_at:],
+                           capture_output=True)
         assert r.returncode == 0, r.stderr.decode()
+        open(csv, "wb").write(r.stdout)
         self.rows = []
         for line in open(csv):
             if line.startswith("#") or line.startswith("c0") or not line.strip():

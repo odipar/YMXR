@@ -1,7 +1,26 @@
 # tools
 
-Every tool's usage, flags and environment. The Java tree is the source of
-truth; the Go and C# trees are to follow it.
+Every tool's usage, flags and environment.
+
+## The two trees
+
+The tools are written twice: in Java under `src/`, and in Go under `go/`.
+Java is the reference, and `ParityTest` runs the two against each other on
+the dumps under `ym/test`, so one input has one output in both.
+
+A Java tool is a shell script naming a class, run through `bin/run`, which
+builds where a source, the pom or a 68000 source is newer than the last
+build. A Go tool is an executable and runs as it stands: it contains the
+five 68000 binaries and DTX's twenty-two images, so it needs neither this
+repository nor a Java runtime beside it.
+
+```bash
+cd go && go build ./cmd/...           # the thirteen, for this machine
+release/publish.sh                    # win, osx and linux, x64 and arm64
+```
+
+DTX and YMXS are module dependencies of the Go tree, read from the
+checkouts beside this one, as the Maven build reads the same two.
 
 ## What a tool reports
 
