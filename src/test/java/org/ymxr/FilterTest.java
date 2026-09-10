@@ -166,7 +166,14 @@ final class FilterTest {
                 ran("YmxsToYmxr", structure, "-tTitle"),
                 ran("YmxsToSndh", structure, "-r0"),
                 ran("YmxsToSndh", structure, "-copiesx"),
-                ran("YmxsToPrg", structure, "-rx"));
+                ran("YmxsToPrg", structure, "-rx"),
+                ran("YmToYmxr", structure, "-kx"),
+                ran("YmToYmxr", structure, "-rx"),
+                ran("YmToYmxr", structure, "-tTitle"),
+                ran("Sndh", structure, "-copies5"),
+                ran("Prg", structure, "-perf"),
+                ran("Trace", structure, "-kx"),
+                ran("Bind", structure, "-r0"));
         for (Ran call : calls) {
             assertEquals(2, call.exit(), () -> "a wrong call exits 2: " + call.err());
             assertEquals(0, call.out().length, "and writes no file");

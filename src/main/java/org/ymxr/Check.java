@@ -251,6 +251,7 @@ final class Check {
         for (String arg : args2) {
             (arg.startsWith("-") ? flags : named).add(arg);
         }
+        Ymxs.numbers(tool, flags);
         Report report = new Report(tool.reports());
         if (named.isEmpty()) {
             Result result = of(tool.bytes(), Path.of("standard input"), flags);

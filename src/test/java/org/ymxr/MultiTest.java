@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -18,9 +19,9 @@ import org.junit.jupiter.api.Test;
  * The multi file (doc/BINARIES.md 0): several tune files in one, a name
  * each.
  *
- * <p>What is under test is that it carries tune files and adds nothing to
- * them: a tune read back out of one is the file that went in, byte for
- * byte, so an SNDH file of subtunes is the file the tune files make.
+ * <p>What is under test is that a multi file adds nothing to the tune
+ * files in it: a tune read back out of one is the file that went in, byte
+ * for byte, so an SNDH file of subtunes is the file the tune files make.
  */
 final class MultiTest {
 
@@ -59,7 +60,7 @@ final class MultiTest {
             assertEquals(tunes.get(i).length, bytes, "entry " + i + " measures its tune file");
             assertEquals(0, at % 2, "and stands on a long");
             assertArrayEquals(tunes.get(i),
-                    java.util.Arrays.copyOfRange(file, at, at + bytes),
+                    Arrays.copyOfRange(file, at, at + bytes),
                     "the tune file stands where the entry says");
         }
     }
@@ -88,9 +89,9 @@ final class MultiTest {
         String said = String.valueOf(assertThrows(IllegalArgumentException.class,
                 () -> Multi.of(many, names)).getMessage());
         assertTrue(said.contains(String.valueOf(Multi.MOST)),
-                "the most it carries is the subtunes an SNDH file numbers: " + said);
+                "the most in one is the subtunes an SNDH file numbers: " + said);
         byte[] file = Multi.of(List.of(tune), List.of("one"));
-        byte[] cut = java.util.Arrays.copyOf(file, Multi.INDEX_AT + 4);
+        byte[] cut = Arrays.copyOf(file, Multi.INDEX_AT + 4);
         assertThrows(IllegalArgumentException.class, () -> Multi.read(cut),
                 "a file its entries stand past");
     }

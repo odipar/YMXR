@@ -173,6 +173,9 @@ public final class YmToYmxr {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ym-to-ymxr", flags, "-k", "-m", "-copies", "-r");
         Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.ROWS);
+        // The call is read before the input is, so a flag that is not a
+        // number is an exit of 2 and standard input is left unread.
+        Ymxs.numbers(tool, flags);
         Report report = new Report(tool.reports());
         Converted converted;
         try {

@@ -1,5 +1,6 @@
 package org.ymxr;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,9 +12,9 @@ import org.ymxs.tool.Tool;
 /**
  * A multi file: several tune files in one, a name each, which
  * {@code ymxr-sndh} reads as a set of subtunes (doc/BINARIES.md 0). A
- * player reads a tune file (SPEC.md 3.3) and never this: it carries tune
- * files between tools, so that a tool reads one input and writes one
- * output.
+ * player reads a tune file (SPEC.md 3.3) and never this: a multi file
+ * passes tune files between tools, so that a tool reads one input and
+ * writes one output.
  *
  * <p>{@code ymxr-multi tune.ymxr more.ymxr [-nNAME]...} writes one on
  * standard output, and {@code ymxs-to-ymxr} writes one where the structure
@@ -33,7 +34,7 @@ final class Multi {
     /** An entry: where the tune file begins, and its bytes. */
     private static final int ENTRY = 8;
 
-    /** The most tunes one carries, the subtunes an SNDH file numbers. */
+    /** The most tunes in one, the subtunes an SNDH file numbers. */
     static final int MOST = Sndh.MAX_SUBTUNES;
 
     /** What a multi file has in it: the tune files, and the name of each,
@@ -176,7 +177,7 @@ final class Multi {
         for (int i = 0; i < files.size(); i++) {
             try {
                 tunes.add(Files.readAllBytes(Path.of(files.get(i))));
-            } catch (java.io.IOException failed) {
+            } catch (IOException failed) {
                 throw tool.wrong(Tool.FAILED, "cannot read " + files.get(i) + ": "
                         + failed.getMessage());
             }

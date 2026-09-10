@@ -124,6 +124,17 @@ final class Ymxs {
         }
     }
 
+    /** Every flag with a number in it read, so a call this cannot read is
+     *  an exit of 2 before standard input is read. */
+    static void numbers(Tool tool, List<String> flags) {
+        Packing.of(tool, flags);
+        for (String flag : flags) {
+            if (flag.startsWith("-r") && !flag.equals("-r")) {
+                rows(tool, List.of(flag), 0);
+            }
+        }
+    }
+
     /** The row count {@code -rROWS} names, {@code none} where the call
      *  names none. */
     static long rows(Tool tool, List<String> flags, long none) {
