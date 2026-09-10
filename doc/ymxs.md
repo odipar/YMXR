@@ -77,9 +77,10 @@ reading it exits 1 and says which row:
 
 Each is a filter: standard input, standard output, and the report on
 standard error (tools.md). No stage writes a file between them: a tune
-passes from one to the next as bytes on a pipe. YMX's `ymx-dump` opens a
-file name rather than a stream, so `ymx-to-ymxs` calls it with
-`/dev/stdin` and reads its input through it.
+passes from one to the next as bytes on a pipe. The Java `ymx-to-ymxs`
+runs YMX's `ymx-dump`, which opens a file name rather than a stream, so it
+calls the program with `/dev/stdin` and reads its input through it. The Go
+tool decodes the file itself.
 
 A YMXS multi of several tunes is a set of subtunes, one tune file each,
 which `ymxs-to-sndh` puts behind one core. `ymxs-to-ymxr` writes those
