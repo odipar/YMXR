@@ -19,12 +19,18 @@ cd go && go build ./cmd/...           # the thirteen, for this machine
 release/publish.sh                    # win, osx and linux, x64 and arm64
 ```
 
-DTX and YMXS are module dependencies of the Go tree, at the releases the
-pom names for their Java artifacts: `github.com/odipar/dtx/go` and
-`github.com/odipar/ymxs/go`. A build fetches them, so the Go tree builds
-without the two checkouts beside it. This tree is a module of its own,
-`github.com/odipar/ymxr/go`, and a version of it is a tag of that
-directory: `go/v0.1.0` beside `v0.1.0`.
+DTX, YMXS and YMX are module dependencies of the Go tree:
+`github.com/odipar/dtx/go` and `github.com/odipar/ymxs/go` at the releases
+the pom names for their Java artifacts, and `github.com/odipar/ymx/go` for
+the `.ymx` reader, which the pom names no artifact for. A build fetches
+all three, so the Go tree builds without the three checkouts beside it.
+This tree is a module of its own, `github.com/odipar/ymxr/go`, and a
+version of it is a tag of that directory: `go/v0.1.0` beside `v0.1.0`.
+
+A `.ymx` is where the two trees differ in what they need installed. A Go
+tool decodes the file with YMX's reader, which it contains. A Java tool
+runs YMX's `ymx-dump` and reads the values it prints: `YMX_DUMP` names
+that program, and the Java tools are its only callers here.
 
 ## What a tool reports
 
@@ -174,7 +180,7 @@ bin/ymxs-to-prg  [-rROWS] ...                                 > OUT.PRG
 | tool | reads | writes |
 |---|---|---|
 | `ym-to-ymxs` | a YM register dump, packed or not | the structure as JSON |
-| `ymx-to-ymxs` | a YMX file, through YMX's `ymx-dump` | the structure as JSON |
+| `ymx-to-ymxs` | a YMX file | the structure as JSON |
 | `ymxs-to-ymxr` | the structure | a tune file (SPEC.md 3.3) |
 | `ymxs-to-sndh` | the structure | an SNDH file any SNDH host plays |
 | `ymxs-to-prg` | the structure | a TOS program |
@@ -322,8 +328,9 @@ each, and `ym/play.sh` reads those, so a name that is not a tune records
 the run and several tunes go into one file as subtunes, as they do there.
 
 `-kK`, `-mN` and `-copies[S]` reach the converter and every other option
-belongs to `ym/play.sh`. `YMX_DUMP` names YMX's `ymx-dump`, and with
-neither it nor `YMX_REPO` set the default is `../YMX/go/bin/ymx-dump`.
+belongs to `ym/play.sh`. The script runs the Java tools, which read a
+`.ymx` through YMX's `ymx-dump`: `YMX_DUMP` names it, and with neither it
+nor `YMX_REPO` set the default is `../YMX/go/bin/ymx-dump`.
 
 The tune file each `.ymx` converts to is kept, and the directory
 containing them is reported on stderr, so a conversion can be read back
@@ -432,9 +439,10 @@ bin/ymx-to-ymxr [-kK] [-mN] [-copies[S]] [-silent] < in.ymx > out.ymxr
 
 A `.ymx` into a tune file, for moving a library of them across, through
 the structure (doc/ymxs.md): `ymx-to-ymxs | ymxs-to-ymxr` writes the same
-file. It reads the `.ymx` through YMX's `ymx-dump`, which `YMX_DUMP` names,
-rather than reading the container here: the contents of a `.ymx` are then
-read by the tree that writes them.
+file. Neither tree reads the container here: the Go tool decodes it with
+YMX's reader, which it imports as a module, and the Java tool runs YMX's
+`ymx-dump`. The contents of a `.ymx` are read by the tree that writes them
+either way.
 
 YMX's streams 0 to 13 are the sound registers as the chip receives them,
 its effect bits stripped (YMX, SPEC.md 2), so a frame's fourteen values go

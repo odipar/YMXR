@@ -7,34 +7,21 @@
 // 3; what an effect is here is SPEC.md 1.8 and 1.9, so the walk in read.go
 // reads one and writes the other.
 //
-// The file is read through YMX's own ymx-dump, which YMX_DUMP names, and
-// that opens a file name rather than a stream, so it is called with the
-// name of this tool's standard input, on that input. No copy of the file
-// is written.
+// The file is decoded by YMX's reader, which this imports: a tool of this
+// repository reads a .ymx with nothing else installed. YMX's ymx-dump
+// prints the same values as text, and the Java tools here read it that
+// way.
 package ymx
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
-	"strconv"
-	"strings"
+
+	"github.com/odipar/ymx/go/check"
 
 	"github.com/odipar/ymxr/go/ym"
 )
-
-// dump is the YMX tool this reads, which YMX_DUMP names.
-func dump() string {
-	if named := os.Getenv("YMX_DUMP"); named != "" {
-		return named
-	}
-	return "ymx-dump"
-}
-
-// standardInput is the name this process's standard input opens under.
-const standardInput = "/dev/stdin"
 
 // Streams the script stands in (YMX, SPEC.md 2).
 const (
@@ -58,8 +45,8 @@ type Dumped struct {
 	Loops     []int
 }
 
-// FormatException is an input ymx-dump does not read: its exit of 1, and
-// the fault itself on standard error, from ymx-dump.
+// FormatException is an input the reader does not read: the fault it
+// returned, under the name of the input it was given.
 type FormatException struct {
 	Said string
 }
@@ -68,82 +55,41 @@ func (f *FormatException) Error() string {
 	return f.Said
 }
 
-// StandardInput is standard input read out through ymx-dump.
+// StandardInput is standard input read out.
 func StandardInput() (Dumped, error) {
-	return read(standardInput, true)
-}
-
-// File is the file at that path read out through ymx-dump.
-func File(named string) (Dumped, error) {
-	return read(named, false)
-}
-
-func read(file string, input bool) (Dumped, error) {
-	named := file
-	if input {
-		named = "standard input"
-	}
-	run := exec.Command(dump(), file)
-	run.Stderr = os.Stderr
-	if input {
-		run.Stdin = os.Stdin
-	}
-	out, err := run.StdoutPipe()
+	file, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return Dumped{}, err
 	}
-	if err := run.Start(); err != nil {
-		return Dumped{}, fmt.Errorf("cannot run %s: YMX_DUMP names YMX's ymx-dump", dump())
+	return read(file, "standard input")
+}
+
+// File is the file at that path read out.
+func File(named string) (Dumped, error) {
+	file, err := os.ReadFile(named)
+	if err != nil {
+		return Dumped{}, err
 	}
-	read := Dumped{Rate: 50}
-	streams := 0
-	said := bufio.NewScanner(out)
-	said.Buffer(make([]byte, 0, 1<<20), 1<<24)
-	for said.Scan() {
-		word := strings.Split(said.Text(), " ")
-		switch {
-		case word[0] == "frames":
-			read.Frames, _ = strconv.Atoi(word[1])
-		case word[0] == "rate":
-			read.Rate, _ = strconv.Atoi(word[1])
-		case word[0] == "loop":
-			read.LoopFrame, _ = strconv.Atoi(word[1])
-		case word[0] == "streams":
-			streams, _ = strconv.Atoi(word[1])
-			read.Streams = make([][]byte, streams)
-			for s := range read.Streams {
-				read.Streams[s] = make([]byte, read.Frames)
-			}
-		case word[0] == "samples":
-			count, _ := strconv.Atoi(word[1])
-			read.Samples = make([][]byte, count)
-			read.Loops = make([]int, count)
-		case word[0] == "sample":
-			at, _ := strconv.Atoi(word[1])
-			read.Loops[at], _ = strconv.Atoi(word[3])
-			level := make([]byte, len(word)-4)
-			for i := range level {
-				value, _ := strconv.Atoi(word[i+4])
-				level[i] = byte(value)
-			}
-			read.Samples[at] = level
-		case len(word) == streams+1:
-			frame, _ := strconv.Atoi(word[0])
-			for s := 0; s < streams; s++ {
-				value, _ := strconv.Atoi(word[s+1])
-				read.Streams[s][frame] = byte(value)
-			}
-		}
+	return read(file, named)
+}
+
+// read is those bytes decoded, under the name the fault reports them by.
+func read(file []byte, named string) (Dumped, error) {
+	out, err := check.ReadFile(file)
+	if err != nil {
+		return Dumped{}, &FormatException{
+			Said: fmt.Sprintf("%s is not a YMX file: %s", named, err)}
 	}
-	if err := run.Wait(); err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) && exit.ExitCode() == 1 {
-			return Dumped{}, &FormatException{Said: fmt.Sprintf("%s is not a file %s reads",
-				named, dump())}
-		}
-		return Dumped{}, fmt.Errorf("%s did not read %s", dump(), named)
+	// A stream decodes to at least the file's frames, and a section that
+	// ends on a unit boundary decodes to more. A frame past the count is
+	// no frame of the tune, so every stream is cut to the count here and
+	// the walk indexes without a bound of its own.
+	streams := make([][]byte, len(out.Streams))
+	for s, stream := range out.Streams {
+		streams[s] = stream[:out.Frames]
 	}
-	return read, nil
+	return Dumped{Frames: out.Frames, Rate: out.Rate, LoopFrame: out.LoopFrame,
+		Streams: streams, Samples: out.Samples, Loops: out.Loops}, nil
 }
 
 // Acting is how many of the file's frames act on a channel.

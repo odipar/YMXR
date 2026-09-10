@@ -1,6 +1,6 @@
 // Command ymx-to-ymxr reads a YMX file on standard input and writes a tune
-// file on standard output. The file is read through YMX's ymx-dump, as
-// ymx-to-ymxs reads it.
+// file on standard output. The file is decoded by YMX's reader, which the
+// ymx package imports, as ymx-to-ymxs decodes it.
 package main
 
 import (
