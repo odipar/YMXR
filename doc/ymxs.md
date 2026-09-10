@@ -85,6 +85,15 @@ bin/ym-to-ymxs < tune.ym > tune.ymxs
 bin/ymxs-to-sndh -tTitle < tune.ymxs > tune.sndh
 ```
 
+`ym/play-ymxs.sh` runs the first of those under Hatari, from a file or
+from standard input, and records the run where it is named a WAV
+(tools.md, Playing a YMXS file):
+
+```bash
+ym/play-ymxs.sh tune.ymxs
+bin/ym-to-ymxs < tune.ym | ym/play-ymxs.sh -v3000 run.wav
+```
+
 ## Building
 
 YMXS is a Maven dependency, `org.ymx:ymxs`, so a build needs that

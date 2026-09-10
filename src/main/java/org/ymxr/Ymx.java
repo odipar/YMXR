@@ -108,7 +108,7 @@ final class Ymx {
             }
             rows.set(repeat, new Row(rows.get(repeat).registers(), at));
         }
-        return new Tune(song.name(), "", "ymx-to-ymxr", read.rate(),
+        return new Tune(song.name(), "", "ymx-to-ymxs", read.rate(),
                 repeat < frames ? Tunes.repeating(rows, repeat) : Tunes.once(rows));
     }
 

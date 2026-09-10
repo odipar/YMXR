@@ -63,9 +63,9 @@
 #              standard error (tools.md)
 #   -h         this text
 #
-# HATARI and TOS name the emulator and a TOS image. The emulator is asked
-# for its modelled YM mixing, which is what a voice whose volume a timer
-# moves is heard through.
+# HATARI and TOS name the emulator and a TOS image (ym/hatari.sh). The
+# emulator is asked for its modelled YM mixing, which is what a voice whose
+# volume a timer moves is heard through.
 #
 # Examples:
 #
@@ -101,8 +101,6 @@
 #
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-HATARI=${HATARI:-hatari}
-TOS=${TOS:-$HOME/hatari-2.6.1_macos/tos-2.06.rom}
 out=
 unit=
 ring=
@@ -240,21 +238,4 @@ fi
 "$here/bin/ymxr-sndh" "$@" "$work/TUNE.SND" $perf $lean $silent \
     "-t${title:-$stem}" ${composer:+"-c$composer"} >/dev/null
 "$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" $silent >/dev/null
-set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \
-    --compatible on --memsize 4 --sound 44100 --ym-mixing model \
-    --log-level fatal
-if [ -n "$vbls" ]; then
-    set -- "$@" --run-vbls "$vbls"
-fi
-if [ -n "$out" ]; then
-    set -- "$@" --fast-forward on --avirecord --avi-vcodec png \
-        --png-level 1 --avi-file "$work/run.avi"
-fi
-(cd "$work" && "$HATARI" "$@" TUNE.PRG >/dev/null 2>&1) || true
-if [ -n "$out" ]; then
-    # The name's stem, not the path's: a name with no dot in a directory
-    # whose path has one would otherwise put the PNG above the run's
-    # directory.
-    said=${out##*/}
-    python3 "$here/ym/avi.py" "$work/run.avi" "$out" "${out%/*}/${said%.*}.png"
-fi
+"$here/ym/hatari.sh" "$work" "$vbls" "$out"

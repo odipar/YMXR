@@ -255,6 +255,10 @@ about a fifth of the play call, and experiments.md has the result on twenty
 tunes. `HATARI` and `TOS` name the emulator
 and a TOS image, as they do for the rigs.
 
+`ym/hatari.sh WORK [VBLS] [out.wav]` runs the `TUNE.PRG` under `WORK`, and
+both play scripts end in it, so the emulator's flags and the recording
+stand in one place.
+
 ## Playing a YMX file
 
 ```
@@ -273,6 +277,31 @@ The tune file each `.ymx` converts to is kept, and the directory
 containing them is reported on stderr, so a conversion can be read back
 with `bin/ymxr-trace` or played by itself. `ym/play.sh` reports where it
 left the SNDH file and the program the same way.
+
+## Playing a YMXS file
+
+```
+ym/play-ymxs.sh [-kK] [-mN] [-copies[S]] [-tTITLE] [-cCOMPOSER] [-perf]
+                [-lean] [-rROWS] [-vN] [-silent] [tune.ymxs] [out.wav]
+ym/play-ymxs.sh -h
+```
+
+The structure played: `bin/ymxs-to-prg` writes the program and Hatari
+runs it, as `ym/play.sh` does with a dump. With no `.ymxs` name the
+structure comes from standard input, so a dump plays with no file
+between:
+
+```bash
+bin/ym-to-ymxs < tune.ym | ym/play-ymxs.sh
+```
+
+A name that is not a `.ymxs` records the run instead, as `ym/play.sh`
+does, and the program stays under a directory reported on stderr.
+
+One name is what it reads, since a multi of several tunes is a set of
+subtunes and the program selects them on the keys 1 to 9. `-rROWS` stops
+the program after that many rows; the packer's flags and the tags are
+`bin/ymxs-to-prg`'s, and `-vN`, `-silent` and `-h` are `ym/play.sh`'s.
 
 ## The rigs
 

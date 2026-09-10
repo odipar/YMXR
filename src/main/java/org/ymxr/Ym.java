@@ -232,7 +232,7 @@ final class Ym {
             rows.set(repeat, new Row(rows.get(repeat).registers(), keyframe));
         }
         Table<Row> table = repeat < frames ? Tunes.repeating(rows, repeat) : Tunes.once(rows);
-        return new Tune(song.name().strip(), song.author().strip(), "ym-to-ymxr",
+        return new Tune(song.name().strip(), song.author().strip(), "ym-to-ymxs",
                 song.playerHz(), table);
     }
 

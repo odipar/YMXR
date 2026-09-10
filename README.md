@@ -63,10 +63,11 @@ bin/ymxr-sndh tune.ymxr tune.sndh -t"The title"
 bin/ymxr-prg tune.sndh TUNE.PRG
 ```
 
-The same, through the structure and standard input:
+The same, through the structure and standard input, and the same played:
 
 ```bash
 bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG
+bin/ym-to-ymxs < tune.ym | ym/play-ymxs.sh
 ```
 
 The tune file contains the tune's tables and no code; the SNDH file is the
