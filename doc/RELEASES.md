@@ -33,6 +33,31 @@ the tools rather than either.
 
 ## Published
 
+### 0.1.1, 2026-09-11
+
+<https://github.com/odipar/YMXR/releases/tag/v0.1.1>, built from the commit
+tagged `v0.1.1`.
+
+A released executable reads a `.ymx` with no other program installed.
+
+- `ymx-to-ymxs` and `ymx-to-ymxr` ran YMX's `ymx-dump` and read the values
+  it printed, so a released executable stopped with `cannot run ymx-dump`
+  unless `YMX_DUMP` named a built copy of that tool. The two decode the
+  file with YMX's reader now, `github.com/odipar/ymx/go`, which an
+  executable contains: all thirteen run as they stand.
+- The Java tools go on running `ymx-dump`, which `YMX_DUMP` names, since
+  YMX publishes no Java artifact for the reader. `ParityTest` reads the
+  four files under `ymx/test` through both trees, so the two routes write
+  one tune file, one JSON and one report.
+- `release/publish.sh` runs the host's executables with an empty
+  environment and puts a `.ymx` through them beside the dump, so a release
+  that reads one only where `ymx-dump` stands beside it is caught before it
+  is published.
+
+The 68000 sources are unchanged since 0.1.0, so the five binaries an
+executable contains are the same bytes and the format versions stand:
+this release changes the tools only.
+
 ### 0.1.0, 2026-09-11
 
 <https://github.com/odipar/YMXR/releases/tag/v0.1.0>, built from the commit
