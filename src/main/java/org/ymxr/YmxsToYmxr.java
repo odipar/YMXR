@@ -11,8 +11,9 @@ import org.ymxs.tool.Tool;
  * file (SPEC.md 3.3) on standard output.
  *
  * <p>The second stage of every conversion here (doc/ymxs.md). A tune file
- * carries one tune, so a multi of several is an error: those are subtunes,
- * and {@code ymxs-to-sndh} puts them behind one core.
+ * has one tune in it, so a multi of several writes a multi file
+ * (doc/BINARIES.md 0) instead: {@code ymxr-sndh} reads that as a set of
+ * subtunes, each named by its tune's title.
  */
 public final class YmxsToYmxr {
 
@@ -25,13 +26,22 @@ public final class YmxsToYmxr {
         Ymxs.only(tool, flags, Ymxs.PACKING);
         Report report = new Report(tool.reports());
         Multi multi = Ymxs.read(tool);
-        if (multi.tunes().size() != 1) {
-            throw tool.wrong(Tool.WRONG, "the multi has " + multi.tunes().size()
-                    + " tunes, and a tune file carries one: ymxs-to-sndh reads several"
-                    + " as subtunes");
+        List<byte[]> tunes = Ymxs.tuneFiles(tool, multi, Ymxs.Packing.of(tool, flags), report);
+        byte[] file;
+        if (tunes.size() == 1) {
+            file = tunes.get(0);
+        } else {
+            List<String> names = new ArrayList<>();
+            for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
+                names.add(Ymxs.title(tune));
+            }
+            try {
+                file = org.ymxr.Multi.of(tunes, names);
+            } catch (IllegalArgumentException wrong) {
+                throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+            }
+            tool.report(tunes.size() + " tunes in a multi file, " + file.length + " bytes");
         }
-        byte[] file = Ymxs.tuneFile(tool, multi.tunes().get(0),
-                Ymxs.Packing.of(tool, flags), report);
         for (String note : report.unsaid()) {
             System.err.println("  " + note);
         }

@@ -28,16 +28,7 @@ public final class YmxsToPrg {
         Tool tool = Tool.of("ymxs-to-prg", flags, Ymxs.PACKING);
         Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.TAGS, Ymxs.ROWS);
         Report report = new Report(tool.reports());
-        long rows = 0;
-        for (String flag : flags) {
-            if (flag.startsWith("-r")) {
-                try {
-                    rows = Long.parseLong(flag.substring(2));
-                } catch (NumberFormatException no) {
-                    throw tool.usage("not a row count: " + flag);
-                }
-            }
-        }
+        long rows = Ymxs.rows(tool, flags, 0);
         Multi multi = Ymxs.read(tool);
         byte[] sndh = YmxsToSndh.of(tool, multi, flags, report);
         byte[] program;

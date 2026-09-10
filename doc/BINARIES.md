@@ -48,6 +48,27 @@ The inner box is the SNDH file of section 3, which any SNDH host plays
 as it stands; section 4 adds the outer box. The assembler produced the
 core and the stub; every other byte is the tool's or the tune's.
 
+## 0. The multi file
+
+Several tune files in one, a name each. A set of subtunes reaches a tool
+as one file rather than as several file names, so every tool reads one
+input and writes one output. A player reads a tune file (SPEC.md 3.3) or
+the bound tune of section 1, and never this.
+
+| offset | bytes | what it is |
+|---|---|---|
+| 0 | 4 | `YMXM` |
+| 4 | 2 | the version, $0002, which is the version of the tune files in it |
+| 6 | 2 | `N`, the tune count, 1 to 99 |
+| 8 | 8`N` | one entry a tune: 4 where its tune file begins, 4 the tune file's bytes |
+| | | the names, in the entries' order, each ended by a zero byte |
+| | | the tune files, each on a long, in the entries' order |
+
+A tune's name is the text a subtune is called by, and empty where the
+file records none for it. An entry records where a tune file begins and
+what it measures, so each is read out as it stands and binds as one
+written by itself: a multi file adds no byte to a tune and moves none.
+
 ## 1. The bound tune
 
 What the player reads: the tune file's tables, with DTX's image for the
@@ -256,10 +277,11 @@ counts the rate against 200. The `FLAG` letters list the timers the set
 claims, so a host that ticks from a timer picks one the tunes do not
 run.
 
-The tools: `bin/ymxr-bind tune.ymxr out.bin` writes the bound tune;
-`bin/ymxr-sndh tune.ymxr ... out.sndh` the SNDH file, with `-tTITLE`,
-`-cCOMPOSER`, `-nNAME` a subtune, `-perf` for the monitor's core and
-`-lean` for the lean one, which are a switch each;
-`bin/ymxr-prg in.sndh out.prg` the program, with `-rROWS` for the rows.
-Each says what it made, on standard error, and `-silent` turns that off.
-tools.md has them, and `ym/cost.sh` reads a monitor run back.
+The tools, each reading standard input and writing standard output:
+`bin/ymxr-multi` writes the multi file of section 0 from the tune files
+named, with `-nNAME` a tune; `bin/ymxr-bind` the bound tune;
+`bin/ymxr-sndh` the SNDH file, with `-tTITLE`, `-cCOMPOSER`, `-perf` for
+the monitor's core and `-lean` for the lean one, which are a switch each;
+`bin/ymxr-prg` the program, with `-rROWS` for the rows. Each says what it
+made, on standard error, and `-silent` turns that off. tools.md has them,
+and `ym/cost.sh` reads a monitor run back.

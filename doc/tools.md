@@ -38,7 +38,8 @@ is Java.
 A YM5!/YM6! register dump into a tune file (SPEC.md 3.3):
 
 ```
-bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+bin/ym-to-ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+               < in.ym > out.ymxr
 ```
 
 | flag | what it sets |
@@ -48,13 +49,13 @@ bin/ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
 | `-copies[S]` | a match beyond the ring packs as a copy from the column's separate literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
 
-The first file is unpacked where it is an LHA archive, as distributed
-`.ym` files are. Standard output is one line: the frames, the sources, the
-effects run, the repeat row and the bytes written. The report beside it
-covers the dump as it was read, the flags as they were read, the sources by
-kind, a row a column of what it packed to, and the notes: effects dropped,
-a unit other than the one requested, and a ring other than the one
-requested.
+The dump is unpacked where it is an LHA archive, as distributed `.ym`
+files are. Standard output is the tune file, and the report on standard
+error covers the dump as it was read, the flags as they were read, the
+sources by kind, a row a column of what it packed to, one closing line of
+the frames, the sources, the effects run, the repeat row and the bytes
+written, and the notes: effects dropped, a unit other than the one
+requested, and a ring other than the one requested.
 
 The table is the dump's frames row for row: the row it repeats to is
 the dump's loop frame, its rows are the dump's, and no row is added
@@ -99,10 +100,12 @@ to read at that reader's init, and a set of subtunes shares one image
 ## Check
 
 ```
-bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] DUMP|DIR ...
+bin/ymxr-check [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent] < in.ym
+bin/ymxr-check [flags] DUMP|DIR ...
 ```
 
-Every dump named, and every `.ym` under a directory named, converted at
+The dump on standard input, or every dump named and every `.ym` under a
+directory named, converted at
 the tool's defaults and replayed against itself: the tune file's table
 stepped frame by frame by the reader in `Replay`, every frame's registers
 checked against the dump's except those an effect owns, and every effect's
@@ -120,15 +123,15 @@ as a tune that plays once.
 ## Trace
 
 ```
-bin/ymxr-trace TUNE [FRAMES] [-silent]
+bin/ymxr-trace [-rROWS] [-silent] < tune.ymxr
 ```
 
 What a reader reports of a tune file (SPEC.md 7), on standard output: the
-first line the tune's fixed values, then one line a frame, `FRAMES` of them
+first line the tune's fixed values, then one line a frame, `ROWS` of them
 or the count the kit uses for the tune, one pass and the loop once, or the
-pass and the frame that reports its end. A file of another version prints
-no report. The conformance kit's references are the output of this tool
-(doc/conformance/README.md).
+pass and the frame that reports its end. A file of another version reports
+none, which is an exit of 1. The conformance kit's references are the
+output of this tool (doc/conformance/README.md).
 
 ## The structure
 
@@ -162,7 +165,8 @@ A multi of several tunes is a set of subtunes: `ymxs-to-sndh` and
 `ymxs-to-prg` put one tune file each behind one core, in the multi's
 order, and a tune's title names its subtune. The title and the composer
 are the first tune's unless `-t` and `-c` name others. `ymxs-to-ymxr`
-writes one tune file, so a multi of several is an error there.
+writes a tune file of one tune and a multi file (BINARIES.md 0) of
+several, which `ymxr-sndh` reads as those subtunes.
 
 The packer's flags are the converter's: `-kK` the unit, `-mN` the ring,
 `-copies[S]` the copies from a column's separate literal stream.
@@ -202,10 +206,11 @@ of the source defines the contract in full.
 ## Bind, SNDH file, program
 
 ```
-bin/ymxr-bind tune.ymxr tune.bin [-silent]
-bin/ymxr-sndh tune.ymxr [more.ymxr ...] tune.sndh [-tTITLE] [-cCOMPOSER]
-              [-nNAME ...] [-perf] [-lean] [-silent]
-bin/ymxr-prg tune.sndh TUNE.PRG [-rROWS] [-silent]
+bin/ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME ...] [-silent] > tunes.ymxr
+bin/ymxr-bind  [-silent] < tune.ymxr > tune.bin
+bin/ymxr-sndh  [-tTITLE] [-cCOMPOSER] [-perf] [-lean] [-silent]
+               < tune.ymxr > tune.sndh
+bin/ymxr-prg   [-rROWS] [-silent] < tune.sndh > TUNE.PRG
 ```
 
 A tune file contains tables and no code. The player reads the bound tune,
@@ -216,7 +221,16 @@ SNDH host plays, with the tags from the flags; and `bin/ymxr-prg` puts the
 program stub in front of an SNDH file, making a TOS program that claims the
 machine under Supexec, plays the file from the VBL or Timer C, stops on
 SPACE or ESC or after `ROWS` rows, switches subtunes on 1 to 9, and
-releases the machine. `-perf` selects the core with the raster monitor in
+releases the machine.
+
+Subtunes come from a multi file (BINARIES.md 0): several tune files in
+one, a name each, which `bin/ymxr-multi` writes from the tune files named
+and `bin/ymxs-to-ymxr` from a structure of several tunes. `bin/ymxr-sndh`
+reads a tune file as one subtune and a multi file as its tunes in order,
+each named by the name the multi file records for it. The title is the
+first tune's name unless `-tTITLE` names another.
+
+`-perf` selects the core with the raster monitor in
 (Measure), and the program then clears the screen so that its bars show;
 `-lean` selects the core whose ticks neither drop the interrupt level nor
 write an end of interrupt, which requires two things of the host
@@ -234,7 +248,7 @@ ym/play.sh [-kK] [-mN] [-rRR | -r] [-copies[S]] [-tTITLE] [-cCOMPOSER]
 ym/play.sh -h
 ```
 
-`ym/play.sh` runs the three tools above and passes the program to Hatari
+`ym/play.sh` runs the tools above and passes the program to Hatari
 with its sound on. SPACE stops the tune, and `-vN` stops the run after
 `N` frames. The first name is a tune; after it a name ending in `.ym` or
 `.ymxr`, in either case, is another tune and any other name records the
@@ -390,7 +404,7 @@ and the reader, and the player rejects a bound tune of another version.
 ## From a YMX file
 
 ```
-bin/ymx-to-ymxr in.ymx out.ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
+bin/ymx-to-ymxr [-kK] [-mN] [-copies[S]] [-silent] < in.ymx > out.ymxr
 ```
 
 A `.ymx` into a tune file, for moving a library of them across, through

@@ -6,8 +6,8 @@ It is defined once, in records, and written down as JSON. Every conversion
 here passes through it.
 
     ym  ──► ym-to-ymxs  ──┐
-                          ├──► YMXS ──► ymxs-to-ymxr ──► a tune file
-    ymx ──► ymx-to-ymxs ──┘                    │
+                          ├──► YMXS ──► ymxs-to-ymxr ──► a tune file, or a
+    ymx ──► ymx-to-ymxs ──┘                    │         multi file of several
                                                ├──► ymxs-to-sndh ──► an SNDH file
                                                └──► ymxs-to-prg  ──► a TOS program
 
@@ -82,7 +82,8 @@ file name rather than a stream, so `ymx-to-ymxs` calls it with
 `/dev/stdin` and reads its input through it.
 
 A YMXS multi of several tunes is a set of subtunes, one tune file each,
-which `ymxs-to-sndh` puts behind one core.
+which `ymxs-to-sndh` puts behind one core. `ymxs-to-ymxr` writes those
+tune files as one multi file (BINARIES.md 0), which `ymxr-sndh` reads.
 
 ```bash
 bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG

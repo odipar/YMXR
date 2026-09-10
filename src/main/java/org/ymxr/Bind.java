@@ -1,18 +1,15 @@
 package org.ymxr;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import org.ymxs.tool.Tool;
 
 /**
- * {@code ymxr-bind in.ymxr out.bin}: the bound tune of a tune file
- * ({@link Bound}), the layout the player reads, as a file. A tune file this
- * does not bind, one of another version for one, gets a line on stderr
- * beginning {@code ymxr-bind: } and an exit of 1; a file that does not
- * read or write gets the same line and an exit of 2, as does a wrong
- * call.
+ * {@code ymxr-bind}: a tune file on standard input, its bound tune
+ * ({@link Bound}) on standard output, which is the layout the player
+ * reads. A tune file this does not bind, one of another version for one,
+ * is a line on standard error and an exit of 1.
  */
 final class Bind {
 
@@ -20,45 +17,24 @@ final class Bind {
     }
 
     public static void main(String[] args) {
-        List<String> named = new ArrayList<>();
-        boolean silent = false;
-        for (String arg : args) {
-            if (arg.equals(YmToYmxr.SILENT)) {
-                silent = true;
-            } else {
-                named.add(arg);
-            }
+        List<String> flags = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ymxr-bind", flags);
+        Report report = new Report(tool.reports());
+        byte[] tune = tool.bytes();
+        if (Multi.is(tune)) {
+            throw tool.wrong(Tool.WRONG, "this is a multi file of several tunes, and a bound"
+                    + " tune is one tune: ymxr-sndh reads a multi file");
         }
-        if (named.size() != 2) {
-            System.err.println("ymxr-bind in.ymxr out.bin [-silent]");
-            System.exit(2);
-            return;
-        }
-        Report report = new Report(!silent);
-        byte[] tune;
         byte[] bound;
         try {
-            tune = Files.readAllBytes(Path.of(named.get(0)));
             read(report, tune);
             bound = Bound.of(tune);
         } catch (IllegalArgumentException wrong) {
-            System.err.println("ymxr-bind: " + wrong.getMessage());
-            System.exit(1);
-            return;
-        } catch (IOException failed) {
-            System.err.println("ymxr-bind: " + failed);
-            System.exit(2);
-            return;
-        }
-        try {
-            Files.write(Path.of(named.get(1)), bound);
-        } catch (IOException failed) {
-            System.err.println("ymxr-bind: " + failed);
-            System.exit(2);
-            return;
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
         bound(report, tune, bound);
-        System.out.println(named.get(1) + ": " + bound.length + " bytes");
+        tool.report(bound.length + " bytes");
+        Out.write(tool, bound);
     }
 
     /** The tune file as it was read. */

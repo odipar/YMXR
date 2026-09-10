@@ -222,8 +222,9 @@ while [ "$left" -gt 0 ]; do
             # were passed, and two tunes may share a name.
             mkdir -p "$work/$at"
             file=$work/$at/${name%.*}.ymxr
-            "$here/bin/ym-to-ymxr" "$tune" "$file" ${unit:+"$unit"} ${ring:+"$ring"} \
-                ${repeat:+"$repeat"} ${copies:+"$copies"} $silent >/dev/null
+            "$here/bin/ym-to-ymxr" ${unit:+"$unit"} ${ring:+"$ring"} \
+                ${repeat:+"$repeat"} ${copies:+"$copies"} $silent \
+                < "$tune" > "$file"
             ;;
     esac
     if [ "$tunes" -gt 1 ]; then
@@ -235,7 +236,15 @@ done
 if [ "$tunes" -gt 9 ]; then
     echo "ym/play.sh: $tunes tunes, and the program's keys reach subtune 9" >&2
 fi
-"$here/bin/ymxr-sndh" "$@" "$work/TUNE.SND" $perf $lean $silent \
-    "-t${title:-$stem}" ${composer:+"-c$composer"} >/dev/null
-"$here/bin/ymxr-prg" "$work/TUNE.SND" "$work/TUNE.PRG" $silent >/dev/null
+# The tune files into one multi file, which is what an SNDH file of
+# several subtunes is made from (BINARIES.md 0); one tune goes in as the
+# tune file it is.
+if [ "$tunes" -gt 1 ]; then
+    "$here/bin/ymxr-multi" "$@" $silent > "$work/TUNE.YMXR"
+else
+    cp "$1" "$work/TUNE.YMXR"
+fi
+"$here/bin/ymxr-sndh" $perf $lean $silent "-t${title:-$stem}" \
+    ${composer:+"-c$composer"} < "$work/TUNE.YMXR" > "$work/TUNE.SND"
+"$here/bin/ymxr-prg" $silent < "$work/TUNE.SND" > "$work/TUNE.PRG"
 "$here/ym/hatari.sh" "$work" "$vbls" "$out"

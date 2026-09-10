@@ -12,7 +12,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -97,21 +99,59 @@ final class FilterTest {
         }
     }
 
+    /** Every tool that reads one file on standard input, and the name it
+     *  reports under. */
+    private static final Map<String, String> FILTERS = new LinkedHashMap<>(Map.of(
+            "YmToYmxs", "ym-to-ymxs", "YmxsToYmxr", "ymxs-to-ymxr",
+            "YmxsToSndh", "ymxs-to-sndh", "YmxsToPrg", "ymxs-to-prg",
+            "YmToYmxr", "ym-to-ymxr", "Bind", "ymxr-bind", "Sndh", "ymxr-sndh",
+            "Prg", "ymxr-prg", "Trace", "ymxr-trace"));
+
     @Test
     void anInputThisCannotReadExitsOne() throws Exception {
-        byte[] structure = structure();
         byte[] nonsense = "not a file of any of these".getBytes(UTF_8);
-        List<Ran> faults = List.of(
-                ran("YmToYmxs", nonsense),
-                ran("YmxsToYmxr", nonsense),
-                ran("YmxsToSndh", nonsense),
-                ran("YmxsToPrg", nonsense),
-                ran("YmToYmxs", new byte[0]),
-                ran("YmxsToYmxr", multi(structure)));
-        for (Ran fault : faults) {
-            assertEquals(1, fault.exit(), () -> "a wrong input exits 1: " + fault.err());
-            assertEquals(0, fault.out().length, "and writes no file");
+        for (String tool : FILTERS.keySet()) {
+            for (byte[] in : List.of(nonsense, new byte[0])) {
+                Ran fault = ran(tool, in);
+                assertEquals(1, fault.exit(), () -> tool + " on a wrong input exits 1: "
+                        + fault.err());
+                assertEquals(0, fault.out().length, () -> tool + " writes no file");
+            }
         }
+    }
+
+    @Test
+    void theChainOfFiltersRunsFromTheDumpToTheProgram() throws Exception {
+        byte[] dump = Files.readAllBytes(DUMP);
+        Ran tune = ran("YmToYmxr", dump, "-silent");
+        assertEquals(0, tune.exit(), () -> "the dump converts: " + tune.err());
+        assertEquals('Y', tune.out()[0], "a tune file opens with YMXR");
+        Ran bound = ran("Bind", tune.out(), "-silent");
+        assertEquals(0, bound.exit(), () -> "the tune file binds: " + bound.err());
+        Ran sndh = ran("Sndh", tune.out(), "-silent", "-tThe title");
+        assertEquals(0, sndh.exit(), () -> "the tune file goes behind a core: " + sndh.err());
+        Ran prg = ran("Prg", sndh.out(), "-silent");
+        assertEquals(0, prg.exit(), () -> "the SNDH file goes into a program: " + prg.err());
+        assertTrue(prg.out().length > sndh.out().length, "a program is the SNDH file and more");
+        Ran trace = ran("Trace", tune.out(), "-silent", "-r4");
+        assertEquals(0, trace.exit(), () -> "the tune file records: " + trace.err());
+        assertEquals('{', trace.out()[0], "a record is one JSON line a row");
+        Ran check = ran("Check", dump, "-silent");
+        assertEquals(0, check.exit(), () -> "the dump replays: " + check.err());
+        assertTrue(new String(check.out(), UTF_8).contains("replays to its dump"),
+                () -> "the verdict is on standard output: " + new String(check.out(), UTF_8));
+    }
+
+    @Test
+    void aMultiOfSeveralTunesIsAMultiFileAndItsSubtunes() throws Exception {
+        Ran made = ran("YmxsToYmxr", multi(structure()), "-silent");
+        assertEquals(0, made.exit(), () -> "a multi of two converts: " + made.err());
+        assertEquals("YMXM", new String(made.out(), 0, 4, UTF_8),
+                "several tunes are one multi file");
+        Ran sndh = ran("Sndh", made.out());
+        assertEquals(0, sndh.exit(), () -> "the multi file goes behind a core: " + sndh.err());
+        assertTrue(sndh.err().contains("2 subtunes"),
+                () -> "its tunes are the subtunes: " + sndh.err());
     }
 
     @Test
@@ -136,14 +176,15 @@ final class FilterTest {
     @Test
     void noFaultReachesTheCallerAsAStackTrace() throws Exception {
         byte[] nonsense = "not a file of any of these".getBytes(UTF_8);
-        for (String tool : List.of("YmToYmxs", "YmxsToYmxr", "YmxsToSndh", "YmxsToPrg")) {
-            for (Ran fault : List.of(ran(tool, nonsense), ran(tool, new byte[0], "-zz"))) {
+        for (Map.Entry<String, String> tool : FILTERS.entrySet()) {
+            for (Ran fault : List.of(ran(tool.getKey(), nonsense),
+                    ran(tool.getKey(), new byte[0], "-zz"))) {
                 assertFalse(fault.err().contains("Exception in thread"),
-                        () -> tool + " reports its fault as a line: " + fault.err());
+                        () -> tool.getValue() + " reports its fault as a line: " + fault.err());
                 assertFalse(fault.err().contains("\n\tat "),
-                        () -> tool + " reports its fault as a line: " + fault.err());
-                assertEquals(1, fault.err().lines().filter(one -> !one.isBlank()).count(),
-                        () -> tool + " reports one line: " + fault.err());
+                        () -> tool.getValue() + " reports its fault as a line: " + fault.err());
+                assertTrue(fault.err().contains(tool.getValue() + ": "),
+                        () -> tool.getValue() + " names itself in its fault: " + fault.err());
             }
         }
     }

@@ -1,0 +1,4 @@
+#!/bin/sh
+# The tune files named, as one multi file on standard output.
+# doc/BINARIES.md 0.
+exec "$(dirname -- "$0")/run" org.ymxr.Multi "$@"

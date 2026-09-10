@@ -34,9 +34,9 @@ for tune in "$@"; do
         /*) path=$tune ;;
         *) path=$(pwd)/$tune ;;
     esac
-    "$here/bin/ymxr-sndh" "$path" "$work/COST.SND" -perf $lean $silent \
-        -t"$(basename "$tune" .ymxr)" >/dev/null
-    "$here/bin/ymxr-prg" "$work/COST.SND" "$work/COST.PRG" $silent >/dev/null
+    "$here/bin/ymxr-sndh" -perf $lean $silent -t"$(basename "$tune" .ymxr)" \
+        < "$path" > "$work/COST.SND"
+    "$here/bin/ymxr-prg" $silent < "$work/COST.SND" > "$work/COST.PRG"
     (cd "$work" && "$HATARI" --tos "$TOS" --machine st --cpuclock 8 \
         --cpu-exact on --compatible on --memsize 4 --sound off --conout 2 \
         --fast-forward on --disable-video 1 --run-vbls "$VBLS" \

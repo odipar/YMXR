@@ -43,7 +43,7 @@ specification in and the checks on what comes out.
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
 | `ym/` | the measurements behind the figures, and `ym/test` ten tunes the tests run on |
 | `ymx/` | a YMX file converted and played, and `ymx/test` three tunes that have no dump |
-| `bin/` | the converters, the structure's five filters, the check, the trace, the binder and the SNDH and program combiners, run out of a build |
+| `bin/` | the tools, each reading standard input and writing standard output: the converters, the structure's five filters, the check, the trace, the binder, the multi file's maker and the SNDH and program combiners, run out of a build |
 
 A tune converts and plays like this:
 
@@ -58,9 +58,9 @@ tools it drives, `-perf` among them for the raster monitor. The three are
 these:
 
 ```bash
-bin/ym-to-ymxr tune.ym tune.ymxr
-bin/ymxr-sndh tune.ymxr tune.sndh -t"The title"
-bin/ymxr-prg tune.sndh TUNE.PRG
+bin/ym-to-ymxr < tune.ym > tune.ymxr
+bin/ymxr-sndh -t"The title" < tune.ymxr > tune.sndh
+bin/ymxr-prg < tune.sndh > TUNE.PRG
 ```
 
 The same, through the structure and standard input, and the same played:

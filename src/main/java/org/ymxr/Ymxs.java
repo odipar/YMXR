@@ -124,6 +124,21 @@ final class Ymxs {
         }
     }
 
+    /** The row count {@code -rROWS} names, {@code none} where the call
+     *  names none. */
+    static long rows(Tool tool, List<String> flags, long none) {
+        for (String flag : flags) {
+            if (flag.startsWith("-r")) {
+                try {
+                    return Long.parseLong(flag.substring(2));
+                } catch (NumberFormatException no) {
+                    throw tool.usage("not a row count: " + flag);
+                }
+            }
+        }
+        return none;
+    }
+
     private static int number(Tool tool, String said, String flag) {
         try {
             return Integer.parseInt(said);

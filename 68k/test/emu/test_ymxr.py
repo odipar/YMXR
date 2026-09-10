@@ -220,34 +220,32 @@ def convert(ym, work):
     named as it stands."""
     if ym.endswith(".ymxr"):
         return open(ym, "rb").read(), ""
-    out = os.path.join(work, "tune.ymxr")
     flags = os.environ.get("YMXR_FLAGS", "").split()
-    r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr"), ym, out] + flags,
-                       capture_output=True)
-    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
-    return open(out, "rb").read(), r.stdout.decode().strip()
+    r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
+                       stdin=open(ym, "rb"), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    # The tool reports on standard error, the last line being what it wrote.
+    said = [line for line in r.stderr.decode().splitlines() if line.startswith("ym-to-ymxr: ")]
+    return r.stdout, said[-1][len("ym-to-ymxr: "):] if said else ""
 
 
 def bind(file, work):
     """The bound tune of a tune file, through bin/ymxr-bind; None where the
     binder rejects the file, which it reports on a line of its own."""
-    path, out = os.path.join(work, "bound.ymxr"), os.path.join(work, "bound.bin")
-    open(path, "wb").write(file)
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), path, out], capture_output=True)
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), "-silent"],
+                       input=file, capture_output=True)
     if r.returncode == 1 and r.stderr.startswith(b"ymxr-bind: "):
         return None
-    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
-    return open(out, "rb").read()
+    assert r.returncode == 0, r.stderr.decode()
+    return r.stdout
 
 
 def trace(file, work, calls):
     """What the Java reader reports of a tune file, one entry a call
     (SPEC.md 7), through bin/ymxr-trace."""
-    path = os.path.join(work, "traced.ymxr")
-    open(path, "wb").write(file)
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-trace"), path, str(calls)],
-                       capture_output=True)
-    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-trace"), "-r%d" % calls, "-silent"],
+                       input=file, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
     return [json.loads(line) for line in r.stdout.decode().splitlines() if line]
 
 
@@ -915,22 +913,22 @@ def hatari(ym, code, symbols, perf=False):
     # the frames are cut at the VBL, which the program plays from where the
     # screen's rate is the tune's: Hatari's ST here refreshes at 50 Hz
     assert tune.rate == 50, "-hatari requires tunes at 50 Hz, and this one plays at %d" % tune.rate
-    path = os.path.join(work, "TUNE.YMXR")
-    open(path, "wb").write(file)
     sndh = os.path.join(work, "TUNE.SND")
     # These switches select the core in the file; the rig assembled the same
     # core, and the comparison below fails where the two differ. A switch
     # missed here fails there rather than running the plain core.
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), path, sndh,
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent",
                         "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
                        + (["-lean"] if LEAN else []),
-                       capture_output=True)
-    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
+                       input=file, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    sndh_bytes = r.stdout
+    open(sndh, "wb").write(sndh_bytes)
     prg = os.path.join(work, "YMXR.PRG")
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), sndh, prg,
-                        "-r%d" % STUB_FRAMES], capture_output=True)
-    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
-    sndh_bytes = open(sndh, "rb").read()
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
+                        "-r%d" % STUB_FRAMES], input=sndh_bytes, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    open(prg, "wb").write(r.stdout)
     core = sndh_bytes.find(b"YMXS") - 12
     assert core >= 12, "the core is not in the SNDH file"
     assert sndh_bytes[core:core + 28] == code[:28] \

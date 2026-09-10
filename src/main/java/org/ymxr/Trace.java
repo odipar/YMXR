@@ -1,13 +1,11 @@
 package org.ymxr;
 
-import java.io.IOException;
 import java.io.PrintStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-
 import org.dtx.Table;
+import org.ymxs.tool.Tool;
 
 /**
  * What a reader reports of a tune (SPEC.md 7): one line a play call, the
@@ -100,32 +98,26 @@ final class Trace {
         return bytes.toByteArray();
     }
 
-    /** {@code ymxr-trace TUNE [FRAMES]}: the tune's record on standard
-     *  output, its first line and one line a frame, the kit's count of
-     *  frames unless the caller names one. */
-    public static void main(String[] args) throws IOException {
-        List<String> named = new ArrayList<>();
-        boolean silent = false;
-        for (String arg : args) {
-            if (arg.equals(YmToYmxr.SILENT)) {
-                silent = true;
-            } else {
-                named.add(arg);
-            }
+    /** {@code ymxr-trace}: a tune file on standard input, its record on
+     *  standard output, the first line and one line a row, {@code -rROWS}
+     *  rows or one pass and the loop once without. */
+    public static void main(String[] args) {
+        List<String> flags = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ymxr-trace", flags, Ymxs.ROWS);
+        Ymxs.only(tool, flags, Ymxs.ROWS);
+        int calls = (int) Ymxs.rows(tool, flags, -1);
+        Report report = new Report(tool.reports());
+        byte[] tune = tool.bytes();
+        if (Multi.is(tune)) {
+            throw tool.wrong(Tool.WRONG, "this is a multi file of several tunes, and a record"
+                    + " is of one tune");
         }
-        if (named.isEmpty() || named.size() > 2) {
-            System.err.println("ymxr-trace TUNE [FRAMES] [-silent]");
-            System.exit(2);
-        }
-        Report report = new Report(!silent);
-        int calls = named.size() == 2 ? Integer.parseInt(named.get(1)) : -1;
-        byte[] tune = Files.readAllBytes(Path.of(named.get(0)));
         // A file this reader does not read produces no record, and says so
         // (SPEC.md 6, R6.1), so the report reads the header under the
         // same guard rather than throwing where the record would not.
         try {
             TuneFile file = TuneFile.read(tune);
-            report.say("the tune file: " + named.get(0) + ", " + tune.length + " bytes");
+            report.say("the tune file: " + tune.length + " bytes");
             report.row("the table", file.table().rows() + " rows of " + file.table().columns()
                     + " columns, repeating at row " + file.table().repeat());
             report.row("the frame rate", file.frameRate() + " Hz");
@@ -133,12 +125,16 @@ final class Trace {
             report.row("the rows to record", calls < 0 ? "one pass and the loop once"
                     : String.valueOf(calls));
         } catch (IllegalArgumentException wrong) {
-            report.say("the tune file: " + named.get(0) + ", " + tune.length
+            report.say("the tune file: " + tune.length
                     + " bytes, which this reader does not read: " + wrong.getMessage());
         }
         byte[] rows = record(tune, calls);
-        report.say("recorded: " + rows.length + " bytes of rows on standard output");
-        System.out.write(rows);
-        System.out.flush();
+        if (rows.length == 0) {
+            // A file this reader does not read produces no record (R6.1),
+            // and a caller reading the exit is told so.
+            throw tool.wrong(Tool.WRONG, "no record: this reader does not read the file");
+        }
+        tool.report(rows.length + " bytes of rows");
+        Out.write(tool, rows);
     }
 }

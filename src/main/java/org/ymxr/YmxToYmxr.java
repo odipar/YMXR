@@ -3,11 +3,11 @@ package org.ymxr;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.ymxs.tool.Tool;
 
 /**
  * A YMX file into a tune file.
@@ -205,38 +205,25 @@ final class YmxToYmxr {
                 read.loopFrame(), false, 0L, new byte[0][], name, "", "", registers);
     }
 
-    public static void main(String[] args) throws IOException {
-        List<String> flags = new ArrayList<>();
-        String in = null;
-        String out = null;
-        for (String arg : args) {
-            if (arg.startsWith("-")) {
-                flags.add(arg);
-            } else if (in == null) {
-                in = arg;
-            } else if (out == null) {
-                out = arg;
-            }
+    /** {@code ymx-to-ymxr}: a YMX file on standard input, a tune file on
+     *  standard output. The file is read through YMX's {@code ymx-dump},
+     *  as {@code ymx-to-ymxs} reads it. */
+    public static void main(String[] args) {
+        List<String> flags = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ymx-to-ymxr", flags, "-k", "-m", "-copies");
+        Ymxs.only(tool, flags, Ymxs.PACKING);
+        Report report = new Report(tool.reports());
+        Ymxs.Packing packing = Ymxs.Packing.of(tool, flags);
+        Dumped read;
+        try {
+            read = standardInput();
+        } catch (FormatException wrong) {
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+        } catch (IOException failed) {
+            throw tool.wrong(Tool.FAILED, String.valueOf(failed.getMessage()));
         }
-        if (in == null || out == null) {
-            System.err.println("ymx-to-ymxr in.ymx out.ymxr [-kK] [-mN]"
-                    + " [-copies[S]] [-silent]");
-            System.exit(2);
-            return;
-        }
-        Report report = new Report(!flags.contains(YmToYmxr.SILENT));
-        Dumped read = dumped(Path.of(in));
         report.say("YMX!: " + read.frames() + " frames at " + read.rate() + " Hz, "
                 + acting(read) + " of them acting on a channel");
-        int unit = YmToYmxr.UNIT;
-        int ring = Tune.RING;
-        for (String flag : flags) {
-            if (flag.startsWith("-k")) {
-                unit = Integer.parseInt(flag.substring(2));
-            } else if (flag.startsWith("-m")) {
-                ring = Integer.parseInt(flag.substring(2));
-            }
-        }
         int frames = frames(read);
         if (frames != read.frames()) {
             report.note((read.frames() - frames) + " frame of YMX's padding"
@@ -246,24 +233,30 @@ final class YmxToYmxr {
         read = new Dumped(frames, read.rate(), read.loopFrame(), read.streams(),
                 read.samples(), read.loops());
         int repeat = Math.min(read.loopFrame(), read.frames());
-        String stem = Path.of(in).getFileName().toString();
-        YmDump.Song song = song(read, stem.endsWith(".ymx")
-                ? stem.substring(0, stem.length() - 4) : stem);
+        YmDump.Song song = song(read, "");
 
         // Every conversion passes through the structure (doc/ymxs.md):
         // the register streams and the script become a YMXS tune, and the
         // schema maps that onto the columns.
-        Schema.Made made = Schema.of(Ymx.read(read, song, repeat, report));
+        Schema.Made made;
+        try {
+            made = Schema.of(Ymx.read(read, song, repeat, report));
+        } catch (IllegalArgumentException wrong) {
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+        }
         Columns columns = made.columns();
         Sources sources = made.sources();
         report.row("the effects", Integer.bitCount(columns.effects) + " of 4 run, "
                 + sources.count() + " sources");
-        Tune.Written written = Tune.write(columns, sources, read.rate(), unit, ring, report);
-        Files.write(Path.of(out), written.file());
-        System.out.println(read.frames() + " frames at " + read.rate() + " Hz, "
+        Tune.Written written = Tune.write(columns, sources, read.rate(), packing.unit(),
+                packing.ring(), packing.packer(), report);
+        tool.report(read.frames() + " rows at " + read.rate() + " Hz, "
                 + sources.count() + " sources, effects "
                 + Integer.toBinaryString(columns.effects) + ": "
                 + written.file().length + " bytes");
-        System.out.println("written: " + out);
+        for (String note : report.unsaid()) {
+            System.err.println("  " + note);
+        }
+        Out.write(tool, written.file());
     }
 }
