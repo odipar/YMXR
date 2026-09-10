@@ -89,9 +89,10 @@ public final class YmToYmxr {
         read(report, song);
         flagsRead(report, flags, unit, ring, repeat, once, copies, seconds);
         Sources sources = new Sources(song);
-        Columns columns = new Columns(song, sources, repeat, report);
+        Schema.Made made = Schema.of(Ym.read(song, sources, repeat, report));
+        Columns columns = made.columns();
         found(report, sources, columns);
-        Tune.Written written = Tune.write(columns, sources, song.playerHz(), unit, ring,
+        Tune.Written written = Tune.write(columns, made.sources(), song.playerHz(), unit, ring,
                 copies ? new St4(true, seconds) : new St4(), report);
         String said = song.frames() + " frames at " + song.playerHz() + " Hz, "
                 + sources.count() + " sources, effects " + Integer.toBinaryString(columns.effects)

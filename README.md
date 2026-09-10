@@ -12,6 +12,12 @@ It defines no meaning for a column. [DTX](https://github.com/odipar/DTX) is
 a separate repository, where the readers of the format live; the player
 lives here.
 
+**YMXS** is the tune data structure: rows of registers and effects, the
+sources those effects run, and one rate a tune, written down as JSON.
+[YMXS](https://github.com/odipar/YMXS) is a separate repository, and every
+conversion here passes through it ([doc/ymxs.md](doc/ymxs.md)), so a tune
+is read, edited or written without a dump.
+
 **YMXR** defines the meaning of each column, and what a player does with
 it. One method serves the whole of that: a clock advances a table one row,
 and a procedure writes that row to the chips. The tune's clock advances the
@@ -37,7 +43,7 @@ specification in and the checks on what comes out.
 | `68k/test/emu/` | the rig: the player under emulation against a model of the specification |
 | `ym/` | the measurements behind the figures, and `ym/test` ten tunes the tests run on |
 | `ymx/` | a YMX file converted and played, and `ymx/test` three tunes that have no dump |
-| `bin/` | the converter, the check, the trace, the binder and the SNDH and program combiners, run out of a build |
+| `bin/` | the converters, the structure's five filters, the check, the trace, the binder and the SNDH and program combiners, run out of a build |
 
 A tune converts and plays like this:
 
@@ -55,6 +61,12 @@ these:
 bin/ym-to-ymxr tune.ym tune.ymxr
 bin/ymxr-sndh tune.ymxr tune.sndh -t"The title"
 bin/ymxr-prg tune.sndh TUNE.PRG
+```
+
+The same, through the structure and standard input:
+
+```bash
+bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG
 ```
 
 The tune file contains the tune's tables and no code; the SNDH file is the
@@ -76,7 +88,7 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 
 | what runs | what it checks |
 |---|---|
-| `mvn test` | the documents against themselves and the house style, every tune under `ym/test` converted, read back and replayed against its dump, the conformance kit converted again and compared byte for byte, and the four cores and the stub assembled and their descriptors, an SNDH file and a program read back |
+| `mvn test` | the documents against themselves and the house style, every dump converted through the structure to the file the converter writes, every tune under `ym/test` converted, read back and replayed against its dump, the conformance kit converted again and compared byte for byte, and the four cores and the stub assembled and their descriptors, an SNDH file and a program read back |
 | `68k/test/emu/test_ymxr.py` | the player on an emulated 68000: every frame's writes, the timers' programming and every tick against the specification's model |
 | the same, `-corpus` | the same, over a spread of the corpus rather than the tunes under `ym/test`, which are one of each shape |
 | the same, `-hatari` | the SNDH file's program on a real MFP under Hatari, the trace of the player's writes against that model |
@@ -95,6 +107,7 @@ source of truth, and the Go and C# trees are to follow it byte for byte.
 | [doc/performance.md](doc/performance.md) | what a play call costs, in cycles |
 | [doc/experiments.md](doc/experiments.md) | ideas measured, and what the measurements said |
 | [doc/plan.md](doc/plan.md) | what a call could cost, and what each step is worth |
+| [doc/ymxs.md](doc/ymxs.md) | the structure every conversion passes through |
 | [doc/BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, and how a tool combines them |
 | [doc/RELEASES.md](doc/RELEASES.md) | what changed in each published set |
 | [doc/conformance/](doc/conformance) | the kit an independent reader is written against |

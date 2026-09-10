@@ -21,7 +21,7 @@
         <errorprone.version>2.36.0</errorprone.version>
         <nullaway.version>0.12.3</nullaway.version>
         <!-- Every package is null-marked and enforced. -->
-        <nullaway.packages>org.ymxr</nullaway.packages>
+        <nullaway.packages>org.ymxr,org.ymxs</nullaway.packages>
         <nullaway.severity>ERROR</nullaway.severity>
         <!-- CLI arguments for exec:exec@ym-to-ymxr (-Dargs="..."). -->
         <args></args>
@@ -34,6 +34,13 @@
             <groupId>org.dtx</groupId>
             <artifactId>dtx</artifactId>
             <version>0.8.0</version>
+        </dependency>
+        <dependency>
+            <!-- the tune data structure every conversion here passes
+                 through, and its JSON form (doc/ymxs.md) -->
+            <groupId>org.ymx</groupId>
+            <artifactId>ymxs</artifactId>
+            <version>0.1-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.jspecify</groupId>

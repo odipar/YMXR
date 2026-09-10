@@ -1,0 +1,3 @@
+#!/bin/sh
+# The structure on standard input into a tune file. doc/ymxs.md.
+exec "$(dirname -- "$0")/run" org.ymxr.YmxsToYmxr "$@"

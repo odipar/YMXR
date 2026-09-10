@@ -1,0 +1,3 @@
+#!/bin/sh
+# The structure on standard input into a TOS program. doc/ymxs.md.
+exec "$(dirname -- "$0")/run" org.ymxr.YmxsToPrg "$@"

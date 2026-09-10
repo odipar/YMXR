@@ -66,6 +66,7 @@ same change (requirements.md, R0.6 to R0.8).
 | YM2149 | The sound chip, Yamaha's AY-3-8910, running at 2 MHz on an Atari ST. | terminology.md, the sound chip |
 | YMX | The format that plays today. YMXR assumes the name when it is done. | README.md |
 | YMXR | This format: one use of DTX, its columns YM2149 and MFP state. | README.md |
+| YMXS | The tune data structure every conversion here passes through: rows of registers and effects, the sources those effects run, and one rate a tune, written down as JSON. A separate repository. | ymxs.md |
 
 ## Named, not yet defined
 
