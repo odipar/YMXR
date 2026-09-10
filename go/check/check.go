@@ -8,11 +8,11 @@ package check
 import (
 	"fmt"
 
-	"github.com/odipar/ymxr/convert"
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/trace"
-	"github.com/odipar/ymxr/ym"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/convert"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/trace"
+	"github.com/odipar/ymxr/go/ym"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // Most is the wrong frames listed for one tune, at most.

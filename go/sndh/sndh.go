@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/odipar/ymxr/binaries"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/binaries"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // An SNDH file from tune files (doc/BINARIES.md 3): the entry triple, the

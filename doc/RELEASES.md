@@ -20,8 +20,12 @@ The version names every file. It is read out of `pom.xml`, or stands as
 the script's one argument.
 
 The five binaries are assembled from `68k/` by rmac on the machine that
-cuts the release, and nowhere else: a release runs no assembler on the
-caller's machine, and no binary is tracked in the tree.
+cuts the release, so the caller's machine has an assembler to install or
+not as it pleases. They are committed under `go/binaries/data`: a Go module
+fetched by its import path contains the files a commit has in it, and an
+executable built from one embeds these. `BinariesTest` reads them against
+the assembly the build makes, so one that does not match what rmac writes
+today fails the build.
 
 A player pins a version of this format: the tune file's is 2 (SPEC.md 3.3)
 and the bound tune's is 2 (BINARIES.md 1), and a release's number names

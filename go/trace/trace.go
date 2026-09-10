@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"dtx/dtx"
+	"github.com/odipar/dtx/go/dtx"
 
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // Calls is the calls the kit uses for a tune: one pass and the loop once,

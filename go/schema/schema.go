@@ -17,8 +17,8 @@ package schema
 import (
 	"fmt"
 
-	"github.com/odipar/ymxr/ymxr"
-	"github.com/odipar/ymxs/ymxs"
+	"github.com/odipar/ymxr/go/ymxr"
+	"github.com/odipar/ymxs/go/ymxs"
 )
 
 // timers is the effect each timer runs, SPEC.md 2.3: A, D, B, C.

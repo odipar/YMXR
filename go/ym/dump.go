@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/odipar/ymxs/ym"
+	"github.com/odipar/ymxs/go/ym"
 )
 
 // Registers is the register count in the file: R0 to R15, the last two

@@ -5,10 +5,10 @@ package sndh
 import (
 	"fmt"
 
-	"dtx/dtx"
-	"dtx/pack"
+	"github.com/odipar/dtx/go/dtx"
+	"github.com/odipar/dtx/go/pack"
 
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // A bound tune: a tune file's tables bound with DTX's reader into what the

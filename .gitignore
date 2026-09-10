@@ -48,7 +48,9 @@ build/
 # an assembler run by hand leaves an object file beside the source
 *.o
 
-# a go build run by hand leaves the executables beside the module
+# a go build run by hand leaves the executables beside the module. The
+# five 68000 binaries under go/binaries/data are committed, since a Go
+# module fetched by its import path contains what a commit has in it.
 /go/ym-to-ymxs
 /go/ym-to-ymxr
 /go/ymx-to-ymxs

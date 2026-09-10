@@ -11,17 +11,17 @@ import (
 	"strconv"
 	"strings"
 
-	"dtx/dtx"
-	"dtx/st4"
-	"github.com/odipar/ymxs/check"
-	"github.com/odipar/ymxs/text"
-	"github.com/odipar/ymxs/tool"
-	"github.com/odipar/ymxs/ymxs"
+	"github.com/odipar/dtx/go/dtx"
+	"github.com/odipar/dtx/go/st4"
+	"github.com/odipar/ymxs/go/check"
+	"github.com/odipar/ymxs/go/text"
+	"github.com/odipar/ymxs/go/tool"
+	"github.com/odipar/ymxs/go/ymxs"
 
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/schema"
-	"github.com/odipar/ymxr/sndh"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/schema"
+	"github.com/odipar/ymxr/go/sndh"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // Packing is what the packer reads: the unit, the ring, and the search for

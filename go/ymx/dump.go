@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/odipar/ymxr/ym"
+	"github.com/odipar/ymxr/go/ym"
 )
 
 // dump is the YMX tool this reads, which YMX_DUMP names.

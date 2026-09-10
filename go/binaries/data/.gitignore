@@ -1,2 +1,0 @@
-# The five 68000 binaries are build output: the Maven build writes them here.
-*.bin

@@ -11,12 +11,12 @@ import (
 	"strconv"
 	"strings"
 
-	"dtx/st4"
+	"github.com/odipar/dtx/go/st4"
 
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/schema"
-	"github.com/odipar/ymxr/ym"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/schema"
+	"github.com/odipar/ymxr/go/ym"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // Unit is the unit a table packs at by default.

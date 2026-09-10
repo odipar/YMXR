@@ -14,11 +14,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/odipar/ymxs/tool"
+	"github.com/odipar/ymxs/go/tool"
 
-	"github.com/odipar/ymxr/flags"
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/sndh"
+	"github.com/odipar/ymxr/go/flags"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/sndh"
 )
 
 func main() {

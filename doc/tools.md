@@ -19,8 +19,12 @@ cd go && go build ./cmd/...           # the thirteen, for this machine
 release/publish.sh                    # win, osx and linux, x64 and arm64
 ```
 
-DTX and YMXS are module dependencies of the Go tree, read from the
-checkouts beside this one, as the Maven build reads the same two.
+DTX and YMXS are module dependencies of the Go tree, at the releases the
+pom names for their Java artifacts: `github.com/odipar/dtx/go` and
+`github.com/odipar/ymxs/go`. A build fetches them, so the Go tree builds
+without the two checkouts beside it. This tree is a module of its own,
+`github.com/odipar/ymxr/go`, and a version of it is a tag of that
+directory: `go/v0.1.0` beside `v0.1.0`.
 
 ## What a tool reports
 

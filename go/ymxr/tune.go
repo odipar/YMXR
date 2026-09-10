@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"dtx/dtx"
-	"dtx/st4"
+	"github.com/odipar/dtx/go/dtx"
+	"github.com/odipar/dtx/go/st4"
 
-	"github.com/odipar/ymxr/report"
+	"github.com/odipar/ymxr/go/report"
 )
 
 // A tune file (SPEC.md 3.3): a tune's fixed values, the tune's table as a
