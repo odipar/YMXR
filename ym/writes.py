@@ -15,7 +15,7 @@ program that clears the screen starts a frame later than one that does
 not, and 900 frames from the first VBL are then 900 different rows. The
 count is FRAMES frames from there, and a register whose sequences agree
 up to the shorter one's end is the window's edge, not a difference: the
-longer run held one more row.
+longer run played one more row.
 
 A tick of another length returns inside the call at another point, so a
 square's toggle can land on the other side of a frame's edge. Such a
@@ -59,7 +59,7 @@ def writes(path, frames=FRAMES):
 
 def parts(a, b):
     """Where two value sequences part: the index, or None where the
-    shorter is the longer's head, which the window's edge gives."""
+    shorter is the longer's head, which the window's edge cuts."""
     n = min(len(a), len(b))
     for i in range(n):
         if a[i] != b[i]:
@@ -74,7 +74,7 @@ def main(argv):
     runs = [writes(path) for path in argv[1:]]
     for path, (first, _, flat) in zip(argv[1:], runs):
         if first < 0:
-            print("no write of the program's own in " + path)
+            print("no write of the program in " + path)
             return 1
         print("%s: %d writes over %d frames from frame %d"
               % (path, len(flat), FRAMES, first))
@@ -89,11 +89,11 @@ def main(argv):
             print("  R%-2d parts at write %d of %d and %d" % (reg, at, len(a), len(b)))
         elif len(a) != len(b):
             edge += 1
-            print("  R%-2d takes the same %d values, and %d more in the longer run"
+            print("  R%-2d receives the same %d values, and %d more in the longer run"
                   % (reg, min(len(a), len(b)), abs(len(a) - len(b))))
     if apart == 0:
         moved = sum(1 for x, y in zip(flat_one, flat_two) if x != y)
-        print("  every register takes the same values in the same order"
+        print("  every register receives the same values in the same order"
               + (", %d at the window's edge" % edge if edge else "")
               + "; %d writes fall in another order between registers" % moved)
     return 0

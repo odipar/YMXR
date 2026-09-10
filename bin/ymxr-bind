@@ -1,5 +1,5 @@
 #!/bin/sh
-# The bound tune of a tune file, what the player takes, run out of
+# The bound tune of a tune file, the layout the player reads, run out of
 # target/classes; builds first where a source, the pom or a 68000 source
 # is newer than the last build, or the core is not assembled. doc/tools.md,
 # Bind.

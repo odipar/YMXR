@@ -2,13 +2,13 @@
 # The play call's cost, measured: a program with the raster monitor's
 # core for each tune, run under a cycle-exact Hatari tracing the
 # background's palette writes, and every call's span read back.
-# doc/performance.md holds the figures this produced and the method.
+# doc/performance.md has the figures this produced and the method.
 #
 #   ym/cost.sh [-lean] [-silent] tune.ymxr [more.ymxr ...]
 #   VBLS=3000 ym/cost.sh tune.ymxr        # a longer run
 #
 # -lean reads the core whose ticks neither drop the interrupt level nor
-# write their own end of interrupt, so what comes back is that core's
+# write an end of interrupt, so what comes back is that core's
 # cost against the plain one's (BINARIES.md, performance.md).
 #
 # performance.md's figures are a VBLS=2300 run, which plays 2,019 calls.

@@ -6,13 +6,13 @@ repository's into another, both run under Hatari, and the chip writes of
 each are cut into frames at the VBL. What the frame procedure writes must
 read alike on both; a register an effect drives is sampled at the frame's
 edge, where a toggle lands one side or the other, so those are counted
-and not held.
+and not compared.
 
   ym/parity.py [-whole] [tune.ym ...]
 
 A pass of the music is what this compares: the frames from the first the
 music writes to the tune's last row. Past that a tune starts over, and
-which row it starts at is each tree's own reading of the dump's loop
+which row it starts at is each tree's reading of the dump's loop
 frame rather than a thing a player does, so `-whole` reads the run out to
 its end and the default stops at the wrap.
 
@@ -48,7 +48,7 @@ SAMPLES = ["Chambers of Shaolin - Mega Pock Olipse", "Lethal Xcess 3 - level 2",
            "Ooh Crikey - main menu", "Turrican 2 - world 1-1 The Desert rocks",
            "Seven Gates of Jambala  - level 11 digidrums"]
 
-# What each register takes of the byte written to it, so that a value the
+# The bits each register reads of the byte written to it, so that a value the
 # chip drops is not a difference (68k/test/emu/test_ymxr.py, TAKES).
 TAKES = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
 
@@ -85,7 +85,7 @@ def frames(path):
 
 
 def rows(tune):
-    """The tune's row count, out of its table's own header (SPEC.md 3.3,
+    """The tune's row count, out of its table's header (SPEC.md 3.3,
     and DTX SPEC.md 1: `R` at bytes 4 to 7 of the table)."""
     file = open(tune, "rb").read()
     at = int.from_bytes(file[12:16], "big")

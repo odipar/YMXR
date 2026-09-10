@@ -10,19 +10,19 @@
 ;        the tool sets where the core has the raster monitor in, so that
 ;        the bars stand where the desktop's pixels were; bit 1 plays from
 ;        the VBL, which the tool sets where the set claims Timer C; with
-;        it clear the program takes the VBL where the screen's rate is the
+;        it clear the program uses the VBL where the screen's rate is the
 ;        tune's, and Timer C at the rate where it is not
 ;   +14  the rate, a word, rows a second
-;   +16  the rows to play, a long, 0 for as many as the tune gives
+;   +16  the rows to play, a long, 0 for the tune's row count
 ;   +20  the core's offset from the SNDH file's first byte, a long
 ;
-; The machine is taken over under Supexec: the VBL vector, the four
+; The machine is claimed under Supexec: the VBL vector, the four
 ; timers' vectors and the enable, mask and control registers kept, every
 ; MFP interrupt off and every timer stopped, the core's init called, the
 ; rows played from the VBL or Timer C, and the state put back once the
 ; rows have played, the core's state byte marks the tune over, or a key
 ; has stopped it. SPACE and ESC stop; 1 to 9 pick a subtune, and the
-; banner offers the keys the set has, on a line of its own since the
+; banner offers the keys the set has, on a separate line since the
 ; screen is forty columns. Timer C's
 ; count is written back as the 192 of the system's 200 Hz, since the
 ; register reads as the live count and writes as the reload. The SNDH
@@ -31,7 +31,7 @@
 ;
 ; The keyboard's ACIA is read directly: its interrupt is off with the
 ; MFP's others, so every byte the IKBD sends waits in it, and each report
-; is taken whole so that TOS finds no packet half read when it has the
+; is read whole so that TOS finds no packet half read when it has the
 ; keyboard back. A byte of $F6 to $FF opens a report of that many bytes
 ; more, which are not keys: a status report 7, an absolute mouse 5, a
 ; relative mouse 2, the time 6, both joysticks 2, one joystick 1. A key
@@ -40,7 +40,7 @@
 ; The mouse is turned off at the chip while the program runs and set back
 ; to reporting where it moves before the machine is handed back, and what
 ; the chip has already sent is read off between the two. So the packets
-; TOS's handler would have taken are not sent at all, rather than taken
+; TOS's handler would have read are not sent at all, rather than read
 ; here and lost.
 
 GEMDOS          equ     1
@@ -131,8 +131,8 @@ play:
                 clr.b   $FFFFFA1B.w
                 clr.b   $FFFFFA1D.w
 ; The keyboard chip is silenced of its mouse: this loop reads the ACIA
-; itself, so a mouse packet it takes is one the operating system's own
-; handler does not, and a packet half taken leaves that handler mid
+; itself, so a mouse packet it reads is one the operating system's
+; handler does not, and a packet half read leaves that handler mid
 ; packet when the program returns.
                 moveq   #$12,d0                 ; the mouse off
                 bsr     ikbd
@@ -176,7 +176,7 @@ play:
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit
 ; What the chip has already sent is read off before the mouse wakes, so
-; the operating system's handler takes the next packet from its first
+; the operating system's handler reads the next packet from its first
 ; byte.
 .drain:         btst    #0,$FFFFFC00.w
                 beq.s   .drained
@@ -201,7 +201,7 @@ play:
                 move.w  (sp)+,sr
                 rts
 
-; One byte to the keyboard chip, d0.b, once its ACIA takes one.
+; One byte to the keyboard chip, d0.b, once its ACIA accepts one.
 ikbd:           btst    #1,$FFFFFC00.w
                 beq.s   ikbd
                 move.b  d0,$FFFFFC02.w
@@ -212,7 +212,7 @@ ikbd:           btst    #1,$FFFFFC00.w
 ; the screen refreshes at the tune's rate; Timer C where it does not.
 start:
                 lea     sndh(pc),a0
-                jsr     4(a0)                   ; exit: nothing where none plays
+                jsr     4(a0)                   ; exit: skipped where none plays
                 jsr     (a0)                    ; init
                 lea     done(pc),a0
                 clr.b   (a0)
@@ -285,7 +285,7 @@ tick:
 ; rate above 200 lands more than one row on a tick. The interrupt is
 ; ended first and the level lowered so that the effects' timers tick
 ; through the row; a tick of this timer that lands inside the row adds
-; its rate to the count and plays nothing, and the row's caller, or the
+; its rate to the count and plays no row, and the row's caller, or the
 ; next tick, plays what the count has reached. The count is moved in
 ; single instructions below the level, which a tick cannot split.
 timer_c:

@@ -2,9 +2,9 @@
 """The sound out of a Hatari recording, as a WAV file.
 
 Hatari records to AVI with `--avirecord`, video and sound together
-(ym/play.sh). This takes the sound chunks out of one and writes them as
+(ym/play.sh). This reads the sound chunks out of one and writes them as
 a WAV, so that a run needs no converter beside the emulator. It reads
-the chunks in order rather than the index, and takes them unpadded,
+the chunks in order rather than the index, and reads them unpadded,
 which is how Hatari writes them.
 
     ym/avi.py in.avi out.wav [frame.png]
@@ -52,7 +52,7 @@ def main():
         elif body[:4] == b"\x89PNG":
             frames.append(body)
     if not sound:
-        print("the recording holds no sound")
+        print("the recording has no sound")
         return 1
     open(sys.argv[2], "wb").write(wav(bytes(sound)))
     print("%s: %.2f seconds, %d frames" % (sys.argv[2], len(sound) / 4 / RATE, len(frames)))
