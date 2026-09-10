@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/odipar/ymxs/ymxs"
+	"github.com/odipar/ymxs/go/ymxs"
 
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/schema"
-	"github.com/odipar/ymxr/ym"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/schema"
+	"github.com/odipar/ymxr/go/ym"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // noVoice is voice 3, which is no voice: three opcodes read it as a second

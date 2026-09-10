@@ -5,9 +5,9 @@
 package trace
 
 import (
-	"dtx/dtx"
+	"github.com/odipar/dtx/go/dtx"
 
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // The frame procedure of SPEC.md section 4, as a model: what the fourteen

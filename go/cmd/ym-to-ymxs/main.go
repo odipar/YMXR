@@ -15,14 +15,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/odipar/ymxs/text"
-	"github.com/odipar/ymxs/tool"
-	"github.com/odipar/ymxs/ymxs"
+	"github.com/odipar/ymxs/go/text"
+	"github.com/odipar/ymxs/go/tool"
+	"github.com/odipar/ymxs/go/ymxs"
 
-	"github.com/odipar/ymxr/flags"
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/ym"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/flags"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/ym"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 func main() {

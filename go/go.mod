@@ -1,13 +1,11 @@
-module github.com/odipar/ymxr
+module github.com/odipar/ymxr/go
 
 go 1.26
 
-// The two libraries this converts through, taken from the checkouts beside
-// this one, as the Maven build takes them from the same two.
-replace dtx => ../../DTX/go
-
-replace github.com/odipar/ymxs => ../../YMXS/go
-
-require dtx v0.0.0-00010101000000-000000000000
-
-require github.com/odipar/ymxs v0.0.0-00010101000000-000000000000 // indirect
+// The two libraries this converts through, at the releases the pom names
+// for their Java artifacts: the packer and the twenty-two images from DTX,
+// the tune data structure from YMXS.
+require (
+	github.com/odipar/dtx/go v0.9.0
+	github.com/odipar/ymxs/go v0.1.0
+)

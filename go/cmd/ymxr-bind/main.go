@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/odipar/ymxs/tool"
+	"github.com/odipar/ymxs/go/tool"
 
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/sndh"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/sndh"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 func main() {

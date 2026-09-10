@@ -133,6 +133,24 @@ final class BinariesTest {
         assertEquals(1, Tune.getWord(stub, 8));
     }
 
+    /**
+     * The five under {@code go/binaries/data} are the five the classes
+     * carry. A Go module fetched by its import path contains the files a
+     * commit has in it, so those are what a Go executable embeds, and a
+     * stale one would put another core under a tune.
+     */
+    @Test
+    void theBinariesTheGoTreeCarriesAreTheOnesTheBuildAssembled() throws IOException {
+        Path data = Path.of("go/binaries/data");
+        for (Binaries.Binary binary : Binaries.all()) {
+            Path at = data.resolve(binary.name());
+            assertTrue(Files.exists(at), at + " is not there: run mvn process-classes");
+            assertArrayEquals(Binaries.carried(binary.name()), Files.readAllBytes(at),
+                    binary.name() + " under go/binaries/data is not the one the build"
+                            + " assembled");
+        }
+    }
+
     @Test
     void aBinaryNotCarriedIsSaidSo() {
         IllegalStateException none = assertThrows(IllegalStateException.class,

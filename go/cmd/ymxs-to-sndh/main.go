@@ -14,10 +14,10 @@ package main
 import (
 	"os"
 
-	"github.com/odipar/ymxs/tool"
+	"github.com/odipar/ymxs/go/tool"
 
-	"github.com/odipar/ymxr/flags"
-	"github.com/odipar/ymxr/report"
+	"github.com/odipar/ymxr/go/flags"
+	"github.com/odipar/ymxr/go/report"
 )
 
 func main() {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/odipar/ymxr/binaries"
-	"github.com/odipar/ymxr/ymxr"
+	"github.com/odipar/ymxr/go/binaries"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 // A TOS program around an SNDH file (doc/BINARIES.md 4): the PRG header,

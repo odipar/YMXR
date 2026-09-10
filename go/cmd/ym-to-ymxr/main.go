@@ -11,12 +11,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/odipar/ymxs/tool"
+	"github.com/odipar/ymxs/go/tool"
 
-	"github.com/odipar/ymxr/convert"
-	"github.com/odipar/ymxr/flags"
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/ym"
+	"github.com/odipar/ymxr/go/convert"
+	"github.com/odipar/ymxr/go/flags"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/ym"
 )
 
 func main() {

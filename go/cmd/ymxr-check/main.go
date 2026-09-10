@@ -16,12 +16,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/odipar/ymxs/tool"
+	"github.com/odipar/ymxs/go/tool"
 
-	"github.com/odipar/ymxr/check"
-	"github.com/odipar/ymxr/flags"
-	"github.com/odipar/ymxr/report"
-	"github.com/odipar/ymxr/ym"
+	"github.com/odipar/ymxr/go/check"
+	"github.com/odipar/ymxr/go/flags"
+	"github.com/odipar/ymxr/go/report"
+	"github.com/odipar/ymxr/go/ym"
 )
 
 // result is what one line of the tool says of a file: no dump where the

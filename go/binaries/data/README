@@ -1,9 +1,13 @@
 The five 68000 binaries a standalone build contains.
 
 The Maven build writes them here, as it writes them into the classes the
-jar is made of, so a Go executable built after it needs neither this
-repository nor an assembler beside it.
+jar is made of, and they are committed: a Go module fetched by its import
+path contains the files a commit has in it, so an executable built from
+one embeds these.
 
-A tree built without them does not contain one, and Read then gives nil
-back: doc/BINARIES.md says what each of them is, and YMXR_68K names a
-directory to read them from instead.
+BinariesTest reads them against the assembly the build makes, so one that
+does not match what rmac writes today fails the build.
+
+A tree without them does not contain one, and Read then gives an error:
+doc/BINARIES.md says what each of them is, and YMXR_68K names a directory
+to read them from instead.
