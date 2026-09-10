@@ -16,9 +16,10 @@
 # the run's last frame beside it as a PNG of the same name.
 #
 # A multi of several tunes is a set of subtunes, one a tune in the multi's
-# order, each named by its title, and the program picks between them on the
-# keys 1 to 9. An SNDH file records one rate, so a multi whose tunes do not
-# share one gets a line on stderr and no program.
+# order, each named by its title, which the program selects on the keys 1 to
+# 9. An SNDH file records one rate, so a multi whose tunes do not share one
+# produces a line on stderr and no program, and a tenth tune and past it
+# play only under a host that selects a subtune by number.
 #
 # The packer's options:
 #

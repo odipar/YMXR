@@ -299,9 +299,14 @@ A name that is not a `.ymxs` records the run instead, as `ym/play.sh`
 does, and the program stays under a directory reported on stderr.
 
 One name is what it reads, since a multi of several tunes is a set of
-subtunes and the program selects them on the keys 1 to 9. `-rROWS` stops
-the program after that many rows; the packer's flags and the tags are
-`bin/ymxs-to-prg`'s, and `-vN`, `-silent` and `-h` are `ym/play.sh`'s.
+subtunes, each named by its title, which the program selects on the keys 1
+to 9. An SNDH file records one rate, so a multi whose tunes do not share
+one produces a line on stderr and no program, and a tenth tune and past it
+play only under a host that selects a subtune by number.
+
+`-rROWS` stops the program after that many rows; the packer's flags and the
+tags are `bin/ymxs-to-prg`'s, and `-vN`, `-silent` and `-h` are
+`ym/play.sh`'s.
 
 ## The rigs
 
