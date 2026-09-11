@@ -33,6 +33,36 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.1, 2026-09-11
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.1>, built from the commit
+tagged `v0.3.1`.
+
+The pending register written whole, and three documents measured again.
+The tune file is version 3 and the bound tune is version 3, as 0.3.0 set
+them, so a file of this release plays under that one and the other way
+round.
+
+- **A tick the MFP latches during a clear is no longer dropped.** A
+  pending bit clears on a written 0 and is unmoved by a written 1, and
+  `bclr` read the byte and wrote it back: two bus cycles, with the MFP
+  free to latch a tick of another timer between them, which the
+  write-back then carried the read's 0 over. The five clears write the
+  whole byte now. Raising the interrupt level is no substitute, since the
+  MFP sets the bit whether the 68000 masks or not.
+- The tick that ends a source costs 132 cycles rather than 136, and 116
+  rather than 120 with the lean switch. No other tick reaches that path,
+  and the five binaries are the size they were. `PERF_STOP` is 116, the
+  figure the raster monitor bills a stop tick at.
+- performance.md's play call and plan.md's closing figures are the ones
+  the rig counts. The call moved where 0.3.0 assigned bit 4 and neither
+  document was read again, and plan.md's ticks read 4,463 against 2,585.
+
+**A spurious interrupt on real hardware is not fixed here.** A player that
+changes a timer's parameters while an interrupt on that timer is live
+races the 68000's acknowledge, and the remedy is a dummy handler at vector
+`$60`. This release is what the fault is measured against.
+
 ### 0.3.0, 2026-09-11
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.0>, built from the commit
