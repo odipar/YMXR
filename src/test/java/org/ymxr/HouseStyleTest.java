@@ -58,6 +58,12 @@ final class HouseStyleTest {
             "keeps its place",
             "keeps the place",
             "stands where it",
+            // a document defines and cites; it rests on no other and
+            // props none up. The trailing space keeps "stands once"
+            // out of the match, which the substring alone would catch
+            " stands on ",
+            " stand on ",
+            "is the base",
             // a period is counted, not flown
             "in flight",
             // a rule justified by quoting a speaking thing
@@ -67,6 +73,9 @@ final class HouseStyleTest {
             "says it",
             "says so",
             "says what to take",
+            // a thing does no human act: it requires, it provides
+            "asks of",
+            "asks for",
             "set-ness",
             "takes the machine with it",
             // "consumer" is a role the specification defines, as "caller"

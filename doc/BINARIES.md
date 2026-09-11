@@ -130,7 +130,7 @@ Position-independent. Its layout from its first byte:
 
 The flags word:
 
-| bit | set where the core was assembled with | which asks of the host |
+| bit | set where the core was assembled with | which the host then provides |
 |---|---|---|
 | 0 | the player's raster monitor (`YMXR_PERF`, performance.md) | that it read the palette writes to have what the run cost, and clear the screen for the bars |
 | 1 | the lean tick (`YMXR_NEST=0` and `YMXR_AEOI=1`, performance.md) | that no MFP interrupt of the host nest inside another, and that the MFP's vector register be the player's to set |

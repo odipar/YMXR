@@ -17,11 +17,10 @@ sources those effects run, and one rate a tune, written down as JSON.
 [YMXS](https://github.com/odipar/YMXS) is a separate repository, and every
 conversion here passes through it ([doc/ymxs.md](doc/ymxs.md)), so a tune
 is read, edited or written without a dump. Its SPEC.md defines what a tune
-is and what a player does with a row, and the specification here is the
-base it stands on.
+is and what a player does with a row.
 
 **YMXR** defines one encoding of that structure: the meaning of each
-column, and the columns a player reads to do what YMXS says a frame does.
+column, and the columns a player reads to do what a frame does.
 One method serves the whole of it: a clock advances a table one row, and a
 procedure writes that row to the chips. The tune's clock advances the
 tune's table, and a timer advances a separate table at an effect's rate.

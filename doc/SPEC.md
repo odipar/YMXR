@@ -10,12 +10,12 @@ allows, each one byte, so a row is 30 bytes.
 
 ## What this defines, and what YMXS does
 
-[YMXS](https://github.com/odipar/YMXS) is the tune data structure, and its
-SPEC.md is the base this one stands on. That document defines what a tune
-is and what a player does with it: what each register reaches on the two
-chips, what a target and a source are, how a rate is reckoned from a
-prescaler and a count, what the two resets do, what a frame does with a row
-and a tick with a source's row, and the rules a writer satisfies.
+[YMXS](https://github.com/odipar/YMXS) is the tune data structure. Its
+SPEC.md defines what a tune is and what a player does with it: what each
+register reaches on the two chips, what a target and a source are, how a
+rate is reckoned from a prescaler and a count, what the two resets do, what
+a frame does with a row and a tick with a source's row, and the rules a
+writer satisfies.
 
 This document defines one encoding of that structure and repeats none of
 it. A rule that belongs to YMXS is cited as `(YMXS, SPEC.md 3.4)` and
@@ -172,10 +172,10 @@ A row sets this column to write R13, and a write to R13 restarts the
 envelope (YMXS, SPEC.md 2). A row that leaves it unset writes no register,
 and the envelope runs on.
 
-Restarting the shape already sounding is the more frequent row (YMXS,
-SPEC.md 2), and such a row sets this column to the four bits already in
-R13, which R3.6 allows: the set bit marks a value to write, not a value
-that changed.
+A row restarting the shape already sounding is more frequent than one
+changing it (YMXS, SPEC.md 2), and such a row sets this column to the four
+bits already in R13, which R3.6 allows: the set bit marks a value to write,
+not a value that changed.
 
 "Do not write" is the clear set bit, so no value of this column is reserved
 for it. A row may set this column while an effect writes R13: the row's
@@ -327,7 +327,7 @@ runs on.
 Bit 6 puts a stop before those writes and a start after them: the player
 writes select 0, then the count, then the select. The count and the select
 it writes come from the row, or where the row leaves a column unset, from
-what the player keeps (R4.6). That sequence is what `timerReset` asks of a
+what the player keeps (R4.6). That sequence is what `timerReset` requires of a
 running timer, and a stopped timer starts on the select either way, so
 where a writer cannot determine which (section 6 rule 3) either bit is
 correct.
@@ -370,14 +370,15 @@ A later version may number procedures that reach the MFP registers (R6.2).
 
 ### 2.2 The sources
 
-What a source is, what the shape of one sounds, and that two effects may
-run one with a separate place each, are YMXS's (YMXS, SPEC.md 3.2). This
-section is the table a source stands in here.
+What a source is, what a source of each shape sounds, and that two effects
+may run one source with a separate place each, are YMXS's (YMXS, SPEC.md
+3.2). This section defines the table a source is written in.
+
+
 
 A source is a DTX table: `R` rows and `C` columns, every value `W` bytes,
 1, 2 or 4, and a row `RR` it repeats to once the last row is done (R1.1).
-`RR` is what the index entry records, and it determines whether the rows
-repeat.
+The index entry records `RR`, which determines whether the rows repeat.
 
 A source is one column of one byte at this version, the row shape 2.1's
 procedures read. A source of two byte values would serve a procedure
@@ -557,9 +558,9 @@ What a tick does is YMXS's (YMXS, SPEC.md 5). Here it is section 4's method
 at a timer's rate: it advances its source one row and calls its target with
 that row (2.1, 2.2).
 
-What this format adds is where the end of a cycle is read. The last row is
+This format marks the end of a cycle in the row itself. The last row is
 the marker (3.2), so the tick that writes it tests bit 7 after the write
-and finds the cycle's end there rather than by counting rows against `R`.
+rather than counting rows against `R`.
 Where the source repeats, the next tick reads row `RR` (3.1); where it does
 not, the timer stops.
 
@@ -569,10 +570,10 @@ A player does not read the DTX table between ticks.
 
 ## 6. The rules a writer satisfies
 
-The rules themselves are YMXS's five (YMXS, SPEC.md 6). What stands below
-is those rules in the columns that encode them, which is why a player
-writes a marked column once and performs no test. Each entry names the
-YMXS rule it encodes.
+The rules themselves are YMXS's five (YMXS, SPEC.md 6). Below are those
+rules in the columns that encode them, which is why a player writes a
+marked column once and performs no test. Each entry names the YMXS rule it
+encodes.
 
 1. **The volume column of a register an effect writes stays unset** (YMXS
    rule 1). A player writing steps 4 to 8 then requires no test: the row
@@ -584,8 +585,8 @@ YMXS rule it encodes.
    3, and a row sets no column of an effect outside that record. A source
    and a target a column names are ones section 2 numbers, and a row that
    starts an effect for the first time has set its target column, on that
-   row or before. The structure settles these where a row is built, so YMXS
-   binds no writer with them and the columns do.
+   row or before. The structure settles these where a row is built, so
+   YMXS lists neither and they bind a writer of columns alone.
 3. **A row that sets the source column sets bit 5 with it** (YMXS rules 3
    and 4), unless the source it starts has the row count of the last source
    this effect ran on the same target, where the row may leave the bit
@@ -612,9 +613,9 @@ decimal, names in the order the document fixes, and a line feed ending each
 line.
 
 A reader there reports the structure and one here reports a tune file, so
-the names and the values below are this document's and the two records are
-separate. A tune whose version is not $0002 is rejected without a report
-(3.3, R6.1). The names, in order:
+the names and the values below are this document's, and a caller reads one
+record or the other. A tune whose version is not $0002 is rejected without
+a report (3.3, R6.1). The names, in order:
 
     {"rate":50,"effects":2,"sources":[{"rows":[13,128],"repeat":0}]}
     {"result":0,"w":{"0":251,"1":4,"7":49},"e":{"1":{"target":10,"source":1,"select":1,"count":122,"timer":true,"place":true}}}
@@ -626,7 +627,7 @@ separate. A tune whose version is not $0002 is rejected without a report
   upward, each with its rows as the table has them, the marker in the last
   row's bit 7 (3.2), and the row it repeats to, `R` where it does not
   (3.1).
-- `result` is what the frame reports (section 4): 0, or -1 for the frame
+- `result` is the frame's report (section 4): 0, or -1 for the frame
   after the last row of a tune whose `RR` is `R`. That entry has `result`
   alone, and the record ends with it.
 - `w` lists the YM2149 registers steps 4 to 8 write, by number in ascending

@@ -104,5 +104,5 @@ bin/ym-to-ymxs < tune.ym | ym/play-ymxs.sh -v3000 run.wav
 ## Building
 
 YMXS is a Maven dependency, `org.ymx:ymxs`, so a build needs that
-repository beside this one: `mvn install` in the YMXS checkout, as DTX
-already asks for.
+repository beside this one: `mvn install` in the YMXS checkout, which DTX
+already requires too.

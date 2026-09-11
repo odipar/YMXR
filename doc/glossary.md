@@ -6,7 +6,7 @@ same change (requirements.md, R0.6 to R0.8).
 
 A term whose document is YMXS is defined there and used here: this
 repository encodes that structure and does not redefine it. The line below
-is what the term is, and SPEC.md defines the columns that encode it.
+defines the term, and SPEC.md the columns that encode it.
 
 | term | what it is | explained in |
 |---|---|---|
@@ -70,7 +70,7 @@ is what the term is, and SPEC.md defines the columns that encode it.
 | YM2149 | The sound chip, Yamaha's AY-3-8910, running at 2 MHz on an Atari ST. | terminology.md, the sound chip |
 | YMX | The format that plays today. YMXR assumes the name when it is done. | README.md |
 | YMXR | This format: one use of DTX, its columns YM2149 and MFP state. | README.md |
-| YMXS | The tune data structure every conversion here passes through: rows of registers and effects, the sources those effects run, and one rate a tune, written down as JSON. Its SPEC.md is the base SPEC.md here stands on. A separate repository. | ymxs.md |
+| YMXS | The tune data structure every conversion here passes through: rows of registers and effects, the sources those effects run, and one rate a tune, written down as JSON. Its SPEC.md defines the structure and SPEC.md here one encoding of it. A separate repository. | ymxs.md |
 
 ## Named, not yet defined
 
