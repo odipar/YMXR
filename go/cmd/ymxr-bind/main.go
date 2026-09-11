@@ -49,11 +49,34 @@ func read(said *report.Report, tune []byte) {
 	said.Row("the sources", fmt.Sprintf("%d", len(file.Sources)))
 }
 
-// bound_ says what the binding came to.
+// bound_ says what the binding came to, and what the player needs of a
+// host.
 func bound_(said *report.Report, tune, bound []byte) {
 	if !said.Says() {
 		return
 	}
-	said.Say(fmt.Sprintf("the bound tune: %d bytes, the state block %d",
-		len(bound), ymxr.GetLong(bound, sndh.StateAt)))
+	file, err := ymxr.Read(tune)
+	if err != nil {
+		return
+	}
+	state := ymxr.GetLong(bound, sndh.StateAt)
+	image := ymxr.GetLong(bound, sndh.ImageAt)
+	// The image stands before the DTX1 source tables, so where there is a
+	// source the first one's offset ends the image, and where there is
+	// none the file does.
+	sources := len(file.Sources)
+	ends := len(bound)
+	if sources > 0 {
+		ends = ymxr.GetLong(bound, sndh.BoundIndexAt)
+	}
+	said.Say("bound: DTX's reader for the table in place of the table")
+	said.Row("the reader's image", fmt.Sprintf("at %d, %d bytes", image, ends-image))
+	if sources > 0 {
+		said.Row("the source tables", fmt.Sprintf("%d of %d bytes", sources,
+			len(bound)-ends))
+	}
+	said.Row("the state block", fmt.Sprintf("%d bytes, which the host finds the"+
+		" workspace for", state))
+	said.Row("in all", fmt.Sprintf("%d bytes, %d over the tune file", len(bound),
+		len(bound)-len(tune)))
 }

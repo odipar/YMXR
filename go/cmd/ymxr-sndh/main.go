@@ -84,7 +84,11 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if !said.Says() {
 		return
 	}
-	said.Say("the core: " + binaryName(options))
+	core, err := binaries.Read(binaries.Named(options.Monitor, options.Lean))
+	if err != nil {
+		return
+	}
+	said.Say(fmt.Sprintf("the core: %s, %d bytes", binaryName(options), len(core)))
 	var switches []string
 	if options.Monitor {
 		switches = append(switches, "-perf, the raster monitor in")
@@ -102,7 +106,15 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if options.Composer != "" {
 		composer = ", COMM " + options.Composer
 	}
-	said.Say("the tags: TITL " + options.Title + composer)
+	named := ""
+	if options.Names != nil {
+		name := " names"
+		if len(options.Names) == 1 {
+			name = " name"
+		}
+		named = fmt.Sprintf(", !#SN with %d%s", len(options.Names), name)
+	}
+	said.Say("the tags: TITL " + options.Title + composer + named)
 	set, err := sndh.Bind(tunes)
 	if err != nil {
 		return
@@ -127,7 +139,27 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	}
 	said.Say(fmt.Sprintf("the images: %d%s%d bytes, DTX's reader once a set of tunes"+
 		" that share one", len(set.Images), image, images))
-	said.Say(fmt.Sprintf("the file: %d bytes", len(file)))
+	// What an image fixes once is what splits a set into more than one,
+	// and the unit is what a flag moves: a tune whose row count or repeat
+	// row is odd packs at unit 1 though -k asks for another (tools.md,
+	// experiments.md).
+	for i := range set.Images {
+		of := 0
+		for _, which := range set.Image {
+			if which == i {
+				of++
+			}
+		}
+		tune := " tunes"
+		if of == 1 {
+			tune = " tune"
+		}
+		said.Row(fmt.Sprintf("image %d", i+1), fmt.Sprintf("%s, %d%s", set.Shapes[i],
+			of, tune))
+	}
+	said.Say(fmt.Sprintf("the file: %d bytes, the core %d, the images %d, the tunes %d,"+
+		" the workspace and the rest %d", len(file), len(core), images, bound,
+		len(file)-len(core)-images-bound))
 }
 
 func binaryName(options sndh.Options) string {

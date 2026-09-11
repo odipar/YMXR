@@ -32,7 +32,7 @@ const (
 	stubVersion    = 1
 	stubVersionAt  = 8
 	stubSubtunesAt = 10
-	stubFlagsAt    = 12
+	StubFlagsAt    = 12
 	stubRateAt     = 14
 	stubRowsAt     = 16
 	stubCoreAt     = 20
@@ -114,7 +114,7 @@ func ProgramWith(stub, sndh []byte, rows int64) ([]byte, error) {
 	if timerC {
 		flags |= FlagVBL
 	}
-	ymxr.PutWord(prg, Header+stubFlagsAt, flags)
+	ymxr.PutWord(prg, Header+StubFlagsAt, flags)
 	ymxr.PutWord(prg, Header+stubRateAt, tags.Rate)
 	ymxr.PutLong(prg, Header+stubRowsAt, int(rows))
 	ymxr.PutLong(prg, Header+stubCoreAt, core)

@@ -10,9 +10,11 @@ import (
 
 	"github.com/odipar/ymxs/go/tool"
 
+	"github.com/odipar/ymxr/go/binaries"
 	"github.com/odipar/ymxr/go/flags"
 	"github.com/odipar/ymxr/go/report"
 	"github.com/odipar/ymxr/go/sndh"
+	"github.com/odipar/ymxr/go/ymxr"
 )
 
 func main() {
@@ -50,11 +52,27 @@ func made(said *report.Report, file, prg []byte, rows int64) {
 	}
 	said.Say(fmt.Sprintf("the SNDH file: %d bytes, %d%s%d Hz, FLAG %s", len(file),
 		tags.Subtunes, subtunes, tags.Rate, tags.Flag))
+	stub, err := binaries.Read(binaries.Stub)
+	if err != nil {
+		return
+	}
+	flags := ymxr.GetWord(prg, sndh.Header+sndh.StubFlagsAt)
+	said.Say(fmt.Sprintf("the stub: %d bytes, patched", len(stub)))
 	said.Row("the subtunes", fmt.Sprintf("%d", tags.Subtunes))
 	if rows == 0 {
 		said.Row("the rows to play", "0, the tune's row count")
 	} else {
 		said.Row("the rows to play", fmt.Sprintf("%d", rows))
 	}
+	from := "the VBL where the screen's rate is the tune's, and Timer C where it is not"
+	if flags&sndh.FlagVBL != 0 {
+		from = "the VBL, the set claims Timer C"
+	}
+	said.Row("it plays from", from)
+	screen := "left as the desktop drew it"
+	if flags&sndh.FlagClear != 0 {
+		screen = "cleared, the core has the raster monitor in"
+	}
+	said.Row("the screen", screen)
 	said.Say(fmt.Sprintf("the program: %d bytes", len(prg)))
 }

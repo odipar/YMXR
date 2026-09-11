@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
@@ -78,11 +79,17 @@ final class ParityTest {
         return new Ran(ran.waitFor(), out, said);
     }
 
+    /** A progress line, which the clock spaces: the two labels a tool
+     *  reports progress under, the count, and the percentage. Matched by
+     *  the whole line, so a report's own line is never taken for one. */
+    private static final Pattern PROGRESS = Pattern.compile(
+            "^ {2}(packing the columns|read) \\d+ of \\d+ \\(\\d+%\\)$");
+
     /** A report with the lines the clock spaces taken out, which two trees
      *  reach at different rows. */
     private static String steady(String said) {
-        return said.lines().filter(one -> !one.contains("packing the columns")
-                && !one.contains("read ")).reduce("", (a, b) -> a + b + "\n");
+        return said.lines().filter(one -> !PROGRESS.matcher(one).matches())
+                .reduce("", (a, b) -> a + b + "\n");
     }
 
     /** The same call in both trees, which must come to the same bytes. */
@@ -204,6 +211,79 @@ final class ParityTest {
             assertArrayEquals(tune, both("ymxs-to-ymxr", structure, "-silent"),
                     file + ": the one call and the two stages write one file");
         }
+    }
+
+    /** The multi file of those tune files, written by both trees, which
+     *  must be the same bytes. ymxr-multi reads file names rather than
+     *  standard input, so it is run here rather than through both. */
+    private static byte[] multiOf(List<byte[]> tunes, String... flags) throws Exception {
+        Path work = Files.createTempDirectory("ymxr-parity");
+        List<String> argv = new ArrayList<>();
+        for (int i = 0; i < tunes.size(); i++) {
+            Path at = work.resolve("tune" + (i + 1) + ".ymxr");
+            Files.write(at, tunes.get(i));
+            argv.add(at.toString());
+        }
+        argv.addAll(List.of(flags));
+        String[] named = argv.toArray(new String[0]);
+        Ran java = ran(Path.of("bin"), "ymxr-multi", new byte[0], named);
+        Ran go = ran(built(), "ymxr-multi", new byte[0], named);
+        assertEquals(java.exit(), go.exit(), "ymxr-multi exits the same: " + go.said());
+        assertArrayEquals(java.out(), go.out(), "ymxr-multi writes the same bytes");
+        assertEquals(steady(java.said()), steady(go.said()), "ymxr-multi reports the same");
+        return java.out();
+    }
+
+    /**
+     * The report a tool prints where it is not silenced.
+     *
+     * <p>Every other test here runs the tools with -silent, which reduces
+     * the report to what the tool wrote and its notes. The figures a reader
+     * of a run reads are in the rest of it and nowhere else: the core's
+     * bytes and the file's parts, what an image fixes and how many tunes
+     * share it, the stub's patches, and what a binding came to. Those
+     * drifted between the trees while every file they name matched byte
+     * for byte, so this runs the same tools without the flag.
+     *
+     * <p>The progress lines are spaced by the clock and come out at
+     * different rows, and steady takes those out of both.
+     */
+    @Test
+    void theVerboseReportIsTheSameInBothTrees() throws Exception {
+        byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym"));
+        byte[] structure = both("ym-to-ymxs", dump);
+        byte[] tune = both("ym-to-ymxr", dump);
+        both("ymxs-to-ymxr", structure);
+        both("ymxs-to-sndh", structure);
+        both("ymxs-to-prg", structure);
+        both("ymxr-bind", tune);
+        both("ymxr-trace", tune, "-r200");
+        both("ymxr-check", dump);
+        // The stub's two flag rows follow the core, so the plain core and
+        // the one with the raster monitor in report different rows.
+        both("ymxr-prg", both("ymxr-sndh", tune));
+        both("ymxr-prg", both("ymxr-sndh", tune, "-perf", "-tOne", "-cTwo"), "-r2000");
+    }
+
+    /**
+     * A set of subtunes reported, where the report has the most to say.
+     *
+     * <p>The tunes of one multi file are grouped by what an image fixes
+     * once, so a set that agrees on those shares one image and one that
+     * does not is split. Both cases are here: two tune files packed
+     * through one ring, and two packed through two.
+     */
+    @Test
+    void aSetOfSubtunesIsReportedTheSameInBothTrees() throws Exception {
+        byte[] dump = Files.readAllBytes(dumps().get(0));
+        byte[] wide = both("ym-to-ymxr", dump, "-silent", "-m900");
+        byte[] narrow = both("ym-to-ymxr", dump, "-silent", "-m300");
+        byte[] shared = multiOf(List.of(wide, wide));
+        byte[] split = multiOf(List.of(wide, narrow));
+        // One image for the two that agree, and two for the two that do
+        // not: the rows that say so are in the report alone.
+        both("ymxr-prg", both("ymxr-sndh", shared, "-perf"));
+        both("ymxr-prg", both("ymxr-sndh", split));
     }
 
     @Test
