@@ -17,7 +17,7 @@ import org.dtx.Table;
  * <pre>
  *  offset  bytes  what it is
  *  0       4      YMXR
- *  4       2      the version, $0002
+ *  4       2      the version, $0003
  *  6       2      the frame rate, in Hz
  *  8       1      effects used, bits 3 to 0
  *  9       1      S, the source count, 0 to 127
@@ -33,7 +33,7 @@ import org.dtx.Table;
 final class Tune {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
-    static final int VERSION = 0x0002;
+    static final int VERSION = 0x0003;
     static final int FRAME_RATE_AT = 6;
     static final int EFFECTS_AT = 8;
     static final int COUNT_AT = 9;

@@ -20,7 +20,7 @@ import (
 //
 //	offset  bytes  what it is
 //	0       4      YMXB
-//	4       2      the version, $0002
+//	4       2      the version, $0003
 //	6       2      the frame rate, in Hz
 //	8       1      effects used, bits 3 to 0
 //	9       1      S, the source count, 0 to 127
@@ -39,7 +39,7 @@ var BoundMagic = []byte{'Y', 'M', 'X', 'B'}
 
 // Where a bound tune's fields stand.
 const (
-	BoundVersion = 0x0002
+	BoundVersion = 0x0003
 	StateAt      = 12
 	ImageAt      = 16
 	BoundTableAt = 20

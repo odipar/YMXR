@@ -377,7 +377,8 @@ final class BinariesTest {
         List<byte[]> files = List.of(tune("chambers"), tune("wrong-version"));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(files, new Sndh.Options("Wrong", null, null, false, false)));
-        assertEquals("subtune 2: version 3 is not 2", wrong.getMessage());
+        assertEquals("subtune 2: version " + ConformanceTest.WRONG_VERSION
+                + " is not " + Tune.VERSION, wrong.getMessage());
     }
 
     @Test

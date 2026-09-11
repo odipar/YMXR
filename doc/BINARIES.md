@@ -58,7 +58,7 @@ the bound tune of section 1, and never this.
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXM` |
-| 4 | 2 | the version, $0002, which is the version of the tune files in it |
+| 4 | 2 | the version, $0003, which is the version of the tune files in it |
 | 6 | 2 | `N`, the tune count, 1 to 99 |
 | 8 | 8`N` | one entry a tune: 4 where its tune file begins, 4 the tune file's bytes |
 | | | the names, in the entries' order, each ended by a zero byte |
@@ -81,7 +81,7 @@ and no row moves.
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0002 |
+| 4 | 2 | the version, $0003 |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |

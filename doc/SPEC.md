@@ -487,7 +487,7 @@ again (1.3); and a source of one row is the marker alone.
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, $0002 |
+| 4 | 2 | the version, $0003 |
 | 6 | 2 | the frame rate, in Hz |
 | 8 | 1 | effects used |
 | 9 | 1 | `S`, the source count, 0 to 127 |
@@ -637,7 +637,7 @@ line.
 
 A reader there reports the structure and one here reports a tune file, so
 the names and the values below are this document's, and a caller reads one
-record or the other. A tune whose version is not $0002 is rejected without
+record or the other. A tune whose version is not $0003 is rejected without
 a report (3.3, R6.1). The names, in order:
 
     {"rate":50,"effects":2,"sources":[{"rows":[13,128],"repeat":0}]}
