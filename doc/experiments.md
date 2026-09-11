@@ -262,7 +262,7 @@ source read as a row that starts a wave.
 The third row is the rule now. A row that starts a square where this effect
 last ran one on the same target leaves bit 5 clear and sets no volume
 column, so no write reaches the voice between the two ticks either side of
-it and they fall a whole period apart (1.3, 1.9, section 6 rule 5). The
+it and they fall a whole period apart (1.3, 1.9, section 6 rule 3). The
 level the second writes belongs to the new source.
 
 ### The place needs no code

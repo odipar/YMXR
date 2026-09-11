@@ -458,7 +458,7 @@ source, and `RELEASE` source 0.
 
 A `RETUNE` at a voice and a `HOLD` that reloads a parameter change the
 source without moving the place: the stream keeps its phase and the half it
-stands in (YMX, SPEC.md 3.1). Section 6 rule 5 allows exactly that, since
+stands in (YMX, SPEC.md 3.1). Section 6 rule 3 allows exactly that, since
 the source they start has the row count the effect already runs, so the row
 leaves bit 5 clear. The row the tune repeats to stops every effect it does
 not start, so a wrap resumes from a known setting. `START_PCM_PREEMPT`
@@ -476,7 +476,7 @@ pad past the first.
 
 A start sets bit 6 where the channel's timer is stopped and leaves it clear
 over a running stream, since bit 6 affects a running timer and a stopped
-one starts on the select either way (1.9, section 6 rule 5). The shape a
+one starts on the select either way (1.9, section 6 rule 3). The shape a
 retrigger start restarts stands in X's bits 7 to 4, and the channels a
 preempt stops in its bits 3 to 0.
 

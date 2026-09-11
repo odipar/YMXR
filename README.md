@@ -16,11 +16,14 @@ lives here.
 sources those effects run, and one rate a tune, written down as JSON.
 [YMXS](https://github.com/odipar/YMXS) is a separate repository, and every
 conversion here passes through it ([doc/ymxs.md](doc/ymxs.md)), so a tune
-is read, edited or written without a dump.
+is read, edited or written without a dump. Its SPEC.md defines what a tune
+is and what a player does with a row, and the specification here is the
+base it stands on.
 
-**YMXR** defines the meaning of each column, and what a player does with
-it. One method serves the whole of that: a clock advances a table one row,
-and a procedure writes that row to the chips. The tune's clock advances the
+**YMXR** defines one encoding of that structure: the meaning of each
+column, and the columns a player reads to do what YMXS says a frame does.
+One method serves the whole of it: a clock advances a table one row, and a
+procedure writes that row to the chips. The tune's clock advances the
 tune's table, and a timer advances a separate table at an effect's rate.
 How a row is stored or unpacked is outside this repository, and DTX names
 no sound chip.

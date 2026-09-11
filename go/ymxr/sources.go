@@ -1,10 +1,12 @@
 package ymxr
 
 // The sources a tune names, built from its effects (SPEC.md 2.2, 3.1): one
-// a distinct kind and value, numbered from 1 as first met. A SID voice is
-// two rows, its level and 0; a sync buzzer one row, its shape; a digidrum
-// the recording's levels and a closing row at mid-scale. The last row of
-// every source has bit 7 set, the marker a tick ends on (SPEC.md 3.2).
+// a distinct kind and value, numbered from 1 as first met. What the shape
+// of a source sounds is YMXS's (YMXS, SPEC.md 3.2): a SID voice is two
+// rows, its level and 0; a sync buzzer one row, its shape; a digidrum the
+// recording's levels and a closing row at mid-scale. The last row of every
+// source has bit 7 set, the marker a tick ends on, which is this format's
+// and not the structure's (SPEC.md 3.2).
 
 // Most is the most sources a tune names: the source column's seven bits.
 const Most = 127

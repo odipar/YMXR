@@ -8,6 +8,11 @@ The two chips come from YMX 0.8.3. They describe the machine rather than a
 format, so no part of them depends on how a tune is stored. The terms for
 what runs on them are written here as the schema settles.
 
+This is the machine at length. What a tune may set on it - a register's
+range, what a volume bit selects, what a write to R13 does - is
+[YMXS](https://github.com/odipar/YMXS)'s SPEC.md 2, which SPEC.md here
+cites and does not repeat.
+
 ---
 
 ## The sound chip
