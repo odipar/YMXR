@@ -33,6 +33,36 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.0, 2026-09-11
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.0>, built from the commit
+tagged `v0.3.0`.
+
+**The tune file is version 3 and the bound tune is version 3.** A file of
+either older version is rejected by the tools and by the player here, and a
+file this writes is rejected by 0.2.0's.
+
+- **A count of 0 is a value.** The count column is the timer's data
+  register, and every value of that register is a count: 1 counts one tick
+  and 0 counts 256. The column reserves 0 for the row that does not set it,
+  and bit 4 of the control column beside it marks that 0 as a value, as the
+  bit beside a tone period byte marks its 0 (SPEC.md 1.1, 1.9). Bit 4 was
+  unassigned, and R6.2 puts an assignment in a later version, which is why
+  the version moves.
+- The player masks the control column to bits 2 to 0 before it writes the
+  select, so bit 4 never reached the MFP and is free to read. A bend, a row
+  that moves the count alone, sets no control column and is untouched.
+  The five binaries are 48 bytes larger, two instructions an effect.
+- SPEC.md 1.9 said bits 4 to 0 belong to the register and a player writes
+  them as the column has them. The player writes bits 2 to 0, and has since
+  it was written.
+
+**The tune data structure is YMXS 0.3.0**, where the count is the timer's
+data register, 0 to 255. A structure of version 2 is read by no tool here.
+
+The conformance kit is rewritten at the new version, and its wrong-version
+tune at 4.
+
 ### 0.2.0, 2026-09-11
 
 <https://github.com/odipar/YMXR/releases/tag/v0.2.0>, built from the commit

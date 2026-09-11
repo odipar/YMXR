@@ -6,7 +6,7 @@
 
     <groupId>org.ymx</groupId>
     <artifactId>ymxr</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
 
     <properties>
         <maven.compiler.source>23</maven.compiler.source>
