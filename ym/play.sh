@@ -17,7 +17,7 @@
 # the program picks between them on the keys 1 to 9. Each is named by its
 # file, and an SNDH file records one rate, so a set whose tunes do not
 # share one gets a line on stderr and no file. A tenth tune and past it
-# play only under a host that asks for a subtune by number.
+# play only under a host that selects a subtune by number.
 #
 # The converter's options, which a tune file is packed already and needs
 # none of:
@@ -49,7 +49,7 @@
 #              (performance.md, BINARIES.md)
 #
 # The two are a switch each: both together select the core that is both,
-# and the bars a run paints are then the lean ticks' own.
+# and the bars a run paints are then the lean ticks'.
 #
 # The run:
 #
@@ -64,8 +64,8 @@
 #   -h         this text
 #
 # HATARI and TOS name the emulator and a TOS image (ym/hatari.sh). The
-# emulator is asked for its modelled YM mixing, which is what a voice whose
-# volume a timer moves is heard through.
+# emulator is asked for its modelled YM mixing, through which a voice
+# whose volume a timer moves is heard.
 #
 # Examples:
 #
@@ -174,7 +174,7 @@ if [ -n "$out" ]; then
 fi
 # A tune file is packed already, so the converter's flags have no work to
 # pack. Said over every name before any dump is converted, so the same
-# mistake costs the same whichever name it stands under.
+# mistake costs the same under every name.
 if [ -n "$unit$ring$repeat$copies" ]; then
     left=$#
     while [ "$left" -gt 0 ]; do
@@ -217,8 +217,8 @@ while [ "$left" -gt 0 ]; do
             file=$tune
             ;;
         *)
-            # A directory a tune, so the file a dump converts into carries
-            # the tune's name: the tools name a subtune by the file they
+            # A directory a tune, so the file a dump converts into is named
+            # for the tune: the tools name a subtune by the file they
             # were passed, and two tunes may share a name.
             mkdir -p "$work/$at"
             file=$work/$at/${name%.*}.ymxr
@@ -236,8 +236,8 @@ done
 if [ "$tunes" -gt 9 ]; then
     echo "ym/play.sh: $tunes tunes, and the program's keys reach subtune 9" >&2
 fi
-# The tune files into one multi file, which is what an SNDH file of
-# several subtunes is made from (BINARIES.md 0); one tune goes in as the
+# The tune files into one multi file, which an SNDH file of several
+# subtunes is made from (BINARIES.md 0); one tune goes in as the
 # tune file it is.
 if [ "$tunes" -gt 1 ]; then
     "$here/bin/ymxr-multi" "$@" $silent > "$work/TUNE.YMXR"

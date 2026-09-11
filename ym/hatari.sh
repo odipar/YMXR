@@ -12,8 +12,8 @@
 # name.
 #
 # HATARI and TOS name the emulator and a TOS image. The emulator is asked
-# for its modelled YM mixing, which is what a voice whose volume a timer
-# moves is heard through.
+# for its modelled YM mixing, through which a voice whose volume a timer
+# moves is heard.
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}

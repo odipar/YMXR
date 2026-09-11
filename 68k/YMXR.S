@@ -274,7 +274,7 @@ q\{col}:
 .no\~:
                 .endm
 
-; A tone period: the coarse column into d2, for its bit 6 and its own
+; A tone period: the coarse column into d2, for its bit 6 and its
 ; value, then the fine column against it.
                 .macro  TONE    fine,coarse,fsel,csel
                 READ2   \coarse
@@ -300,7 +300,7 @@ q\{col}:
                 .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,vector
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
-; that separates them, and the word after it carries the read's
+; that separates them, and the word after it has the read's
 ; displacement or the branch's, by which head it is.
 \{tick}_over:
 q\{ct}:         bra.w   \{tick}_done
@@ -351,7 +351,7 @@ q\{ct}:         bra.w   \{tick}_done
                 ori.w   #$0700,sr
                 move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
                 move.l  a4,d1                   ; the place: the first row,
-                btst    #5,d2                   ; or the row it stands on in
+                btst    #5,d2                   ; or the row it stands at in
                 bne.s   .put\~                  ; the rows it replaces, which
                 tst.b   \fx+FX_SHAPE(a0)        ; the square keeps in bit 7 of
                 beq.s   .same\~                 ; its immediate, and a
@@ -461,7 +461,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; timer neither stops nor reloads the running count (SPEC.md 1.9), and
 ; select 0 in front of the new select stops the timer and costs it the
 ; prescaler's partial count. Timer A's and Timer B's control register is
-; the timer's own, so one move writes it and no interrupt can fall
+; the timer's alone, so one move writes it and no interrupt can fall
 ; inside an instruction; Timers C and D share theirs, and only there
 ; does the read, the mask and the or run at level 7.
                 .if     \shared
@@ -651,7 +651,7 @@ YMXR_init:
                 move.l  a2,WS_IMAGE(a6)
                 move.b  TF_EFFECTS(a0),WS_EFFECTS(a6)
                 cmp.b   #2,IM_VARIANT(a2)       ; a DTX2 image: its rows come
-                bne     .bad6                   ; round on their own
+                bne     .bad6                   ; round by themselves
 ; The table to read, which the image may carry beside others: subtunes
 ; that agree on what an image fixes once share one, so the code in it
 ; stands once for them and every bound tune names its table (DTX abi.md
@@ -674,7 +674,7 @@ YMXR_init:
 ; Every source resolved once: its first row, and its loop cell, which is
 ; row RR where it repeats, 0 where it plays once, -1 where it is two
 ; rows repeating to row 0, and -2 where it is one row repeating. The
-; last two are the shapes with a handler of their own. A start then
+; last two are the shapes with a separate handler. A start then
 ; reads two longs where it walked the index and read the source's
 ; header.
                 movea.l WS_TUNE(a6),a1
@@ -696,7 +696,7 @@ YMXR_init:
                 add.l   a5,d0
                 tst.l   DT_REPEAT(a3)           ; a source repeating to row 0
                 bne.s   .cell                   ; of one row or of two has a
-                cmp.l   #1,DT_ROWS(a3)          ; handler of its own
+                cmp.l   #1,DT_ROWS(a3)          ; a separate handler
                 bne.s   .pair
                 moveq   #-2,d0
                 bset    #1,d5
@@ -730,8 +730,8 @@ YMXR_init:
                 move.w  d0,(a4,d4.w)
                 dbra    d2,.site
 
-; The tick handlers: each one's step and loop operands name its own
-; cells, and its place is parked on a marker until a start.
+; The tick handlers: each one's step and loop operands name a
+; separate pair of cells, and its place is parked on a marker until a start.
                 lea     ymxr_tick0(pc),a5
                 bsr     ymxr_link
                 lea     ymxr_tick1(pc),a5
@@ -743,7 +743,7 @@ YMXR_init:
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
-                bclr    #3,MFP_VECTOR.w             ; MFP ending its own
+                bclr    #3,MFP_VECTOR.w             ; the MFP ends each
                 .endif
 
                 .if     YMXR_NEST
@@ -751,7 +751,7 @@ YMXR_init:
 ; so the level that tick drops buys it no safety: two nops stand where the
 ; drop
 ; would, in all three of that effect's handlers. A tune running two or
-; more keeps the drop, and one running none reaches no handler at all.
+; more keeps the drop, and one running none reaches no handler.
                 move.b  WS_EFFECTS(a6),d0
                 move.b  d0,d1
                 subq.b  #1,d1
@@ -851,7 +851,7 @@ YMXR_init:
 
 ; The first row, read here so that a call writes a row it already has
 ; (SPEC.md 4): the writes then leave a host's clock at one offset,
-; whatever the advance for the next row costs.
+; by the advance for the next row.
                 move.l  a6,-(sp)
                 lea     WS_STATE(a6),a6         ; the block, in a6
                 jsr     (a3)                    ; a1 the row
@@ -1065,7 +1065,7 @@ ymxr_sites:
                 ONEROW  ymxr_one3,$DF,$FFFFFA11,$077
 
 ; The offsets the patching writes at, measured off the first handler's
-; labels of its own: the row it writes, the marker it reads, and its loop cell.
+; labels: the row it writes, the marker it reads, and its loop cell.
 ; A monitor's mark stands between those blocks, and the distances follow
 ; it. Every handler is laid out by the one macro, so one handler's
 ; offsets are all four handlers'. The rig reads them back.
@@ -1100,7 +1100,7 @@ ONE_SR          equ     ymxr_one0_val-ymxr_one0+6
 ONE_SIZE        equ     ymxr_one1-ymxr_one0
 
 ; The start's dispatch: where the branch that leaves the general
-; handler's path carries its displacement, and where the two shapes with
+; handler's path has its displacement, and where the two shapes with
 ; a separate handler stand from it. One macro lays out every effect and no
 ; timer's field stands between the three, so one effect's distances are
 ; all four's.

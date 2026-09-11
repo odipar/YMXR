@@ -141,8 +141,17 @@ final class HouseStyleTest {
             "states",
             "stated",
             "stating",
-            "giv",
-            "tak",
+            // The verb forms rather than the stem: "giv" would match no
+            // word here, but "tak" stands inside "mistake" and "stands
+            // on" inside "stands once", so an entry that would read a
+            // word apart carries the spaces that keep it out
+            "gives",
+            "giving",
+            "given",
+            " take ",
+            " takes ",
+            " taking ",
+            " taken ",
             "nothing",
             // possessive decoration: a table of its own is a table
             " own ",
@@ -163,14 +172,19 @@ final class HouseStyleTest {
         }
     }
 
-    /** Every Java and Go source in the tree but this one, which quotes the
-     *  struck phrases to ban them. */
+    /** The five languages this repository writes comments in. */
+    private static final List<String> SOURCES =
+            List.of(".java", ".go", ".S", ".py", ".sh");
+
+    /** Every source in the tree but this one, which quotes the struck
+     *  phrases to ban them, and the built trees, which are output. */
     private static List<Path> sources() throws IOException {
         try (Stream<Path> tree = Files.walk(Path.of("."))) {
             return tree.filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(".java")
-                            || path.toString().endsWith(".go"))
-                    .filter(path -> !path.toString().contains("/target/"))
+                    .filter(path -> SOURCES.stream()
+                            .anyMatch(one -> path.toString().endsWith(one)))
+                    .filter(path -> !path.toString().contains("/target/")
+                            && !path.toString().contains("/dist/"))
                     .filter(path -> !path.getFileName().toString()
                             .equals("HouseStyleTest.java"))
                     .sorted()
@@ -187,8 +201,24 @@ final class HouseStyleTest {
      * text and leaves the rest of the line out.
      */
     private static List<String[]> commentsOf(Path source) throws IOException {
+        String named = source.toString();
+        if (named.endsWith(".java")) {
+            return java(Files.readAllLines(source));
+        }
+        if (named.endsWith(".go")) {
+            return marked(Files.readAllLines(source), "//");
+        }
+        if (named.endsWith(".S")) {
+            return assembly(Files.readAllLines(source));
+        }
+        // A shell comment and a Python one open the same way, and a
+        // Python docstring is read as the prose it is.
+        return script(Files.readAllLines(source));
+    }
+
+    /** A javadoc block and the line comments beside it. */
+    private static List<String[]> java(List<String> lines) {
         List<String[]> out = new ArrayList<>();
-        List<String> lines = Files.readAllLines(source);
         boolean inside = false;
         for (int at = 0; at < lines.size(); at++) {
             String said = lines.get(at).strip();
@@ -211,6 +241,79 @@ final class HouseStyleTest {
         return out;
     }
 
+    /** Every line opening with {@code mark}, that mark off. */
+    private static List<String[]> marked(List<String> lines, String mark) {
+        List<String[]> out = new ArrayList<>();
+        for (int at = 0; at < lines.size(); at++) {
+            String said = lines.get(at).strip();
+            if (said.startsWith(mark)) {
+                out.add(new String[] {String.valueOf(at + 1),
+                        said.substring(mark.length()).strip()});
+            }
+        }
+        return out;
+    }
+
+    /**
+     * A 68000 source: rmac reads a line opening with {@code *} or
+     * {@code ;} as a comment, and a {@code ;} after an instruction as the
+     * rest of that line.
+     */
+    private static List<String[]> assembly(List<String> lines) {
+        List<String[]> out = new ArrayList<>();
+        for (int at = 0; at < lines.size(); at++) {
+            String line = lines.get(at);
+            String said = line.strip();
+            if (said.startsWith("*") || said.startsWith(";")) {
+                out.add(new String[] {String.valueOf(at + 1),
+                        said.replaceFirst("^[*;\\s]+", "").strip()});
+                continue;
+            }
+            int mark = line.indexOf(';');
+            if (mark >= 0) {
+                out.add(new String[] {String.valueOf(at + 1),
+                        line.substring(mark + 1).strip()});
+            }
+        }
+        return out;
+    }
+
+    /** A shell or Python source: a {@code #} line, and a Python docstring,
+     *  which is prose and not a string a program prints. */
+    private static List<String[]> script(List<String> lines) {
+        List<String[]> out = new ArrayList<>();
+        String open = null;
+        for (int at = 0; at < lines.size(); at++) {
+            String said = lines.get(at).strip();
+            if (open != null) {
+                out.add(new String[] {String.valueOf(at + 1),
+                        said.replace(open, "").strip()});
+                if (said.contains(open)) {
+                    open = null;
+                }
+                continue;
+            }
+            String head = said.startsWith("r") ? said.substring(1) : said;
+            String mark = head.startsWith("\"\"\"") ? "\"\"\""
+                    : head.startsWith("'''") ? "'''" : null;
+            if (mark != null) {
+                String body = head.substring(mark.length());
+                int end = body.indexOf(mark);
+                out.add(new String[] {String.valueOf(at + 1),
+                        (end < 0 ? body : body.substring(0, end)).strip()});
+                if (end < 0) {
+                    open = mark;
+                }
+                continue;
+            }
+            if (said.startsWith("#") && !said.startsWith("#!")) {
+                out.add(new String[] {String.valueOf(at + 1),
+                        said.replaceFirst("^#+", "").strip()});
+            }
+        }
+        return out;
+    }
+
     /**
      * The comments of the Java and the Go tree, against the same list.
      *
@@ -219,11 +322,21 @@ final class HouseStyleTest {
      * where no test read it, so the comments are read here: the same
      * phrases, the same list, and the paragraph joined as a document's is,
      * since a comment wraps at the same width.
+     *
+     * <p>Five languages, and a comment opens differently in each: javadoc
+     * and {@code //} in Java, {@code //} in Go, {@code *} and {@code ;} in
+     * a 68000 source, and {@code #} with a docstring in Python and in a
+     * shell script.
      */
     @Test
     void noCommentHasAStruckPhrase() throws IOException {
         List<Path> sources = sources();
-        assertTrue(!sources.isEmpty(), "no source was found to read");
+        assertTrue(sources.size() > 50, () -> "only " + sources.size()
+                + " sources read; the walk is asleep");
+        for (String kind : SOURCES) {
+            assertTrue(sources.stream().anyMatch(one -> one.toString().endsWith(kind)),
+                    () -> "no " + kind + " source was read");
+        }
         List<String> hits = new ArrayList<>();
         for (Path source : sources) {
             List<String[]> comments = commentsOf(source);

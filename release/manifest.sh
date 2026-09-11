@@ -7,7 +7,7 @@
 #   COMMIT=e39c110 release/manifest.sh VERSION DIR
 #
 # The zips are listed by what each contains. The source commit is HEAD
-# unless COMMIT gives the commit DIR was built from.
+# unless COMMIT names the commit DIR was built from.
 set -e
 VERSION=$1
 DIR=$2

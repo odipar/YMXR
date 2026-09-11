@@ -25,7 +25,7 @@
 #
 # The tune file each .ymx converts to is kept, and the directory with
 # them is said on stderr, so a conversion can be read back with
-# bin/ymxr-trace or played on its own.
+# bin/ymxr-trace or played by itself.
 #
 #   ymx/play.sh ymx/test/Deeper.ymx
 #   ymx/play.sh -v600 ymx/test/*.ymx run.wav
@@ -68,9 +68,9 @@ fi
 # them. Said on stderr rather than left to be found.
 work=$(mktemp -d)
 echo "ymx/play.sh: the tune files are under $work" >&2
-# A directory a tune, so the file a conversion writes carries the tune's
-# name of its own: ym/play.sh names a subtune by the file it is passed, and two
-# tunes may share a name.
+# A directory a tune, so the file a conversion writes is named for the
+# tune: ym/play.sh names a subtune by the file it is passed, and two tunes
+# may share a name.
 at=0
 left=$#
 while [ "$left" -gt 0 ]; do
