@@ -39,10 +39,7 @@ func main() {
 			read.Frames-frames))
 	}
 	read.Frames = frames
-	repeat := read.LoopFrame
-	if repeat > read.Frames {
-		repeat = read.Frames
-	}
+	repeat := ymx.Repeat(read)
 	song := ymx.Song(read, "")
 
 	// Every conversion passes through the structure (doc/ymxs.md): the

@@ -47,11 +47,32 @@ final class YmxToYmxr {
     private YmxToYmxr() {
     }
 
-    /** One .ymx read out: the header's frames and rate, the streams, and
-     *  each sample's level bytes with the end marker after them and the
-     *  position it loops to, $FFFF where it plays once (YMX, SPEC.md 6). */
-    record Dumped(int frames, int rate, int loopFrame, byte[][] streams,
+    /** One .ymx read out: the header's frames, rate and flags, the
+     *  streams, and each sample's level bytes with the end marker after
+     *  them and the position it loops to (YMX, SPEC.md 6).
+     *
+     *  <p>{@code loopFrame} is the frame a tune that starts over goes back
+     *  to, and a tune that plays once through has 0 there, so
+     *  {@link #startsOver} reads bit 0 of the flags before the field
+     *  means anything. */
+    record Dumped(int frames, int rate, int loopFrame, int flags, byte[][] streams,
                   byte[][] samples, int[] loops) {
+    }
+
+    /** Bit 0 of the header's flags: the tune starts over instead of
+     *  ending (YMX, SPEC.md 1.2). */
+    static final int FLAG_LOOPS = 1;
+
+    /** Whether the tune starts over rather than ending after its last
+     *  frame. The record's {@code loops} are the sample loops. */
+    static boolean startsOver(Dumped read) {
+        return (read.flags() & FLAG_LOOPS) != 0;
+    }
+
+    /** The row the tune repeats to: the file's loop frame where it starts
+     *  over, and its frame count where it plays once. */
+    static int repeat(Dumped read) {
+        return startsOver(read) ? Math.min(read.loopFrame(), read.frames()) : read.frames();
     }
 
     /** The file read out through ymx-dump. */
@@ -94,6 +115,7 @@ final class YmxToYmxr {
         int frames = 0;
         int rate = 50;
         int loop = 0;
+        int flags = 0;
         int streams = 0;
         byte[][] value = new byte[0][];
         byte[][] samples = new byte[0][];
@@ -109,6 +131,8 @@ final class YmxToYmxr {
                     rate = Integer.parseInt(word[1]);
                 } else if (word[0].equals("loop")) {
                     loop = Integer.parseInt(word[1]);
+                } else if (word[0].equals("flags")) {
+                    flags = Integer.parseInt(word[1]);
                 } else if (word[0].equals("streams")) {
                     streams = Integer.parseInt(word[1]);
                     value = new byte[streams][frames];
@@ -143,7 +167,7 @@ final class YmxToYmxr {
             Thread.currentThread().interrupt();
             throw new IOException("interrupted reading " + named, stopped);
         }
-        return new Dumped(frames, rate, loop, value, samples, loops);
+        return new Dumped(frames, rate, loop, flags, value, samples, loops);
     }
 
     /**
@@ -164,7 +188,7 @@ final class YmxToYmxr {
      */
     static int frames(Dumped read) {
         int last = read.frames() - 1;
-        if (read.frames() % 2 != 0 || last <= read.loopFrame()) {
+        if (read.frames() % 2 != 0 || (startsOver(read) && last <= read.loopFrame())) {
             return read.frames();
         }
         if ((read.streams()[STREAM_M][last] & 0xFF) != 0) {
@@ -202,7 +226,7 @@ final class YmxToYmxr {
             System.arraycopy(read.streams()[r], 0, registers[r], 0, read.frames());
         }
         return new YmDump.Song("YMX!", read.frames(), read.rate(), 2000000L,
-                read.loopFrame(), false, 0L, new byte[0][], name, "", "", registers);
+                repeat(read), false, 0L, new byte[0][], name, "", "", registers);
     }
 
     /** {@code ymx-to-ymxr}: a YMX file on standard input, a tune file on
@@ -230,9 +254,9 @@ final class YmxToYmxr {
                     + " comes off the end: a dump's rows are what a tune has,"
                     + " and this conversion selects its unit separately");
         }
-        read = new Dumped(frames, read.rate(), read.loopFrame(), read.streams(),
-                read.samples(), read.loops());
-        int repeat = Math.min(read.loopFrame(), read.frames());
+        read = new Dumped(frames, read.rate(), read.loopFrame(), read.flags(),
+                read.streams(), read.samples(), read.loops());
+        int repeat = repeat(read);
         YmDump.Song song = song(read, "");
 
         // Every conversion passes through the structure (doc/ymxs.md):

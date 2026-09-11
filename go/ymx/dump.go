@@ -33,16 +33,40 @@ const (
 // acts is the bits of M that mark a channel acting.
 const acts = 0x0F
 
-// Dumped is one .ymx read out: the header's frames and rate, the streams,
-// and each sample's level bytes with the end marker after them and the
-// position it loops to, $FFFF where it plays once (YMX, SPEC.md 6).
+// Dumped is one .ymx read out: the header's frames, rate and flags, the
+// streams, and each sample's level bytes with the end marker after them
+// and the position it loops to (YMX, SPEC.md 6).
+//
+// LoopFrame is the frame a tune that starts over goes back to, and a tune
+// that plays once through has 0 there, so StartsOver reads bit 0 of the
+// flags before the field means anything.
 type Dumped struct {
 	Frames    int
 	Rate      int
 	LoopFrame int
+	Flags     int
 	Streams   [][]byte
 	Samples   [][]byte
 	Loops     []int
+}
+
+// FlagLoops is bit 0 of the header's flags: the tune starts over instead
+// of ending (YMX, SPEC.md 1.2).
+const FlagLoops = 1
+
+// StartsOver is whether the tune starts over rather than ending after its
+// last frame. The record's Loops are the sample loops.
+func StartsOver(read Dumped) bool {
+	return read.Flags&FlagLoops != 0
+}
+
+// Repeat is the row the tune repeats to: the file's loop frame where it
+// starts over, and its frame count where it plays once.
+func Repeat(read Dumped) int {
+	if !StartsOver(read) || read.LoopFrame > read.Frames {
+		return read.Frames
+	}
+	return read.LoopFrame
 }
 
 // FormatException is an input the reader does not read: the fault it
@@ -89,7 +113,7 @@ func read(file []byte, named string) (Dumped, error) {
 		streams[s] = stream[:out.Frames]
 	}
 	return Dumped{Frames: out.Frames, Rate: out.Rate, LoopFrame: out.LoopFrame,
-		Streams: streams, Samples: out.Samples, Loops: out.Loops}, nil
+		Flags: out.Flags, Streams: streams, Samples: out.Samples, Loops: out.Loops}, nil
 }
 
 // Acting is how many of the file's frames act on a channel.
@@ -114,6 +138,6 @@ func Song(read Dumped, name string) ym.Song {
 		copy(values[r], read.Streams[r][:read.Frames])
 	}
 	return ym.Song{Format: "YMX!", Frames: read.Frames, PlayerHz: read.Rate,
-		MasterClock: 2000000, LoopFrame: int64(read.LoopFrame), Name: name,
+		MasterClock: 2000000, LoopFrame: int64(Repeat(read)), Name: name,
 		Values: values}
 }

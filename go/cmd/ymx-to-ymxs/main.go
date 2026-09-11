@@ -77,8 +77,5 @@ func Repeat(at int, asked bool, read ymx.Dumped) int {
 		}
 		return at
 	}
-	if read.LoopFrame < read.Frames {
-		return read.LoopFrame
-	}
-	return read.Frames
+	return ymx.Repeat(read)
 }

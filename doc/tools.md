@@ -492,15 +492,27 @@ preempt stops in its bits 3 to 0.
 Which timer a channel runs on is YMX's `T` stream and this schema's 2.3, so
 the map does not cross: channel 0 becomes effect 0.
 
+Whether the tune starts over is bit 0 of the header's flags (YMX, SPEC.md
+1.2). The loop frame `L` is 0 both in a tune that plays once and in one
+that starts over from its first frame, so the flag is the one place the
+two part: with it clear the tune converts to a table whose `RR` is `R`
+(SPEC.md 3.1), and the frame after the last row reports -1 rather than
+wrapping. `-rRR` and `-r` on `ymx-to-ymxs` name the row instead.
+
+An action byte's P is the timer count, and 0 there is the MFP's slowest
+count, 256 (YMX, SPEC.md 5). It converts as it stands: the count column
+reaches 0 with bit 4 of the control column beside it (SPEC.md 1.9).
+
 **Two readings the structure corrected.** Reading a `.ymx` as a structure
 rather than as columns exposed two places where the columns this tool wrote
 broke SPEC.md. A sample whose bytes run past YMX's end marker put a second
 marker inside a source, where 3.2 allows one and a tick ends on the first:
-the source now ends at that marker. A `RETUNE` whose low bits are 0 wrote
-select 0 to the control column, which 1.9 defines as a stop: a count or a
-select of 0 is now read as the rate the effect already runs at, and the
-tool counts those rows in a note. Both change what a `.ymx` converts to,
-by a few bytes either way; `ym-to-ymxr` is untouched by them.
+the source now ends at that marker. An action byte whose low bits are 0
+wrote select 0 to the control column, which 1.9 defines as a stop: an
+opcode that programs a timer names an index of 1 to 7 (YMX, SPEC.md 2.4),
+so a file naming 0 there produces a note and the row is left behind. Both
+change what a `.ymx` converts to, by a few bytes either way;
+`ym-to-ymxr` is untouched by them.
 
 ## Against YMX
 
@@ -536,7 +548,7 @@ against the other player rather than assumed.
 A name ending `.ymx` is a tune with no dump behind it. YMX plays the file
 itself, and this tree plays what `bin/ymx-to-ymxr` makes of it, so the run
 reads the move across rather than two packings of one dump.
-`ymx/test` has three of them, and the default reads those.
+`ymx/test` has four of them, and the default reads those.
 
 | variable | what it names |
 |---|---|
