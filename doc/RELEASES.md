@@ -33,6 +33,28 @@ the tools rather than either.
 
 ## Published
 
+### 0.2.0, 2026-09-11
+
+<https://github.com/odipar/YMXR/releases/tag/v0.2.0>, built from the commit
+tagged `v0.2.0`.
+
+**The tune data structure is YMXS 0.2.0, and `ym-to-ymxs` and
+`ymx-to-ymxs` write version 2.** A row and a frame have one word each
+there now: the tune key `frames` was the row count under a frame's name
+and is `rows`, and the key `rows` was the columns a register and is
+`registers`. The CSV form follows.
+
+- A structure of version 1 is read by no tool here, and one this writes is
+  read by no release before this. The tune file, the SNDH file and the
+  program are untouched: their formats stand at the versions 0.1.0 set,
+  and a `.ymxr` from 0.1.2 plays here.
+- No file in this repository names those keys. Every conversion reads and
+  writes the structure through the library, so the move is the dependency
+  and what the library writes.
+
+The five 68000 binaries are the same bytes as 0.1.0's, and the format
+versions stand: the tune file's is 2 and the bound tune's is 2.
+
 ### 0.1.2, 2026-09-11
 
 <https://github.com/odipar/YMXR/releases/tag/v0.1.2>, built from the commit
