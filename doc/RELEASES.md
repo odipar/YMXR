@@ -33,6 +33,34 @@ the tools rather than either.
 
 ## Published
 
+### 0.1.2, 2026-09-11
+
+<https://github.com/odipar/YMXR/releases/tag/v0.1.2>, built from the commit
+tagged `v0.1.2`.
+
+The report three of the tools print where they are not silenced.
+
+- `ymxr-sndh` left out the core's bytes, the `!#SN` tag, what each image
+  fixes with the tunes that share it, and the file's parts. The image
+  rows are the figure that reports whether a set of subtunes shares DTX's
+  reader, and a release before this one had no row to read it from.
+- `ymxr-bind` printed one line where five belong: the image's place and
+  bytes, the source tables, the state block the host finds the workspace
+  for, and what the binding came to over the tune file.
+- `ymxr-prg` left out the stub's bytes, the clock it plays from and what
+  becomes of the screen, both of which follow the core.
+
+The three printed less than the Java tools they are read against, which
+`ParityTest` missed because it ran every tool with `-silent`. It runs
+them without the flag now, and reads a set of subtunes that shares one
+image against a set split over two, so a report that drifts from the Java
+tree fails the build.
+
+Every file a tool writes is unchanged: a tune file, an SNDH file or a
+program from 0.1.1 is byte for byte what 0.1.2 writes, and the five
+68000 binaries an executable contains are the same bytes. The report is
+what moved.
+
 ### 0.1.1, 2026-09-11
 
 <https://github.com/odipar/YMXR/releases/tag/v0.1.1>, built from the commit
