@@ -74,11 +74,16 @@ final class Replay {
             }
             int select = was.select();
             int count = was.count();
-            if ((r[t + 3] & 0xFF) != 0) {
-                count = r[t + 3] & 0xFF;
-            }
             boolean timer = false;
             boolean place = false;
+            // Bit 4 marks the count column's 0 as the value the MFP counts
+            // 256 for, and a player reads it where the row sets the control
+            // column (SPEC.md 1.1, 1.9).
+            boolean value = (r[t + 2] & 0x80) != 0
+                    && (r[t + 2] & Columns.COUNT_VALUE) != 0;
+            if ((r[t + 3] & 0xFF) != 0 || value) {
+                count = r[t + 3] & 0xFF;
+            }
             if ((r[t + 2] & 0x80) != 0) {
                 select = r[t + 2] & 7;
                 timer = (r[t + 2] & 0x40) != 0;

@@ -99,11 +99,15 @@ func (m *Replay) Step() {
 		}
 		selects := was.Select
 		count := was.Count
-		if r[t+3] != 0 {
-			count = int(r[t+3])
-		}
 		timer := false
 		place := false
+		// Bit 4 marks the count column's 0 as the value the MFP counts 256
+		// for, and a player reads it where the row sets the control column
+		// (SPEC.md 1.1, 1.9).
+		value := r[t+2]&0x80 != 0 && r[t+2]&ymxr.CountValue != 0
+		if r[t+3] != 0 || value {
+			count = int(r[t+3])
+		}
 		if r[t+2]&0x80 != 0 {
 			selects = int(r[t+2]) & 7
 			timer = r[t+2]&0x40 != 0

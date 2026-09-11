@@ -40,8 +40,9 @@ No other class reads a dump, and no other class writes a column.
 | the structure | the columns |
 |---|---|
 | a row's registers | each in its column, with the set bit, and the bit beside it where a column that fills its byte is 0 (1.1, 1.2, 1.7) |
+| a count of 0 | the count column at 0, and bit 4 of the control column beside it, which marks that 0 as the value the MFP counts 256 for (1.1, 1.9) |
 | `Start` | the source column; the target column where the target differs from the one the player keeps; the control column with the two resets; the count column |
-| `Retune` | the control column where the select or a reset moved, and the count column where the count moved |
+| `Retune` | the control column where the select or a reset moved, or the count moved to 0; and the count column where the count moved |
 | `Stop` | the source column at `$80`, the rate columns left unset (1.8) |
 | a source | its values, bit 7 set on the last row as the marker (3.2), repeating at its repeat row |
 | Timer A, D, B, C | effects 0, 1, 2, 3 (2.3) |
@@ -69,7 +70,7 @@ reading it exits 1 and says which row:
 
 | the structure | why |
 |---|---|
-| a count of 256 | the count column fills its byte, and 0 is the row that does not set it (1.9) |
+| a count past 255 | the count column is the timer's data register, a byte (1.9) |
 | a source value past 127 | bit 7 of a source's row is the marker (3.2) |
 | more than 127 sources | the source column numbers 1 to 127 (1.8) |
 

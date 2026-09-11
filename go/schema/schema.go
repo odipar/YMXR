@@ -142,7 +142,8 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			return 0, err
 		}
 		count[i] = counted
-		out[t+2] = byte(0x80 | resets(e.TimerReset, e.PlaceReset) | selects[i])
+		out[t+2] = byte(0x80 | resets(e.TimerReset, e.PlaceReset) |
+			marked(count[i]) | selects[i])
 		out[t+3] = byte(count[i])
 		return 1 << i, nil
 	case ymxs.Retune:
@@ -151,12 +152,20 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			return 0, err
 		}
 		reset := resets(e.TimerReset, e.PlaceReset)
-		if now != selects[i] || reset != 0 {
-			out[t+2] = byte(0x80 | reset | now)
-		}
 		rate, err := counted(e.Count, at)
 		if err != nil {
 			return 0, err
+		}
+		// A count of 0 is the value the MFP counts 256 for, and the count
+		// column reserves 0 for the row that does not set it, so bit 4 of
+		// the control column marks it (SPEC.md 1.9). The row then sets the
+		// control column whether the select moved or not.
+		mark := 0
+		if rate != count[i] {
+			mark = marked(rate)
+		}
+		if now != selects[i] || reset != 0 || mark != 0 {
+			out[t+2] = byte(0x80 | reset | mark | now)
 		}
 		if rate != count[i] {
 			out[t+3] = byte(rate)
@@ -168,14 +177,23 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 	return 0, fmt.Errorf("row %d: an effect this version does not read", at)
 }
 
-// counted is the count column, which fills its byte, so the 256 the MFP
-// reads a 0 as is out of reach (SPEC.md 1.9).
+// counted is the count column, which is the timer's data register
+// (SPEC.md 1.9). Every value of that register is a count, 0 among them.
 func counted(count, at int) (int, error) {
-	if count < 1 || count >= ymxs.MostCount {
-		return 0, fmt.Errorf("row %d: a count of %d, and the count column reaches 1 to %d",
-			at, count, ymxs.MostCount-1)
+	if count < 0 || count > ymxs.MostCount {
+		return 0, fmt.Errorf("row %d: a count of %d, and the count column reaches 0 to %d",
+			at, count, ymxs.MostCount)
 	}
 	return count, nil
+}
+
+// marked is bit 4 of the control column, which marks the count column's 0
+// as the value the MFP counts 256 for (SPEC.md 1.1, 1.9).
+func marked(count int) int {
+	if count == 0 {
+		return ymxr.CountValue
+	}
+	return 0
 }
 
 func resets(timer, place bool) int {
