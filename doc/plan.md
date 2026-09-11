@@ -5,9 +5,9 @@ has what it costs today; every figure below is against those, and each one
 records whether it was measured on the rig or counted from the 68000's
 manual.
 
-Two figures matter and they are not the same. A call is 1,370 to 2,361
+Two figures matter and they are not the same. A call is 1,370 to 2,362
 cycles on average by tune, and the costliest frame of a tune is 1,648 to
-6,356. R4.5 budgets 6,656 a frame, and what it binds is the costliest
+6,358. R4.5 budgets 6,656 a frame, and what it binds is the costliest
 frame. Most of what follows moves the average; the steps that move the
 costliest frame are named where they are.
 
@@ -17,12 +17,12 @@ costliest frame are named where they are.
 
 DTX's advance is 48 to 67 per cent of an average call and 78 to 85 per
 cent of the costliest frame: 4,130 of Turrican - world 4-3's 4,836 and
-4,948 of Synergy Credits' 6,356. A refill parses at most one ST4
+4,948 of Synergy Credits' 6,358. A refill parses at most one ST4
 operation a unit at about 225 to 240 cycles each, and its unit count is
 the column count, so fifteen operations is a tune's costliest frame and
 the schema's thirty columns set that bound.
 
-The frame procedure is the rest, 510 to 1,141. A column the row leaves
+The frame procedure is the rest, 510 to 1,142. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset:
 a row sets 0.6 to 13.0 of the fourteen register columns, 3.2 on the
 median tune. Whole groups go unset, which a gate can skip,
@@ -150,9 +150,9 @@ Every step this document listed is in place, each measured on the rig:
 | a separate tick for a one-row source | 74 a tick | 568 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
-its count. Synergy Credits reads 2,361 cycles a call against the 2,469
-this document opened at and 4,463 cycles of ticks against 5,380, so
-6,824 a frame against 7,849. performance.md has the call, and `-cycles`
+its count. Synergy Credits reads 2,362 cycles a call against the 2,469
+this document opened at and 2,585 cycles of ticks against 5,380, so
+4,947 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
 What is left is where the costliest frame is. A refill parses at most
