@@ -13,12 +13,12 @@ import org.junit.jupiter.api.Test;
 final class BuiltTunesTest {
 
     @Test
-    void thePreemptTuneIsWhatItsSourceBuilds() throws IOException {
+    void thePreemptTuneIsTheOneItsSourceBuilds() throws IOException {
         assertBuilt("Digidrum preempt, built.ym", BuiltTunes.preempt());
     }
 
     @Test
-    void theRetriggerRetuneIsWhatItsSourceBuilds() throws IOException {
+    void theRetriggerRetuneIsTheOneItsSourceBuilds() throws IOException {
         assertBuilt("Retrigger retune, built.ym", BuiltTunes.retriggerRetune());
     }
 

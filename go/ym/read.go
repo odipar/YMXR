@@ -327,7 +327,7 @@ func source(made map[int]ymxs.Source, sources *ymxr.Sources, number int) ymxs.So
 	return built
 }
 
-// name is what a source of that kind is called, so that two sources of one
+// name names a source of that kind, so that two sources of one
 // shape and two values stay two sources.
 func name(kind int) string {
 	switch kind {

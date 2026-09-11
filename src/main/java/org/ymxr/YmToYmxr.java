@@ -59,9 +59,9 @@ public final class YmToYmxr {
             } else if (flag.startsWith("-m")) {
                 ring = Integer.parseInt(flag.substring(2));
             } else if (flag.startsWith("-copies")) {
-                // the packer's own, spelled as DTX's dtx-write spells it:
-                // a match beyond the ring copies from the column's own
-                // literal stream, which packs a small ring far smaller,
+                // the packer's, spelled as DTX's dtx-write spells it:
+                // a match beyond the ring copies from the column's literal
+                // stream, which packs a small ring far smaller,
                 // and -copiesS searches S seconds for a better parse
                 copies = true;
                 seconds = flag.length() > 7 ? Double.parseDouble(flag.substring(7)) : 0;

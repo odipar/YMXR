@@ -157,7 +157,7 @@ final class YmxsTest {
     }
 
     @Test
-    void everyTimerRunsTheEffectTheSpecificationGivesIt() {
+    void everyTimerRunsTheEffectTheSpecificationAssignsIt() {
         assertEquals(Timer.A, Schema.timer(0));
         assertEquals(Timer.D, Schema.timer(1));
         assertEquals(Timer.B, Schema.timer(2));

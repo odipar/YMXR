@@ -14,7 +14,7 @@ import org.ymxs.tool.Tool;
  * <p>Every tune of the multi is a subtune, 1 upward in its order, behind
  * one core (doc/BINARIES.md 2). The title and the composer are the first
  * tune's unless {@code -t} and {@code -c} name others, and a tune's title
- * names its subtune where the multi carries several.
+ * names its subtune where the multi has several.
  *
  * <p>{@code -perf} selects the core with the raster monitor in and
  * {@code -lean} the core whose ticks neither drop the interrupt level nor

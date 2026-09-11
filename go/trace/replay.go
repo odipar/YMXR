@@ -1,4 +1,4 @@
-// Package trace is what a reader reports of a tune (SPEC.md 7): one line a
+// Package trace is a reader's report of a tune (SPEC.md 7): one line a
 // play call, the call's result, the registers the frame writes and the
 // effects the row touched. The kit's references are the output of this,
 // and the rig checks the 68000 player to it.
@@ -21,7 +21,7 @@ import (
 //
 // What the last step wrote stands beside the state: Written reports each
 // register's value where the row wrote it and -1 where not, and each
-// effect says whether the row touched it and which control bits the row
+// effect reports whether the row touched it and which control bits the row
 // set.
 
 // Effect is what one effect runs after a row: source 0 where it runs no

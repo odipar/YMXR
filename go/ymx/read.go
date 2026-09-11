@@ -33,7 +33,7 @@ const (
 //
 // YMX fits a tune to its unit by padding it, where the conversion here
 // drops to a unit of 1 instead, so a dump of an odd frame count is one
-// frame longer through YMX than through the dump. The dump is what a
+// frame longer through YMX than through the dump. A dump's rows are a
 // tune's rows are, so the padding comes off and this format reckons the
 // unit separately.
 //
@@ -172,7 +172,7 @@ func script(read Dumped, made *built, effects []map[ymxs.Timer]ymxs.Effect,
 			// A count byte of 0 is the MFP's 256, which the count column
 			// does not reach (SPEC.md 1.9), and a select of 0 stops a
 			// timer. Either way the rate the effect runs at does not move,
-			// which is what the columns encoded before this conversion
+			// which the columns encoded before this conversion
 			// read the structure.
 			if written == 0 && count[c] != 0 {
 				kept++
@@ -344,7 +344,7 @@ func retrigger(shape int) []int {
 
 // values is a sample's bytes as source values: YMX writes its end marker
 // in bit 7, which is this format's marker (SPEC.md 3.2), so the sample
-// ends at the first byte that carries one and the values are the seven
+// ends at the first byte that has one and the values are the seven
 // bits under it.
 func values(rows []byte) []int {
 	out := make([]int, 0, len(rows))

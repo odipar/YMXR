@@ -15,13 +15,13 @@ import org.dtx.Table;
  *
  * <p>What the last step wrote stands beside the state: {@code written}
  * reports each register's value where the row wrote it and -1 where not,
- * and each effect says whether the row touched it and which control bits
- * the row set. That is what a reader reports (SPEC.md 7).
+ * and each effect reports whether the row touched it and which control bits
+ * the row set. A reader reports that (SPEC.md 7).
  */
 final class Replay {
 
     /** What one effect runs after a row: source 0 where it runs no source.
-     *  {@code touched} says the row set one of its columns, {@code timer}
+     *  {@code touched} marks the row that set one of its columns, {@code timer}
      *  that the row's control column had bit 6 and {@code place} bit 5. */
     record Effect(int target, int source, int select, int count, boolean started,
                   boolean touched, boolean timer, boolean place) {

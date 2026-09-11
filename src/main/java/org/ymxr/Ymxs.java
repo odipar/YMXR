@@ -9,7 +9,7 @@ import org.ymxs.YMXS.Multi;
 import org.ymxs.tool.Tool;
 
 /**
- * What the tools that read a YMXS file share: the flags they take, the
+ * What the tools that read a YMXS file share: the flags they read, the
  * structure read off standard input, and the tune files it maps to
  * (doc/ymxs.md).
  *
@@ -48,10 +48,10 @@ final class Ymxs {
     private Ymxs() {
     }
 
-    /** The multi standard input carries, read and checked.
+    /** The multi on standard input, read and checked.
      *
      * @throws RuntimeException where the text is not this form, or is a
-     *     structure no player plays: the tool exits 1 and says what
+     *     structure no player plays: the tool exits 1 and reports what
      */
     static Multi read(Tool tool) {
         Multi multi;

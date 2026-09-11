@@ -163,7 +163,7 @@ final class Ymx {
                 // A count byte of 0 is the MFP's 256, which the count
                 // column does not reach (SPEC.md 1.9), and a select of 0
                 // stops a timer. Either way the rate the effect runs at
-                // does not move, which is what the columns encoded before
+                // does not move, which the columns encoded before
                 // this conversion read the structure.
                 if (written == 0 && count[c] != 0) {
                     kept++;
@@ -323,7 +323,7 @@ final class Ymx {
 
     /** A sample's bytes as source values: YMX writes its end marker in
      *  bit 7, which is this format's marker (SPEC.md 3.2), so the sample
-     *  ends at the first byte that carries one and the values are the
+     *  ends at the first byte that has one and the values are the
      *  seven bits under it. */
     private static List<Integer> values(byte[] rows) {
         List<Integer> out = new ArrayList<>(rows.length);

@@ -27,7 +27,7 @@ const entry = 8
 // MostTunes is the most tunes in one, the subtunes an SNDH file numbers.
 const MostTunes = MaxSubtunes
 
-// Read is what a multi file has in it: the tune files, and the name of
+// MultiRead is the tune files a multi file has in it, and the name of
 // each, both in the file's order.
 type MultiRead struct {
 	Tunes [][]byte

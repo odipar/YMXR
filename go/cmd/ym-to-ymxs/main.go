@@ -67,7 +67,7 @@ func Asked(t *tool.Tool, args []string) (int, bool) {
 	return 0, false
 }
 
-// Repeat is the row the tune repeats to: the row the call asks for, the
+// Repeat is the row the tune repeats to: the row the call names, the
 // dump's loop frame, or its frame count where the tune plays once.
 func Repeat(t *tool.Tool, at int, asked bool, song ym.Song, said *report.Report) int {
 	if asked {

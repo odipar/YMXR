@@ -12,7 +12,7 @@ final class Out {
     private Out() {
     }
 
-    /** {@code file} on standard output, which is what the tool is for. A
+    /** {@code file} on standard output, which the tool is for. A
      *  write that fails, a closed pipe among them, is an exit of 2: the
      *  stream records the fault in a flag rather than throwing it, so the
      *  flag is read, as {@code Tool.write} reads it after text. */

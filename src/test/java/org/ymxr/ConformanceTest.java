@@ -23,10 +23,10 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * The conformance kit is what the converter writes: every tune under
+ * The converter writes the conformance kit: every tune under
  * {@code doc/conformance/tunes} is the dump its SOURCES.md row names,
  * converted with the row's options, or the tune its builder builds, and
- * every reference is what the reader reports of it (SPEC.md 7). This
+ * every reference is the reader's report of it (SPEC.md 7). This
  * makes each again and compares, so a change to the converter or the
  * reader that moved a byte of the kit fails here, and writes what is
  * missing beside the kit.
@@ -164,7 +164,7 @@ final class ConformanceTest {
     }
 
     @Test
-    void everyTuneIsWhatItsRowGives() throws IOException {
+    void everyTuneMatchesItsRowsFile() throws IOException {
         List<String> missing = new ArrayList<>();
         List<String> rows = new ArrayList<>();
         String sources = Files.readString(KIT.resolve("SOURCES.md"));

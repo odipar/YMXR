@@ -266,7 +266,7 @@ general handler's marker path cost, and 64 against 130 where the tune runs
 more than one effect. The kit's `retune` ticks 7.7 times a frame, a 383 Hz
 buzzer, so 568 cycles a frame come off it against a play call of 1,493.
 `retune` is a built tune: no corpus file names a source of this shape, 83 of
-them naming a source at all (experiments.md), so what the handler saves is
+them naming any source (experiments.md), so what the handler saves is
 measured here and on the conformance kit and nowhere else. The target belongs
 to the effect on all three handlers, patched at a start out of the effect's
 record, so a source's shape selects the handler and the register it drives

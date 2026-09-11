@@ -7,10 +7,12 @@ before what it describes, and what things are called comes before both.
 
 - **R0.1** `AGENTS.md` defines the rules, for every document, code comment
   and commit message.
-- **R0.2** A test reads every document against a list of phrases struck in
-  review, and names the file and line of each hit.
-- **R0.3** The test walks the tree for documents. A document is read
-  because it is there, not because someone listed it.
+- **R0.2** A test reads every document and every code comment against a
+  list of phrases struck in review, and names the file and line of each
+  hit.
+- **R0.3** The test walks the tree for documents and for sources. Each is
+  read because it is there, not because someone listed it. In a source the
+  comments are read and the code is not: a name is not prose.
 - **R0.4** Striking a phrase adds it to the list, in the same change.
 - **R0.5** Using a struck phrase again removes it from the list, in the same
   change.
@@ -44,7 +46,7 @@ of that and repeats none of it.
 settings of an Atari ST's sound chip and timers, and its player turns each
 row into writes to them. YMXR defines the meaning of each column and how it
 reaches the hardware. How a row is stored, packed or unpacked is outside
-YMXR, and so is what a tune is.
+YMXR, and so is the definition of a tune.
 
 The three meet at the table and the structure and nowhere else. DTX defines
 the table's shape, YMXS what a row sets on the two chips, and YMXR the

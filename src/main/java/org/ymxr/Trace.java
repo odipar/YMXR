@@ -112,7 +112,7 @@ final class Trace {
             throw tool.wrong(Tool.WRONG, "this is a multi file of several tunes, and a record"
                     + " is of one tune");
         }
-        // A file this reader does not read produces no record, and says so
+        // A file this reader does not read produces no record, and reports why
         // (SPEC.md 6, R6.1), so the report reads the header under the
         // same guard rather than throwing where the record would not.
         try {

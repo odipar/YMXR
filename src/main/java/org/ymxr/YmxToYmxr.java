@@ -21,7 +21,7 @@ import org.ymxs.tool.Tool;
  * <p>Streams 14 to 24 are the script that drives YMX's four timer
  * channels. A tune whose script starts no effect converts whole here. One
  * that starts something converts to its frame values without it, which
- * this says on standard error rather than leaving to a listener.
+ * this reports on standard error rather than leaving to a listener.
  */
 final class YmxToYmxr {
 
@@ -38,7 +38,7 @@ final class YmxToYmxr {
     /** Stream 14, M, the master byte (YMX, SPEC.md 2.1): bits 0 to 3 mark
      *  the timer channels that act this frame, and bits 4 to 7 name which
      *  voices the frame leaves its volume register unwritten for, which is
-     *  what SPEC.md 6 rule 1 asks of a row here. */
+     *  what SPEC.md 6 rule 1 requires of a row here. */
     private static final int STREAM_M = 14;
 
     /** The bits of M that mark a channel acting. */
@@ -152,7 +152,7 @@ final class YmxToYmxr {
      * <p>YMX fits a tune to its unit by padding it (YMX, ymx), where the
      * conversion here drops to a unit of 1 instead, so a dump of an odd
      * frame count is one frame longer through YMX than through the dump.
-     * The dump is what a tune's rows are, so the padding comes off and
+     * A dump's rows are the tune's rows, so the padding comes off and
      * this format reckons the unit separately.
      *
      * <p>A pad at YMX's unit of 2 is one frame, it repeats the frame

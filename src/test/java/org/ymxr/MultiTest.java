@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test;
  * The multi file (doc/BINARIES.md 0): several tune files in one, a name
  * each.
  *
- * <p>What is under test is that a multi file adds nothing to the tune
- * files in it: a tune read back out of one is the file that went in, byte
- * for byte, so an SNDH file of subtunes is the file the tune files make.
+ * <p>A multi file leaves the tune files in it as they were: a tune read
+ * back out of one is the file that went in, byte for byte, so an SNDH file
+ * of subtunes is the file the tune files make.
  */
 final class MultiTest {
 

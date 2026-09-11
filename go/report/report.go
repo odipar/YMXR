@@ -1,6 +1,6 @@
-// Package report is what a conversion has to say beside the file it
+// Package report is a conversion's account beside the file it
 // writes: the notes and warnings a caller reads back, and, where a tool
-// asks for it, a running account of what the conversion did.
+// requires it, a running account of what the conversion did.
 //
 // A tool reports by default and -silent turns it off. The library's
 // callers pass a report that emits no line, so a test or a corpus run over
@@ -51,7 +51,7 @@ type Report struct {
 	Overflow     int
 	CutAtRepeat  int
 
-	// Most is the sources a tune names, which the overflow note gives.
+	// Most is the sources a tune names, which the overflow note reports.
 	Most int
 }
 

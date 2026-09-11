@@ -140,8 +140,8 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	said.Say(fmt.Sprintf("the images: %d%s%d bytes, DTX's reader once a set of tunes"+
 		" that share one", len(set.Images), image, images))
 	// What an image fixes once is what splits a set into more than one,
-	// and the unit is what a flag moves: a tune whose row count or repeat
-	// row is odd packs at unit 1 though -k asks for another (tools.md,
+	// and a flag moves the unit: a tune whose row count or repeat
+	// row is odd packs at unit 1 though -k names another (tools.md,
 	// experiments.md).
 	for i := range set.Images {
 		of := 0

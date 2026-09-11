@@ -60,7 +60,7 @@ const (
 // triple: its SNDH, then the tags.
 const tagsAt = 12
 
-// Tagged is what the tag block says: the subtunes, the rate, the FLAG
+// Tagged is the tag block read out: the subtunes, the rate, the FLAG
 // letters and where the block ends.
 type Tagged struct {
 	Subtunes int
@@ -94,7 +94,7 @@ func ProgramWith(stub, sndh []byte, rows int64) ([]byte, error) {
 	timerC := strings.ContainsRune(tags.Flag, 'c')
 	if timerC && tags.Rate != 50 {
 		return nil, fmt.Errorf("the set claims Timer C and plays at %d Hz: the stub then"+
-			" plays from the VBL, a 50 Hz clock, so this set needs a host of its own",
+			" plays from the VBL, a 50 Hz clock, so this set needs a separate host",
 			tags.Rate)
 	}
 	core, err := Core(sndh, tags.End+4)

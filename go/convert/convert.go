@@ -50,8 +50,8 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 		case strings.HasPrefix(flag, "-m"):
 			ring, err = strconv.Atoi(flag[2:])
 		case strings.HasPrefix(flag, "-copies"):
-			// the packer's own, spelled as DTX's dtx-write spells it: a
-			// match beyond the ring copies from the column's own literal
+			// the packer's, spelled as DTX's dtx-write spells it: a
+			// match beyond the ring copies from the column's literal
 			// stream, which packs a small ring far smaller, and -copiesS
 			// searches S seconds for a better parse
 			copies = true
@@ -183,7 +183,7 @@ func found(said *report.Report, sources *ymxr.Sources, effects int) {
 	}
 }
 
-// kindName is what a source of a kind is called.
+// kindName names a source of a kind.
 func kindName(kind int) string {
 	switch kind {
 	case ymxr.SID:

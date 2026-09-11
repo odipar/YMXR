@@ -41,7 +41,7 @@ type Made struct {
 //
 // The error names a structure this format cannot encode: a count of 256, a
 // source value past seven bits, more sources than the source column
-// numbers, or a source of more rows than a table carries.
+// numbers, or a source of more rows than a table has.
 func Of(tune ymxs.Tune) (Made, error) {
 	rows := ymxs.Rows(tune)
 	frames := len(rows)
@@ -115,7 +115,7 @@ func registers(row ymxs.Row, out []byte) {
 }
 
 // effect writes one row's operation on one effect, as its four columns,
-// and gives the bit of the effects word where the row starts one.
+// and the bit of the effects word where the row starts one.
 func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 	target, selects, count *[4]int, at int) (int, error) {
 	t := ymxr.Effect + 4*i
@@ -237,8 +237,8 @@ func sourceTables(sources []ymxs.Source) ([]ymxr.Source, error) {
 	return out, nil
 }
 
-// kind is what a source of this shape sounds, for a report: the format
-// names no kind, and the shape is what a tune uses it for (SPEC.md 2.2).
+// kind names what a source of this shape sounds, for a report: the format
+// names no kind, and a tune's use of the shape settles it (SPEC.md 2.2).
 func kind(source ymxs.Source) int {
 	table := ymxs.SourceTable(source)
 	_, repeats := table.Repeat()

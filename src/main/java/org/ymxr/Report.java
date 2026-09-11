@@ -7,7 +7,7 @@ import java.util.Locale;
 
 /**
  * What a conversion has to say beside the file it writes: the notes and
- * warnings a caller reads back, and, where a tool asks for it, a running
+ * warnings a caller reads back, and, where a tool requires it, a running
  * account of what the conversion did.
  *
  * <p>A tool reports by default and {@code -silent} turns it off. The

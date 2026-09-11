@@ -83,7 +83,7 @@ final class ConversionTest {
         assertEquals(1, TuneFile.read(file).sources().get(0).width(),
                 "the converter writes a source of one byte");
         int at = Tune.getLong(file, Tune.INDEX_AT);
-        // the DTX header carries W at byte 14 and C at bytes 8 and 9
+        // the DTX header has W at byte 14 and C at bytes 8 and 9
         byte[] wide = file.clone();
         wide[at + 14] = 2;
         assertThrows(IllegalArgumentException.class, () -> TuneFile.read(wide),

@@ -49,7 +49,7 @@ final class Schema {
      * @throws IllegalArgumentException where the structure is one this
      *     format cannot encode: a count of 256, a source value past seven
      *     bits, more sources than the source column numbers, or a source
-     *     of more rows than a table carries
+     *     of more rows than a table has
      */
     static Made of(org.ymxs.YMXS.Tune tune) {
         List<Row> rows = Tunes.rows(tune);
@@ -215,7 +215,7 @@ final class Schema {
     }
 
     /** What a source of this shape sounds, for a report: the format names
-     *  no kind, and the shape is what a tune uses it for (SPEC.md 2.2). */
+     *  no kind, and a tune's use of the shape settles it (SPEC.md 2.2). */
     private static int kind(Source source) {
         int rows = Tunes.size(Tunes.table(source));
         boolean repeats = Tunes.table(source).repeat().isPresent();

@@ -15,7 +15,7 @@ import org.ymxs.tool.Tool;
  *
  * <p>The first stage of a YMX conversion (doc/ymxs.md), so
  * {@code ymx-to-ymxs | ymxs-to-ymxr} writes the tune file
- * {@code ymx-to-ymxr} writes. The file is read through YMX's own
+ * {@code ymx-to-ymxr} writes. The file is read through YMX's
  * {@code ymx-dump}, which {@code YMX_DUMP} names, and that opens a file
  * name rather than a stream, so it is called with the name of this tool's
  * standard input, on that input. No copy of the file is written.
@@ -64,7 +64,7 @@ public final class YmxToYmxs {
         return Text.write(Tunes.multi(Ymx.read(read, song, repeat, report)));
     }
 
-    /** The row the tune repeats to: the row the call asks for, the file's
+    /** The row the tune repeats to: the row the call names, the file's
      *  loop frame, or its frame count where the tune plays once. */
     private static int repeat(OptionalInt asked, YmxToYmxr.Dumped read) {
         if (asked.isPresent()) {

@@ -8,7 +8,7 @@
 // reads one and writes the other.
 //
 // The file is decoded by YMX's reader, which this imports: a tool of this
-// repository reads a .ymx with nothing else installed. YMX's ymx-dump
+// repository reads a .ymx with no other program installed. YMX's ymx-dump
 // prints the same values as text, and the Java tools here read it that
 // way.
 package ymx
@@ -46,7 +46,7 @@ type Dumped struct {
 }
 
 // FormatException is an input the reader does not read: the fault it
-// returned, under the name of the input it was given.
+// returned, under the name the input was read by.
 type FormatException struct {
 	Said string
 }
@@ -83,7 +83,7 @@ func read(file []byte, named string) (Dumped, error) {
 	// A stream decodes to at least the file's frames, and a section that
 	// ends on a unit boundary decodes to more. A frame past the count is
 	// no frame of the tune, so every stream is cut to the count here and
-	// the walk indexes without a bound of its own.
+	// the walk indexes without a separate bound.
 	streams := make([][]byte, len(out.Streams))
 	for s, stream := range out.Streams {
 		streams[s] = stream[:out.Frames]

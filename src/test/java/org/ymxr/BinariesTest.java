@@ -74,7 +74,7 @@ final class BinariesTest {
     }
 
     @Test
-    void theCoreIsWhatItsDescriptorStates() throws IOException {
+    void theCoreMatchesItsDescriptor() throws IOException {
         assertCore(Binaries.core(), 0);
     }
 
@@ -124,7 +124,7 @@ final class BinariesTest {
     }
 
     @Test
-    void theStubIsWhatItsDescriptorStates() {
+    void theStubMatchesItsDescriptor() {
         byte[] stub = Binaries.stub();
         assertEquals(0, stub.length & 1, "the stub is even-sized");
         int to = reaches(stub, 0);
@@ -163,7 +163,7 @@ final class BinariesTest {
      * tags in order, each text tag's text, the '##' count, the TC rate,
      * the FLAG letters after its '~', FRMS's longs, the names, and where
      * the block ends, past HDNS. A zero byte where a tag would begin is a
-     * pad, and stands on an odd position.
+     * pad, and stands at an odd position.
      */
     record Tags(List<String> order, Map<String, String> text, int subtunes, int rate,
                 String flag, int[] frames, List<String> names, int end) {
@@ -331,7 +331,7 @@ final class BinariesTest {
     }
 
     @Test
-    void theFramesTagGivesTheRowsOfATuneThatPlaysOnce() throws IOException {
+    void theFramesTagIsTheRowsOfATuneThatPlaysOnce() throws IOException {
         byte[] file = tune("plays-once");
         org.dtx.Table table = TuneFile.read(file).table();
         assertEquals(table.rows(), table.repeat(), "plays-once has RR at R");
@@ -363,7 +363,7 @@ final class BinariesTest {
     }
 
     @Test
-    void moreSubtunesThanTheCountHoldsAreRejected() throws IOException {
+    void moreSubtunesThanTheCountNumbersAreRejected() throws IOException {
         List<byte[]> files = Collections.nCopies(Sndh.MAX_SUBTUNES + 1, tune("circus"));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(files, new Sndh.Options("Many", null, null, false, false)));
@@ -431,10 +431,10 @@ final class BinariesTest {
     }
 
     @Test
-    void aFileTakesTheCoreOfTheTwoSwitchesItIsAskedFor() throws IOException {
+    void aFileUsesTheCoreTheTwoSwitchesSelect() throws IOException {
         // The failure this covers: a file asked for the monitor and the
         // lean tick used the monitor's core, whose flags record no
-        // the lean tick, and checkCore refused it.
+        // the lean tick, and checkCore rejected it.
         List<byte[]> files = List.of(tune("chambers"));
         for (int setting = 0; setting < 4; setting++) {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
@@ -487,7 +487,7 @@ final class BinariesTest {
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Prg.of(sndh, 0));
         assertEquals("the set claims Timer C and plays at 60 Hz: the stub then plays from the"
-                + " VBL, a 50 Hz clock, so this set needs a host of its own", wrong.getMessage());
+                + " VBL, a 50 Hz clock, so this set needs a separate host", wrong.getMessage());
     }
 
     @Test

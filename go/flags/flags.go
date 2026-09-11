@@ -1,4 +1,4 @@
-// Package flags is what the tools that read a YMXS file share: the flags
+// Package flags is shared by the tools that read a YMXS file: the flags
 // they read, the structure read off standard input, and the tune files it
 // maps to (doc/ymxs.md).
 //
@@ -24,7 +24,8 @@ import (
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
-// Packing is what the packer reads: the unit, the ring, and the search for
+// Packing is the packer's three settings: the unit, the ring, and the
+// search for
 // a better parse.
 type Packing struct {
 	Unit    int
@@ -113,7 +114,7 @@ func RowsOf(t *tool.Tool, args []string, none int64) int64 {
 	return none
 }
 
-// Read is the multi standard input carries, read and checked. A text that
+// Read is the multi on standard input, read and checked. A text that
 // is not this form, or a structure no player plays, exits 1.
 func Read(t *tool.Tool) ymxs.Multi {
 	multi, err := text.Read(t.Text())
@@ -154,7 +155,7 @@ func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	return written.File
 }
 
-// Title is what a tune is called, its writer where it has no title.
+// Title names a tune, and its writer where it has no title.
 func Title(tune ymxs.Tune) string {
 	if strings.TrimSpace(tune.Title) == "" {
 		return "(untitled)"
@@ -181,7 +182,7 @@ func decimal(t *tool.Tool, said, flag string) float64 {
 // SndhOf is the SNDH file of the multi, as the flags ask for it: every
 // tune a subtune, 1 upward in the multi's order, behind one core. The
 // title and the composer are the first tune's unless -t and -c name
-// others, and a tune's title names its subtune where the multi carries
+// others, and a tune's title names its subtune where the multi has
 // several.
 func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 	said *report.Report) []byte {
