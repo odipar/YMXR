@@ -379,11 +379,19 @@ place names.
 ```
 python3 68k/test/emu/test_ymxr.py [tune.ym ...]
 python3 68k/test/emu/test_ymxr.py -corpus [N]
+python3 68k/test/emu/test_ymxr.py -framesN [tunes]
 python3 68k/test/emu/test_ymxr.py -cycles [tunes]
 python3 68k/test/emu/test_ymxr.py -hatari [tunes]
 python3 68k/test/emu/test_ymxr.py -kit [tune.ymxr ...]
 python3 68k/test/emu/test_ymxr.py -lean [tunes]
 ```
+
+`-framesN` plays each tune for N frames at most. Every frame it plays is
+read against the model as a whole run reads it; what a capped run leaves is
+the wrap and the end, which a tune reaches only once its rows are played.
+The ten fixtures whole are a minute, and at `-frames40` eight seconds, so a
+build runs a capped one and a release the whole: `RigCallsTest` runs the two
+built tunes at `-frames24` on every build.
 
 The tunes under `ym/test` are chosen for the shapes a tune has, one of
 each, and `-corpus` reads the corpus instead: every Nth file of it by name,

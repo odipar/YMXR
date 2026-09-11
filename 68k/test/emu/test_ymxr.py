@@ -11,12 +11,17 @@ against the converter.
 Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -corpus [N]        a spread of the corpus in place of the
                                        fixtures, 40 tunes unless N sets it
+       test_ymxr.py -framesN [tunes]   each tune played for N frames at most,
+                                       for a short run over every shape
        test_ymxr.py -cycles [tunes]    the play call's cost as well
        test_ymxr.py -hatari [tunes]    the same tunes on a real MFP, under
                                        Hatari
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
                                        the monitor moves no chip write
+       test_ymxr.py -kit [tunes]       the conformance kit's tune files, the
+                                       player's frames against the reader's
+                                       entries a frame at a time
 
 The fixtures under ym/test are chosen for the shapes a tune has, one of
 each; -corpus reads the corpus instead, which no fixture was chosen for. A
@@ -201,6 +206,10 @@ CORPUS = os.environ.get("YM_CORPUS",
 # How many tunes -corpus reads where no count follows it. Forty is about
 # eleven minutes, which is a net a reader runs and waits for.
 CORPUS_TUNES = 40
+
+# The frames a tune is played for at most, which -frames sets. None plays
+# every tune whole, which is what a full run does.
+MOST_FRAMES = None
 
 
 def spread(most):
@@ -751,6 +760,13 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
     clocks = MFP_CLOCK / tune.rate
     once = tune.RR == tune.R
     frames = tune.R + 1 if once else min(tune.R + tune.R - tune.RR, 4 * tune.R)
+    # -frames caps a long tune: every frame is emulated, so a tune of ten
+    # thousand rows is minutes by itself. A capped run reads the frames it
+    # plays against the model as a whole run does, and reaches neither the
+    # wrap nor the end.
+    if MOST_FRAMES and frames > MOST_FRAMES:
+        frames = MOST_FRAMES
+        once = False
     entries = trace(file, work, frames) if kit else None
     if kit:
         assert len(entries) == frames + 1, "the reader writes %d lines, not %d" % (len(entries), frames + 1)
@@ -1139,10 +1155,36 @@ def main():
     kit = "-kit" in sys.argv
     perf = PERF
     wide = next((a for a in sys.argv[1:] if a.startswith("-corpus")), None)
+    capped = next((a for a in sys.argv[1:] if a.startswith("-frames")), None)
+    if capped is not None:
+        said = capped[len("-frames"):]
+        if not said.isdigit() or int(said) < 1:
+            raise SystemExit("-frames reads a count of 1 or more and not " + said)
+        global MOST_FRAMES
+        MOST_FRAMES = int(said)
     if kit:
         where = os.path.join(ROOT, "doc", "conformance", "tunes")
         tunes = args or sorted(os.path.join(where, f) for f in os.listdir(where)
                                if f.endswith(".ymxr"))
+        # The kit's wrong-version tune has no record to play against: the
+        # binder and the reader both reject it, which is what the kit reads
+        # of it (doc/conformance/README.md). So it is checked to be rejected
+        # and left out of the tunes played.
+        left = [one for one in tunes
+                if os.path.basename(one) == "wrong-version.ymxr"]
+        tunes = [one for one in tunes if one not in left]
+        for one in left:
+            with open(one, "rb") as f:
+                file = f.read()
+            said = subprocess.run(
+                [os.path.join(ROOT, "bin", "ymxr-trace"), "-silent"],
+                input=file, capture_output=True)
+            assert said.returncode != 0 and not said.stdout, \
+                "%s: the reader read a tune of another version" % os.path.basename(one)
+            assert bind(file, tempfile.mkdtemp(prefix="ymxr68")) is None, \
+                "%s: the binder bound a tune of another version" % os.path.basename(one)
+            print("%-45s the binder and the reader reject it"
+                  % os.path.basename(one))
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():
