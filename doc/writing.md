@@ -6,6 +6,14 @@ format leaves to a writer, and the checks on what comes out. A reader is
 written against the conformance kit instead (conformance/README.md), and a
 player against SPEC.md 4 and 5.
 
+**Read YMXS first.** [YMXS](https://github.com/odipar/YMXS)'s SPEC.md is
+what a tune is: rows of registers and effects, what each register reaches,
+how a rate is reckoned, and the rules a writer satisfies. SPEC.md here is
+the encoding of that, and repeats none of it. A writer with a tune already
+in the structure has a shorter route than this document: write it as YMXS
+JSON and run `bin/ymxs-to-ymxr`, which encodes the columns for it
+(ymxs.md).
+
 ## What a writer makes
 
 A tune file (SPEC.md 3.3): a header, the tune's table as a DTX2 file, an

@@ -2,8 +2,16 @@
 
 Implement a YMXR reader from the specification.
 
-`SPEC.md` in this directory is the format specification. Implement a
-reader for the `.ymxr` files under `tunes/`: what SPEC.md 7 calls one.
+`SPEC.md` in this directory is the format specification, and
+`YMXS-SPEC.md` beside it is the specification SPEC.md stands on: what a
+tune is, what each register reaches, how a rate is reckoned, and what a
+frame and a tick do with a row. SPEC.md cites it as `(YMXS, SPEC.md 3.4)`,
+which means section 3.4 of `YMXS-SPEC.md`. Read both. Implement a reader
+for the `.ymxr` files under `tunes/`: what SPEC.md 7 calls one.
+
+The record you print is SPEC.md 7's, not `YMXS-SPEC.md` 7's. Those are two
+readers of two things, and the one asked for here reports the columns a
+tune file has.
 
 ## What to produce
 
@@ -59,13 +67,13 @@ table's (SPEC.md 7).
 
 ## The rules
 
-- Work **only** from `SPEC.md`.
-- **Do not read the YMXR repository, or the DTX repository,** and do not
-  read any implementation of this format, of DTX or of the compression
-  under them, anywhere: not in those repositories, not on the web. This
-  is a test of whether the specification alone is enough. Whoever sets the
-  exercise names the directories those repositories are in, so you can keep
-  out of them.
+- Work **only** from `SPEC.md` and `YMXS-SPEC.md`.
+- **Do not read the YMXR repository, the YMXS repository, or the DTX
+  repository,** and do not read any implementation of this format, of the
+  structure under it, of DTX or of the compression under them, anywhere:
+  not in those repositories, not on the web. This is a test of whether the
+  two documents alone are enough. Whoever sets the exercise names the
+  directories those repositories are in, so you can keep out of them.
 - You have no reference output. You cannot check your answer.
 
 ## Also produce

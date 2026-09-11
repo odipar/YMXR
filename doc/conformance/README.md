@@ -23,9 +23,13 @@ repository's LICENSE covers neither the dumps nor these.
 
 ## Running the exercise
 
-Copy `TASK.md`, `tunes/` and `../SPEC.md` into a fresh directory and hand
-that directory to an implementer with no access to this repository, to
-DTX's, or to any implementation of the format or the compression under
+Copy `TASK.md`, `tunes/`, `../SPEC.md` and YMXS's `doc/SPEC.md` into a
+fresh directory and hand that directory to an implementer with no access to
+this repository, to YMXS's, to DTX's, or to any implementation of the
+format or the compression under it. Both specifications go over: SPEC.md
+here defines the columns and cites YMXS's for what a frame and a tick do
+with them, so an implementer handed one of the two is reading half a
+document. Name the YMXS copy `YMXS-SPEC.md`, which is what `TASK.md` calls
 it. `TASK.md` tells the implementer to keep out of both repositories and
 leaves the paths to you, since a checkout is somewhere different on every
 machine: name them when you hand the directory over. Keep `MANIFEST.txt`
@@ -47,7 +51,7 @@ Three tests, all three of which must hold:
 1. **Output.** Every record byte-identical to the reference on every
    tune, the empty record of `wrong-version` included.
 2. **Sources.** No implementer names an implementation: not a source
-   file here or in DTX, not one on the web.
+   file here, in YMXS or in DTX, not one on the web.
 3. **Notes.** No entry is marked "decides output". A choice that settles
    a byte is a sentence the document lacks, whether or not the guess
    matched the reference.

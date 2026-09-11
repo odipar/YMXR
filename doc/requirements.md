@@ -27,20 +27,28 @@ before what it describes, and what things are called comes before both.
   followed: the figures, the citations, the links, the glossary's order,
   the one wrap width.
 
-## DTX and YMXR
+## DTX, YMXS and YMXR
 
 **DTX** is a data format, and a separate repository. It defines a table of
 `R` rows and `C` columns, and no meaning for a column. The table is data: a
 compile step or a calling convention belongs to a reader, not to the
 format.
 
-**YMXR** is one use of DTX. Its columns are the settings of an Atari ST's
-sound chip and timers, and its player turns each row into writes to them.
-YMXR defines the meaning of each column, and how it reaches the hardware.
-How a row is stored, packed or unpacked is outside YMXR.
+**YMXS** is the tune data structure, and a separate repository. It defines
+what a tune is - rows of registers and effects, the sources those effects
+run, one rate a tune - what each register reaches on the two chips, and
+what a player does with a row and a tick. Its SPEC.md is the base SPEC.md
+here stands on.
 
-The two meet at the table and nowhere else. DTX defines its shape, and
-YMXR defines the meaning of its columns.
+**YMXR** is one use of DTX, and one encoding of YMXS. Its columns are the
+settings of an Atari ST's sound chip and timers, and its player turns each
+row into writes to them. YMXR defines the meaning of each column and how it
+reaches the hardware. How a row is stored, packed or unpacked is outside
+YMXR, and so is what a tune is.
+
+The three meet at the table and the structure and nowhere else. DTX defines
+the table's shape, YMXS what a row means as music, and YMXR the columns
+that carry one into the other.
 
 YMXR assumes the name YMX when it is done. R1 to R6 are requirements of
 that format, and bind anyone who writes or plays a tune. R0 binds this
@@ -131,8 +139,8 @@ what a tune requires beyond a row.
 - **R5.2** Which source plays, on which target, and at what rate, comes
   from the columns.
 - **R5.3** A source's rows are values that fit the register its target
-  writes. A recording is linear amplitudes and a volume register is a
-  logarithmic level, so the conversion is the writer's work under R3.3.
+  writes, which is YMXS's rule (YMXS, SPEC.md 3.2). The conversion a
+  recording needs is the writer's work under R3.3.
 - **R5.4** The sources belong to the tune. A player defines none.
 - **R5.5** How many sources a tune runs, how large one is, and the content
   of an index entry are SPEC.md's.
