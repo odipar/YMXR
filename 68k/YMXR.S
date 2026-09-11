@@ -119,7 +119,7 @@ PERF_ON         equ     76      ; a row written, the place stepped
 PERF_SQ         equ     56      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     32      ; a source of one row, no place stepped
 PERF_LOOP       equ     114     ; the marker, the place to row RR
-PERF_STOP       equ     120     ; the marker, the timer stopped
+PERF_STOP       equ     116     ; the marker, the timer stopped
 
 ; What each switch adds to a path: the level is dropped on the three
 ; paths that write a row's value, and an end of interrupt on all five.
@@ -190,6 +190,12 @@ YM_PORTS        equ     $C0             ; R7's port directions, the ST's
 ; effect 2, Timer B     $FFFA1B   $FFFA21   $120    $FFFA07 0    $F0   0
 ; effect 3, Timer C     $FFFA1D   $FFFA23   $114    $FFFA09 5    $0F   4
 ; IER+4 is the pending register, IER+8 the in-service, IER+12 the mask.
+; A pending bit and an in-service bit clear on a written 0 and are unmoved
+; by a written 1, so the whole byte is written rather than read and
+; written back. bclr's read and its write are two bus cycles, and the MFP
+; latches a tick of another timer between them where one comes: the
+; write-back would carry the 0 that read had and drop it. The enable and
+; the mask are written by software alone, so bclr stands there.
 
 ; A tick handler's operands, patched at a start, stand at fixed offsets
 ; into it; the equates are below the handlers, since the raster monitor's
@@ -319,7 +325,7 @@ q\{ct}:         bra.w   \{tick}_done
                 btst    #6,d2                   ; switched, so no tick of the
                 beq.s   .kept\~                 ; old rate reads the new
                 andi.b  #\keep,\ctrl.w          ; source, and the tick latched
-                bclr    #\bit,(\ier+4).w        ; before the stop is dropped
+                move.b  #255-(1<<\bit),(\ier+4).w ; before the stop is dropped
 .kept\~:
                 READ    \ct
                 bpl.s   .t\~
@@ -429,7 +435,7 @@ q\{ct}:         bra.w   \{tick}_done
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 \{tick}_stop:   andi.b  #\keep,\ctrl.w          ; select 0: the timer stops
-                bclr    #\bit,(\ier+4).w    ; and drops its latched tick
+                move.b  #255-(1<<\bit),(\ier+4).w ; and drops its latched tick
 \{tick}_rate:   READ    \cn
                 tst.b   d2
                 bpl.s   .live\~
@@ -504,7 +510,7 @@ q\{ct}:         bra.w   \{tick}_done
                 andi.b  #\keep,\ctrl.w
                 lea     \tick(pc),a3
                 move.l  a3,\vector.w
-                bclr    #\bit,(\ier+4).w
+                move.b  #255-(1<<\bit),(\ier+4).w
                 bset    #\bit,\ier.w
                 bset    #\bit,(\ier+12).w
 .no\~:
@@ -517,7 +523,7 @@ q\{ct}:         bra.w   \{tick}_done
                 andi.b  #\keep,\ctrl.w
                 bclr    #\bit,\ier.w
                 bclr    #\bit,(\ier+12).w
-                bclr    #\bit,(\ier+4).w
+                move.b  #255-(1<<\bit),(\ier+4).w
 .no\~:
                 .endm
 
@@ -582,7 +588,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; period is near the handler's cost the two race, and that tick would
 ; read a place past the source's last row. The row that stops an effect
 ; drops it the same way (EFFECT, .stop).
-                bclr    #\bit,(\ier+4).w
+                move.b  #255-(1<<\bit),(\ier+4).w
                 COUNT   PERF_STOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w

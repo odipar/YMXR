@@ -17,11 +17,11 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Big - Samantha Fox Strip Poker 6 | 430 | 1536 | 2130 | 1026 | 1608 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1370 | 3396 | 806 | 2814 |
 | Circus Attractions 2 | 8 | 1446 | 1648 | 746 | 746 |
-| DBA 2 | 19442 | 1969 | 5522 | 1139 | 4874 |
-| DBA 5 | 22262 | 2057 | 5694 | 1211 | 4508 |
+| DBA 2 | 19442 | 1970 | 5522 | 1139 | 4874 |
+| DBA 5 | 22262 | 2057 | 5696 | 1211 | 4508 |
 | Digidrum preempt, built | 800 | 1627 | 2808 | 776 | 2006 |
-| Retrigger retune, built | 1200 | 1493 | 2228 | 782 | 1052 |
-| Synergy Credits | 10754 | 2361 | 6356 | 1220 | 4948 |
+| Retrigger retune, built | 1200 | 1493 | 2230 | 782 | 1052 |
+| Synergy Credits | 10754 | 2362 | 6358 | 1220 | 4948 |
 | Turrican - world 4-3 | 3680 | 1608 | 4836 | 887 | 4130 |
 | Turrican 2 - world completed 1 | 179 | 1908 | 5644 | 1238 | 5016 |
 
@@ -47,7 +47,7 @@ in its costliest frame. Unit 1 packs the corpus to 0.69 bytes a frame against
 4-3, the advance 1,138 on average and 4,586 at most against 887 and 4,130, and
 the play call 1,859 and 5,240 against 1,608 and 4,836; `-k1` packs at it.
 
-The frame procedure is the rest, from 510 to 1,141 cycles on average:
+The frame procedure is the rest, from 510 to 1,142 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
 effects' columns and the call's entry and exit. An effect the tune
 does not run is jumped over, two nops standing at its columns' head
@@ -187,12 +187,12 @@ select only where it writes.
 |---|---|
 | a row written, the place stepped | 108 |
 | the marker, the place to row `RR` | 130 |
-| the marker, the timer stopped | 136 |
+| the marker, the timer stopped | 132 |
 | a square's two rows, no place stepped | 88 |
 | a source of one row, no place stepped | 64 |
 | a row written, the tune running one effect | 100 |
 | the marker to row `RR`, one effect | 130 |
-| the marker and the stop, one effect | 136 |
+| the marker and the stop, one effect | 132 |
 | a square's two rows, one effect | 80 |
 | a source of one row, one effect | 56 |
 
@@ -219,7 +219,7 @@ returns:
 |---|---|---|
 | a row written, the place stepped | 108 | 76 |
 | the marker, the place to row `RR` | 130 | 114 |
-| the marker, the timer stopped | 136 | 120 |
+| the marker, the timer stopped | 132 | 116 |
 | a square's two rows, no place stepped | 88 | 56 |
 | a source of one row, no place stepped | 64 | 32 |
 
