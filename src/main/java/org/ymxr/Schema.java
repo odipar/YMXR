@@ -127,17 +127,23 @@ final class Schema {
                 select[i] = select(start.prescaler());
                 count[i] = counted(start.count(), at);
                 out[t + 2] = (byte) (0x80 | resets(start.timerReset(), start.placeReset())
-                        | select[i]);
+                        | marked(count[i]) | select[i]);
                 out[t + 3] = (byte) count[i];
                 return 1 << i;
             }
             case Retune retune -> {
                 int now = select(retune.prescaler());
                 int resets = resets(retune.timerReset(), retune.placeReset());
-                if (now != select[i] || resets != 0) {
-                    out[t + 2] = (byte) (0x80 | resets | now);
-                }
                 int rate = counted(retune.count(), at);
+                // A count of 0 is the value the MFP counts 256 for, and the
+                // count column reserves 0 for the row that does not set it,
+                // so bit 4 of the control column marks it (SPEC.md 1.9). The
+                // row then sets the control column whether the select moved
+                // or not.
+                int mark = rate != count[i] ? marked(rate) : 0;
+                if (now != select[i] || resets != 0 || mark != 0) {
+                    out[t + 2] = (byte) (0x80 | resets | mark | now);
+                }
                 if (rate != count[i]) {
                     out[t + 3] = (byte) rate;
                 }
@@ -150,14 +156,20 @@ final class Schema {
         }
     }
 
-    /** The count column, which fills its byte, so the 256 the MFP reads a
-     *  0 as is out of reach (SPEC.md 1.9). */
+    /** The count column, which is the timer's data register (SPEC.md 1.9).
+     *  Every value of that register is a count, 0 among them. */
     private static int counted(int count, int at) {
-        if (count < 1 || count >= Chip.MOST_COUNT) {
+        if (count < 0 || count > Chip.MOST_COUNT) {
             throw new IllegalArgumentException("row " + at + ": a count of " + count
-                    + ", and the count column reaches 1 to " + (Chip.MOST_COUNT - 1));
+                    + ", and the count column reaches 0 to " + Chip.MOST_COUNT);
         }
         return count;
+    }
+
+    /** Bit 4 of the control column, which marks the count column's 0 as the
+     *  value the MFP counts 256 for (SPEC.md 1.1, 1.9). */
+    private static int marked(int count) {
+        return count == 0 ? Columns.COUNT_VALUE : 0;
     }
 
     private static int resets(boolean timer, boolean place) {

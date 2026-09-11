@@ -24,6 +24,10 @@ final class Columns {
     static final int TIMER_RESET = 0x40;
     static final int PLACE_RESET = 0x20;
 
+    /** Bit 4 of a control column: the count column beside it is 0, and
+     *  that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9). */
+    static final int COUNT_VALUE = 0x10;
+
     /** The register bits a YM dump uses for its flags, masked off. */
     static final int[] MASK = {0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0x3F,
                                0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F};

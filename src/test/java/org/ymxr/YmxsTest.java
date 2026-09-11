@@ -142,11 +142,11 @@ final class YmxsTest {
     void aStructureThisFormatCannotEncodeIsAnError() {
         org.ymxs.YMXS.Source square = Tunes.repeating("square 12", List.of(12, 0), 0);
         List<Row> big = List.of(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8),
-                square, Chip.prescaler(4), Chip.MOST_COUNT, true, true)));
+                square, Chip.prescaler(4), Chip.MOST_COUNT + 1, true, true)));
         String said = String.valueOf(assertThrows(IllegalArgumentException.class,
                 () -> Schema.of(built(big, 0))).getMessage());
-        assertTrue(said.contains("count of 256"), "a count of 256 is past the count column: "
-                + said);
+        assertTrue(said.contains("count of 256"), "a count of 256 is past the timer's data"
+                + " register, which the count column is: " + said);
         org.ymxs.YMXS.Source wide = Tunes.repeating("wide", List.of(200), 0);
         List<Row> marked = List.of(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R0),
                 wide, Chip.prescaler(4), 100, true, true)));

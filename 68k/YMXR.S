@@ -435,8 +435,12 @@ q\{ct}:         bra.w   \{tick}_done
                 bpl.s   .live\~
                 btst    #6,d2
                 beq.s   .set\~
-; the timer's reset: stopped above, the count, then the select
+; the timer's reset: stopped above, the count, then the select. Bit 4
+; marks a count column of 0 as the value the MFP counts 256 for (1.9), so
+; the kept count stands in only where the row sets neither.
                 tst.b   d1
+                bne.s   .cnt\~
+                btst    #4,d2
                 bne.s   .cnt\~
                 move.b  \fx+FX_COUNT(a0),d1
 .cnt\~:         move.b  d1,\data.w
@@ -448,8 +452,10 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  d1,\fx+FX_COUNT(a0)
                 bra.s   .done\~
 .set\~:         tst.b   d1
+                bne.s   .put\~
+                btst    #4,d2                 ; a count of 0, marked a value
                 beq.s   .sel\~
-                move.b  d1,\data.w
+.put\~:         move.b  d1,\data.w
                 move.b  d1,\fx+FX_COUNT(a0)
 .sel\~:         move.b  d2,d1
                 and.b   #7,d1

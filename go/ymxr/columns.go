@@ -15,6 +15,10 @@ const (
 	PlaceReset = 0x20
 )
 
+// CountValue is bit 4 of a control column: the count column beside it is
+// 0, and that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9).
+const CountValue = 0x10
+
 // Mask is the register bits a YM dump uses for its flags, masked off.
 var Mask = [14]int{0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0x3F,
 	0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F}

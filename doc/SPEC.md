@@ -80,8 +80,8 @@ which are arbitrary.
 Nine columns have no bit to spare, because the register fills the whole
 byte: the three tone periods' fine columns, the two envelope period
 columns and the four timer counts. Each reserves 0 for the row that does
-not set it (R3.7). For five of them a bit of the column beside it, read on
-every row, keeps 0 reachable as a value:
+not set it (R3.7), and for each a bit of the column beside it keeps 0
+reachable as a value:
 
 | column | its 0 is a value where |
 |---|---|
@@ -90,6 +90,10 @@ every row, keeps 0 reachable as a value:
 | 4 | bit 6 of column 5 is 1 |
 | 11 | bit 6 of column 13 is 1 |
 | 12 | bit 5 of column 13 is 1 |
+| 17 | bit 4 of column 16 is 1 |
+| 21 | bit 4 of column 20 is 1 |
+| 25 | bit 4 of column 24 is 1 |
+| 29 | bit 4 of column 28 is 1 |
 
 A player reads such a column and its bit together:
 
@@ -99,13 +103,14 @@ A player reads such a column and its bit together:
 | 0 | 0 | does not set it, and the register is not written |
 | 0 | 1 | sets it to 0 |
 
-The four timer counts have no such bit, and a count of 0, which the MFP
-reads as 256, is not reachable (1.9).
-
-The set bit flags the value, not the column. The five bits above sit
+The set bit flags the value, not the column. The nine bits above sit
 beside another column's value rather than inside the value they mark, and
-a player reads them on every row, set bit or no (R3.6). Every other bit of
-a column is part of its value, read only where the row sets it.
+where each is read follows the column it belongs to. The five in a register
+column are read on every row, set bit or no (R3.6). The four in a control
+column are read where the row sets that column (1.9): every count a bend
+moves through is 1 to 255, and a row reaching 0 is one that programs the
+timer and sets both columns. Every other bit of a column is part of its
+value, read only where the row sets it.
 
 One column gathering all twenty-one set bits would gather twenty-one
 reasons to move, and the sum of them moves on nearly every row. A bit
@@ -287,8 +292,19 @@ so a player masks the player's bits off and writes the rest.
 
 The count column is the timer count, bits 7 to 0, the byte written to the
 timer's data register. It fills its byte, so 0 marks the row that does not
-set it. The MFP reads a count of 0 as 256, and the schema does not reach
-that count; a later version may assign a bit for it (R6.2).
+set it, and bit 4 of the control column beside it marks that 0 as a value
+(1.1). The MFP counts 256 at a count of 0, so a row reaches that count by
+setting both columns.
+
+| the count column | control bit 4 | the row |
+|---|---|---|
+| not 0 | 0 or 1 | sets the count to the column's value |
+| 0 | 0 | does not set it, and the timer counts on |
+| 0 | 1 | sets it to 0, which the MFP counts 256 |
+
+A player reads bit 4 where the row sets the control column, as it reads
+bits 6 and 5. A row that leaves the control column unset sets a count of 1
+to 255 or none, which is every count a bend moves through (1.9).
 
 The control column:
 
@@ -297,12 +313,14 @@ The control column:
 | 7 | the set bit |
 | 6 | the timer's reset: the player stops it, writes the count and starts it |
 | 5 | the place's reset: the timer's place in its source returns to the first row, which the next tick reads |
-| 4, 3 | zero: the register's bits, which select an output's reset and modes no tune uses |
+| 4 | the count column's 0 is a value: the count beside this one is 0, which counts 256 (1.1) |
+| 3 | zero |
 | 2 to 0 | the prescaler select as the register reads it: 1 for 4, 2 for 10, 3 for 16, 4 for 50, 5 for 64, 6 for 100, 7 for 200 |
 
-Bits 4 to 0 belong to the register, and a player writes them as the column
-has them; bits 7 to 5 belong to the player, part of the column's value and
-read where the row sets it. Select 0 stops a timer, which a row does
+Bits 2 to 0 belong to the register, and a player writes those three; bits
+7 to 4 belong to the player, part of the column's value and read where the
+row sets it. Bit 3 is the register's mode select, which reaches no tune,
+and a player writes 0 to it. Select 0 stops a timer, which a row does
 through the source column (1.8), so 0 is unassigned here (R6.2).
 
 Timers C and D share a control register, C in bits 6 to 4 and D in bits 2
@@ -525,10 +543,11 @@ keeps it (R4.6) rather than reading it back from the buffer. The five bits
    on.
 3. Columns 16, 20, 24 and 28, the controls, each with the count column
    beside it, to its timer's two registers as 1.9 defines: the count,
-   where the row sets it or bit 6 is set; then the select, where the row
-   sets it or bit 6 is set; and the timer's place to its source's first
-   row where bit 5 is set. Bit 6's stop is step 2's write, and the select
-   here is the start after it. A row that sets the source column and
+   where the row sets it, where bit 4 marks its 0 as a value, or where
+   bit 6 is set; then the select, where the row sets it or bit 6 is set;
+   and the timer's place to its source's first row where bit 5 is set.
+   Bit 6's stop is step 2's write, and the select here is the start after
+   it. A row that sets the source column and
    leaves bit 5 clear moves no place: the row number in the place counts
    into the new source's rows (1.9).
 4. Columns 0 to 5, the tone periods, to R0 to R5.
@@ -597,9 +616,13 @@ encodes.
 4. **A row sets a rate column on the row that starts its effect** (YMXS
    rule 5), or while the effect runs, and not before its first start. The
    row that starts an effect for the first time sets its count column,
-   because the count the player keeps is 0 until a row sets it, bit 6
-   writes the kept count where the row leaves the column unset, and the MFP
-   reads a count of 0 as 256 (1.9).
+   because the count the player keeps is 0 until a row sets it, and bit 6
+   writes the kept count where the row leaves the column unset (1.9).
+5. **A row that sets a count of 0 sets bit 4 of the control column with
+   it.** The count column reserves 0 for the row that does not set it, and
+   bit 4 is what marks that 0 as the value the MFP counts 256 for (1.1,
+   1.9). A row that leaves the control column unset sets a count of 1 to
+   255 or none.
 
 ---
 

@@ -398,7 +398,10 @@ class Model:
             if r[t + 2] & 0x40:
                 fx["restart"] = True
                 fx["running"] = True
-            if r[t + 3]:
+            # bit 4 marks the count column's 0 as the value the MFP counts
+            # 256 for, and a player reads it where the row sets this column
+            # (SPEC.md 1.1, 1.9)
+            if r[t + 3] or r[t + 2] & 0x10:
                 fx["count"] = r[t + 3]
             fx["select"] = r[t + 2] & 7
             fx["selected"] = bool(r[t + 2] & 7)
@@ -835,8 +838,13 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
                     "frame %d: effect %d's timer restarted where the row sets no bit 6" % (f, i)
             if fx["running"]:
                 assert timers.mode[i] == fx["select"], "frame %d: effect %d runs at select %d, not %d" % (f, i, timers.mode[i], fx["select"])
-                assert (timers.pending[i] or timers.count[i]) == fx["count"], \
-                    "frame %d: effect %d's count is %d, not %d" % (f, i, timers.pending[i] or timers.count[i], fx["count"])
+                # The timer counts the ticks its data register names, and a
+                # register of 0 counts 256 (SPEC.md 1.9), so the column's
+                # count is read as ticks to compare with what the MFP counts.
+                ticks = fx["count"] or 256
+                assert (timers.pending[i] or timers.count[i]) == ticks, \
+                    "frame %d: effect %d counts %d ticks, not %d" % (
+                        f, i, timers.pending[i] or timers.count[i], ticks)
             elif fx["source"] == 0 and tune.effects & 1 << i:
                 assert timers.mode[i] == 0, "frame %d: effect %d's timer runs with no source" % (f, i)
             place = model.place_address(i)
