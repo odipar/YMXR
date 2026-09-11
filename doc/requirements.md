@@ -37,8 +37,8 @@ format.
 **YMXS** is the tune data structure, and a separate repository. It defines
 what a tune is - rows of registers and effects, the sources those effects
 run, one rate a tune - what each register reaches on the two chips, and
-what a player does with a row and a tick. Its SPEC.md is the base SPEC.md
-here stands on.
+what a player does with a row and a tick. SPEC.md here defines one encoding
+of that and repeats none of it.
 
 **YMXR** is one use of DTX, and one encoding of YMXS. Its columns are the
 settings of an Atari ST's sound chip and timers, and its player turns each
@@ -47,8 +47,8 @@ reaches the hardware. How a row is stored, packed or unpacked is outside
 YMXR, and so is what a tune is.
 
 The three meet at the table and the structure and nowhere else. DTX defines
-the table's shape, YMXS what a row means as music, and YMXR the columns
-that carry one into the other.
+the table's shape, YMXS what a row sets on the two chips, and YMXR the
+columns that encode the second in the first.
 
 YMXR assumes the name YMX when it is done. R1 to R6 are requirements of
 that format, and bind anyone who writes or plays a tune. R0 binds this

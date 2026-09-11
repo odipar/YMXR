@@ -26,11 +26,11 @@ repository's LICENSE covers neither the dumps nor these.
 Copy `TASK.md`, `tunes/`, `../SPEC.md` and YMXS's `doc/SPEC.md` into a
 fresh directory and hand that directory to an implementer with no access to
 this repository, to YMXS's, to DTX's, or to any implementation of the
-format or the compression under it. Both specifications go over: SPEC.md
-here defines the columns and cites YMXS's for what a frame and a tick do
-with them, so an implementer handed one of the two is reading half a
-document. Name the YMXS copy `YMXS-SPEC.md`, which is what `TASK.md` calls
-it. `TASK.md` tells the implementer to keep out of both repositories and
+format or the compression under it. Both are handed over: SPEC.md defines
+the columns and cites YMXS's for what a frame and a tick do with them, so
+an implementer handed one of the two cannot read the tunes. Name the YMXS
+copy `YMXS-SPEC.md`, which is what `TASK.md` calls it. `TASK.md` tells the
+implementer to keep out of the three repositories and
 leaves the paths to you, since a checkout is somewhere different on every
 machine: name them when you hand the directory over. Keep `MANIFEST.txt`
 and the references back: an implementer who can check an answer is not

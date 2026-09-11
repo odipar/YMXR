@@ -3,11 +3,11 @@
 Implement a YMXR reader from the specification.
 
 `SPEC.md` in this directory is the format specification, and
-`YMXS-SPEC.md` beside it is the specification SPEC.md stands on: what a
-tune is, what each register reaches, how a rate is reckoned, and what a
-frame and a tick do with a row. SPEC.md cites it as `(YMXS, SPEC.md 3.4)`,
-which means section 3.4 of `YMXS-SPEC.md`. Read both. Implement a reader
-for the `.ymxr` files under `tunes/`: what SPEC.md 7 calls one.
+`YMXS-SPEC.md` beside it defines what a tune is, what each register
+reaches, how a rate is reckoned, and what a frame and a tick do with a row.
+SPEC.md cites it as `(YMXS, SPEC.md 3.4)`, which means section 3.4 of
+`YMXS-SPEC.md`, and repeats none of it. Read both. Implement a reader for
+the `.ymxr` files under `tunes/`: what SPEC.md 7 calls one.
 
 The record you print is SPEC.md 7's, not `YMXS-SPEC.md` 7's. Those are two
 readers of two things, and the one asked for here reports the columns a
@@ -23,7 +23,7 @@ It prints the record SPEC.md 7 defines: one line of JSON a frame, at most
 `<lines>` of them, the first line the tune's fixed values. A frame
 reporting -1 is one line, and the record ends with it: print no line for
 any frame after. For a file whose version is not the one the specification
-defines, print no line at all.
+defines, print no line.
 
 Your output is compared with the reference byte for byte: no space in a
 line, integers in decimal, names in the order SPEC.md 7 defines, register

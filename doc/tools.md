@@ -374,7 +374,7 @@ named, on an emulated 68000 and checks the player against a model of
 SPEC.md 4 and 5 built from the tune's tables: every frame's chip writes in
 order, the timers' programming against the rate columns, each handler's
 place against the source's rows, and every tick's write against the row its
-place stands on.
+place names.
 
 ```
 python3 68k/test/emu/test_ymxr.py [tune.ym ...]
@@ -519,8 +519,8 @@ wave right still part (performance.md). Those partings are counted and
 named. A frame differing on a register no effect drives is what fails the
 run.
 
-The tunes under `ym/test` are one of each shape, which is what the rig
-requires of them. This reads eleven from the corpus besides, six whose
+The tunes under `ym/test` are one of each shape, which the rig requires of
+them. This reads eleven from the corpus besides, six whose
 effects are square waves on a volume register and five whose sources are
 recordings played once, so the shapes an ST tune is driven with are read
 against the other player rather than assumed.

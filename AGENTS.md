@@ -143,6 +143,14 @@ been struck so far.
 | `for a reader who would rather open one in a spreadsheet` | `for reading in a spreadsheet` |
 | `frames says how long every column is` | `frames is the length of every column` |
 | `tool.say(...)`, `tool.says()` | `tool.report(...)`, `tool.reports()` |
+| `its SPEC.md is the base this one stands on` | `its SPEC.md defines what a tune is; this document defines one encoding of that` |
+| `that sequence is what timerReset asks of a running timer` | `that sequence is what timerReset requires of a running timer` |
+| `which asks of the host` | `which the host then provides` |
+| `the row its place stands on` | `the row its place names` |
+| `what this format adds is where the end of a cycle is read` | `this format marks the end of a cycle in the row itself` |
+| `a writer with a tune already in the structure has a shorter route` | `a writer whose tune is already in the structure needs none of this document` |
+| `an implementer handed one of the two is reading half a document` | `an implementer handed one of the two cannot read the tunes` |
+| `the columns that carry one into the other` | `the columns that encode the second in the first` |
 
 ## A specification defines operations
 
