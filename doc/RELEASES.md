@@ -33,6 +33,49 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.2, 2026-09-11
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.2>, built from the commit
+tagged `v0.3.2`.
+
+Three faults in the YMX conversion. The tune file is version 3 and the
+bound tune is version 3, as 0.3.0 set them, so a file of this release plays
+under 0.3.0 and 0.3.1 and the other way round. The 68000 sources are
+unchanged since 0.3.1, so the five binaries are the same bytes.
+
+- **A `.ymx` that plays once converted to one that starts over.** Bit 0 of
+  the header's flags parts the two: `L` is 0 in a tune that plays once and
+  0 in one that starts over from its first frame (YMX, SPEC.md 1.2), and
+  neither reader read the flags word. A play-once file converted to a table
+  repeating at row 0, and the SNDH its tools wrote named `FRMS 0` where
+  YMX's named the tune's frame count.
+- **A count of 0 was replaced by the count the channel already ran.** The
+  MFP counts 256 at a count of 0, the slowest count the format reaches. The
+  conversion dropped it under a comment citing the bound 0.3.0 removed when
+  control bit 4 was assigned. One row of the four files under `ymx/test`
+  reloads a timer to 0, and that stream ran 7% fast from there to its next
+  reload.
+- **A flag byte was read as a prescaler select.** An action byte's low bits
+  are an index only for the five opcodes that program a timer; `HOLD`,
+  `RELEASE` and a voiced `RESUME` read them as flags (YMX, SPEC.md 2.4).
+  The note about a count or a select of 0 fired on 2,017 rows across the
+  four files under `ymx/test`, and 2,016 of those were flag bytes, so the
+  note is gone. An index of 0 on an opcode that programs is a malformed
+  file, and that row produces a note and is left behind.
+
+`ym/parity.py` reads a play-once `.ymx` against YMX's program 674 of 674
+frames alike, where before the change 35 frames differed on R10 and R11,
+registers no effect drives. `YmxTest` reads the corpus back on every build
+with no emulator: the repeat each file's flags name, and the count and the
+prescaler of all 7,477 rows that set a timer's rate.
+
+`ym-to-ymxs`, `ym-to-ymxr` and every tool downstream of the structure are
+untouched: a dump converts to the file 0.3.1 wrote, byte for byte, and
+`ConformanceTest` pins that.
+
+**A spurious interrupt on real hardware is not fixed here.** The remedy is
+a dummy handler at vector `$60`, as 0.3.1 records.
+
 ### 0.3.1, 2026-09-11
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.1>, built from the commit
