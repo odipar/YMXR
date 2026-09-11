@@ -27,8 +27,8 @@ executable built from one embeds these. `BinariesTest` reads them against
 the assembly the build makes, so one that does not match what rmac writes
 today fails the build.
 
-A player pins a version of this format: the tune file's is 2 (SPEC.md 3.3)
-and the bound tune's is 2 (BINARIES.md 1), and a release's number names
+A player pins a version of this format: the tune file's is 3 (SPEC.md 3.3)
+and the bound tune's is 3 (BINARIES.md 1), and a release's number names
 the tools rather than either.
 
 ## Published

@@ -72,7 +72,7 @@ No run has been measured yet.
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |
 | `fine-zero` | a tone fine byte moving to 0 on each voice, with and without the coarse set bit |
 | `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and the rows section 4 allows that no dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit |
-| `wrong-version` | the version word $0003: a reader produces no report |
+| `wrong-version` | the version word $0004: a reader produces no report |
 
 SOURCES.md records where each tune comes from and what it exercises in
 full.

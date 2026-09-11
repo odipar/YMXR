@@ -17,7 +17,7 @@ import (
 //
 //	offset  bytes  what it is
 //	0       4      YMXR
-//	4       2      the version, $0002
+//	4       2      the version, $0003
 //	6       2      the frame rate, in Hz
 //	8       1      effects used, bits 3 to 0
 //	9       1      S, the source count, 0 to 127
@@ -33,7 +33,7 @@ import (
 var Magic = []byte{'Y', 'M', 'X', 'R'}
 
 // Version is the version of this format.
-const Version = 0x0002
+const Version = 0x0003
 
 // Where each header field stands.
 const (

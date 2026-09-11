@@ -74,8 +74,8 @@ TOS = os.environ.get("TOS", os.path.expanduser("~/hatari-2.6.1_macos/tos-2.06.ro
 # The rows the program is asked to play before it stops (bin/ymxr-prg -r).
 STUB_FRAMES = 2000
 # The tune file's version (SPEC.md 3.3) and the bound tune's (BINARIES.md 1).
-TUNE_VERSION = 2
-BOUND_VERSION = 2
+TUNE_VERSION = 3
+BOUND_VERSION = 3
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209

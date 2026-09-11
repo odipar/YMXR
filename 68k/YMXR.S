@@ -65,7 +65,7 @@
 ; default, no byte and no cycle of it stands.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
-YMXR_VERSION    equ     $0002           ; its version
+YMXR_VERSION    equ     $0003           ; its version
 YMXR_COLUMNS    equ     30
 YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 
