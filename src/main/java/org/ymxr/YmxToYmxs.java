@@ -56,8 +56,8 @@ public final class YmxToYmxs {
             report.note((read.frames() - frames) + " frame of YMX's padding comes off the"
                     + " end: a dump's rows are the tune's rows");
         }
-        read = new YmxToYmxr.Dumped(frames, read.rate(), read.loopFrame(), read.streams(),
-                read.samples(), read.loops());
+        read = new YmxToYmxr.Dumped(frames, read.rate(), read.loopFrame(), read.flags(),
+                read.streams(), read.samples(), read.loops());
         int repeat = repeat(asked, read);
         YmDump.Song song = YmxToYmxr.song(read, "");
         tool.report("YMX!: " + read.frames() + " rows at " + read.rate() + " Hz");
@@ -71,6 +71,6 @@ public final class YmxToYmxs {
             int at = asked.getAsInt();
             return at == YmToYmxs.ONCE ? read.frames() : at;
         }
-        return Math.min(read.loopFrame(), read.frames());
+        return YmxToYmxr.repeat(read);
     }
 }

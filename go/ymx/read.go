@@ -28,6 +28,13 @@ const (
 	startPCMEmpt   = 7
 )
 
+// programs is whether the opcode programs or retunes a timer, so that its
+// action byte's low bits are the prescaler index and its P byte the count
+// (YMX, SPEC.md 2.4). The rest read the low bits as flags.
+func programs(opcode int) bool {
+	return opcode >= startToggle
+}
+
 // Frames is the frames of a dumped file, its packing's padding off the
 // end.
 //
@@ -42,7 +49,7 @@ const (
 // off where all three apply.
 func Frames(read Dumped) int {
 	last := read.Frames - 1
-	if read.Frames%2 != 0 || last <= read.LoopFrame {
+	if read.Frames%2 != 0 || (StartsOver(read) && last <= read.LoopFrame) {
 		return read.Frames
 	}
 	if read.Streams[StreamM][last] != 0 {
@@ -154,7 +161,6 @@ func script(read Dumped, made *built, effects []map[ymxs.Timer]ymxs.Effect,
 	// than restarting the period.
 	var running [4]bool
 	var left []string
-	kept := 0
 	for f := 0; f < read.Frames; f++ {
 		master := int(read.Streams[StreamM][f])
 		here := effects[f]
@@ -169,24 +175,19 @@ func script(read Dumped, made *built, effects []map[ymxs.Timer]ymxs.Effect,
 			opcode := action >> 5
 			voice := (action >> 3) & 3
 			low := action & 7
-			// A count byte of 0 is the MFP's 256, which the count column
-			// does not reach (SPEC.md 1.9), and a select of 0 stops a
-			// timer. Either way the rate the effect runs at does not move,
-			// which the columns encoded before this conversion
-			// read the structure.
-			if written == 0 && count[c] != 0 {
-				kept++
-			}
+			// An opcode that programs a timer reads P as the count and its
+			// low bits as the prescaler index (YMX, SPEC.md 2.4). A count
+			// of 0 is the MFP's 256, which the count column reaches with
+			// bit 4 of the control column beside it (SPEC.md 1.9), so the
+			// byte passes as it stands. HOLD, RELEASE and RESUME read the
+			// low bits as flags, and those opcodes read neither value
+			// here.
 			rate := written
-			if written == 0 {
-				rate = count[c]
-			}
-			if low == 0 && selects[c] != 0 {
-				kept++
-			}
 			at := low
-			if low == 0 {
-				at = selects[c]
+			if programs(opcode) && at == 0 {
+				left = append(left, fmt.Sprintf("frame %d programs channel %d at"+
+					" prescaler index 0, and an index is 1 to 7", f, c))
+				continue
 			}
 			volume := 0
 			if voice != noVoice {
@@ -261,7 +262,7 @@ func script(read Dumped, made *built, effects []map[ymxs.Timer]ymxs.Effect,
 				// HOLD's low bits are flags and not a prescaler (YMX,
 				// SPEC.md 2.4): 1 reloads the count, 2 the toggle's
 				// volume, 4 the retrigger's shape.
-				if low&1 != 0 && written != 0 {
+				if low&1 != 0 {
 					count[c] = written
 				}
 				on := target[c]
@@ -298,10 +299,6 @@ func script(read Dumped, made *built, effects []map[ymxs.Timer]ymxs.Effect,
 				running[other] = false
 			}
 		}
-	}
-	if kept > 0 {
-		said.Note(fmt.Sprintf("%d rows write a count or a select of 0, which the columns"+
-			" read as the rate the effect already runs at", kept))
 	}
 	most := len(left)
 	if most > 3 {

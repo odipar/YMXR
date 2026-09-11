@@ -48,6 +48,13 @@ final class Ymx {
     private static final int START_PCM = 6;
     private static final int START_PCM_PREEMPT = 7;
 
+    /** Whether the opcode programs or retunes a timer, so that its action
+     *  byte's low bits are the prescaler index and its P byte the count
+     *  (YMX, SPEC.md 2.4). The rest read the low bits as flags. */
+    private static boolean programs(int opcode) {
+        return opcode >= START_TOGGLE;
+    }
+
     /** The sources a script names, one for each distinct table: two
      *  channels running one shape run one source (SPEC.md 2.2). */
     private static final class Built {
@@ -145,7 +152,6 @@ final class Ymx {
         // clear rather than restarting the period.
         boolean[] running = {false, false, false, false};
         List<String> left = new ArrayList<>();
-        int kept = 0;
         for (int f = 0; f < read.frames(); f++) {
             int master = read.streams()[STREAM_M][f] & 0xFF;
             Map<Timer, Effect> here = effects.get(f);
@@ -160,19 +166,20 @@ final class Ymx {
                 int opcode = action >> 5;
                 int voice = (action >> 3) & 3;
                 int low = action & 7;
-                // A count byte of 0 is the MFP's 256, which the count
-                // column does not reach (SPEC.md 1.9), and a select of 0
-                // stops a timer. Either way the rate the effect runs at
-                // does not move, which the columns encoded before
-                // this conversion read the structure.
-                if (written == 0 && count[c] != 0) {
-                    kept++;
+                // An opcode that programs a timer reads P as the count and
+                // its low bits as the prescaler index (YMX, SPEC.md 2.4).
+                // A count of 0 is the MFP's 256, which the count column
+                // reaches with bit 4 of the control column beside it
+                // (SPEC.md 1.9), so the byte passes as it stands. HOLD,
+                // RELEASE and RESUME read the low bits as flags, and those
+                // opcodes read neither value here.
+                int rate = written;
+                int at = low;
+                if (programs(opcode) && at == 0) {
+                    left.add("frame " + f + " programs channel " + c
+                            + " at prescaler index 0, and an index is 1 to 7");
+                    continue;
                 }
-                int rate = written == 0 ? count[c] : written;
-                if (low == 0 && select[c] != 0) {
-                    kept++;
-                }
-                int at = low == 0 ? select[c] : low;
                 int volume = voice == NO_VOICE ? 0 : read.streams()[8 + voice][f] & 0x1F;
                 switch (opcode) {
                     case START_TOGGLE -> {
@@ -252,7 +259,7 @@ final class Ymx {
                         // HOLD's low bits are flags and not a prescaler
                         // (YMX, SPEC.md 2.4): 1 reloads the count, 2 the
                         // toggle's volume, 4 the retrigger's shape.
-                        if ((low & 1) != 0 && written != 0) {
+                        if ((low & 1) != 0) {
                             count[c] = written;
                         }
                         Target on = target[c];
@@ -290,10 +297,6 @@ final class Ymx {
                     running[other] = false;
                 }
             }
-        }
-        if (kept > 0) {
-            report.note(kept + " rows write a count or a select of 0, which the columns"
-                    + " read as the rate the effect already runs at");
         }
         for (String said : left.subList(0, Math.min(left.size(), 3))) {
             report.note(said);
