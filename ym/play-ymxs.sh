@@ -66,7 +66,7 @@ vbls=
 help=
 silent=
 # The flags read off, and the names left in the positional parameters, as
-# ym/play.sh reads its own.
+# ym/play.sh reads them.
 left=$#
 while [ "$left" -gt 0 ]; do
     arg=$1
@@ -88,7 +88,7 @@ if [ -n "$help" ]; then
     exit 0
 fi
 # The flags stay in the parameters and the names come out of them: one
-# .ymxs to play, or none where standard input carries the structure, and
+# .ymxs to play, or none where standard input has the structure, and
 # any other name to record to.
 tune=
 left=$#

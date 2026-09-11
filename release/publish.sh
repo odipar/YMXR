@@ -41,8 +41,8 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-# What go:embed takes: the five binaries the build assembles. A tree whose
-# build has not run carries none, and a tool would then have no core to put
+# What go:embed reads: the five binaries the build assembles. A tree whose
+# build has not run has none, and a tool would then have no core to put
 # a tune behind.
 BINARIES=go/binaries/data
 for binary in YMXR_sndh.bin YMXR_sndh-perf.bin YMXR_sndh-lean.bin \
@@ -75,7 +75,7 @@ for target in $TARGETS; do
     mkdir -p "$OUT/$target"
     for tool in $TOOLS; do
         # CGO off makes the binary static and the cross-build runs; -s -w
-        # drop the symbol and debug tables, which nothing here reads.
+        # drop the symbol and debug tables, which no tool here reads.
         (cd go && CGO_ENABLED=0 GOOS=$os GOARCH=$arch \
             go build -ldflags="-s -w" -o "$OUT/$target/$tool$ext" \
             ./cmd/"$tool")
@@ -89,7 +89,8 @@ done
 release/manifest.sh "$VERSION" "$OUT/release"
 
 # The host's executables, tried as a user would: from a directory that is
-# not this repository, with nothing beside them and an empty environment.
+# not this repository, with no other file beside them and an empty
+# environment.
 # A dump goes in and a TOS program comes out, which is the whole pipeline
 # in one run, and a .ymx goes through the same two tools: that path read
 # the file by running YMX's ymx-dump until 0.1.0, and a released executable

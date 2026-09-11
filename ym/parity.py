@@ -38,9 +38,9 @@ VBLS = int(os.environ.get("VBLS", "700"))
 WHOLE = "-whole" in sys.argv
 CORPUS = os.environ.get("YM_CORPUS", os.path.expanduser("~/git/jatari/data/ym_format"))
 
-# The tunes under ym/test are one of each shape, which is what the rig
-# asks of them. A comparison against another player wants the shapes an
-# ST tune is driven with besides: these are the corpus's own, six tunes
+# The tunes under ym/test are one of each shape, which the rig
+# requires of them. A comparison against another player needs the shapes an
+# ST tune is driven with besides: these come from the corpus, six tunes
 # whose effects are square waves on a volume register and five whose
 # sources are recordings played once (experiments.md counts both).
 SID = ["Sid Music #1", "Sid Music #2", "Synergy Odyssey",
@@ -50,8 +50,8 @@ SAMPLES = ["Chambers of Shaolin - Mega Pock Olipse", "Lethal Xcess 3 - level 2",
            "Seven Gates of Jambala  - level 11 digidrums"]
 
 # The bits each register reads of the byte written to it, so that a value the
-# chip drops is not a difference (68k/test/emu/test_ymxr.py, TAKES).
-TAKES = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
+# chip drops is not a difference (68k/test/emu/test_ymxr.py, MASK).
+MASK = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
 
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+)")
 VBL = re.compile(r"^VBL=(\d+)")
@@ -87,7 +87,7 @@ def frames(path):
             if reg <= 13:
                 if first is None and reg != 7:
                     first = len(out)
-                state[reg] = value & TAKES[reg]
+                state[reg] = value & MASK[reg]
     return out, first
 
 
@@ -176,7 +176,7 @@ def compare(ym):
     off = first_b - first_a
     last = len(a) if WHOLE else min(len(a), first_a + rows(tune))
     same = read = parted = 0
-    # the registers a frame actually parted on, which is what the run
+    # the registers a frame parted on, which the run
     # names: the set an effect drives is what it is judged against
     where = set()
     for i in range(last):

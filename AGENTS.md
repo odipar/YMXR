@@ -150,6 +150,11 @@ been struck so far.
 | `a tool says while it works` | `a tool reports while it works` |
 | `lines taken out` | `lines dropped` |
 | `name a source at all` | `name any source` |
+| `the timer's own` | `the timer's alone` |
+| `a handler of its own` | `a separate handler` |
+| `whatever the advance costs` | `by the advance for the next row` |
+| `TAKES`, the register mask | `MASK`, as the Java and the Go trees name it |
+| `which is what a voice is heard through` | `through which a voice is heard` |
 | `its SPEC.md is the base this one stands on` | `its SPEC.md defines what a tune is; this document defines one encoding of that` |
 | `that sequence is what timerReset asks of a running timer` | `that sequence is what timerReset requires of a running timer` |
 | `which asks of the host` | `which the host then provides` |

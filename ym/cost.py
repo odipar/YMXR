@@ -5,7 +5,7 @@ A player with the monitor in (68k/YMXR.S, YMXR_PERF) paints the
 background red while a call's work runs and yellow while it burns the
 timers' counted cost, and each tick handler paints a separate colour and
 puts back what stood before it. This reads a Hatari trace of the writes
-to the background back: the red mark to the yellow one is the call's own
+to the background back: the red mark to the yellow one is the call's
 work, less every tick band inside it, and the yellow to the write that
 puts the desktop's colour back is the bar. doc/performance.md has the
 figures and the method.

@@ -85,7 +85,7 @@ def rows(nf, g, ym6):
     read and which packs smallest of the fills tried.
 
     A YM dump names an effect by kind and by a value out of a volume
-    register, so each distinct pair becomes a source of the tune's own,
+    register, so each distinct pair becomes a separate source of the tune,
     numbered from 1 as it is first met."""
     cols = [bytearray() for _ in range(C)]
     kept = [None] * 14               # what the player keeps of R0 to R13

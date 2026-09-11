@@ -101,8 +101,8 @@ TIMER = [dict(ctrl=0xFFFFFA19, shift=0, data=0xFFFFFA1F, ier=0xFFFFFA07, bit=5, 
          dict(ctrl=0xFFFFFA1B, shift=0, data=0xFFFFFA21, ier=0xFFFFFA07, bit=0, vector=0x120),
          dict(ctrl=0xFFFFFA1D, shift=4, data=0xFFFFFA23, ier=0xFFFFFA09, bit=5, vector=0x114)]
 # The effects each of those registers belongs to, in effect order, so a
-# trace of the MFP says which effect the frame procedure has stepped.
-# Timers C and D share a control register, and that one carries two.
+# trace of the MFP reports which effect the frame procedure has stepped.
+# Timers C and D share a control register, and that one has two.
 OWNS = {reg: [i for i in range(4) if reg in (TIMER[i]["ctrl"], TIMER[i]["data"])]
         for t in TIMER for reg in (t["ctrl"], t["data"])}
 C = 30
@@ -231,7 +231,7 @@ def convert(ym, work):
 
 def bind(file, work):
     """The bound tune of a tune file, through bin/ymxr-bind; None where the
-    binder rejects the file, which it reports on a line of its own."""
+    binder rejects the file, which it reports on a separate line."""
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), "-silent"],
                        input=file, capture_output=True)
     if r.returncode == 1 and r.stderr.startswith(b"ymxr-bind: "):
@@ -286,9 +286,10 @@ class Tune:
         count = file[9]
         self.state = long_at(file, 12)
         self.image_at = long_at(file, 16)
-        # Where this tune's table stands in the image that carries it: an
-        # image of one names it in its format block, and one shared by
-        # several names the first, so a bound tune carries its own
+        # Where this tune's table stands in the image it is packaged
+        # into: an image of one names it in its format block, and one
+        # shared by several names the first, so a bound tune records a
+        # separate offset
         # (BINARIES.md 2, DTX abi.md 1).
         self.table_at = long_at(file, 20)
         index = [long_at(file, 24 + 4 * i) for i in range(count)]
@@ -467,8 +468,8 @@ class Model:
         return R == 1 and RR == 0
 
     def value(self, i):
-        """The row a handler that keeps its place as an immediate stands
-        at, which is its place."""
+        """The row a handler with its place as an immediate stands at,
+        which is its place."""
         fx = self.fx[i]
         at, R, RR, rows = self.tune.sources[fx["source"]]
         return rows[fx["place"]]
@@ -903,7 +904,7 @@ ROM = 0xE00000
 
 def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
-    trace carries, checked against the model, and the ticks counted. code
+    trace records, checked against the model, and the ticks counted. code
     and symbols are the SNDH core's, the player's symbols among them; with
     perf the core with the raster monitor in: the switches that chose the
     core here choose the SNDH file's core too."""
@@ -1216,8 +1217,9 @@ def main():
                 if said != counted:
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
-                # plan.md's closing figures, on the tune it names. Nothing
-                # reached them: its call had moved twice and its ticks once,
+                # plan.md's closing figures, on the tune it names. No
+                # figure reached them: its call had moved twice and its
+                # ticks once,
                 # while performance.md's table beside them stayed fixed. The
                 # figures are the core the document reckons against, whose
                 # ticks drop the level and write an end of interrupt, so

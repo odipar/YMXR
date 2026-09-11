@@ -12,7 +12,9 @@ before what it describes, and what things are called comes before both.
   hit.
 - **R0.3** The test walks the tree for documents and for sources. Each is
   read because it is there, not because someone listed it. In a source the
-  comments are read and the code is not: a name is not prose.
+  comments are read and the code is not: a name is not prose. The five
+  languages are Java, Go, 68000 assembly, Python and the shell, and a
+  comment opens differently in each.
 - **R0.4** Striking a phrase adds it to the list, in the same change.
 - **R0.5** Using a struck phrase again removes it from the list, in the same
   change.

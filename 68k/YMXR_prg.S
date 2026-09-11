@@ -40,7 +40,7 @@
 ; The mouse is turned off at the chip while the program runs and set back
 ; to reporting where it moves before the machine is handed back, and what
 ; the chip has already sent is read off between the two. So the packets
-; TOS's handler would have read are not sent at all, rather than read
+; TOS's handler would have read are not sent, rather than read
 ; here and lost.
 
 GEMDOS          equ     1
@@ -83,7 +83,7 @@ main:           btst    #0,flags+1(pc)
                 addq.l  #6,sp
 ; The subtunes a key reaches. The keys are 1 to 9, so a set of one has
 ; none to offer and a larger set offers what it has, nine at most. The
-; screen is forty columns, so each line stands on its own.
+; screen is forty columns, so each line stands alone.
                 move.w  subtunes(pc),d0
                 cmp.w   #1,d0
                 bls.s   .alone
@@ -254,7 +254,7 @@ vbl:
                 bsr     tick
                 rte
 
-; One row from the core. The tune is done once the core says its last row
+; One row from the core. The tune is done once the core reports its last row
 ; has played, or the rows asked for have. Every register kept. A core
 ; with the raster monitor in paints the call itself (the player,
 ; doc/performance.md), and this program clears the screen for it.
