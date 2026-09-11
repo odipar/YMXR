@@ -2,5 +2,5 @@ github.com/odipar/dtx/go v0.9.0 h1:3y5MfV59OROZfd9lstrOQst0k2dt/jFUTzUPN2fHsuc=
 github.com/odipar/dtx/go v0.9.0/go.mod h1:axE+pTSWgxDM6V8DEiCbneK8ufzprD0LcmYCw3O5iWg=
 github.com/odipar/ymx/go v0.1.0 h1:xHgZoBolmN4uiW0l5XauSZJTTJhgaH6h5WnkISaHCwk=
 github.com/odipar/ymx/go v0.1.0/go.mod h1:fs0J1mETR3rZQDDJ++75VlO7W0SmV5oMGRnbb2Rjasg=
-github.com/odipar/ymxs/go v0.1.0 h1:x0B47IEQGt+TBORFsleAyoANxLduF32ZCdYDU2vmxSA=
-github.com/odipar/ymxs/go v0.1.0/go.mod h1:1dGec133U1iy9VAgt8HOY1zIHVPpiRLaAeYYgqUpXFs=
+github.com/odipar/ymxs/go v0.2.0 h1:xfw/Fxpo3YkRKYo/jYMVHLwOXepxP7jwci27KQg3G40=
+github.com/odipar/ymxs/go v0.2.0/go.mod h1:1dGec133U1iy9VAgt8HOY1zIHVPpiRLaAeYYgqUpXFs=

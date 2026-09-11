@@ -10,5 +10,5 @@ go 1.26
 require (
 	github.com/odipar/dtx/go v0.9.0
 	github.com/odipar/ymx/go v0.1.0
-	github.com/odipar/ymxs/go v0.1.0
+	github.com/odipar/ymxs/go v0.2.0
 )
