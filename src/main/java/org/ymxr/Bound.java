@@ -54,7 +54,7 @@ final class Bound {
     /**
      * A set of tunes bound together: the images their tables were packaged
      * into, and a bound tune for each, in the order named. A bound tune
-     * here carries no image of its own, and its {@code IMAGE_AT} stands at
+     * here has no image in it, and its {@code IMAGE_AT} stands at
      * 0 for the caller that lays them out to patch (SPEC.md's files are
      * laid out by {@link Sndh}).
      *
@@ -142,7 +142,7 @@ final class Bound {
 
     /**
      * The bound tune: the header, the state block's bytes, the table's
-     * place in the image that carries it, the source index, then the image
+     * place in the image it stands in, the source index, then the image
      * where the tune has one and the file's DTX1 tables.
      *
      * @param image the image to carry, or null where the tunes share one
@@ -175,9 +175,9 @@ final class Bound {
         Tune.putWord(bound, 4, VERSION);
         Tune.putLong(bound, STATE_AT, state);
         Tune.putLong(bound, IMAGE_AT, imageAt);
-        // Where this tune's table stands in the image that carries it. An
+        // Where this tune's table stands in the image it is packaged into. An
         // image of one names it in its format block; one of several
-        // names the first, so a tune past the first carries its own.
+        // names the first, so a tune past the first records a separate offset.
         Tune.putLong(bound, TABLE_AT, table);
         for (int i = 0; i < count; i++) {
             Tune.putLong(bound, INDEX_AT + 4 * i, sourceAt[i]);

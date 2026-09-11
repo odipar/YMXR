@@ -38,8 +38,8 @@ final class Binaries {
      * The core with the player's raster monitor assembled in (the
      * player's {@code YMXR_PERF}, doc/performance.md): the play call
      * paints the background red while its work runs and burns a yellow
-     * bar for the timers' counted cost, and each tick handler paints its
-     * colour of its own. A trace of the palette writes reports what the run
+     * bar for the timers' counted cost, and each tick handler paints a
+     * separate colour. A trace of the palette writes reports what the run
      * cost, and a file made for reading a run uses this core in place of the
      * plain one.
      */

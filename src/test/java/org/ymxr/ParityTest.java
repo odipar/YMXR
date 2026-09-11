@@ -21,14 +21,14 @@ import org.junit.jupiter.api.Test;
  *
  * <p>One input has one output. Java and Go read the same dumps, write the
  * same tune files, bind them the same way and put the same bytes behind
- * the core and the stub, so a caller who takes either has the same file at
+ * the core and the stub, so a caller who runs either has the same file at
  * every step.
  *
  * <p>The tools are run as a caller runs them: the input on standard input,
- * the output on standard output. What is compared is standard output and
- * the exit. A report is prose, and the progress lines a long run prints
- * are spaced by the clock, so a report is compared with those lines taken
- * out.
+ * the output on standard output. Standard output and the exit are
+ * compared. A report is prose, and the progress lines a long run prints
+ * are spaced by the clock, so a report is compared with those lines
+ * dropped.
  *
  * <p>Skipped where Go is not installed, or where the Java tools have not
  * been built.
@@ -81,11 +81,11 @@ final class ParityTest {
 
     /** A progress line, which the clock spaces: the two labels a tool
      *  reports progress under, the count, and the percentage. Matched by
-     *  the whole line, so a report's own line is never taken for one. */
+     *  the whole line, so a report's line is never read as one. */
     private static final Pattern PROGRESS = Pattern.compile(
             "^ {2}(packing the columns|read) \\d+ of \\d+ \\(\\d+%\\)$");
 
-    /** A report with the lines the clock spaces taken out, which two trees
+    /** A report with the lines the clock spaces dropped, which two trees
      *  reach at different rows. */
     private static String steady(String said) {
         return said.lines().filter(one -> !PROGRESS.matcher(one).matches())
@@ -246,7 +246,7 @@ final class ParityTest {
      * for byte, so this runs the same tools without the flag.
      *
      * <p>The progress lines are spaced by the clock and come out at
-     * different rows, and steady takes those out of both.
+     * different rows, and steady drops those from both.
      */
     @Test
     void theVerboseReportIsTheSameInBothTrees() throws Exception {

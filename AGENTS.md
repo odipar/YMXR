@@ -143,6 +143,13 @@ been struck so far.
 | `for a reader who would rather open one in a spreadsheet` | `for reading in a spreadsheet` |
 | `frames says how long every column is` | `frames is the length of every column` |
 | `tool.say(...)`, `tool.says()` | `tool.report(...)`, `tool.reports()` |
+| `X is what Y does` | `Y does X` - the cleft, struck wherever it stood |
+| `a table carries W` | `a table has W` |
+| `an image of its own` | `a separate image` |
+| `the row the call asks for` | `the row the call names` |
+| `a tool says while it works` | `a tool reports while it works` |
+| `lines taken out` | `lines dropped` |
+| `name a source at all` | `name any source` |
 | `its SPEC.md is the base this one stands on` | `its SPEC.md defines what a tune is; this document defines one encoding of that` |
 | `that sequence is what timerReset asks of a running timer` | `that sequence is what timerReset requires of a running timer` |
 | `which asks of the host` | `which the host then provides` |

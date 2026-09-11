@@ -163,7 +163,7 @@ final class Sndh {
      * @throws IllegalArgumentException where the core is not one, is of
      *     another descriptor version, reads bound tunes of another
      *     version than {@link Bound} writes, has no raster monitor in
-     *     where {@code monitor} asks for one, or its ticks are not the
+     *     where {@code monitor} selects one, or its ticks are not the
      *     lean ones where {@code lean} does
      */
     static void checkCore(byte[] core, boolean monitor, boolean lean) {
@@ -280,7 +280,7 @@ final class Sndh {
      * The same, of a set whose tunes share their images: the images stand
      * behind the subtune table and every bound tune's {@code IMAGE_AT} is
      * patched to reach the one with its table in it, from its first
-     * byte. A tune whose set has no image carries its own, as a bound tune
+     * byte. A tune whose set has no image is packaged with one, as a bound tune
      * written by itself does.
      */
     static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace) {
@@ -480,8 +480,8 @@ final class Sndh {
                 + (set.images().size() == 1 ? " image of " : " images of ") + images
                 + " bytes, DTX's reader once a set of tunes that share one");
         // What an image fixes once is what splits a set into more than one,
-        // and the unit is what a flag moves: a tune whose row count or
-        // repeat row is odd packs at unit 1 though -k asks for another
+        // and a flag moves the unit: a tune whose row count or
+        // repeat row is odd packs at unit 1 though -k names another
         // (tools.md, experiments.md).
         for (int i = 0; i < set.images().size(); i++) {
             int of = 0;

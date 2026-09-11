@@ -103,9 +103,9 @@ The four timer counts have no such bit, and a count of 0, which the MFP
 reads as 256, is not reachable (1.9).
 
 The set bit flags the value, not the column. The five bits above sit
-beside another column's value rather than inside their own, and are read on
-every row, set bit or no (R3.6). Every other bit of a column is part of its
-value, read only where the row sets it.
+beside another column's value rather than inside the value they mark, and
+a player reads them on every row, set bit or no (R3.6). Every other bit of
+a column is part of its value, read only where the row sets it.
 
 One column gathering all twenty-one set bits would gather twenty-one
 reasons to move, and the sum of them moves on nearly every row. A bit

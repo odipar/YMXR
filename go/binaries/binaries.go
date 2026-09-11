@@ -8,8 +8,8 @@
 // file that requests both uses the core that is both.
 //
 // The files are build output. The Maven build writes them into data/,
-// which go:embed reads only inside its own module. A tree built without
-// them does not contain one: Read then gives nil back and the caller reads
+// which go:embed reads only inside its module. A tree built without
+// them does not contain one: Read then returns nil and the caller reads
 // them out of the directory YMXR_68K names.
 package binaries
 
@@ -57,7 +57,7 @@ func Named(monitor, lean bool) string {
 	return Core
 }
 
-// Read is a binary as this executable carries it, or as YMXR_68K names a
+// Read is a binary as this executable contains it, or as YMXR_68K names a
 // directory to read it from.
 func Read(name string) ([]byte, error) {
 	if where := os.Getenv("YMXR_68K"); where != "" {
@@ -71,7 +71,7 @@ func Read(name string) ([]byte, error) {
 	return file, nil
 }
 
-// Embedded is how many binaries this executable carries, which a test
+// Embedded is how many binaries this executable contains, which a test
 // reads to skip where the build has not run.
 func Embedded() int {
 	said, err := data.ReadDir("data")

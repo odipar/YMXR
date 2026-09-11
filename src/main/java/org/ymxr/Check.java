@@ -175,7 +175,7 @@ final class Check {
         return wrong;
     }
 
-    /** What one line of the tool says of a file: no dump where the file is
+    /** What one line of the tool reports of a file: no dump where the file is
      *  not a YM5!/YM6! dump, and otherwise an empty list, or the faults. */
     record Result(Path file, boolean dump, List<String> wrong) {
     }
@@ -234,12 +234,12 @@ final class Check {
      * {@code ymxr-check}: a YM5!/YM6! dump on standard input, one line on
      * standard output saying whether the tune it converts to replays to
      * that dump, and the wrong frames under it where it does not. The
-     * flags are the converter's, and an exit of 1 says a dump does not
+     * flags are the converter's, and an exit of 1 marks a dump that does not
      * replay.
      *
      * <p>A corpus is read by naming files and directories instead:
      * {@code ymxr-check corpus/} reads every {@code .ym} under it, in
-     * parallel, one line a file and a count at the end. The tool says how
+     * parallel, one line a file and a count at the end. The tool reports how
      * far through it is on standard error, which a run of thousands runs
      * for minutes.
      */
@@ -292,8 +292,7 @@ final class Check {
         System.exit(failed == 0 ? Tool.DONE : Tool.WRONG);
     }
 
-    /** One file's verdict, on standard output, which is what the tool is
-     *  for. */
+    /** One file's verdict, on standard output, which the tool is for. */
     private static void said(Result result) {
         String name = result.file().getFileName().toString();
         if (!result.dump()) {

@@ -17,11 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * What a tool says while it works: the account a report prints, the
+ * What a tool reports while it works: the account a report prints, the
  * progress lines of a long run, and the conversion's
  * account against the file it wrote. {@code -silent} turns the account
  * off and leaves the notes, and no account reaches standard output,
- * which is what a tool is for.
+ * which the tool writes its file to.
  */
 final class ReportTest {
 
@@ -119,7 +119,7 @@ final class ReportTest {
     }
 
     @Test
-    void theConverterTakesTheSilentFlagAndWritesTheSameFileEitherWay() throws Exception {
+    void theConverterReadsTheSilentFlagAndWritesTheSameFileEitherWay() throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Chambers of Shaolin 5 -"
                 + " you blew it!.ym"));
         Caught silent = caught(false);
@@ -156,7 +156,7 @@ final class ReportTest {
     }
 
     @Test
-    void everyColumnsPackedBytesAreTheBytesTheFileHolds(@TempDir Path work) throws Exception {
+    void everyColumnsPackedBytesAreTheBytesInTheFile(@TempDir Path work) throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Chambers of Shaolin 5 -"
                 + " you blew it!.ym"));
         Caught c = caught(true);

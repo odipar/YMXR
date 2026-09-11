@@ -68,7 +68,7 @@ func Asked(t *tool.Tool, args []string) (int, bool) {
 	return 0, false
 }
 
-// Repeat is the row the tune repeats to: the row the call asks for, the
+// Repeat is the row the tune repeats to: the row the call names, the
 // file's loop frame, or its frame count where the tune plays once.
 func Repeat(at int, asked bool, read ymx.Dumped) int {
 	if asked {

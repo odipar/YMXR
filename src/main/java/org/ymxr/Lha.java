@@ -2,13 +2,13 @@ package org.ymxr;
 
 /**
  * Unpacks the LHA archives that distributed {@code .ym} files come wrapped
- * in, entirely in memory.
+ * in, and no file is written out.
  *
  * <p>Carried from YMX's {@code org.ym6.Lha}, a port of the ST-Sound
  * library's LZH depacker by Arnaud Carré, which
  * is based on original LZH code by Haruhiko Okumura (1991) and Kerwin F.
  * Medina (1996). It reads a level-0 header - the kind every YM archive in
- * the wild carries - verifies its checksum, and inflates the {@code -lh5-}
+ * the wild has - verifies its checksum, and inflates the {@code -lh5-}
  * method; {@code -lh0-} members are stored uncompressed and copied out.
  *
  * <p>YM archives contain exactly one member, so this returns the first member's

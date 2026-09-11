@@ -159,7 +159,7 @@ final class ConsistencyTest {
         List<String> dangling = new ArrayList<>();
         // A citation a document qualifies with DTX is DTX's requirements and
         // not this repository's: tools.md cites DTX's R5.6 and R5.11 for
-        // what a unit asks of a column's bytes. Those are read out first.
+        // what a unit requires of a column's bytes. Those are read out first.
         Pattern theirs = Pattern.compile("DTX'?s?\\s+R\\d+\\.\\d+(\\s+and\\s+R\\d+\\.\\d+)*");
         for (Path p : DOCUMENTS) {
             Matcher c = Pattern.compile("\\bR\\d+\\.\\d+\\b")
@@ -307,7 +307,7 @@ final class ConsistencyTest {
      * than a table row, so the check above does not reach them.
      */
     @Test
-    void theEnvelopeSavingIsTheDifferenceItStates() throws IOException {
+    void theEnvelopeSavingIsTheDifferenceItReports() throws IOException {
         String experiments = read(EXP);
         Matcher both = wrapped("cost ([\\d,]+) bytes as SPEC\\.md has them, and"
                 + " ([\\d,]+) under").matcher(experiments);
@@ -624,7 +624,7 @@ final class ConsistencyTest {
     }
 
     @Test
-    void everyDocumentHoldsOneWrapWidth() throws IOException {
+    void everyDocumentKeepsOneWrapWidth() throws IOException {
         List<String> wide = new ArrayList<>();
         for (Path p : DOCUMENTS) {
             List<String> lines = Files.readAllLines(p);

@@ -67,9 +67,9 @@ type Written struct {
 // its loop begin on a unit (DTX's R5.6 and R5.11), so a tune whose row
 // count or repeat row does not divide by the unit asked for packs at unit
 // 1. The table packs at a period of C rows, the smallest DTX allows, since
-// a refill decodes a period's rows of one column at once and the period is
-// what a refill costs; the ring is a multiple of C for that, the one
-// nearest what was asked for within what the player reaches. A loop longer
+// a refill decodes a period's rows of one column at once and a refill
+// costs a period; the ring is a multiple of C for that, the one nearest
+// what was asked for within what the player reaches. A loop longer
 // than the ring is replayed at its exact rows by DTX's reader.
 func Write(columns Columns, sources *Sources, frameRate, unit, ring int,
 	said *report.Report) (Written, error) {

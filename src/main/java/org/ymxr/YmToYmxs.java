@@ -74,7 +74,7 @@ public final class YmToYmxs {
         return OptionalInt.empty();
     }
 
-    /** The row the tune repeats to: the row the call asks for, the dump's
+    /** The row the tune repeats to: the row the call names, the dump's
      *  loop frame, or its frame count where the tune plays once. */
     static int repeat(Tool tool, OptionalInt asked, YmDump.Song song, Report report) {
         if (asked.isPresent()) {

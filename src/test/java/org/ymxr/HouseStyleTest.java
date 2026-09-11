@@ -163,6 +163,87 @@ final class HouseStyleTest {
         }
     }
 
+    /** Every Java and Go source in the tree but this one, which quotes the
+     *  struck phrases to ban them. */
+    private static List<Path> sources() throws IOException {
+        try (Stream<Path> tree = Files.walk(Path.of("."))) {
+            return tree.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java")
+                            || path.toString().endsWith(".go"))
+                    .filter(path -> !path.toString().contains("/target/"))
+                    .filter(path -> !path.getFileName().toString()
+                            .equals("HouseStyleTest.java"))
+                    .sorted()
+                    .toList();
+        }
+    }
+
+    /**
+     * The comment lines of a source, each with the line it stands on.
+     *
+     * <p>R0.1 binds a code comment as it binds a document, and the code
+     * around a comment does not: a field named {@code holds} or a call to
+     * {@code getState} is a name and not prose. So this reads the comment
+     * text and leaves the rest of the line out.
+     */
+    private static List<String[]> commentsOf(Path source) throws IOException {
+        List<String[]> out = new ArrayList<>();
+        List<String> lines = Files.readAllLines(source);
+        boolean inside = false;
+        for (int at = 0; at < lines.size(); at++) {
+            String said = lines.get(at).strip();
+            if (said.startsWith("/*")) {
+                inside = true;
+            }
+            if (inside) {
+                out.add(new String[] {String.valueOf(at + 1),
+                        said.replaceFirst("^/?\\*+/?", "").strip()});
+                if (said.endsWith("*/")) {
+                    inside = false;
+                }
+                continue;
+            }
+            if (said.startsWith("//")) {
+                out.add(new String[] {String.valueOf(at + 1),
+                        said.substring(2).strip()});
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The comments of the Java and the Go tree, against the same list.
+     *
+     * <p>R0.1 makes the rules bind every document, code comment and commit
+     * message, and R0.2's test read the documents alone. A comment drifted
+     * where no test read it, so the comments are read here: the same
+     * phrases, the same list, and the paragraph joined as a document's is,
+     * since a comment wraps at the same width.
+     */
+    @Test
+    void noCommentHasAStruckPhrase() throws IOException {
+        List<Path> sources = sources();
+        assertTrue(!sources.isEmpty(), "no source was found to read");
+        List<String> hits = new ArrayList<>();
+        for (Path source : sources) {
+            List<String[]> comments = commentsOf(source);
+            for (String[] one : comments) {
+                String line = " " + one[1].toLowerCase();
+                for (String struck : STRUCK) {
+                    if (line.contains(struck)) {
+                        hits.add(source + ":" + one[0] + " has \"" + struck + '"');
+                    }
+                }
+            }
+            hits.addAll(wrappedHits(source,
+                    comments.stream().map(one -> one[1]).toList()));
+        }
+        assertTrue(hits.isEmpty(), () -> String.join("\n", hits)
+                + "\nAGENTS.md binds a code comment as it binds a document"
+                + " (R0.1); reword the comment, or drop the entry from this"
+                + " list in the same change.");
+    }
+
     @Test
     void noDocumentHasAStruckPhrase() throws IOException {
         List<Path> documents = documents();

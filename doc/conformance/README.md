@@ -18,7 +18,7 @@ record, below.
 
 The tunes are converted from the dumps under `ym/test`, six of them
 recordings of published music, by Jochen Hippel, Mad Max and Scavenger
-as their headers say, and two built. The music is its composers': the
+as their headers record, and two built. The music is its composers': the
 repository's LICENSE covers neither the dumps nor these.
 
 ## Running the exercise

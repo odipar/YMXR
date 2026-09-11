@@ -30,7 +30,7 @@ final class BuiltTunes {
     /**
      * A sync buzzer whose shape and rate move on the same frame, running
      * unbroken from frame 8 on voice C: both step every fiftieth frame
-     * together, so the row that carries them restarts a running source
+     * together, so the row that sets them restarts a running source
      * with a new rate and a new shape, and the buzzer is never stopped.
      */
     static byte[] retriggerRetune() {

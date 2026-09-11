@@ -56,7 +56,7 @@ const (
 
 // Set is a set of tunes bound together: the images their tables were
 // packaged into, and a bound tune for each, in the order named. A bound
-// tune here carries no image of its own, and its ImageAt stands at 0 for
+// tune here has no image in it, and its ImageAt stands at 0 for
 // the caller that lays them out to patch.
 //
 // The tunes are grouped by what an image fixes once (DTX abi.md 1), so
@@ -137,7 +137,8 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 	return Set{Images: images, Shapes: keys, Tunes: tunes, Image: image, Table: table}, nil
 }
 
-// shape is what an image fixes once, as a key two tables are grouped by
+// shape is the values an image fixes once, as a key two tables are
+// grouped by
 // and as a reader of the report sees it: the variant, the width, and under
 // DTX2 the unit, the copies flag and the ring (DTX abi.md 1). The period
 // follows the ring and C, which the schema fixes.
@@ -173,7 +174,7 @@ func Bound(tuneFile []byte) ([]byte, error) {
 }
 
 // build is the bound tune: the header, the state block's bytes, the
-// table's place in the image that carries it, the source index, then the
+// table's place in the image it stands in, the source index, then the
 // image where the tune has one and the file's DTX1 tables. A nil image is
 // a tune of a set, whose ImageAt the caller patches.
 func build(tuneFile, image []byte, table, state int) ([]byte, error) {
@@ -208,9 +209,9 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	ymxr.PutWord(bound, 4, BoundVersion)
 	ymxr.PutLong(bound, StateAt, state)
 	ymxr.PutLong(bound, ImageAt, imageAt)
-	// Where this tune's table stands in the image that carries it. An
+	// Where this tune's table stands in the image it is packaged into. An
 	// image of one names it in its format block; one of several names the
-	// first, so a tune past the first carries its own.
+	// first, so a tune past the first records a separate offset.
 	ymxr.PutLong(bound, BoundTableAt, table)
 	for i := 0; i < count; i++ {
 		ymxr.PutLong(bound, BoundIndexAt+4*i, sourceAt[i])

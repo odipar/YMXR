@@ -90,7 +90,7 @@ final class Prg {
         if (timerC && tags.rate() != 50) {
             throw new IllegalArgumentException("the set claims Timer C and plays at " + tags.rate()
                     + " Hz: the stub then plays from the VBL, a 50 Hz clock, so this set needs"
-                    + " a host of its own");
+                    + " a separate host");
         }
         int core = core(sndh, tags.end() + 4);
         boolean monitor = (Tune.getWord(sndh, core + Sndh.CORE_FLAGS_AT)
@@ -109,8 +109,8 @@ final class Prg {
         return prg;
     }
 
-    /** What the program was made of: the file under it, the stub's own
-     *  bytes, and what the stub was patched with. */
+    /** What the program was made of: the file under it, the stub's bytes,
+     *  and what the stub was patched with. */
     private static void made(Report report, byte[] sndh, byte[] prg, long rows) {
         if (!report.says()) {
             return;

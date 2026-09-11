@@ -24,7 +24,7 @@ import (
 	"github.com/odipar/ymxr/go/ym"
 )
 
-// result is what one line of the tool says of a file: no dump where the
+// result is what one line of the tool reports of a file: no dump where the
 // file is not a YM5!/YM6! dump, and otherwise an empty list, or the
 // faults.
 type result struct {
@@ -116,7 +116,7 @@ func of(data []byte, name string, reads []string) result {
 	return result{file: name, dump: true, wrong: check.Of(song, reads)}
 }
 
-// says puts one file's verdict on standard output, which is what the tool
+// says puts one file's verdict on standard output, which the tool
 // is for.
 func says(one result) {
 	name := filepath.Base(one.file)

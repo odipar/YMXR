@@ -108,7 +108,7 @@ final class PlayerTest {
      * in all three or the three disagree.
      */
     @Test
-    void theBoundTuneIsLaidOutAsBinariesStates() throws IOException {
+    void theBoundTuneIsLaidOutAsBinariesDefines() throws IOException {
         Map<String, Integer> said = layout(Files.readString(BINARIES), "1. The bound tune");
         Map<String, Integer> e = equates();
         assertEquals(0, row(said, "`YMXB`").getValue(), "the magic stands first");
@@ -132,7 +132,7 @@ final class PlayerTest {
      * defines them, against the packager that writes them.
      */
     @Test
-    void theSndhCoreIsLaidOutAsBinariesStates() throws IOException {
+    void theSndhCoreIsLaidOutAsBinariesDefines() throws IOException {
         String binaries = Files.readString(BINARIES);
         Map<String, Integer> said = layout(binaries, "2. The SNDH core");
         assertEquals(Sndh.CORE_MAGIC_AT, row(said, "`YMXS`").getValue());
@@ -153,7 +153,7 @@ final class PlayerTest {
      * defines them, against the tool that patches them.
      */
     @Test
-    void theProgramStubIsLaidOutAsBinariesStates() throws IOException {
+    void theProgramStubIsLaidOutAsBinariesDefines() throws IOException {
         String binaries = Files.readString(BINARIES);
         Map<String, Integer> said = layout(binaries, "4. The program stub");
         assertEquals(Prg.STUB_MAGIC_AT, row(said, "`YMXT`").getValue());
@@ -234,7 +234,7 @@ final class PlayerTest {
     }
 
     @Test
-    void theTuneFileIsWhatTheSpecificationStates() {
+    void theTuneFileIsLaidOutAsTheSpecificationDefines() {
         // SPEC.md 3.3: the version, where the DTX2 table's offset stands
         // and where the source index begins
         assertEquals(0x0002, Tune.VERSION);
@@ -253,7 +253,7 @@ final class PlayerTest {
         byte[] bound = Bound.of(file);
         assertArrayEquals(Bound.MAGIC, Arrays.copyOf(bound, 4));
         assertEquals(Bound.VERSION, Tune.getWord(bound, 4));
-        // the header the file carries, from the frame rate to the count
+        // the header in the file, from the frame rate to the count
         assertArrayEquals(Arrays.copyOfRange(file, Tune.FRAME_RATE_AT, Tune.TABLE_AT),
                 Arrays.copyOfRange(bound, Tune.FRAME_RATE_AT, Tune.TABLE_AT));
         int count = tune.sources().size();

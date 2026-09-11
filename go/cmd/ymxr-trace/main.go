@@ -25,7 +25,7 @@ func main() {
 		t.Wrong(tool.Wrong, "this is a multi file of several tunes, and a record is of"+
 			" one tune")
 	}
-	// A file this reader does not read produces no record, and says so
+	// A file this reader does not read produces no record, and reports why
 	// (SPEC.md 6, R6.1), so the report reads the header under the same
 	// guard rather than failing where the record would not.
 	if file, err := ymxr.Read(tune); err == nil {

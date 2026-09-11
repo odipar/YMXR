@@ -24,7 +24,7 @@ DTX, YMXS and YMX are module dependencies of the Go tree:
 the pom names for their Java artifacts, and `github.com/odipar/ymx/go` for
 the `.ymx` reader, which the pom names no artifact for. A build fetches
 all three, so the Go tree builds without the three checkouts beside it.
-This tree is a module of its own, `github.com/odipar/ymxr/go`, and a
+This tree is a separate module, `github.com/odipar/ymxr/go`, and a
 version of it is a tag of that directory: `go/v0.1.0` beside `v0.1.0`.
 
 A `.ymx` is where the two trees differ in what they need installed. A Go
@@ -556,7 +556,7 @@ a program with the raster monitor's core for each tune, runs it under
 Hatari tracing the writes to the background, and reads every call's
 span back through `ym/cost.py`. The monitor is a build of the player
 (`68k/YMXR.S`, `YMXR_PERF`): the call paints the background red while its
-work runs, each tick handler paints a colour of its own, and the call burns
+work runs, each tick handler paints a separate colour, and the call burns
 a yellow bar for the cost of the ticks it counted, after its writes, so
 none of them moves for it. `-lean` builds the core whose ticks neither drop
 the interrupt level nor write an end of interrupt, so the result is that

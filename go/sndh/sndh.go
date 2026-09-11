@@ -29,7 +29,7 @@ import (
 //	28      4      the subtune table's offset, patched here
 //	32      4      the workspace's offset, patched here
 
-// MaxSubtunes is what the '##' tag's two digits hold.
+// MaxSubtunes is the most the '##' tag's two digits number.
 const MaxSubtunes = ymxr.MaxSubtunes
 
 // The core's descriptor.

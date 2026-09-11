@@ -9,7 +9,7 @@ const C = 30
 // Effect is the first effect's target column; four columns an effect.
 const Effect = 14
 
-// The two resets a control column carries (SPEC.md 1.9).
+// The two resets in a control column (SPEC.md 1.9).
 const (
 	TimerReset = 0x40
 	PlaceReset = 0x20
@@ -59,7 +59,7 @@ func Duration(rows, selects, count, frameRate int) int {
 	return int((scaled + MFP - 1) / MFP)
 }
 
-// Name is what a column is, for a reported row: a register by its number,
+// Name is a column's name in a report: a register by its number,
 // and an effect column by its effect and its part of it.
 func Name(c int) string {
 	if c < Effect {
