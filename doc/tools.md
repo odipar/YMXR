@@ -190,6 +190,13 @@ byte, and `ymxs-to-sndh` and `ymxs-to-prg` write what `ymxr-sndh` and
 `ymxr-prg` write of it. `YmxsTest` reads the first back on every tune under
 `ym/test`.
 
+Each tool that reads a structure reads it as `ymxs-check` does (YMXS,
+doc/tools.md). A structure no player plays stops the tool at exit 1. A
+structure that plays, but not as written, produces the warnings of YMXS,
+SPEC.md 6 on standard error and converts: a fault a writer left in is
+named where the tune is used rather than only where it is checked, and
+`-silent` does not quiet a warning.
+
 A multi of several tunes is a set of subtunes: `ymxs-to-sndh` and
 `ymxs-to-prg` put one tune file each behind one core, in the multi's
 order, and a tune's title names its subtune. The title and the composer

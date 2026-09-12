@@ -50,6 +50,12 @@ final class Ymxs {
 
     /** The multi on standard input, read and checked.
      *
+     * <p>A structure no player plays exits 1. A structure that plays, but
+     * not as written, produces the warnings of YMXS, SPEC.md 6 on standard
+     * error and passes: every tool that reads a tune reports those, so a
+     * fault a writer left in is named where the tune is used rather than
+     * only where it is checked.
+     *
      * @throws RuntimeException where the text is not this form, or is a
      *     structure no player plays: the tool exits 1 and reports what
      */
@@ -64,6 +70,7 @@ final class Ymxs {
         if (!faults.isEmpty()) {
             throw tool.wrong(Tool.WRONG, String.join("\n", faults));
         }
+        tool.warnings(multi);
         return multi;
     }
 

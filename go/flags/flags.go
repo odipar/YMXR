@@ -114,8 +114,13 @@ func RowsOf(t *tool.Tool, args []string, none int64) int64 {
 	return none
 }
 
-// Read is the multi on standard input, read and checked. A text that
-// is not this form, or a structure no player plays, exits 1.
+// Read is the multi on standard input, read and checked. A text that is
+// not this form, or a structure no player plays, exits 1.
+//
+// A structure that plays, but not as written, produces the warnings of
+// YMXS, SPEC.md 6 on standard error and passes: every tool that reads a
+// tune reports those, so a fault a writer left in is named where the tune
+// is used rather than only where it is checked.
 func Read(t *tool.Tool) ymxs.Multi {
 	multi, err := text.Read(t.Text())
 	if err != nil {
@@ -124,6 +129,7 @@ func Read(t *tool.Tool) ymxs.Multi {
 	if faults := check.Multi(multi); len(faults) > 0 {
 		t.Wrong(tool.Wrong, strings.Join(faults, "\n"))
 	}
+	t.Warnings(multi)
 	return multi
 }
 
