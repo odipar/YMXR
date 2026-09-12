@@ -569,6 +569,15 @@ a column 1.1 lists sends the player to the bit beside it. Step 2 is the
 only step that reads the source index, and it reads it to start an effect
 rather than to place a value.
 
+Those steps write the column byte whole, and each register drops the bits
+it does not have: four for R1, R3, R5 and R13, five for R6, R8, R9 and
+R10. A set bit, and a bit beside it marking another column's 0, reach the
+chip inside that byte and are dropped there, so a row whose R13 column is
+`$AE` runs shape `$E`. Step 7 is the one write a player masks, since bits
+7 and 6 of R7 belong to the host rather than to the column. Section 7
+reports the masked value, which is the value the register reads, and a
+check that reads a player against a reader masks each write the same way.
+
 ---
 
 ## 5. What a tick does

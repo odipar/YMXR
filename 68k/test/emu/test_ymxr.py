@@ -112,8 +112,9 @@ OWNS = {reg: [i for i in range(4) if reg in (TIMER[i]["ctrl"], TIMER[i]["data"])
         for t in TIMER for reg in (t["ctrl"], t["data"])}
 C = 30
 EFFECT = 14
-# The bits each register reads of a byte written to it: the rest the chip
-# ignores, and the player leaves the set bit and the bits beside in.
+# The bits each register reads of a byte written to it (SPEC.md 4): the
+# player writes the column byte whole, set bit and bits beside included,
+# and the chip drops the rest.
 FITS = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
 
 
