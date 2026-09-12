@@ -560,10 +560,14 @@ class Machine:
         elif not (WORK <= address < WORK + 0x40000 or STACK <= address < STACK + 0x10000):
             self.stray.append((address, size, value))
 
-    def call(self, name, a0=0, a1=0):
-        """One call through the jump table, back at the sentinel."""
+    def call(self, name, a0=0, a1=0, d0=0):
+        """One call through the jump table, back at the sentinel. The
+        core's three entries stand in another order than the player's
+        (BINARIES.md 2), so each set has a name a slot."""
         mu = self.mu
-        slot = {"init": 0, "play": 4, "stop": 8}[name]
+        slot = {"init": 0, "play": 4, "stop": 8,
+                "core-init": 0, "core-exit": 4, "core-play": 8}[name]
+        mu.reg_write(UC_M68K_REG_D0, d0)
         mu.reg_write(UC_M68K_REG_D6, 0x6D6D6D6D)
         mu.reg_write(UC_M68K_REG_D7, 0x7D7D7D7D)
         mu.reg_write(UC_M68K_REG_A6, 0x00046000)
@@ -1157,6 +1161,56 @@ def hatari(ym, code, symbols, perf=False):
     return played, sum(counted)
 
 
+# The vector the 68000 runs where an interrupt acknowledge finds no
+# vector on the bus: exception 24, the spurious interrupt.
+SPURIOUS = 0x60
+
+
+def core(defines, ym):
+    """The SNDH core's vector at $60 (BINARIES.md 2), under the emulator:
+    init keeps the host's and puts an rte there, and exit puts the host's
+    back.
+
+    A write of the player's that clears a pending or an enable bit between
+    the MFP raising an interrupt and the 68000 acknowledging it leaves the
+    MFP with no vector to place on the bus, and the 68000 runs exception 24
+    rather than the timer's handler. The tick that acknowledge stood for is
+    the one the write cancelled, so the handler returns."""
+    code, symbols = assemble("YMXR_sndh.S", defines=defines)
+    work = tempfile.mkdtemp()
+    file, _ = convert(ym, work)
+    bound = bind(file, work)
+    assert bound is not None, "the binder rejected " + os.path.basename(ym)
+    # The core reads its subtune table and its workspace as offsets from
+    # its first byte, which the tool patches (BINARIES.md 3). The table
+    # stands after the bound tune here, one entry, and the workspace at
+    # WORK.
+    table = (FILE + len(bound) + 1) & ~1
+    code = bytearray(code)
+    code[28:32] = struct.pack(">I", table - CODE)
+    code[32:36] = struct.pack(">I", WORK - CODE)
+    loaded = bound + b"\0" * (table - FILE - len(bound)) \
+        + struct.pack(">HI", 1, FILE - CODE)
+    m = Machine(bytes(code), symbols, loaded)
+    host = 0x00ABCDE0
+    m.mu.mem_write(SPURIOUS, struct.pack(">I", host))
+    # The core keeps every register, so its entries report through the
+    # state byte rather than through d0: bit 0 stands while a tune plays.
+    m.call("core-init", d0=1)
+    assert m.byte(CODE + symbols["sndh_state"]) & 1, \
+        "the core's init rejected " + os.path.basename(ym)
+    at = m.long(SPURIOUS)
+    assert at == CODE + symbols["sndh_spurious"], \
+        "init left $60 at %08x, not the core's handler at %08x" % (
+            at, CODE + symbols["sndh_spurious"])
+    assert bytes(m.mu.mem_read(at, 2)) == b"\x4e\x73", "the handler at $60 is not an rte"
+    m.call("core-exit")
+    assert not m.byte(CODE + symbols["sndh_state"]) & 1, "the core's exit left the tune playing"
+    assert m.long(SPURIOUS) == host, "exit left $60 at %08x, not the host's %08x" % (
+        m.long(SPURIOUS), host)
+    return len(code)
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     count = "-cycles" in sys.argv
@@ -1217,10 +1271,11 @@ def main():
     print("the player: %d bytes%s%s" % (len(code),
                                        ", the raster monitor in" if perf else "",
                                        ", the lean tick" if LEAN else ""))
+    if tunes:
+        print("the SNDH core: %d bytes, $60 kept and put back"
+              % core(defines, tunes[0]))
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
-        print("the SNDH core: %d bytes%s" % (len(code),
-                                             ", the raster monitor in" if perf else ""))
     cycles_of = None
     if count:
         sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))

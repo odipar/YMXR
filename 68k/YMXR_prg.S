@@ -13,17 +13,17 @@
 ;        it clear the program uses the VBL where the screen's rate is the
 ;        tune's, and Timer C at the rate where it is not
 ;   +14  the rate, a word, rows a second
-;   +16  the rows to play, a long, 0 for the tune's row count
+;   +16  the rows to play, a long, 0 to play on until a key stops it
 ;   +20  the core's offset from the SNDH file's first byte, a long
 ;
 ; The machine is claimed under Supexec: the VBL vector, the four
 ; timers' vectors and the enable, mask and control registers kept, every
 ; MFP interrupt off and every timer stopped, the core's init called, the
-; rows played from the VBL or Timer C, and the state put back once the
-; rows have played, the core's state byte marks the tune over, or a key
-; has stopped it. SPACE and ESC stop; 1 to 9 pick a subtune, and the
-; banner offers the keys the set has, on a separate line since the
-; screen is forty columns. Timer C's
+; rows played from the VBL or Timer C, and the state put back once SPACE
+; or ESC has stopped the program, or the rows patched in have played. A
+; tune that plays its last row stops no program: it goes quiet and the
+; keys stand. 1 to 9 pick a subtune, and the banner offers the keys the
+; set has, on a separate line since the screen is forty columns. Timer C's
 ; count is written back as the 192 of the system's 200 Hz, since the
 ; register reads as the live count and writes as the reload. The SNDH
 ; file's address is printed first, so that a trace can be read against
@@ -254,8 +254,10 @@ vbl:
                 bsr     tick
                 rte
 
-; One row from the core. The tune is done once the core reports its last row
-; has played, or the rows asked for have. Every register kept. A core
+; One row from the core. The rows asked for run out and the program is
+; done; a tune that plays its last row does not end the program, and the
+; core's play writes no register after that row, so a subtune of a set
+; that ends leaves the keys to pick another. Every register kept. A core
 ; with the raster monitor in paints the call itself (the player,
 ; doc/performance.md), and this program clears the screen for it.
 tick:
@@ -264,17 +266,13 @@ tick:
                 bne.s   .done
                 lea     sndh(pc),a1
                 jsr     8(a1)
-                adda.l  core(pc),a1
-                move.w  24(a1),d0
-                btst    #1,(a1,d0.w)
-                bne.s   .over
                 lea     rows_left(pc),a0
                 move.l  (a0),d0
-                beq.s   .done
+                beq.s   .done                   ; no count asked for
                 subq.l  #1,d0
                 move.l  d0,(a0)
                 bne.s   .done
-.over:          lea     done(pc),a0
+                lea     done(pc),a0
                 st      (a0)
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts
@@ -316,7 +314,7 @@ timer_c:
 clear:          dc.b    27,"E",0                ; VT52: the screen cleared
 text:           dc.b    "YMXR at $"
 hex:            dc.b    "00000000",13,10
-                dc.b    "SPACE stops the tune",13,10,0
+                dc.b    "SPACE or ESC ends the program",13,10,0
 picks:          dc.b    "1 to 9 pick a subtune",13,10,0
 digits:         dc.b    "0123456789ABCDEF"
 reports:        dc.b    7,5,2,2,2,2,6,2,1,1     ; the bytes after $F6 to $FF

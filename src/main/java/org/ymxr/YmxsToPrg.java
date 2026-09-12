@@ -15,8 +15,8 @@ import org.ymxs.tool.Tool;
  * Supexec, plays the tune from the VBL or Timer C, switches subtunes on
  * the keys 1 to 9, and releases the machine on SPACE or ESC.
  *
- * <p>{@code -rROWS} stops the run after that many rows, 0 for the tune's
- * row count; every other flag is {@code ymxs-to-sndh}'s.
+ * <p>{@code -rROWS} stops the run after that many rows, 0 to play on
+ * until a key stops it; every other flag is {@code ymxs-to-sndh}'s.
  */
 public final class YmxsToPrg {
 
@@ -38,7 +38,7 @@ public final class YmxsToPrg {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
         report.row("the program", program.length + " bytes, "
-                + (rows == 0 ? "the tune's row count" : rows + " rows"));
+                + (rows == 0 ? "until a key stops it" : rows + " rows"));
         Out.write(tool, program);
         for (String note : report.unsaid()) {
             System.err.println("  " + note);

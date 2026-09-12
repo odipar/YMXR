@@ -21,7 +21,7 @@ import org.ymxs.tool.Tool;
  *  10      2      the subtunes, patched here from the '##' tag
  *  12      2      flags, patched here
  *  14      2      the rate, rows a second, patched here from the TC tag
- *  16      4      the rows to play, patched here; 0 plays the tune's row count
+ *  16      4      the rows to play, patched here; 0 plays on until a key stops it
  *  20      4      the core's offset from the SNDH file's first byte, patched here
  * </pre>
  */
@@ -70,7 +70,7 @@ final class Prg {
     /**
      * The program around an SNDH file, from the stub carried.
      *
-     * @param rows the rows to play, 0 for the tune's row count
+     * @param rows the rows to play, 0 to play on until a key stops it
      * @throws IllegalArgumentException where the file is not an SNDH file
      *     around this player's core, or the set claims Timer C at a rate
      *     other than 50
@@ -122,7 +122,7 @@ final class Prg {
                 + " Hz, FLAG " + tags.flag());
         report.say("the stub: " + Binaries.stub().length + " bytes, patched");
         report.row("the subtunes", String.valueOf(tags.subtunes()));
-        report.row("the rows to play", rows == 0 ? "0, the tune's row count"
+        report.row("the rows to play", rows == 0 ? "0, until a key stops it"
                 : String.valueOf(rows));
         report.row("it plays from", (flags & FLAG_VBL) != 0 ? "the VBL, the set claims Timer C"
                 : "the VBL where the screen's rate is the tune's, and Timer C where it is not");
@@ -314,9 +314,9 @@ final class Prg {
 
     /**
      * {@code ymxr-prg}: an SNDH file on standard input, the program
-     * around it on standard output, playing {@code -rROWS} rows, or the
-     * tune's row count without. The stub's flag bit 0 follows the file's core: the screen
-     * is cleared where that core has the raster monitor in.
+     * around it on standard output, playing {@code -rROWS} rows, or
+     * playing on without. The stub's flag bit 0 follows the file's core:
+     * the screen is cleared where that core has the raster monitor in.
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
@@ -333,7 +333,7 @@ final class Prg {
         }
         made(report, sndh, prg, rows);
         tool.report(prg.length + " bytes, "
-                + (rows == 0 ? "the tune's row count" : rows + " rows"));
+                + (rows == 0 ? "until a key stops it" : rows + " rows"));
         Out.write(tool, prg);
     }
 
