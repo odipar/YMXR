@@ -33,6 +33,61 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.3, 2026-09-12
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.3>, built from the commit
+tagged `v0.3.3`.
+
+The 68000 binaries move: the four cores are 38 bytes larger and the program
+stub 8 bytes smaller. The tune file is version 3 and the bound tune is
+version 3, as 0.3.0 set them, so a file of this release plays under 0.3.0
+to 0.3.2 and the other way round, and `ym-to-ymxr` writes the file 0.3.2
+wrote, byte for byte.
+
+- **A handler at `$60` while a tune plays.** The MFP raises an interrupt
+  and the 68000 acknowledges it an instruction or more later. A write of
+  the player's that clears a pending bit or an enable bit inside that
+  window leaves the MFP with no vector to place on the bus, and the 68000
+  runs exception 24 rather than the timer's handler. The SNDH core keeps
+  the host's vector at `$60` and puts an `rte` there at init, beside the
+  four timer vectors it already keeps, and exit puts the host's back. The
+  tick that acknowledge stood for is the one the write cancelled, so
+  returning is the whole handler. Raising the interrupt level around the
+  write is no substitute: an acknowledge the 68000 has begun runs to its
+  end at any level, and the MFP sets a pending bit whether the 68000 masks
+  or not.
+- The player is untouched. It saves and restores no vector, and its
+  header names `$60` among what a host keeps around it. No cycle of a play
+  call or a tick moves: init and exit alone.
+- **A tune that ends stops no program.** The program left the machine the
+  moment the core's state byte marked the tune over, so a tune that plays
+  once played once and the desktop came back, and a set of subtunes ended
+  with the first one that ran out. SPACE and ESC end the program now, and
+  the rows patched in where a caller names a count. A tune that plays
+  its last row goes quiet and the keys stand, so another subtune is one
+  keypress away.
+- The banner named SPACE alone, where ESC has stopped the program since
+  the stub was written. It names both. The rows field of the stub's
+  descriptor is what it always was, and 0 in it means what the stub always
+  did with it: play on. Every document and both trees called that "the
+  tune's row count", which was true only of a tune that plays once.
+- SPEC.md 4 defines what reaches the chip, which section 7 defined for a
+  reader's record alone: a player writes the column byte whole and each
+  register drops the bits it does not have, so a row whose R13 column is
+  `$AE` runs shape `$E`. The player has written that since it was written,
+  and `ConsistencyTest` reads the widths back against the mask tables of
+  the rig and `ym/parity.py`.
+
+The rig drives the SNDH core's three entries under the emulator for the
+first time and reads `$60` before init, after it and after exit. On
+Hatari, a program of this release plays its rows and traces no line of ROM
+after its last write, where the same program under 0.3.2 left 502,132
+lines of desktop behind it.
+
+**Whether the spurious interrupt is gone from real hardware is unmeasured
+here.** 0.3.1 is what the fault was reported against; this release is the
+remedy its notes named, and a run on an ST is what settles it.
+
 ### 0.3.2, 2026-09-11
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.2>, built from the commit
