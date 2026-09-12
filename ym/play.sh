@@ -70,7 +70,7 @@
 # Examples:
 #
 #   ym/play.sh "ym/test/Turrican - world 4-3.ym"
-#       the dump converted at the defaults and played until SPACE
+#       the dump converted at the defaults and played until SPACE or ESC
 #
 #   ym/play.sh -k1 -tTurrican -cHippel tune.ym
 #       packed a byte a unit, and the two tags set

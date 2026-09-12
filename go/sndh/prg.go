@@ -22,7 +22,7 @@ import (
 //	10      2      the subtunes, patched here from the '##' tag
 //	12      2      flags, patched here
 //	14      2      the rate, rows a second, patched here from the TC tag
-//	16      4      the rows to play, patched here; 0 plays the tune's row count
+//	16      4      the rows to play, patched here; 0 plays on until a key stops it
 //	20      4      the core's offset from the SNDH file's first byte, patched here
 
 var stubMagic = []byte{'Y', 'M', 'X', 'T'}
@@ -70,7 +70,7 @@ type Tagged struct {
 }
 
 // Program is the program around an SNDH file, playing that many rows, or
-// the tune's row count where rows is 0.
+// playing on where rows is 0.
 func Program(sndh []byte, rows int64) ([]byte, error) {
 	stub, err := binaries.Read(binaries.Stub)
 	if err != nil {

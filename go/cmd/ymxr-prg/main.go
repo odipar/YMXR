@@ -28,7 +28,7 @@ func main() {
 		t.Wrong(tool.Wrong, err.Error())
 	}
 	made(said, file, prg, rows)
-	rowed := "the tune's row count"
+	rowed := "until a key stops it"
 	if rows != 0 {
 		rowed = fmt.Sprintf("%d rows", rows)
 	}
@@ -60,7 +60,7 @@ func made(said *report.Report, file, prg []byte, rows int64) {
 	said.Say(fmt.Sprintf("the stub: %d bytes, patched", len(stub)))
 	said.Row("the subtunes", fmt.Sprintf("%d", tags.Subtunes))
 	if rows == 0 {
-		said.Row("the rows to play", "0, the tune's row count")
+		said.Row("the rows to play", "0, until a key stops it")
 	} else {
 		said.Row("the rows to play", fmt.Sprintf("%d", rows))
 	}

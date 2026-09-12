@@ -6,8 +6,8 @@
 // plays the tune from the VBL or Timer C, switches subtunes on the keys 1
 // to 9, and releases the machine on SPACE or ESC.
 //
-// -rROWS stops the run after that many rows, 0 for the tune's row count;
-// every other flag is ymxs-to-sndh's.
+// -rROWS stops the run after that many rows, 0 to play on until a key
+// stops it; every other flag is ymxs-to-sndh's.
 package main
 
 import (
@@ -32,7 +32,7 @@ func main() {
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
-	rowed := "the tune's row count"
+	rowed := "until a key stops it"
 	if rows != 0 {
 		rowed = fmt.Sprintf("%d rows", rows)
 	}

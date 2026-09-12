@@ -223,7 +223,7 @@ the stub's last byte. Its layout from its first byte:
 | 10 | 2 | the subtunes: patched by the tool |
 | 12 | 2 | flags: patched; the bits are below |
 | 14 | 2 | the rate, rows a second: patched from the `TC` tag |
-| 16 | 4 | the rows to play: patched; 0 plays the tune's row count |
+| 16 | 4 | the rows to play: patched; 0 plays on until a key stops it |
 | 20 | 4 | the core's offset from the SNDH file's first byte: patched |
 
 The flags word:
@@ -263,8 +263,8 @@ Supexec, keeping the VBL vector, the four timers' vectors and the
 enable, mask and control registers, and turns every MFP interrupt off
 and stops the four timers; calls init with subtune 1 and plays from the
 VBL or Timer C; stops on SPACE or ESC, or once the rows patched in have
-played, or once the core's state byte says the tune is over; switches
-subtunes on 1 to 9, offering in its banner the keys the set has; and
+played; switches subtunes on 1 to 9, offering in its banner the keys the
+set has; and
 hands the machine back with the mouse reporting again, Timer C's count
 written as the 192 of the system's 200 Hz. The stub keeps no vector at
 `$60`: init stands before it arms its clock and exit after it stops, so
