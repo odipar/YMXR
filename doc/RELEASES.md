@@ -33,6 +33,44 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.4, 2026-09-12
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.4>, built from the commit
+tagged `v0.3.4`.
+
+Every tool that reads a structure reads it the way `ymxs-check` does. The
+68000 sources are unchanged since 0.3.3, so the five binaries are the same
+bytes, the tune file is version 3 and the bound tune is version 3, and
+`ym-to-ymxr` writes the file 0.3.3 wrote, byte for byte.
+
+**The tune data structure is YMXS 0.3.1**, which puts the warnings of its
+SPEC.md 6 where its errors already stood. `Ymxs.read` and `flags.Read`
+call them, which is the one place each tree reads a structure, so
+`ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg` name a fault a writer left
+in rather than converting in silence. `-silent` does not quiet a warning:
+that flag is about what a tool reports of its work, and a warning is what
+the tune gets wrong.
+
+What YMXS 0.3.1 reads that 0.3.0 did not:
+
+- rule 1's warnings as one line a run, where a run of two hundred rows was
+  two hundred warnings
+- rule 2, at the row a second timer starts on a register another runs on
+- rule 1 at the wrap, where an effect running after the last row runs on
+  into the row the tune repeats to
+- a new rule 6: a `Stop` of a timer the tune has not started, with the row
+  it repeats to excepted
+- a rate no 68000 services, as an error: past 125,000 ticks a second a
+  68000 at 8 MHz spends every cycle it has entering interrupts and leaving
+  them
+- a source no row starts, and two sources under one name, as errors of the
+  form
+- a JSON number past what an int reads, rejected in both trees
+
+The rules are silent over `ym/test` through `ymxs-to-prg` and over the four
+files under `ymx/test` through `ymxs-to-ymxr`, and over the 543 tunes of
+the corpus in YMXS.
+
 ### 0.3.3, 2026-09-12
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.3>, built from the commit
