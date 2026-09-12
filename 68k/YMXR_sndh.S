@@ -8,14 +8,14 @@
 ;   +8   play  one row
 ;
 ; Each keeps every register. Init keeps the four timers' vectors, control
-; and interrupt bits as it finds them, and exit puts back those of the
-; timers the tune claimed: the player claims a timer only for an effect
-; the tune runs, and the bound tune's effects byte says which. A timer the
-; tune does not run is never touched, so what a host runs on it runs on
-; through the tune. No data register is kept: it reads as the live count
-; and writes as the reload, so a count written back sets a rate no one
-; asked for, and a host that needs a timer's rate back writes the value
-; it knows.
+; and interrupt bits as it finds them, and the vector at $60; exit puts
+; back that vector and the state of the timers the tune claimed. The
+; player claims a timer only for an effect the tune runs, and the bound
+; tune's effects byte says which. A timer the tune does not run is never
+; touched, so what a host runs on it runs on through the tune. No data
+; register is kept: it reads as the live count and writes as the reload,
+; so a count written back sets a rate no one asked for, and a host that
+; needs a timer's rate back writes the value it knows.
 ;
 ; The descriptor, from the core's first byte:
 ;
@@ -61,7 +61,8 @@ SAV_VEC         equ     0               ; four vectors
 SAV_CTRL        equ     16              ; TACR, TBCR, TCDCR
 SAV_IER         equ     19              ; IERA, IERB
 SAV_IMR         equ     21              ; IMRA, IMRB
-SAV_SIZE        equ     24
+SAV_SPUR        equ     24              ; the vector at $60
+SAV_SIZE        equ     28
 
 ; A timer restored where d2 has its bit: its vector, its bits of its
 ; control register (keep is the other timer's), and its enable and mask
@@ -146,6 +147,23 @@ sndh_init:
                 CLAIMS  2,1
                 CLAIMS  3,2
                 move.b  d2,sndh_claims-sndh_state(a6)
+
+; The vector at $60, the 68000's spurious interrupt. The MFP raises an
+; interrupt and the 68000 acknowledges it an instruction or more later,
+; and a write of the player's that clears the pending bit or the enable
+; bit inside that window leaves the MFP with no vector to place on the
+; bus: the 68000 runs exception 24 rather than the timer's handler. The
+; handler below returns from it, since the tick it would have run is the
+; one the write cancelled. Raising the interrupt level around the write
+; is no substitute: an acknowledge the 68000 has begun runs to its end at
+; any level. The host's vector stands again at exit.
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                lea     sndh_saved(pc),a5
+                move.l  $60.w,SAV_SPUR(a5)
+                lea     sndh_spurious(pc),a1
+                move.l  a1,$60.w
+                move.w  (sp)+,sr
                 move.b  #1,(a6)
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts
@@ -173,6 +191,7 @@ sndh_stop:
                 moveq   #0,d2
                 move.b  sndh_claims-sndh_state(a6),d2
                 lea     sndh_saved(pc),a5
+                move.l  SAV_SPUR(a5),$60.w
                 PUTBACK 0,$134,$FFFFFA19,$F0,0,$FFFFFA07,5,SAV_IER
                 PUTBACK 1,$120,$FFFFFA1B,$F0,1,$FFFFFA07,0,SAV_IER
                 PUTBACK 2,$114,$FFFFFA1D,$0F,2,$FFFFFA09,5,SAV_IER+1
@@ -206,6 +225,10 @@ sndh_play:
                 bset    #1,(a6)                 ; the last row has played
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts
+
+; Exception 24, for as long as a tune plays: the acknowledge found no
+; vector, and the tick it stood for is one the player already cancelled.
+sndh_spurious:  rte
 
 sndh_state:     dc.b    0
 sndh_claims:    dc.b    0

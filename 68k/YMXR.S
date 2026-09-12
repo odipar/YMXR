@@ -42,6 +42,14 @@
 ; touched. The MFP runs in software end-of-interrupt mode, as TOS leaves
 ; it, and the vectors are the 68000's at zero.
 ;
+; A host also needs a handler at $60 while this player runs. A write here
+; that clears a pending or an enable bit between the MFP raising an
+; interrupt and the 68000 acknowledging it leaves the MFP with no vector
+; to place on the bus, and the 68000 runs exception 24 rather than the
+; timer's handler. An rte is the handler: the tick the acknowledge stood
+; for is the one the write cancelled. YMXR_sndh.S keeps the host's vector
+; and puts an rte there for as long as a tune plays.
+;
 ; The player patches itself: the row's displacements and the branches
 ; over the effects the tune does not run at init, and the tick handlers'
 ; operands at every start. It runs from RAM, and one loaded copy serves

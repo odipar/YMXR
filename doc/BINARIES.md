@@ -160,13 +160,18 @@ address up to a long, and the two bytes leave room for that.
 Init keeps the four timers' vectors, control, enable and mask bits as it
 finds them, calls the player's init on the subtune's bound tune and the
 workspace, and records which timers the tune claims from its effects
-byte: effects 0 to 3 run Timers A, D, B and C. Exit stops the player and
-puts the claimed timers back as they were kept; a timer the tune does
-not run is never touched. No data register is kept: it reads as the live
-count and writes as the reload, so a count written back sets a rate no
-one asked for, and a host that needs a timer's rate back writes the
-value it knows. Play calls the player's play. Each entry keeps every
-register.
+byte: effects 0 to 3 run Timers A, D, B and C. It keeps the vector at
+`$60` and puts an `rte` there: a write of the player's that clears a
+pending or an enable bit between the MFP raising an interrupt and the
+68000 acknowledging it leaves the MFP with no vector to place on the bus,
+and the 68000 runs exception 24 rather than the timer's handler. The
+tick that acknowledge stood for is the one the write cancelled, so the
+handler returns. Exit puts that vector back and puts the claimed timers
+back as they were kept; a timer the tune does not run is never touched.
+No data register is kept: it reads as the live count and writes as the
+reload, so a count written back sets a rate no one asked for, and a host
+that needs a timer's rate back writes the value it knows. Play calls the
+player's play. Each entry keeps every register.
 
 ## 3. The SNDH file
 
@@ -261,10 +266,13 @@ VBL or Timer C; stops on SPACE or ESC, or once the rows patched in have
 played, or once the core's state byte says the tune is over; switches
 subtunes on 1 to 9, offering in its banner the keys the set has; and
 hands the machine back with the mouse reporting again, Timer C's count
-written as the 192 of the system's 200 Hz. The keyboard is read at its
-ACIA, every IKBD report read whole, and the mouse turned off at the
-chip while the program runs, so that TOS finds no packet half read when
-it has the keyboard back.
+written as the 192 of the system's 200 Hz. The stub keeps no vector at
+`$60`: init stands before it arms its clock and exit after it stops, so
+the core's handler is installed for every frame the player runs, and the
+claim and the release around those run at interrupt level 7. The keyboard
+is read at its ACIA, every IKBD report read whole, and the mouse turned
+off at the chip while the program runs, so that TOS finds no packet half
+read when it has the keyboard back.
 
 ## 5. Driving play, the host's side
 
