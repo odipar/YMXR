@@ -49,8 +49,9 @@ SAMPLES = ["Chambers of Shaolin - Mega Pock Olipse", "Lethal Xcess 3 - level 2",
            "Ooh Crikey - main menu", "Turrican 2 - world 1-1 The Desert rocks",
            "Seven Gates of Jambala  - level 11 digidrums"]
 
-# The bits each register reads of the byte written to it, so that a value the
-# chip drops is not a difference (68k/test/emu/test_ymxr.py, MASK).
+# The bits each register reads of the byte written to it (SPEC.md 4), so
+# that a value the chip drops is not a difference. The rig's FITS is this
+# table (68k/test/emu/test_ymxr.py).
 MASK = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
 
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+)")

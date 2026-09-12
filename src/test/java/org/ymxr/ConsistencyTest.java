@@ -644,4 +644,76 @@ final class ConsistencyTest {
         assertTrue(wide.isEmpty(), () -> String.join("\n", wide)
                 + "\nAGENTS.md requires one width.");
     }
+
+    private static final Path RIG = Path.of("68k/test/emu/test_ymxr.py");
+    private static final Path PARITY = Path.of("ym/parity.py");
+
+    /** The register numbers a phrase names, in the order it names them. */
+    private static Set<Integer> registers(String said) {
+        Set<Integer> out = new TreeSet<>();
+        Matcher one = Pattern.compile("R(\\d+)").matcher(said);
+        while (one.find()) {
+            out.add(Integer.parseInt(one.group(1)));
+        }
+        return out;
+    }
+
+    /** The registers a "four for ..., five for ..." phrase puts at that
+     *  width, one entry a width, read from the {@code at}th such phrase. */
+    private static Map<Integer, Set<Integer>> widths(String said, int at) {
+        Matcher phrase = Pattern.compile(
+                "four\\s+for\\s+([^.]*?),\\s+five\\s+for\\s+([^.]*?)"
+                        + "(?:,\\s+and\\s+six|\\.)")
+                .matcher(said);
+        for (int i = 0; i <= at; i++) {
+            assertTrue(phrase.find(), "SPEC.md names no " + (at + 1)
+                    + " widths phrase; the check is asleep");
+        }
+        Map<Integer, Set<Integer>> out = new LinkedHashMap<>();
+        out.put(4, registers(phrase.group(1)));
+        out.put(5, registers(phrase.group(2)));
+        return out;
+    }
+
+    /** A Python list of fourteen bytes under that name. */
+    private static List<Integer> table(Path at, String named) throws IOException {
+        Matcher said = Pattern.compile(named + "\\s*=\\s*\\[([^\\]]*)\\]")
+                .matcher(read(at));
+        assertTrue(said.find(), at + " writes down no " + named);
+        List<Integer> out = new ArrayList<>();
+        for (String one : said.group(1).split(",")) {
+            out.add(Integer.decode(one.trim()));
+        }
+        return out;
+    }
+
+    /** The bits each register reads of the byte written to it: SPEC.md 4
+     *  and section 7 name the same widths, and the rig and ym/parity.py
+     *  mask by them (AGENTS.md, Measure). */
+    @Test
+    void theRegisterWidthsReadTheSameInTheSpecificationAndBothMaskTables()
+            throws IOException {
+        String spec = read(SPEC);
+        Map<Integer, Set<Integer>> writes = widths(spec, 0);
+        Map<Integer, Set<Integer>> reports = widths(spec, 1);
+        assertEquals(writes, reports,
+                "SPEC.md 4 and section 7 read the same register at two widths");
+        assertEquals(Set.of(1, 3, 5, 13), writes.get(4), "the registers of four bits");
+        assertEquals(Set.of(6, 8, 9, 10), writes.get(5), "the registers of five bits");
+
+        List<Integer> fits = table(RIG, "FITS");
+        assertEquals(fits, table(PARITY, "MASK"), RIG + " and " + PARITY
+                + " mask by two tables");
+        assertEquals(14, fits.size(), "a mask a sound register");
+        for (int r = 0; r < fits.size(); r++) {
+            int bits = Integer.bitCount(fits.get(r));
+            Set<Integer> named = writes.getOrDefault(bits, Set.of());
+            assertEquals(named.contains(r), bits == 4 || bits == 5,
+                    "R" + r + " masks to " + bits + " bits, which SPEC.md 4"
+                            + " reads as " + (named.contains(r) ? "that" : "another")
+                            + " width");
+        }
+        assertEquals(0x0E, 0xAE & fits.get(13),
+                "SPEC.md 4: a row whose R13 column is $AE runs shape $E");
+    }
 }
