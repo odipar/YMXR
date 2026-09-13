@@ -33,6 +33,45 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.10, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.10>, built from the commit
+tagged `v0.3.10`.
+
+The player, in its four SNDH cores. The stub is the bytes 0.3.9 wrote, the
+tune file is version 3 and the bound tune is version 3, so a dump converts
+to the tune file 0.3.9 wrote; it binds to another bound tune, since the
+core in it moved. YMXS is 0.3.2 and DTX 0.10.1, as 0.3.9 had them.
+
+- **A subtune ran the code the subtune before it had left.** A set inits
+  one loaded player for every subtune, and init patched three words on
+  one path and left them alone on the other, so each read the subtune
+  before rather than the one started. The head of an effect the tune
+  does not run: init wrote the branch's displacement and not its opcode,
+  so after a subtune that ran the effect the read's opcode stood there
+  and the next fell into the effect's columns instead of over them. The
+  shape word of every tick: init skipped it where a tune used both shapes
+  or neither, so one using both after one using squares alone sent its
+  one-row sources to the square handler. The level a tick drops, in the
+  three handlers of an effect: init wrote nops where the tune ran that
+  effect alone and no word where it ran two or more, so a tune running an
+  effect beside another, after one that ran it alone, kept the nops and
+  its ticks no longer dropped to level 5 for the other timer to nest
+  inside. That one is a change of timing that persists across a set and
+  lands on a tune of several SID voices.
+- Each word is written on every init now, on every path. The plain core
+  is 4,726 bytes against 4,710, the monitor's 5,216 against 5,200, the
+  lean 4,492 against 4,484 and the lean monitor's 4,982 against 4,974.
+- The rig reads the invariant back: every one of its tunes inited alone
+  on a fresh image, then after every other, all at one address in one
+  set, and the player's code and the tunes' images the same both ways.
+  Ninety ordered pairs of ten tunes pass on the plain core and on the
+  lean; with the head's opcode left unwritten the check fails at that
+  opcode.
+- `ym/convert.py pairs` names the version its `.ymx` files open with,
+  read out of them, where it had 0.7 written in and the files are 0.9. A
+  script of the repository, in no zip.
+
 ### 0.3.9, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.9>, built from the commit
