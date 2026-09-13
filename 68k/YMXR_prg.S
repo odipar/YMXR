@@ -70,6 +70,12 @@ LINE_WIDE       equ     128
 ; fixes.
 LIST_WIDE       equ     96
 
+; The rows the list of subtunes may use: the screen is twenty-five rows
+; in every resolution, and the banner, the header, the line that says
+; what plays and one row spare account for the rest. A set of more than
+; this stands in two columns or more, so no part of it scrolls away.
+LIST_ROWS       equ     18
+
 ; The columns the line that says which subtune plays leaves a name: the
 ; screen's, less "playing NN/NN  " and the column an auto-wrap would take.
 SAYING_LESS     equ     16
@@ -110,27 +116,69 @@ main:           move.w  #Getrez,-(sp)           ; forty columns in low
                 move.w  #Cconws,-(sp)
                 trap    #GEMDOS
                 addq.l  #6,sp
-; The set, one subtune a line: its number and the name the SNDH file's
-; '!#SN' tag names it by (BINARIES.md 3). A set of one has no list, since
-; the banner names the tune already. The screen is forty columns, so each
-; line stands alone.
+; The set: its number and the name the SNDH file's '!#SN' tag names it by
+; (BINARIES.md 3), a subtune an entry. A set of one has no list, since the
+; banner names the tune already. A column has LIST_ROWS entries at most,
+; so a longer set stands in as many columns as it needs and every entry
+; is on the screen; a column is the screen's width divided by their
+; number, and the entries run down one column before the next.
                 move.w  subtunes(pc),d0
                 cmp.w   #1,d0
-                bls.s   .alone
+                bls.w   .alone
                 pea     picks(pc)
                 move.w  #Cconws,-(sp)
                 trap    #GEMDOS
                 addq.l  #6,sp
-                moveq   #0,d7
-.one:           move.w  d7,d0
+                moveq   #0,d0
+                move.w  subtunes(pc),d0
+                subq.w  #1,d0                   ; two subtunes or more here
+                move.l  d0,d1
+                divu.w  #LIST_ROWS,d1
+                andi.l  #$FFFF,d1
+                addq.w  #1,d1
+                move.w  d1,d7                   ; the columns
+                move.l  d0,d1
+                divu.w  d7,d1
+                andi.l  #$FFFF,d1
+                addq.w  #1,d1
+                move.w  d1,d6                   ; the rows
+                moveq   #0,d1
+                move.w  wide(pc),d1
+                divu.w  d7,d1
+                andi.l  #$FFFF,d1
+                move.w  d1,d5                   ; a column's width
+                moveq   #0,d4
+.row:           lea     line(pc),a1
+                moveq   #0,d3
+.col:           moveq   #0,d0
+                move.w  d3,d0
+                mulu.w  d6,d0
+                add.w   d4,d0                   ; the subtune this cell names
+                cmp.w   subtunes(pc),d0
+                bcc.s   .past
                 bsr     entry
+.past:          addq.w  #1,d3
+                cmp.w   d7,d3
+                bcs.s   .col
+; the spaces a last column leaves off the end, so a row that fills the
+; screen does not move the cursor down a row of its accord
+.trim:          lea     line(pc),a0
+                cmpa.l  a0,a1
+                bls.s   .ends
+                cmpi.b  #' ',-1(a1)
+                bne.s   .ends
+                subq.l  #1,a1
+                bra.s   .trim
+.ends:          move.b  #13,(a1)+
+                move.b  #10,(a1)+
+                clr.b   (a1)
                 pea     line(pc)
                 move.w  #Cconws,-(sp)
                 trap    #GEMDOS
                 addq.l  #6,sp
-                addq.w  #1,d7
-                cmp.w   subtunes(pc),d7
-                bcs.s   .one
+                addq.w  #1,d4
+                cmp.w   d6,d4
+                bcs.s   .row
 .alone:         pea     play(pc)
                 move.w  #Supexec,-(sp)
                 trap    #XBIOS
@@ -357,12 +405,15 @@ padded:
                 dbra    d3,.pad
                 rts
 
-; The line the list has for subtune d0.w, 0 up, into line: two spaces, its
-; number 1 up, two spaces, its name, and a new line.
+; The list's cell for subtune d0.w, 0 up, appended at (a1) and padded to
+; d5.w characters, which a1 is left past: two spaces, its number 1 up,
+; two spaces, and its name cut to what the column leaves. Every register
+; but a1 is kept, since the row loop reads the count and the widths out
+; of them across a GEMDOS call.
 entry:
-                movem.l d0-d4/a0-a1,-(sp)
-                move.w  d0,d4                   ; two and padded clobber d0
-                lea     line(pc),a1
+                movem.l d0-d7/a0/a2,-(sp)
+                move.w  d0,d4                   ; two and name_of clobber d0
+                movea.l a1,a2                   ; where the cell begins
                 move.b  #' ',(a1)+
                 move.b  #' ',(a1)+
                 move.w  d4,d0
@@ -377,15 +428,27 @@ entry:
                 move.l  a0,d1
                 bne.s   .named
                 lea     unnamed(pc),a0
-.named:         moveq   #LIST_WIDE-1,d3
+; six columns stand before the name and one space after it, so a name
+; reaches the width less seven, which dbra counts from one under that. A
+; cell is then a character short of its column, and a row of full cells a
+; character short of the screen, where a row the width of the screen
+; would wrap the cursor and cost a row
+.named:         move.w  d5,d3
+                subq.w  #8,d3
+                bmi.s   .filled
 .name:          move.b  (a0)+,d0
-                beq.s   .ends
+                beq.s   .filled
                 move.b  d0,(a1)+
                 dbra    d3,.name
-.ends:          move.b  #13,(a1)+
-                move.b  #10,(a1)+
-                clr.b   (a1)
-                movem.l (sp)+,d0-d4/a0-a1
+.filled:        move.l  a1,d0
+                sub.l   a2,d0                   ; what the cell came to
+                move.w  d5,d3
+                sub.w   d0,d3
+                bls.s   .done
+                subq.w  #1,d3
+.pad:           move.b  #' ',(a1)+
+                dbra    d3,.pad
+.done:          movem.l (sp)+,d0-d7/a0/a2
                 rts
 
 ; The line that says which subtune plays, written over the line before
