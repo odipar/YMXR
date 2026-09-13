@@ -87,7 +87,7 @@ final class Ymxs {
     static byte[] tuneFile(Tool tool, org.ymxs.YMXS.Tune tune, Packing packing, Report report) {
         Schema.Made made;
         try {
-            made = Schema.of(tune);
+            made = Schema.of(Padding.toUnit(tune, packing.unit(), report).tune());
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }

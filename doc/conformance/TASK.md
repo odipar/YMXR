@@ -53,11 +53,11 @@ here covers what a reader does with one that does.
 | `circus.ymxr` | 9 |
 | `plays-once.ymxr` | 6 |
 | `turrican.ymxr` | 3,681 |
-| `turrican-2.ymxr` | 180 |
-| `synergy.ymxr` | 10,755 |
+| `turrican-2.ymxr` | 183 |
+| `synergy.ymxr` | 10,757 |
 | `preempt.ymxr` | 801 |
 | `retune.ymxr` | 1,201 |
-| `fine-zero.ymxr` | 431 |
+| `fine-zero.ymxr` | 433 |
 | `four-timers.ymxr` | 211 |
 | `wrong-version.ymxr` | 0 |
 

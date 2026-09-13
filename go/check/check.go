@@ -37,7 +37,10 @@ func Of(song ym.Song, args []string) []string {
 		wrong = append(wrong, fmt.Sprintf("the frame rate is %d, not %d", tune.FrameRate,
 			song.PlayerHz))
 	}
-	rows := song.Frames
+	// rows of the table that set no column, added so it packs at its
+	// unit (SPEC.md 6, rule 6): each is a frame the dump does not have
+	added := made.Added
+	rows := song.Frames + len(added)
 	if tune.Table.Rows() != rows {
 		wrong = append(wrong, fmt.Sprintf("the table has %d rows, not %d",
 			tune.Table.Rows(), rows))
@@ -83,7 +86,30 @@ func Of(song ym.Song, args []string) []string {
 			break // a tune that plays once has played
 		}
 		model.Step()
-		f := r
+		before := 0
+		pad := false
+		for _, a := range added {
+			if a < r {
+				before++
+			} else if a == r {
+				pad = true
+			}
+		}
+		if pad {
+			// a row that sets no column: it writes no register, and the
+			// effects run on through it
+			for c := 0; c < 13; c++ {
+				if model.Written[c] >= 0 {
+					wrong = append(wrong, fmt.Sprintf("%d: a row that sets no column wrote R%d",
+						r, c))
+				}
+			}
+			if model.EnvelopeWritten {
+				wrong = append(wrong, fmt.Sprintf("%d: a row that sets no column wrote R13", r))
+			}
+			continue
+		}
+		f := r - before
 		dump := registers(song, f)
 		slots := ym.Slots(song, f)
 		owned := 0

@@ -229,12 +229,18 @@ final class ReportTest {
                 "the summary names the tool, on standard error: " + err[0]);
         assertTrue(err[0].contains("the flags:") && err[0].contains("the table: "),
                 "the account is on standard error: " + err[0]);
-        assertEquals("", err[1].replace("  packed at unit 1: the repeat row 177 does not"
-                + " divide by 2" + System.lineSeparator(), ""),
+        // Turrican 2 has 178 frames repeating to 177: a row goes in before
+        // the repeat, the count is then odd, and one goes in at the end
+        // (SPEC.md 6, rule 6), which is two notes
+        String before = "  padded: 1 unset row at row 177, before the repeat row, so the table"
+                + " packs at unit 2" + System.lineSeparator();
+        String after = "  padded: 1 unset row at row 179, so the table packs at unit 2"
+                + System.lineSeparator();
+        assertEquals("", err[1].replace(before, "").replace(after, ""),
                 "a silent run prints its notes alone: " + err[1]);
-        assertTrue(err[0].contains("note: packed at unit 1"),
+        assertTrue(err[0].contains("note: padded: 1 unset row at row 177"),
                 "the note stands either way: " + err[0]);
-        assertEquals(1, err[0].lines().filter(l -> l.contains("note: packed at unit 1")).count(),
-                "and stands once: " + err[0]);
+        assertEquals(2, err[0].lines().filter(l -> l.contains("note: padded:")).count(),
+                "and each stands once: " + err[0]);
     }
 }

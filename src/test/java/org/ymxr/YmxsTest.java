@@ -56,7 +56,7 @@ final class YmxsTest {
         int repeat = (int) Math.min(song.loopFrame(), song.frames());
         Tune tune = Ym.read(song, new Sources(song), repeat, new Report());
         Tune back = Text.read(Text.write(Tunes.multi(tune))).tunes().get(0);
-        Schema.Made made = Schema.of(back);
+        Schema.Made made = Schema.of(Padding.toUnit(back, YmToYmxr.UNIT, new Report()).tune());
         // the tune file records the tune's name, as ymxs-to-ymxr writes it
         return org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
                 YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report(), back.title()).file();

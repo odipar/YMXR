@@ -645,6 +645,16 @@ encodes.
    bit 4 is what marks that 0 as the value the MFP counts 256 for (1.1,
    1.9). A row that leaves the control column unset sets a count of 1 to
    255 or none.
+6. **The row count and the repeat row divide by the unit the table packs
+   at.** DTX packs a column in units of `k` bytes, so `R` divides by `k`
+   and so does `RR` (DTX R5.6 and R5.11). A writer whose tune does not
+   divide adds rows that set no column: where `RR` does not divide, rows
+   at `RR` until it does, which moves the loop's first row later and
+   lengthens what plays before it; then, where `R` does not divide, rows
+   at the end. A row that sets no column writes no register and leaves
+   every timer running (section 4), so the tune plays one more frame
+   there, its effects running through it. At most `k` minus one rows go in
+   each place.
 
 ---
 
