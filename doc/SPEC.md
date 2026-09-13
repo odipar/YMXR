@@ -251,11 +251,15 @@ source.
 The two columns and the timer this effect runs on (2.3) are the
 connection. A row setting the source column connects the three: the timer
 runs the source it names on the target the player keeps for this effect,
-at the rate of the two columns beside them (1.9). The row moves the place
+at the rate the two columns beside them set, or at the rate the timer
+already counts where the row sets neither (1.9). The row moves the place
 to the source's first row where bit 5 of the control column is set. A
 stopped timer starts on the select the row writes, bit 6 set or clear,
 since a select runs an MFP timer; bit 6 is a stop before the writes, which
 a running timer requires and a stopped one already has (1.9, section 6).
+So a row that hands a running timer a second source at the rate it counts
+sets the source column alone: the ticks read the new source from here on,
+and the rate columns stay 0.
 
 A row setting source 0 stops the timer. It moves no place: the place stays
 at the row number the last tick read, and a source that starts on that

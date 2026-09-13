@@ -63,6 +63,9 @@ final class Schema {
         byte[][] column = new byte[Columns.C][frames];
         int[] target = new int[4];
         int[] select = new int[4];
+        // Whether the timer is known to be counting: a start sets it where
+        // the source it runs repeats, and a stop clears it.
+        boolean[] counting = new boolean[4];
         int[] count = new int[4];
         Arrays.fill(target, -1);
         int used = 0;
@@ -77,7 +80,8 @@ final class Schema {
             registers(row, out);
             for (Map.Entry<Timer, Effect> one : Tunes.effects(row).entrySet()) {
                 int i = effect(one.getKey());
-                used |= effect(out, i, one.getValue(), sources, target, select, count, f);
+                used |= effect(out, i, one.getValue(), sources, target, select, count,
+                        counting, f);
             }
             for (int c = 0; c < Columns.C; c++) {
                 column[c][f] = out[c];
@@ -108,13 +112,15 @@ final class Schema {
     /** One row's operation on one effect, as its four columns; the bit of
      *  the effects word where the row starts one. */
     private static int effect(byte[] out, int i, Effect effect, List<Source> sources,
-                              int[] target, int[] select, int[] count, int at) {
+                              int[] target, int[] select, int[] count, boolean[] counting,
+                              int at) {
         int t = Columns.EFFECT + 4 * i;
         switch (effect) {
             case Stop ignored -> {
                 // The set bit with no source under it: the timer stops,
                 // and the row leaves the rate columns unset (SPEC.md 1.8).
                 out[t + 1] = (byte) 0x80;
+                counting[i] = false;
                 return 0;
             }
             case Start start -> {
@@ -124,11 +130,23 @@ final class Schema {
                     target[i] = reaches;
                 }
                 out[t + 1] = (byte) (0x80 | (sources.indexOf(start.source()) + 1));
-                select[i] = select(start.prescaler());
-                count[i] = counted(start.count(), at);
-                out[t + 2] = (byte) (0x80 | resets(start.timerReset(), start.placeReset())
-                        | marked(count[i]) | select[i]);
-                out[t + 3] = (byte) count[i];
+                int now = select(start.prescaler());
+                int rate = counted(start.count(), at);
+                int resets = resets(start.timerReset(), start.placeReset());
+                // A start on a timer already counting, at the rate it
+                // counts, sets no rate column: step 2 resolves the source
+                // and the ticks read it from here on, at the rate the
+                // control register already has (SPEC.md 4). The timer is
+                // known to be counting only where the source it runs
+                // repeats, since a source that plays once stops it at its
+                // marker (section 5) and no row says when.
+                if (resets != 0 || now != select[i] || rate != count[i] || !counting[i]) {
+                    out[t + 2] = (byte) (0x80 | resets | marked(rate) | now);
+                    out[t + 3] = (byte) rate;
+                }
+                select[i] = now;
+                count[i] = rate;
+                counting[i] = Tunes.table(start.source()).repeat().isPresent();
                 return 1 << i;
             }
             case Retune retune -> {

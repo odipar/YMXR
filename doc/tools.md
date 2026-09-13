@@ -473,7 +473,12 @@ source, and `RELEASE` source 0.
 
 A `RETUNE` at a voice and a `HOLD` that reloads a parameter change the
 source without moving the place: the stream keeps its phase and the half it
-stands in (YMX, SPEC.md 3.1). Section 6 rule 3 allows exactly that, since
+stands in (YMX, SPEC.md 3.1). Those rows hand a running timer a second
+source at the rate it counts, so they set the source column alone and
+leave the rate columns 0 (SPEC.md 1.8): 58 to 92 per cent of the starts a
+conversion writes are of that shape, and writing their rate again cost 6.7
+to 35.3 per cent of the rate columns.
+Section 6 rule 3 allows exactly that, since
 the source they start has the row count the effect already runs, so the row
 leaves bit 5 clear. The row the tune repeats to stops every effect it does
 not start, so a wrap resumes from a known setting. `START_PCM_PREEMPT`
