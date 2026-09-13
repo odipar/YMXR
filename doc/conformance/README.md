@@ -66,7 +66,7 @@ No run has been measured yet.
 | `circus` | four frames, fewer than a period |
 | `plays-once` | four frames whose `RR` is `R`: the frame after the last row reports -1 |
 | `turrican` | three drums on Timer D, each ending by its marker; `RR` at 160, a loop longer than the ring replayed at its exact rows; R13 rewritten |
-| `turrican-2` | a loop of one row from an odd `RR`, so a row that sets no column goes in before it and one after it, and the table packs at unit 2; six drums before it, the last stopped by a row |
+| `turrican-2` | a loop of one row from an odd `RR`, so a row that sets no column goes in before it and the loop's row is written twice, and the table packs at unit 2; six drums before it, the last stopped by a row |
 | `synergy` | nine SIDs on two timers at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; an odd row count, so a row that sets no column goes in at the end and the table packs at unit 2 |
 | `preempt` | a drum starting on the voice a SID runs on stops the SID first; R8 passed between them with its column unset, written by ticks alone |
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |

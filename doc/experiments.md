@@ -55,9 +55,11 @@ R5.6). At `k` = 2, 148 of the 543 tunes need one frame added to divide; at
 `k` = 4, 250 tunes need 508 frames between them, and the packing is worse
 besides. The converter packs at `k` = 2 (tools.md): `k` = 1 costs the
 play call about a seventh more on average (performance.md). A tune whose
-row count or repeat row is odd is padded with rows that set no column, at
-the repeat row and then at the end, until it packs at `k` = 2 (SPEC.md 6,
-rule 6); before that rule it packed at `k` = 1 instead.
+row count or repeat row is odd is padded until it packs at `k` = 2
+(SPEC.md 6, rule 6): rows that set no column at the repeat row, then a
+loop of fewer than 64 rows written again or rows that set no column at
+the end ("Where a padded tune's added frame lands" below); before that
+rule it packed at `k` = 1 instead.
 
 The gain over YMX, on the 42 tunes it ships with both files and their
 391,193 frames. The `.ymx` files are YMX 0.10.1's, format 0.9, every one
@@ -267,6 +269,27 @@ the budget binds moves toward it. The image is 1,492 bytes of the 14,148,
 so what a set gains from one unit is mostly what any tune gains from it,
 and `-k1` stays a flag rather than the default for a set. Under rule 6 the
 image is no part of the trade, and the tables alone are.
+
+## Where a padded tune's added frame lands
+
+Rule 6 pads a loop of odd length by one frame a pass, and the 543 dumps of
+the corpus, converted under 0.3.11, read where that frame lands: 161 dumps
+are padded, and in 137 the frame is inside the loop. Thirteen of those
+loops are one row, an ending that sustains, which a row that sets no column
+leaves as it was; 121 are 95 rows or more, where one frame is under one per
+cent of a pass; and three are short and move every row: Masterblazer 7, a
+slide on all three tones over 7 rows, A Prehistoric Tale 6, a vibrato on
+voice B over 9, and Crapman game over, an arpeggio over 17, which one frame
+a pass slows by 14, 11 and 6 per cent. So a loop of fewer than 64 rows is
+written again instead (SPEC.md 6, rule 6): the sixteen short loops play as
+they did, and the 121 long ones keep the frame. What the second copy costs
+against the frame it replaces, on the three and on Turrican 2 - world
+completed 1: 1,768 to 1,816 bytes, 1,452 to 1,508, 2,448 to 2,508 and 2,164
+to 2,180, under four per cent, since the second copy packs as a match a
+column; a one-row loop written twice costs 0 to 16 bytes on four of the
+thirteen.
+
+---
 
 ## What a square does when it starts
 

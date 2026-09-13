@@ -230,11 +230,11 @@ final class ReportTest {
         assertTrue(err[0].contains("the flags:") && err[0].contains("the table: "),
                 "the account is on standard error: " + err[0]);
         // Turrican 2 has 178 frames repeating to 177: a row goes in before
-        // the repeat, the count is then odd, and one goes in at the end
-        // (SPEC.md 6, rule 6), which is two notes
+        // the repeat, the count is then odd, and the loop of one row is
+        // written twice (SPEC.md 6, rule 6), which is two notes
         String before = "  padded: 1 unset row at row 177, before the repeat row, so the table"
                 + " packs at unit 2" + System.lineSeparator();
-        String after = "  padded: 1 unset row at row 179, so the table packs at unit 2"
+        String after = "  padded: the loop's 1 row written twice, so the table packs at unit 2"
                 + System.lineSeparator();
         assertEquals("", err[1].replace(before, "").replace(after, ""),
                 "a silent run prints its notes alone: " + err[1]);

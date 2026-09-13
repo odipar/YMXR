@@ -51,10 +51,11 @@ final class Check {
         if (tune.frameRate() != song.playerHz()) {
             wrong.add("the frame rate is " + tune.frameRate() + ", not " + song.playerHz());
         }
-        // rows of the table that set no column, added so it packs at its
-        // unit (SPEC.md 6, rule 6): each is a frame the dump does not have
-        int[] added = converted.added();
-        int rows = song.frames() + added.length;
+        // the frame of the dump each row of the table answers to (SPEC.md
+        // 6, rule 6): -1 for a row that sets no column, and the rows of a
+        // loop written again answer to its frames again
+        int[] frames = converted.frames();
+        int rows = frames.length;
         if (tune.table().rows() != rows) {
             wrong.add("the table has " + tune.table().rows() + " rows, not " + rows);
         }
@@ -95,16 +96,8 @@ final class Check {
                 break;                              // a tune that plays once has played
             }
             model.step();
-            int before = 0;
-            boolean pad = false;
-            for (int a : added) {
-                if (a < r) {
-                    before++;
-                } else if (a == r) {
-                    pad = true;
-                }
-            }
-            if (pad) {
+            int f = frames[r];
+            if (f < 0) {
                 // a row that sets no column: it writes no register, and the
                 // effects run on through it
                 for (int c = 0; c < 13; c++) {
@@ -117,7 +110,6 @@ final class Check {
                 }
                 continue;
             }
-            int f = r - before;
             int[] dump = Columns.registers(song, f);
             Effects.Slot[] slots = Effects.of(song, f);
             int owned = 0;

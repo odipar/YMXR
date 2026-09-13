@@ -31,10 +31,11 @@ type Converted struct {
 	Sources *ymxr.Sources
 	Said    string
 	Effects int
-	// Added is the rows of the table that set no column, added so that
-	// it packs at its unit (SPEC.md 6, rule 6): no frame of the dump
-	// answers to one.
-	Added []int
+	// Frames is the frame of the dump each row of the table answers to,
+	// once the table is padded to its unit (SPEC.md 6, rule 6): -1 for a
+	// row that sets no column, and the rows of a loop written again
+	// answer to its frames again.
+	Frames []int
 }
 
 // Of is the dump converted with the tool's flags, -kK, -mN, -rRR or -r,
@@ -91,7 +92,7 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 	}
 	flagsRead(said, args, unit, ring, repeat, once, copies, seconds)
 	sources := ymxr.Drums(song.Drums, song.Attributes&ym.Drums4Bit != 0)
-	padded, added := ymxr.PadToUnit(ym.Of(song, sources, repeat, said), unit, said)
+	padded, frames := ymxr.PadToUnit(ym.Of(song, sources, repeat, said), unit, said)
 	made, err := schema.Of(padded)
 	if err != nil {
 		return Converted{}, err
@@ -110,7 +111,7 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 		Effects: made.Columns.Effects,
 		Said: fmt.Sprintf("%d frames at %d Hz, %d sources, effects %b, repeats at %s:"+
 			" %d bytes", song.Frames, song.PlayerHz, sources.Count(),
-			made.Columns.Effects, repeats, len(written.File)), Added: added}, nil
+			made.Columns.Effects, repeats, len(written.File)), Frames: frames}, nil
 }
 
 // flagsRead says which flags the tool read and what each came to.
