@@ -51,6 +51,14 @@ Supexec         equ     38
 VBL             equ     $70
 SPACE           equ     $39
 ESC             equ     $01
+LEFT            equ     $4B
+RIGHT           equ     $4D
+UP              equ     $48
+DOWN            equ     $50
+
+; The name a line of the list reserves. A name longer than this is cut,
+; and a shorter one padded, so a line covers the line it is written over.
+NAME_WIDE       equ     28
 
 stub:           bra.w   main
                 dc.b    'YMXT'
@@ -81,22 +89,27 @@ main:           btst    #0,flags+1(pc)
                 move.w  #Cconws,-(sp)
                 trap    #GEMDOS
                 addq.l  #6,sp
-; The subtunes a key reaches. The keys are 1 to 9, so a set of one has
-; none to offer and a larger set offers what it has, nine at most. The
-; screen is forty columns, so each line stands alone.
+; The set, one subtune a line: its number and the name the SNDH file's
+; '!#SN' tag names it by (BINARIES.md 3). A set of one has no list, since
+; the banner names the tune already. The screen is forty columns, so each
+; line stands alone.
                 move.w  subtunes(pc),d0
                 cmp.w   #1,d0
                 bls.s   .alone
-                cmp.w   #9,d0
-                bls.s   .most
-                moveq   #9,d0
-.most:          lea     picks(pc),a0
-                add.b   #'0',d0
-                move.b  d0,5(a0)                ; the N of "1 to N"
-                pea     (a0)
+                pea     picks(pc)
                 move.w  #Cconws,-(sp)
                 trap    #GEMDOS
                 addq.l  #6,sp
+                moveq   #0,d7
+.one:           move.w  d7,d0
+                bsr     entry
+                pea     line(pc)
+                move.w  #Cconws,-(sp)
+                trap    #GEMDOS
+                addq.l  #6,sp
+                addq.w  #1,d7
+                cmp.w   subtunes(pc),d7
+                bcs.s   .one
 .alone:         pea     play(pc)
                 move.w  #Supexec,-(sp)
                 trap    #XBIOS
@@ -139,9 +152,10 @@ play:
                 moveq   #1,d0
                 bsr     start
                 move.w  #$2300,sr
+                bsr     saying
                 clr.w   d1                      ; the report's bytes to skip
 .wait:          btst    #0,$FFFFFC00.w
-                beq.s   .read
+                beq.w   .read
                 moveq   #0,d0
                 move.b  $FFFFFC02.w,d0
                 tst.w   d1
@@ -161,17 +175,39 @@ play:
                 beq.s   .stop
                 cmp.b   #ESC,d0
                 beq.s   .stop
+                cmp.b   #LEFT,d0
+                beq.s   .back
+                cmp.b   #UP,d0
+                beq.s   .back
+                cmp.b   #RIGHT,d0
+                beq.s   .on
+                cmp.b   #DOWN,d0
+                beq.s   .on
                 subq.b  #1,d0                   ; 1 to 9 are $02 to $0A
                 beq.s   .read
                 cmp.b   #9,d0
                 bhi.s   .read
                 cmp.w   subtunes(pc),d0
                 bhi.s   .read
-                move.w  #$2700,sr
+                bra.s   .pick
+; The arrows walk the set and wrap at each end, so a set of any size is
+; reached by them where the nine keys run out.
+.back:          move.w  playing(pc),d0
+                subq.w  #1,d0
+                bne.s   .pick
+                move.w  subtunes(pc),d0
+                bra.s   .pick
+.on:            move.w  playing(pc),d0
+                addq.w  #1,d0
+                cmp.w   subtunes(pc),d0
+                bls.s   .pick
+                moveq   #1,d0
+.pick:          move.w  #$2700,sr
                 bsr     start
                 move.w  #$2300,sr
+                bsr     saying
 .read:          move.b  done(pc),d0
-                beq.s   .wait
+                beq.w   .wait
 .stop:          move.w  #$2700,sr
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit
@@ -201,6 +237,140 @@ play:
                 move.w  (sp)+,sr
                 rts
 
+; ---------------------------------------------------------- the subtunes
+
+; a0 the SNDH file's '!#SN' tag, or 0 where the file has none. d0 is
+; clobbered. The tag
+; block runs from 'SNDH' at offset 12 to 'HDNS' (BINARIES.md 3), and
+; every tag this reads is at an even address, since the block pads
+; before FRMS and the names follow it.
+names:
+                lea     sndh(pc),a0
+                lea     12(a0),a0
+                move.w  #2048,d0
+.look:          cmpi.l  #'!#SN',(a0)
+                beq.s   .found
+                cmpi.l  #'HDNS',(a0)
+                beq.s   .none
+                addq.l  #2,a0
+                dbra    d0,.look
+.none:          suba.l  a0,a0
+.found:         rts
+
+; a0 the name of subtune d0.w, 0 up, or 0 where the file has none to
+; give. d0 and d1 are clobbered.
+;
+; A file that names its subtunes has the '!#SN' tag, and each name's
+; offset stands in the word table after it, counted from the tag's first
+; byte. A file of one subtune has no such tag, and its title is the name:
+; 'TITL' opens the block and its text follows, so the two stand at a
+; fixed place (BINARIES.md 3).
+name_of:
+                move.w  d0,d1
+                bsr     names
+                move.l  a0,d0
+                beq.s   .title
+                add.w   d1,d1
+                adda.w  4(a0,d1.w),a0
+                rts
+.title:         lea     sndh(pc),a0
+                cmpi.l  #'TITL',16(a0)
+                bne.s   .none
+                lea     20(a0),a0
+                rts
+.none:          suba.l  a0,a0
+                rts
+
+; d1.b and d2.b the two digits of d0.w, which is 0 to 99. d0 is
+; clobbered: the set is at
+; most 99 subtunes, the two digits of the '##' tag (BINARIES.md 3).
+two:
+                ext.l   d0
+                divu    #10,d0
+                move.w  d0,d1
+                add.b   #'0',d1
+                swap    d0
+                move.w  d0,d2
+                add.b   #'0',d2
+                swap    d0
+                rts
+
+; The name of subtune d0.w, 0 up, into (a1), NAME_WIDE bytes of it: a
+; longer name is cut and a shorter one padded, so the line covers the one
+; written over it. a1 ends past the last byte. Clobbers d0-d3/a0.
+padded:
+                bsr     name_of
+                move.l  a0,d3
+                bne.s   .named
+                lea     unnamed(pc),a0          ; "subtune", where the file
+.named:         moveq   #NAME_WIDE-1,d3         ; names none
+.name:          move.b  (a0)+,d0
+                beq.s   .pad
+                move.b  d0,(a1)+
+                dbra    d3,.name
+                rts
+.pad:           move.b  #' ',(a1)+
+                dbra    d3,.pad
+                rts
+
+; The line the list has for subtune d0.w, 0 up, into line: two spaces, its
+; number 1 up, two spaces, its name, and a new line.
+entry:
+                movem.l d0-d4/a0-a1,-(sp)
+                move.w  d0,d4                   ; two and padded clobber d0
+                lea     line(pc),a1
+                move.b  #' ',(a1)+
+                move.b  #' ',(a1)+
+                move.w  d4,d0
+                addq.w  #1,d0
+                bsr     two
+                move.b  d1,(a1)+
+                move.b  d2,(a1)+
+                move.b  #' ',(a1)+
+                move.b  #' ',(a1)+
+                move.w  d4,d0
+                bsr     padded
+                move.b  #13,(a1)+
+                move.b  #10,(a1)+
+                clr.b   (a1)
+                movem.l (sp)+,d0-d4/a0-a1
+                rts
+
+; The line that says which subtune plays, written over the line before
+; it: a carriage return opens it and no new line closes it, so the next
+; one stands where this one did. Called under Supexec with the player's
+; interrupts on, which write the chip and the MFP and no more.
+saying:
+                movem.l d0-d3/a0-a2,-(sp)
+                lea     line(pc),a1
+                move.b  #13,(a1)+
+                lea     plays(pc),a0
+.said:          move.b  (a0)+,d0
+                beq.s   .number
+                move.b  d0,(a1)+
+                bra.s   .said
+.number:        move.w  playing(pc),d0
+                bsr     two
+                move.b  d1,(a1)+
+                move.b  d2,(a1)+
+                move.b  #'/',(a1)+
+                move.w  subtunes(pc),d0
+                bsr     two
+                move.b  d1,(a1)+
+                move.b  d2,(a1)+
+                move.b  #' ',(a1)+
+                move.b  #' ',(a1)+
+                move.w  playing(pc),d0
+                subq.w  #1,d0
+                bsr     padded
+                clr.b   (a1)
+                pea     line(pc)
+                move.w  #Cconws,-(sp)
+                trap    #GEMDOS
+                addq.l  #6,sp
+                movem.l (sp)+,d0-d3/a0-a2
+                rts
+
 ; One byte to the keyboard chip, d0.b, once its ACIA accepts one.
 ikbd:           btst    #1,$FFFFFC00.w
                 beq.s   ikbd
@@ -211,6 +381,8 @@ ikbd:           btst    #1,$FFFFFC00.w
 ; clock armed, at level 7. The VBL where the tool asked for it, or where
 ; the screen refreshes at the tune's rate; Timer C where it does not.
 start:
+                lea     playing(pc),a0
+                move.w  d0,(a0)
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit: skipped where none plays
                 jsr     (a0)                    ; init
@@ -315,13 +487,17 @@ clear:          dc.b    27,"E",0                ; VT52: the screen cleared
 text:           dc.b    "YMXR at $"
 hex:            dc.b    "00000000",13,10
                 dc.b    "SPACE or ESC ends the program",13,10,0
-picks:          dc.b    "1 to 9 pick a subtune",13,10,0
+picks:          dc.b    "LEFT and RIGHT pick a subtune",13,10,13,10,0
+plays:          dc.b    "playing ",0
+unnamed:        dc.b    "subtune",0
 digits:         dc.b    "0123456789ABCDEF"
 reports:        dc.b    7,5,2,2,2,2,6,2,1,1     ; the bytes after $F6 to $FF
                 .even
 saved:          dcb.b   28,0
 rows_left:      dc.l    0
 accumulated:    dc.w    0
+playing:        dc.w    1
+line:           dcb.b   NAME_WIDE+16,0
 done:           dc.b    0
 busy:           dc.b    0
                 .even

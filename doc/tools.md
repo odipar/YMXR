@@ -256,7 +256,8 @@ the SNDH core, the player under SNDH's three entries, into an SNDH file any
 SNDH host plays, with the tags from the flags; and `bin/ymxr-prg` puts the
 program stub in front of an SNDH file, making a TOS program that claims the
 machine under Supexec, plays the file from the VBL or Timer C, stops on
-SPACE or ESC or after `ROWS` rows, switches subtunes on 1 to 9, and
+SPACE or ESC or after `ROWS` rows, lists the set and says which subtune
+plays, walks it on the arrows and reaches the first nine on 1 to 9, and
 releases the machine.
 
 Subtunes come from a multi file (BINARIES.md 0): several tune files in
