@@ -264,7 +264,8 @@ final class YmxToYmxr {
         // schema maps that onto the columns.
         Schema.Made made;
         try {
-            made = Schema.of(Ymx.read(read, song, repeat, report));
+            made = Schema.of(Padding.toUnit(Ymx.read(read, song, repeat, report),
+                    packing.unit(), report).tune());
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }

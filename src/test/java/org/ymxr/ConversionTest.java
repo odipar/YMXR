@@ -43,10 +43,11 @@ final class ConversionTest {
     }
 
     @Test
-    void anOddRowCountPacksAtUnitOne() throws IOException {
+    void anOddRowCountIsPaddedToTheUnit() throws IOException {
         // Thirty-one frames of a dump that repeats, cut to a tune that plays
         // once: a column of 31 bytes does not divide by a unit of 2 (DTX's
-        // R5.6), so the table packs at unit 1, and no row is added.
+        // R5.6). SPEC.md 6 rule 6: a row that sets no column goes in at the
+        // end, the table packs at unit 2, and the tool notes it.
         YmDump.Song whole = YmDump.read(Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym")));
         int frames = 31;
         byte[][] registers = new byte[whole.registers().length][];
@@ -58,16 +59,45 @@ final class ConversionTest {
                 whole.drums(), whole.name(), whole.author(), whole.comment(), registers);
         Report report = new Report();
         Sources sources = new Sources(song);
-        Schema.Made made = Schema.of(Ym.read(song, sources, frames, report));
+        Schema.Made made = Schema.of(Padding.toUnit(
+                Ym.read(song, sources, frames, report), 2, report).tune());
         Tune.Written written = Tune.write(made.columns(), made.sources(), song.playerHz(),
                 2, Tune.RING, report);
         TuneFile tune = TuneFile.read(written.file());
-        assertEquals(31, tune.table().rows(), "the rows are the frames");
-        assertEquals(31, tune.table().repeat(), "a tune that plays once repeats at its row count");
+        assertEquals(32, tune.table().rows(), "the frames and one row that sets no column");
+        assertEquals(32, tune.table().repeat(), "a tune that plays once repeats at its row count");
         // the payload's byte 2 is k, the unit (DTX, SPEC.md 2.3)
-        assertEquals(1, tune.dtx2()[Dtx.HEADER + 2] & 0xFF, "the table's unit");
-        assertTrue(report.notes().stream().anyMatch(n -> n.contains("packed at unit 1")),
-                "the tool says why: " + report.notes());
+        assertEquals(2, tune.dtx2()[Dtx.HEADER + 2] & 0xFF, "the table's unit");
+        assertEquals(List.of("padded: 1 unset row at row 31, so the table packs at unit 2"),
+                report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
+                "the tool says what it added: " + report.notes());
+    }
+
+    @Test
+    void anOddRepeatRowIsPaddedBeforeIt() throws IOException {
+        // A tune of 180 rows repeating to row 177: the repeat row does not
+        // divide by 2, so a row goes in at 177, the loop starts at 178, and
+        // the count, 181, then needs one at the end as well.
+        YmDump.Song whole = YmDump.read(Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym")));
+        int frames = 180;
+        byte[][] registers = new byte[whole.registers().length][];
+        for (int r = 0; r < registers.length; r++) {
+            registers[r] = Arrays.copyOf(whole.registers()[r], frames);
+        }
+        YmDump.Song song = new YmDump.Song(whole.format(), frames, whole.playerHz(),
+                whole.masterClock(), 177, whole.interleaved(), whole.attributes(),
+                whole.drums(), whole.name(), whole.author(), whole.comment(), registers);
+        Report report = new Report();
+        org.ymxs.YMXS.Tune padded = Padding.toUnit(
+                Ym.read(song, new Sources(song), 177, report), 2, report).tune();
+        assertEquals(182, padded.table().rows().size(), "180 rows, one before the repeat and one at the end");
+        assertEquals(178, padded.table().repeat().getAsInt(), "the repeat row moved past the added row");
+        assertTrue(padded.table().rows().get(177).registers().isEmpty()
+                && padded.table().rows().get(177).effects().isEmpty(), "the added row sets no column");
+        assertEquals(List.of("padded: 1 unset row at row 177, before the repeat row, so the table packs at unit 2",
+                             "padded: 1 unset row at row 181, so the table packs at unit 2"),
+                report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
+                "one note an addition: " + report.notes());
     }
 
     @Test

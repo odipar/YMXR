@@ -1,7 +1,7 @@
 # conformance
 
 The kit is 11 tunes, and what a reader of SPEC.md reports of each:
-18,276 entries between them, a line of record each. It exists to test
+18,283 entries between them, a line of record each. It exists to test
 [SPEC.md](../SPEC.md) rather than the code: hand it to someone who has
 never seen this repository, and see whether the document alone is enough
 to read the tunes.
@@ -66,11 +66,11 @@ No run has been measured yet.
 | `circus` | four frames, fewer than a period |
 | `plays-once` | four frames whose `RR` is `R`: the frame after the last row reports -1 |
 | `turrican` | three drums on Timer D, each ending by its marker; `RR` at 160, a loop longer than the ring replayed at its exact rows; R13 rewritten |
-| `turrican-2` | a loop of one row from an odd `RR`, so the table packs at unit 1; six drums before it, the last stopped by a row |
-| `synergy` | nine SIDs on two timers at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; an odd row count, so the table packs at unit 1 |
+| `turrican-2` | a loop of one row from an odd `RR`, so a row that sets no column goes in before it and one after it, and the table packs at unit 2; six drums before it, the last stopped by a row |
+| `synergy` | nine SIDs on two timers at once, six of them named by both; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; an odd row count, so a row that sets no column goes in at the end and the table packs at unit 2 |
 | `preempt` | a drum starting on the voice a SID runs on stops the SID first; R8 passed between them with its column unset, written by ticks alone |
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |
-| `fine-zero` | a tone fine byte moving to 0 on each voice, with and without the coarse set bit |
+| `fine-zero` | a tone fine byte moving to 0 on each voice, with and without the coarse set bit; an odd row count, so a row that sets no column goes in at the end and the table packs at unit 2 |
 | `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and the rows section 4 allows that no dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit |
 | `wrong-version` | the version word $0004: a reader produces no report |
 

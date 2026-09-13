@@ -163,15 +163,18 @@ the costliest frame"), and it moved the question.
 
 The window is 30 units at unit 1 and 15 at unit 2, and the worst refill
 measured is 15 operations at unit 1 against 9 to 11 at unit 2: 52 percent
-of R4.5's 6,656-cycle budget against 31. A tune packs at unit 1 only
-because its row count or its repeat row is odd. So the lever is the row
+of R4.5's 6,656-cycle budget against 31. A tune packed at unit 1 only
+because its row count or its repeat row was odd. So the lever was the row
 count, not the packer: low with one row fewer packs at unit 2, and its
 worst refill falls from 15 to 9. A penalty a block in ST4 (`st4 -p8`) also
 helps at unit 1, from 15 to 12 for two percent more bytes, and does little
 at unit 2; it stays a flag of ST4, since a default in DTX means changing
 three packers.
 
-What is left is a rule for a tune whose row count or repeat row is odd:
-which row to add so that the table packs at unit 2, and whether the added
-row can be heard. That is a question for SPEC.md rather than for the
-packer.
+SPEC.md 6, rule 6 is the rule that follows: a writer whose tune does not
+divide by the unit adds rows that set no column, at the repeat row until
+it divides and then at the end, and a row that sets no column writes no
+register and leaves every timer running. The converter applies it
+(tools.md, `-kK`), so every tune packs at unit 2 and the window of every
+tune is 15 units. What is left is to measure performance.md's Synergy
+Credits and Turrican 2 - world completed 1 again at unit 2.

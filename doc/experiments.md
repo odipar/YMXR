@@ -54,9 +54,10 @@ each data set on a long.
 R5.6). At `k` = 2, 148 of the 543 tunes need one frame added to divide; at
 `k` = 4, 250 tunes need 508 frames between them, and the packing is worse
 besides. The converter packs at `k` = 2 (tools.md): `k` = 1 costs the
-play call about a seventh more on average (performance.md). No frame is
-added: a tune whose row count or repeat row is odd packs at `k` = 1
-instead.
+play call about a seventh more on average (performance.md). A tune whose
+row count or repeat row is odd is padded with rows that set no column, at
+the repeat row and then at the end, until it packs at `k` = 2 (SPEC.md 6,
+rule 6); before that rule it packed at `k` = 1 instead.
 
 The gain over YMX, on the 42 tunes it ships with both files and their
 391,193 frames. The `.ymx` files are YMX 0.10.1's, format 0.9, every one
@@ -225,10 +226,12 @@ one-byte values (R1.1).
 ## One unit across a set of subtunes
 
 A set of subtunes shares an image with every other subtune that agrees on
-what an image fixes once, the unit among them (BINARIES.md 1), and a tune
-whose row count or repeat row is odd packs at unit 1 whichever unit the
-flags request. So a set as it comes needs two images, one a unit, and `-k1` on
-every dump needs one.
+what an image fixes once, the unit among them (BINARIES.md 1). Before
+SPEC.md 6, rule 6, a tune whose row count or repeat row was odd packed at
+unit 1 whichever unit the flags requested, so a set as it came needed two
+images, one a unit, and `-k1` on every dump needed one. Under rule 6 every
+tune packs at the unit the flags request and a set needs one image either
+way; the measurement below is from before it.
 
 Twenty tunes off the corpus, every ninth, converted both ways:
 
@@ -262,7 +265,8 @@ read 3,016 to 5,496 in their costliest frame, and R4.5 budgets 6,656.
 So the trade is a tenth of the file for a fifth of the call, and the frame
 the budget binds moves toward it. The image is 1,492 bytes of the 14,148,
 so what a set gains from one unit is mostly what any tune gains from it,
-and `-k1` stays a flag rather than the default for a set.
+and `-k1` stays a flag rather than the default for a set. Under rule 6 the
+image is no part of the trade, and the tables alone are.
 
 ## What a square does when it starts
 

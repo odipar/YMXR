@@ -73,7 +73,7 @@ bin/ym-to-ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
 
 | flag | what it sets |
 |---|---|
-| `-kK` | the unit the table packs at, 2 by default, and 1 where the repeat row or the row count does not divide by it |
+| `-kK` | the unit the table packs at, 2 by default. A tune whose row count or repeat row does not divide by it is padded with rows that set no column until both do (SPEC.md 6, rule 6), which the report notes |
 | `-mN` | the ring a column unpacks through, in bytes, 960 by default and at most 1129: the player reaches column 29 through a 16-bit displacement |
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
 | `-copies[S]` | a match beyond the ring packs as a copy from the column's separate literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
@@ -97,7 +97,9 @@ anywhere. A table packs at unit 2: unit 1 packs the corpus to 0.69 bytes
 a frame against 0.81, and costs the play call about a seventh more on
 average (performance.md); `-k1` selects it. A column's bytes and
 its loop begin on a unit (DTX's R5.6 and R5.11), so a tune whose row
-count or repeat row is odd packs at unit 1, which the tool notes. The
+count or repeat row is odd is padded with rows that set no column until
+both divide (SPEC.md 6, rule 6), which the tool notes: one at the end
+where the count is odd, one before the repeat row where that is. The
 table packs at a period of thirty rows, the column count and the
 smallest DTX allows, since a refill decodes a period's rows of one
 column at once and a refill costs the period (performance.md);

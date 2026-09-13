@@ -36,7 +36,11 @@ public final class YmToYmxr {
     /** A conversion: the tune file written, the dump's frame the tune
      *  repeats to, or its frame count where it plays once, and what the
      *  tool prints of it. */
-    record Converted(Tune.Written written, int repeat, Sources sources, String said) {
+    /** {@code added} is the rows of the table that set no column, added
+     *  so that it packs at its unit (SPEC.md 6, rule 6): no frame of the
+     *  dump answers to one. */
+    record Converted(Tune.Written written, int repeat, Sources sources, String said,
+                     int[] added) {
     }
 
     /** The dump converted with the tool's flags, {@code -kK}, {@code -mN},
@@ -88,7 +92,9 @@ public final class YmToYmxr {
         read(report, song);
         flagsRead(report, flags, unit, ring, repeat, once, copies, seconds);
         Sources sources = new Sources(song);
-        Schema.Made made = Schema.of(Ym.read(song, sources, repeat, report));
+        Padding.Padded padded = Padding.toUnit(Ym.read(song, sources, repeat, report), unit,
+                report);
+        Schema.Made made = Schema.of(padded.tune());
         Columns columns = made.columns();
         found(report, sources, columns);
         Tune.Written written = Tune.write(columns, made.sources(), song.playerHz(), unit, ring,
@@ -97,7 +103,7 @@ public final class YmToYmxr {
                 + sources.count() + " sources, effects " + Integer.toBinaryString(columns.effects)
                 + ", repeats at " + (repeat < song.frames() ? "row " + written.repeat() : "no row")
                 + ": " + written.file().length + " bytes";
-        return new Converted(written, repeat, sources, said);
+        return new Converted(written, repeat, sources, said, padded.added());
     }
 
     /** The dump as it was read. */

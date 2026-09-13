@@ -45,7 +45,8 @@ func main() {
 	// Every conversion passes through the structure (doc/ymxs.md): the
 	// register streams and the script become a YMXS tune, and the schema
 	// maps that onto the columns.
-	made, err := schema.Of(ymx.Of(read, song, repeat, said))
+	padded, _ := ymxr.PadToUnit(ymx.Of(read, song, repeat, said), packing.Unit, said)
+	made, err := schema.Of(padded)
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}

@@ -147,7 +147,8 @@ func TuneFiles(t *tool.Tool, multi ymxs.Multi, packing Packing,
 // packed.
 func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	said *report.Report) []byte {
-	made, err := schema.Of(tune)
+	padded, _ := ymxr.PadToUnit(tune, packing.Unit, said)
+	made, err := schema.Of(padded)
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
