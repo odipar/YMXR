@@ -1173,6 +1173,98 @@ def hatari(ym, code, symbols, perf=False):
 SPURIOUS = 0x60
 
 
+# The head of an effect: a bra.w over its columns where a tune does not run
+# it, and the read's opcode where it does (68k/YMXR.S, the EFFECT macro).
+# Init writes one or the other, so a set where one subtune runs an effect
+# and the next does not reads the head back as the branch it began as.
+HEAD_BRANCH = 0x6000
+HEAD_READ = 0x1229
+
+
+def heads(m, symbols):
+    """The four effect heads as init left them."""
+    return [int.from_bytes(bytes(m.mu.mem_read(
+        CODE + symbols["ymxr_tick%d_over" % i], 2)), "big") for i in range(4)]
+
+
+def want_heads(effects):
+    return [HEAD_READ if effects & (1 << i) else HEAD_BRANCH for i in range(4)]
+
+
+def patched_code_follows_the_subtune(defines, tunes):
+    """Init leaves the player's code a function of the subtune and not of
+    the subtune before it.
+
+    A set shares one loaded player, and init patches it: the effect heads,
+    the shape word of every tick, the row displacements, the advance's
+    address. A word written on one path and left alone on another reads
+    the subtune before it. So every subtune is inited alone on a fresh
+    image, and then after every other, all at one address, and the code
+    and the tunes' images must read the same both ways. The workspace is
+    outside both and is not compared.
+    """
+    code, symbols = assemble("YMXR_sndh.S", defines=defines)
+    work = tempfile.mkdtemp()
+    bounds = []
+    for ym in tunes:
+        file, _ = convert(ym, work)
+        bound = bind(file, work)
+        if bound is not None:
+            bounds.append((os.path.basename(ym), bound))
+    if len(bounds) < 2:
+        return "one subtune: no pair to init one after the other"
+    offsets, blob = [], b""
+    for _, bound in bounds:
+        at = (len(blob) + 3) & ~3
+        blob += b"\0" * (at - len(blob)) + bound
+        offsets.append(at)
+    table = (FILE + len(blob) + 3) & ~3
+    code = bytearray(code)
+    code[28:32] = struct.pack(">I", table - CODE)
+    code[32:36] = struct.pack(">I", WORK - CODE)
+    loaded = blob + b"\0" * (table - FILE - len(blob)) \
+        + struct.pack(">H", len(bounds)) \
+        + b"".join(struct.pack(">I", FILE - CODE + o) for o in offsets)
+
+    def image(m):
+        return (bytes(m.mu.mem_read(CODE, len(code))),
+                bytes(m.mu.mem_read(FILE, len(loaded))))
+
+    alone = []
+    for i in range(len(bounds)):
+        m = Machine(bytes(code), symbols, loaded)
+        m.call("core-init", d0=i + 1)
+        alone.append(image(m))
+    pairs = 0
+    for a in range(len(bounds)):
+        for b in range(len(bounds)):
+            if a == b:
+                continue
+            m = Machine(bytes(code), symbols, loaded)
+            m.call("core-init", d0=a + 1)
+            m.call("core-init", d0=b + 1)
+            got = image(m)
+            for region, name, base in ((0, "the code", CODE), (1, "the tunes", FILE)):
+                if got[region] != alone[b][region]:
+                    where = [i for i in range(len(got[region]))
+                             if got[region][i] != alone[b][region][i]]
+                    near = {}
+                    for sym, at in symbols.items():
+                        if not sym.startswith(".") and at <= where[0]:
+                            near[at] = sym
+                    label = near[max(near)] if near and region == 0 else "?"
+                    raise AssertionError(
+                        "%s after %s then %s differs from %s alone at %d byte(s), "
+                        "the first at %s+%d ($%X): %02X where %02X" % (
+                            name, bounds[a][0], bounds[b][0], bounds[b][0], len(where),
+                            label, where[0] - max(near) if near else where[0],
+                            base + where[0], got[region][where[0]],
+                            alone[b][region][where[0]]))
+            pairs += 1
+    return "%d subtunes in one set: the code after any one then another is the " \
+        "code after the other alone, %d ordered pairs" % (len(bounds), pairs)
+
+
 def core(defines, ym):
     """The SNDH core's vector at $60 (BINARIES.md 2), under the emulator:
     init keeps the host's and puts an rte there, and exit puts the host's
@@ -1211,6 +1303,10 @@ def core(defines, ym):
         "init left $60 at %08x, not the core's handler at %08x" % (
             at, CODE + symbols["sndh_spurious"])
     assert bytes(m.mu.mem_read(at, 2)) == b"\x4e\x73", "the handler at $60 is not an rte"
+    assert heads(m, symbols) == want_heads(bound[8]), \
+        "init left the effect heads at %s, not %s for effects %s" % (
+            ["%04X" % h for h in heads(m, symbols)],
+            ["%04X" % h for h in want_heads(bound[8])], format(bound[8], "04b"))
     m.call("core-exit")
     assert not m.byte(CODE + symbols["sndh_state"]) & 1, "the core's exit left the tune playing"
     assert masked(m.psg) == masked(HUSHED), \
@@ -1283,6 +1379,7 @@ def main():
     if tunes:
         print("the SNDH core: %d bytes, $60 kept and put back"
               % core(defines, tunes[0]))
+        print("    %s" % patched_code_follows_the_subtune(defines, tunes))
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
     cycles_of = None
