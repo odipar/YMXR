@@ -222,9 +222,9 @@ Hatari, a program of this release plays its rows and traces no line of ROM
 after its last write, where the same program under 0.3.2 left 502,132
 lines of desktop behind it.
 
-**Whether the spurious interrupt is gone from real hardware is unmeasured
-here.** 0.3.1 is what the fault was reported against; this release is the
-remedy its notes named, and a run on an ST is what settles it.
+**The spurious interrupt is gone on hardware.** 0.3.1 is the release the
+fault was reported against, and it does not appear on an ST with this
+release's handler in place.
 
 ### 0.3.2, 2026-09-11
 
