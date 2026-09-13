@@ -45,6 +45,7 @@
 
 GEMDOS          equ     1
 XBIOS           equ     14
+Getrez          equ     4
 Cconws          equ     9
 Pterm0          equ     0
 Supexec         equ     38
@@ -61,9 +62,19 @@ DOWN            equ     $50
 ; and a digit is the whole number where no second follows it.
 PAUSE           equ     25
 
-; The name a line of the list reserves. A name longer than this is cut,
-; and a shorter one padded, so a line covers the line it is written over.
-NAME_WIDE       equ     28
+; The bytes a line is built in, wide enough for the longest line either
+; kind makes: a name of LIST_WIDE and the six columns before it, or a
+; name of eighty columns less the words before it.
+LINE_WIDE       equ     128
+
+; The name a line of the list writes, at most. The list writes a name
+; whole, so this is the guard on the buffer and not a width the screen
+; fixes.
+LIST_WIDE       equ     96
+
+; The columns the line that says which subtune plays leaves a name: the
+; screen's, less "playing NN/NN  " and the column an auto-wrap would take.
+SAYING_LESS     equ     16
 
 stub:           bra.w   main
                 dc.b    'YMXT'
@@ -74,7 +85,16 @@ rate:           dc.w    50
 rows:           dc.l    0
 core:           dc.l    0
 
-main:           btst    #0,flags+1(pc)
+main:           move.w  #Getrez,-(sp)           ; forty columns in low
+                trap    #XBIOS                  ; resolution, eighty in the
+                addq.l  #2,sp                   ; other two
+                moveq   #80,d1
+                tst.w   d0
+                bne.s   .wide
+                moveq   #40,d1
+.wide:          lea     wide(pc),a0
+                move.w  d1,(a0)
+                btst    #0,flags+1(pc)
                 beq.s   .banner
                 pea     clear(pc)               ; the desktop's pixels away,
                 move.w  #Cconws,-(sp)           ; so the monitor's bars show
@@ -307,15 +327,18 @@ two:
                 swap    d0
                 rts
 
-; The name of subtune d0.w, 0 up, into (a1), NAME_WIDE bytes of it: a
-; longer name is cut and a shorter one padded, so the line covers the one
-; written over it. a1 ends past the last byte. Clobbers d0-d3/a0.
+; The name of subtune d0.w, 0 up, into (a1), the columns the screen
+; leaves it: a longer name is cut and a shorter one padded, so the line
+; covers the one written over it. a1 ends past the last byte. Clobbers
+; d0-d3/a0.
 padded:
                 bsr     name_of
-                move.l  a0,d3
+                move.l  a0,d1
                 bne.s   .named
                 lea     unnamed(pc),a0          ; "subtune", where the file
-.named:         moveq   #NAME_WIDE-1,d3         ; names none
+.named:         move.w  wide(pc),d3             ; names none
+                sub.w   #SAYING_LESS,d3
+                subq.w  #1,d3
 .name:          move.b  (a0)+,d0
                 beq.s   .pad
                 move.b  d0,(a1)+
@@ -341,8 +364,16 @@ entry:
                 move.b  #' ',(a1)+
                 move.b  #' ',(a1)+
                 move.w  d4,d0
-                bsr     padded
-                move.b  #13,(a1)+
+                bsr     name_of
+                move.l  a0,d1
+                bne.s   .named
+                lea     unnamed(pc),a0
+.named:         moveq   #LIST_WIDE-1,d3
+.name:          move.b  (a0)+,d0
+                beq.s   .ends
+                move.b  d0,(a1)+
+                dbra    d3,.name
+.ends:          move.b  #13,(a1)+
                 move.b  #10,(a1)+
                 clr.b   (a1)
                 movem.l (sp)+,d0-d4/a0-a1
@@ -559,7 +590,8 @@ accumulated:    dc.w    0
 playing:        dc.w    1
 pending:        dc.w    0
 waiting:        dc.w    0
-line:           dcb.b   NAME_WIDE+24,0
+wide:           dc.w    40
+line:           dcb.b   LINE_WIDE,0
 done:           dc.b    0
 busy:           dc.b    0
                 .even
