@@ -271,7 +271,10 @@ VBL or Timer C; stops on SPACE or ESC, or once the rows patched in have
 played; walks the set on the arrows, left or up back and right or down
 on, wrapping at each end, and reads a subtune's number typed on the
 digits, which waits half a second for a digit after it and no longer
-where no second digit can keep the number inside the set; and
+where no second digit can keep the number inside the set; starts the next
+subtune where the one playing has played its last row and repeats to none,
+the last ending at the first, which a set of one does not do since it has
+no next; and
 hands the machine back with the mouse reporting again, Timer C's count
 written as the 192 of the system's 200 Hz. The stub keeps no vector at
 `$60`: init stands before it arms its clock and exit after it stops, so

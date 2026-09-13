@@ -238,7 +238,20 @@ play:
                 move.w  waiting(pc),d0
                 bne.s   .idle
                 bsr     take
-.idle:          move.b  done(pc),d0
+.idle:          move.b  over(pc),d0             ; the tune played its last
+                beq.s   .running                ; row and repeats to none
+                lea     over(pc),a0
+                clr.b   (a0)
+                move.w  playing(pc),d0
+                addq.w  #1,d0
+                cmp.w   subtunes(pc),d0
+                bls.s   .next
+                moveq   #1,d0                   ; the last ends at the first
+.next:          move.w  #$2700,sr
+                bsr     start
+                move.w  #$2300,sr
+                bsr     saying
+.running:       move.b  done(pc),d0
                 beq.w   .wait
 .stop:          move.w  #$2700,sr
                 lea     sndh(pc),a0
@@ -469,6 +482,8 @@ start:
                 move.w  d0,(a0)
                 clr.w   pending-playing(a0)     ; a key that picks a subtune
                 clr.w   waiting-playing(a0)     ; drops a number half typed
+                lea     over(pc),a0
+                clr.b   (a0)
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit: skipped where none plays
                 jsr     (a0)                    ; init
@@ -530,11 +545,26 @@ tick:
                 jsr     8(a1)
                 lea     rows_left(pc),a0
                 move.l  (a0),d0
-                beq.s   .done                   ; no count asked for
+                beq.s   .ended                  ; no count asked for
                 subq.l  #1,d0
                 move.l  d0,(a0)
-                bne.s   .done
+                bne.s   .ended
                 lea     done(pc),a0
+                st      (a0)
+                bra.s   .done
+; A tune that played its last row and does not repeat is marked by bit 1
+; of the core's state byte (BINARIES.md 2). The key loop reads the mark
+; and starts the next subtune, since starting one calls the core's exit
+; and init and arms the clock, which no handler does to itself. A set of
+; one has no next, so its tune goes quiet where it ends.
+.ended:         move.w  subtunes(pc),d0
+                cmp.w   #1,d0
+                bls.s   .done
+                adda.l  core(pc),a1
+                move.w  24(a1),d0
+                btst    #1,(a1,d0.w)
+                beq.s   .done
+                lea     over(pc),a0
                 st      (a0)
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts
@@ -593,6 +623,7 @@ waiting:        dc.w    0
 wide:           dc.w    40
 line:           dcb.b   LINE_WIDE,0
 done:           dc.b    0
+over:           dc.b    0
 busy:           dc.b    0
                 .even
 sndh:
