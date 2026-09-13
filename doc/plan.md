@@ -5,9 +5,9 @@ has what it costs today; every figure below is against those, and each one
 records whether it was measured on the rig or counted from the 68000's
 manual.
 
-Two figures matter and they are not the same. A call is 1,370 to 2,362
+Two figures matter and they are not the same. A call is 1,292 to 2,036
 cycles on average by tune, and the costliest frame of a tune is 1,648 to
-6,358. R4.5 budgets 6,656 a frame, and what it binds is the costliest
+5,144. R4.5 budgets 6,656 a frame, and what it binds is the costliest
 frame. Most of what follows moves the average; the steps that move the
 costliest frame are named where they are.
 
@@ -15,14 +15,14 @@ costliest frame are named where they are.
 
 ## Where the time is
 
-DTX's advance is 48 to 67 per cent of an average call and 78 to 85 per
+DTX's advance is 46 to 61 per cent of an average call and 58 to 85 per
 cent of the costliest frame: 4,130 of Turrican - world 4-3's 4,836 and
-4,948 of Synergy Credits' 6,358. A refill parses at most one ST4
+2,982 of Synergy Credits' 5,144. A refill parses at most one ST4
 operation a unit at about 225 to 240 cycles each, and its unit count is
 the column count, so fifteen operations is a tune's costliest frame and
 the schema's thirty columns set that bound.
 
-The frame procedure is the rest, 510 to 1,142. A column the row leaves
+The frame procedure is the rest, 510 to 1,092. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset:
 a row sets 0.6 to 13.0 of the fourteen register columns, 3.2 on the
 median tune. Whole groups go unset, which a gate can skip,
@@ -150,9 +150,9 @@ Every step this document listed is in place, each measured on the rig:
 | a separate tick for a one-row source | 74 a tick | 568 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
-its count. Synergy Credits reads 2,362 cycles a call against the 2,469
+its count. Synergy Credits reads 2,036 cycles a call against the 2,469
 this document opened at and 2,585 cycles of ticks against 5,380, so
-4,947 a frame against 7,849. performance.md has the call, and `-cycles`
+4,621 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
 What was left was the costliest frame. A refill parses at most one ST4
@@ -176,5 +176,8 @@ divide by the unit adds rows that set no column, at the repeat row until
 it divides and then at the end, and a row that sets no column writes no
 register and leaves every timer running. The converter applies it
 (tools.md, `-kK`), so every tune packs at unit 2 and the window of every
-tune is 15 units. What is left is to measure performance.md's Synergy
-Credits and Turrican 2 - world completed 1 again at unit 2.
+tune is 15 units. Five of the ten tunes packed at unit 1 before it;
+measured again at unit 2, their calls fell by a seventh to a sixth on
+average and by a tenth to more than a third in the costliest frame,
+Synergy Credits' from 6,358 to 5,144 (performance.md). The costliest frame
+of any tune is now that one, 1,512 cycles under the budget.
