@@ -38,121 +38,97 @@ the tools rather than either.
 <https://github.com/odipar/YMXR/releases/tag/v0.3.10>, built from the commit
 tagged `v0.3.10`.
 
-The player, in its four SNDH cores. The stub is the bytes 0.3.9 wrote, the
-tune file is version 3 and the bound tune is version 3, so a dump converts
-to the tune file 0.3.9 wrote; it binds to another bound tune, since the
-core in it moved. YMXS is 0.3.2 and DTX 0.10.1, as 0.3.9 had them.
+The player changed; the tools around it did not. A tune file converts to
+the same bytes as under 0.3.9 and reads under 0.3.9. A bound tune and a
+program contain the new player, so those differ. YMXS 0.3.2 and DTX 0.10.1
+are unchanged.
 
-- **A subtune ran the code the subtune before it had left.** A set inits
-  one loaded player for every subtune, and init patched three words on
-  one path and left them alone on the other, so each read the subtune
-  before rather than the one started. The head of an effect the tune
-  does not run: init wrote the branch's displacement and not its opcode,
-  so after a subtune that ran the effect the read's opcode stood there
-  and the next fell into the effect's columns instead of over them. The
-  shape word of every tick: init skipped it where a tune used both shapes
-  or neither, so one using both after one using squares alone sent its
-  one-row sources to the square handler. The level a tick drops, in the
-  three handlers of an effect: init wrote nops where the tune ran that
-  effect alone and no word where it ran two or more, so a tune running an
-  effect beside another, after one that ran it alone, kept the nops and
-  its ticks no longer dropped to level 5 for the other timer to nest
-  inside. That one is a change of timing that persists across a set and
-  lands on a tune of several SID voices.
-- Each word is written on every init now, on every path. The plain core
-  is 4,726 bytes against 4,710, the monitor's 5,216 against 5,200, the
-  lean 4,492 against 4,484 and the lean monitor's 4,982 against 4,974.
-- The rig reads the invariant back: every one of its tunes inited alone
-  on a fresh image, then after every other, all at one address in one
-  set, and the player's code and the tunes' images the same both ways.
-  Ninety ordered pairs of ten tunes pass on the plain core and on the
-  lean; with the head's opcode left unwritten the check fails at that
-  opcode.
-- `ym/convert.py pairs` names the version its `.ymx` files open with,
-  read out of them, where it had 0.7 written in and the files are 0.9. A
-  script of the repository, in no zip.
+- **Switching subtunes could change how the next one sounded.** In a
+  multi-tune program every subtune shares one copy of the player, and
+  starting a subtune patches that copy for the effects it uses. Three of
+  those patches were applied in one direction only: set for a subtune that
+  needed them, never cleared for one that did not. So a subtune could
+  inherit code from the one played before it. The most audible case: after
+  a subtune that used one timer effect alone, a subtune using that same
+  effect together with another lost the interrupt-level drop that lets the
+  two timers interleave, which changes the timing of SID voices. Every one
+  of these patches is now rewritten at every start, whether the subtune
+  needs it or not.
+- The four player cores grew by 8 to 16 bytes each: plain 4,726, monitor
+  5,216, lean 4,492, lean monitor 4,982.
+- The test rig now checks this directly. It starts every test tune on a
+  fresh player, and again after every other tune, and requires the
+  player's code to be identical both ways. Ninety ordered pairs pass on
+  both cores, and removing one of the fixes makes the check fail at the
+  exact byte.
+- `ym/convert.py pairs` printed "YMX 0.7" for files that are 0.9; it now
+  reads the version from the files. This is a script in the repository,
+  not part of the release zips.
 
 ### 0.3.9, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.9>, built from the commit
 tagged `v0.3.9`.
 
-The program stub alone. The four SNDH cores are the bytes 0.3.8 wrote, so
-a dump converts to the tune file 0.3.8 wrote and binds to the bound tune
-it wrote; the tune file is version 3 and the bound tune is version 3.
-YMXS is 0.3.2 and DTX 0.10.1, as 0.3.8 had them.
+Only the program stub changed. The player cores are byte-identical to
+0.3.8, so a tune file and a bound tune convert to the same bytes as
+before. YMXS 0.3.2 and DTX 0.10.1 are unchanged.
 
-- **A set of more than eighteen subtunes scrolled off the top.** The list
-  printed a line a subtune under a banner of two rows and a header of
-  three, so twenty-five subtunes came to thirty rows on a screen of
-  twenty-five and the first entries were gone before a key could reach
-  them. A column has eighteen entries at most now, and a longer set
-  stands in as many columns as it needs: twenty-five in two, ninety-nine
-  in six. A column is the screen's width divided by their number, and the
-  entries run down one column before the next, so a number is found where
-  it reads. A set of eighteen or fewer prints as it did.
-- A cell is a character short of its column and a row of full cells a
-  character short of the screen, since a row the width of the screen
-  wraps the cursor and costs the row the wrap lands on; trailing spaces
-  come off the end for the same reason. Read out of the console output
-  the program writes under Hatari, twenty-five subtunes stand in twenty
-  rows of twenty-five at eighty columns and at forty, the longest row 79
-  and 39. At forty columns a name is cut to thirteen characters, which
-  every subtune is numbered through.
-- The stub is 1,794 bytes against 1,674.
+- **A program with more than eighteen subtunes scrolled its list off the
+  top of the screen.** The list printed one line per subtune under a
+  five-line header, so twenty-five subtunes needed thirty rows on a
+  twenty-five-row screen. The list is now laid out in columns: at most
+  eighteen entries per column, as many columns as needed (twenty-five
+  subtunes in two, ninety-nine in six), numbered down each column.
+  Eighteen or fewer subtunes print exactly as before.
+- On a 40-column screen, names are cut to thirteen characters so that
+  everything fits; on 80 columns they fit in full. Every subtune stays
+  numbered and selectable either way.
+- The stub is 1,794 bytes, up from 1,674.
 
 ### 0.3.8, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.8>, built from the commit
 tagged `v0.3.8`.
 
-The tune data structure is YMXS 0.3.2 and the table format is DTX 0.10.1,
-as 0.3.7 had them. The tune file is version 3 and the bound tune is version
-3. A dump does not convert to the file 0.3.7 wrote: the tune file records
-what the tune is called now, and the name and its zero are bytes 0.3.7 did
-not write. A reader of 0.3.7 passes over the word that records it and reads
-such a file as it always did.
+Two changes to what the tools write, and one to the player. YMXS 0.3.2 and
+DTX 0.10.1 are unchanged. A tune file written by 0.3.8 is not
+byte-identical to one from 0.3.7, because it now records the tune's name;
+0.3.7 tools read such a file without trouble, since the name is in a
+field they skip.
 
-- **A subtune played differently by what was selected ahead of it.**
-  `YMXR_stop` silenced the three voices and left every other register where
-  the tune had written it, and a row sets the registers it names and no
-  others, so a tune whose first row leaves one unset read the value the
-  tune before it wrote. The envelope shape reaches furthest, since writing
-  R13 retriggers the generator. Two tunes of the corpus set it late:
-  Turrican - world 4-3 at row 161 and DBA 5 at row 774. Under Hatari,
-  Turrican - world 4-3 after Deeper read R13 as 0 for its first 161 frames
-  and after Synergy Credits as 8. The stop writes every register zero and
-  the mixer with each channel off now, the voices first so the rest is
-  written into silence, and the two read alike on all fourteen registers.
-  The SNDH core is 4,710 bytes against 4,686.
-- The timers were not the fault, and are not changed. A release of a
-  claimed timer stops it, clears its enable and its mask and drops its
-  pending, and init clears the four effect records and re-seeds the rings.
-  A tune using no timer reads alike after a tune using two and after one
-  using three.
-- **The tune file records what the tune is called.** Bytes 10 and 11 were
-  zero and no reader read them; they are the name's offset now, and the
-  name lies between the source index and the DTX2 table, in UTF-8 ended by
-  a zero, at most 255 bytes. `ym-to-ymxr` writes the dump's song name and
-  `ymxs-to-ymxr` the tune's title; `ymx-to-ymxr` writes none, since a
-  `.ymx` dump has none to read. `ymxr-multi` names a subtune by `-nNAME`
-  where one names it, else by the name the file records, else by the file,
-  so a set built from a directory of dumps lists tunes rather than
-  filenames.
-- The conformance kit is written again for that: every fixture from a dump
-  grows by its name and the zero, chambers by 36 bytes for a title of 33
-  characters, and `four-timers`, which is built without a dump, is the
-  bytes it was.
-- **The program clears the screen every run.** It cleared it where the
-  SNDH file's core had the raster monitor in and left the desktop's pixels
-  otherwise, so a plain program drew its banner and its list of subtunes
-  over them. Bit 0 of the stub descriptor's flags word is zero from here
-  and a caller never chose it. The stub is 1,674 bytes against 1,682.
-- The ring a small program packs at, and where it stops paying for a set,
-  are measured in experiments.md: a ring of 120 bytes with copies cuts
-  what one tune occupies by 36 to 43 percent, and a set of about six
-  tunes or more packs larger, since a host allocates one workspace for a
-  set and the bytes are paid a tune. The defaults are unchanged.
+- **A subtune could sound different depending on which subtune played
+  before it.** Stopping a tune silenced the three volume registers but
+  left every other chip register - tone, noise, mixer, envelope - as the
+  tune had set them. A tune that does not set one of those on its first
+  row then inherited the previous tune's value. The envelope shape was the
+  worst case, because writing it restarts the envelope: Turrican world 4-3
+  does not set it until row 161, and DBA 5 not until row 774. Stopping a
+  tune now resets every register and switches every channel off in the
+  mixer. Verified under Hatari: Turrican world 4-3 plays identically after
+  Deeper and after Synergy Credits.
+- The timers were checked and were not at fault; they are unchanged.
+- **The tune file now records the tune's name.** Two header bytes that
+  were always zero, and that no reader looked at, now point at a name
+  string in UTF-8 of at most 255 bytes. `ym-to-ymxr` fills it from the YM
+  dump's song name and `ymxs-to-ymxr` from the YMXS title; `ymx-to-ymxr`
+  leaves it empty, because a `.ymx` dump has no name. `ymxr-multi` now
+  names each subtune from `-nNAME` where one names it, otherwise from this
+  field, otherwise from the filename, so a multi-tune program built from a
+  directory of dumps shows real titles instead of filenames.
+- The conformance kit was regenerated for this: each fixture built from a
+  dump grew by its name, and `four-timers`, built without a dump, is
+  unchanged.
+- **The program now clears the screen every time it starts.** It used to
+  do so only when the raster monitor was included, so a normal program
+  drew its banner over the desktop's leftover pixels. Flag bit 0 of the
+  stub descriptor is now always zero. The stub shrank to 1,674 bytes from
+  1,682.
+- Measured and documented in experiments.md, with the defaults unchanged:
+  packing one tune with a 120-byte ring and `-copies` cuts its memory use
+  by 36 to 43 percent, but a set of about six or more tunes ends up
+  larger, because a multi-tune program allocates one shared workspace and
+  pays the larger file once per tune.
 
 ### 0.3.7, 2026-09-13
 
