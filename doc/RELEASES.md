@@ -33,6 +33,59 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.8, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.8>, built from the commit
+tagged `v0.3.8`.
+
+The tune data structure is YMXS 0.3.2 and the table format is DTX 0.10.1,
+as 0.3.7 had them. The tune file is version 3 and the bound tune is version
+3. A dump does not convert to the file 0.3.7 wrote: the tune file records
+what the tune is called now, and the name and its zero are bytes 0.3.7 did
+not write. A reader of 0.3.7 passes over the word that records it and reads
+such a file as it always did.
+
+- **A subtune played differently by what was selected ahead of it.**
+  `YMXR_stop` silenced the three voices and left every other register where
+  the tune had written it, and a row sets the registers it names and no
+  others, so a tune whose first row leaves one unset read the value the
+  tune before it wrote. The envelope shape reaches furthest, since writing
+  R13 retriggers the generator. Two tunes of the corpus set it late:
+  Turrican - world 4-3 at row 161 and DBA 5 at row 774. Under Hatari,
+  Turrican - world 4-3 after Deeper read R13 as 0 for its first 161 frames
+  and after Synergy Credits as 8. The stop writes every register zero and
+  the mixer with each channel off now, the voices first so the rest is
+  written into silence, and the two read alike on all fourteen registers.
+  The SNDH core is 4,710 bytes against 4,686.
+- The timers were not the fault, and are not changed. A release of a
+  claimed timer stops it, clears its enable and its mask and drops its
+  pending, and init clears the four effect records and re-seeds the rings.
+  A tune using no timer reads alike after a tune using two and after one
+  using three.
+- **The tune file records what the tune is called.** Bytes 10 and 11 were
+  zero and no reader read them; they are the name's offset now, and the
+  name lies between the source index and the DTX2 table, in UTF-8 ended by
+  a zero, at most 255 bytes. `ym-to-ymxr` writes the dump's song name and
+  `ymxs-to-ymxr` the tune's title; `ymx-to-ymxr` writes none, since a
+  `.ymx` dump has none to read. `ymxr-multi` names a subtune by `-nNAME`
+  where one names it, else by the name the file records, else by the file,
+  so a set built from a directory of dumps lists tunes rather than
+  filenames.
+- The conformance kit is written again for that: every fixture from a dump
+  grows by its name and the zero, chambers by 36 bytes for a title of 33
+  characters, and `four-timers`, which is built without a dump, is the
+  bytes it was.
+- **The program clears the screen every run.** It cleared it where the
+  SNDH file's core had the raster monitor in and left the desktop's pixels
+  otherwise, so a plain program drew its banner and its list of subtunes
+  over them. Bit 0 of the stub descriptor's flags word is zero from here
+  and a caller never chose it. The stub is 1,674 bytes against 1,682.
+- The ring a small program packs at, and where it stops paying for a set,
+  are measured in experiments.md: a ring of 120 bytes with copies cuts
+  what one tune occupies by 36 to 43 percent, and a set of about six
+  tunes or more packs larger, since a host allocates one workspace for a
+  set and the bytes are paid a tune. The defaults are unchanged.
+
 ### 0.3.7, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.7>, built from the commit
