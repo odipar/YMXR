@@ -14,43 +14,51 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 430 | 1536 | 2130 | 1026 | 1608 |
+| Big - Samantha Fox Strip Poker 6 | 432 | 1292 | 1926 | 782 | 1404 |
 | Chambers of Shaolin 5 - you blew it! | 1000 | 1370 | 3396 | 806 | 2814 |
 | Circus Attractions 2 | 8 | 1446 | 1648 | 746 | 746 |
-| DBA 2 | 19442 | 1970 | 5522 | 1139 | 4874 |
-| DBA 5 | 22262 | 2057 | 5696 | 1211 | 4508 |
+| DBA 2 | 19444 | 1678 | 4344 | 881 | 3044 |
+| DBA 5 | 22264 | 1759 | 3666 | 944 | 2470 |
 | Digidrum preempt, built | 800 | 1627 | 2808 | 776 | 2006 |
 | Retrigger retune, built | 1200 | 1493 | 2230 | 782 | 1052 |
-| Synergy Credits | 10754 | 2362 | 6358 | 1220 | 4948 |
+| Synergy Credits | 10756 | 2036 | 5144 | 944 | 2982 |
 | Turrican - world 4-3 | 3680 | 1608 | 4836 | 887 | 4130 |
-| Turrican 2 - world completed 1 | 179 | 1908 | 5644 | 1238 | 5016 |
+| Turrican 2 - world completed 1 | 182 | 1608 | 4296 | 939 | 3672 |
+
+Five of the ten packed at unit 1 before SPEC.md 6, rule 6, since an odd
+row count or repeat row does not divide by 2, and a refill of theirs was
+thirty units of a byte. The call on each, at unit 1 and padded to unit 2:
+
+| tune | on average at unit 1 | at unit 2 | at most at unit 1 | at unit 2 |
+|---|---|---|---|---|
+| Big - Samantha Fox Strip Poker 6 | 1536 | 1292 | 2130 | 1926 |
+| DBA 2 | 1970 | 1678 | 5522 | 4344 |
+| DBA 5 | 2057 | 1759 | 5696 | 3666 |
+| Synergy Credits | 2362 | 2036 | 6358 | 5144 |
+| Turrican 2 - world completed 1 | 1908 | 1608 | 5644 | 4296 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so a
 refill is fifteen units of two bytes and one comes every row (tools.md,
-Convert). When these were measured, a tune whose row count or repeat row
-was odd packed at unit 1, Synergy Credits and Turrican 2 - world completed
-1 among these, so a refill of theirs was thirty units of a byte; SPEC.md 6,
-rule 6 has since padded such a tune to unit 2, and the figures for those
-two are not yet measured again. What those units cost depends on how the
-column packed: a run of long matches costs 12 cycles a unit to copy, and a
-short operation, a length and an offset read bit by bit, about 225 to 240
-an operation to parse. The advance spends 450 cycles a refill outside the
-decoder, loading and storing the decoder's eight registers, testing its
-mark and stepping to the next, and a refill that parses no new operation
-adds 334 on Turrican - world 4-3 at unit 2 and 578 on Synergy Credits at
-unit 1. The range comes from the endpoints on Turrican - world 4-3: the 334
-above and 3,680 at its heaviest are 3,346 over fourteen operations, about
-239 each, against a slope of about 225 an operation in YMX. A least-squares
-fit over every refill reads higher, 285 to 342 an operation, since a refill
-that parses few operations is mostly the fixed part. A refill of 450
-outside and the heaviest 3,680 inside is the 4,130 the table above reads as
-Turrican's advance in its costliest frame. Unit 1 packs the corpus to 0.69
-bytes a frame against 0.81 (experiments.md) and costs more to decode:
-measured on Turrican - world 4-3, the advance 1,138 on average and 4,586 at
-most against 887 and 4,130, and the play call 1,859 and 5,240 against 1,608
-and 4,836; `-k1` packs at it.
+Convert). What those units cost depends on how the column packed: a run of
+long matches costs 12 cycles a unit to copy, and a short operation, a
+length and an offset read bit by bit, about 225 to 240 an operation to
+parse. The advance spends 450 cycles a refill outside the decoder, loading
+and storing the decoder's eight registers, testing its mark and stepping to
+the next, and a refill that parses no new operation adds 334 on Turrican -
+world 4-3 and 326 on Synergy Credits, 578 at unit 1. The range comes from
+the endpoints on Turrican - world 4-3: the 334 above and 3,680 at its
+heaviest are 3,346 over fourteen operations, about 239 each, against a
+slope of about 225 an operation in YMX. A least-squares fit over every
+refill reads higher, 285 to 342 an operation, since a refill that parses
+few operations is mostly the fixed part. A refill of 450 outside and the
+heaviest 3,680 inside is the 4,130 the table above reads as Turrican's
+advance in its costliest frame. Unit 1 packs the corpus to 0.69 bytes a
+frame against 0.81 (experiments.md) and costs more to decode: measured on
+Turrican - world 4-3, the advance 1,138 on average and 4,586 at most
+against 887 and 4,130, and the play call 1,859 and 5,240 against 1,608 and
+4,836; `-k1` packs at it.
 
-The frame procedure is the rest, from 510 to 1,142 cycles on average:
+The frame procedure is the rest, from 510 to 1,092 cycles on average:
 the fourteen register columns' tests and the writes they admit, the
 effects' columns and the call's entry and exit. An effect the tune
 does not run is jumped over, two nops standing at its columns' head
@@ -68,10 +76,9 @@ column's next refill, one column a row over the period after the pass's
 end, so no row pays for more than one decoder's copy.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it:
-the averages by more than three fifths of it, and the costliest frame of
-every tune but one by 900 cycles or more. Synergy Credits' costliest frame,
-at unit 1, is 296 cycles under the budget. The ticks of a frame stand
-beside the call and are counted in A tick below.
+the averages by more than two thirds of it, and the costliest frame of
+every tune by 1,512 cycles or more, Synergy Credits' 5,144 the nearest.
+The ticks of a frame stand beside the call and are counted in A tick below.
 
 ## The raster monitor
 
@@ -129,25 +136,25 @@ the VBL and no call nests inside a tick.
 YMX's performance.md measures its player the same way, painting the
 background red while a call runs and reading the palette writes back
 from a cycle-exact Hatari (`ymx/test/cost.py` there). So the two players
-read by one method, on the same dumps, over the 2,019 calls of a
-`VBLS=2300` run:
+read by one method, on the same dumps, over a `VBLS=2300` run: 2,019
+calls of YMX and 2,020 of YMXR.
 
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
-| Synergy Credits | YMXR | 2421 | 4220 | 5408 |
+| Synergy Credits | YMXR | 1995 | 3528 | 4464 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
-| Turrican - world 4-3 | YMXR | 1749 | 3032 | 5148 |
+| Turrican - world 4-3 | YMXR | 1655 | 2936 | 5056 |
 
 These figures and the rig's are not one sample: the rig counts every frame
 of the tune in 68000 cycles with no wait state, and these are the first
-2,019 calls on a machine that stalls the processor while the shifter
-fetches. Synergy Credits' costliest frame is its 4,517th, past the end of
+2,020 calls on a machine that stalls the processor while the shifter
+fetches. Synergy Credits' costliest frame is its 5,346th, past the end of
 this run.
 
-YMXR costs a thirteenth less on average on Turrican - world 4-3 and a
-twenty-fifth more on Synergy Credits, whose odd row count put it at unit 1,
-and a fifth and a seventh more at their worst, and the figures have two
+YMXR costs an eighth less on average on Turrican - world 4-3 and a seventh
+less on Synergy Credits, and at their worst 18 per cent more on Turrican -
+world 4-3 and a twentieth less on Synergy Credits, and the figures have two
 causes. The frame procedure is 588 to 1,203 cycles: the fourteen register
 columns' tests and the writes they admit, the effects' columns and the call's
 entry and exit, where YMX writes its fourteen registers unconditionally, one
@@ -156,7 +163,7 @@ included. Fourteen tests and a few writes cost what fourteen writes cost,
 which YMX's measurement found and its design rests on; the schema adds the
 effects' columns and the entry. So YMXR's frame procedure costs less on the
 rows that set few columns, 787 on average on that tune against YMX's 908, and
-the average lands a thirteenth under.
+the average lands under.
 
 The refill is the second cause. YMXR refills fifteen units every row; YMX
 serves a round-robin of twenty-four slots, twenty-one of them a live
@@ -170,8 +177,11 @@ bounds the parse, and that count follows the streams the schedule serves:
 thirty columns here against twenty-one live streams there. The worst frame of
 each player parses one operation for every unit, fifteen of fifteen here and
 twelve of twelve there, so each worst frame is that bound. On Synergy Credits
-the gap is wider: unit 1 makes the refill thirty units, where YMX
-duplicates a frame to raise its row count and stays at unit 2.
+the run ends before YMXR's costliest frame, so its 4,464 at most is not that
+frame, which the rig counts at 5,144. Both players pad this tune to unit 2,
+YMX by duplicating a frame and YMXR by a row that sets no column (SPEC.md 6,
+rule 6); before that rule the tune packed at unit 1, the refill was thirty
+units, and the same run read 5,408 at most.
 
 The one thing YMX does here that this player does not is write its
 register columns unconditionally, dense, with the effects behind one
