@@ -69,10 +69,6 @@ func made(said *report.Report, file, prg []byte, rows int64) {
 		from = "the VBL, the set claims Timer C"
 	}
 	said.Row("it plays from", from)
-	screen := "left as the desktop drew it"
-	if flags&sndh.FlagClear != 0 {
-		screen = "cleared, the core has the raster monitor in"
-	}
-	said.Row("the screen", screen)
+	said.Row("the screen", "cleared before the banner")
 	said.Say(fmt.Sprintf("the program: %d bytes", len(prg)))
 }

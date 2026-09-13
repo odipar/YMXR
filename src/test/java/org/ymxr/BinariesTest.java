@@ -419,16 +419,19 @@ final class BinariesTest {
     }
 
     @Test
-    void theMonitorInTheCoreSetsTheStubsClearBit() throws IOException {
+    void theMonitorInTheCoreLeavesTheStubsFlagsAlone() throws IOException {
+        // The stub clears the screen every run, so the monitor no longer
+        // decides it and the flags read the same either way.
         List<byte[]> files = List.of(tune("chambers"));
         byte[] plain = Sndh.of(files, new Sndh.Options("Plain", null, null, false, false));
         byte[] watched = Sndh.of(files, new Sndh.Options("Watched", null, null, true, false));
         assertCombined(Binaries.core(), plain, files, tags(plain));
         assertCombined(Binaries.core(true, false), watched, files, tags(watched));
         assertEquals(0, Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
-                "the plain core leaves the desktop's pixels where they are");
-        assertEquals(Prg.FLAG_CLEAR, Tune.getWord(Prg.of(watched, 0), 28 + Prg.STUB_FLAGS_AT),
-                "the monitor core has the program clear the screen");
+                "a set with no Timer C sets no flag");
+        assertEquals(Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
+                Tune.getWord(Prg.of(watched, 0), 28 + Prg.STUB_FLAGS_AT),
+                "the monitor core sets the same flags as the plain one");
     }
 
     @Test
@@ -445,9 +448,8 @@ final class BinariesTest {
                     Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
                     "the file's core reads back the switches asked for");
             assertCombined(Binaries.core(monitor, lean), sndh, files, tags(sndh));
-            assertEquals(monitor ? Prg.FLAG_CLEAR : 0,
-                    Tune.getWord(Prg.of(sndh, 0), 28 + Prg.STUB_FLAGS_AT),
-                    "the program clears the screen for the monitor's bars and not otherwise");
+            assertEquals(0, Tune.getWord(Prg.of(sndh, 0), 28 + Prg.STUB_FLAGS_AT),
+                    "neither switch sets a stub flag: the screen is cleared every run");
         }
     }
 

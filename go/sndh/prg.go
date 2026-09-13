@@ -39,12 +39,6 @@ const (
 	stubLength     = 24
 )
 
-// FlagClear is flag bit 0: the screen cleared before the banner. Set where
-// the SNDH file's core has the raster monitor in, so that the monitor's
-// bars stand where the desktop's pixels were. It follows the core, and a
-// caller does not choose it.
-const FlagClear = 1
-
 // FlagVBL is flag bit 1: play from the VBL, a 50 Hz clock. Set where the
 // set claims Timer C, since the stub then has no timer to play from; such
 // a set is at 50 Hz, or there is no program.
@@ -101,16 +95,12 @@ func ProgramWith(stub, sndh []byte, rows int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	monitor := ymxr.GetWord(sndh, core+coreFlagsAt)&coreMonitor != 0
 	prg := make([]byte, Header+len(stub)+len(sndh)+4)
 	ymxr.PutWord(prg, 0, PrgMagic)
 	ymxr.PutLong(prg, 2, len(stub)+len(sndh))
 	copy(prg[Header:], stub)
 	ymxr.PutWord(prg, Header+stubSubtunesAt, tags.Subtunes)
 	flags := 0
-	if monitor {
-		flags |= FlagClear
-	}
 	if timerC {
 		flags |= FlagVBL
 	}

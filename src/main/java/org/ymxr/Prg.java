@@ -38,12 +38,6 @@ final class Prg {
     static final int STUB_CORE_AT = 20;
     static final int STUB_DESCRIPTOR = 24;
 
-    /** Flag bit 0: the screen cleared before the banner. Set where the
-     *  SNDH file's core has the raster monitor in, so that the monitor's
-     *  bars stand where the desktop's pixels were. It follows the core,
-     *  and a caller does not choose it. */
-    static final int FLAG_CLEAR = 1;
-
     /** Flag bit 1: play from the VBL, a 50 Hz clock. Set where the set
      *  claims Timer C, since the stub then has no timer to play from;
      *  such a set is at 50 Hz, or there is no program. Clear, the stub
@@ -93,15 +87,12 @@ final class Prg {
                     + " a separate host");
         }
         int core = core(sndh, tags.end() + 4);
-        boolean monitor = (Tune.getWord(sndh, core + Sndh.CORE_FLAGS_AT)
-                & Sndh.CORE_MONITOR) != 0;
         byte[] prg = new byte[HEADER + stub.length + sndh.length + 4];
         Tune.putWord(prg, 0, PRG_MAGIC);
         Tune.putLong(prg, 2, stub.length + sndh.length);
         System.arraycopy(stub, 0, prg, HEADER, stub.length);
         Tune.putWord(prg, HEADER + STUB_SUBTUNES_AT, tags.subtunes());
-        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, (monitor ? FLAG_CLEAR : 0)
-                | (timerC ? FLAG_VBL : 0));
+        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, timerC ? FLAG_VBL : 0);
         Tune.putWord(prg, HEADER + STUB_RATE_AT, tags.rate());
         Tune.putLong(prg, HEADER + STUB_ROWS_AT, (int) rows);
         Tune.putLong(prg, HEADER + STUB_CORE_AT, core);
@@ -126,9 +117,7 @@ final class Prg {
                 : String.valueOf(rows));
         report.row("it plays from", (flags & FLAG_VBL) != 0 ? "the VBL, the set claims Timer C"
                 : "the VBL where the screen's rate is the tune's, and Timer C where it is not");
-        report.row("the screen", (flags & FLAG_CLEAR) != 0
-                ? "cleared, the core has the raster monitor in"
-                : "left as the desktop drew it");
+        report.row("the screen", "cleared before the banner");
         report.say("the program: " + prg.length + " bytes");
     }
 
@@ -315,8 +304,7 @@ final class Prg {
     /**
      * {@code ymxr-prg}: an SNDH file on standard input, the program
      * around it on standard output, playing {@code -rROWS} rows, or
-     * playing on without. The stub's flag bit 0 follows the file's core:
-     * the screen is cleared where that core has the raster monitor in.
+     * playing on without. The stub clears the screen before its banner.
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));

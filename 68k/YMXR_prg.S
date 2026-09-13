@@ -6,9 +6,7 @@
 ;   +4   'YMXT'
 ;   +8   the descriptor's version, 1
 ;   +10  the subtunes, a word
-;   +12  flags, a word: bit 0 clears the screen before the banner, which
-;        the tool sets where the core has the raster monitor in, so that
-;        the bars stand where the desktop's pixels were; bit 1 plays from
+;   +12  flags, a word: bit 0 is zero; bit 1 plays from
 ;        the VBL, which the tool sets where the set claims Timer C; with
 ;        it clear the program uses the VBL where the screen's rate is the
 ;        tune's, and Timer C at the rate where it is not
@@ -94,13 +92,11 @@ main:           move.w  #Getrez,-(sp)           ; forty columns in low
                 moveq   #40,d1
 .wide:          lea     wide(pc),a0
                 move.w  d1,(a0)
-                btst    #0,flags+1(pc)
-                beq.s   .banner
                 pea     clear(pc)               ; the desktop's pixels away,
-                move.w  #Cconws,-(sp)           ; so the monitor's bars show
-                trap    #GEMDOS
-                addq.l  #6,sp
-.banner:        lea     hex(pc),a0
+                move.w  #Cconws,-(sp)           ; so the banner, the list and
+                trap    #GEMDOS                 ; the monitor's bars are read
+                addq.l  #6,sp                   ; against an empty screen
+                lea     hex(pc),a0
                 lea     sndh(pc),a1
                 lea     digits(pc),a2
                 move.l  a1,d0
