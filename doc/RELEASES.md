@@ -33,6 +33,49 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.5, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.5>, built from the commit
+tagged `v0.3.5`.
+
+A conversion writes fewer bytes, and a player writes fewer MFP registers.
+The 68000 sources are unchanged since 0.3.3, so the five binaries are the
+same bytes, and the tune file is version 3 and the bound tune is version
+3, as 0.3.0 set them. A file this release writes plays under 0.3.0 to
+0.3.4 and a file those wrote plays here: the reading does not move, and
+`doc/conformance/tunes/synergy.ymxr` is 7,596 bytes against 7,920 with
+its reference record the same bytes.
+
+- **A start on a running timer keeps the rate it finds.** A start wrote
+  the control and count columns on every row, where a retune writes them
+  only where they moved, so a row handing a running timer a second source
+  at the rate it counts wrote that rate again and the player wrote two MFP
+  registers it need not. SPEC.md 1.8 defines the reading, and now in as
+  many words: a running timer runs at the rate the two columns set, or at
+  the rate it already counts where the row sets neither.
+- The encoder leaves the two columns 0 where no reset is asked, the select
+  and the count are the ones in force, and the timer is known to be
+  counting. A source that plays once clears that last, since it stops the
+  timer at its marker and no row says when.
+- A `.ymx` conversion is where it tells: YMX's `HOLD` that repatches a
+  toggle's volume becomes a start of exactly that shape, and 58 to 92 per
+  cent of the starts across the files with a dump beside them are one.
+
+Measured over three `.ymx` tunes, a minute of each under Hatari against
+the program YMX writes of the same file:
+
+| | the rate columns | the packed table | MFP writes |
+|---|---|---|---|
+| Deeper | -6.7% | -2.6% | 6,536 to 3,634 |
+| DitherDance | -35.3% | -14.3% | 5,352 to 1,472 |
+| low | -12.4% | -4.7% | 7,118 to 2,792 |
+
+Where this tree wrote 1.4 to 3.0 times YMX's timer traffic it writes less:
+3,634 against 4,778, 1,472 against 1,800, 2,792 against 3,760. No frame
+differs on a register no effect drives, the envelope restarts the rows ask
+for are the same count both ways, and the end-of-interrupt counts move by
+less than a tenth of a per cent.
+
 ### 0.3.4, 2026-09-12
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.4>, built from the commit
