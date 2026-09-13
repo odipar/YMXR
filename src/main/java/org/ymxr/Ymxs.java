@@ -92,7 +92,7 @@ final class Ymxs {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
         Tune.Written written = Tune.write(made.columns(), made.sources(), made.rate(),
-                packing.unit(), packing.ring(), packing.packer(), report);
+                packing.unit(), packing.ring(), packing.packer(), report, tune.title());
         report.row(title(tune), org.ymxs.Tunes.size(tune.table()) + " rows at " + made.rate()
                 + " Hz, " + made.sources().count() + " sources: "
                 + written.file().length + " bytes");

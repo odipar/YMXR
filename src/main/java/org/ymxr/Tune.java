@@ -21,14 +21,18 @@ import org.dtx.Table;
  *  6       2      the frame rate, in Hz
  *  8       1      effects used, bits 3 to 0
  *  9       1      S, the source count, 0 to 127
- *  10      2      zero
+ *  10      2      where the name begins, or zero where the tune has none
  *  12      4      where the DTX2 table begins
  *  16      4S     the source index: where source 1 to S's DTX1 table begins
+ *          ..     the name, its bytes and a zero, where there is one
  *          ..     the DTX2 table, on a long
  *          ..     the DTX1 tables, each on a long
  * </pre>
  *
- * Every offset counts from the file's first byte.
+ * Every offset counts from the file's first byte. The name is what the
+ * dump or the YMXS file titles the tune, in UTF-8 and ended by a zero
+ * byte. It lies between the index and the table, so its offset fits the
+ * word that records it however large the tables are.
  */
 final class Tune {
 
@@ -37,8 +41,14 @@ final class Tune {
     static final int FRAME_RATE_AT = 6;
     static final int EFFECTS_AT = 8;
     static final int COUNT_AT = 9;
+    static final int NAME_AT = 10;
     static final int TABLE_AT = 12;
     static final int INDEX_AT = 16;
+
+    /** The most bytes a name takes, its zero aside. A longer one is cut
+     *  to this: the player reads a name onto a screen of forty columns and
+     *  an SNDH tag numbers its bytes in a word. */
+    static final int MOST_NAME = 255;
 
     /** The ring a column unpacks through, dtx-write's default. */
     static final int RING = 960;
@@ -71,12 +81,24 @@ final class Tune {
      *  ring is replayed at its exact rows by DTX's reader. */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          Report report) {
-        return write(columns, sources, frameRate, unit, ring, new St4(), report);
+        return write(columns, sources, frameRate, unit, ring, new St4(), report, "");
+    }
+
+    /** The same, with the tune named. */
+    static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
+                         Report report, String name) {
+        return write(columns, sources, frameRate, unit, ring, new St4(), report, name);
     }
 
     /** The same, packed by the packer the tool's flags asked for. */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          Packer packer, Report report) {
+        return write(columns, sources, frameRate, unit, ring, packer, report, "");
+    }
+
+    /** The same, with the tune named. */
+    static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
+                         Packer packer, Report report, String name) {
         int frames = columns.column[0].length;
         int repeat = columns.repeat;
         if (unit > 1 && (frames % unit != 0 || (repeat < frames && repeat % unit != 0))) {
@@ -102,7 +124,10 @@ final class Tune {
             sourceRows += s.rows().length;
             sourceBytes += tables[i].length;
         }
-        int here = align(INDEX_AT + 4 * tables.length);
+        byte[] named = named(name);
+        int after = INDEX_AT + 4 * tables.length;
+        int nameAt = named.length == 0 ? 0 : after;
+        int here = align(after + named.length);
         int tableAt = here;
         here = align(here + table.length);
         int[] sourceAt = new int[tables.length];
@@ -116,7 +141,9 @@ final class Tune {
         putWord(file, FRAME_RATE_AT, frameRate);
         file[EFFECTS_AT] = (byte) columns.effects;
         file[COUNT_AT] = (byte) tables.length;
+        putWord(file, NAME_AT, nameAt);
         putLong(file, TABLE_AT, tableAt);
+        System.arraycopy(named, 0, file, nameAt, named.length);
         for (int i = 0; i < tables.length; i++) {
             putLong(file, INDEX_AT + 4 * i, sourceAt[i]);
         }
@@ -127,6 +154,55 @@ final class Tune {
         packed(report, watched, frames, table.length, tables.length, sourceRows, sourceBytes,
                 at, unit, file.length);
         return new Written(file, repeat < frames ? repeat : frames);
+    }
+
+    /**
+     * What a name comes to in the file: its UTF-8 and a zero, cut to
+     * {@link #MOST_NAME} bytes. A name of no printable characters writes
+     * none, and the file records zero for it. Bytes under a space are
+     * dropped, since a name reaches an ST screen and an SNDH tag.
+     */
+    private static byte[] named(String name) {
+        StringBuilder kept = new StringBuilder();
+        for (int i = 0; i < name.length(); i++) {
+            char one = name.charAt(i);
+            if (one >= ' ') {
+                kept.append(one);
+            }
+        }
+        byte[] said = kept.toString().strip()
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        if (said.length == 0) {
+            return said;
+        }
+        int cut = Math.min(said.length, MOST_NAME);
+        // a cut lands on a whole character, so the name stays UTF-8
+        while (cut > 0 && cut < said.length && (said[cut] & 0xC0) == 0x80) {
+            cut--;
+        }
+        byte[] out = new byte[cut + 1];
+        System.arraycopy(said, 0, out, 0, cut);
+        return out;
+    }
+
+    /**
+     * The name a tune file records, or an empty string where it records
+     * none. A file of a version before the name reads as none, since the
+     * word was zero there.
+     */
+    static String name(byte[] file) {
+        if (file.length < INDEX_AT) {
+            return "";
+        }
+        int at = getWord(file, NAME_AT);
+        if (at == 0 || at >= file.length) {
+            return "";
+        }
+        int end = at;
+        while (end < file.length && file[end] != 0) {
+            end++;
+        }
+        return new String(file, at, end - at, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /** The columns as a DTX2 file, packed. */

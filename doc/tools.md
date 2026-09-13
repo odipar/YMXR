@@ -268,7 +268,11 @@ last, and releases the machine.
 
 Subtunes come from a multi file (BINARIES.md 0): several tune files in
 one, a name each, which `bin/ymxr-multi` writes from the tune files named
-and `bin/ymxs-to-ymxr` from a structure of several tunes. `bin/ymxr-sndh`
+and `bin/ymxs-to-ymxr` from a structure of several tunes. A tune is named
+by `-nNAME` where one names it, else by the name the tune file records
+(SPEC.md 3.3), which `bin/ym-to-ymxr` writes from the dump's song name
+and `bin/ymxs-to-ymxr` from the tune's title, and else by the file it was
+read from. `bin/ymxr-sndh`
 reads a tune file as one subtune and a multi file as its tunes in order,
 each named by the name the multi file records for it. The title is the
 first tune's name unless `-tTITLE` names another.

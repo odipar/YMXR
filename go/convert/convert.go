@@ -92,8 +92,8 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 		return Converted{}, err
 	}
 	found(said, sources, made.Columns.Effects)
-	written, err := ymxr.WriteWith(made.Columns, made.Sources, song.PlayerHz, unit, ring,
-		st4.Packer{CopiesFlag: copies, Seconds: seconds}, said)
+	written, err := ymxr.WriteNamed(made.Columns, made.Sources, song.PlayerHz, unit, ring,
+		st4.Packer{CopiesFlag: copies, Seconds: seconds}, said, song.Name)
 	if err != nil {
 		return Converted{}, err
 	}

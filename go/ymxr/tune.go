@@ -3,6 +3,7 @@ package ymxr
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/odipar/dtx/go/dtx"
 	"github.com/odipar/dtx/go/st4"
@@ -21,7 +22,7 @@ import (
 //	6       2      the frame rate, in Hz
 //	8       1      effects used, bits 3 to 0
 //	9       1      S, the source count, 0 to 127
-//	10      2      zero
+//	10      2      where the name begins, or zero where the tune has none
 //	12      4      where the DTX2 table begins
 //	16      4S     the source index: where source 1 to S's DTX1 table begins
 //	        ..     the DTX2 table, on a long
@@ -40,8 +41,11 @@ const (
 	FrameRateAt = 6
 	EffectsAt   = 8
 	CountAt     = 9
-	TableAt     = 12
-	IndexAt     = 16
+	NameAt      = 10
+	// MostName is the most bytes a name takes, its zero aside.
+	MostName = 255
+	TableAt  = 12
+	IndexAt  = 16
 )
 
 // Ring is the ring a column unpacks through, dtx-write's default.
@@ -73,12 +77,64 @@ type Written struct {
 // than the ring is replayed at its exact rows by DTX's reader.
 func Write(columns Columns, sources *Sources, frameRate, unit, ring int,
 	said *report.Report) (Written, error) {
-	return WriteWith(columns, sources, frameRate, unit, ring, st4.Packer{}, said)
+	return WriteNamed(columns, sources, frameRate, unit, ring, st4.Packer{}, said, "")
 }
 
 // WriteWith is the same, packed by the packer the tool's flags asked for.
 func WriteWith(columns Columns, sources *Sources, frameRate, unit, ring int,
 	packer dtx.Packer, said *report.Report) (Written, error) {
+	return WriteNamed(columns, sources, frameRate, unit, ring, packer, said, "")
+}
+
+// namedBytes is what a name comes to in the file: its UTF-8 and a zero,
+// cut to MostName bytes. A name of no printable characters writes none,
+// and the file records zero for it. Bytes under a space are dropped, since
+// a name reaches an ST screen and an SNDH tag.
+func namedBytes(name string) []byte {
+	kept := make([]rune, 0, len(name))
+	for _, one := range name {
+		if one >= ' ' {
+			kept = append(kept, one)
+		}
+	}
+	said := []byte(strings.TrimSpace(string(kept)))
+	if len(said) == 0 {
+		return said
+	}
+	cut := len(said)
+	if cut > MostName {
+		cut = MostName
+	}
+	// a cut lands on a whole character, so the name stays UTF-8
+	for cut > 0 && cut < len(said) && said[cut]&0xC0 == 0x80 {
+		cut--
+	}
+	out := make([]byte, cut+1)
+	copy(out, said[:cut])
+	return out
+}
+
+// TuneName is the name a tune file records, or an empty string where it
+// records none. A file written before the name reads as none, since the
+// word was zero there.
+func TuneName(file []byte) string {
+	if len(file) < IndexAt {
+		return ""
+	}
+	at := GetWord(file, NameAt)
+	if at == 0 || at >= len(file) {
+		return ""
+	}
+	end := at
+	for end < len(file) && file[end] != 0 {
+		end++
+	}
+	return string(file[at:end])
+}
+
+// WriteNamed is the same, with the tune named.
+func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
+	packer dtx.Packer, said *report.Report, name string) (Written, error) {
 	frames := len(columns.Column[0])
 	repeat := columns.Repeat
 	if unit > 1 && (frames%unit != 0 || (repeat < frames && repeat%unit != 0)) {
@@ -112,7 +168,13 @@ func WriteWith(columns Columns, sources *Sources, frameRate, unit, ring int,
 		sourceRows += len(one.Rows)
 		sourceBytes += len(tables[i])
 	}
-	here := Align(IndexAt + 4*len(tables))
+	named := namedBytes(name)
+	after := IndexAt + 4*len(tables)
+	nameAt := 0
+	if len(named) != 0 {
+		nameAt = after
+	}
+	here := Align(after + len(named))
 	tableAt := here
 	here = Align(here + len(table))
 	sourceAt := make([]int, len(tables))
@@ -126,7 +188,9 @@ func WriteWith(columns Columns, sources *Sources, frameRate, unit, ring int,
 	PutWord(file, FrameRateAt, frameRate)
 	file[EffectsAt] = byte(columns.Effects)
 	file[CountAt] = byte(len(tables))
+	PutWord(file, NameAt, nameAt)
 	PutLong(file, TableAt, tableAt)
+	copy(file[nameAt:], named)
 	for i := range tables {
 		PutLong(file, IndexAt+4*i, sourceAt[i])
 	}
