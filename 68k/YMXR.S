@@ -347,7 +347,7 @@ q\{ct}:         bra.w   \{tick}_done
                 lsl.w   #3,d1
                 movea.l WS_SOURCES-8(a0,d1.w),a4    ; its first row
                 move.l  WS_SOURCES-4(a0,d1.w),d0    ; the loop cell: row RR,
-\{tick}_pick:   bmi.w   .shaped\~                   ; 0 where it plays once,
+\{tick}_pick:   bmi.w   \{tick}_shaped              ; 0 where it plays once,
                                                     ; -1 for a square and -2
                                                     ; for a source of one row
 ; the handler's three operands stand under one mask, since the timer may
@@ -391,7 +391,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; The cell separates the two shapes: -1 two rows alternating, -2 one
 ; row repeating. Init drops this test where the tune uses one of the two
 ; and not the other, the branch above going straight to that shape.
-.shaped\~:      addq.l  #1,d0
+\{tick}_shaped: addq.l  #1,d0
                 bne.s   \{tick}_one
 ; A square: the two rows into the handler's immediate and the difference
 ; of the two into the one instruction that moves between them. The row the
@@ -769,30 +769,35 @@ YMXR_init:
                 .if     YMXR_NEST
 ; A tune that runs one effect has no second timer to nest inside a tick,
 ; so the level that tick drops buys it no safety: two nops stand where the
-; drop
-; would, in all three of that effect's handlers. A tune running two or
-; more keeps the drop, and one running none reaches no handler.
-                move.b  WS_EFFECTS(a6),d0
-                move.b  d0,d1
+; drop would, in all three of that effect's handlers. A tune running two
+; or more keeps the drop, and one running none reaches no handler. Every
+; handler's word is written on every init: a set inits one loaded copy
+; for each subtune, and a subtune that ran one effect alone left its nops
+; where the next, running that effect beside another, needs the drop.
+                move.l  #$46FC2500,d3           ; move.w #$2500,sr, the drop,
+                move.b  WS_EFFECTS(a6),d0       ; which a handler keeps unless
+                move.b  d0,d1                   ; its effect runs alone
                 subq.b  #1,d1
                 and.b   d1,d0                   ; more than one bit set
                 bne.s   .nests
-                lea     ymxr_tick0(pc),a5
+                move.l  #$4E714E71,d3           ; nop nop, for the one it runs
+.nests:         lea     ymxr_tick0(pc),a5
                 lea     ymxr_sq0(pc),a4
                 lea     ymxr_one0(pc),a3
                 moveq   #0,d4
                 moveq   #3,d2
-.alone:         btst    d4,WS_EFFECTS(a6)
-                beq.s   .quiet
-                move.l  #$4E714E71,TICK_SR(a5)
-                move.l  #$4E714E71,SQ_SR(a4)
-                move.l  #$4E714E71,ONE_SR(a3)
-.quiet:         lea     TICK_SIZE(a5),a5
+.each:          move.l  #$46FC2500,d0           ; a handler the tune does not
+                btst    d4,WS_EFFECTS(a6)       ; run keeps the drop, and one
+                beq.s   .word                   ; it runs is written d3
+                move.l  d3,d0
+.word:          move.l  d0,TICK_SR(a5)
+                move.l  d0,SQ_SR(a4)
+                move.l  d0,ONE_SR(a3)
+                lea     TICK_SIZE(a5),a5
                 lea     SQ_SIZE(a4),a4
                 lea     ONE_SIZE(a3),a3
                 addq.w  #1,d4
-                dbra    d2,.alone
-.nests:
+                dbra    d2,.each
                 .endif
 
 ; A square's handler names the row it stands at in the one instruction
@@ -830,9 +835,10 @@ YMXR_init:
                 move.w  #$1229,(a1)             ; move.b d16(a1),d1: the
                 movea.l a1,a5                   ; effect's first read
                 bra.s   .next
-.skip:          move.l  a5,d0
-                sub.l   a1,d0
-                subq.l  #2,d0
+.skip:          move.w  #$6000,(a1)             ; bra.w: the head the assembler
+                move.l  a5,d0                   ; wrote, which a tune before
+                sub.l   a1,d0                   ; this one that ran the effect
+                subq.l  #2,d0                   ; replaced with the read
                 move.w  d0,2(a1)
 .next:          dbra    d2,.over
 
@@ -840,11 +846,15 @@ YMXR_init:
 ; of the two shapes with a separate handler and not the other needs no
 ; test: the branch that leaves the general handler's path goes straight
 ; to that shape's block, and the start pays no test for the shape it
-; does not use. A tune using both keeps the test.
+; does not use. A tune using both, or neither, keeps the test. The word
+; is written on every path: a tune before this one that used one shape
+; wrote its block there, and a set inits one loaded copy for every
+; subtune.
+                move.w  #PICK_BOTH,d1
                 move.b  d5,d0
-                beq.s   .picked
+                beq.s   .only
                 cmp.b   #3,d0
-                beq.s   .picked
+                beq.s   .only
                 move.w  #PICK_ONE,d1
                 btst    #0,d0
                 beq.s   .only
@@ -856,7 +866,6 @@ YMXR_init:
                 lea     (a4,d4.w),a1
                 move.w  d1,PICK_AT(a1)
                 dbra    d2,.pick
-.picked:
 
 ; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body stands two bytes past the slot
@@ -1145,6 +1154,7 @@ ONE_SIZE        equ     ymxr_one1-ymxr_one0
 PICK_AT         equ     ymxr_tick0_pick-ymxr_tick0_over+2
 PICK_SQ         equ     ymxr_tick0_square-ymxr_tick0_pick-2
 PICK_ONE        equ     ymxr_tick0_one-ymxr_tick0_pick-2
+PICK_BOTH       equ     ymxr_tick0_shaped-ymxr_tick0_pick-2
 
 ; A parked place: a marker with no loop cell, so a stray tick stops its
 ; timer.
