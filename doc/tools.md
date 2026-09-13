@@ -277,15 +277,15 @@ reads a tune file as one subtune and a multi file as its tunes in order,
 each named by the name the multi file records for it. The title is the
 first tune's name unless `-tTITLE` names another.
 
-`-perf` selects the core with the raster monitor in
-(Measure), and the program then clears the screen so that its bars show;
-`-lean` selects the core whose ticks neither drop the interrupt level nor
-write an end of interrupt, which requires two things of the host
-(performance.md). The two are a switch each, and both together select the
-core that is both, whose bars are those of the lean ticks. The four cores
-and the stub are assembled by the build with rmac, once, into the
-classpath; BINARIES.md is the contract for every byte of them, and no
-assembler runs at combine time.
+`-perf` selects the core with the raster monitor in (Measure), whose bars
+are read against the screen the program clears before its banner
+(BINARIES.md 4); `-lean` selects the core whose ticks neither drop the
+interrupt level nor write an end of interrupt, which requires two things
+of the host (performance.md). The two are a switch each, and both
+together select the core that is both, whose bars are those of the lean
+ticks. The four cores and the stub are assembled by the build with rmac,
+once, into the classpath; BINARIES.md is the contract for every byte of
+them, and no assembler runs at combine time.
 
 ## Play
 
@@ -631,8 +631,8 @@ python3 ym/writes.py a.txt b.txt
 register, whether the values come in the same order and where they part.
 The cores of BINARIES.md play one tune through the same player, so this
 is the measure of whether a switch changed the tune. It counts from the
-frame the player first writes in, since a program that clears the screen
-starts a frame later and 900 frames from the first VBL are then 900
+frame the player first writes in, since the program clears the screen
+and starts a frame later, so 900 frames from the first VBL are 900
 different rows, and a register whose values agree to the shorter run's
 end is the window's edge, not a difference. performance.md, A tick, has
 what it read off the four cores.
