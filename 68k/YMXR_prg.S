@@ -56,6 +56,11 @@ RIGHT           equ     $4D
 UP              equ     $48
 DOWN            equ     $50
 
+; The frames a number typed waits for a digit after it, at the tune's
+; rate: half a second at 50 Hz. A set of more than nine needs two digits,
+; and a digit is the whole number where no second follows it.
+PAUSE           equ     25
+
 ; The name a line of the list reserves. A name longer than this is cut,
 ; and a shorter one padded, so a line covers the line it is written over.
 NAME_WIDE       equ     28
@@ -161,20 +166,20 @@ play:
                 tst.w   d1
                 beq.s   .fresh
                 subq.w  #1,d1                   ; inside a report
-                bra.s   .read
+                bra.w   .read
 .fresh:         cmp.b   #$F6,d0
                 bcs.s   .key
                 lea     reports(pc),a0
                 sub.b   #$F6,d0
                 and.w   #15,d0
                 move.b  (a0,d0.w),d1
-                bra.s   .read
+                bra.w   .read
 .key:           tst.b   d0
-                bmi.s   .read                   ; a key released
+                bmi.w   .read                   ; a key released
                 cmp.b   #SPACE,d0
-                beq.s   .stop
+                beq.w   .stop
                 cmp.b   #ESC,d0
-                beq.s   .stop
+                beq.w   .stop
                 cmp.b   #LEFT,d0
                 beq.s   .back
                 cmp.b   #UP,d0
@@ -183,13 +188,15 @@ play:
                 beq.s   .on
                 cmp.b   #DOWN,d0
                 beq.s   .on
-                subq.b  #1,d0                   ; 1 to 9 are $02 to $0A
-                beq.s   .read
-                cmp.b   #9,d0
-                bhi.s   .read
-                cmp.w   subtunes(pc),d0
-                bhi.s   .read
-                bra.s   .pick
+                subq.b  #1,d0                   ; 1 to 9 are $02 to $0A,
+                beq.w   .read                   ; and 0 is $0B
+                cmp.b   #10,d0
+                bhi.w   .read
+                cmp.b   #10,d0
+                bne.s   .typed
+                moveq   #0,d0
+.typed:         bsr     typed
+                bra.w   .read
 ; The arrows walk the set and wrap at each end, so a set of any size is
 ; reached by them where the nine keys run out.
 .back:          move.w  playing(pc),d0
@@ -206,7 +213,12 @@ play:
                 bsr     start
                 move.w  #$2300,sr
                 bsr     saying
-.read:          move.b  done(pc),d0
+.read:          move.w  pending(pc),d0          ; a number typed, and the
+                beq.s   .idle                   ; pause after it run out
+                move.w  waiting(pc),d0
+                bne.s   .idle
+                bsr     take
+.idle:          move.b  done(pc),d0
                 beq.w   .wait
 .stop:          move.w  #$2700,sr
                 lea     sndh(pc),a0
@@ -371,6 +383,47 @@ saying:
                 movem.l (sp)+,d0-d3/a0-a2
                 rts
 
+; One digit d0.b, 0 to 9, onto the number typed, and the pause started.
+; A digit that would put the number past the set starts it again at that
+; digit, so 9 in a set of thirteen is 9 and 1 then 3 is 13. A number no
+; second digit can grow reaches the set at once, so 2 in that set starts
+; its subtune as the key is read.
+typed:
+                movem.l d0-d1/a0,-(sp)
+                move.w  pending(pc),d1
+                mulu    #10,d1
+                add.w   d0,d1
+                cmp.w   subtunes(pc),d1
+                bls.s   .keep
+                move.w  d0,d1
+.keep:          lea     pending(pc),a0
+                move.w  d1,(a0)
+                move.w  #PAUSE,waiting-pending(a0)
+                mulu    #10,d1
+                cmp.w   subtunes(pc),d1
+                bls.s   .wait
+                clr.w   waiting-pending(a0)
+.wait:          movem.l (sp)+,d0-d1/a0
+                rts
+
+; The number typed, once the pause after its last digit has run out: the
+; subtune it names started, and one outside the set left alone.
+take:
+                movem.l d0-d1/a0,-(sp)
+                move.w  pending(pc),d0
+                lea     pending(pc),a0
+                clr.w   (a0)
+                tst.w   d0
+                beq.s   .no
+                cmp.w   subtunes(pc),d0
+                bhi.s   .no
+                move.w  #$2700,sr
+                bsr     start
+                move.w  #$2300,sr
+                bsr     saying
+.no:            movem.l (sp)+,d0-d1/a0
+                rts
+
 ; One byte to the keyboard chip, d0.b, once its ACIA accepts one.
 ikbd:           btst    #1,$FFFFFC00.w
                 beq.s   ikbd
@@ -383,6 +436,8 @@ ikbd:           btst    #1,$FFFFFC00.w
 start:
                 lea     playing(pc),a0
                 move.w  d0,(a0)
+                clr.w   pending-playing(a0)     ; a key that picks a subtune
+                clr.w   waiting-playing(a0)     ; drops a number half typed
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit: skipped where none plays
                 jsr     (a0)                    ; init
@@ -434,7 +489,11 @@ vbl:
 ; doc/performance.md), and this program clears the screen for it.
 tick:
                 movem.l d0-d7/a0-a6,-(sp)
-                move.b  done(pc),d0
+                lea     waiting(pc),a0          ; the pause after a digit,
+                tst.w   (a0)                    ; which the key loop reads
+                beq.s   .counted
+                subq.w  #1,(a0)
+.counted:       move.b  done(pc),d0
                 bne.s   .done
                 lea     sndh(pc),a1
                 jsr     8(a1)
@@ -487,7 +546,8 @@ clear:          dc.b    27,"E",0                ; VT52: the screen cleared
 text:           dc.b    "YMXR at $"
 hex:            dc.b    "00000000",13,10
                 dc.b    "SPACE or ESC ends the program",13,10,0
-picks:          dc.b    "LEFT and RIGHT pick a subtune",13,10,13,10,0
+picks:          dc.b    "LEFT and RIGHT pick a subtune",13,10
+                dc.b    "or type its number",13,10,13,10,0
 plays:          dc.b    "playing ",0
 unnamed:        dc.b    "subtune",0
 digits:         dc.b    "0123456789ABCDEF"
@@ -497,7 +557,9 @@ saved:          dcb.b   28,0
 rows_left:      dc.l    0
 accumulated:    dc.w    0
 playing:        dc.w    1
-line:           dcb.b   NAME_WIDE+16,0
+pending:        dc.w    0
+waiting:        dc.w    0
+line:           dcb.b   NAME_WIDE+24,0
 done:           dc.b    0
 busy:           dc.b    0
                 .even
