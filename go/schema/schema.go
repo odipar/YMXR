@@ -59,6 +59,9 @@ func Of(tune ymxs.Tune) (Made, error) {
 		column[c] = make([]byte, frames)
 	}
 	var target, selects, count [4]int
+	// Whether the timer is known to be counting: a start sets it where the
+	// source it runs repeats, and a stop clears it.
+	var counting [4]bool
 	for i := range target {
 		target[i] = -1
 	}
@@ -78,7 +81,8 @@ func Of(tune ymxs.Tune) (Made, error) {
 			if err != nil {
 				return Made{}, err
 			}
-			runs, err := effect(out, i, one.Effect, sources, &target, &selects, &count, f)
+			runs, err := effect(out, i, one.Effect, sources, &target, &selects, &count,
+				&counting, f)
 			if err != nil {
 				return Made{}, err
 			}
@@ -117,13 +121,14 @@ func registers(row ymxs.Row, out []byte) {
 // effect writes one row's operation on one effect, as its four columns,
 // and the bit of the effects word where the row starts one.
 func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
-	target, selects, count *[4]int, at int) (int, error) {
+	target, selects, count *[4]int, counting *[4]bool, at int) (int, error) {
 	t := ymxr.Effect + 4*i
 	switch e := one.(type) {
 	case ymxs.Stop:
 		// The set bit with no source under it: the timer stops, and the
 		// row leaves the rate columns unset (SPEC.md 1.8).
 		out[t+1] = byte(0x80)
+		counting[i] = false
 		return 0, nil
 	case ymxs.Start:
 		reaches := ymxs.TargetNumber(e.Target)
@@ -132,19 +137,28 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			target[i] = reaches
 		}
 		out[t+1] = byte(0x80 | (indexOf(sources, e.Source) + 1))
-		by, err := selectOf(e.Prescaler)
+		now, err := selectOf(e.Prescaler)
 		if err != nil {
 			return 0, err
 		}
-		selects[i] = by
-		counted, err := counted(e.Count, at)
+		rate, err := counted(e.Count, at)
 		if err != nil {
 			return 0, err
 		}
-		count[i] = counted
-		out[t+2] = byte(0x80 | resets(e.TimerReset, e.PlaceReset) |
-			marked(count[i]) | selects[i])
-		out[t+3] = byte(count[i])
+		reset := resets(e.TimerReset, e.PlaceReset)
+		// A start on a timer already counting, at the rate it counts,
+		// sets no rate column: step 2 resolves the source and the ticks
+		// read it from here on, at the rate the control register already
+		// has (SPEC.md 4). The timer is known to be counting only where
+		// the source it runs repeats, since a source that plays once
+		// stops it at its marker (section 5) and no row says when.
+		if reset != 0 || now != selects[i] || rate != count[i] || !counting[i] {
+			out[t+2] = byte(0x80 | reset | marked(rate) | now)
+			out[t+3] = byte(rate)
+		}
+		selects[i] = now
+		count[i] = rate
+		_, counting[i] = ymxs.SourceTable(e.Source).Repeat()
 		return 1 << i, nil
 	case ymxs.Retune:
 		now, err := selectOf(e.Prescaler)

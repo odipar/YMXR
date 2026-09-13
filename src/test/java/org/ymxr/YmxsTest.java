@@ -128,6 +128,38 @@ final class YmxsTest {
     }
 
     @Test
+    void aStartOnATimerAtTheRateItCountsSetsNoRateColumn() {
+        org.ymxs.YMXS.Source loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        org.ymxs.YMXS.Source soft = Tunes.repeating("square 6", List.of(6, 0), 0);
+        List<Row> rows = new ArrayList<>();
+        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), loud,
+                Chip.prescaler(4), 100, true, true)));
+        // a second source on the running timer, at the rate it counts
+        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), soft,
+                Chip.prescaler(4), 100, false, false)));
+        // the same, with the count moved
+        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), loud,
+                Chip.prescaler(4), 90, false, false)));
+        // the timer stopped, then started again at the rate it last ran
+        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP)));
+        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), loud,
+                Chip.prescaler(4), 90, false, false)));
+        byte[][] column = Schema.of(built(rows, 0)).columns().column;
+        int source = Columns.EFFECT + 1;
+        int control = Columns.EFFECT + 2;
+        int count = Columns.EFFECT + 3;
+        assertEquals(0, column[control][1] & 0xFF, "row 1 sets no control column");
+        assertEquals(0, column[count][1] & 0xFF, "and no count");
+        assertEquals(0x82, column[source][1] & 0xFF, "the source alone");
+        assertEquals(0x80 | 1, column[control][2] & 0xFF, "a count that moved writes both");
+        assertEquals(90, column[count][2] & 0xFF, "and the count");
+        assertEquals(0x80, column[source][3] & 0xFF, "the stop");
+        assertEquals(0x80 | 1, column[control][4] & 0xFF,
+                "a stopped timer starts on the select the row writes (SPEC.md 1.8)");
+        assertEquals(90, column[count][4] & 0xFF, "and its count");
+    }
+
+    @Test
     void aRegisterOfZeroSetsTheBitBesideIt() {
         List<Row> rows = List.of(new Row(Map.of(Register.R0, 0, Register.R11, 0), Map.of()),
                 new Row(Map.of(Register.R0, 64), Map.of()));
