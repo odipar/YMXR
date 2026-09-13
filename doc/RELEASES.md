@@ -33,6 +33,50 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.11, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.11>, built from the commit
+tagged `v0.3.11`.
+
+The converters changed; the player did not. A dump with an even number of
+frames and an even loop frame converts to the same bytes as under 0.3.10.
+A dump where either is odd converts to a slightly larger file that costs
+the player less to decode. Every file reads under 0.3.10, since the format
+is unchanged. YMXS 0.3.2 and DTX 0.10.1 are unchanged.
+
+- **Tunes with an odd frame count or an odd loop frame are padded.** DTX
+  packs a tune in units of two bytes, which needs an even row count and an
+  even loop row. A tune without them was packed in units of one byte
+  instead, and the player then decoded twice as many units a frame. Now
+  the converter adds a silent row: at the loop row where that is odd, then
+  at the end where the count is odd. A silent row sets no register and
+  leaves the timer effects running, so the tune plays one extra frame
+  there; the converter reports each row it adds. This is rule 6 in SPEC.md
+  section 6, and `-k1` still packs in units of one byte and adds no row.
+  148 of the 543 dumps in the corpus have an odd frame count.
+- **What it saves.** Five of the ten test tunes were affected. Measured on
+  the rig, their play call costs a seventh to a sixth less on average and
+  a tenth to more than a third less in the costliest frame. The worst
+  frame over all ten tunes is now 5,144 cycles, down from 6,358, against
+  the budget of 6,656. The files grow by the alignment: the three affected
+  tunes in the conformance kit grew 0.9, 2.4 and 5.3 per cent.
+- **Multi-tune programs with mixed tunes shrink.** A set of subtunes shares
+  one DTX image per unit, so a set with both kinds of tune needed two
+  images; now every tune packs at unit 2 and a set needs one. On the
+  twenty-tune set measured in experiments.md the second image was 1,492
+  bytes.
+- **The conformance kit is regenerated.** Three of its eleven tunes,
+  `turrican-2`, `synergy` and `fine-zero`, had an odd row count or loop
+  row, so their bytes, their `.rows` files and the manifest differ. A
+  reader that passed the 0.3.10 kit passes this one, since the format did
+  not change.
+- **performance.md is measured again.** Five of its ten tunes had been
+  measured at units of one byte. The tables now show both, and the
+  comparison with YMX 0.10.1 is a run of today's player: an eighth and a
+  seventh less on average than YMX on the two tunes compared.
+- The release notes for 0.3.8 to 0.3.10, experiments.md and plan.md were
+  rewritten in plain language. Documentation only.
+
 ### 0.3.10, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.10>, built from the commit
