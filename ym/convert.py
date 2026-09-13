@@ -349,10 +349,19 @@ def main():
              (3, "a sinus SID"), (4, "a sync buzzer"))))
     elif mode == "pairs":
         pairs = []
+        said = set()
         for f in sorted(os.listdir(PAIRS)):
             if f.endswith(".ymx") and os.path.exists(os.path.join(PAIRS, f[:-4] + ".ym")):
+                at = os.path.join(PAIRS, f)
                 pairs.append((os.path.join(PAIRS, f[:-4] + ".ym"),
-                              os.path.getsize(os.path.join(PAIRS, f))))
+                              os.path.getsize(at)))
+                # the version the file opens with, so the row below names
+                # the format these were written by rather than one a reader
+                # of this remembers (YMX, SPEC.md 2)
+                with open(at, "rb") as one:
+                    head = one.read(6)
+                if head[:4] == b"YMX!":
+                    said.add("%d.%d" % (head[4], head[5]))
         n = frames = ymx = 0
         total = {k: 0 for k in (1, 2, 4)}
         for got, (_, size) in zip(each([p for p, _ in pairs], "pairs"), pairs):
@@ -360,7 +369,8 @@ def main():
             for k, (dsize, _, _) in got["files"].items():
                 total[k] += dsize
         print(f"{n} tunes with a .ymx beside them, {frames:,} frames, ring {RING}")
-        table([("YMX 0.7, the .ymx files", ymx)]
+        version = ", ".join(sorted(said)) if said else "of no version read"
+        table([(f"YMX {version}, the .ymx files", ymx)]
               + [(f"YMXR, DTX2 files at k = {k}", total[k]) for k in (1, 2, 4)],
               frames)
     elif mode == "envelope":
