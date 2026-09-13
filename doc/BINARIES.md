@@ -258,13 +258,23 @@ A program from the stub, in order:
    or
    the SNDH file is relocated.
 
-The program prints the SNDH file's address, claims the machine under
+The program prints the SNDH file's address and the set, one subtune a
+line: its number and the name the file's `!#SN` tag names it by, or the
+title where the file has one subtune and no such tag. While a tune plays
+it says which, on a line it writes over the line before it, so the list
+stays where it is and the line below it follows the arrows. It claims
+the machine under
 Supexec, keeping the VBL vector, the four timers' vectors and the
 enable, mask and control registers, and turns every MFP interrupt off
 and stops the four timers; calls init with subtune 1 and plays from the
 VBL or Timer C; stops on SPACE or ESC, or once the rows patched in have
-played; switches subtunes on 1 to 9, offering in its banner the keys the
-set has; and
+played; walks the set on the arrows, left or up back and right or down
+on, wrapping at each end, and reads a subtune's number typed on the
+digits, which waits half a second for a digit after it and no longer
+where no second digit can keep the number inside the set; starts the next
+subtune where the one playing has played its last row and repeats to none,
+the last ending at the first, which a set of one does not do since it has
+no next; and
 hands the machine back with the mouse reporting again, Timer C's count
 written as the 192 of the system's 200 Hz. The stub keeps no vector at
 `$60`: init stands before it arms its clock and exit after it stops, so

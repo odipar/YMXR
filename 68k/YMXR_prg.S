@@ -45,12 +45,36 @@
 
 GEMDOS          equ     1
 XBIOS           equ     14
+Getrez          equ     4
 Cconws          equ     9
 Pterm0          equ     0
 Supexec         equ     38
 VBL             equ     $70
 SPACE           equ     $39
 ESC             equ     $01
+LEFT            equ     $4B
+RIGHT           equ     $4D
+UP              equ     $48
+DOWN            equ     $50
+
+; The frames a number typed waits for a digit after it, at the tune's
+; rate: half a second at 50 Hz. A set of more than nine needs two digits,
+; and a digit is the whole number where no second follows it.
+PAUSE           equ     25
+
+; The bytes a line is built in, wide enough for the longest line either
+; kind makes: a name of LIST_WIDE and the six columns before it, or a
+; name of eighty columns less the words before it.
+LINE_WIDE       equ     128
+
+; The name a line of the list writes, at most. The list writes a name
+; whole, so this is the guard on the buffer and not a width the screen
+; fixes.
+LIST_WIDE       equ     96
+
+; The columns the line that says which subtune plays leaves a name: the
+; screen's, less "playing NN/NN  " and the column an auto-wrap would take.
+SAYING_LESS     equ     16
 
 stub:           bra.w   main
                 dc.b    'YMXT'
@@ -61,7 +85,16 @@ rate:           dc.w    50
 rows:           dc.l    0
 core:           dc.l    0
 
-main:           btst    #0,flags+1(pc)
+main:           move.w  #Getrez,-(sp)           ; forty columns in low
+                trap    #XBIOS                  ; resolution, eighty in the
+                addq.l  #2,sp                   ; other two
+                moveq   #80,d1
+                tst.w   d0
+                bne.s   .wide
+                moveq   #40,d1
+.wide:          lea     wide(pc),a0
+                move.w  d1,(a0)
+                btst    #0,flags+1(pc)
                 beq.s   .banner
                 pea     clear(pc)               ; the desktop's pixels away,
                 move.w  #Cconws,-(sp)           ; so the monitor's bars show
@@ -81,22 +114,27 @@ main:           btst    #0,flags+1(pc)
                 move.w  #Cconws,-(sp)
                 trap    #GEMDOS
                 addq.l  #6,sp
-; The subtunes a key reaches. The keys are 1 to 9, so a set of one has
-; none to offer and a larger set offers what it has, nine at most. The
-; screen is forty columns, so each line stands alone.
+; The set, one subtune a line: its number and the name the SNDH file's
+; '!#SN' tag names it by (BINARIES.md 3). A set of one has no list, since
+; the banner names the tune already. The screen is forty columns, so each
+; line stands alone.
                 move.w  subtunes(pc),d0
                 cmp.w   #1,d0
                 bls.s   .alone
-                cmp.w   #9,d0
-                bls.s   .most
-                moveq   #9,d0
-.most:          lea     picks(pc),a0
-                add.b   #'0',d0
-                move.b  d0,5(a0)                ; the N of "1 to N"
-                pea     (a0)
+                pea     picks(pc)
                 move.w  #Cconws,-(sp)
                 trap    #GEMDOS
                 addq.l  #6,sp
+                moveq   #0,d7
+.one:           move.w  d7,d0
+                bsr     entry
+                pea     line(pc)
+                move.w  #Cconws,-(sp)
+                trap    #GEMDOS
+                addq.l  #6,sp
+                addq.w  #1,d7
+                cmp.w   subtunes(pc),d7
+                bcs.s   .one
 .alone:         pea     play(pc)
                 move.w  #Supexec,-(sp)
                 trap    #XBIOS
@@ -139,39 +177,82 @@ play:
                 moveq   #1,d0
                 bsr     start
                 move.w  #$2300,sr
+                bsr     saying
                 clr.w   d1                      ; the report's bytes to skip
 .wait:          btst    #0,$FFFFFC00.w
-                beq.s   .read
+                beq.w   .read
                 moveq   #0,d0
                 move.b  $FFFFFC02.w,d0
                 tst.w   d1
                 beq.s   .fresh
                 subq.w  #1,d1                   ; inside a report
-                bra.s   .read
+                bra.w   .read
 .fresh:         cmp.b   #$F6,d0
                 bcs.s   .key
                 lea     reports(pc),a0
                 sub.b   #$F6,d0
                 and.w   #15,d0
                 move.b  (a0,d0.w),d1
-                bra.s   .read
+                bra.w   .read
 .key:           tst.b   d0
-                bmi.s   .read                   ; a key released
+                bmi.w   .read                   ; a key released
                 cmp.b   #SPACE,d0
-                beq.s   .stop
+                beq.w   .stop
                 cmp.b   #ESC,d0
-                beq.s   .stop
-                subq.b  #1,d0                   ; 1 to 9 are $02 to $0A
-                beq.s   .read
-                cmp.b   #9,d0
-                bhi.s   .read
+                beq.w   .stop
+                cmp.b   #LEFT,d0
+                beq.s   .back
+                cmp.b   #UP,d0
+                beq.s   .back
+                cmp.b   #RIGHT,d0
+                beq.s   .on
+                cmp.b   #DOWN,d0
+                beq.s   .on
+                subq.b  #1,d0                   ; 1 to 9 are $02 to $0A,
+                beq.w   .read                   ; and 0 is $0B
+                cmp.b   #10,d0
+                bhi.w   .read
+                cmp.b   #10,d0
+                bne.s   .typed
+                moveq   #0,d0
+.typed:         bsr     typed
+                bra.w   .read
+; The arrows walk the set and wrap at each end, so a set of any size is
+; reached by them where the nine keys run out.
+.back:          move.w  playing(pc),d0
+                subq.w  #1,d0
+                bne.s   .pick
+                move.w  subtunes(pc),d0
+                bra.s   .pick
+.on:            move.w  playing(pc),d0
+                addq.w  #1,d0
                 cmp.w   subtunes(pc),d0
-                bhi.s   .read
-                move.w  #$2700,sr
+                bls.s   .pick
+                moveq   #1,d0
+.pick:          move.w  #$2700,sr
                 bsr     start
                 move.w  #$2300,sr
-.read:          move.b  done(pc),d0
-                beq.s   .wait
+                bsr     saying
+.read:          move.w  pending(pc),d0          ; a number typed, and the
+                beq.s   .idle                   ; pause after it run out
+                move.w  waiting(pc),d0
+                bne.s   .idle
+                bsr     take
+.idle:          move.b  over(pc),d0             ; the tune played its last
+                beq.s   .running                ; row and repeats to none
+                lea     over(pc),a0
+                clr.b   (a0)
+                move.w  playing(pc),d0
+                addq.w  #1,d0
+                cmp.w   subtunes(pc),d0
+                bls.s   .next
+                moveq   #1,d0                   ; the last ends at the first
+.next:          move.w  #$2700,sr
+                bsr     start
+                move.w  #$2300,sr
+                bsr     saying
+.running:       move.b  done(pc),d0
+                beq.w   .wait
 .stop:          move.w  #$2700,sr
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit
@@ -201,6 +282,192 @@ play:
                 move.w  (sp)+,sr
                 rts
 
+; ---------------------------------------------------------- the subtunes
+
+; a0 the SNDH file's '!#SN' tag, or 0 where the file has none. d0 is
+; clobbered. The tag
+; block runs from 'SNDH' at offset 12 to 'HDNS' (BINARIES.md 3), and
+; every tag this reads is at an even address, since the block pads
+; before FRMS and the names follow it.
+names:
+                lea     sndh(pc),a0
+                lea     12(a0),a0
+                move.w  #2048,d0
+.look:          cmpi.l  #'!#SN',(a0)
+                beq.s   .found
+                cmpi.l  #'HDNS',(a0)
+                beq.s   .none
+                addq.l  #2,a0
+                dbra    d0,.look
+.none:          suba.l  a0,a0
+.found:         rts
+
+; a0 the name of subtune d0.w, 0 up, or 0 where the file has none to
+; give. d0 and d1 are clobbered.
+;
+; A file that names its subtunes has the '!#SN' tag, and each name's
+; offset stands in the word table after it, counted from the tag's first
+; byte. A file of one subtune has no such tag, and its title is the name:
+; 'TITL' opens the block and its text follows, so the two stand at a
+; fixed place (BINARIES.md 3).
+name_of:
+                move.w  d0,d1
+                bsr     names
+                move.l  a0,d0
+                beq.s   .title
+                add.w   d1,d1
+                adda.w  4(a0,d1.w),a0
+                rts
+.title:         lea     sndh(pc),a0
+                cmpi.l  #'TITL',16(a0)
+                bne.s   .none
+                lea     20(a0),a0
+                rts
+.none:          suba.l  a0,a0
+                rts
+
+; d1.b and d2.b the two digits of d0.w, which is 0 to 99. d0 is
+; clobbered: the set is at
+; most 99 subtunes, the two digits of the '##' tag (BINARIES.md 3).
+two:
+                ext.l   d0
+                divu    #10,d0
+                move.w  d0,d1
+                add.b   #'0',d1
+                swap    d0
+                move.w  d0,d2
+                add.b   #'0',d2
+                swap    d0
+                rts
+
+; The name of subtune d0.w, 0 up, into (a1), the columns the screen
+; leaves it: a longer name is cut and a shorter one padded, so the line
+; covers the one written over it. a1 ends past the last byte. Clobbers
+; d0-d3/a0.
+padded:
+                bsr     name_of
+                move.l  a0,d1
+                bne.s   .named
+                lea     unnamed(pc),a0          ; "subtune", where the file
+.named:         move.w  wide(pc),d3             ; names none
+                sub.w   #SAYING_LESS,d3
+                subq.w  #1,d3
+.name:          move.b  (a0)+,d0
+                beq.s   .pad
+                move.b  d0,(a1)+
+                dbra    d3,.name
+                rts
+.pad:           move.b  #' ',(a1)+
+                dbra    d3,.pad
+                rts
+
+; The line the list has for subtune d0.w, 0 up, into line: two spaces, its
+; number 1 up, two spaces, its name, and a new line.
+entry:
+                movem.l d0-d4/a0-a1,-(sp)
+                move.w  d0,d4                   ; two and padded clobber d0
+                lea     line(pc),a1
+                move.b  #' ',(a1)+
+                move.b  #' ',(a1)+
+                move.w  d4,d0
+                addq.w  #1,d0
+                bsr     two
+                move.b  d1,(a1)+
+                move.b  d2,(a1)+
+                move.b  #' ',(a1)+
+                move.b  #' ',(a1)+
+                move.w  d4,d0
+                bsr     name_of
+                move.l  a0,d1
+                bne.s   .named
+                lea     unnamed(pc),a0
+.named:         moveq   #LIST_WIDE-1,d3
+.name:          move.b  (a0)+,d0
+                beq.s   .ends
+                move.b  d0,(a1)+
+                dbra    d3,.name
+.ends:          move.b  #13,(a1)+
+                move.b  #10,(a1)+
+                clr.b   (a1)
+                movem.l (sp)+,d0-d4/a0-a1
+                rts
+
+; The line that says which subtune plays, written over the line before
+; it: a carriage return opens it and no new line closes it, so the next
+; one stands where this one did. Called under Supexec with the player's
+; interrupts on, which write the chip and the MFP and no more.
+saying:
+                movem.l d0-d3/a0-a2,-(sp)
+                lea     line(pc),a1
+                move.b  #13,(a1)+
+                lea     plays(pc),a0
+.said:          move.b  (a0)+,d0
+                beq.s   .number
+                move.b  d0,(a1)+
+                bra.s   .said
+.number:        move.w  playing(pc),d0
+                bsr     two
+                move.b  d1,(a1)+
+                move.b  d2,(a1)+
+                move.b  #'/',(a1)+
+                move.w  subtunes(pc),d0
+                bsr     two
+                move.b  d1,(a1)+
+                move.b  d2,(a1)+
+                move.b  #' ',(a1)+
+                move.b  #' ',(a1)+
+                move.w  playing(pc),d0
+                subq.w  #1,d0
+                bsr     padded
+                clr.b   (a1)
+                pea     line(pc)
+                move.w  #Cconws,-(sp)
+                trap    #GEMDOS
+                addq.l  #6,sp
+                movem.l (sp)+,d0-d3/a0-a2
+                rts
+
+; One digit d0.b, 0 to 9, onto the number typed, and the pause started.
+; A digit that would put the number past the set starts it again at that
+; digit, so 9 in a set of thirteen is 9 and 1 then 3 is 13. A number no
+; second digit can grow reaches the set at once, so 2 in that set starts
+; its subtune as the key is read.
+typed:
+                movem.l d0-d1/a0,-(sp)
+                move.w  pending(pc),d1
+                mulu    #10,d1
+                add.w   d0,d1
+                cmp.w   subtunes(pc),d1
+                bls.s   .keep
+                move.w  d0,d1
+.keep:          lea     pending(pc),a0
+                move.w  d1,(a0)
+                move.w  #PAUSE,waiting-pending(a0)
+                mulu    #10,d1
+                cmp.w   subtunes(pc),d1
+                bls.s   .wait
+                clr.w   waiting-pending(a0)
+.wait:          movem.l (sp)+,d0-d1/a0
+                rts
+
+; The number typed, once the pause after its last digit has run out: the
+; subtune it names started, and one outside the set left alone.
+take:
+                movem.l d0-d1/a0,-(sp)
+                move.w  pending(pc),d0
+                lea     pending(pc),a0
+                clr.w   (a0)
+                tst.w   d0
+                beq.s   .no
+                cmp.w   subtunes(pc),d0
+                bhi.s   .no
+                move.w  #$2700,sr
+                bsr     start
+                move.w  #$2300,sr
+                bsr     saying
+.no:            movem.l (sp)+,d0-d1/a0
+                rts
+
 ; One byte to the keyboard chip, d0.b, once its ACIA accepts one.
 ikbd:           btst    #1,$FFFFFC00.w
                 beq.s   ikbd
@@ -211,6 +478,12 @@ ikbd:           btst    #1,$FFFFFC00.w
 ; clock armed, at level 7. The VBL where the tool asked for it, or where
 ; the screen refreshes at the tune's rate; Timer C where it does not.
 start:
+                lea     playing(pc),a0
+                move.w  d0,(a0)
+                clr.w   pending-playing(a0)     ; a key that picks a subtune
+                clr.w   waiting-playing(a0)     ; drops a number half typed
+                lea     over(pc),a0
+                clr.b   (a0)
                 lea     sndh(pc),a0
                 jsr     4(a0)                   ; exit: skipped where none plays
                 jsr     (a0)                    ; init
@@ -262,17 +535,36 @@ vbl:
 ; doc/performance.md), and this program clears the screen for it.
 tick:
                 movem.l d0-d7/a0-a6,-(sp)
-                move.b  done(pc),d0
+                lea     waiting(pc),a0          ; the pause after a digit,
+                tst.w   (a0)                    ; which the key loop reads
+                beq.s   .counted
+                subq.w  #1,(a0)
+.counted:       move.b  done(pc),d0
                 bne.s   .done
                 lea     sndh(pc),a1
                 jsr     8(a1)
                 lea     rows_left(pc),a0
                 move.l  (a0),d0
-                beq.s   .done                   ; no count asked for
+                beq.s   .ended                  ; no count asked for
                 subq.l  #1,d0
                 move.l  d0,(a0)
-                bne.s   .done
+                bne.s   .ended
                 lea     done(pc),a0
+                st      (a0)
+                bra.s   .done
+; A tune that played its last row and does not repeat is marked by bit 1
+; of the core's state byte (BINARIES.md 2). The key loop reads the mark
+; and starts the next subtune, since starting one calls the core's exit
+; and init and arms the clock, which no handler does to itself. A set of
+; one has no next, so its tune goes quiet where it ends.
+.ended:         move.w  subtunes(pc),d0
+                cmp.w   #1,d0
+                bls.s   .done
+                adda.l  core(pc),a1
+                move.w  24(a1),d0
+                btst    #1,(a1,d0.w)
+                beq.s   .done
+                lea     over(pc),a0
                 st      (a0)
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts
@@ -315,14 +607,23 @@ clear:          dc.b    27,"E",0                ; VT52: the screen cleared
 text:           dc.b    "YMXR at $"
 hex:            dc.b    "00000000",13,10
                 dc.b    "SPACE or ESC ends the program",13,10,0
-picks:          dc.b    "1 to 9 pick a subtune",13,10,0
+picks:          dc.b    "LEFT and RIGHT pick a subtune",13,10
+                dc.b    "or type its number",13,10,13,10,0
+plays:          dc.b    "playing ",0
+unnamed:        dc.b    "subtune",0
 digits:         dc.b    "0123456789ABCDEF"
 reports:        dc.b    7,5,2,2,2,2,6,2,1,1     ; the bytes after $F6 to $FF
                 .even
 saved:          dcb.b   28,0
 rows_left:      dc.l    0
 accumulated:    dc.w    0
+playing:        dc.w    1
+pending:        dc.w    0
+waiting:        dc.w    0
+wide:           dc.w    40
+line:           dcb.b   LINE_WIDE,0
 done:           dc.b    0
+over:           dc.b    0
 busy:           dc.b    0
                 .even
 sndh:
