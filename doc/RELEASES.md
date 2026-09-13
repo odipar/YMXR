@@ -33,6 +33,35 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.9, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.9>, built from the commit
+tagged `v0.3.9`.
+
+The program stub alone. The four SNDH cores are the bytes 0.3.8 wrote, so
+a dump converts to the tune file 0.3.8 wrote and binds to the bound tune
+it wrote; the tune file is version 3 and the bound tune is version 3.
+YMXS is 0.3.2 and DTX 0.10.1, as 0.3.8 had them.
+
+- **A set of more than eighteen subtunes scrolled off the top.** The list
+  printed a line a subtune under a banner of two rows and a header of
+  three, so twenty-five subtunes came to thirty rows on a screen of
+  twenty-five and the first entries were gone before a key could reach
+  them. A column has eighteen entries at most now, and a longer set
+  stands in as many columns as it needs: twenty-five in two, ninety-nine
+  in six. A column is the screen's width divided by their number, and the
+  entries run down one column before the next, so a number is found where
+  it reads. A set of eighteen or fewer prints as it did.
+- A cell is a character short of its column and a row of full cells a
+  character short of the screen, since a row the width of the screen
+  wraps the cursor and costs the row the wrap lands on; trailing spaces
+  come off the end for the same reason. Read out of the console output
+  the program writes under Hatari, twenty-five subtunes stand in twenty
+  rows of twenty-five at eighty columns and at forty, the longest row 79
+  and 39. At forty columns a name is cut to thirteen characters, which
+  every subtune is numbered through.
+- The stub is 1,794 bytes against 1,674.
+
 ### 0.3.8, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.8>, built from the commit
