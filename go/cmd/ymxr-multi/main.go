@@ -40,9 +40,14 @@ func main() {
 			t.Wrong(tool.Failed, "cannot read "+name+": "+err.Error())
 		}
 		tunes = append(tunes, file)
-		if i < len(named) {
+		// -n names a tune, then the name the tune file records, then
+		// the file it was read from
+		switch recorded := ymxr.TuneName(file); {
+		case i < len(named):
 			names = append(names, named[i])
-		} else {
+		case recorded != "":
+			names = append(names, recorded)
+		default:
 			names = append(names, ymxr.Stem(name))
 		}
 	}

@@ -92,7 +92,7 @@ public final class YmToYmxr {
         Columns columns = made.columns();
         found(report, sources, columns);
         Tune.Written written = Tune.write(columns, made.sources(), song.playerHz(), unit, ring,
-                copies ? new St4(true, seconds) : new St4(), report);
+                copies ? new St4(true, seconds) : new St4(), report, song.name());
         String said = song.frames() + " frames at " + song.playerHz() + " Hz, "
                 + sources.count() + " sources, effects " + Integer.toBinaryString(columns.effects)
                 + ", repeats at " + (repeat < song.frames() ? "row " + written.repeat() : "no row")

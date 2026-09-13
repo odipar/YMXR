@@ -495,14 +495,23 @@ again (1.3); and a source of one row is the marker alone.
 | 6 | 2 | the frame rate, in Hz |
 | 8 | 1 | effects used |
 | 9 | 1 | `S`, the source count, 0 to 127 |
-| 10 | 2 | zero |
+| 10 | 2 | where the name begins, or zero where the tune has none |
 | 12 | 4 | where the DTX2 table begins |
 | 16 | 4`S` | the source index: where the table of source 1 to `S` begins |
+| | | the name, its bytes and a zero, where there is one |
 | | | the DTX2 table, on a long |
 | | | the DTX1 tables, each on a long |
 
 Every offset counts from the file's first byte, and a field of more than
 one byte is most significant byte first.
+
+The name is what the tune is called, in UTF-8 and ended by a zero byte,
+at most 255 bytes before that zero. It lies between the index and the
+table, so the word recording it reaches the name however large the
+tables are. A writer that has no name for a tune writes zero in the word
+and no bytes, and a reader of a file written that way reads no name. The
+name is for a tool that lists tunes; a player reads the tables and
+passes over it.
 
 The DTX2 table is the tune's table as a complete DTX file (DTX, SPEC.md 1
 and 2.3), its header and its payload, which DTX's reader reads. The file

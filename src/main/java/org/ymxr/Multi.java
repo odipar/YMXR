@@ -181,7 +181,11 @@ final class Multi {
                 throw tool.wrong(Tool.FAILED, "cannot read " + files.get(i) + ": "
                         + failed.getMessage());
             }
-            names.add(i < named.size() ? named.get(i) : stem(files.get(i)));
+            // -n names a tune, then the name the tune file records, then
+            // the file it was read from
+            String recorded = Tune.name(tunes.get(tunes.size() - 1));
+            names.add(i < named.size() ? named.get(i)
+                    : !recorded.isEmpty() ? recorded : stem(files.get(i)));
         }
         byte[] file;
         try {

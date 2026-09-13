@@ -151,8 +151,8 @@ func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
-	written, err := ymxr.WriteWith(made.Columns, made.Sources, made.Rate,
-		packing.Unit, packing.Ring, packing.Packer(), said)
+	written, err := ymxr.WriteNamed(made.Columns, made.Sources, made.Rate,
+		packing.Unit, packing.Ring, packing.Packer(), said, tune.Title)
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
