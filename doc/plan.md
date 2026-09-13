@@ -155,7 +155,23 @@ this document opened at and 2,585 cycles of ticks against 5,380, so
 4,947 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
-What is left is where the costliest frame is. A refill parses at most
-one ST4 operation a unit and there are fifteen units, so the frame R4.5
-binds is fifteen operations at 225 to 240 apiece, and no step above
-touches it. ST4 needs a separate pass.
+What was left was the costliest frame. A refill parses at most one ST4
+operation per unit of its window, so the frame R4.5 binds is one operation
+per unit at 225 to 240 cycles each, and no step above touches it. That
+pass has now been made, in ST4 (research.md, "A penalty a block, against
+the costliest frame"), and it moved the question.
+
+The window is 30 units at unit 1 and 15 at unit 2, and the worst refill
+measured is 15 operations at unit 1 against 9 to 11 at unit 2: 52 percent
+of R4.5's 6,656-cycle budget against 31. A tune packs at unit 1 only
+because its row count or its repeat row is odd. So the lever is the row
+count, not the packer: low with one row fewer packs at unit 2, and its
+worst refill falls from 15 to 9. A penalty a block in ST4 (`st4 -p8`) also
+helps at unit 1, from 15 to 12 for two percent more bytes, and does little
+at unit 2; it stays a flag of ST4, since a default in DTX means changing
+three packers.
+
+What is left is a rule for a tune whose row count or repeat row is odd:
+which row to add so that the table packs at unit 2, and whether the added
+row can be heard. That is a question for SPEC.md rather than for the
+packer.
