@@ -118,6 +118,13 @@ EFFECT = 14
 FITS = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
 
 
+# What YMXR_stop leaves on the chip: the three voices silenced first, then
+# every register zero, then the mixer with each channel off. A row sets the
+# registers it names and no others, so a tune that follows one which set a
+# register it leaves unset would read that value (68k/YMXR.S, YMXR_stop).
+HUSHED = ([(8, 0), (9, 0), (10, 0)] + [(r, 0) for r in range(13, -1, -1)]
+          + [(7, 0xFF)])
+
 def masked(writes):
     return [(reg, value & FITS[reg]) for reg, value in writes]
 
@@ -1157,7 +1164,7 @@ def hatari(ym, code, symbols, perf=False):
                 "effect %d ticked %d times, the rates say %d" % (i, counted[i], expected[i])
     stopped = [(reg, value) for events, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
                for kind, reg, value in events if kind == "stop"]
-    assert masked(stopped) == [(8, 0), (9, 0), (10, 0)], "the stop wrote %s" % stopped
+    assert masked(stopped) == masked(HUSHED), "the stop wrote %s" % stopped
     return played, sum(counted)
 
 
@@ -1206,6 +1213,8 @@ def core(defines, ym):
     assert bytes(m.mu.mem_read(at, 2)) == b"\x4e\x73", "the handler at $60 is not an rte"
     m.call("core-exit")
     assert not m.byte(CODE + symbols["sndh_state"]) & 1, "the core's exit left the tune playing"
+    assert masked(m.psg) == masked(HUSHED), \
+        "exit wrote %s, not the chip state a tune starts from" % masked(m.psg)
     assert m.long(SPURIOUS) == host, "exit left $60 at %08x, not the host's %08x" % (
         m.long(SPURIOUS), host)
     return len(code)
