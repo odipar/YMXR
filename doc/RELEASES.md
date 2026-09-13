@@ -33,6 +33,41 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.12, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.12>, built from the commit
+tagged `v0.3.12`.
+
+The converters changed; the player did not. A dump converts to the same
+bytes as under 0.3.11 unless its loop is an odd number of frames and
+shorter than 64; such a dump converts to a slightly larger file that plays
+as the dump does. Every file reads under 0.3.11, since the format is
+unchanged. YMXS 0.3.2 and DTX 0.10.1 are unchanged.
+
+- **A short loop of odd length is written twice instead of padded.**
+  0.3.11 made every table an even number of rows by adding a silent row,
+  and where the loop was an odd number of rows that row landed inside the
+  loop: a silent frame on every pass. Over the 543 dumps of the corpus
+  that is 137 tunes. For 13 of them the loop is one row, a sustained
+  ending, where the frame changes what is heard by no amount; for 121 the
+  loop is 95 rows or more, where one frame is under one per cent of a
+  pass; but for three the loop is short and moves every row (Masterblazer
+  7, a tone slide over 7 rows; A Prehistoric Tale 6, a vibrato over 9;
+  Crapman game over, an arpeggio over 17), and the frame slowed the figure
+  by 14, 11 and 6 per cent on every pass. Now a loop of fewer than 64 rows
+  is written again in full instead, so the tune plays as the dump does; a
+  loop of 64 rows or more, and a tune that plays once, still gets the
+  silent row at the end. Sixteen corpus tunes change, and the second copy
+  packs as a match: 0 to 60 bytes more on the tunes measured. The rule is
+  SPEC.md 6, rule 6, with the bound and its reason; the converter's report
+  names what it did, as in `padded: the loop's 7 rows written twice, so
+  the table packs at unit 2`.
+- **The conformance kit changed in one tune.** `turrican-2` has a one-row
+  loop, now written twice, so its bytes, its `.rows` file and the manifest
+  differ. The other ten tunes are as in 0.3.11.
+- experiments.md has the corpus scan behind the change, "Where a padded
+  tune's added frame lands". Documentation only.
+
 ### 0.3.11, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.11>, built from the commit
