@@ -107,6 +107,35 @@ than without. Packing costs 4 to 38 times as long, and `-copiesS` searches
 S seconds beyond the opening passes, which packs another parse every
 run.
 
+### A set shares one workspace
+
+A host allocates one workspace for a multi-tune file: `YMXR_FIXED` plus the
+largest state block over the set's bound tunes (BINARIES.md). A small ring
+saves those bytes once, and costs the bytes every tune of the set packs
+larger to, so what it is worth falls as a set grows. Deeper at 9,984 rows,
+DitherDance at 4,044 and low at 9,903, repeated in that order to fill the
+set, as programs:
+
+| tunes | ring 960, no copies | ring 120 with copies | smaller by |
+|---|---|---|---|
+| 1 | 53,320 | 33,992 | 36.2% |
+| 2 | 69,480 | 51,208 | 26.3% |
+| 3 | 82,826 | 70,816 | 14.5% |
+| 4 | 95,878 | 89,710 | 6.4% |
+| 6 | 123,918 | 125,034 | -0.9% |
+| 9 | 165,012 | 179,254 | -8.6% |
+| 12 | 206,104 | 233,472 | -13.3% |
+
+The workspace saved is 25,200 bytes, once: 31,272 bytes at a ring of 960
+against 6,072 at 120. The bytes a tune adds are 13,889 at the defaults and
+18,135 at the small ring, 4,246 more a tune. The two meet at 25,200 over
+4,246, near six tunes, where the table turns negative.
+
+Where they meet follows the length of the tunes. The ring sets the
+workspace and the rows set the file, so a set of short tunes adds less a
+tune and meets it later. So `-m120 -copies` is for a program of one tune
+or a few, and the defaults are for a set.
+
 ---
 
 At `k` = 1, the three tone periods, fine and coarse together, are 21.9%,

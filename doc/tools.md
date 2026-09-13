@@ -78,6 +78,11 @@ bin/ym-to-ymxr [-kK] [-mN] [-rRR | -r] [-copies[S]] [-silent]
 | `-rRR` | the row the tune repeats to. The default is the dump's loop frame, and `-r` alone a tune that plays once |
 | `-copies[S]` | a match beyond the ring packs as a copy from the column's separate literal stream, which packs a small ring far smaller. `-copiesS` searches `S` seconds for a better parse, and a search of some seconds packs another parse every run |
 
+The ring and copies trade the workspace a host allocates against the bytes
+a tune packs to. A host allocates one workspace for a set, so a small ring
+with copies packs a program of one tune or a few smaller, and a set of six
+or more larger: experiments.md measures where the two meet.
+
 The dump is unpacked where it is an LHA archive, as distributed `.ym`
 files are. Standard output is the tune file, and the report on standard
 error covers the dump as it was read, the flags as they were read, the

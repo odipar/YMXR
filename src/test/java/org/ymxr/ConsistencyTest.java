@@ -716,4 +716,78 @@ final class ConsistencyTest {
         assertEquals(0x0E, 0xAE & fits.get(13),
                 "SPEC.md 4: a row whose R13 column is $AE runs shape $E");
     }
+
+    /**
+     * The crossover table of a set: every row's share against the two
+     * figures beside it, and the three sentences below it against the
+     * table's first and last rows.
+     */
+    @Test
+    void theSetCrossoverRecomputes() throws IOException {
+        String experiments = read(EXP);
+        int at = experiments.indexOf("| tunes | ring 960, no copies |");
+        assertTrue(at >= 0, "experiments.md has no crossover table");
+        String block = experiments.substring(at, experiments.indexOf("\n\n", at));
+        Matcher row = Pattern.compile(
+                "^\\| (\\d+) \\| ([\\d,]+) \\| ([\\d,]+) \\| (-?\\d+\\.\\d)% \\|$",
+                Pattern.MULTILINE).matcher(block);
+        List<long[]> table = new ArrayList<>();
+        while (row.find()) {
+            long tunes = Long.parseLong(row.group(1));
+            long wide = number(row.group(2));
+            long small = number(row.group(3));
+            double said = Double.parseDouble(row.group(4));
+            double got = Math.round(1000.0 * (wide - small) / wide) / 10.0;
+            assertTrue(Math.abs(got - said) < 0.05, () -> "at " + tunes
+                    + " tunes " + wide + " against " + small + " is " + got
+                    + "%, and the row reads " + said + "%");
+            table.add(new long[] {tunes, wide, small});
+        }
+        assertTrue(table.size() >= 5, "the crossover table has " + table.size() + " rows");
+
+        long[] first = table.get(0);
+        long[] last = table.get(table.size() - 1);
+        long span = last[0] - first[0];
+
+        // the workspace, which the ring alone decides
+        Matcher space = wrapped("The workspace saved is ([\\d,]+) bytes, once:"
+                + " ([\\d,]+) bytes at a ring of 960 against ([\\d,]+) at 120")
+                .matcher(experiments);
+        assertTrue(space.find(), "experiments.md has no workspace sentence");
+        long saved = number(space.group(1));
+        assertEquals(number(space.group(2)) - number(space.group(3)), saved,
+                "the workspace saved is the difference of the two state blocks");
+
+        // what a tune adds, out of the first and last rows of the table
+        Matcher each = wrapped("The bytes a tune adds are ([\\d,]+) at the defaults"
+                + " and ([\\d,]+) at the small ring, ([\\d,]+) more a tune")
+                .matcher(experiments);
+        assertTrue(each.find(), "experiments.md has no per-tune sentence");
+        long wideEach = Math.round((double) (last[1] - first[1]) / span);
+        long smallEach = Math.round((double) (last[2] - first[2]) / span);
+        assertEquals(wideEach, number(each.group(1)),
+                "what a tune adds at the defaults, over the table's span");
+        assertEquals(smallEach, number(each.group(2)),
+                "what a tune adds at the small ring, over the table's span");
+        assertEquals(smallEach - wideEach, number(each.group(3)),
+                "the difference of the two the sentence reports");
+
+        // where the two meet, and that the table turns negative there
+        Matcher meet = wrapped("The two meet at ([\\d,]+) over ([\\d,]+),"
+                + " near six tunes").matcher(experiments);
+        assertTrue(meet.find(), "experiments.md has no crossover sentence");
+        assertEquals(saved, number(meet.group(1)), "the saving the sentence divides");
+        assertEquals(smallEach - wideEach, number(meet.group(2)),
+                "the cost a tune the sentence divides by");
+        assertEquals(6, Math.round((double) saved / (smallEach - wideEach)),
+                "the crossover the two figures make");
+        for (long[] one : table) {
+            if (one[0] <= 4) {
+                assertTrue(one[2] < one[1], "at " + one[0] + " tunes the small ring is larger");
+            }
+            if (one[0] >= 6) {
+                assertTrue(one[2] > one[1], "at " + one[0] + " tunes the small ring is smaller");
+            }
+        }
+    }
 }
