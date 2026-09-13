@@ -164,7 +164,6 @@ final class PlayerTest {
         assertEquals(Prg.STUB_ROWS_AT, row(said, "the rows to play").getValue());
         assertEquals(Prg.STUB_CORE_AT, row(said, "the core's offset").getValue());
         Map<String, Integer> bits = flags(binaries, "4. The program stub");
-        assertEquals(Prg.FLAG_CLEAR, 1 << row(bits, "the core has the raster monitor").getValue());
         assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the set claims Timer C").getValue());
     }
 

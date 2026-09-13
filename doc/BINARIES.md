@@ -230,8 +230,11 @@ The flags word:
 
 | bit | set by the tool where | the stub then |
 |---|---|---|
-| 0 | the core has the raster monitor in | clears the screen before the banner, so that the monitor's bars stand where the desktop's pixels were |
+| 0 | never | zero: the stub clears the screen before its banner every run |
 | 1 | the set claims Timer C | plays from the VBL; with the bit clear, from the VBL where the screen's rate is the tune's and from Timer C where it is not |
+
+The banner, the list of subtunes and the raster monitor's bars are read
+against an empty screen rather than the desktop's pixels.
 
 The VBL is the screen's clock: 50 or 60 Hz by the sync bit, 71 in
 high resolution. A set that claims Timer C leaves the stub no timer to
