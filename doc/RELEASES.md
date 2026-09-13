@@ -33,6 +33,27 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.7, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.7>, built from the commit
+tagged `v0.3.7`.
+
+The tune data structure is YMXS 0.3.2 and the table format is DTX 0.10.1.
+The 68000 sources are unchanged since 0.3.6, so the five binaries are the
+same bytes, the tune file is version 3 and the bound tune is version 3,
+and a dump converts to the file 0.3.6 wrote, byte for byte.
+
+- **A structure with two sources under one name reads here.** YMXS 0.3.1
+  made them an error of the form and 0.3.2 took the rule off: an effect
+  names its source by the number of the table it stands in, so a name
+  tells one from another in no form. A tune the tools of 0.3.6 rejected
+  converts here.
+- DTX 0.10.1 is the table format: its module is fetched by its import
+  path, its twenty-two images are committed with it, and its rig reaches
+  its tools again. No class, image or packaged byte of it moves, which
+  `ConformanceTest` reads back: the eleven tunes of the kit are the bytes
+  they were.
+
 ### 0.3.6, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.6>, built from the commit

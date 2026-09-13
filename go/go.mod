@@ -8,7 +8,7 @@ go 1.26
 // artifact: the Java tools here run ymx-dump in its place, and a tool
 // built from this tree calls no program at all.
 require (
-	github.com/odipar/dtx/go v0.9.0
+	github.com/odipar/dtx/go v0.10.1
 	github.com/odipar/ymx/go v0.1.0
-	github.com/odipar/ymxs/go v0.3.1
+	github.com/odipar/ymxs/go v0.3.2
 )
