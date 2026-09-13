@@ -33,6 +33,42 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.6, 2026-09-13
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.6>, built from the commit
+tagged `v0.3.6`.
+
+The program a tool writes lists its subtunes, walks them and plays on to
+the next. The player and the four cores are unchanged, so a tune file and
+a bound tune are what 0.3.5 wrote, both version 3, and the program stub
+is 1,682 bytes against 836.
+
+- **The set is on the screen, one subtune a line**: its number and the
+  name the SNDH file's `!#SN` tag names it by, which `ymxs-to-sndh` writes
+  from the tunes' titles. A file of one subtune has no such tag and its
+  title is the name, read at a fixed place since `TITL` opens the tag
+  block. The list writes a name whole.
+- **A line says which subtune plays**, written over the line before it, so
+  the list stays where it is. `Getrez` sets what the screen leaves a name:
+  23 columns in low resolution and 63 in the other two.
+- **The arrows walk the set**, left or up back and right or down on,
+  wrapping at each end, so a set of any size is reached.
+- **A number typed reaches past the ninth.** A digit joins the number
+  before it, and half a second after the last digit it reaches the set: 1
+  then 3 is 13, and 1 alone is 1. A digit that would put the number past
+  the set starts it again at that digit, and a number no second digit can
+  grow starts its subtune as the key is read.
+- **A tune that ends starts the next one.** Bit 1 of the core's state byte
+  marks a tune that has played its last row and repeats to no row, and the
+  last ends at the first. A tune that repeats plays on, and a set of one
+  has no next, so its tune goes quiet where it ends as 0.3.5 has it.
+
+Driven under Hatari through its command fifo: the arrows read 02, 03, 04,
+03, 02, 01, 02 and wrap both ways; 1 then 3 reads 13 and 1 then 0 reads
+10; 4 alone reads 4 with no wait and 1 alone reads 1 once the pause runs
+out; and three tunes that each play once read 01, 02, 03 three times over
+with no key pressed.
+
 ### 0.3.5, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.5>, built from the commit
