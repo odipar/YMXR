@@ -76,28 +76,95 @@ final class ConversionTest {
     @Test
     void anOddRepeatRowIsPaddedBeforeIt() throws IOException {
         // A tune of 180 rows repeating to row 177: the repeat row does not
-        // divide by 2, so a row goes in at 177, the loop starts at 178, and
-        // the count, 181, then needs one at the end as well.
+        // divide by 2, so a row goes in at 177 and the loop starts at 178.
+        // The count, 181, then does not divide either, and the loop is three
+        // rows, fewer than Padding.SHORT, so it is written twice: 184 rows.
+        YmDump.Song song = cut(180, 177);
+        Report report = new Report();
+        Padding.Padded padded = Padding.toUnit(
+                Ym.read(song, new Sources(song), 177, report), 2, report);
+        List<org.ymxs.YMXS.Row> rows = padded.tune().table().rows();
+        assertEquals(184, rows.size(), "180 rows, one before the repeat, and the loop of 3 again");
+        assertEquals(178, padded.tune().table().repeat().getAsInt(), "the repeat row moved past the added row");
+        assertTrue(rows.get(177).registers().isEmpty() && rows.get(177).effects().isEmpty(),
+                "the added row sets no column");
+        assertEquals(rows.subList(178, 181), rows.subList(181, 184), "the loop's rows, written again");
+        assertEquals(List.of("padded: 1 unset row at row 177, before the repeat row, so the table packs at unit 2",
+                             "padded: the loop's 3 rows written twice, so the table packs at unit 2"),
+                report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
+                "one note an addition: " + report.notes());
+        // the frame each row answers to: -1 for the added row, and the loop's
+        // frames 177 to 179 twice over
+        int[] frames = padded.frames();
+        assertEquals(184, frames.length, "a frame a row");
+        assertEquals(176, frames[176]);
+        assertEquals(-1, frames[177], "a row that sets no column answers to no frame");
+        assertEquals(177, frames[178]);
+        assertEquals(179, frames[180]);
+        assertEquals(177, frames[181], "the loop written again answers to its frames again");
+        assertEquals(179, frames[183]);
+    }
+
+    @Test
+    void aLongOddLoopIsPaddedAtTheEnd() throws IOException {
+        // 165 rows repeating to row 100: the loop is 65 rows, SHORT or more,
+        // so a row that sets no column goes in at the end rather than the
+        // loop being written again, and the frame it adds is one in 65.
+        YmDump.Song song = cut(165, 100);
+        Report report = new Report();
+        Padding.Padded padded = Padding.toUnit(
+                Ym.read(song, new Sources(song), 100, report), 2, report);
+        assertEquals(166, padded.tune().table().rows().size(), "165 rows and one at the end");
+        assertEquals(100, padded.tune().table().repeat().getAsInt(), "the repeat row divides as it is");
+        assertEquals(List.of("padded: 1 unset row at row 165, so the table packs at unit 2"),
+                report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
+                "one note: " + report.notes());
+        assertEquals(-1, padded.frames()[165], "the added row answers to no frame");
+    }
+
+    @Test
+    void aShortOddLoopIsWrittenAgain() throws IOException {
+        // 163 rows repeating to row 100: the loop is 63 rows, one under
+        // SHORT, so it is written twice and the tune plays as it did.
+        YmDump.Song song = cut(163, 100);
+        Report report = new Report();
+        Padding.Padded padded = Padding.toUnit(
+                Ym.read(song, new Sources(song), 100, report), 2, report);
+        List<org.ymxs.YMXS.Row> rows = padded.tune().table().rows();
+        assertEquals(226, rows.size(), "100 rows before the loop and the loop of 63 twice");
+        assertEquals(rows.subList(100, 163), rows.subList(163, 226), "the loop's rows, written again");
+        assertEquals(List.of("padded: the loop's 63 rows written twice, so the table packs at unit 2"),
+                report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
+                "one note: " + report.notes());
+        assertEquals(100, padded.frames()[163], "the loop written again answers to its frames again");
+        assertEquals(162, padded.frames()[225]);
+    }
+
+    @Test
+    void aLoopIsWrittenUntilTheCountDivides() throws IOException {
+        // 101 rows repeating to row 100 at unit 4: the loop of one row is
+        // written until the count divides by 4, which is four times.
+        YmDump.Song song = cut(101, 100);
+        Report report = new Report();
+        Padding.Padded padded = Padding.toUnit(
+                Ym.read(song, new Sources(song), 100, report), 4, report);
+        assertEquals(104, padded.tune().table().rows().size(), "100 rows and the loop's row four times");
+        assertEquals(List.of("padded: the loop's 1 row written 4 times, so the table packs at unit 4"),
+                report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
+                "one note: " + report.notes());
+    }
+
+    /** The first {@code frames} frames of Turrican - world 4-3 as a dump
+     *  whose loop frame is {@code loop}. */
+    private static YmDump.Song cut(int frames, int loop) throws IOException {
         YmDump.Song whole = YmDump.read(Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym")));
-        int frames = 180;
         byte[][] registers = new byte[whole.registers().length][];
         for (int r = 0; r < registers.length; r++) {
             registers[r] = Arrays.copyOf(whole.registers()[r], frames);
         }
-        YmDump.Song song = new YmDump.Song(whole.format(), frames, whole.playerHz(),
-                whole.masterClock(), 177, whole.interleaved(), whole.attributes(),
+        return new YmDump.Song(whole.format(), frames, whole.playerHz(),
+                whole.masterClock(), loop, whole.interleaved(), whole.attributes(),
                 whole.drums(), whole.name(), whole.author(), whole.comment(), registers);
-        Report report = new Report();
-        org.ymxs.YMXS.Tune padded = Padding.toUnit(
-                Ym.read(song, new Sources(song), 177, report), 2, report).tune();
-        assertEquals(182, padded.table().rows().size(), "180 rows, one before the repeat and one at the end");
-        assertEquals(178, padded.table().repeat().getAsInt(), "the repeat row moved past the added row");
-        assertTrue(padded.table().rows().get(177).registers().isEmpty()
-                && padded.table().rows().get(177).effects().isEmpty(), "the added row sets no column");
-        assertEquals(List.of("padded: 1 unset row at row 177, before the repeat row, so the table packs at unit 2",
-                             "padded: 1 unset row at row 181, so the table packs at unit 2"),
-                report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
-                "one note an addition: " + report.notes());
     }
 
     @Test

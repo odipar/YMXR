@@ -36,11 +36,12 @@ public final class YmToYmxr {
     /** A conversion: the tune file written, the dump's frame the tune
      *  repeats to, or its frame count where it plays once, and what the
      *  tool prints of it. */
-    /** {@code added} is the rows of the table that set no column, added
-     *  so that it packs at its unit (SPEC.md 6, rule 6): no frame of the
-     *  dump answers to one. */
+    /** {@code frames} is the frame of the dump each row of the table
+     *  answers to, once the table is padded to its unit (SPEC.md 6, rule
+     *  6): -1 for a row that sets no column, and the rows of a loop
+     *  written again answer to its frames again. */
     record Converted(Tune.Written written, int repeat, Sources sources, String said,
-                     int[] added) {
+                     int[] frames) {
     }
 
     /** The dump converted with the tool's flags, {@code -kK}, {@code -mN},
@@ -103,7 +104,7 @@ public final class YmToYmxr {
                 + sources.count() + " sources, effects " + Integer.toBinaryString(columns.effects)
                 + ", repeats at " + (repeat < song.frames() ? "row " + written.repeat() : "no row")
                 + ": " + written.file().length + " bytes";
-        return new Converted(written, repeat, sources, said, padded.added());
+        return new Converted(written, repeat, sources, said, padded.frames());
     }
 
     /** The dump as it was read. */

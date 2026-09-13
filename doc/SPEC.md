@@ -648,13 +648,20 @@ encodes.
 6. **The row count and the repeat row divide by the unit the table packs
    at.** DTX packs a column in units of `k` bytes, so `R` divides by `k`
    and so does `RR` (DTX R5.6 and R5.11). A writer whose tune does not
-   divide adds rows that set no column: where `RR` does not divide, rows
-   at `RR` until it does, which moves the loop's first row later and
-   lengthens what plays before it; then, where `R` does not divide, rows
-   at the end. A row that sets no column writes no register and leaves
-   every timer running (section 4), so the tune plays one more frame
-   there, its effects running through it. At most `k` minus one rows go in
-   each place.
+   divide lengthens it. Where `RR` does not divide, rows that set no column
+   go in at `RR` until it does, which moves the loop's first row later and
+   lengthens what plays before it. Then, where `R` does not divide: a loop
+   of fewer than 64 rows is written again, whole, until `R` divides, which
+   is fewer than `k` times more; a loop of 64 rows or more, or a tune that
+   plays once, gets rows that set no column at the end until `R` divides. A
+   row that sets no column writes no register and leaves every timer
+   running (section 4), so the tune plays one more frame there, its effects
+   running through it; a loop written again plays as it did, since a pass
+   plays the same rows. At most `k` minus one rows that set no column go in
+   each place. A short loop is written again rather than padded since a
+   frame added to a loop of a few rows lengthens every pass of it by a
+   sixty-fourth or more, which is heard in a sweep or an arpeggio; a frame
+   added to a loop of 64 rows or more lengthens a pass by less than that.
 
 ---
 
