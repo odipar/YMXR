@@ -660,8 +660,9 @@ encodes.
    plays the same rows. At most `k` minus one rows that set no column go in
    each place. A short loop is written again rather than padded since a
    frame added to a loop of a few rows lengthens every pass of it by a
-   sixty-fourth or more, which is heard in a sweep or an arpeggio; a frame
-   added to a loop of 64 rows or more lengthens a pass by less than that.
+   sixty-fourth or more, where the loop written again keeps the period the
+   tune had; a frame added to a loop of 64 rows or more lengthens a pass by
+   less than that.
 
 ---
 

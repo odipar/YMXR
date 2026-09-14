@@ -280,8 +280,11 @@ leaves as it was; 121 are 95 rows or more, where one frame is under one per
 cent of a pass; and three are short and move every row: Masterblazer 7, a
 slide on all three tones over 7 rows, A Prehistoric Tale 6, a vibrato on
 voice B over 9, and Crapman game over, an arpeggio over 17, which one frame
-a pass slows by 14, 11 and 6 per cent. So a loop of fewer than 64 rows is
-written again instead (SPEC.md 6, rule 6): the sixteen short loops play as
+a pass slows by 14, 11 and 6 per cent. Played side by side under Hatari,
+each of the three with the frame and written again, neither version was
+heard as wrong: the difference is measured, not heard. A loop of fewer than
+64 rows is written again all the same (SPEC.md 6, rule 6), since it keeps
+the period the dump had for a few bytes: the sixteen short loops play as
 they did, and the 121 long ones keep the frame. What the second copy costs
 against the frame it replaces, on the three and on Turrican 2 - world
 completed 1: 1,768 to 1,816 bytes, 1,452 to 1,508, 2,448 to 2,508 and 2,164
