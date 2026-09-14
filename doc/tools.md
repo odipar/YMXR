@@ -91,22 +91,21 @@ the frames, the sources, the effects run, the repeat row and the bytes
 written, and the notes: effects dropped, a unit other than the one
 requested, and a ring other than the one requested.
 
-The table is the dump's frames row for row: the row it repeats to is
-the dump's loop frame, its rows are the dump's, and no row is added
-anywhere. A table packs at unit 2: unit 1 packs the corpus to 0.69 bytes
-a frame against 0.81, and costs the play call about a seventh more on
-average (performance.md); `-k1` selects it. A column's bytes and
-its loop begin on a unit (DTX's R5.6 and R5.11), so a tune whose row
-count or repeat row is odd is padded until both divide (SPEC.md 6, rule
-6), which the tool notes: a row that sets no column before the repeat
-row where that is odd, and then, where the count is odd, a loop of fewer
-than 64 rows written twice or a row that sets no column at the end. The
-table packs at a period of thirty rows, the column count and the
-smallest DTX allows, since a refill decodes a period's rows of one
-column at once and a refill costs the period (performance.md);
-the ring is the multiple of thirty nearest the one asked for, at least
-sixty and at most 1,110. A loop longer than the ring is replayed at its
-exact rows by DTX's reader, at any period.
+The table is the dump's frames row for row, the row it repeats to the
+dump's loop frame, but for the rows rule 6 adds. A table packs at unit 2:
+unit 1 packs the corpus to 0.69 bytes a frame against 0.81, and costs the
+play call about a seventh more on average (performance.md); `-k1` selects
+it. A column's bytes and its loop begin on a unit (DTX's R5.6 and R5.11),
+so a tune whose row count or repeat row is odd is padded until both divide
+(SPEC.md 6, rule 6), which the tool notes: a row that sets no column before
+the repeat row where that is odd, and then, where the count is odd, a loop
+of fewer than 64 rows written twice or a row that sets no column at the
+end. The table packs at a period of thirty rows, the column count and the
+smallest DTX allows, since a refill decodes a period's rows of one column
+at once and a refill costs the period (performance.md); the ring is the
+multiple of thirty nearest the one asked for, at least sixty and at most
+1,110. A loop longer than the ring is replayed at its exact rows by DTX's
+reader, at any period.
 
 What the converter does with a dump's effects: a SID voice is a source of
 two rows, its level and 0; a sync buzzer one row, its shape; a digidrum the

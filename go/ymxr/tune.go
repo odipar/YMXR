@@ -66,11 +66,11 @@ type Written struct {
 // Write is the file: its table packed at unit through a ring of that many
 // bytes, as a DTX2 file.
 //
-// The table is the dump's frames row for row, the row it repeats to the
-// dump's loop frame, and no row is added anywhere. A column's bytes and
-// its loop begin on a unit (DTX's R5.6 and R5.11), so a tune whose row
-// count or repeat row does not divide by the unit asked for packs at unit
-// 1. The table packs at a period of C rows, the smallest DTX allows, since
+// The table is the tune's rows, the row it repeats to the tune's, and
+// this adds no row. A column's bytes and its loop begin on a unit (DTX's
+// R5.6 and R5.11), which PadToUnit provides before the columns are made
+// (SPEC.md 6, rule 6); a table that does not divide packs at unit 1. The
+// table packs at a period of C rows, the smallest DTX allows, since
 // a refill decodes a period's rows of one column at once and a refill
 // costs a period; the ring is a multiple of C for that, the one nearest
 // what was asked for within what the player reaches. A loop longer
