@@ -10,9 +10,9 @@ each writes to the chip is the measure of whether a switch changed the
 tune. This reads both traces and reports, for every register, whether
 the values come in the same order and where they part.
 
-A run is counted from the frame the player first writes in, since a
-program that clears the screen starts a frame later than one that does
-not, and 900 frames from the first VBL are then 900 different rows. The
+A run is counted from the frame the player first writes in, since the
+program clears the screen and starts a frame later, and 900 frames from
+the first VBL are then 900 different rows. The
 count is FRAMES frames from there, and a register whose sequences agree
 up to the shorter one's end is the window's edge, not a difference: the
 longer run played one more row.

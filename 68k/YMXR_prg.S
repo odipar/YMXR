@@ -591,7 +591,7 @@ vbl:
 ; core's play writes no register after that row, so a subtune of a set
 ; that ends leaves the keys to pick another. Every register kept. A core
 ; with the raster monitor in paints the call itself (the player,
-; doc/performance.md), and this program clears the screen for it.
+; doc/performance.md) on the screen this program clears every run.
 tick:
                 movem.l d0-d7/a0-a6,-(sp)
                 lea     waiting(pc),a0          ; the pause after a digit,

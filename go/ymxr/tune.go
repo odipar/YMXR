@@ -137,6 +137,9 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	packer dtx.Packer, said *report.Report, name string) (Written, error) {
 	frames := len(columns.Column[0])
 	repeat := columns.Repeat
+	// PadToUnit runs before this in every tool (SPEC.md 6, rule 6), so a
+	// table reaching here divides; one from a caller that skipped it packs
+	// at unit 1, which the note reports.
 	if unit > 1 && (frames%unit != 0 || (repeat < frames && repeat%unit != 0)) {
 		what := fmt.Sprintf("the repeat row %d", repeat)
 		if frames%unit != 0 {

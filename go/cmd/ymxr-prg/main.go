@@ -1,7 +1,7 @@
 // Command ymxr-prg reads an SNDH file on standard input and writes the
 // program around it on standard output, playing -rROWS rows, or the tune's
-// row count without. The stub's flag bit 0 follows the file's core: the
-// screen is cleared where that core has the raster monitor in.
+// row count without. The stub clears the screen before its banner every
+// run.
 package main
 
 import (

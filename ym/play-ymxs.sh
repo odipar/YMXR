@@ -24,7 +24,8 @@
 # The packer's options:
 #
 #   -kK        the unit the table packs at, 1 or 2; 2 by default, and a
-#              tune whose row count or repeat row is odd packs at 1
+#              tune whose row count or repeat row is odd is padded until
+#              both divide (SPEC.md 6, rule 6)
 #   -mN        the ring in bytes, 960 by default
 #   -copies[S] a match beyond the ring packs as a copy from the column's
 #              separate literal stream, which packs a small ring far

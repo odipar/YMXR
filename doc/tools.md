@@ -326,12 +326,13 @@ host that selects a subtune by number.
 | `-h` | the options and examples, from the head of the script |
 
 `-k`, `-m` and `-r` belong to the converter, and a tune file, which is
-packed already, accepts none of them. A set whose tunes do not share a unit
-needs an image a unit and pays for DTX's reader twice, which the report
-names; `-k1` on every dump needs one image and packs the tables smaller, at
+packed already, accepts none of them. A set converted here shares a unit,
+since the flags reach every dump, and needs one image; a multi file of tune
+files packed at different units needs an image a unit and pays for DTX's
+reader twice, which the report names. `-k1` packs the tables smaller, at
 about a fifth of the play call, and experiments.md has the result on twenty
-tunes. `HATARI` and `TOS` name the emulator
-and a TOS image, as they do for the rigs.
+tunes. `HATARI` and `TOS` name the emulator and a TOS image, as they do for
+the rigs.
 
 `ym/hatari.sh WORK [VBLS] [out.wav]` runs the `TUNE.PRG` under `WORK`, and
 both play scripts end in it, so the emulator's flags and the recording

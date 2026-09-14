@@ -101,6 +101,9 @@ final class Tune {
                          Packer packer, Report report, String name) {
         int frames = columns.column[0].length;
         int repeat = columns.repeat;
+        // Padding runs before this in every tool (SPEC.md 6, rule 6), so a
+        // table reaching here divides; one from a caller that skipped it
+        // packs at unit 1, which the note reports.
         if (unit > 1 && (frames % unit != 0 || (repeat < frames && repeat % unit != 0))) {
             report.note("packed at unit 1: " + (frames % unit != 0 ? "the row count " + frames
                     : "the repeat row " + repeat) + " does not divide by " + unit);
