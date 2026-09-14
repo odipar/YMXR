@@ -519,6 +519,26 @@ final class ConsistencyTest {
     }
 
     /**
+     * The play call the ticks section reads its savings against, one
+     * figure a tune, is the table's average call for that tune: the
+     * sentence read 2,380, 1,985 and 2,073 from a player three releases
+     * older than the table beside it.
+     */
+    @Test
+    void theTickSavingsReadTheTablesCalls() throws IOException {
+        Map<String, long[]> calls = playCalls(read(PERF));
+        Matcher said = wrapped("cycles a frame come off those tunes, against a play"
+                + " call of ([\\d,]+), ([\\d,]+) and ([\\d,]+)").matcher(read(PERF));
+        assertTrue(said.find(), "performance.md has no play call beside the tick savings");
+        for (int i = 0; i < 3; i++) {
+            String tune = List.of("Synergy Credits", "DBA 2", "DBA 5").get(i);
+            long[] call = Objects.requireNonNull(calls.get(tune),
+                    "performance.md's table names no " + tune);
+            assertEquals(string(call[0]), said.group(i + 1), tune + "'s call");
+        }
+    }
+
+    /**
      * The share plan.md reads for the advance, and the two tunes it names,
      * against the table. The percentages round the table's figures, so a figure
      * that moves without its percentage moving is caught here.
