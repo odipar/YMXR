@@ -11,7 +11,7 @@
 # write an end of interrupt, so what comes back is that core's
 # cost against the plain one's (BINARIES.md, performance.md).
 #
-# performance.md's figures are a VBLS=2300 run, which plays 2,019 calls.
+# performance.md's figures are a VBLS=2300 run, which plays 2,020 calls.
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}

@@ -359,19 +359,19 @@ keeping the last kind and target each effect ran rather than the one it
 runs.
 
 The other half of maxYMiser's model, a timer that counts through the gap,
-was built and measured: the source column's 0 clears the enable bit
-instead of writing select 0, the tick that runs a source out does the
-same, and a start after a gap programs the timer only where the prescaler
-moved. It costs 64 bytes of player and the effect step's enable write,
-2,502 cycles a call on Synergy Credits against 2,469, and 2,457 through the
-raster monitor against 2,421. It buys the timer's phase over a gap in which
-the voice is silent. Measured against it on the drum preempt tune, which
-stops and starts a square on one voice 191 times, the two produce 2,873 and
-2,874 edges, and the one whose timer counts on shows three short halves
-where the other shows none: its first half after a gap runs for what the
-counter had left of a period, where a timer started again counts a whole
-one. It costs less and breaks fewer halves, so the
-timer is stopped and bit 5 alone moves the place.
+was built and measured: the source column's 0 clears the enable bit instead
+of writing select 0, the tick that runs a source out does the same, and a
+start after a gap programs the timer only where the prescaler moved. It
+costs 64 bytes of player and the effect step's enable write, 2,502 cycles a
+call on Synergy Credits against the 2,469 of the player then, and 2,457
+through the raster monitor against its 2,421. It buys the timer's phase
+over a gap in which the voice is silent. Measured against it on the drum
+preempt tune, which stops and starts a square on one voice 191 times, the
+two produce 2,873 and 2,874 edges, and the one whose timer counts on shows
+three short halves where the other shows none: its first half after a gap
+runs for what the counter had left of a period, where a timer started again
+counts a whole one. It costs less and breaks fewer halves, so the timer is
+stopped and bit 5 alone moves the place.
 
 ### Four rules this left behind
 

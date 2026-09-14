@@ -23,7 +23,8 @@
 # none of:
 #
 #   -kK        the unit the table packs at, 1 or 2; 2 by default, and a
-#              tune whose row count or repeat row is odd packs at 1
+#              tune whose row count or repeat row is odd is padded until
+#              both divide (SPEC.md 6, rule 6)
 #   -mN        the ring in bytes, 960 by default
 #   -rRR       the row the tune repeats to; -r alone plays it once
 #   -copies[S] a match beyond the ring packs as a copy from the column's
@@ -39,8 +40,8 @@
 # The core the file uses, the plain one by default:
 #
 #   -perf      the core with the raster monitor in, so the run paints
-#              what each call costs and the program clears the screen
-#              for it (performance.md, Measure)
+#              what each call costs on the screen the program clears
+#              (performance.md, Measure)
 #   -lean      the core whose ticks neither drop the interrupt level nor
 #              write an end of interrupt, 32 cycles cheaper on a
 #              tick that writes a row and 16 on one that ends a source,
