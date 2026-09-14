@@ -79,7 +79,8 @@ instead:
   trailing clause that generalises what the sentence already said. Name the
   condition or end the sentence.
 - **the metaphor.** `leaves a tail no reader ever touches`, `the pressure
-  point` - an image in place of the operation. Write the operation.
+  point`, `the structure written down` - an image in place of the
+  operation. Write the operation: a form encodes the structure.
 - **the verdict.** `this is deliberate`, `asked properly`, `worth reading` -
   the sentence grading itself or its subject. Delete it.
 
@@ -133,11 +134,12 @@ been struck so far.
 | `a value the register takes` | `a value that fits the register` |
 | `a reader takes any JSON of this shape` | `a reader reads any JSON of this shape` |
 | `it states nothing about how a tune is written down` | dropped; the paragraph says what is there |
-| `A form is that structure written down, and no form is the format.` | `A form is that structure written down.` |
+| `A form is that structure written down, and no form is the format.` | `A form is an encoding of that structure.` |
 | `What is turned away` | `What is an error` |
 | `the text form`, `the table form` | `JSON`, `CSV` |
 | `a timer no row uses opens none` | `each timer a row uses opens a table` |
 | `Writing a tune down is a separate job, and a form does it.` | dropped; the paragraph below it defines a form |
+| `A form is the structure written down` | `A form is an encoding of the structure`; `written down` is a metaphor for encoded, struck wherever it stood |
 | `Each player names the version of this it reads.` | `A player is a separate program, and pins a version of this format.` |
 | `a table of its own` | `a table` |
 | `for a reader who would rather open one in a spreadsheet` | `for reading in a spreadsheet` |

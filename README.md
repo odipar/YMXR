@@ -13,7 +13,7 @@ a separate repository, where the readers of the format live; the player
 lives here.
 
 **YMXS** is the tune data structure: rows of registers and effects, the
-sources those effects run, and one rate a tune, written down as JSON.
+sources those effects run, and one rate a tune, encoded as JSON.
 [YMXS](https://github.com/odipar/YMXS) is a separate repository, and every
 conversion here passes through it ([doc/ymxs.md](doc/ymxs.md)), so a tune
 is read, edited or written without a dump. Its SPEC.md defines what a tune

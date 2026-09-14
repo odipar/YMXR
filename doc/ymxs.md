@@ -2,7 +2,7 @@
 
 [YMXS](https://github.com/odipar/YMXS) is the tune data structure: rows of
 registers and effects, the sources those effects run, and one rate a tune.
-It is defined once, in records, and written down as JSON. Every conversion
+It is defined once, in records, and encoded as JSON. Every conversion
 here passes through it.
 
     ym  ──► ym-to-ymxs  ──┐
