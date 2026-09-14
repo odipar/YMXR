@@ -216,17 +216,16 @@ second terminology.md sets as the practical ceiling, 55%.
 A source of two rows repeating to row 0 runs a separate handler
 (68k/YMXR.S, SQUARE), which encodes both rows as immediates and moves
 between them by their difference: 88 cycles, 152 with the entry and the
-`rte`, against the 172 and 194 the two paths of the general handler
-cost. A tune whose effects are all such sources ticks 29.4 times
-a frame on Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 911, 769
-and 626 cycles a frame come off those tunes, against a play call of 2,380,
-1,985 and 2,073. A tick drops the interrupt level and writes an end of
+`rte`, against the 172 and 194 the two paths of the general handler cost. A
+tune whose effects are all such sources ticks 29.4 times a frame on Synergy
+Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 911, 769 and 626 cycles a
+frame come off those tunes, against a play call of 2,036, 1,678 and 1,759
+(the table above). A tick drops the interrupt level and writes an end of
 interrupt because the MFP runs in software end-of-interrupt mode, as TOS
 leaves it, and because a faster timer may nest inside a slower one. A host
 that requires neither uses the core assembled with `YMXR_NEST=0` and
-`YMXR_AEOI=1` (BINARIES.md,
-`YMXR_sndh-lean.bin`), where a tick writes its two chip registers and
-returns:
+`YMXR_AEOI=1` (BINARIES.md, `YMXR_sndh-lean.bin`), where a tick writes its
+two chip registers and returns:
 
 | tick | as it stands | lean |
 |---|---|---|
