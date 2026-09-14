@@ -34,9 +34,8 @@ final class Padding {
 
     /** A loop of fewer rows than this is written again rather than
      *  padded: a frame added to a loop of a few rows lengthens every pass
-     *  by a sixty-fourth or more, which is heard in a sweep or an
-     *  arpeggio (experiments.md), and the rows written again cost a match
-     *  a column. */
+     *  by a sixty-fourth or more (experiments.md), and the rows written
+     *  again keep the period the tune had, for a match a column. */
     static final int SHORT = 64;
 
     /** A row that sets no register and leaves every timer running. */
