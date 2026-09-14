@@ -38,11 +38,11 @@ func programs(opcode int) bool {
 // Frames is the frames of a dumped file, its packing's padding off the
 // end.
 //
-// YMX fits a tune to its unit by padding it, where the conversion here
-// drops to a unit of 1 instead, so a dump of an odd frame count is one
-// frame longer through YMX than through the dump. A dump's rows are a
-// tune's rows are, so the padding comes off and this format reckons the
-// unit separately.
+// YMX fits a tune to its unit by padding it with a frame that repeats
+// the one before it, so a dump of an odd frame count is one frame longer
+// through YMX than through the dump. A dump's rows are a tune's rows, so
+// the padding comes off, and the padding step (ymxr.PadToUnit) then pads
+// the tune as the dump's conversion does (SPEC.md 6, rule 6).
 //
 // A pad at YMX's unit of 2 is one frame, it repeats the frame before it
 // and it acts on no channel, and a padded count is even. One frame comes
