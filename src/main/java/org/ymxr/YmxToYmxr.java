@@ -173,11 +173,12 @@ final class YmxToYmxr {
     /**
      * The frames of a dumped file, its packing's padding off the end.
      *
-     * <p>YMX fits a tune to its unit by padding it (YMX, ymx), where the
-     * conversion here drops to a unit of 1 instead, so a dump of an odd
-     * frame count is one frame longer through YMX than through the dump.
-     * A dump's rows are the tune's rows, so the padding comes off and
-     * this format reckons the unit separately.
+     * <p>YMX fits a tune to its unit by padding it (YMX, ymx) with a
+     * frame that repeats the one before it, so a dump of an odd frame
+     * count is one frame longer through YMX than through the dump. A
+     * dump's rows are the tune's rows, so the padding comes off, and
+     * {@link Padding} then pads the tune as the dump's conversion does
+     * (SPEC.md 6, rule 6).
      *
      * <p>A pad at YMX's unit of 2 is one frame, it repeats the frame
      * before it and it acts on no channel, and a padded count is even.

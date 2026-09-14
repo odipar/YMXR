@@ -499,13 +499,14 @@ stops the channels its operand names, filling their whole row: a select
 left standing there would start the timer the stop just stopped (SPEC.md
 1.9).
 
-YMX fits a tune to its unit by padding it, where this conversion drops to a
-unit of 1 instead, so a dump of an odd frame count is one frame longer
-through YMX. A dump's rows are the tune's rows (`ym-to-ymxr` prevails where
-the two readings differ), so a pad comes off: one frame, repeating the
-frame before it, acting on no channel, on an even count. A tune whose last
-frame reads that way loses it, and a file packed at a wider unit keeps the
-pad past the first.
+YMX fits a tune to its unit by padding it with a frame that repeats the one
+before it, so a dump of an odd frame count is one frame longer through YMX
+than through the dump. A dump's rows are the tune's rows (`ym-to-ymxr`
+prevails where the two readings differ), so that pad comes off, one frame
+repeating the frame before it, acting on no channel, on an even count, and
+rule 6 then pads the tune as `ym-to-ymxr` does (SPEC.md 6). A tune whose
+last frame reads that way loses it, and a file packed at a wider unit keeps
+the pad past the first.
 
 A start sets bit 6 where the channel's timer is stopped and leaves it clear
 over a running stream, since bit 6 affects a running timer and a stopped
