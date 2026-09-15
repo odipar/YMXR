@@ -33,6 +33,23 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.15, 2026-09-16
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.15>, built from the commit
+tagged `v0.3.15`.
+
+DTX 0.11.1, in the pom and in `go.mod`, for the ST4 that packs faster. A
+dump converts to the same bytes as under 0.3.14: over the ten dumps under
+`ym/test` through `ym-to-ymxr`, `ym-to-ymxs`, `ymxs-to-sndh` and
+`ymxs-to-prg`, every one of the forty files is byte for byte 0.3.14's. The
+format is unchanged.
+
+- ST4's literal channel reads its least in one step where it read a
+  min-tree in a logarithm, so a search of a packed column fits a fifth more
+  steps in a second at a small ring.
+- `github.com/odipar/st4/go` stands at v0.1.2 in `go.mod`, which is DTX's
+  requirement reaching this module through it.
+
 ### 0.3.14, 2026-09-15
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.14>, built from the commit
