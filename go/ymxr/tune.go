@@ -39,9 +39,15 @@ const Version = 0x0003
 // Where each header field stands.
 const (
 	FrameRateAt = 6
-	EffectsAt   = 8
-	CountAt     = 9
-	NameAt      = 10
+
+	// MostRate is the largest frame rate the word at FrameRateAt reads. A
+	// YMXS rate reaches 2,147,483,647 (YMXS, SPEC.md 1.3), so a writer
+	// reads this bound rather than writing the low sixteen bits of a rate
+	// above it.
+	MostRate  = 65535
+	EffectsAt = 8
+	CountAt   = 9
+	NameAt    = 10
 	// MostName is the most bytes a name takes, its zero aside.
 	MostName = 255
 	TableAt  = 12
@@ -135,6 +141,10 @@ func TuneName(file []byte) string {
 // WriteNamed is the same, with the tune named.
 func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	packer dtx.Packer, said *report.Report, name string) (Written, error) {
+	if frameRate < 1 || frameRate > MostRate {
+		return Written{}, fmt.Errorf("a frame rate of %d, and the frame rate is a"+
+			" word, 1 to %d", frameRate, MostRate)
+	}
 	frames := len(columns.Column[0])
 	repeat := columns.Repeat
 	// PadToUnit runs before this in every tool (SPEC.md 6, rule 6), so a
