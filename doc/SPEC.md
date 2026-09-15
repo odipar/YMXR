@@ -842,6 +842,7 @@ and R a row number.
 |---|---|
 | the structure has N sources, above 127 (2.2.2) | `the tune runs N sources, and a source column numbers 127` |
 | source NAME has the value V, above 127, in row R (3.2.1) | `the source NAME has the value V in row R, and bit 7 of a source's row is the marker` |
+| the rate is H, outside 1 to 65,535, the word at 6 (3.3) | `a frame rate of H, and the frame rate is a word, 1 to 65535` |
 
 ---
 
@@ -968,5 +969,3 @@ source column above S (3.3).
 (5.2), and whether a tick falls between two steps of 4.3 or between 4.3
 and 4.4 (YMXS, SPEC.md 8.6).
 
-**8.7** A structure whose rate is above 65,535, which is outside the word
-at 6 (3.3).

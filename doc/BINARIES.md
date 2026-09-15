@@ -292,11 +292,11 @@ the core's first byte, at H.
 | the core | H | the core (2), its field at 28 patched with even(L) and its field at 32 with W below |
 | the subtune table | even(L) from the core | the word `N`, then `N` longs, each a bound tune's offset from the core (2.5) |
 | the images | from even(L) + 2 + 4`N`, each on a long, from the core | the images of the set (1.4), in group order |
-| the bound tunes | subtune 1 at the end of the last image, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset, a negative figure |
+| the bound tunes | subtune 1 at even(the end of the last image), subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset, a negative figure |
 | the workspace | W = even(the end of the last bound tune), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
 
-A pad byte is zero. Note: the offset of subtune 1 is even where the last
-image's length is even, and 5.1 requires a bound tune on an even address.
+A pad byte is zero. Every bound tune begins on an even address, as 5.1
+requires.
 
 **3.2 The tag block**, in this order; each text is cleaned to the bytes
 $20 to $7E, the others dropped.
