@@ -33,6 +33,26 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.14, 2026-09-15
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.14>, built from the commit
+tagged `v0.3.14`.
+
+The libraries under this one move: DTX 0.11.0 and YMXS 0.3.4, and the Go
+module with them. A dump converts to the same bytes as under 0.3.13: over
+the ten dumps under `ym/test` through `ym-to-ymxr`, `ym-to-ymxs`,
+`ymxs-to-sndh` and `ymxs-to-prg`, every one of the forty files is byte for
+byte 0.3.13's, and the conformance kit and the parity tests read the same.
+The format is unchanged.
+
+- **DTX 0.11.0** reads ST4 as a module in its Go tree, and its other two
+  copy the ST4 that collects its node pool. Packing a column with
+  copies costs a fifth of the memory it did, and the Java tools pack a
+  48 KB file at `-Xmx1g` where they needed 12 GB.
+- **YMXS 0.3.4** is its documents alone, so a tune file reads as it did.
+- `github.com/odipar/st4/go` stands in `go.mod` as an indirect requirement
+  now, which is DTX's dependency reaching this module through it.
+
 ### 0.3.13, 2026-09-15
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.13>, built from the commit
