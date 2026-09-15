@@ -9,7 +9,7 @@ below it.
 `release/manifest.sh` the manifest in it:
 
 - one zip a platform, over six: Windows, macOS and Linux, each on x64 and
-  arm64. A zip contains the thirteen tools as executables, and each
+  arm64. A zip contains the eleven tools as executables, and each
   executable contains the five 68000 binaries of BINARIES.md and DTX's
   twenty-two images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed

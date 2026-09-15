@@ -4,7 +4,7 @@ package org.ymxr;
  * Unpacks the LHA archives that distributed {@code .ym} files come wrapped
  * in, and no file is written out.
  *
- * <p>Carried from YMX's {@code org.ym6.Lha}, a port of the ST-Sound
+ * <p>Carried from YMX, a port of the ST-Sound
  * library's LZH depacker by Arnaud Carré, which
  * is based on original LZH code by Haruhiko Okumura (1991) and Kerwin F.
  * Medina (1996). It reads a level-0 header - the kind every YM archive in

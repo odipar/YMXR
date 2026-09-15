@@ -5,9 +5,8 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * A YM6! dump written from register vectors, for the tunes built rather
- * than recorded. Carried from YMX's {@code org.ymx.rig.GenYm}, the part of
- * it that writes a file: the two built dumps under {@code ym/test} are
- * byte for byte what YMX's builder writes, and this keeps them so here.
+ * than recorded. The two built dumps under {@code ym/test} were written by
+ * the rig YMX had, and this writes the same bytes.
  */
 final class GenYm {
 

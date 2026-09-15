@@ -1,3 +1,0 @@
-#!/bin/sh
-# A YMX file into a tune file, through the structure. doc/tools.md, From a YMX file.
-exec "$(dirname -- "$0")/run" org.ymxr.YmxToYmxr "$@"

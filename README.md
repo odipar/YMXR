@@ -17,9 +17,13 @@ Arnaud Carré's, and SNDH is the Atari ST scene's shared music container.
 
 ## What YMXR is
 
-YMXR is a chiptune format and 68000 player for the Atari ST. It replaces
-[YMX](https://github.com/odipar/YMX) and encodes YMXS tune data in DTX
-tables. Each repository defines a layer:
+YMXR is a chiptune format and 68000 player for the Atari ST. It encodes
+YMXS tune data in DTX tables.
+
+[YMX](https://github.com/odipar/YMX) is the family this repository
+belongs to: a design document defining how YMXS, YMXR, DTX and ST4 fit
+together. YMX was a format and a player until 0.10.1, and YMXR replaces
+both. Each repository defines a layer:
 
 - **[DTX](https://github.com/odipar/DTX)** defines table layout, packing
   and 68000 readers. Values have a fixed width; tables repeat from a
@@ -79,13 +83,12 @@ conformance kit. Read SPEC.md with [YMXS's specification](https://github.com/odi
 
 | source | contents |
 |---|---|
-| [`src/main/java/org/ymxr/`](src/main/java/org/ymxr) | the thirteen tools in Java, the reference: the converters, the check, the trace, the binder and the combiners |
-| [`go/`](go) | the same thirteen in Go, the executables a release ships |
-| [`bin/`](bin) | the thirteen as scripts, each writing standard output; eleven read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1) |
+| [`src/main/java/org/ymxr/`](src/main/java/org/ymxr) | the eleven tools in Java, the reference: the converters, the check, the trace, the binder and the combiners |
+| [`go/`](go) | the same eleven in Go, the executables a release ships |
+| [`bin/`](bin) | the eleven as scripts, each writing standard output; nine read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1) |
 | [`68k/YMXR.S`](68k/YMXR.S) | the player; `YMXR_PERF` builds the raster monitor in |
 | [`68k/YMXR_sndh.S`](68k/YMXR_sndh.S), [`68k/YMXR_prg.S`](68k/YMXR_prg.S) | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool |
-| [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 19), and [`ym/test`](ym/test), ten dumps the tests run on |
-| [`ymx/`](ymx) | a YMX file converted and played, and [`ymx/test`](ymx/test), four tunes read from YMX files alone |
+| [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 18), and [`ym/test`](ym/test), ten dumps the tests run on |
 | [`release/`](release) | the scripts that build and list a release |
 
 ## Converting and playing
@@ -115,10 +118,9 @@ report and summary but preserves output and notes ([tools.md](doc/tools.md) 3.3)
 Java 23, Maven and rmac, with DTX and YMXS installed in the local Maven
 repository by `mvn install` in each checkout. The Go tree builds with
 `go build ./cmd/...` under [`go/`](go) and fetches its modules
-([tools.md](doc/tools.md) 20).
+([tools.md](doc/tools.md) 19).
 
 | what runs | what it reads |
 |---|---|
 | `mvn test` | document consistency and style; dump conversion and replay; conformance files byte for byte; assembled cores, stub, SNDH and PRG layouts; Java/Go parity |
-| [`68k/test/emu/test_ymxr.py`](68k/test/emu/test_ymxr.py) | emulated 68000 frames, timer programming and ticks against the specification model; corpus and build flags in [tools.md](doc/tools.md) 18 |
-| [`ym/parity.py`](ym/parity.py) | YMX and YMXR register writes compared frame by frame under Hatari |
+| [`68k/test/emu/test_ymxr.py`](68k/test/emu/test_ymxr.py) | emulated 68000 frames, timer programming and ticks against the specification model; corpus and build flags in [tools.md](doc/tools.md) 17 |

@@ -20,10 +20,10 @@ acknowledgement below.
    condition is that you must indicate somehow in your documentation that you
    have used YMXR, and that you have used ZX1 through ST4 through DTX where
    what you ship contains a DTX image (see the attribution below). They are
-   everything under 68k/, src/, go/, bin/, ym/, ymx/ and release/, and the
+   everything under 68k/, src/, go/, bin/, ym/ and release/, and the
    executables and the 68000 binaries a release carries.
 
-   The tunes under ym/test and ymx/test are test input; the music in them is
+   The tunes under ym/test are test input; the music in them is
    outside this licence.
 
 Attribution
@@ -51,13 +51,13 @@ Attribution
   passes through it: the Maven artifact, and the Go module
   github.com/odipar/ymxs/go. No source of it is kept here.
 * YMX, https://github.com/odipar/YMX, Copyright (c) 2026 Robbert van Dalen,
-  is the format YMXR replaces. ymx-to-ymxr reads a .ymx file through it, the
-  Go module github.com/odipar/ymx/go, and ym/parity.py plays one tune packed
-  by each against the other.
+  is the family this repository belongs to: a design document defining how
+  YMXS, YMXR, DTX and ST4 fit together. It was a format and a player until
+  0.10.1, which YMXR replaces. No source of it is kept here.
 * The YM5 and YM6 register-dump formats are by Arnaud Carré
   (Leonard/Oxygene); ym-to-ymxr reads them. The LHA depacker in
-  src/main/java/org/ymxr/Lha.java and go/ym/dump.go is carried from YMX's
-  org.ym6.Lha, a port of the ST-Sound library's LZH code by Arnaud Carré,
+  src/main/java/org/ymxr/Lha.java and go/ym/dump.go is carried from YMX, a
+  port of the ST-Sound library's LZH code by Arnaud Carré,
   itself based on LZH code by Haruhiko Okumura (1991) and Kerwin F. Medina
   (1996). It carries both notices below.
 * SNDH is the Atari ST scene's shared music container; ymxr-sndh and

@@ -5,22 +5,21 @@ registers and effects, the sources those effects run, and one rate a tune.
 It is defined once, in records, and encoded as JSON. Every conversion
 here passes through it.
 
-    ym  ──► ym-to-ymxs  ──┐
-                          ├──► YMXS ──► ymxs-to-ymxr ──► a tune file, or a
-    ymx ──► ymx-to-ymxs ──┘                    │         multi file of several
-                                               ├──► ymxs-to-sndh ──► an SNDH file
-                                               └──► ymxs-to-prg  ──► a TOS program
+    ym ──► ym-to-ymxs ──► YMXS ──► ymxs-to-ymxr ──► a tune file, or a
+                                    │              multi file of several
+                                    ├──► ymxs-to-sndh ──► an SNDH file
+                                    └──► ymxs-to-prg  ──► a TOS program
 
-`ym-to-ymxr` and `ymx-to-ymxr` run both stages in one call and write the
-bytes the pipeline writes, which `YmxsTest` reads back on every tune under
+`ym-to-ymxr` runs both stages in one call and writes the bytes the
+pipeline writes, which `YmxsTest` reads back on every tune under
 `ym/test`.
 
 A tracker can emit YMXS JSON for conversion to YMXR.
 
 ## The two stages
 
-**Reading.** `Ym` converts a YM5!/YM6! dump and `Ymx` a YMX file into
-register rows, effects, sources and a repeat row. Import rules cover
+**Reading.** `Ym` converts a YM5!/YM6! dump into register rows, effects,
+sources and a repeat row. Import rules cover
 drums preempting square waves, drum duration from source rows and rate,
 effect volume registers, and repeat rows that restore registers and
 restart effects running through the wrap.
@@ -67,8 +66,7 @@ and exits 1:
 ## The tools
 
 The tools read standard input, write standard output and report on
-standard error (tools.md). Java's `ymx-to-ymxs` calls YMX's `ymx-dump`
-with `/dev/stdin` as its file name. The Go tool decodes YMX directly.
+standard error (tools.md).
 
 A YMXS multi of several tunes is a set of subtunes, one tune file each,
 which `ymxs-to-sndh` puts behind one core. `ymxs-to-ymxr` writes those

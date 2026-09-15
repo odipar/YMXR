@@ -132,7 +132,7 @@ final class HouseStyleTest {
             // value that fits it, and a negation stands where the sentence
             // belongs. This vocabulary defines the noun "state" (a state
             // block, a register of YM2149 state), so only its verb forms
-            // are struck. YMX's opcode `HOLD` is a name, so the entries
+            // are struck. A name spelled `HOLD` is a name, so the entries
             // here are the verb forms rather than the bare stem.
             " hold ",
             "holds",

@@ -29,8 +29,8 @@ OUT=${OUT:-dist}
 # somewhere else.
 case $OUT in /*) ;; *) OUT=$REPO/$OUT ;; esac
 TARGETS=${TARGETS:-"win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64"}
-TOOLS="ym-to-ymxs ymx-to-ymxs ymxs-to-ymxr ymxs-to-sndh ymxs-to-prg \
-       ym-to-ymxr ymx-to-ymxr ymxr-multi ymxr-bind ymxr-sndh ymxr-prg \
+TOOLS="ym-to-ymxs ymxs-to-ymxr ymxs-to-sndh ymxs-to-prg \
+       ym-to-ymxr ymxr-multi ymxr-bind ymxr-sndh ymxr-prg \
        ymxr-trace ymxr-check"
 
 # The version names the zips. The pom is where it is recorded, and this
@@ -92,9 +92,7 @@ release/manifest.sh "$VERSION" "$OUT/release"
 # not this repository, with no other file beside them and an empty
 # environment.
 # A dump goes in and a TOS program comes out, which is the whole pipeline
-# in one run, and a .ymx goes through the same two tools: that path read
-# the file by running YMX's ymx-dump until 0.1.0, and a released executable
-# stopped where the host had no copy of it.
+# in one run.
 case "$(uname -s)-$(uname -m)" in
     Darwin-arm64) host=osx-arm64 ;;
     Darwin-x86_64) host=osx-x64 ;;
@@ -105,15 +103,10 @@ esac
 if [ -n "$host" ] && [ -d "$OUT/$host" ]; then
     try=$(mktemp -d)
     cp "ym/test/Turrican - world 4-3.ym" "$try/tune.ym"
-    cp "ymx/test/DitherDance.ymx" "$try/tune.ymx"
     (cd "$try" && env -i "$OUT/$host/ym-to-ymxs" -silent < tune.ym \
         | env -i "$OUT/$host/ymxs-to-prg" -silent > TUNE.PRG)
     echo "tried: a dump through two tools from $OUT/$host, outside the repository," \
          "$(wc -c < "$try/TUNE.PRG" | tr -d ' ') bytes of program"
-    (cd "$try" && env -i "$OUT/$host/ymx-to-ymxs" -silent < tune.ymx \
-        | env -i "$OUT/$host/ymxs-to-prg" -silent > YMX.PRG)
-    echo "tried: a .ymx through the same two," \
-         "$(wc -c < "$try/YMX.PRG" | tr -d ' ') bytes of program"
     rm -rf "$try"
 fi
 

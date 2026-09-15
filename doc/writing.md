@@ -71,7 +71,7 @@ leaves unset while an effect runs, which effects a row may name, and
 which bits a row that starts a source sets with it. A player assumes the
 rules and writes each set column as the row has it (YMXS, SPEC.md 6.1);
 a file that breaks one plays, and a check of the structure reports the
-breach as a warning (tools.md 8.2). Each rule names the YMXS rule it
+breach as a warning (tools.md 7.2). Each rule names the YMXS rule it
 encodes; YMXS, SPEC.md 6 defines those in the structure.
 
 ---
@@ -126,7 +126,7 @@ thirty rings and a fixed part; a smaller ring packs to more bytes
 | shorter than 16 bytes, or other than `YMXR` at offset 0 | SPEC.md 3.3 |
 | a version other than `$0003` | SPEC.md 3.3, R6.1 |
 | a source whose `C` or `W` is other than 1 | SPEC.md 3.1 |
-| a table or a source whose offsets lie outside the file | SPEC.md 3.3; the Go reader, where the Java reader leaves this unchecked (tools.md 20.5) |
+| a table or a source whose offsets lie outside the file | SPEC.md 3.3; the Go reader, where the Java reader leaves this unchecked (tools.md 19.5) |
 
 A reader reports a rejected file (SPEC.md 7) and produces zero entries.
 
@@ -146,7 +146,7 @@ ym/play.sh tune.ymxr                  # under Hatari, with its sound on
 **8.2** The third plays the file on an emulated 68000 and checks every
 frame against a model of SPEC.md 4 and 5 built from the tune's tables,
 and names the frame and the register that differ; `-hatari` plays it on
-a real MFP (tools.md 18.1).
+a real MFP (tools.md 17.1).
 
 **8.3** `doc/conformance/tunes/` has eleven tune files: ten a reader
 reads, and `wrong-version.ymxr`, version `$0004`, which a reader rejects
