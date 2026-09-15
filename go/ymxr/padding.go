@@ -14,7 +14,7 @@ import (
 // column.
 const Short = 64
 
-// Unset is a row that sets no register and leaves every timer running.
+// Unset is the row that leaves every register as it is and every timer running.
 var Unset = ymxs.Row{}
 
 // PadToUnit is tune with rows added so that its table packs at unit,
@@ -32,8 +32,8 @@ var Unset = ymxs.Row{}
 // first row later and lengthens what plays before it. Then, where the
 // count does not divide, a loop of fewer than Short rows is written
 // again until it does, and a longer loop, or a tune that plays once, gets
-// rows that set no column at the end. A row that sets no column writes
-// no register and leaves every timer running, so the tune plays one more
+// rows that set no column at the end. A row that sets no column leaves
+// every register as it is and every timer running, so the tune plays one more
 // frame there with its effects running through it; a loop written again
 // plays as it did, since a pass plays the same rows. At most k minus one
 // rows that set no column go in each place, and a tune that already

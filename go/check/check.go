@@ -89,7 +89,7 @@ func Of(song ym.Song, args []string) []string {
 		model.Step()
 		f := frames[r]
 		if f < 0 {
-			// a row that sets no column: it writes no register, and the
+			// a row that sets no column: every register keeps its value, and the
 			// effects run on through it
 			for c := 0; c < 13; c++ {
 				if model.Written[c] >= 0 {

@@ -423,10 +423,10 @@ tune that fails rather than the first alone.
 
 A tune named as a `.ymxr` file plays as it stands, without the converter. A
 tune whose `RR` is `R` is played one frame past its last row, where the
-call reports -1 and writes no register. `-hatari` requires tunes at 50 Hz:
-it cuts the trace into frames at the VBL, which the program plays from
-where the screen's rate is the tune's, and Hatari's ST refreshes at 50
-Hz.
+call reports -1 and leaves every register as it is. `-hatari` requires
+tunes at 50 Hz: it cuts the trace into frames at the VBL, which the program
+plays from where the screen's rate is the tune's, and Hatari's ST refreshes
+at 50 Hz.
 
 Under unicorn, which raises no interrupt, the rig models the four timers
 and fires every tick itself at the time the model computes. `-cycles`

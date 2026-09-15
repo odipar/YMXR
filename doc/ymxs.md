@@ -33,7 +33,7 @@ SPEC.md 1. Every rule about the encoding lives here: the set bit, the bit
 beside a column that fills its byte, the four columns an effect, the
 marker on a source's last row, and the effect each timer runs.
 
-No other class reads a dump, and no other class writes a column.
+One class reads a dump, and one class writes a column.
 
 ## What each column is written from
 

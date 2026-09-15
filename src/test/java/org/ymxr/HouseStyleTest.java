@@ -166,6 +166,19 @@ final class HouseStyleTest {
             "a tune down",
             "the structure down",
             "puts down",
+            // a "no X" where the operation has a name: a reader skips a
+            // blank line, the player leaves a register as it is
+            "belongs to no",
+            "performs no ",
+            "writes no ",
+            "reaches no ",
+            "and no other",
+            "for none",
+            "on no chip",
+            "with no error",
+            "is not defined",
+            "not defined by",
+            "no other step",
             "would rather");
 
     /** Every Markdown file in the tree but the two that define the rules. */

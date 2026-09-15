@@ -114,6 +114,12 @@ has to undo both to learn what happens. Say what is there: `a timer any row
 uses opens a table of its own`. Where a rule is about what is left alone, one
 negative carries it: `a register the row does not set is absent`.
 
+`no X` where the operation has a name is the same fault in one negative:
+`a blank line belongs to no block and is not read` is `a reader skips a
+blank line`; `writes no register` is `leaves every register as it is`;
+`is not defined` is `is left to a later version`. A quoted message text
+keeps its words.
+
 ## Plain names for sections
 
 A heading says what the section is about in the words the reader would use.
@@ -140,6 +146,7 @@ been struck so far.
 | `a timer no row uses opens none` | `each timer a row uses opens a table` |
 | `Writing a tune down is a separate job, and a form does it.` | dropped; the paragraph below it defines a form |
 | `A form is the structure written down` | `A form is an encoding of the structure`; `written down` is a metaphor for encoded, struck wherever it stood |
+| `a blank line belongs to no block and is not read` | `a reader skips a blank line`; a `no X` where the operation has a name, struck wherever it stood |
 | `Each player names the version of this it reads.` | `A player is a separate program, and pins a version of this format.` |
 | `a table of its own` | `a table` |
 | `for a reader who would rather open one in a spreadsheet` | `for reading in a spreadsheet` |

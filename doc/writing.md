@@ -37,8 +37,8 @@ the row that does not set them. Five of those have a bit beside them that
 keeps 0 reachable as a value, and 1.1 lists which. 1.2 to 1.7 define each
 column separately.
 
-A row that sets no column writes no register, so a writer writes a value on
-the row it changes and leaves the rows between alone.
+A row that sets no column leaves every register as it is, so a writer
+writes a value on the row it changes and leaves the rows between alone.
 
 ## The effects
 
@@ -61,8 +61,8 @@ length.
 Those rules bind the writer rather than the player: which columns a row
 leaves unset while an effect runs, which effects a row may name, and which
 bit a row that starts a source sets with it. A player writes a marked
-column once and performs no test, because a writer satisfies those rules,
-so a file that breaks one plays as something else rather than failing.
+column once and assumes those rules, which a writer satisfies, so a file
+that breaks one plays as something else rather than failing.
 
 ## The sources
 
@@ -71,7 +71,7 @@ A source is a DTX1 table of `R` rows and one column of one-byte values
 source of another shape. `RR` is the row it repeats to, and where `RR`
 equals `R` the source plays once.
 
-The last row has bit 7 set and no other row has (3.2). That bit is the
+The last row has bit 7 set, alone among the rows (3.2). That bit is the
 marker, and the register reads the rest of the byte, so a source names a
 target whose register ignores bit 7: `setR1`, `setR3`, `setR5`, `setR6`,
 `setR8` to `setR10` and `setR13` (2.1). A source on `setR0`, `setR7` or any

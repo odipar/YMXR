@@ -23,8 +23,7 @@ import org.ymxs.YMXS.Tune;
  * plays before it. Then, where the count does not divide, a loop of fewer
  * than {@link #SHORT} rows is written again until it does, and a longer
  * loop, or a tune that plays once, gets rows that set no column at the
- * end. A row that sets no column writes no register and leaves every
- * timer running, so the tune plays one more frame there with its effects
+ * end. A row that sets no column leaves every register as it is and * every timer running, so the tune plays one more frame there with its effects
  * running through it; a loop written again plays as it did, since a pass
  * plays the same rows. At most {@code k} minus one rows that set no
  * column go in each place, and a tune that already divides is returned

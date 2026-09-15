@@ -770,7 +770,7 @@ YMXR_init:
 ; A tune that runs one effect has no second timer to nest inside a tick,
 ; so the level that tick drops buys it no safety: two nops stand where the
 ; drop would, in all three of that effect's handlers. A tune running two
-; or more keeps the drop, and one running none reaches no handler. Every
+; or more keeps the drop, and one running none skips the handlers. Every
 ; handler's word is written on every init: a set inits one loaded copy
 ; for each subtune, and a subtune that ran one effect alone left its nops
 ; where the next, running that effect beside another, needs the drop.
@@ -925,7 +925,7 @@ YMXR_stop:
                 RELEASE 3,$FFFFFA1D,$0F,$FFFFFA09,5
                 move.w  (sp)+,sr
 ; The chip left as the next tune finds it. A row sets the registers it
-; names and no others (SPEC.md 4), so a tune whose first row leaves one
+; names alone (SPEC.md 4), so a tune whose first row leaves one
 ; unset would read the register the tune before it wrote: the envelope
 ; shape reaches furthest, since writing it retriggers the generator and
 ; a tune that sets it late runs on the shape the tune before it left.
@@ -1012,7 +1012,7 @@ ymxr_frame:
                 bra.s   ymxr_played
 
 ; Steps 6 and 7 again, for the row whose envelope column step 5 found 0:
-; step 8 writes no register on that row, and this copy ends without
+; step 8 leaves every register as it is on that row, and this copy ends without
 ; the test that would say so.
 ymxr_plain:     PLAIN   _11,$0B00
                 PLAIN   _12,$0C00
@@ -1140,7 +1140,7 @@ SQ_SR           equ     ymxr_sq0_val-ymxr_sq0+6
 SQ_SIZE         equ     ymxr_sq1-ymxr_sq0
 
 ; A one-row source's handler: the register it selects and the row it
-; writes, both immediates a start puts there, and no other field.
+; writes, both immediates a start puts there, those two fields alone.
 ONE_SEL         equ     ymxr_one0_sel-ymxr_one0+3
 ONE_VAL         equ     ymxr_one0_val-ymxr_one0+3
 ONE_SR          equ     ymxr_one0_val-ymxr_one0+6
