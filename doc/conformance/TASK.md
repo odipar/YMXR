@@ -1,51 +1,55 @@
-# task
+# The task
 
 Implement a YMXR reader from the specification.
 
-`SPEC.md` in this directory is the format specification, and
+**1. The documents.** `SPEC.md` in this directory defines the format;
 `YMXS-SPEC.md` beside it defines what a tune is, what each register
-reaches, how a rate is reckoned, and what a frame and a tick do with a row.
-SPEC.md cites it as `(YMXS, SPEC.md 3.4)`, which means section 3.4 of
-`YMXS-SPEC.md`, and repeats none of it. Read both. Implement a reader for
-the `.ymxr` files under `tunes/`: what SPEC.md 7 calls one.
+reaches, how a rate is reckoned, and what a frame and a tick do with a
+row. A citation `(YMXS, SPEC.md 3.4)` in `SPEC.md` is clause 3.4 of
+`YMXS-SPEC.md`. Read both. Implement the reader of `SPEC.md` 7 for the
+`.ymxr` files under `tunes/`.
 
-The record you print is SPEC.md 7's, not `YMXS-SPEC.md` 7's. Those are two
-readers of two things, and the one asked for here reports the columns a
-tune file has.
+The record is `SPEC.md` 7's, which reports the columns of a tune file;
+`YMXS-SPEC.md` 7 defines the record of a separate reader, of the
+structure, and is outside this task.
 
-## What to produce
-
-`decode.py` in this directory. Run as:
+**2. What to produce.** `decode.py` in this directory, run as
 
     python3 decode.py <file.ymxr> <file.rows> <lines>
 
-It prints the record SPEC.md 7 defines: one line of JSON a frame, at most
-`<lines>` of them, the first line the tune's fixed values. A frame
-reporting -1 is one line, and the record ends with it: print no line for
-any frame after. For a file whose version is not the one the specification
-defines, print no line.
+It prints at most `<lines>` lines of the record `SPEC.md` 7 defines: the
+first line, the tune's fixed values, then one line of JSON a frame. A
+frame reporting -1 is one line, and the record ends with it. For a file
+whose version word is other than $0003 (`SPEC.md` 3.3), the record is
+empty and the program's output is empty.
 
-Your output is compared with the reference byte for byte: no space in a
-line, integers in decimal, names in the order SPEC.md 7 defines, register
-keys in ascending numeric order, and a line feed ending each line. In
-Python that is `json.dumps(entry, separators=(",", ":"))` over dicts
-filled in that order, and not `sort_keys`.
+The output is compared with the reference byte for byte: each line free
+of spaces, integers in decimal, names in the order `SPEC.md` 7 defines,
+the register names in ascending numeric order, and a line feed ending
+each line. In Python that is `json.dumps(entry, separators=(",", ":"))`
+over dicts filled in that order, `sort_keys` left at its default.
 
-`<file.rows>` is the tune's table: a header of sixteen bytes carrying `R`
-at bytes 4 to 7 and `RR` at bytes 10 to 13, most significant byte first, as
-SPEC.md 3.1 defines a source's, then row 0 to `R` minus one, each row its
-thirty columns in order, one byte a column, with no padding between them.
-Read the table from it. Everything else, the frame rate, the effects used,
-the source index and the sources' tables, is in the tune file as SPEC.md 3
-lays it out. The DTX2 table in the tune file packs the same rows in a form
-another format defines, and you do not read it.
+**3. The rows file.** `<file.rows>` is the tune's table: a 16-byte
+header, then row 0 to `R` - 1, each its thirty columns in order, one
+byte a column, the rows adjoining.
 
-## The tunes
+| offset | bytes | what it is |
+|---|---|---|
+| 4 | 4 | `R`, the row count, most significant byte first |
+| 10 | 4 | `RR`, the row the table repeats to, most significant byte first; `R` where the tune plays once |
+| 16 | 30`R` | the rows |
 
-Each is a `.ymxr` beside its `.rows`, and no two have the same shape. The
-specification defines how each one is read. No tune here breaks section 6,
-names a target above 13, a select of 0 or a source past `S`, and no test
-here covers what a reader does with one that does.
+Read the table from it. The frame rate, the effects used, the source
+index and the sources' tables are in the tune file as `SPEC.md` 3 lays
+it out. The DTX2 table in the tune file packs the same rows in a form
+another format defines; the rows file stands in for it.
+
+**4. The tunes.** Each is a `.ymxr` beside its `.rows`; the tunes differ
+in what they reach. Every tune satisfies `SPEC.md` 6, names targets 0 to
+13, selects 1 to 7 and sources 0 to `S`, 0 the stop (`SPEC.md` 1.8); a
+reader records a source's rows as the table has them, a set bit 7 before
+the last row included (`SPEC.md` 7); what a reader does with a file
+outside those is outside this task.
 
 | file | lines to produce |
 |---|---:|
@@ -61,28 +65,25 @@ here covers what a reader does with one that does.
 | `four-timers.ymxr` | 211 |
 | `wrong-version.ymxr` | 0 |
 
-The count is the first line and `R` plus `R` minus `RR` frames for a tune
-that repeats, or `R` plus 1 for one that does not, with `R` and `RR` the
-table's (SPEC.md 7).
+The count is the first line and `R` + `R` - `RR` frames for a tune that
+repeats, or `R` + 1 for one that plays once, `R` and `RR` the table's
+(`SPEC.md` 7).
 
-## The rules
+**5. The rules.**
 
-- Work **only** from `SPEC.md` and `YMXS-SPEC.md`.
-- **Do not read the YMXR repository, the YMXS repository, or the DTX
-  repository,** and do not read any implementation of this format, of the
-  structure under it, of DTX or of the compression under them, anywhere:
-  not in those repositories, not on the web. This is a test of whether the
-  two documents alone are enough. Whoever sets the exercise names the
-  directories those repositories are in, so you can keep out of them.
-- You have no reference output. You cannot check your answer.
+1. Work from `SPEC.md` and `YMXS-SPEC.md` alone.
+2. The YMXR, YMXS and DTX repositories are outside the task, as is every
+   implementation of this format, of the structure under it, of DTX and
+   of the compression under them, in those repositories or on the web.
+   The task tests whether the two documents alone define the record. The
+   *setter* names the directories of the three repositories.
+3. The reference output is outside the task: the setter checks an
+   answer.
 
-## Also produce
+**6. Also produce.** `READ.md`: every file and page read, listed; where
+an implementation of anything was read, the list names it.
 
-`READ.md`: every file and page you read, listed. If you read an
-implementation of anything, say so plainly: a list that names one is
-worth more here than one that leaves it out.
-
-`NOTES.md`: every place the specification left you guessing. For each, the
-section, what it omits, what you assumed, and how you would word it. Mark
-each entry **decides output** or **costs no byte**, depending on whether
-your assumption changed a byte you emitted.
+`NOTES.md`: every place the specification left a choice. For each, the
+section, what it omits, what was assumed, and the wording proposed. Mark
+each entry **decides output** or **leaves output as it is**, by whether
+the assumption changed a byte emitted.

@@ -1,47 +1,68 @@
 # The YMXR format
 
-A working draft. A player plays it under emulation and on an emulated
-machine, and the numbers move as the corpus says.
+Version 3 of the tune file: one encoding of the YMXS tune data structure
+(YMXS, SPEC.md 1) as a DTX table and the tables beside it, and what a
+player of it writes to the YM2149 and the MC68901 of an Atari ST. The
+columns of the table (1), the maps from a column's value to a target, a
+source and a timer (2), the tables and the tune file (3), the procedure
+of a frame (4) and of a tick (5), the rules a writer satisfies and what a
+check reports (6), the record a reader produces (7), and what a later
+version defines (8).
 
-A tune is a DTX table and the values outside it. Every value of a DTX
-table is the one width the table defines (R1.1), and this table's width is
-a byte, the width of one register. It defines 30 columns of the 32 R3.4
-allows, each one byte, so a row is 30 bytes.
+A tune's table is a DTX table (DTX, SPEC.md 1) of one width (R1.1), a
+byte, the width of a register: 30 columns of the 32 R3.4 allows, each one
+byte, so a row is 30 bytes. YMXS, SPEC.md 2 to 6 define what each
+register reaches, what a target, a source and a rate are, what a frame
+and a tick do with them, and the rules of the structure; this document
+defines the encoding of each and cites the rest.
 
-## What this defines, and what YMXS does
+**Conventions.** A clause is cited by number, 4.3 or 1.1.2, and a step
+within one as 4.3 step 2; a rule of section 6 as rule 1 and a condition
+of one as rule 1(a); a clause of YMXS's SPEC.md as (YMXS, SPEC.md 3.4)
+and a section of DTX's as (DTX, SPEC.md 1). `Note:` begins an
+informative sentence. A range includes both ends. `$` prefixes a
+hexadecimal figure. The bits of a byte are numbered 7 to 0, bit 7 the
+most significant, and a bit is 1 or 0. A field of more than one byte is
+most significant byte first. An offset counts from the first byte of the
+file, and an offset *on a long* divides by 4. A row *sets* a column where
+the column is set as 1.1 defines, and otherwise leaves it *unset*. In a
+reported text, `Rn` is a register and each other capital letter a decimal
+figure defined beside the text.
 
-[YMXS](https://github.com/odipar/YMXS) is the tune data structure. Its
-SPEC.md defines what a tune is and what a player does with it: what each
-register reaches on the two chips, what a target and a source are, how a
-rate is reckoned from a prescaler and a count, what the two resets do, what
-a frame does with a row and a tick with a source's row, and the rules a
-writer satisfies.
+**Roles.** A player performs sections 4 and 5 on the two chips. A reader
+reads a tune file (3.3) and performs section 4 with every register write
+and every effect column recorded as an entry of section 7 in place of the
+chips (R2.4). A writer produces a tune file, satisfying the rules of
+section 6, from a structure free of the errors of YMXS, SPEC.md 1.11. A
+check reads a tune file beside the recording it encodes and reports the
+lines of 6.4. The host calls the player once a frame at the frame rate
+(3.3), and owns every timer outside the tune's and every register outside
+R0 to R13. [BINARIES.md](BINARIES.md) 1 defines the bound tune a player
+reads, and [tools.md](tools.md), The player, the player's three calls.
 
-This document defines one encoding of that structure and repeats none of
-it. A rule that belongs to YMXS is cited as `(YMXS, SPEC.md 3.4)` and
-defined there alone, as a rule that belongs to DTX is cited as `(DTX,
-SPEC.md 2.2)`.
-
-| here | there |
-|---|---|
-| the thirty columns and the bits of each (section 1) | the value in a column, and what it reaches on the chips |
-| a column's number to a target, a source and a timer (section 2) | what a target, a source and a rate are |
-| the DTX tables, the source index and the tune file (section 3) | - |
-| the order and the tests a player performs on a row (section 4, 5) | what a frame and a tick do |
-| what a writer satisfies in columns (section 6) | what a writer satisfies in the structure |
-| what a reader of a tune file reports (section 7) | what a reader of the structure reports |
-
-DTX and ST4 are this document's throughout. The table, its packing, its
-reader and the file they stand in belong here, and YMXS defines none of
-them.
+**Terms.** A *frame* is one call of the player (4.2); a *tick* one
+interrupt of a timer (5.1); a *row* one entry of a table. The *MFP* is
+the MC68901. An *effect* is one of the four groups of columns 14 to 29
+(1.8), and *effect i* runs on the timer 2.3 assigns it. A *start* is a
+row setting an effect's source column to 1 to 127, a *stop* a row setting
+it to 0 (1.8.3). The *kept* target, select and count of an effect are the
+values the player keeps of the last row that set each (R4.6). The *place*
+of a timer is the row of its source the next tick reads (YMXS, SPEC.md
+3.4.2). A *recording* is the frames a writer produces a tune from: each
+frame the values of R0 to R12, R13 present or absent, and a flag on
+effect 0 and on effect 1, present or absent (6.4). Section 3.2 defines
+the *marker*, 3.1 the *source index* and an *index entry*, 6.3 an *unset
+row*, and 2.3 *stopping*, *claiming* and *releasing* a timer.
 
 ---
 
 ## 1. The columns
 
-Columns 0 to 13 reach R0 to R13, one a register, in the chip's numbering.
-Columns 14 to 29 are the four effects, four columns each. A bit an entry
-does not name is written as zero and has no meaning (R6.2).
+Columns 0 to 13 reach R0 to R13, one a register, in the chip's numbering;
+columns 14 to 29 are the four effects, four columns each, effect i at
+columns 14 + 4i to 17 + 4i. A writer writes 0 to a bit this section
+leaves unassigned, a player leaves it unread, and a later version assigns
+it (R6.2, section 8).
 
 | column | what it reaches |
 |---|---|
@@ -67,21 +88,20 @@ does not name is written as zero and has no meaning (R6.2).
 | 22 to 25 | effect 2, the same, on Timer B |
 | 26 to 29 | effect 3, the same, on Timer C |
 
-An effect belongs to the schema and a timer to the machine. Section 2.3
-assigns one to the other. A tune running one effect sets columns 14 to 17 and
-leaves 18 to 29 unset for its whole length.
-
 ### 1.1 The set bit
 
-Bit 7 of a column is its set bit, the flag for the column's value (R3.6).
-At 1 a player reads the value; at 0 it does not interpret the value's bits,
-which are arbitrary.
+**1.1.1** Every column other than the nine of 1.1.2 has a set bit, bit 7
+(R3.6). Where it is 1 the row sets the column, and a player reads bits 6
+to 0 as the column's clause defines. Where it is 0 the row leaves the
+column unset, and a player leaves bits 6 to 0 unread, other than a bit
+1.1.2 assigns, which 1.1.4 reads; a writer may write any value to those
+bits, other than a bit 1.1.2 assigns and a bit this section leaves
+unassigned. A row may set a column to the value the register already
+has.
 
-Nine columns have no bit to spare, because the register fills the whole
-byte: the three tone periods' fine columns, the two envelope period
-columns and the four timer counts. Each reserves 0 for the row that does
-not set it (R3.7), and for each a bit of the column beside it keeps 0
-reachable as a value:
+**1.1.2** Nine columns fill their byte with their value: 0, 2, 4, 11, 12,
+17, 21, 25 and 29. Each reserves the value 0 for a row that leaves it
+unset (R3.7), and a bit of a column beside it marks its 0 as a value:
 
 | column | its 0 is a value where |
 |---|---|
@@ -95,635 +115,857 @@ reachable as a value:
 | 25 | bit 4 of column 24 is 1 |
 | 29 | bit 4 of column 28 is 1 |
 
-A player reads such a column and its bit together:
+**1.1.3** A player reads such a column and the bit beside it together,
+and writes the column's register where the row sets the column (4.3,
+4.4):
 
 | the column | the bit | the row |
 |---|---|---|
-| not 0 | 0 or 1 | sets the register to the column's value |
-| 0 | 0 | does not set it, and the register is not written |
-| 0 | 1 | sets it to 0 |
+| other than 0 | 0 or 1 | sets the column, whose value is the byte |
+| 0 | 0 | leaves the column unset |
+| 0 | 1 | sets the column to 0 |
 
-The set bit flags the value, not the column. The nine bits above sit
-beside another column's value rather than inside the value they mark, and
-where each is read follows the column it belongs to. The five in a register
-column are read on every row, set bit or no (R3.6). The four in a control
-column are read where the row sets that column (1.9): every count a bend
-moves through is 1 to 255, and a row reaching 0 is one that programs the
-timer and sets both columns. Every other bit of a column is part of its
-value, read only where the row sets it.
-
-One column gathering all twenty-one set bits would gather twenty-one
-reasons to move, and the sum of them moves on nearly every row. A bit
-beside its value moves only when that value's use does, and compresses with
-it. A reserved 0 does the same for a column that fills its byte: the column
-is 0 where the row leaves it, and the bit beside it moves only where a tune
-sets the register to 0.
+**1.1.4** A player reads the five bits in columns 1, 3, 5 and 13 on every
+row, that column's set bit 1 or 0: a row may set a fine column to 0 and
+leave the coarse column unset (1.2), or mark a period byte 0 and leave
+R13 as it is (1.6). A player reads the four bits in the control columns
+where the row sets the control column (1.9); where it leaves that column
+unset, a count column of 0 is unset. Every other bit of a column is part
+of its value, read where the row sets the column.
 
 ### 1.2 Tone period
 
-Two columns a voice, one a register. The fine column is the divider's bits
-7 to 0, the byte written to R0, R2 or R4. It fills its byte, so 0 marks the
-row that does not set it, and bit 6 of the coarse column marks the row that
-sets it to 0 (1.1).
+**1.2.1** Two columns a voice: a fine column, 0, 2 or 4, and a coarse
+column, 1, 3 or 5. The fine column is bits 7 to 0 of the twelve-bit
+period, the byte written to R0, R2 or R4; it fills its byte, and bit 6
+of the coarse column marks its 0 as a value (1.1.2).
 
-The coarse column: bit 7 is the set bit, bit 6 marks the fine column's 0 as
-a value, and bits 3 to 0 are the divider's bits 11 to 8, which reach R1, R3
-or R5. Bits 5 and 4 are zero.
+**1.2.2** The coarse column:
 
-A period whose low byte is 0 sets the fine column to 0 and bit 6 of the
-coarse column to 1 on the same row. Bit 6 sits beside the coarse column's
-value rather than inside it (R3.5), so a player reads it on every row, and
-a row may mark the fine byte as 0 without setting the coarse. Across the 543
-tunes the fine byte moves to 0 in 3,541, 2,697 and 13,970 frames of
-3,789,212 for voices A, B and C, which `ym/measure.py` reads back.
+| bit | meaning |
+|---|---|
+| 7 | the set bit |
+| 6 | the fine column's 0 is a value (1.1.2) |
+| 5, 4 | unassigned, 0 |
+| 3 to 0 | bits 11 to 8 of the period, which reach R1, R3 or R5 |
+
+**1.2.3** A row sets either column of a pair alone, or both (YMXS,
+SPEC.md 2.2). A player reads bit 6 on every row (1.1.4).
 
 ### 1.3 Volume
 
-Bit 7 is the set bit. Bits 4 to 0 are the value that reaches R8, R9 or R10,
-which YMXS defines (YMXS, SPEC.md 2). Bits 6 and 5 are zero.
+**1.3.1** Columns 8, 9 and 10, one a voice:
 
-While an effect writes this voice's volume register, a row leaves this
-column unset (section 6), so the frame's write does not undo what the
-effect's ticks write. One row sets it: the row that stops the effect, whose
-write restores the voice's level. The row that starts a square wave sets no
-level, so the voice keeps the value the last row left for the timer's first
-period, and the first tick writes the loud half. A row that starts a square
-where one already runs on the voice does not move the place (1.9), so the
-tick after it falls a whole period after the tick before it, and the level
-it writes belongs to the new source.
+| bit | meaning |
+|---|---|
+| 7 | the set bit |
+| 6, 5 | unassigned, 0 |
+| 4 to 0 | the value, which reaches R8, R9 or R10 (YMXS, SPEC.md 2.3) |
+
+**1.3.2** While an effect runs on the register, every row leaves the
+column unset, and the row that stops the effect may set it (rule 1).
 
 ### 1.4 Mixing
 
-Bit 7 is the set bit. Bits 5 to 0 reach R7, whose bits YMXS defines (YMXS,
-SPEC.md 2). Bit 6 is zero. Bits 7 and 6 of R7 are never written from this
-column (section 4): they are the host's I/O port directions.
+**1.4.1** Column 7:
+
+| bit | meaning |
+|---|---|
+| 7 | the set bit |
+| 6 | unassigned, 0 |
+| 5 to 0 | the value, bits 5 to 0 of R7 (YMXS, SPEC.md 2.4) |
+
+**1.4.2** Bits 7 and 6 of R7 are the directions of the two I/O ports
+(YMXS, SPEC.md 2.4, 8.8). A player writes both as 1 on every write of R7
+(4.4 step 5), the directions of an Atari ST; a reader reports bits 5 to
+0 (7.3).
 
 ### 1.5 Noise period
 
-Bit 7 is the set bit. Bits 4 to 0 reach R6. Bits 6 and 5 are zero.
+**1.5.1** Column 6:
+
+| bit | meaning |
+|---|---|
+| 7 | the set bit |
+| 6, 5 | unassigned, 0 |
+| 4 to 0 | the value, which reaches R6 |
 
 ### 1.6 Envelope shape
 
-| bits | what they are |
+**1.6.1** Column 13:
+
+| bit | meaning |
 |---|---|
-| 7 | the set bit of this column |
-| 6 | column 11's 0 is a value: the envelope period's fine byte is 0 (1.7) |
-| 5 | column 12's 0 is a value: its coarse byte is 0 (1.7) |
+| 7 | the set bit |
+| 6 | column 11's 0 is a value (1.7) |
+| 5 | column 12's 0 is a value (1.7) |
+| 4 | unassigned, 0 |
 | 3 to 0 | the shape, which reaches R13 |
 
-Bit 4 is zero.
-
-A row sets this column to write R13, and a write to R13 restarts the
-envelope (YMXS, SPEC.md 2). A row that leaves it unset writes no register,
-and the envelope runs on.
-
-A row restarting the shape already sounding is more frequent than one
-changing it (YMXS, SPEC.md 2), and such a row sets this column to the four
-bits already in R13, which R3.6 allows: the set bit marks a value to write,
-not a value that changed.
-
-"Do not write" is the clear set bit, so no value of this column is reserved
-for it. A row may set this column while an effect writes R13: the row's
-write restarts the envelope alongside the restarts from the ticks, as the
-dumps in the corpus do (section 6).
-
-Bits 6 and 5 sit beside this column's value rather than inside it (R3.5),
-so a player reads them on every row. A row may mark a period byte as 0
-without writing R13.
+**1.6.2** A row that sets this column writes R13, and every write of R13
+restarts the envelope, the value changed or the same (YMXS, SPEC.md 2.5);
+a row that leaves it unset leaves R13 and the envelope as they are. A
+player reads bits 6 and 5 on every row (1.1.4). A row may set this column
+while an effect runs on R13 (rule 1).
 
 ### 1.7 Envelope period
 
-Two columns, one a register. Column 11 is the divider's bits 7 to 0, the
-byte written to R11, and column 12 its bits 15 to 8, the byte written to
-R12. Each fills its byte, so 0 marks the row that does not set it, and a
-bit of column 13 marks the row that sets it to 0: bit 6 for column 11 and
-bit 5 for column 12 (1.1).
-
-| column 11 | column 13 bit 6 | the row |
-|---|---|---|
-| not 0 | 0 or 1 | sets R11 to the column's value |
-| 0 | 0 | does not set it, and R11 is not written |
-| 0 | 1 | sets R11 to 0 |
-
-Column 12 and bit 5 read the same way for R12.
-
-Neither column has a set bit. The divider fills both bytes and leaves no
-bit beside them, so a reserved value does that work: a player reads the
-byte and writes where it is not zero, which costs the same test as a bit
-would.
-
-**Why 0 is the value reserved.** The divider reads 0 as 1, so the two
-values are one pitch (YMXS, SPEC.md 2). A tune that needs that pitch writes
-1 at no cost, and 0 is free to mark the row that sets neither byte.
-
-**Why the bits exist anyway.** Period 0 is a setting the chip accepts, and
-a tune converted from a register dump should convert without
-approximation. The two bits keep it reachable, and with it every period
-that has a zero byte: 1 to 255 have a zero coarse byte, 256 and its
-multiples a zero fine byte. Period 0 itself sounds in almost no row: across
-the 543 tunes, 211 frames of 3,789,212 have it with a voice reading its
-level from the envelope, in 8 tunes.
-
-**What the corpus says about the reserved value.** 2,312,208 of the
-corpus's frames have period 0, and all but the 211 above have it with no
-voice following the envelope. There the registers are untouched, which is
-the meaning of "the row does not set these columns", so the reserved value
-and the common case agree.
-
-**Why the bits are not the whole answer.** Set bits for the two period
-bytes, marking not set against set, would move whenever a byte moved
-between set and unset: 101,444 changes on a column that changes 24,099
-times. The two bits beside them move only where a row sets a byte to 0:
-55,799 changes. `ym/measure.py` reads the three figures back, and
-experiments.md has what the difference packs to.
+**1.7.1** Column 11 is bits 7 to 0 of the sixteen-bit period, the byte
+written to R11; column 12 is bits 15 to 8, the byte written to R12. Each
+fills its byte (1.1.2): bit 6 of column 13 marks column 11's 0 as a value
+and bit 5 marks column 12's, and a player reads each pair by 1.1.3. A row
+sets either column alone, or both.
 
 ### 1.8 Effect
 
-Two columns: the target, and the source.
+**1.8.1** Four columns an effect, effect i at column 14 + 4i: the target
+column, the source column, the control column and the count column (1.9).
+Effect i runs on the timer of 2.3.
 
-The target column: bit 7 is the set bit, and bits 6 to 0 are the target, 0
-to 127, an index into 2.1's procedures.
+**1.8.2** The target column: bit 7 the set bit, bits 6 to 0 the target
+number, 0 to 127 (2.1). A row that sets it makes its value the kept
+target; the kept target is 0 until a row sets it. A row that sets the
+target column alone changes the kept target and leaves the effect
+running as it is: a running effect writes the register of the kept target
+at its start (4.3 step 3).
 
-The source column: bit 7 is the set bit, and bits 6 to 0 are the source, 0
-to 127, an index into the tune's source index (3.1). Source 0 names no
-source.
+**1.8.3** The source column: bit 7 the set bit, bits 6 to 0 the source
+number, 0 to 127. A row that sets it to 1 to 127 is a start: from 4.3
+step 3 the timer runs that source of the source index (3.1) on the kept
+target, and each tick writes the register of that target (5.1). A row
+that sets it to 0, the byte `$80`, is a stop: the timer stops and is
+idle, and the place is left as it is.
 
-The two columns and the timer this effect runs on (2.3) are the
-connection. A row setting the source column connects the three: the timer
-runs the source it names on the target the player keeps for this effect,
-at the rate the two columns beside them set, or at the rate the timer
-already counts where the row sets neither (1.9). The row moves the place
-to the source's first row where bit 5 of the control column is set. A
-stopped timer starts on the select the row writes, bit 6 set or clear,
-since a select runs an MFP timer; bit 6 is a stop before the writes, which
-a running timer requires and a stopped one already has (1.9, section 6).
-So a row that hands a running timer a second source at the rate it counts
-sets the source column alone: the ticks read the new source from here on,
-and the rate columns stay 0.
+**1.8.4** A start places the source: where the row sets the control
+column with bit 5 at 1, the place is row 0; otherwise the place keeps its
+row number, which is then a row number of the source started (YMXS,
+SPEC.md 3.4.3). A start sets the rate where the row sets the control
+column or the count column (1.9), and leaves the timer counting at the
+kept select and count where it leaves both unset: a row that connects a
+second source to a running timer at the rate it counts sets the source
+column alone.
 
-A row setting source 0 stops the timer. It moves no place: the place stays
-at the row number the last tick read, and a source that starts on that
-timer again reads from that number where the row leaves bit 5 clear.
+**1.8.5** A stopped timer starts at the write of a select (1.9.4), bit 6
+of the control column 1 or 0; rule 3 fixes the value a writer sets.
 
-The target the player keeps is the one in the row's target column, or where
-the row leaves that column unset, the last one it read (R4.6). A row
-setting the target column alone changes no effect until a source starts.
-
-These columns define no other value. A source's values are its rows (2.2),
-so a level or a shape is a source rather than an operand, and two levels
-are two sources.
-
-A row may set the source column to the value already there, which R3.6
-allows: the source is resolved again, and bit 5 places it at its first
-row.
-
-A player resolves the source and the target when the source column is
-set, and not again while the source runs.
-
-A timer runs one effect at a time. The schema defines four effects and the
-MFP has four timers, so four sound at once and there is no fifth. A tune
-that requires another stops one of the four on the row that starts it, the
-writer's work rather than a player's (R3.3).
-
-A register accepts writes from as many timers as name it, and each of those
-timers runs a separate effect.
+**1.8.6** A row may set the source column to the number the timer runs:
+the source starts again, placed by 1.8.4. Two effects may run one source,
+each with a separate place (YMXS, SPEC.md 3.2.3).
 
 ### 1.9 Effect rate
 
-Two columns, one a register of the timer this effect runs on (2.3): the
-control column and the count column. Each is laid out as its register is,
-so a player masks the player's bits off and writes the rest.
+**1.9.1** The count column is the count, the byte written to the timer's
+data register (YMXS, SPEC.md 3.3.3). It fills its byte (1.1.2): 0 marks a
+row that leaves it unset, and bit 4 of the control column marks 0 as the
+value, which the timer counts as 256. A player reads bit 4 where the row
+sets the control column (1.1.4).
 
-The count column is the timer count, bits 7 to 0, the byte written to the
-timer's data register. It fills its byte, so 0 marks the row that does not
-set it, and bit 4 of the control column beside it marks that 0 as a value
-(1.1). The MFP counts 256 at a count of 0, so a row reaches that count by
-setting both columns.
-
-| the count column | control bit 4 | the row |
+| the count column | bit 4 of the control column | the row |
 |---|---|---|
-| not 0 | 0 or 1 | sets the count to the column's value |
-| 0 | 0 | does not set it, and the timer counts on |
-| 0 | 1 | sets it to 0, which the MFP counts 256 |
+| other than 0 | 0 or 1, or the control column unset | sets the count to its byte |
+| 0 | 0, or the control column unset | leaves the count unset |
+| 0 | 1 | sets the count to 0, which counts 256 |
 
-A player reads bit 4 where the row sets the control column, as it reads
-bits 6 and 5. A row that leaves the control column unset sets a count of 1
-to 255 or none, which is every count a bend moves through (1.9).
+**1.9.2** The control column:
 
-The control column:
-
-| bits | what they are |
+| bit | meaning |
 |---|---|
 | 7 | the set bit |
-| 6 | the timer's reset: the player stops it, writes the count and starts it |
-| 5 | the place's reset: the timer's place in its source returns to the first row, which the next tick reads |
-| 4 | the count column's 0 is a value: the count beside this one is 0, which counts 256 (1.1) |
-| 3 | zero |
-| 2 to 0 | the prescaler select as the register reads it: 1 for 4, 2 for 10, 3 for 16, 4 for 50, 5 for 64, 6 for 100, 7 for 200 |
+| 6 | `timerReset` (YMXS, SPEC.md 3.4.1): the player stops the timer, writes the count, then writes the select (4.3) |
+| 5 | `placeReset` (YMXS, SPEC.md 3.4.3): the place is row 0 |
+| 4 | the count column's 0 is a value (1.9.1) |
+| 3 | unassigned, 0 |
+| 2 to 0 | the select: 1 to 7 for the divisors 4, 10, 16, 50, 64, 100 and 200 (YMXS, SPEC.md 3.3.2); 0 unassigned (section 8) |
 
-Bits 2 to 0 belong to the register, and a player writes those three; bits
-7 to 4 belong to the player, part of the column's value and read where the
-row sets it. Bit 3 is the register's mode select, which reaches no tune,
-and a player writes 0 to it. Select 0 stops a timer, which a row does
-through the source column (1.8), so 0 is unassigned here (R6.2).
+**1.9.3** A row that sets the control column sets the select, the two
+resets and bit 4 at once. A row that leaves it unset sets a count of 1 to
+255 or leaves the count unset, and leaves the timer running as it is.
+Rule 4 fixes on which rows a writer sets the two columns.
 
-Timers C and D share a control register, C in bits 6 to 4 and D in bits 2
-to 0. The player moves Timer C's select up by four, and writes the three
-bits of its timer, leaving the other timer's as they are, as the frame's
-write to R7 leaves the host's two (section 4).
-
-The rate the select and the count come to, and what a write to either
-does to a running timer, are YMXS's (YMXS, SPEC.md 3.3). Bit 6 is
-`timerReset` and bit 5 is `placeReset`, which that document defines (YMXS,
-SPEC.md 3.4). What follows is how a player reaches those from these two
-columns.
-
-Each rate column belongs to one effect, and 2.3 fixes the timer that
-effect runs on, so the two registers a rate reaches are settled before a
-tune plays (R3.5).
-
-A player writes each column where the row sets it (section 4): the count
-to the data register, the select to the control register, and the timer
-runs on.
-
-Bit 6 puts a stop before those writes and a start after them: the player
-writes select 0, then the count, then the select. The count and the select
-it writes come from the row, or where the row leaves a column unset, from
-what the player keeps (R4.6). That sequence is what `timerReset` requires of a
-running timer, and a stopped timer starts on the select either way, so
-where a writer cannot determine which (section 6 rule 3) either bit is
-correct.
-
-Bit 5 moves the place to row 0, which the next tick reads. Without the bit
-the row leaves the place where it is, through a change of rate and through
-a start, so the row number counts into the rows of the source that runs
-next; a row that stopped the effect in between makes no difference, since
-only bit 5 and a tick move the place.
-
-A row that leaves a rate column unset leaves the timer running at its
-current rate.
+**1.9.4** The select reaches the timer's control register (2.3). Timers A
+and B each have a register: the player writes one byte, the select in
+bits 2 to 0 and 0 in bits 7 to 3. Timers C and D share one, C's select in
+bits 6 to 4 and D's in bits 2 to 0: at interrupt level 7 the player reads
+the register, keeps the four bits of the other timer, writes the select
+to its three bits and 0 to the fourth bit of its four, and writes the
+byte back. A select of 0 stops a timer; a row stops one through the
+source column (1.8.3). YMXS, SPEC.md 3.3.5 and 3.4.1 define what a select
+or a count written to a running or a stopped timer does; 4.3 fixes the
+order of the two writes.
 
 ---
 
 ## 2. The maps
 
-The format defines these once, and a tune repeats none of them. They make a
-column's numbers the schema's rather than the machine's: a tracker maps its
-terms onto these (R3.2).
+The format fixes these three maps once, and a tune's columns are numbers
+under them (R3.2).
 
 ### 2.1 The targets
 
-What a target is, and the fourteen this version names, are YMXS's (YMXS,
-SPEC.md 3.1). This section numbers them for the target column (1.8).
-
-| target | the procedure |
+| target | procedure |
 |---|---|
-| 0 to 13 | `setR0` to `setR13`, which write the row to that register |
-| 14 to 127 | unassigned |
+| 0 to 13 | `setR0` to `setR13` (YMXS, SPEC.md 3.1.2): `setRn` writes the row to Rn |
+| 14 to 127 | unassigned; a later version assigns them (section 8) |
 
-A source's last row has a marker in its bit 7 (3.2), which is this
-format's and not the structure's. So a source names a target whose register
-reads seven bits or fewer and ignores that bit: `setR1`, `setR3`, `setR5`,
-`setR6`, `setR8` to `setR10` and `setR13`. The targets that read the whole
-byte, and `setR7` with its two host bits, belong to a later version for a
-source (R6.2).
-
-A later version may number procedures that reach the MFP registers (R6.2).
+**2.1.1** A tick writes a source's row to the register whole, the marker
+of 3.2 in bit 7, and the register reads the bits it has (4.4). The eight
+targets whose register reads seven bits or fewer are `setR1`, `setR3`,
+`setR5`, `setR6`, `setR8`, `setR9`, `setR10` and `setR13`; a source runs
+on one of these (rule 2), and a source on `setR0`, `setR2`, `setR4`,
+`setR7`, `setR11` or `setR12` is left to a later version (section 8).
 
 ### 2.2 The sources
 
-What a source is, what a source of each shape sounds, and that two effects
-may run one source with a separate place each, are YMXS's (YMXS, SPEC.md
-3.2). This section defines the table a source is written in.
+**2.2.1** A source is a table of one value a row (YMXS, SPEC.md 3.2.1),
+written as a DTX1 table of R rows, one column and one byte a value,
+repeating to RR or playing once (3.1). A source's values are its rows.
 
-
-
-A source is a DTX table: `R` rows and `C` columns, every value `W` bytes,
-1, 2 or 4, and a row `RR` it repeats to once the last row is done (R1.1).
-The index entry records `RR`, which determines whether the rows repeat.
-
-A source is one column of one byte at this version, the row shape 2.1's
-procedures read. A source of two byte values would serve a procedure
-reading a word, a tone period being twelve bits, and more columns a source
-driving more than one target; the table already records `C` and `W` in its
-header (3.1), and the procedure that reads such a row belongs to a later
-version (2.1, R6.2).
-
-A tune keeps its sources and an index of them (3.1), and an effect column
-names one, 1 to 127. Source 0 names none.
-
-A source's rows are separate from the tune's. The DTX table's rows advance
-once a frame (R1.3); a source's advance once a tick.
+**2.2.2** A source is numbered by its index entry, 1 to 127 (3.1), and a
+source column names one by that number (1.8.3). A tick advances a source
+one row (5.1); a frame advances the tune's table one row (4.2).
 
 ### 2.3 The timers
 
-| effect | runs on |
-|---|---|
-| 0 | Timer A |
-| 1 | Timer D |
-| 2 | Timer B |
-| 3 | Timer C |
+| effect | timer | control register | select bits | data register | vector | bit | enable, pending, in-service, mask |
+|---|---|---|---|---|---|---|---|
+| 0 | A | `$FFFA19` | 2 to 0 | `$FFFA1F` | `$134` | 5 | `$FFFA07`, `$FFFA0B`, `$FFFA0F`, `$FFFA13` |
+| 1 | D | `$FFFA1D` | 2 to 0 | `$FFFA25` | `$110` | 4 | `$FFFA09`, `$FFFA0D`, `$FFFA11`, `$FFFA15` |
+| 2 | B | `$FFFA1B` | 2 to 0 | `$FFFA21` | `$120` | 0 | `$FFFA07`, `$FFFA0B`, `$FFFA0F`, `$FFFA13` |
+| 3 | C | `$FFFA1D` | 6 to 4 | `$FFFA23` | `$114` | 5 | `$FFFA09`, `$FFFA0D`, `$FFFA11`, `$FFFA15` |
 
-The order is the order a tune claims them. Timer C is the operating
-system's
-200 Hz clock, so a tune that runs effect 3 stops that clock and cannot be
-hosted from a Timer C hook. A tune that runs three effects or fewer leaves
-Timer C to the host.
+**2.3.1** Effect i runs on the timer of its row; the bit column is the
+timer's bit in each of the four interrupt registers of its row, and the
+vector is the address of its exception vector, the vector table at
+address 0. A tune claims timers in effect order (4.1). Timer C is the 200
+Hz clock of the operating system: a tune running effect 3 stops that
+clock, and one running effects 0 to 2 alone leaves Timer C to the host.
+
+**2.3.2** A pending bit and an in-service bit clear on a written 0 and
+keep their value on a written 1: a player clears one by one write of the
+byte with that bit 0 and every other bit 1. A player sets or clears an
+enable bit or a mask bit by a read, a change and a write back.
+
+Note: a read and a write back of the pending register drops a tick of
+another timer latched between the two bus cycles.
+
+**2.3.3** Three operations on a timer:
+
+- *Stopping* it: write 0 to its four bits of its control register, the
+  select and the bit above it, the other four bits as they are; then
+  clear its pending bit.
+- *Claiming* it (4.1): write 0 to its four bits of the control register;
+  write the address of its tick (5.1) to its vector; clear its pending
+  bit; set its enable bit; set its mask bit.
+- *Releasing* it (4.7): write 0 to its four bits of the control register;
+  clear its enable bit; clear its mask bit; clear its pending bit.
+
+**2.3.4** A write that clears a pending bit or an enable bit between the
+MFP raising an interrupt and the 68000 acknowledging it leaves the 68000
+at the spurious interrupt exception, vector `$60`; a host provides an
+`rte` there while a tune plays, and keeps and restores its handler.
 
 ---
 
 ## 3. Outside the table
 
-A tune records these once. None is a column (R5.6).
-
-| value | what it is |
-|---|---|
-| the version | the version of this specification the tune was written for (R6.1) |
-| the frame rate | how often the player is called, in Hz |
-| effects used | bits 3 to 0: which of the four effects the tune ever runs, so a player claims those timers before the first row |
-| the source index | where each source's table stands, in source-number order |
-| the sources | one DTX1 table a source |
-
-A player reads one row at a time (R1.3), so it cannot find which timers to
-claim by reading ahead. That is why the effects a tune runs are recorded
-here. Section 3.3 defines the bytes.
+A tune records these once (R5.6): the version, the frame rate, the
+effects used, the name, the source index and the sources. Section 3.3
+defines the bytes of each.
 
 ### 3.1 The source index
 
-An effect's source column is a source number, 1 to 127, and the index
-entry at that number is where the source's table stands. A source is a
-DTX1 table (DTX, SPEC.md 2.2), its rows from byte 16 of the table, and its
-header carrying `R` at bytes 4 to 7, `C` at bytes 8 and 9, `RR` at bytes 10
-to 13 and `W` at byte 14, each most significant byte first (R1.1), `RR`
-equal to `R` where the source does not repeat, as DTX defines it.
+**3.1.1** The source index is S index entries, S the source count, 0 to
+127: index entry n, 1 to S, is 4 bytes at 16 + 4(n - 1), the offset of
+the DTX1 table of source n. The index begins at source 1: source 0 is the
+stop (1.8.3).
 
-`C` is 1 and `W` is 1 at this version: one column of one-byte values, the
-row shape 2.1's procedures read. A reader reads a source of that shape and
-rejects one of another, as it rejects a tune of another version (R6.1). A
-row of more columns or of another width belongs to a later version (2.1).
+**3.1.2** A source's table is a DTX1 file (DTX, SPEC.md 1 and 2.2):
 
-Source 0 has no index entry. The index runs from source 1.
+| offset | bytes | meaning |
+|---|---|---|
+| 0 | 3 | `DTX` |
+| 3 | 1 | the variant, 1 |
+| 4 | 4 | R, the row count, 1 upward |
+| 8 | 2 | C, the column count, 1 |
+| 10 | 4 | RR, the row the source repeats to, 0 to R - 1, or R for a source that plays once |
+| 14 | 1 | W, the bytes a value, 1 |
+| 15 | 1 | 0 |
+| 16 | R | the rows, row n at 16 + n |
 
-A start resolves the number through the index once, and the ticks advance
-rows from there on; no lookup happens while the effect runs (R3.3).
+**3.1.3** A reader reads a source whose C is 1 and W is 1; another is an
+error of the file (3.3.4). A source of more columns or of a wider value
+is left to a later version (section 8).
 
-`RR` determines what the last row does. Where `RR` is below `R` the next
-tick reads row `RR`; where it is `R` the source has no next row (section
-5). A source of two rows repeating is a square wave, and one of many rows
-playing once is a drum; a loop returns to `RR`, which is where the loop
-begins and need not be the first row.
+**3.1.4** RR below R marks a source that repeats: the tick that reads row
+R - 1 places the next at row RR (5.1). RR equal to R marks a source that
+plays once: the tick that reads row R - 1 stops the timer (5.1).
+
+**3.1.5** A writer numbers the sources in first-start order (YMXS,
+SPEC.md 1.9).
 
 ### 3.2 The rows
 
-A source's rows are values that fit the register its target writes (R5.3,
-YMXS, SPEC.md 3.2).
+**3.2.1** A row of a source is one byte: bit 7 the marker, bits 6 to 0
+the value, which fits the register the target writes (R5.3; YMXS, SPEC.md
+3.2.2). A writer writes the marker as 1 in the last row of the source and
+as 0 in every other row.
 
-The last row of a source has bit 7 set, and no other row has. That bit is
-the marker: a tick tests it after the write, so the tick pays for it only
-then, and the register reads the rest of the byte (2.1). The rest belongs
-to the writer: a square wave's is its silent half, its first row being the
-loud one, so the first tick a timer's period after the start writes the
-loud half; a drum's is the level the register keeps until a row sets it
-again (1.3); and a source of one row is the marker alone.
+**3.2.2** A tick writes the byte whole and tests the marker after the
+write (5.1); the register reads the bits it has (2.1.1). A source of one
+row is the marker and its value in one byte. A player tests bit 7 of
+every row it writes, so a row other than the last with bit 7 at 1 ends
+the pass through the source at that row; a check reports such a row
+(6.4).
 
 ### 3.3 The tune file
 
-| offset | bytes | what it is |
+| offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, $0003 |
-| 6 | 2 | the frame rate, in Hz |
-| 8 | 1 | effects used |
-| 9 | 1 | `S`, the source count, 0 to 127 |
-| 10 | 2 | where the name begins, or zero where the tune has none |
-| 12 | 4 | where the DTX2 table begins |
-| 16 | 4`S` | the source index: where the table of source 1 to `S` begins |
-| | | the name, its bytes and a zero, where there is one |
-| | | the DTX2 table, on a long |
-| | | the DTX1 tables, each on a long |
+| 4 | 2 | the version, `$0003` |
+| 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
+| 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bits 7 to 4 are 0 |
+| 9 | 1 | S, the source count, 0 to 127 |
+| 10 | 2 | the offset of the name, or 0 for a tune with an empty name |
+| 12 | 4 | the offset of the DTX2 table |
+| 16 | 4S | the source index: index entry 1 to S (3.1) |
+| 16 + 4S | 2 to 256 | the name, where the word at 10 is other than 0: its UTF-8 bytes, 1 to 255, and a zero byte |
+| on a long | | the DTX2 table (3.3.3) |
+| on a long each | | the DTX1 tables of sources 1 to S, in that order (3.1.2) |
 
-Every offset counts from the file's first byte, and a field of more than
-one byte is most significant byte first.
+**3.3.1** Each table begins on a long: the DTX2 table at the first offset
+on a long at or after the end of the name, or of the index where the name
+is empty, and each DTX1 table at the first on a long at or after the end
+of the table before it. Each byte between the end of one of those and the
+start of the next is 0. The DTX2 table ends where the table of source 1
+begins, or at the file's end where S is 0. A tune file is data alone; a
+tool binds it with a reader of DTX2 into the bound tune a player reads
+(BINARIES.md 1).
 
-The name is what the tune is called, in UTF-8 and ended by a zero byte,
-at most 255 bytes before that zero. It lies between the index and the
-table, so the word recording it reaches the name however large the
-tables are. A writer that has no name for a tune writes zero in the word
-and no bytes, and a reader of a file written that way reads no name. The
-name is for a tool that lists tunes; a player reads the tables and
-passes over it.
+**3.3.2** The name is for display. A writer drops each character below
+space, drops leading and trailing spaces, cuts the UTF-8 at a character
+boundary to at most 255 bytes, and writes the word at 10 as 0 for a name
+left empty. A reader reads an empty name where the word at 10 is 0 or at
+or past the file's end, and otherwise the bytes from the word's offset to
+the first zero byte or the file's end.
 
-The DTX2 table is the tune's table as a complete DTX file (DTX, SPEC.md 1
-and 2.3), its header and its payload, which DTX's reader reads. The file
-contains the tune's tables and no code: a tool outside this specification
-binds them with that reader into the layout a player reads, and that
-layout is defined in the player's documents. A reader reads a tune of this
-version and rejects another (R6.1).
+**3.3.3** The DTX2 table is the tune's table as a complete DTX file (DTX,
+SPEC.md 1 and 2.3), header and payload: R rows, 1 upward, C = 30, W = 1,
+RR the repeat row or R for a tune that plays once. A reader unpacks each
+column at the payload's unit k, 1, 2 or 4, with copies where bit 0 of the
+payload's flags byte is 1 (DTX, SPEC.md 2.3); R and RR divide by k (rule
+6). The ring N is at most 1,129 bytes and one DTX's packager binds (DTX,
+abi.md 4).
+
+Note: a player reaching column 29's ring through a 16-bit displacement
+from column 0's reads a ring of at most 32,767 divided by 29. The
+reference writer packs through a ring that is a multiple of 30 bytes, 60
+to 1,110, 960 by default.
+
+**3.3.4** Errors of the file. A reader reads a file free of the
+conditions below and reports each condition present as its line, V the
+version, N a source number, C its column count and W its width; the
+record of such a file is empty (7.4). What a reader reports of an offset
+outside the file, or of a DTX2 table of another C, W or variant, is left
+to a later version (section 8).
+
+| condition | reported as |
+|---|---|
+| the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
+| the version is other than 3 | `version V is not 3` |
+| source N has C other than 1 or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one column of one (SPEC.md 3.1)` |
+| the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
+
+Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
+Attractions #2` begins `594D5852 0003 0032 00 00 0010 00000028`: the 22
+bytes of the name at 16, and the DTX2 table at 40.
 
 ---
 
 ## 4. The frame
 
-What a frame does is YMXS's: the effects first and then the registers, in
-the register order step 4 to step 8 below follow, and why that order
-preserves a restore (YMXS, SPEC.md 4). This section is the columns a player
-reads to do it, and the tests it performs on them.
+The player performs 4.1 once, 4.2 once a call of the host, and 4.7 once
+at the end. It reads the current row of the tune's table one row a frame
+and writes the columns the row sets; a column the row leaves unset is
+left unread, and a value the player requires on a later row is kept
+(R4.6).
 
-One method serves both rates: a clock advances a table one row and calls a
-procedure with that row. The frame clock advances the DTX table and calls
-the procedure this section defines, which writes the columns of section 1.
-A timer advances a source and calls its target, which writes one register
-(section 5). They differ in the table, the clock and the procedure, and in
-no other respect: a source has the DTX table's shape - `R` rows, `C`
-columns, a repeat at `RR` (2.2, R1.1) - and a target does what the
-procedure below does, for one register rather than thirty columns.
+### 4.1 Before the first frame
 
-A player advances the tune's table one row a frame, for every table the
-tune runs, and writes the columns that row sets (1.1). A value the row does
-not set is not interpreted, and a player that requires one on a later row
-keeps it (R4.6) rather than reading it back from the buffer. The five bits
-1.1 lists are beside their columns' values, and read on every row.
+The host calls the player once with the tune, then once a frame at the
+frame rate (3.3). The player, in order:
 
-1. Columns 14, 18, 22 and 26, the targets. The player keeps the value for
-   the effect's next start, and writes no register.
-2. Columns 15, 19, 23 and 27, the sources, each on its timer (2.3).
-   Where the row sets that effect's control column with bit 6 (1.9), the
-   player writes select 0 to the timer's control register first, whether
-   or not the row sets the source column, so that no tick of the old rate
-   reads the new source. A source of 0 stops the timer: select 0 to its
-   control register. Any other is resolved through the index (3.1) on the
-   target the player keeps, and the timer's ticks advance it from here
-   on.
-3. Columns 16, 20, 24 and 28, the controls, each with the count column
-   beside it, to its timer's two registers as 1.9 defines: the count,
-   where the row sets it, where bit 4 marks its 0 as a value, or where
-   bit 6 is set; then the select, where the row sets it or bit 6 is set;
-   and the timer's place to its source's first row where bit 5 is set.
-   Bit 6's stop is step 2's write, and the select here is the start after
-   it. A row that sets the source column and
-   leaves bit 5 clear moves no place: the row number in the place counts
-   into the new source's rows (1.9).
-4. Columns 0 to 5, the tone periods, to R0 to R5.
-5. Column 6 to R6, and columns 11 and 12 to R11 and R12, as 1.7's table
-   reads them.
-6. Columns 8, 9 and 10, the volumes, to R8, R9 and R10.
-7. Column 7 to R7. The player writes bits 5 to 0 of the column with R7's
-   bits 7 and 6 left as the host set them.
-8. Column 13 to R13, which restarts the envelope (YMXS, SPEC.md 2).
+1. Read the version; for a version other than 3, report -1 and leave
+   every register and every timer as it is.
+2. Read R and RR of the tune's table and the effects used.
+3. Resolve each source of the source index: its first row, and its loop
+   row, row RR where it repeats and the end where it plays once (3.1.4).
+4. Set the kept target, select and count of each effect to 0. The place
+   of each timer before its first start with bit 5 at 1 is left to a
+   later version (section 8).
+5. Read row 0, the current row.
+6. At interrupt level 7, for each effect i the effects used names, 0 to
+   3 in order, claim its timer (2.3.3).
 
-A table whose `RR` is `R` has no row after its last (3.1). The frame after
-the one that read the last row advances no row, writes no register and
-reports -1, as does every frame after it; every other frame reports 0,
-which a player returns to its caller (R2.4, YMXS, SPEC.md 4).
+Every other timer, and every register of the YM2149, is left as it is
+until a row sets it (YMXS, SPEC.md 4.1). The host keeps, before 4.1, and
+restores, after 4.7, the vector, the control register and the enable and
+mask bits of each timer the tune claims.
 
-Steps 4 to 8 write where the row sets, each to registers the column itself
-fixes, and none of them reads an index. Five tests cross columns: a zero in
-a column 1.1 lists sends the player to the bit beside it. Step 2 is the
-only step that reads the source index, and it reads it to start an effect
-rather than to place a value.
+Note: a player reads the bound tune (BINARIES.md 1), whose first four
+bytes are `YMXB`; it reports -1 at step 1 for other first four bytes, and
+for an image of a variant other than 2.
 
-Those steps write the column byte whole, and each register drops the bits
-it does not have: four for R1, R3, R5 and R13, five for R6, R8, R9 and
-R10. A set bit, and a bit beside it marking another column's 0, reach the
-chip inside that byte and are dropped there, so a row whose R13 column is
-`$AE` runs shape `$E`. Step 7 is the one write a player masks, since bits
-7 and 6 of R7 belong to the host rather than to the column. Section 7
-reports the masked value, which is the value the register reads, and a
-check that reads a player against a reader masks each write the same way.
+### 4.2 A frame
+
+One call of the player, in order:
+
+1. Where the tune has ended (4.6): report -1 and end, every register and
+   timer left as it is.
+2. Read the current row, columns 0 to 29.
+3. For each effect 0 to 3 in order, perform 4.3 on its four columns.
+4. Write the register columns (4.4).
+5. Where the row is row R - 1 of a tune whose RR is R, the tune has
+   ended (4.6); otherwise the current row is the row after it: n + 1 for
+   row n below R - 1, and row RR after row R - 1 (4.5).
+6. Report 0.
+
+A player performs step 3 for the effects the effects used names and
+leaves the columns of the other effects unread; a reader performs it for
+all four (7.3). Every write of step 4 follows the four effects of step 3:
+a tick between two effects reads the effects before it as the row leaves
+them and those after it as they were.
+
+Note: a player that reads the row of the next frame at the end of a
+call, after step 4, leaves the writes of every frame at one offset from
+the host's clock; row 0 is then read at 4.1 step 5.
+
+### 4.3 An effect's columns
+
+For effect i, its target column T, source column S, control column K and
+count column N, columns 14 + 4i to 17 + 4i, and its timer (2.3), in
+order:
+
+1. Where K is set with bit 6 at 1: stop the timer (2.3.3).
+2. Where T is set: the kept target is bits 6 to 0 of T.
+3. Where S is set and bits 6 to 0 are 0: stop the timer (2.3.3). Where S
+   is set and bits 6 to 0 are s, 1 to 127: start source s. At interrupt
+   level 7: the register the timer's tick writes is the register of the
+   kept target; the place is row 0 of source s where K is set with bit 5
+   at 1, and otherwise the row number the place has, in source s; the
+   loop row of the tick is the loop row of source s (3.1.4). From this
+   step a tick of the timer reads source s.
+4. Where K is set with bit 6 at 1: the count is N where N is other than
+   0 or bit 4 of K is 1, and the kept count otherwise; write it to the
+   timer's data register and keep it. Otherwise, where N is other than
+   0, or K is set with bit 4 at 1: write N to the data register and keep
+   it.
+5. Where K is set: write bits 2 to 0 of K, the select, to the timer's
+   control register (1.9.4) and keep it. A stopped timer starts at this
+   write on a whole period at the count its data register has.
+6. Where K is set with bit 5 at 1, and S is unset or set to 0: the place
+   is row 0 of the source last started on the timer.
+
+The three writes of step 3 are made at interrupt level 7, so a tick falls
+before all of them or after all of them. A row that leaves T, S and K
+unset and N at 0 leaves the effect as it is.
+
+Note: step 4 before step 5 loads the count before the select starts a
+stopped timer (YMXS, SPEC.md 3.4.1 and 8.5).
+
+### 4.4 The register columns
+
+The player writes the registers below in this order, each where the row
+sets its column (1.1), one write a register: the register's number to
+`$FFFF8800`, then the column's byte whole to `$FFFF8802`; the two bytes
+are one write, and a tick falls before both or after both. The register
+reads the bits it has: eight for R0, R2, R4, R11 and R12, four for R1,
+R3, R5 and R13, five for R6, R8, R9 and R10, and six for R7, whose bits
+7 and 6 the player writes as 1 (1.4.2). A row whose column 13 is `$AE`
+writes shape `$E`.
+
+1. R0, then R1; R2, then R3; R4, then R5 (1.2).
+2. R6 (1.5).
+3. R11, then R12 (1.7).
+4. R8, R9, R10 (1.3).
+5. R7 (1.4).
+6. R13 (1.6), which restarts the envelope.
+
+A register the row leaves alone keeps its value (YMXS, SPEC.md 4.4). A
+register an effect runs on is written as any other where the row sets
+its column; rule 1 leaves such a column unset.
+
+Note: on a 68000 the two bytes of a write are one `movep.w`.
+
+### 4.5 The wrap
+
+The row after row R - 1 of a tune whose RR is below R is row RR, read by
+the next frame and performed as any row. The wrap leaves every timer,
+every place and every kept value as it is (YMXS, SPEC.md 4.5); rule 1(d)
+and rule 6(a) of YMXS, SPEC.md 6 define what the repeat row performs on
+a running timer.
+
+### 4.6 The end
+
+A tune whose RR is R ends with row R - 1: the frame that reads it
+reports 0, and every frame after it leaves the current row, every
+register and every timer as it is and reports -1 (YMXS, SPEC.md 4.6).
+Frames 0 to R - 1 read the R rows, and frame R on reports -1. A timer
+running at the end runs on until the stop (4.7).
+
+### 4.7 The stop
+
+The host calls the stop once, after the last frame it requires. The
+player, in order:
+
+1. At interrupt level 7, for each effect the effects used names, 0 to 3
+   in order, release its timer (2.3.3).
+2. Write R8, R9 and R10 as 0; then R13, R12 and so on down to R0 as 0;
+   then R7 as `$FF`, every channel off and both port directions 1.
+3. Where the player cleared bit 3 of the vector register at 4.1 (5.1.1),
+   write the register back as 4.1 read it.
+
+Every other timer is left as it is.
 
 ---
 
-## 5. What a tick does
+## 5. The tick
 
-What a tick does is YMXS's (YMXS, SPEC.md 5). Here it is section 4's method
-at a timer's rate: it advances its source one row and calls its target with
-that row (2.1, 2.2).
+### 5.1 A tick
 
-This format marks the end of a cycle in the row itself. The last row is
-the marker (3.2), so the tick that writes it tests bit 7 after the write
-rather than counting rows against `R`.
-Where the source repeats, the next tick reads row `RR` (3.1); where it does
-not, the timer stops.
+A tick of a timer running an effect, in order (YMXS, SPEC.md 5.2):
 
-A player does not read the DTX table between ticks.
+1. Write the number of the register of the effect's kept target at its
+   start (4.3 step 3) to `$FFFF8800`.
+2. Write the byte at the place to `$FFFF8802`, whole (3.2.2).
+3. Where bit 7 of the byte is 0: the place is the row after it.
+4. Where bit 7 is 1, the marker: for a source that repeats, the place is
+   row RR; for a source that plays once, stop the timer (2.3.3). The
+   timer is idle, the place stays at row R - 1, and the register keeps
+   the value written until a row sets it.
+5. Where bit 3 of the vector register `$FFFA17` is 1, software end of
+   interrupt: clear the timer's in-service bit (2.3.2).
+
+**5.1.1** A player runs the MFP in the mode the host leaves it, bit 3 of
+`$FFFA17` at 1, and performs step 5. A player that clears bit 3 at 4.1,
+automatic end of interrupt, omits step 5, keeps the interrupt level
+through every tick, and writes the register back at 4.7 (BINARIES.md 2,
+the flags word).
+
+**5.1.2** A player performing step 5 may lower the interrupt level to 5
+after step 2, so that a tick of a timer of higher priority nests in this
+one; a tick of the same timer or of a lower one is served after it.
+
+### 5.2 The timer at a tick
+
+A tick leaves the data register and, other than the stop of 5.1 step 4,
+the control register of its timer as they are: the timer counts the next
+period from the count it has, and a count written by a row loads as YMXS,
+SPEC.md 3.3.5 defines. A tick reads its source alone; the tune's table is
+read at a frame (4.2). What a tick performs on a timer whose source is
+disconnected, a select written before the first start (rule 4), is left
+to a later version (section 8).
 
 ---
 
 ## 6. The rules a writer satisfies
 
-The rules themselves are YMXS's five (YMXS, SPEC.md 6). Below are those
-rules in the columns that encode them, which is why a player writes a
-marked column once and performs no test. Each entry names the YMXS rule it
-encodes.
+### 6.1 The rules and the player
 
-1. **The volume column of a register an effect writes stays unset** (YMXS
-   rule 1). A player writing steps 4 to 8 then requires no test: the row
-   does not set the column. An effect on R13 leaves the row free (1.6).
-   Where the row that stops one effect starts another on the same register,
-   the column stays unset: the register is the second effect's from that
-   row.
-2. **An effect a row sets a column of is one the tune records** in section
-   3, and a row sets no column of an effect outside that record. A source
-   and a target a column names are ones section 2 numbers, and a row that
-   starts an effect for the first time has set its target column, on that
-   row or before. The structure settles these where a row is built, so
-   YMXS lists neither and they bind a writer of columns alone.
-3. **A row that sets the source column sets bit 5 with it** (YMXS rules 3
-   and 4), unless the source it starts has the row count of the last source
-   this effect ran on the same target, where the row may leave the bit
-   clear and keep the phase (1.9); a row between them setting source 0
-   makes no difference. It sets bit 6 where the timer is stopped, which a
-   row setting source 0 leaves it. A row that sets the source column to 0
-   leaves the control and count columns unset.
-4. **A row sets a rate column on the row that starts its effect** (YMXS
-   rule 5), or while the effect runs, and not before its first start. The
-   row that starts an effect for the first time sets its count column,
-   because the count the player keeps is 0 until a row sets it, and bit 6
-   writes the kept count where the row leaves the column unset (1.9).
-5. **A row that sets a count of 0 sets bit 4 of the control column with
-   it.** The count column reserves 0 for the row that does not set it, and
-   bit 4 is what marks that 0 as the value the MFP counts 256 for (1.1,
-   1.9). A row that leaves the control column unset sets a count of 1 to
-   255 or none.
-6. **The row count and the repeat row divide by the unit the table packs
-   at.** DTX packs a column in units of `k` bytes, so `R` divides by `k`
-   and so does `RR` (DTX R5.6 and R5.11). A writer whose tune does not
-   divide lengthens it. Where `RR` does not divide, rows that set no column
-   go in at `RR` until it does, which moves the loop's first row later and
-   lengthens what plays before it. Then, where `R` does not divide: a loop
-   of fewer than 64 rows is written again, whole, until `R` divides, which
-   is fewer than `k` times more; a loop of 64 rows or more, or a tune that
-   plays once, gets rows that set no column at the end until `R` divides. A
-   row that sets no column writes no register and leaves every timer
-   running (section 4), so the tune plays one more frame there, its effects
-   running through it; a loop written again plays as it did, since a pass
-   plays the same rows. At most `k` minus one rows that set no column go in
-   each place. A short loop is written again rather than padded since a
-   frame added to a loop of a few rows lengthens every pass of it by a
-   sixty-fourth or more, where the loop written again keeps the period the
-   tune had; a frame added to a loop of 64 rows or more lengthens a pass by
-   less than that.
+A player assumes the six rules below and writes each column as the row
+has it, so a tune that breaks a rule plays as its columns read. A check
+reads rules 1 and 6 (6.4); rules 2 to 5 bind the writer alone. Rule 1
+encodes rule 1 of the structure, rule 3 its rules 3 and 4, and rule 4 its
+rule 5 (YMXS, SPEC.md 6); its rules 2 and 6 are satisfied in the
+structure a writer encodes; rules 2, 5 and 6 here are this format's. A
+structure outside what this version encodes is an error of the writer
+(6.5).
+
+Terms: an effect *runs* from 4.3 step 3 of its start row until the first
+of a stop on the effect, a later start on it, and, for a source that
+plays once, the tick that reads its last row (YMXS, SPEC.md 6.2); its
+timer is *stopped* from then until the next start. An effect runs on the
+register of the kept target at its start.
+
+### 6.2 The rules
+
+**Rule 1: while an effect runs on a register R0 to R12, every row leaves
+that register's column unset** (YMXS rule 1).
+
+- 1(a) The start row leaves the column unset; the row that stops the
+  effect may set it, and the register then reads the row's value.
+- 1(b) Where one row stops an effect on a register and starts another
+  on it, the row leaves the column unset.
+- 1(c) R13 is outside the rule: a row may set column 13 while an effect
+  runs on R13 (1.6.2).
+- 1(d) An effect running when row R - 1 is read runs through the wrap
+  (4.5), and the rows of the next pass are bound by 1(a).
+
+**Rule 2: a row sets columns of the effects the tune records, with
+numbers the maps assign.**
+
+- 2(a) A row leaves the target, control and count columns of an effect
+  whose bit of the effects used (3.3) is 0 unset, and its source column
+  unset or set to 0, a stop (YMXS rule 6(a)); a player leaves the
+  columns of such an effect unread (4.2), and a reader records the stop
+  (7.3).
+- 2(b) A source column is 0 or 1 to S, S the source count (3.3); a
+  target column is 0 to 13 (2.1); a source runs on one of the eight
+  targets of 2.1.1.
+- 2(c) A start whose target column is unset runs on the kept target, the
+  last target column set on the effect in frame order, through the wrap
+  (4.5). A writer sets the target column on the first start of an
+  effect in the first pass, and on the first start at or after the
+  repeat row.
+
+**Rule 3: a start sets bit 5 of the control column with it, with one
+exception, and sets bit 6 where the timer is stopped** (YMXS rules 3
+and 4).
+
+- 3(a) The exception: the source started has the row count of the source
+  last started on the effect, on the same kept target. The row may then
+  leave bit 5 at 0, and the place is left at its row number (1.8.4); a
+  stop between the two starts leaves the place as it is (YMXS, SPEC.md
+  3.4.3).
+- 3(b) A timer is stopped before its first start, after a stop, and
+  after its source that plays once has run out (5.1 step 4). Where the
+  rows leave open whether a source has run out at the start row, bit 6
+  at either value is correct: a stopped timer starts on the select
+  either way (4.3 step 5).
+- 3(c) A stop leaves the control column and the count column unset.
+
+**Rule 4: a row sets a rate column on the start row of its effect or
+while the effect runs** (YMXS rule 5).
+
+- 4(a) The first start on an effect sets the control column and the
+  count column: the kept select and count are 0 until a row sets them,
+  and a start with bit 6 at 1 and the count column unset writes the kept
+  count (4.3 step 4).
+- 4(b) A start on a stopped timer sets the control column, with bit 6 as
+  rule 3 fixes; a start on a timer counting at the kept select and count
+  may leave both columns unset (1.8.4).
+- 4(c) A row before the first start of an effect leaves both columns
+  unset: a select written to a timer with its source disconnected starts
+  it (5.2).
+
+**Rule 5: a row that sets a count of 0 sets bit 4 of the control column
+with it.** A row that leaves the control column unset sets a count of 1
+to 255, or leaves the count unset (1.9.1).
+
+**Rule 6: the row count and the repeat row divide by the unit the table
+packs at.** R divides by k, and RR where below R divides by k (DTX's
+R5.6 and R5.11). A writer whose table divides by k packs it as it is;
+otherwise it lengthens the table by 6.3.
+
+### 6.3 The padding
+
+An *unset row* leaves every column unset: the frame that reads it leaves
+every register and every timer as it is, one frame long.
+
+Initial condition: the table has R rows and a repeat row RR, present, or
+absent for a tune that plays once; the unit k is 2 or 4 (k = 1 divides
+every table).
+
+1. Where RR is present and RR mod k is other than 0: insert k - (RR mod
+   k) unset rows before row RR, and RR increases by that count. Reported
+   as `padded: N unset rows at row RR, before the repeat row, so the
+   table packs at unit k`, N the rows inserted and RR the repeat row
+   before the insert; `N unset row` for N = 1.
+2. Where R, after step 1, mod k is other than 0: L is R - RR where RR is
+   present, and 0 where absent.
+   - Where L is 1 to 63: append the L rows of the loop, rows RR to
+     R - 1 in order, again until R divides by k; the loop is then
+     written T times in all, 2 or 4. Reported as `padded: the loop's L
+     rows written T times, so the table packs at unit k`, `the loop's 1
+     row` for L = 1 and `written twice` for T = 2.
+   - Otherwise: append k - (R mod k) unset rows. Reported as `padded: N
+     unset rows at row R, so the table packs at unit k`, R the row count
+     before the append; `N unset row` for N = 1.
+
+End: R and RR divide by k. The rows of the tune keep their order, with
+the additions between and after them; a loop written again repeats its
+rows, and an unset row adds one frame at its place with every effect
+running through it.
+
+Note: a frame added to a loop of fewer than 64 rows lengthens every pass
+of the loop by a sixty-fourth or more, where the loop written again keeps
+its period.
+
+### 6.4 The check
+
+A check reads a tune file beside the recording it encodes, one frame of
+the recording a row, each row 6.3 added beside the frame it encodes. It
+reports each condition below as its line: the first seven in table order
+and, where one of them is reported, the rows left unread; the rest in row
+order over the rows of the frames 7.4 names for an unnamed F, a row read
+while fewer than 20 lines have been reported. Decimal figures are H, P,
+R, N, X, M, C, W, V, F and J; Rn is a register; the model is the
+registers and effects of section 4 after the row; F is the frame of the
+recording the row encodes, and r the row's number.
+
+A flag on effect i, 0 or 1, is a kind, 1 a SID voice, 2 a digidrum, 3 a
+sinus SID and 4 a sync buzzer, a value, a target register, a select and a
+count; it names source N, the source the writer produced from that kind and
+value, or 0 for a kind 3, a digidrum outside the recording, or a source
+past 127. A source produced from a digidrum plays once; its end row, for a
+start at row r of a source of J rows at the flag's select, divisor D, and
+count C, at H frames a second, is r + (J × D × C × H + 153,600 + 2,457,599)
+divided by 2,457,600, the arithmetic exact.
+
+| condition | reported as |
+|---|---|
+| the frame rate of the file is H and the recording's is P, H other than P | `the frame rate is H, not P` |
+| the table has R rows, and the recording's frames with the rows 6.3 added are N, R other than N | `the table has R rows, not N` |
+| the table repeats at RR and the recording at X, RR other than X | `the table repeats at RR, not X` |
+| the file has N sources and the writer produced M from the recording, N other than M | `the file has N sources, not M` |
+| source N's table has C columns of R rows, and the writer's source N has W rows, C other than 1 or R other than W | `source N is C columns of R rows, not one of W` |
+| bit 7 of row R of source N is 1, R other than the last row | `source N row R is a marker` |
+| bit 7 of the last row, R, of source N is 0 | `source N row R is not the marker` |
+| row N is an unset row 6.3 added, and its frame writes Rn, n 0 to 12 (rule 6) | `N: a row that sets no column wrote Rn` |
+| row N is an unset row 6.3 added, and its frame writes R13 (rule 6) | `N: a row that sets no column wrote R13` |
+| for i 0 and 1 in order: the flag on effect i is a SID voice on Rt, the model's effect 1 - i runs on Rt a source produced from a digidrum, and the model's effect i runs source S, S other than 0 | `F: effect i runs source S under a drum on its voice` |
+| otherwise, the flag on effect i names source N, N other than 0, and the model's effect i runs source 0; K the flag's kind | `F: effect i runs no source where the dump flags kind K` |
+| otherwise, the flag on effect i names source N and the model's effect i runs source S on Rt at select P and count C, one of S, t, P and C other than the flag's N, t2, P2 and C2; K and V are the kind and value S was produced from, K2 and V2 those of N | `F: effect i runs source S (kind K value V) on Rt at P/C, not source N (kind K2 value V2) on Rt2 at P2/C2` |
+| the flag on effect i is a digidrum naming source N, N other than 0, the model's effect i runs a source, and the row is other than a start on effect i | `F: the drum is not started` |
+| the flag on effect i is absent or names source 0, and the model's effect i runs source S, S other than 0: a source produced from other than a digidrum, or from a digidrum with r at or past its end row | `F: effect i runs source S where the dump flags no effect` |
+| the row sets the column of R8, R9 or R10, Rn, to V while the model's effect runs on Rn (rule 1) | `F: Rn's column is set to V while an effect runs on it` |
+| after the row, Rn is V in the model and W in the recording's frame, n 0 to 12, V other than W, Rn outside the registers the model's effects run on; for R7, W has bits v and v + 3 set for each voice v, 0 to 2, whose volume register the model's effects run a source produced from a digidrum on | `F: Rn is V, not W` |
+| the row writes R13 as V and the recording's frame has R13 as W, V other than W; or one of the two has R13 written and the other leaves it | `F: R13 written V, the dump writes W`, with `not written` for a row that leaves R13 and `does not write` for a frame that leaves it |
+
+### 6.5 Errors of a writer
+
+A writer reports a structure outside what this version encodes as one
+line, in place of a tune file: N a count, NAME a source's name, V a value
+and R a row number.
+
+| condition | reported as |
+|---|---|
+| the structure has N sources, above 127 (2.2.2) | `the tune runs N sources, and a source column numbers 127` |
+| source NAME has the value V, above 127, in row R (3.2.1) | `the source NAME has the value V in row R, and bit 7 of a source's row is the marker` |
+| the rate is H, outside 1 to 65,535, the word at 6 (3.3) | `a frame rate of H, and the frame rate is a word, 1 to 65535` |
 
 ---
 
 ## 7. What a reader reports
 
-The role, the shape of the record and the conventions its lines follow are
-YMXS's (YMXS, SPEC.md 7): a reader writes to no chip, reports the fixed
-values on the first line and one entry a frame after it, omits what a timer
-writes between frames, and writes lines of JSON without spaces, integers in
-decimal, names in the order the document fixes, and a line feed ending each
-line.
+### 7.1 The record
 
-A reader there reports the structure and one here reports a tune file, so
-the names and the values below are this document's, and a caller reads one
-record or the other. A tune whose version is not $0003 is rejected without
-a report (3.3, R6.1). The names, in order:
+A reader reads a tune file (3.3) and performs the frames of section 4
+with every register write and each row's effect columns recorded in
+place of the chips (R2.4): the figures of the tune once, then one entry
+a frame in order; the ticks are outside the record. The record is lines
+of JSON in US-ASCII, one entry a line, each line free of spaces,
+integers in decimal, the keys of each object in the order this section
+lists them, `true` and `false` as JSON defines them, and a line feed,
+byte 10, ending every line (YMXS, SPEC.md 7.2).
 
-    {"rate":50,"effects":2,"sources":[{"rows":[13,128],"repeat":0}]}
-    {"result":0,"w":{"0":251,"1":4,"7":49},"e":{"1":{"target":10,"source":1,"select":1,"count":122,"timer":true,"place":true}}}
-    {"result":0,"w":{},"e":{}}
+### 7.2 The first line
+
+`{"rate":H,"effects":E,"sources":[...]}`: `rate` the frame rate H (3.3);
+`effects` the effects used E as a decimal integer, 0 to 15; `sources`
+the sources in index order, source 1 first, each
+`{"rows":[...],"repeat":RR}` with `rows` the bytes of its rows in row
+order, the marker included, 0 to 255, and `repeat` its RR as its header
+has it (3.1); `[]` where S is 0.
+
+### 7.3 A frame's entry
+
+For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
+
+- `w` is the registers 4.4 writes, keyed by number as text, `"0"` to
+  `"13"`, in ascending numeric order, `"2"` before `"10"`, each with the
+  value the register reads: for a column with a set bit, bits 6 to 0
+  masked to the register's width, four for R1, R3, R5 and R13, five for
+  R6, R8, R9 and R10, and six for R7, whose bits 7 and 6 the player
+  writes as 1 (1.4.2); for a column that fills its byte, the byte
+  (1.1.3). `{}` for a row that leaves every register column unset. A
+  register an effect runs on is included where the row sets its column
+  (6.1).
+- `e` is the effects the row sets a column of, regardless of the effects
+  used byte (4.2): those whose target, source or control column is set,
+  or whose count column is other than 0; keyed by number as text, `"0"`
+  to `"3"`, in ascending order; `{}` for a row that leaves every effect
+  column unset. Each is
+  `{"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b}`:
+  `target` the kept target after 4.3 step 2, 0 to 127; `source` the
+  source number of the last start or stop on the effect, 0 to 127, 0
+  until a row sets it and left as it is by the tick that ends a source
+  that plays once; `select`, 0 to 7, and `count`, 0 to 255, the kept
+  select and count after 4.3 steps 4 and 5, 0 until a row sets them and
+  kept through a stop; `timer` bit 6 of the row's control column and
+  `place` bit 5, each `true` or `false`, both `false` where the row
+  leaves the control column unset.
+
+For the first frame after the end (4.6), `{"result":-1}`, where the
+record ends.
+
+### 7.4 The length
+
+The record is the first line and the entries of frames 0 to F - 1, F the
+frames the host requires, except that the record of a tune that plays
+once ends with its `{"result":-1}` entry. Where the host leaves F
+unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
+loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
+record of a file with an error of 3.3.4 is empty, 0 bytes. Two readers of
+one tune file over one F produce one record, byte for byte.
+
+### 7.5 The example
+
+The record of `doc/conformance/tunes/plays-once.ymxr`: four rows at 50
+Hz, RR equal to R, S 0, over the unnamed F of 7.4, five frames:
+
+    {"rate":50,"effects":0,"sources":[]}
+    {"result":0,"w":{"0":163,"1":2,"2":238,"3":14,"4":238,"5":14,"6":12,"7":56,"8":15,"9":0,"10":0,"11":0,"12":0},"e":{}}
+    {"result":0,"w":{"0":142,"1":12,"6":28,"7":49,"8":12},"e":{}}
+    {"result":0,"w":{"0":251,"1":4,"6":12,"8":13},"e":{}}
+    {"result":0,"w":{"0":89,"1":2,"7":56,"8":15},"e":{}}
     {"result":-1}
 
-- `rate` is the frame rate and `effects` the effects used, as the file
-  records them (3.3), and `sources` the sources in the index's order, 1
-  upward, each with its rows as the table has them, the marker in the last
-  row's bit 7 (3.2), and the row it repeats to, `R` where it does not
-  (3.1).
-- `result` is the frame's report (section 4): 0, or -1 for the frame
-  after the last row of a tune whose `RR` is `R`. That entry has `result`
-  alone, and the record ends with it.
-- `w` lists the YM2149 registers steps 4 to 8 write, by number in ascending
-  numeric order, `"2"` before `"10"`, and only those: a register the row
-  does not set is absent, and a row that sets none is `{}`. For a column
-  with a set bit the value is bits 6 to 0 masked to the register's bits:
-  four for R1, R3, R5 and R13, five for R6, R8, R9 and R10, and six for R7,
-  whose bits 7 and 6 belong to the host (step 7) and are not reported. For
-  a column that fills its byte the value is the byte where it is not 0, and
-  0 where the byte is 0 and the bit beside it is set (1.1); a fine byte 0
-  with the coarse column's bit 6 set and its set bit clear writes R0 and
-  not R1 (1.2).
-- `e` lists the effects the row set a column of, by number 0 to 3 in
-  ascending order: an effect whose target, source or control column has bit
-  7, or whose count column is not 0 (1.1, 1.9). A row that sets none is
-  `{}`. Each effect reports its setting after steps 1 to 3, in this order:
-  `target` as the player keeps it after step 1, 0 to 127 as the column has
-  it, and 0 before a row sets it; `source`, the number the last row set, 0
-  to 127, whether or not its ticks have reached the marker (section 5);
-  `select`, the column's three bits, and `count`, as the player keeps them
-  (1.9): 0 before a row sets them, and kept through a stop after; `timer`,
-  bit 6 of the row's control column where that column is set, and `place`,
-  bit 5 the same, false where the column is not set.
+Row 0 sets R11 and R12 to 0 with bits 6 and 5 of column 13 at 1 and its
+set bit at 0 (1.6), so the entry has `"11":0,"12":0` and R13 is absent.
 
-The record of a tune is its first line and the entries of its frames from
-the first, as many as the caller requires: one pass plus one loop is `R`
-plus `R` minus `RR` frames for a tune that repeats, with `R` and `RR` the
-table's, and the pass and the frame after it, `R` plus 1, for one that does
-not.
+The entry of frame 8 of `doc/conformance/tunes/retune.ymxr`, whose row
+sets columns 14 to 17 to `$8D`, `$81`, `$E5` and `$3C`, a start of source
+1 on `setR13` at select 5 and count 60 with both resets, beside columns
+0, 2, 4, 6, 10 and 11:
+
+    {"result":0,"w":{"0":72,"2":56,"4":40,"6":8,"10":10,"11":24},"e":{"0":{"target":13,"source":1,"select":5,"count":60,"timer":true,"place":true}}}
+
+### 7.6 The conformance kit
+
+[conformance/README.md](conformance/README.md) defines the test of a
+reader: the record of each tune of the kit over the unnamed F of 7.4,
+the empty record of `wrong-version.ymxr` included, each with the sha256
+and the length `MANIFEST.txt` lists.
 
 ---
 
-## 8. Not yet written
+## 8. What a later version defines
 
-What a player does with a tune of a version it was not built for beyond
-rejecting it (R6.1).
+A player of this version is unconstrained in each item below.
+
+**8.1** What a reader does with a file whose first four bytes or version
+are another, beyond reporting the error (3.3.4); what it reports of a
+table or a source whose offset is outside the file, of a name offset
+other than 16 + 4S, and of a DTX2 table whose C is other than 30, whose
+W is other than 1 or whose variant is other than 2 (3.3.3).
+
+**8.2** Targets 14 to 127 (2.1), and a source on `setR0`, `setR2`,
+`setR4`, `setR7`, `setR11` or `setR12` (2.1.1).
+
+**8.3** A source of more than one column or of values wider than a byte
+(3.1.3), and a source whose RR is above R.
+
+**8.4** The place of a timer before its first start with bit 5 at 1, and
+the row a tick reads where the place is outside the rows of the source
+connected (1.8.4; YMXS, SPEC.md 8.4).
+
+**8.5** The unassigned bits and values: select 0 and bit 3 of a control
+column (1.9.2), bits 5 and 4 of a coarse column (1.2.2), bits 6 and 5 of
+columns 6, 8, 9 and 10, bit 6 of column 7, bit 4 of column 13, and a
+source column above S (3.3).
+
+**8.6** What a tick performs on a timer whose source is disconnected
+(5.2), and whether a tick falls between two steps of 4.3 or between 4.3
+and 4.4 (YMXS, SPEC.md 8.6).
+

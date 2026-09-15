@@ -98,7 +98,7 @@ final class Check {
             model.step();
             int f = frames[r];
             if (f < 0) {
-                // a row that sets no column: it writes no register, and the
+                // a row that sets no column: every register keeps its value, and the
                 // effects run on through it
                 for (int c = 0; c < 13; c++) {
                     if (model.written[c] >= 0) {

@@ -106,8 +106,7 @@ func (s *Sources) build(kind, data int) Source {
 	switch kind {
 	case SID:
 		// The level then the silence. The row that starts the square
-		// writes no level, so the voice keeps the value the last row set
-		// for a timer's period and the first tick opens the loud half.
+		// leaves the level as it is, so the voice keeps the value the last		// row set for a timer's period, and the first tick opens the loud half.
 		return Source{Kind: kind, Data: data, Rows: []byte{byte(data), byte(Mark)}}
 	case Buzzer:
 		return Source{Kind: kind, Data: data, Rows: []byte{byte(Mark | data)}}

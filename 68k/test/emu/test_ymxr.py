@@ -120,7 +120,7 @@ FITS = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 
 
 # What YMXR_stop leaves on the chip: the three voices silenced first, then
 # every register zero, then the mixer with each channel off. A row sets the
-# registers it names and no others, so a tune that follows one which set a
+# registers it names alone, so a tune that follows one which set a
 # register it leaves unset would read that value (68k/YMXR.S, YMXR_stop).
 HUSHED = ([(8, 0), (9, 0), (10, 0)] + [(r, 0) for r in range(13, -1, -1)]
           + [(7, 0xFF)])

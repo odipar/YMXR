@@ -1,172 +1,161 @@
-# What YMXR has to do
+# requirements
+
+The requirements of this repository and of the format. R0 binds the
+repository: its documents, its comments and its terms. R1 records what
+DTX defines. R2 to R6 are requirements of the format and bind a writer,
+a player and a reader of a tune (R2.4). A requirement is cited by number,
+R3.6; one that rests on DTX or YMXS cites the clause it rests on.
 
 ## R0. The house style and the terms
 
-This repository produces the specification. How it is written comes
-before what it describes, and what things are called comes before both.
-
-- **R0.1** `AGENTS.md` defines the rules, for every document, code comment
-  and commit message.
+- **R0.1** `AGENTS.md` defines the rules of prose, for every document,
+  code comment and commit message.
 - **R0.2** A test reads every document and every code comment against a
   list of phrases struck in review, and names the file and line of each
   hit.
-- **R0.3** The test walks the tree for documents and for sources. Each is
-  read because it is there, not because someone listed it. In a source the
-  comments are read and the code is not: a name is not prose. The five
-  languages are Java, Go, 68000 assembly, Python and the shell, and a
-  comment opens differently in each.
+- **R0.3** The test walks the tree for documents and for sources, and
+  reads each file it finds. In a source the comments are read and the
+  code is left unread. The five languages are Java, Go,
+  68000 assembly, Python and the shell, and a comment opens differently
+  in each.
 - **R0.4** Striking a phrase adds it to the list, in the same change.
-- **R0.5** Using a struck phrase again removes it from the list, in the same
-  change.
+- **R0.5** Using a struck phrase again removes it from the list, in the
+  same change.
 - **R0.6** [glossary.md](glossary.md) lists every term and names the
-  document that explains it. The terms are this repository's ubiquitous
-  language.
-- **R0.7** Every document, comment and name in this repository uses those
-  terms, and no second word for a thing that has one.
+  document that defines it. The terms are the ubiquitous language of
+  this repository.
+- **R0.7** Every document, comment and name uses those terms, one word
+  for each thing.
 - **R0.8** A term that changes in the glossary changes everywhere in the
   same change.
-- **R0.9** A test reads terminology.md and fails when a term it explains
-  has no glossary entry.
-- **R0.10** A test reads the documents for what can be recomputed or
-  followed: the figures, the citations, the links, the glossary's order,
-  the one wrap width.
-
-## DTX, YMXS and YMXR
-
-**DTX** is a data format, and a separate repository. It defines a table of
-`R` rows and `C` columns, and no meaning for a column. The table is data: a
-compile step or a calling convention belongs to a reader, not to the
-format.
-
-**YMXS** is the tune data structure, and a separate repository. It defines
-what a tune is - rows of registers and effects, the sources those effects
-run, one rate a tune - what each register reaches on the two chips, and
-what a player does with a row and a tick. SPEC.md here defines one encoding
-of that and repeats none of it.
-
-**YMXR** is one use of DTX, and one encoding of YMXS. Its columns are the
-settings of an Atari ST's sound chip and timers, and its player turns each
-row into writes to them. YMXR defines the meaning of each column and how it
-reaches the hardware. How a row is stored, packed or unpacked is outside
-YMXR, and so is the definition of a tune.
-
-The three meet at the table and the structure and nowhere else. DTX defines
-the table's shape, YMXS what a row sets on the two chips, and YMXR the
-columns that encode the second in the first.
-
-YMXR assumes the name YMX when it is done. R1 to R6 are requirements of
-that format, and bind anyone who writes or plays a tune. R0 binds this
-repository.
+- **R0.9** A test reads terminology.md and fails where a term it defines
+  is absent from the glossary.
+- **R0.10** A test reads the documents for every figure that can be
+  recomputed and every reference that can be followed: the figures, the
+  citations, the links, the glossary's order and the one wrap width.
+- **R0.11** DTX is the table format, a separate repository: a table of
+  `R` rows and `C` columns, the meaning of a column left to the format
+  built on it. The table is data; DTX's reader defines its compile step
+  and its calling convention (DTX, abi.md).
+- **R0.12** YMXS is the tune data structure, a separate repository: rows
+  of registers and effects, the sources those effects run, one rate a
+  tune, what each register reaches on the two chips, and what a player
+  does with a row and with a tick. SPEC.md here defines one encoding of
+  that structure and cites it.
+- **R0.13** YMXR is one use of DTX and one encoding of YMXS: its columns
+  are the settings of the sound chip and the timers of an Atari ST, and
+  its player writes each row to them. YMXR defines the meaning of each
+  column and how it reaches the hardware; DTX defines the layout, the
+  packing and the unpacking of a row, and YMXS defines a tune.
 
 ## R1. What DTX defines
 
-DTX's specification defines these, and 0.4.0 is the release this
-repository reads them from. They are recorded here because YMXR is written
-against them, and they change in that repository rather than this one.
+DTX, SPEC.md defines these; 0.10.1 is the release the Java tree and the
+Go tree read. Note: they change in that repository.
 
-- **R1.1** A tune's data is a table: `R` rows and `C` columns, every value
-  `W` bytes, 1, 2 or 4, and a row `RR` it repeats to once the last row is
-  done. Those four are its metadata.
+- **R1.1** A tune's data is a table: `R` rows and `C` columns, every
+  value `W` bytes, 1, 2 or 4, and a row `RR` it repeats to after its last
+  row. Those four are its metadata.
 - **R1.2** The layout of the table, row by row or column by column, and
-  how a row is read from it, belong to that format and are defined in that
-  repository.
-- **R1.3** DTX defines no meaning for a column.
+  how a row is read from it, are defined in that repository.
+- **R1.3** The meaning of a column is left to the format built on DTX.
 
 ## R2. What YMXR defines
 
 - **R2.1** The meaning of each column.
 - **R2.2** How a column reaches the YM2149 and the MFP.
 - **R2.3** A tune's sources and their index, and the values fixed for a
-  whole tune, neither of which DTX defines.
+  whole tune, both outside DTX.
 - **R2.4** The two roles that read a tune: a player, which writes to the
-  two chips as it goes, and a reader, which reports the result and
-  writes to no chip.
-- **R2.5** No part of the table's layout or its packing.
+  two chips as it reads, and a reader, which reports the record with
+  every write recorded in place of the chips (SPEC.md 7).
+- **R2.5** The layout of the table and its packing are DTX's (R1.2),
+  outside YMXR.
 
 ## R3. The schema
 
-- **R3.1** The schema covers the YM2149's and the MFP's registers, and the
-  effects an ST tune drives them with: SID voices, sync buzzers, samples,
-  waveforms, and the others in common use. Coverage is measured against the
-  543-tune corpus YMX 0.8.3 was measured on, and an effect no tune in
-  it plays is outside the schema until a change puts it in.
-- **R3.2** The schema is an abstraction over those effects rather than one
-  tracker's arrangement of them. It is the ubiquitous language trackers map
-  onto.
-- **R3.3** A player computes no decision while a tune plays. Every choice
-  is compiled into the data, which costs columns, and a column is cheap.
+- **R3.1** The schema covers the registers of the YM2149 and the MFP and
+  the effects of the corpus (glossary.md): SID voices, sync buzzers,
+  samples and waveforms. An effect absent from the corpus is outside the
+  schema until a change puts it in.
+- **R3.2** The schema is an abstraction over those effects rather than
+  one tracker's arrangement of them: the ubiquitous language a tracker
+  maps its terms onto.
+- **R3.3** Every choice is compiled into the data, at the cost of
+  columns, and a player reads a row and writes it.
 - **R3.4** At most 32 columns.
-- **R3.5** A column is one value, and every column is one byte: a table's
-  values are one width (R1.1), and a register is a byte. A register's value
-  comes from one column, a column names its target, and a value wider than
-  a byte is a column a byte: a period's two halves, a timer's prescaler and
-  its count.
-- **R3.6** Most columns define a set bit, their top bit: 1 sets the value,
-  0 does not, and a value not set is not read - its bits are arbitrary.
-  Some columns define a bit for another column, and such a bit is read on
-  every row. A row may set a value the register already has: the bit marks
-  what to write, not what changed.
-- **R3.7** Each column defines its set bit. One column of all the set bits
-  would move for every reason any column moves, where a bit beside its
-  value moves with that value and packs with it. A column whose value fills
-  its width reserves a value for the same purpose, and where the reserved
-  value needs a qualifying bit, another column defines it (R3.6).
+- **R3.5** A column is one value of one byte: a table's values are one
+  width (R1.1), and a register is a byte. A register's value comes from
+  one column, and a value wider than a byte is one column a byte: the
+  two halves of a period.
+- **R3.6** A column with a bit to spare defines a set bit, its top bit:
+  at 1 the row sets the value, at 0 the value's bits are arbitrary and
+  left unread. A column may define a bit for another column: such a bit
+  in a register column is read on every row, and one in an effect's
+  control column is read where the row sets the control column (SPEC.md
+  1.1). A row may set a value the register already has: the bit marks
+  what to write, the value changed or the same.
+- **R3.7** Each column defines its set bit. A column whose value fills
+  its byte reserves a value for the row that leaves it unset, and where
+  the reserved value is also a value of the register, a bit of another
+  column marks it as one (R3.6). Note: one column of every set bit would
+  move where any column moves; a bit beside its value packs with it.
 
 ## R4. The player
 
-- **R4.1** A player runs one method at two rates: a clock advances a table
-  one row and a procedure writes that row. The frame clock advances the
-  tune's table, once a frame for every table it runs, and a timer advances
-  a separate source.
-- **R4.2** A column the row does not set costs a player the test and no
-  more.
-- **R4.3** The mapping is the player's work: the frame's procedure for a
-  row of the tune's table, a target's for a row of a source.
-- **R4.4** A frame costs the row it reads and what that row sets. It does
-  not grow with the count of columns. R3.6 puts what a row sets in the
-  writer's hands, and the frame's cost with it.
-- **R4.5** The worst frame stays near YMX 0.8.3's, which 13 scanlines
-  cover over every shape it produces. That is the work of the call itself,
-  with the cost of the timers counted apart. R4.4 spends the average; a
-  demo budgets for the worst frame, and it does not move.
-- **R4.6** A player keeps what it requires of a value it read. The row is
-  not that store: R3.6 leaves an unset value uninterpreted.
+- **R4.1** A player advances two tables at two rates: a clock advances a
+  table one row and a procedure writes that row. The frame clock advances
+  each table of the tune one row a frame (R6.4), and a timer advances a
+  source.
+- **R4.2** A column the row leaves unset costs a player one test.
+- **R4.3** A player performs R2.2: the frame's procedure writes a row of
+  the tune's table to the chips, and a target writes a row of a source.
+- **R4.4** A frame costs the row it reads and the columns that row sets,
+  independent of the column count. R3.6 leaves what a row sets to the
+  writer, and the frame's cost with it.
+- **R4.5** A play call costs at most 6,656 cycles, 13 scanlines of 512,
+  the ticks counted apart; performance.md records the costliest call of
+  each tune. Note: a demo budgets for the worst frame; R4.4 bounds the
+  average.
+- **R4.6** A player keeps every value it requires of a row it has read:
+  the kept value of an effect is its target and its count. R3.6 leaves an
+  unset value uninterpreted, so a row is read once, and a value the
+  player requires on a later row is the kept value.
 
 ## R5. Outside the DTX table
 
-R3 sits behind R2.1 and R4 behind R2.2. This sits behind R2.3, and lists
-what a tune requires beyond a row.
+R3 defines R2.1 and R4 defines R2.2; this section defines R2.3, what a
+tune requires beyond a row.
 
-- **R5.1** A tune keeps its sources outside the DTX table. Their rows are
-  read at a tick's rate rather than a row's, so a row that did not change
-  still feeds them.
-- **R5.2** Which source plays, on which target, and at what rate, comes
-  from the columns.
+- **R5.1** A tune keeps its sources outside the DTX table: a timer reads
+  a source's rows at its ticks, between frames, at the rate the tune's
+  rows set (R5.2), so a row of the tune that leaves every column unset
+  leaves every timer running.
+- **R5.2** The four columns of an effect select the source, the target
+  and the rate (SPEC.md 1.8, 1.9).
 - **R5.3** A source's rows are values that fit the register its target
-  writes, which is YMXS's rule (YMXS, SPEC.md 3.2). The conversion a
-  recording needs is the writer's work under R3.3.
-- **R5.4** The sources belong to the tune. A player defines none.
-- **R5.5** How many sources a tune runs, how large one is, and the content
-  of an index entry are SPEC.md's.
-- **R5.6** A value fixed for a whole tune is not a column. It would set a
-  column once and repeat it on every row after it.
-- **R5.7** How often a player is called, and which timers it claims before
-  the first row, are the tune's. A player reads one row at a time, so it
-  finds neither by reading ahead.
+  writes (YMXS, SPEC.md 3.2.2); a writer converts a recording to such
+  values (R3.3).
+- **R5.4** A player reads the sources from the tune file alone (SPEC.md
+  3.1).
+- **R5.5** SPEC.md 3 defines the source count, the size of a source and
+  the index entry.
+- **R5.6** A value fixed for a whole tune is recorded once, outside the
+  table. Note: as a column it would be set once and repeated on every
+  row after.
+- **R5.7** The frame rate and the effects used are recorded once (R5.6,
+  SPEC.md 3.3); a player reads both before the first row.
 
 ## R6. Version and extension
 
-- **R6.1** A tune records the version it was written for. Where it records
-  it, and what a player does with a version it was not built for, are
-  SPEC.md's.
-- **R6.2** A meaning is fixed once assigned: a column's, a bit's within its
-  column, a value's within its field. A later version assigns what this one
-  leaves unassigned, and redefines none.
-- **R6.3** R3.4's ceiling of 32 stands at this version and at every later
-  one.
-- **R6.4** A schema outgrowing 32 columns runs a second DTX table beside
-  the first, a row of each a frame. The ceiling is one table's.
-- **R6.5** Columns are split evenly across the tables a tune runs. A schema
-  of 33 columns is 16 and 17, not 32 and 1, so no table is read for the
-  sake of one value.
+- **R6.1** A tune records the version it was written for. Where it
+  records it, and what a player does with another version, are SPEC.md's.
+- **R6.2** A meaning is fixed once assigned: a column's, a bit's within
+  its column, a value's within its field. A later version assigns what
+  this one leaves unassigned and leaves every assigned meaning as it is.
+- **R6.3** R3.4's ceiling of 32 binds this version and every later one.
+- **R6.4** A schema of more than 32 columns runs a second DTX table
+  beside the first, a row of each a frame; the ceiling is one table's.
+- **R6.5** The columns are split evenly across the tables a tune runs: a
+  schema of 33 columns is 16 and 17.
 - **R6.6** R4.5's worst frame counts every table a tune runs.

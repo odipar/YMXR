@@ -588,7 +588,7 @@ vbl:
 
 ; One row from the core. The rows asked for run out and the program is
 ; done; a tune that plays its last row does not end the program, and the
-; core's play writes no register after that row, so a subtune of a set
+; core's play leaves every register as it is after that row, so a subtune
 ; that ends leaves the keys to pick another. Every register kept. A core
 ; with the raster monitor in paints the call itself (the player,
 ; doc/performance.md) on the screen this program clears every run.

@@ -174,11 +174,11 @@ three packers.
 SPEC.md 6, rule 6 is the rule that follows: a writer whose tune does not
 divide by the unit adds rows that set no column at the repeat row until it
 divides, and then writes a loop of fewer than 64 rows again or adds rows
-that set no column at the end; a row that sets no column writes no register
-and leaves every timer running, and a loop written again plays as it did.
-The converter applies it (tools.md, `-kK`), so every tune packs at unit 2
-and the window of every tune is 15 units. Five of the ten tunes packed at
-unit 1 before it; measured again at unit 2, their calls fell by a seventh
-to a sixth on average and by a tenth to more than a third in the costliest
-frame, Synergy Credits' from 6,358 to 5,144 (performance.md). The costliest
-frame of any tune is now that one, 1,512 cycles under the budget.
+that set no column at the end; a row that sets no column leaves every
+register as it is and every timer running, and a loop written again plays
+as it did. The converter applies it (tools.md, `-kK`), so every tune packs
+at unit 2 and the window of every tune is 15 units. Five of the ten tunes
+packed at unit 1 before it; measured again at unit 2, their calls fell by a
+seventh to a sixth on average and by a tenth to more than a third in the
+costliest frame, Synergy Credits' from 6,358 to 5,144 (performance.md). The
+costliest frame of any tune is now that one, 1,512 cycles under the budget.

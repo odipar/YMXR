@@ -87,8 +87,7 @@ final class Sources {
         switch (kind) {
             case Effects.SID:
                 // The level then the silence. The row that starts the square
-                // writes no level, so the voice keeps the value the
-                // last row set for a timer's period and the first tick opens
+                // leaves the level as it is, so the voice keeps the                // value the last row set for a timer's period, and the first tick opens
                 // the loud half.
                 return new Source(kind, data, new byte[] {(byte) data, (byte) MARK}, 0);
             case Effects.BUZZER:

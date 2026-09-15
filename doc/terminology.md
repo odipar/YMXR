@@ -1,28 +1,24 @@
 # terminology
 
-The machine's terms, and no second word for a thing that has one
-(requirements.md, R0.6 to R0.9). [glossary.md](glossary.md) lists every term
-this repository uses and names where each is explained.
+The terms of the two chips and of the format, one word for each thing
+(requirements.md R0.6 to R0.9). [glossary.md](glossary.md) lists every
+term with the section that defines it. The range of a register, what a
+volume bit selects and what a write to R13 does are YMXS, SPEC.md 2,
+cited here and defined there.
 
-The two chips come from YMX 0.8.3. They describe the machine rather than a
-format, so no part of them depends on how a tune is stored. The terms for
-what runs on them are written here as the schema settles.
-
-This is the machine at length. What a tune may set on it - a register's
-range, what a volume bit selects, what a write to R13 does - is
-[YMXS](https://github.com/odipar/YMXS)'s SPEC.md 2, which SPEC.md here
-cites and does not repeat.
+**Conventions.** A clause is cited by number, 2.3. A bold term is defined
+in the clause that bolds it. A range includes both ends. `Note:` begins
+an informative sentence.
 
 ---
 
-## The sound chip
+## 1. The sound chip
 
-A **YM2149**, Yamaha's AY-3-8910, running at 2 MHz on an Atari ST.
-
-A **register** is one byte of chip state. There are sixteen: fourteen steer
-the sound, two are peripheral I/O ports the ST borrowed for other duties.
-Writing a register is the only way software changes anything, and a register
-keeps its value until written again.
+**1.1 The chip.** The **YM2149** is Yamaha's AY-3-8910, clocked at 2 MHz
+on an Atari ST. A **register** is one byte of its settings: a write is the
+one way software changes a register, and a register keeps its value until
+written again. Sixteen registers: fourteen are the sound, and R14 and R15
+are the two I/O ports, which belong to the host.
 
 | register | bits | what it is |
 |---|---|---|
@@ -30,179 +26,199 @@ keeps its value until written again.
 | R2, R3 | 8 + 4 | voice B tone period |
 | R4, R5 | 8 + 4 | voice C tone period |
 | R6 | 5 | **noise period** |
-| R7 | 8 | the mixer register: **mixing** - which generators reach which voice - plus the I/O port directions |
-| R8, R9, R10 | 5 each | voice A, B, C **volume**: bits 3-0 the level, bit 4 meaning "follow the envelope" |
-| R11, R12 | 8 + 8 | **envelope period**, fine and coarse: a 16-bit divider, coarse as a pitch |
+| R7 | 8 | **mixing** in bits 5 to 0; the I/O port directions in bits 7 and 6 |
+| R8, R9, R10 | 5 each | voice A, B, C **volume**: bits 3 to 0 the level, bit 4 the envelope's level instead |
+| R11, R12 | 8 + 8 | **envelope period**, fine and coarse: a 16-bit divider |
 | R13 | 4 | **envelope shape** |
-| R14, R15 | 8 each | the two I/O ports. Not sound |
+| R14, R15 | 8 each | the two I/O ports |
 
-**Two bits of R7 are not sound.** Bits 7 and 6 set the direction of the two
-I/O ports, which on an ST serve the floppy selects, the serial line and the
-printer. A player MUST NOT change them: a write to R7 leaves the host's
-two bits unchanged.
+**1.2 Bits 7 and 6 of R7.** Bits 7 and 6 of R7 select the direction of
+the two I/O ports. A write of R7 by a player writes bits 5 to 0 from the
+tune and bits 7 and 6 as 1, the port directions an ST runs with; a reader
+reports bits 5 to 0 (SPEC.md 7). Note: YMXS, SPEC.md 8.8 leaves the two
+bits to a later version; this format fixes them.
 
-A **signal** is a series of values with a rate: a square wave, a run of
-noise, a sample. Five **generators** make them:
+**1.3 Generators.** A **signal** is a series of values at a rate: a square
+wave, noise, a sample. Five **generators** produce them: three
+**tone generators**, each a counter that flips its output at the end of
+each period, producing a square wave; one **noise generator**, a shift
+register producing a pseudo-random bit pattern, one for the three voices;
+and one **envelope generator**, a counter walking one of sixteen shapes.
 
-- three **tone generators**, each a counter that flips its output when it
-  runs out, making a square wave;
-- one **noise generator**, a shift register producing a random-sounding bit
-  pattern;
-- one **envelope generator**, a counter walking one of sixteen shapes.
-  Normally a note's rise and fall; run fast, the same sweep is a pitch.
-
-The length of one cycle of a generator is its **period**. Bigger period,
-lower pitch:
+**1.4 Period.** The **period** of a generator is the length of one cycle
+in steps of its clock; a larger period is a lower pitch.
 
     tone frequency     = 2,000,000 / (16 x tone period)
     noise clock        = 2,000,000 / (16 x noise period)
     envelope frequency = 2,000,000 / (256 x envelope period)
 
-Tone period 284 is about 440 Hz. Envelope period 18 is about 434 Hz - the
-same note from the envelope generator.
+**1.5 Noise period.** R6, five bits, 0 to 31: the divider of the noise
+generator (1.4). One generator feeds the three voices, which differ in
+volume and mixing alone.
 
-**Noise period** sets how bright the noise is, not how loud: five bits, 1 to
-31. At 1 it is a wide hiss, around 15 a coarser rush, at 31 slow enough to
-carry a pitch. One generator feeds all three voices, so only its volume can
-differ between them.
+**1.6 The envelope.** The envelope shape is four bits. Four of the sixteen
+shapes repeat, two sawtooths and two triangles; the other twelve run once
+and stop. Every write to R13 restarts the envelope, the value changed or
+the same (YMXS, SPEC.md 2.5), so a row that leaves the shape as it is
+leaves R13 unwritten, and the set bit of column 13 encodes that (SPEC.md
+1.6).
 
-**Envelope shapes** are four bits, and only four of the sixteen repeat: two
-sawtooths and two triangles. The other twelve run once and stop, which suits
-a decay and is useless as an oscillator.
+Note: the divisor of the envelope period is 256, so periods 18 and 17 are
+434 and 460 Hz, about a semitone apart; a sync buzzer (5.4) sets the pitch
+from a timer instead.
 
-**The envelope's pitch resolution is coarse, and worsens as pitch rises.**
-The divisor is 256, so neighbouring periods are far apart: period 18 is 434
-Hz, period 17 is 460 Hz - just over a semitone between adjacent settings.
-That is the limit on a buzzer part. A sync buzzer's pitch comes from a timer
-instead, which at 440 Hz lands within a few cents.
+**1.7 Voices.** Three **voices**, A, B and C. Each has a **volume**, R8, R9
+or R10, and a **mixing** setting in R7: which of the voice's tone and the
+noise reach it. In a volume register bits 3 to 0 are the level, and bit 4
+set selects the level of the envelope generator instead, the level bits
+then unread (YMXS, SPEC.md 2.3). A set bit among bits 5 to 0 of R7
+silences what it selects (YMXS, SPEC.md 2.4).
 
-Three **voices**, A, B and C. Each has a **volume** and a **mixing** setting
-- which generator signals reach it: tone, noise, both or neither. The volume
-scales what arrives. "Follow the envelope" is a real bit, bit 4 of the
-volume register: with it set, the level bits are ignored and the envelope
-supplies the level.
-
-**The DAC** is a ladder of levels, close to logarithmic: about 3 dB a step,
-a factor of 1.4 in amplitude. A volume register picks one of 16 steps, the
-envelope walks 32, and the bottom of the ladder is irregular, so a measured
-table serves where a formula does not. This matters for **samples**: a
-recording is linear amplitudes and the register is a logarithmic index, so
-filtering or resampling happens on the amplitudes and converts afterwards.
-The ladder spans about 54 dB top to bottom, the bottom step being a jump of
-8 dB where the rest average nearer 3.3, so material with its peaks near the
-top keeps the most detail.
-
-**Writing the envelope shape restarts the envelope.** Writing the same shape
-twice is a restart, the mechanism behind the sync buzzer. A format therefore
-needs an encoding for "leave the shape alone" on a row that must not restart
-it.
+**1.8 The DAC.** The **DAC** is the ladder of output levels, 16 for a
+volume register and 32 for the envelope, close to logarithmic. A sample
+is amplitudes and a volume register is an index into the ladder; a writer
+converts each amplitude to an index (R5.3).
 
 ---
 
-## The timers
+## 2. The timers
 
-The **MFP** (MC68901) has four timers, A to D. All four are reachable, and
-two cost more than the others. Timer C is the operating system's 200 Hz
-clock, so a tune that claims it stops that clock and cannot be hosted from a
-Timer C hook. Timer B counts the display's lines, the timer a demo uses for
-raster work.
+**2.1 The MFP.** The **MFP**, the MC68901, has four **timers**, A to D,
+clocked at 2,457,600 a second, unrelated to the YM2149's clock. Effect 0
+runs on Timer A, effect 1 on Timer D, effect 2 on Timer B and effect 3 on
+Timer C (SPEC.md 2.3); a player claims the timers of the effects used at
+init, before the first row is written (2.5). Timer C is the operating
+system's 200 Hz clock: a player that claims it stops that clock, and the
+host calls the player from another interrupt (BINARIES.md 5).
 
-So a tune claims A and D first, then B, and C last of all.
-
-The MFP's clock runs at 2,457,600 a second, unrelated to the YM2149's. A
-timer divides it twice: by a **prescaler**, one of 4, 10, 16, 50, 64, 100 or
-200, then by a **timer count**, 1 to 255, and 0, which the MFP reads as 256.
+**2.2 The rate.** A timer divides the clock twice: by a **prescaler**, 4,
+10, 16, 50, 64, 100 or 200, then by a **timer count**, 1 to 255, or 0,
+which counts 256. The timer counts the divided clock down from its count
+and raises an interrupt at zero. That interrupt is a tick (4.2), and the
+**rate** of the timer is its ticks a second:
 
     rate = 2,457,600 / (prescaler x timer count)
 
-The timer counts down at the divided speed and raises an interrupt at zero.
-That interrupt is the **tick**. Both numbers are divisors, and a generator's
-counter is a different thing.
+The slowest rate, a count of 0 at a prescaler of 200, is 48 a second; the
+fastest, a count of 1 at a prescaler of 4, is 614,400. A rate above
+125,000 is an error of the structure (YMXS, SPEC.md 3.3.4).
 
-A timer has two registers. Its **timer control register** is the
-prescaler select in three bits: 1 for 4, 2 for 10, 3 for 16, 4 for 50, 5
-for 64, 6 for 100, 7 for 200, and 0 stops the timer. Timers A and B have
-one each, the select in bits 2 to 0; bits 4 and 3 select an output's reset
-and modes no tune uses, and are zero. C and D share one, C in bits 6 to 4
-and D in bits 2 to 0. Its **timer data register** is the timer count.
-A count written while the timer runs loads when the running count reaches
-zero; one written while it is stopped loads at once, and the select that
-follows starts the timer from it.
+**2.3 The two registers.** The **timer control register** of a timer has
+its prescaler select in three bits: 1 for 4, 2 for 10, 3 for 16, 4 for
+50, 5 for 64, 6 for 100, 7 for 200; 0 stops the timer. Timers A and B
+have one each, the select in bits 2 to 0; a player writes bit 3, the mode
+bit, and bits 7 to 4 as 0. Timers C and D share one, C's select in bits 6
+to 4 and D's in bits 2 to 0, and a write for one timer leaves the bits of
+the other as they are. The **timer data register** of a timer is its
+timer count.
 
-The slowest rate is 48 a second and the fastest 614,400. Above about 25,600
-the interrupt alone costs a quarter of an 8 MHz 68000, the practical
-ceiling. For scale, 69 tunes of the 543-tune corpus play
-samples, mostly between 5,000 and 6,100 a second.
+| timer | control register | data register | vector | enable and mask bit |
+|---|---|---|---|---|
+| A | $FFFA19, bits 3 to 0 | $FFFA1F | $134 | bit 5 of IERA and IMRA |
+| B | $FFFA1B, bits 3 to 0 | $FFFA21 | $120 | bit 0 of IERA and IMRA |
+| C | $FFFA1D, bits 7 to 4 | $FFFA23 | $114 | bit 5 of IERB and IMRB |
+| D | $FFFA1D, bits 3 to 0 | $FFFA25 | $110 | bit 4 of IERB and IMRB |
+
+IERA is $FFFA07 and IERB $FFFA09; the pending register of each is 4
+bytes on, the in-service register 8 and the mask register 12.
+
+**2.4 A write to a running timer.** A count written while the timer runs
+loads when the running count reaches zero; one written while the timer
+is stopped loads at once, and the select written after it starts the
+timer from that count (YMXS, SPEC.md 3.3.5, 3.4.1). A player stops a
+timer by writing select 0 and clearing its pending bit, so a tick latched
+while the stop runs is dropped; the timer's reset, bit 6 of the control
+column, stops the timer that way before the count and the select are
+written (SPEC.md 1.9).
+
+**2.5 Claim and release.** A **claim** is what a player does to a timer
+at init, for each effect the effects used byte marks: it stops the timer,
+writes its vector, clears its pending bit, and sets its enable bit and
+its mask bit. A **release** is the reverse, at stop: the timer stopped,
+its enable bit and its mask bit cleared, its pending bit cleared. A timer
+outside the tune's is left as it is. Note: YMXS, SPEC.md 8.5 leaves what
+a claim comprises to a later version; this format fixes it.
 
 ---
 
-## Tables, rows and procedures
+## 3. Tables, rows and procedures
 
-A **table** yields rows: `R` of them, `C` columns wide, every value **`W`**
-bytes, 1, 2 or 4, and a row `RR` it repeats to once the last row is done.
-A **row** is one step of one: `C` values, with no meaning attached to any
-of them.
-
-**Yielding** is one row at a time and in order. A clock advances to a next
-row, and keeps a place in the table: the first advance yields row 0, the
-next row 1, and the advance after row `R` minus one yields row `RR`, or
-ends where the table does not repeat. Two clocks on one table keep two
-places, and neither moves the other's.
-
-`R` counts the rows a table contains, not the rows it yields. One that
-repeats yields them without end, and two rows alternating a level and zero
-yield a square wave for as long as a caller advances it.
-
-`R`, `C`, `RR` and `W` are a table's **metadata**. They describe a table
-rather than fill it. `W` is the table's and not a column's: every value is
-1, 2 or 4 bytes, and one table uses one of the three. The layout of the
-rows under them, row by row or column by column, belongs to the format
+**3.1 A table.** A **table** is `R` rows of `C` columns, every value `W`
+bytes, 1, 2 or 4, and a row `RR` it repeats to after its last row, `RR`
+equal to `R` where it plays once (DTX, SPEC.md 1). `R`, `C`, `RR` and `W`
+are its **metadata**; the layout of the rows is one of DTX's variants
 (R1.2).
 
-A **procedure** reads a row and writes it to the chips.
+**3.2 A row.** A **row** is one step of a table: `C` values, one a
+**column**, each `W` bytes. A table has values alone; the meaning of a
+column is the format's (R2.1). An **unset row** is a row of the tune's
+table that leaves every column unset: a frame that reads it leaves every
+register as it is and every timer running (SPEC.md 6, rule 6).
 
-The two make one method, and everything a player does is that method: a
-clock advances a table one row and calls a procedure with that row. What
-differs between one use and another is the table, the clock and the
-procedure.
+**3.3 Yielding.** **Yielding** is reading the rows of a table one at a
+time, in order. A clock keeps a row number in the table: the first
+advance yields row 0, each advance the row after, and the advance after
+row `R` - 1 yields row `RR`, or ends the table where `RR` is `R`. Two
+clocks on one table keep two row numbers, and each moves its number
+alone. A table that repeats has a row after every row. A timer's row
+number in its source is its place (YMXS, SPEC.md 3.4.2).
 
----
-
-## Frames and ticks
-
-Two clocks turn the method, and each turn has a name.
-
-The tune's clock runs at a fixed rate, usually 50 a second. Its table is
-the tune's, its procedure writes the whole row to the chips, and one turn
-is a **frame**: one step of the tune, what a tracker put there.
-
-The MFP's timers run from 48 to 25,600 a second in practice. Each has a
-separate table and a procedure that writes one register, and one turn is a
-**tick**. An effect is a timer running a table on a register.
-
-A row is data and a frame is that row read as music. They are the same
-thing from either end, and each word names the end it comes from. A
-document about storing or packing values uses row. A document about a tune,
-a note or a chip uses frame.
-
-A frame or a tick may write any register. A note usually changes as the
-tune advances, because that is where a tracker puts it. A tick changing one
-is allowed but uncommon.
+**3.4 A procedure.** A **procedure** writes a row to the chips. A clock
+advances a table one row and calls a procedure with that row. A frame
+(4.1) and a tick (4.2) differ in the table, the clock and the procedure.
 
 ---
 
-## Rates
+## 4. Frames and ticks
 
-A tick's rate is fixed or it moves, and its origin determines which. The
-frame's is fixed by the host. The rest come from one of two places.
+**4.1 A frame.** The clock of the tune is the host, which calls the
+player at the frame rate, fixed for the tune (SPEC.md 3.3). Its table is
+the tune's, its procedure writes the columns the row sets to the two
+chips (SPEC.md 4), and one advance and call is a **frame**. After the end
+of a tune that plays once, a call leaves every register as it is and
+reports -1 (SPEC.md 4).
 
-A sample's rate belongs to the recording. No other value sets it, and a
-note under it does not move it. A square chopping a voice draws its rate
-from the note playing instead, and the two stay in ratio or the pitch moves
-with every note.
+**4.2 A tick.** The clock of a timer is its interrupt (2.2). Its table is
+a source, its procedure a target, which writes one register (SPEC.md 5),
+and one advance and call is a **tick**.
 
-That difference fixes when a rate may change. A rate belonging to the
-effect is settled when the effect starts. A rate drawn from a note is
-renewed as often as the note may move, which is every frame.
+**4.3 Row and frame.** A document about storing or packing values uses
+row (3.2); a document about playing uses frame (4.1).
 
-The terms for these two come from the schema.
+**4.4 What each writes.** A frame writes the registers its row sets; a
+tick writes the register of its target. Under rule 1 of SPEC.md 6 a row
+leaves a register an effect runs on unset, R13 excepted.
+
+---
+
+## 5. Effects
+
+**5.1 An effect.** An **effect** is a source connected to a target on one
+timer, at the rate of its prescaler and count (YMXS, SPEC.md 1.7). Four
+columns encode it: the target column, the source column, the control
+column and the count column (SPEC.md 1.8, 1.9). The **effect rate** is
+the rate of the timer (2.2), set by the control column and the count
+column of the row that starts or retunes the effect, and unchanged by a
+row that leaves those columns unset.
+
+**5.2 Square wave and SID voice.** A **square wave** is a source of two
+rows, a level and 0, repeating to row 0. A **SID voice** is a square wave
+run on a voice's volume register at a rate in ratio to the note the voice
+plays, so a row sets the rate where the note changes.
+
+**5.3 Sample and digidrum.** A **sample** is a recording, one value a
+tick, converted to the levels of the DAC (1.8). A **digidrum** is a sample
+run on a voice's volume register: a source of many rows that plays once,
+at the rate of the recording. Note: the converter of this repository
+closes a drum with a row of level 13 and the marker, so the voice is left
+at 13 when the timer stops.
+
+**5.4 Sync buzzer.** A **sync buzzer** is a source of one row run on
+`setR13`: each tick restarts the envelope (1.6), so the rate of the timer
+is the pitch and the row is the shape.
+
+**5.5 The kinds.** The tools report a source as a square, a drum or a
+buzzer (tools.md), the kinds of 5.2 to 5.4; a sinus SID, a fourth kind of
+the dumps, is dropped with a note (tools.md). The format encodes a source
+as a table (SPEC.md 2.2), and the kind is outside the format: a player
+reads the table alone.

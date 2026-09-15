@@ -305,17 +305,16 @@ The **ym2149-rs model**, which the reference player ships: a start writes
 0 to the voice at once and sets the alternation to its loud half, and the
 first tick, one timer period later, writes that half.
 
-**maxYMiser's model**, the tracker most of these sections were written
-in: the start writes no level and sets no half. Its replayer traced under
-Hatari on *Chipping for Ca$h* writes R0 to R10 every frame and leaves the
-volume register a square owns unwritten for all 218 frames the square
-runs; on the row the square starts it writes no level either, and the
-first tick writes the wave's first value. Its timer's count and control
-are rewritten every frame with the timer running, and no row stops it.
-Its
-release clears the mask and not the control register, so the count runs
-on and the tick after the next note falls a whole period after the tick
-before the gap.
+**maxYMiser's model**, the tracker most of these sections were written in:
+the start leaves the level and the half as they are. Its replayer traced
+under Hatari on *Chipping for Ca$h* writes R0 to R10 every frame and leaves
+the volume register a square owns unwritten for all 218 frames the square
+runs; on the row the square starts it leaves the level as it is too, and
+the first tick writes the wave's first value. Its timer's count and control
+are rewritten every frame with the timer running, and no row stops it. Its
+release clears the mask and not the control register, so the count runs on
+and the tick after the next note falls a whole period after the tick before
+the gap.
 
 This format adopted the first model and applied it to every row that
 starts a source. In this schema the values written belong to the source
@@ -331,7 +330,7 @@ voice's edges over 1,575 frames of DBA 5:
 |---|---|---|---|---|
 | moves the place and writes 0 to the voice | 16,906 | 351 | 52 | 2.4% |
 | moves the place alone | 16,266 | 7 | 313 | 2.0% |
-| moves no place and writes no level | 16,625 | 5 | 29 | 0.2% |
+| leaves the place and the level as they are | 16,625 | 5 | 29 | 0.2% |
 | the reference player | 16,625 | 4 | 28 | 0.2% |
 
 The middle row stood before the write of 0 was added: a start whose place
@@ -380,26 +379,25 @@ stopped and bit 5 alone moves the place.
    player against a model built from the tune's tables, so it proves the
    player writes what the table encodes. It cannot see that the table
    encodes the wrong thing. The conformance kit pins what the converter
-   writes, so it pinned the defect as the reference too, and
-   `synergy.ymxr` shrank by 244 bytes when the defect was removed. A rule
-   about sound needs a check that reads sound.
+   writes, so it pinned the defect as the reference too, and `synergy.ymxr`
+   shrank by 244 bytes when the defect was removed. A rule about sound
+   needs a check that reads sound.
 2. **Compare event timing, not event values.** Every comparison made
    against the reference player before this one passed: which registers a
    frame writes, the values, the order, the counts, each register at each
    frame boundary, the timers' prescaler and count at each boundary. The
    write that broke the square is a legal value at a legal moment, and it
-   changes the spacing between the writes to one register and no other
-   figure. `ym/halves.py` reads that spacing out of a trace; run it before
-   reading a square as right.
-3. **A loudness metric over a second decides no question.** The metric
-   used for two days was a per-second correlation of level against the
+   changes the spacing between the writes to one register alone.
+   `ym/halves.py` reads that spacing out of a trace; run it before reading
+   a square as right.
+3. **A loudness metric over a second decides no question.** The metric used
+   for two days was a per-second correlation of level against the
    reference, and two builds whose output was identical byte for byte
    scored 0.70 and 0.28 on it, differing only in where the program landed
    in the frame. A measure that moves with the phase cannot report on the
    phase.
-4. **Read the distinction the reference draws, not one of its rules.**
-   The reference player has two routines here, and the comment on the
-   first says which is which: "a fresh square restarts at phase zero …
-   Retunes
+4. **Read the distinction the reference draws, not one of its rules.** The
+   reference player has two routines here, and the comment on the first
+   says which is which: "a fresh square restarts at phase zero … Retunes
    and resumes never come here". Reading the fresh-start routine and
    applying its rule to every start put the defect here.
