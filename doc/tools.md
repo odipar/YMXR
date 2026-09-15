@@ -1,13 +1,13 @@
 # The tools
 
-The thirteen tools: what each reads and writes, its flags, the lines it
-writes on standard error and its exit codes (sections 1 to 14); the pipe
-(15); the calls of the player (16); the scripts (17), the rigs (18) and
-the measurements (19); the two trees (20); a release (21); the
-environment (22). The terms of [SPEC.md](SPEC.md) and
-[BINARIES.md](BINARIES.md) apply. A *structure* is a YMXS multi as JSON
-([ymxs.md](ymxs.md)); a *dump* a YM5! or YM6! register dump, in an LHA
-archive or bare; a *YMX file* a `.ymx` of [YMX](https://github.com/odipar/YMX).
+Commands, flags, reports and exit codes (1 to 14), pipes (15), player
+calls (16), scripts (17), rigs (18), measurements (19), Java and Go
+implementations (20), releases (21), and environment (22).
+
+Terms follow [SPEC.md](SPEC.md) and [BINARIES.md](BINARIES.md). A
+*structure* is a YMXS multi as JSON ([ymxs.md](ymxs.md)); a *dump* is
+YM5! or YM6!, bare or in an LHA archive; a *YMX file* is a `.ymx` of
+[YMX](https://github.com/odipar/YMX).
 
 **Conventions.** A clause is cited by number, 9.3. In a quoted line a
 capital letter is a decimal figure defined beside the line or in the

@@ -1,28 +1,24 @@
 # Writing a tune file
 
-For a writer: a tracker, a converter, or any program that produces a
-tune file for a player to play. [SPEC.md](SPEC.md) defines the format;
-this document fixes the order to read it in, what the format leaves to a
-writer, and the checks on the file. A reader is written against
-the conformance kit ([conformance/README.md](conformance/README.md)), a
-player against SPEC.md 4 and 5.
+How to produce and check a tune file from a tracker or converter.
+[SPEC.md](SPEC.md) defines the format; this document covers the writer's
+choices and reading order. For a reader, use the
+[conformance kit](conformance/README.md); for a player, SPEC.md 4 and 5.
 
 ---
 
 ## 1. Two routes
 
-**1.1** [YMXS](https://github.com/odipar/YMXS)'s SPEC.md defines what a
-tune is: rows of registers and effects, what each register reaches, how
-a rate is reckoned, and the rules a writer satisfies. SPEC.md here
-defines one encoding of that structure.
+**1.1** [YMXS](https://github.com/odipar/YMXS)'s SPEC.md defines tune
+data, chip values, rates and writer rules. SPEC.md here defines an
+encoding of that structure.
 
-**1.2** A writer whose tune is in the structure emits it as YMXS JSON
-(YMXS, json.md) and runs `bin/ymxs-to-ymxr`, which encodes the columns
-([ymxs.md](ymxs.md) 5) and packs the table; that writer reads sections 4
-and 5 of this document alone.
+**1.2** To convert a tune in the structure, emit YMXS JSON and run
+`bin/ymxs-to-ymxr` to encode and pack it ([ymxs.md](ymxs.md)). Read
+sections 4 and 5 for effects and sources.
 
-**1.3** A writer that produces the columns itself reads the whole of this
-document and SPEC.md, and produces the file of section 2.
+**1.3** To write columns directly, read this document and SPEC.md in
+full, then produce the file of section 2.
 
 ---
 
@@ -87,12 +83,10 @@ values (SPEC.md 3.1): `C` is 1 and `W` is 1 at this version, and a reader
 rejects a source of another shape. `RR` is the row it repeats to; where
 `RR` equals `R` the source plays once.
 
-**5.2** The last row has bit 7 set, alone among the rows (SPEC.md 3.2).
-That bit is the marker, and the register reads the rest of the byte, so
-a source names a target whose register ignores bit 7: `setR1`, `setR3`,
-`setR5`, `setR6`, `setR8` to `setR10` and `setR13` (SPEC.md 2.1). A source
-on `setR0`, `setR7` or any other target of the fourteen belongs to a later
-version (SPEC.md 2.1, R6.2).
+**5.2** Set bit 7, the marker, on the last row and clear it on every
+other row (SPEC.md 3.2). The target register must ignore that bit:
+`setR1`, `setR3`, `setR5`, `setR6`, `setR8` to `setR10` or `setR13`.
+Other targets are left to a later version (SPEC.md 2.1, R6.2).
 
 **5.3** The format leaves the kind of a source to its shape (SPEC.md
 2.2); the sound follows from the shape:

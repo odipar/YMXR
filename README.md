@@ -17,51 +17,67 @@ Arnaud Carré's, and SNDH is the Atari ST scene's shared music container.
 
 ## What YMXR is
 
-A chiptune format for the Atari ST, and a player of it. YMXR replaces
-[YMX](https://github.com/odipar/YMX). Three repositories stand behind a
-tune file, each defining one layer:
+YMXR is a chiptune format and 68000 player for the Atari ST. It replaces
+[YMX](https://github.com/odipar/YMX) and encodes YMXS tune data in DTX
+tables. Each repository defines a layer:
 
-**[DTX](https://github.com/odipar/DTX)** is the table format: rows and
-columns, every value one width of 1, 2 or 4 bytes, repeating at a row
-the table selects. It defines the layout of a column and leaves the
-meaning to the format above it, and its readers, the 68000 code a tool
-binds a tune with, are there.
+- **[DTX](https://github.com/odipar/DTX)** defines table layout, packing
+  and 68000 readers. Values have a fixed width; tables repeat from a
+  selected row or play once.
+- **[YMXS](https://github.com/odipar/YMXS)** defines tune data and playback:
+  register rows, effects, sources and rates. Every conversion here passes
+  through this structure, which a tracker can emit as JSON.
+- **YMXR** encodes the structure as DTX tables and defines how each column
+  reaches the YM2149 sound chip or MC68901 (MFP) timers.
 
-**[YMXS](https://github.com/odipar/YMXS)** is the tune data structure:
-rows of registers and effects, the sources those effects run, and one
-rate a tune, encoded as JSON. Its SPEC.md defines what a tune is and
-what a player does with a row and a tick. Every conversion here passes
-through it, so a tune is read, edited or written as a structure, from a
-dump or from a tracker.
+## Reading and playback
 
-**YMXR**, this repository, encodes that structure as a thirty-column DTX
-table and defines the meaning of each column: the fourteen registers of
-the YM2149 and four effects, each a source on a target at a timer of the
-MC68901. A clock advances a table one row and a procedure writes the row
-to the chips: the host's clock advances the tune's table, a timer a
-source's, at the effect's rate.
+The host calls the player at the tune's frame rate. Each frame applies
+an unpacked tune row: effect columns first, then register columns. MFP
+interrupts run the tick procedure at each effect's rate.
+
+```mermaid
+flowchart TD
+    host[Host] -->|frame| frame[Player: apply tune row]
+    dtx[DTX reader] -->|unpacked row| frame
+    frame -->|effect columns| mfp[MFP timers]
+    frame -->|register columns| ym[YM2149]
+    mfp -->|tick| tick[Player: write source byte]
+    source[DTX1 source tables] -->|byte at place| tick
+    tick --> ym
+```
+
+A tick writes a source byte through its target. It advances the *place*,
+or, at the marker on the last row, repeats the source or stops its timer.
+[SPEC.md](doc/SPEC.md) sections 4 and 5 define the order and interrupt
+boundaries. A YMXR reader records frames instead of writing to the chips;
+its record excludes ticks (section 7).
 
 ## The documents
 
-| | what it defines | where to begin |
-|---|---|---|
-| [requirements.md](doc/requirements.md) | what the encoding has to do | a player, first |
-| [SPEC.md](doc/SPEC.md) | the format: every column, the frame, the tick, the rules a writer satisfies, the record a reader reports | a player, 1 to 5, with [YMXS's SPEC.md](https://github.com/odipar/YMXS/blob/main/doc/SPEC.md) beside it; a reader, 1 to 3 and 7 |
-| [BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, how a tool combines them, and the host's side | a player, after SPEC.md |
-| [doc/conformance/](doc/conformance) | the kit an independent reader is written against | a reader, after SPEC.md |
-| [writing.md](doc/writing.md) | writing a tune file, for a tracker or a converter | a writer |
-| [tools.md](doc/tools.md) | every tool: its flags, its lines, its exits | a tool |
-| [ymxs.md](doc/ymxs.md) | the structure every conversion passes through, and the clauses of YMXS this format encodes | |
-| [glossary.md](doc/glossary.md) | every term, one line each | |
-| [terminology.md](doc/terminology.md) | the machine, and the terms for it | |
-| [performance.md](doc/performance.md) | what a play call costs, in cycles | |
-| [experiments.md](doc/experiments.md) | ideas measured, and the measurements | |
-| [plan.md](doc/plan.md) | what a call could cost, and the cost of each step | |
-| [RELEASES.md](doc/RELEASES.md) | what changed in each published set | |
+For a player, begin with requirements, SPEC.md sections 1 to 5 and
+BINARIES.md. For a reader, use SPEC.md sections 1 to 3 and 7, then the
+conformance kit. Read SPEC.md with [YMXS's specification](https://github.com/odipar/YMXS/blob/main/doc/SPEC.md).
+
+| document | contents |
+|---|---|
+| [requirements.md](doc/requirements.md) | format and repository requirements |
+| [SPEC.md](doc/SPEC.md) | columns, frames, ticks, writer rules and reader output |
+| [BINARIES.md](doc/BINARIES.md) | binary layouts, assembly and host calls |
+| [doc/conformance/](doc/conformance) | independent reader tests |
+| [writing.md](doc/writing.md) | producing tune files from a tracker or converter |
+| [tools.md](doc/tools.md) | commands, flags, reports and exit codes |
+| [ymxs.md](doc/ymxs.md) | conversion through YMXS |
+| [glossary.md](doc/glossary.md) | term definitions |
+| [terminology.md](doc/terminology.md) | chip and format terminology |
+| [performance.md](doc/performance.md) | measured playback costs |
+| [experiments.md](doc/experiments.md) | experiments and measurements |
+| [plan.md](doc/plan.md) | estimated costs and possible reductions |
+| [RELEASES.md](doc/RELEASES.md) | release history |
 
 ## What is here
 
-| | |
+| source | contents |
 |---|---|
 | [`src/main/java/org/ymxr/`](src/main/java/org/ymxr) | the thirteen tools in Java, the reference: the converters, the check, the trace, the binder and the combiners |
 | [`go/`](go) | the same thirteen in Go, the executables a release ships |
@@ -85,15 +101,14 @@ bin/ymxr-trace -r4 < tune.ymxr
 ym/play.sh tune.ym
 ```
 
-The tune file has the tune's tables; the SNDH file is those tables bound
-with DTX's reader and combined with the player, which any SNDH host
-plays; the program plays the SNDH file on a bare machine. `ym/play.sh`
-runs the three tools and Hatari; `bin/ymxr-check` replays a dump against
-the tune it converts to, and `bin/ymxr-trace` prints the record a reader
-reports of a tune file ([SPEC.md](doc/SPEC.md) 7), the conformance kit's
-reference. Each tool reports on standard error and writes its output on
-standard output; `-silent` omits the report and the summary line and
-keeps the output and the notes ([tools.md](doc/tools.md) 3.3).
+A tune file contains tables. An SNDH file adds DTX's reader and the
+player; a TOS program plays that SNDH file on a bare machine.
+`ym/play.sh` runs the conversion and Hatari.
+
+`ymxr-check` compares a converted tune with its dump. `ymxr-trace`
+prints the frame record used by the conformance kit. Tools write output
+to standard output and reports to standard error; `-silent` omits the
+report and summary but preserves output and notes ([tools.md](doc/tools.md) 3.3).
 
 ## Building and testing
 
@@ -104,6 +119,6 @@ repository by `mvn install` in each checkout. The Go tree builds with
 
 | what runs | what it reads |
 |---|---|
-| `mvn test` | the documents against themselves and the house style; every dump under [`ym/test`](ym/test) converted through the structure to the file the converter writes, read back and replayed against its dump; the conformance kit made again and compared byte for byte; the four cores and the stub assembled and their descriptors, an SNDH file and a program read back; the two trees against each other |
-| [`68k/test/emu/test_ymxr.py`](68k/test/emu/test_ymxr.py) | the player on an emulated 68000: every frame's writes, the timers' programming and every tick against the specification's model; `-corpus`, `-hatari`, `-kit`, `-perf` and `-lean` select what it plays and which build ([tools.md](doc/tools.md) 18) |
-| [`ym/parity.py`](ym/parity.py) | one tune packed by YMX and by this repository, both played under Hatari, each frame's registers read against the other run's |
+| `mvn test` | document consistency and style; dump conversion and replay; conformance files byte for byte; assembled cores, stub, SNDH and PRG layouts; Java/Go parity |
+| [`68k/test/emu/test_ymxr.py`](68k/test/emu/test_ymxr.py) | emulated 68000 frames, timer programming and ticks against the specification model; corpus and build flags in [tools.md](doc/tools.md) 18 |
+| [`ym/parity.py`](ym/parity.py) | YMX and YMXR register writes compared frame by frame under Hatari |
