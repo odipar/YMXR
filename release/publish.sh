@@ -33,7 +33,7 @@ TOOLS="ym-to-ymxs ymx-to-ymxs ymxs-to-ymxr ymxs-to-sndh ymxs-to-prg \
        ym-to-ymxr ymx-to-ymxr ymxr-multi ymxr-bind ymxr-sndh ymxr-prg \
        ymxr-trace ymxr-check"
 
-# The version names the zips. The pom is where it is written down, and this
+# The version names the zips. The pom is where it is recorded, and this
 # reads the text rather than running anything.
 VERSION=${1:-$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml | head -1)}
 if [ -z "$VERSION" ]; then

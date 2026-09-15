@@ -157,6 +157,15 @@ final class HouseStyleTest {
             " own ",
             " own.",
             // a person's viewpoint in a sentence about a file
+            // the metaphor: a form is an encoding of the structure, and a
+            // tune is encoded rather than written down
+            "written down",
+            "write down",
+            "writes down",
+            "writing down",
+            "a tune down",
+            "the structure down",
+            "puts down",
             "would rather");
 
     /** Every Markdown file in the tree but the two that define the rules. */

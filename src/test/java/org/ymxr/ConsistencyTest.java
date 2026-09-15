@@ -699,7 +699,7 @@ final class ConsistencyTest {
     private static List<Integer> table(Path at, String named) throws IOException {
         Matcher said = Pattern.compile(named + "\\s*=\\s*\\[([^\\]]*)\\]")
                 .matcher(read(at));
-        assertTrue(said.find(), at + " writes down no " + named);
+        assertTrue(said.find(), at + " records no " + named);
         List<Integer> out = new ArrayList<>();
         for (String one : said.group(1).split(",")) {
             out.add(Integer.decode(one.trim()));

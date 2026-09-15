@@ -19,7 +19,7 @@ writer satisfies.
 
 This document defines one encoding of that structure and repeats none of
 it. A rule that belongs to YMXS is cited as `(YMXS, SPEC.md 3.4)` and
-written down there alone, as a rule that belongs to DTX is cited as `(DTX,
+defined there alone, as a rule that belongs to DTX is cited as `(DTX,
 SPEC.md 2.2)`.
 
 | here | there |
