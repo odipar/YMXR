@@ -1,13 +1,10 @@
 # The YMXR format
 
-Version 3 of the tune file: one encoding of the YMXS tune data structure
-(YMXS, SPEC.md 1) as a DTX table and the tables beside it, and what a
-player of it writes to the YM2149 and the MC68901 of an Atari ST. The
-columns of the table (1), the maps from a column's value to a target, a
-source and a timer (2), the tables and the tune file (3), the procedure
-of a frame (4) and of a tick (5), the rules a writer satisfies and what a
-check reports (6), the record a reader produces (7), and what a later
-version defines (8).
+Version 3 encodes YMXS tune data (YMXS, SPEC.md 1) as DTX tables for
+playback on the Atari ST's YM2149 and MC68901. This document defines
+columns (1), target, source and timer maps (2), file layout (3), frames
+(4), ticks (5), writer rules and checks (6), reader output (7), and later
+versions (8).
 
 A tune's table is a DTX table (DTX, SPEC.md 1) of one width (R1.1), a
 byte, the width of a register: 30 columns of the 32 R3.4 allows, each one
@@ -484,11 +481,9 @@ bytes of the name at 16, and the DTX2 table at 40.
 
 ## 4. The frame
 
-The player performs 4.1 once, 4.2 once a call of the host, and 4.7 once
-at the end. It reads the current row of the tune's table one row a frame
-and writes the columns the row sets; a column the row leaves unset is
-left unread, and a value the player requires on a later row is kept
-(R4.6).
+The player initializes once (4.1), processes a row on each host call
+(4.2), and stops once (4.7). Each frame applies the current tune row,
+reading only set columns and keeping values needed by later rows (R4.6).
 
 ### 4.1 Before the first frame
 
@@ -530,11 +525,10 @@ One call of the player, in order:
    row n below R - 1, and row RR after row R - 1 (4.5).
 6. Report 0.
 
-A player performs step 3 for the effects the effects used names and
-leaves the columns of the other effects unread; a reader performs it for
-all four (7.3). Every write of step 4 follows the four effects of step 3:
-a tick between two effects reads the effects before it as the row leaves
-them and those after it as they were.
+At step 3, a player processes only the effects marked in effects used;
+a reader processes all four (7.3). Register writes follow effect
+operations. A tick between two operations uses the updated effects
+before it and the previous values of those after it.
 
 Note: a player that reads the row of the next frame at the end of a
 call, after step 4, leaves the writes of every frame at one offset from
@@ -566,9 +560,9 @@ order:
 6. Where K is set with bit 5 at 1, and S is unset or set to 0: the place
    is row 0 of the source last started on the timer.
 
-The three writes of step 3 are made at interrupt level 7, so a tick falls
-before all of them or after all of them. A row that leaves T, S and K
-unset and N at 0 leaves the effect as it is.
+A start updates the tick's target, place and loop row at interrupt level
+7; a tick occurs before or after the complete update. With T, S and K
+unset and N at 0, the effect continues unchanged.
 
 Note: step 4 before step 5 loads the count before the select starts a
 stopped timer (YMXS, SPEC.md 3.4.1 and 8.5).
@@ -599,11 +593,10 @@ Note: on a 68000 the two bytes of a write are one `movep.w`.
 
 ### 4.5 The wrap
 
-The row after row R - 1 of a tune whose RR is below R is row RR, read by
-the next frame and performed as any row. The wrap leaves every timer,
-every place and every kept value as it is (YMXS, SPEC.md 4.5); rule 1(d)
-and rule 6(a) of YMXS, SPEC.md 6 define what the repeat row performs on
-a running timer.
+When RR is below R, the frame after row R - 1 reads row RR and performs
+it as any row. The wrap preserves timers, places and kept values (YMXS,
+SPEC.md 4.5). YMXS, SPEC.md 6 rules 1(d) and 6(a) define the repeat row's
+operations on a running timer.
 
 ### 4.6 The end
 
@@ -658,13 +651,12 @@ one; a tick of the same timer or of a lower one is served after it.
 
 ### 5.2 The timer at a tick
 
-A tick leaves the data register and, other than the stop of 5.1 step 4,
-the control register of its timer as they are: the timer counts the next
-period from the count it has, and a count written by a row loads as YMXS,
-SPEC.md 3.3.5 defines. A tick reads its source alone; the tune's table is
-read at a frame (4.2). What a tick performs on a timer whose source is
-disconnected, a select written before the first start (rule 4), is left
-to a later version (section 8).
+A tick leaves its timer's data register unchanged and writes the control
+register only to stop the timer (5.1 step 4). The next period uses the
+current count; a count written by a row loads as YMXS, SPEC.md 3.3.5
+defines. Ticks read source rows; frames read tune rows (4.2). A select
+written before the first start breaks rule 4; ticks with a disconnected
+source are left to a later version (section 8).
 
 ---
 

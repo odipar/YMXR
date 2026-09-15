@@ -1,9 +1,8 @@
 # The YMXR binaries
 
-The files a tool writes around tune files (SPEC.md 3.3), and what a host
-does with each: the multi file (0), the bound tune (1), the SNDH core
-(2), the SNDH file (3), the program stub and the program around an SNDH
-file (4), and the procedure of a host that drives the player (5).
+Binary layouts and host calls: multi files (0), bound tunes (1), SNDH
+cores (2), SNDH files (3), program stubs and programs (4), and host
+procedures (5).
 
 **Conventions.** A clause is cited by number, 2.7. `Note:` begins an
 informative sentence. A range includes both ends. A field of more than
@@ -97,11 +96,10 @@ condition met of the table below; then reads each tune file as SPEC.md
 
 ## 1. The bound tune
 
-**1.1** The player reads a bound tune: the header fields, the source
-index and the DTX1 tables of a tune file (SPEC.md 3.3), with an image in
-place of the DTX2 table. The image is the packager's output for the table
-at the unit and the copies flag its payload records (DTX, SPEC.md 2.3;
-abi.md 1); every row of every table is byte for byte the tune file's.
+**1.1** A bound tune combines tune metadata, a source index and DTX1
+tables with an image in place of the tune file's DTX2 table. The packager
+builds that image using the table's unit and copies flag (DTX, SPEC.md
+2.3; abi.md 1). Every unpacked row matches the tune file byte for byte.
 
 **1.2 Layout.**
 
@@ -150,9 +148,8 @@ field at 16 written 0; 3.1 places the images and patches the field.
    its `RR` and its rows from byte 16.
 6. Report 0.
 
-The fields at 6, 10 and 12 are outside what the player reads: the rate is
-the host's clock (5.4), and the field at 12 sizes the workspace the host
-provides (5.2).
+The player skips fields 6, 10 and 12. The host supplies the frame clock
+(5.4) and allocates the workspace sized by field 12 (5.2).
 
 ---
 

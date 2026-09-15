@@ -1,4 +1,4 @@
-# YMXS in the middle
+# Conversion through YMXS
 
 [YMXS](https://github.com/odipar/YMXS) is the tune data structure: rows of
 registers and effects, the sources those effects run, and one rate a tune.
@@ -15,25 +15,19 @@ here passes through it.
 bytes the pipeline writes, which `YmxsTest` reads back on every tune under
 `ym/test`.
 
-A YMXS file is where a tune is read, edited or written: a tracker that
-emits YMXS reaches this player through it.
+A tracker can emit YMXS JSON for conversion to YMXR.
 
 ## The two stages
 
-**Reading** decides what a tune is. `Ym` reads a YM5!/YM6! dump and `Ymx` a
-YMX file: which register each row sets, which effect starts, moves or
-stops, what each source sounds, and which row the tune repeats to. Every
-rule about a dump lives here: a drum preempting a square on its voice, a
-drum's duration reckoned from its rows and its rate, the volume register
-an effect owns, and the row the tune repeats to setting every register and
-starting every effect that runs into the wrap.
+**Reading.** `Ym` converts a YM5!/YM6! dump and `Ymx` a YMX file into
+register rows, effects, sources and a repeat row. Import rules cover
+drums preempting square waves, drum duration from source rows and rate,
+effect volume registers, and repeat rows that restore registers and
+restart effects running through the wrap.
 
-**The schema** (`Schema`) encodes that structure as the thirty columns of
-SPEC.md 1. Every rule about the encoding lives here: the set bit, the bit
-beside a column that fills its byte, the four columns an effect, the
-marker on a source's last row, and the effect each timer runs.
-
-One class reads a dump, and one class writes a column.
+**Encoding.** `Schema` converts the structure into the columns of SPEC.md
+1: set bits, bits marking zero values in full-byte columns, effect
+columns, source markers and timer assignments.
 
 ## What each column is written from
 
@@ -41,8 +35,8 @@ One class reads a dump, and one class writes a column.
 |---|---|
 | a row's registers | each in its column, with the set bit, and the bit beside it where a column that fills its byte is 0 (1.1, 1.2, 1.7) |
 | a count of 0 | the count column at 0, and bit 4 of the control column beside it, which marks that 0 as the value the MFP counts 256 for (1.1, 1.9) |
-| `Start` | the source column; the target column where the target differs from the one the player keeps; the control column with the two resets; the count column |
-| `Retune` | the control column where the select or a reset moved, or the count moved to 0; and the count column where the count moved |
+| `Start` | source; target if changed; control and count if a reset is set, the rate changes or the timer may be stopped |
+| `Retune` | control if the select changes, a reset is set or the count changes to 0; count if changed |
 | `Stop` | the source column at `$80`, the rate columns left unset (1.8) |
 | a source | its values, bit 7 set on the last row as the marker (3.2), repeating at its repeat row |
 | Timer A, D, B, C | effects 0, 1, 2, 3 (2.3) |
@@ -50,22 +44,19 @@ One class reads a dump, and one class writes a column.
 
 ## The rate a row leaves alone
 
-A YMXS effect is the whole of what an effect is: its target, its source and
-its rate. A column is written where its value differs from the value the
-player keeps (R3.6, R4.6), so the schema keeps the target, the select and
-the count of each effect as a player does, and a retune whose select is the
-kept one leaves the control column unset.
+The schema tracks each effect's target, select and count as the player
+does (R3.6, R4.6). It omits unchanged columns where the operation permits:
+a retune with both resets clear that changes only a nonzero count leaves
+the control column unset. For a start, the timer is treated as running
+only when its previous source repeats and has not been stopped.
 
-Each structure encodes the columns it needs: a row that moves a count alone
-and a row that moves both are two structures.
-
-After the wrap a player keeps what the last row left, so the row the tune
-repeats to writes its targets again.
+A wrap preserves the player's kept values, so the repeat row writes its
+targets again.
 
 ## What is an error
 
-A structure this format cannot encode is a fault of the file, and the tool
-reading it exits 1 and says which row:
+For a structure this format cannot encode, the tool reports the row
+and exits 1:
 
 | the structure | why |
 |---|---|
@@ -75,11 +66,9 @@ reading it exits 1 and says which row:
 
 ## The tools
 
-Each is a filter: standard input, standard output, and the report on
-standard error (tools.md). Each stage passes bytes on a pipe to the next.
-The Java `ymx-to-ymxs` runs YMX's `ymx-dump`, which opens a file name
-rather than a stream, so it calls the program with `/dev/stdin` and reads
-its input through it. The Go tool decodes the file itself.
+The tools read standard input, write standard output and report on
+standard error (tools.md). Java's `ymx-to-ymxs` calls YMX's `ymx-dump`
+with `/dev/stdin` as its file name. The Go tool decodes YMX directly.
 
 A YMXS multi of several tunes is a set of subtunes, one tune file each,
 which `ymxs-to-sndh` puts behind one core. `ymxs-to-ymxr` writes those
