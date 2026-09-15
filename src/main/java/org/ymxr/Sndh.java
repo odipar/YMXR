@@ -302,6 +302,9 @@ final class Sndh {
             imageAt[i] = at;
             at += set.images().get(i).length;
         }
+        // Every bound tune of the set begins on an even address (5.1), the
+        // first as well as the rest: the last image's length may be odd.
+        at = even(at);
         int[] offsets = new int[n];
         for (int i = 0; i < n; i++) {
             offsets[i] = at;

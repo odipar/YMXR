@@ -86,13 +86,17 @@ final class Ymxs {
     /** One tune file: the structure mapped onto the columns and packed. */
     static byte[] tuneFile(Tool tool, org.ymxs.YMXS.Tune tune, Packing packing, Report report) {
         Schema.Made made;
+        Tune.Written written;
         try {
             made = Schema.of(Padding.toUnit(tune, packing.unit(), report).tune());
+            // The writer's faults of the encoding are reported here as the
+            // schema's are: a structure the columns or the header cannot
+            // carry is the tune's, and the tool names it and exits 1.
+            written = Tune.write(made.columns(), made.sources(), made.rate(),
+                    packing.unit(), packing.ring(), packing.packer(), report, tune.title());
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
-        Tune.Written written = Tune.write(made.columns(), made.sources(), made.rate(),
-                packing.unit(), packing.ring(), packing.packer(), report, tune.title());
         report.row(title(tune), org.ymxs.Tunes.size(tune.table()) + " rows at " + made.rate()
                 + " Hz, " + made.sources().count() + " sources: "
                 + written.file().length + " bytes");
