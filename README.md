@@ -17,9 +17,9 @@ Arnaud Carré's, and SNDH is the Atari ST scene's shared music container.
 
 ## What YMXR is
 
-A chiptune format for the Atari ST, and a player of it. YMXR replaces
-[YMX](https://github.com/odipar/YMX). Three repositories stand behind a
-tune file, each defining one layer:
+YMXR is a chiptune format and 68000 player for the Atari ST. It replaces
+[YMX](https://github.com/odipar/YMX) and encodes YMXS tune data in DTX
+tables. Each repository defines a layer:
 
 **[DTX](https://github.com/odipar/DTX)** is the table format: rows and
 columns, every value one width of 1, 2 or 4 bytes, repeating at a row
