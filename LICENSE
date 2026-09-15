@@ -1,115 +1,85 @@
-YMX License
-===========
+YMXR License
+============
 
-YMX is a streaming chiptune format for the Atari ST's 68000. This repository
-holds the format specification (doc/SPEC.md, doc/BINARIES.md), the 68000
-players, the Java and C# tools that pack and combine, and the test rigs. It
-carries a copy of the ST4 compression project (https://github.com/odipar/ST4)
-and, through it, of the ZX1 data compression format
-(https://github.com/einar-saukas/ZX1), and it follows their dual licensing
-structure:
+YMXR is a chiptune format for the Atari ST: one encoding of the YMXS tune
+data structure in a DTX table, and a player of it. This repository contains
+the specification and the documents around it (doc/), the conformance kit
+(doc/conformance/), the 68000 player with the SNDH core and the program stub
+combined around it (68k/), the tools in Java (src/main/java/org/ymxr) and in
+Go (go/), and the rigs, the tests and the scripts.
 
-1. THE COMPRESSOR - the compressors and optimizers in Java
-   (src/main/java/org/st4) and C# (dotnet/st4), derived from Einar Saukas'
-   optimal C compressor through ST1's jx1, apart from the decompressor files
-   clause 2 lists - is available under the BSD 3-Clause License below. In
-   practice this is relevant only if you modify its source code and/or
-   incorporate the compressor within your own products; if you just execute
-   it to pack files, you can simply ignore these conditions.
+The format may be implemented freely. doc/SPEC.md and doc/BINARIES.md are the
+contract, and an independent writer, player or reader owes only the
+acknowledgement below.
 
-2. THE DECOMPRESSORS, PLAYERS AND TOOLS can be used freely within your own
-   programs (for any platform), even for commercial releases. The only
-   condition is that you must indicate somehow in your documentation that
-   you have used ZX1, via ST4 or YMX. They are:
+1. THE DOCUMENTS under doc/ and this file are Copyright (c) 2026 Robbert van
+   Dalen.
 
-   * The reference decompressors: src/main/java/org/st4/St4Decompressor.java,
-     src/main/java/org/st4/Dst4.java, dotnet/st4/St4Decompressor.cs
-     and dotnet/st4/Dst4Cli.cs.
-   * The ST4 68000 decoders: 68k/ST4.S, 68k/ST4_wrap.S, 68k/ST4_ring.S.
-   * The YMX players: 68k/YMX.S, 68k/YMX_sndh.S, 68k/YMX_player.S.
-   * The packers, combiners and front ends: src/main/java/org/ymx/,
-     src/main/java/org/ym6/, dotnet/ymx/, dotnet/ym6/,
-     dotnet/Program.cs and dotnet/Check.cs.
-   * The rigs and tests: src/test/, dotnet/rig/, 68k/test/ and ymx/test/.
-   * The shell scripts: ym/*.sh and ymx/*.sh.
-   * The prebuilt binaries in dist/ and the ones the releases carry.
+2. THE PLAYER, THE TOOLS AND THE TESTS can be used freely within your own
+   programs, for any platform, even for commercial releases. The only
+   condition is that you must indicate somehow in your documentation that you
+   have used YMXR, and that you have used ZX1 through ST4 through DTX where
+   what you ship contains a DTX image (see the attribution below). They are
+   everything under 68k/, src/, go/, bin/, ym/, ymx/ and release/, and the
+   executables and the 68000 binaries a release carries.
 
-   The tunes under ym/test are test input; this licence says
-   nothing about the music in them.
-
-The YMX format itself may be implemented freely: doc/SPEC.md and
-doc/BINARIES.md are the contract, and an independent writer, player or
-combiner owes only the same acknowledgement.
+   The tunes under ym/test and ymx/test are test input; the music in them is
+   outside this licence.
 
 Attribution
 -----------
 
-* The ZX1 data compression format and algorithm was designed and implemented
-  by Einar Saukas (Copyright (c) 2021), with thanks to introspec/spke. The
-  original C and z80 sources live in the ZX1 repository.
-* The ST4 format (the four streams, the unit alignment, the container) is
-  Copyright (c) 2026 Robbert van Dalen, copied here as org.st4, dotnet/st4
-  and the 68k/ decoders. ST4_wrap.S is based on ST1_wrap.S, which OpenAI
-  Codex adapted for ST1 from ST1_ring.S.
-* The YMX format, the packers and combiners, the SNDH and PRG tooling, the
-  C# tree and the emulation and measurement rigs are Copyright (c) 2026
-  Robbert van Dalen; written by Claude (Anthropic's Claude Code) under
-  Robbert van Dalen's direction.
-* The YM5/YM6 register-dump formats are by Arnaud Carré (Leonard/Oxygene);
-  YMX reads them, and the player was inspired by Steven Tattersall's
-  MinYMiser. The LHA depacker in org.ym6 and dotnet/ym6 is ported from the
-  ST-Sound library's LZH code by Arnaud Carré, itself based on LZH code by
-  Haruhiko Okumura (1991) and Kerwin F. Medina (1996).
-* SNDH is the Atari ST scene's shared music container; the SNDH files YMX
-  builds follow revision 2.2 of its file structure.
+* YMXR, its specification, its player, its tools and its tests are Copyright
+  (c) 2026 Robbert van Dalen; written by Claude (Anthropic's Claude Code)
+  under Robbert van Dalen's direction.
+* DTX, https://github.com/odipar/DTX, Copyright (c) 2026 Robbert van Dalen,
+  is the table format a tune is laid out in. This repository depends on DTX
+  rather than copying it: the Maven artifact, and the Go module
+  github.com/odipar/dtx/go. A release built here carries DTX's twenty-two
+  68000 images, and each contains an ST4 decoder, so a program written with
+  these tools uses ZX1 through ST4 through DTX, and your documentation
+  indicates that in the same way.
+* ST4, https://github.com/odipar/ST4, Copyright (c) 2026 Robbert van Dalen,
+  packs a DTX2 column; its compressor is derived from the ZX1 data
+  compression format and algorithm, designed and implemented by Einar Saukas
+  (Copyright (c) 2021), with thanks to introspec/spke. No source of either is
+  kept here, so the BSD 3-Clause License that covers that compressor stands
+  in ST4's and DTX's own licence files rather than in this one; a decoder in
+  a DTX image is free to use on the acknowledgement above.
+* YMXS, https://github.com/odipar/YMXS, Copyright (c) 2026 Robbert van Dalen,
+  is the tune data structure this format encodes, and every conversion here
+  passes through it: the Maven artifact, and the Go module
+  github.com/odipar/ymxs/go. No source of it is kept here.
+* YMX, https://github.com/odipar/YMX, Copyright (c) 2026 Robbert van Dalen,
+  is the format YMXR replaces. ymx-to-ymxr reads a .ymx file through it, the
+  Go module github.com/odipar/ymx/go, and ym/parity.py plays one tune packed
+  by each against the other.
+* The YM5 and YM6 register-dump formats are by Arnaud Carré
+  (Leonard/Oxygene); ym-to-ymxr reads them. The LHA depacker in
+  src/main/java/org/ymxr/Lha.java and go/ym/dump.go is carried from YMX's
+  org.ym6.Lha, a port of the ST-Sound library's LZH code by Arnaud Carré,
+  itself based on LZH code by Haruhiko Okumura (1991) and Kerwin F. Medina
+  (1996). It carries both notices below.
+* SNDH is the Atari ST scene's shared music container; ymxr-sndh and
+  ymxs-to-sndh write files of that structure (doc/BINARIES.md 3).
 
 Used by the build and the tests, not distributed
 ------------------------------------------------
 
-* rmac, the 68000 assembler, assembles the players and prebuilt binaries.
-* Hatari, with a TOS or EmuTOS image, runs the real-hardware harness.
-* The Unicorn engine (GPL-2.0) is loaded at run time by the emulator rigs
-  from the machine's own installed copy; no part of it is kept or
-  distributed here.
-* Maven pulls JSpecify, JUnit, Error Prone and NullAway for the Java build;
-  the .NET SDK builds the C# tree. No copy of any of them is kept here.
-
-BSD 3-Clause License (the compressor)
--------------------------------------
-
-Copyright (c) 2021, Einar Saukas (original ZX1)
-Copyright (c) 2026, Robbert van Dalen (ST4 and YMX additions)
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+* rmac, the 68000 assembler, assembles the four cores and the stub.
+* Hatari, with a TOS or EmuTOS image, runs the harness on an emulated
+  machine.
+* The Unicorn engine (GPL-2.0) is loaded at run time by the emulator rig from
+  the machine's own installed copy; no part of it is kept or distributed
+  here.
+* Maven pulls DTX, YMXS, JSpecify, JUnit, Error Prone and NullAway for the
+  Java build, and the Go toolchain builds go/. No copy of any of them is kept
+  here.
 
 ST-Sound notices (the LHA depacker)
 -----------------------------------
 
-The LHA depacker in src/main/java/org/ym6/Lha.java and dotnet/ym6/Lha.cs is a
+The LHA depacker in src/main/java/org/ymxr/Lha.java and go/ym/dump.go is a
 port of StSoundLibrary/LZH/LzhLib.cpp from ST-Sound, which carries both
 notices below.
 
