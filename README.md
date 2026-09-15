@@ -3,6 +3,23 @@
 A chiptune format for the Atari ST, and a player of it. YMXR replaces
 [YMX](https://github.com/odipar/YMX).
 
+## Read this first
+
+**AI wrote most of YMXR.** Claude (Anthropic's Claude Code) wrote the
+two tool trees, the 68000 player and the two files combined around it,
+the tests, the emulation rig and most of what is written here, under
+Robbert van Dalen's direction: he requested, read and merged every
+change. [LICENSE](LICENSE) is the terms. Whether to use software
+written that way is the reader's decision, and this section is here so
+that the decision is informed.
+
+What it is built on is older than it. DTX defines the table and the 68000
+readers a tool binds a tune with, and the ST4 compressor beneath DTX
+derives from Einar Saukas's ZX1. The YM5 and YM6 register-dump formats are
+Arnaud Carré's, and SNDH is the Atari ST scene's shared music container.
+
+## The three layers
+
 Three repositories stand behind a tune file, each defining one layer:
 
 **[DTX](https://github.com/odipar/DTX)** is the table format: rows and
