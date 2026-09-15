@@ -386,11 +386,28 @@ final class HouseStyleTest {
         List<String> hits = new ArrayList<>();
         for (Path document : documents) {
             List<String> lines = Files.readAllLines(document);
+            boolean fenced = false;
+            boolean span = false;
             for (int at = 0; at < lines.size(); at++) {
+                if (lines.get(at).isBlank()) {
+                    // a paragraph ends, and a span with it
+                    span = false;
+                }
+                if (lines.get(at).startsWith("```")) {
+                    fenced = !fenced;
+                    continue;
+                }
+                // A fence and an indented block are quoted: a message a
+                // tool writes, a file's bytes, a command. The rules are
+                // for prose, and a quotation keeps the words it quotes.
+                if (fenced || lines.get(at).startsWith("    ")) {
+                    continue;
+                }
                 // a space in front, so an entry that leads
                 // with one matches a word at the start of a
                 // line as well as inside one
-                String line = " " + lines.get(at).toLowerCase();
+                String line = " " + quoted(lines.get(at), span).toLowerCase();
+                span = open(lines.get(at), span);
                 for (String struck : STRUCK) {
                     if (line.contains(struck)) {
                         hits.add(document + ":" + (at + 1)
@@ -427,12 +444,14 @@ final class HouseStyleTest {
             }
             if (at > from) {
                 List<String> paragraph = lines.subList(from, at);
-                String joined = " " + String.join(" ", paragraph).toLowerCase();
+                String joined = " " + quoted(String.join(" ", paragraph), false).toLowerCase();
                 for (String struck : STRUCK) {
                     int whole = occurrences(joined, struck);
                     int apart = 0;
+                    boolean span = false;
                     for (String line : paragraph) {
-                        apart += occurrences(" " + line.toLowerCase(), struck);
+                        apart += occurrences(" " + quoted(line, span).toLowerCase(), struck);
+                        span = open(line, span);
                     }
                     for (int n = apart; n < whole; n++) {
                         hits.add(document + ":" + (from + 1) + " has \""
@@ -443,6 +462,44 @@ final class HouseStyleTest {
             from = at + 1;
         }
         return hits;
+    }
+
+    /**
+     * {@code said} with every inline code span blanked, the backticks
+     * included, where {@code open} says a span from an earlier line of
+     * the paragraph is still open.
+     *
+     * <p>A span between backticks is a quotation: a message a tool
+     * writes, a column's name, a flag, a field of a file. The rules are
+     * for prose, and a quotation keeps the words it quotes, so a struck
+     * phrase inside one is the quoted program's and not this document's.
+     * Each character of a span becomes a space, so a hit that straddles
+     * a span's edge still stands out.
+     */
+    private static String quoted(String said, boolean open) {
+        StringBuilder out = new StringBuilder(said);
+        boolean inside = open;
+        for (int at = 0; at < out.length(); at++) {
+            if (out.charAt(at) == '`') {
+                inside = !inside;
+                out.setCharAt(at, ' ');
+            } else if (inside) {
+                out.setCharAt(at, ' ');
+            }
+        }
+        return out.toString();
+    }
+
+    /** Whether a span open at the start of {@code said} is open at its
+     *  end: a span wraps with the paragraph it stands in. */
+    private static boolean open(String said, boolean open) {
+        boolean inside = open;
+        for (int at = 0; at < said.length(); at++) {
+            if (said.charAt(at) == '`') {
+                inside = !inside;
+            }
+        }
+        return inside;
     }
 
     /** How many times a struck phrase stands in a run of text. */

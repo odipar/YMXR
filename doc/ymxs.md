@@ -16,7 +16,7 @@ bytes the pipeline writes, which `YmxsTest` reads back on every tune under
 `ym/test`.
 
 A YMXS file is where a tune is read, edited or written: a tracker that
-emits YMXS reaches this player with no dump behind it.
+emits YMXS reaches this player through it.
 
 ## The two stages
 
@@ -50,15 +50,14 @@ One class reads a dump, and one class writes a column.
 
 ## The rate a row leaves alone
 
-A YMXS effect is the whole of what an effect is: its target, its source
-and its rate. A column is written where its value differs from the value
-the player keeps (R3.6, R4.6), so the schema keeps the target, the select
-and the count of each effect as a player does, and a retune whose select
-did not move leaves the control column unset.
+A YMXS effect is the whole of what an effect is: its target, its source and
+its rate. A column is written where its value differs from the value the
+player keeps (R3.6, R4.6), so the schema keeps the target, the select and
+the count of each effect as a player does, and a retune whose select is the
+kept one leaves the control column unset.
 
-The delta is not part of the structure, and it is not lost by leaving it
-out: a row that moves a count alone and a row that moves both are two
-different structures, and each encodes to the columns it needs.
+Each structure encodes the columns it needs: a row that moves a count alone
+and a row that moves both are two structures.
 
 After the wrap a player keeps what the last row left, so the row the tune
 repeats to writes its targets again.
@@ -77,11 +76,10 @@ reading it exits 1 and says which row:
 ## The tools
 
 Each is a filter: standard input, standard output, and the report on
-standard error (tools.md). No stage writes a file between them: a tune
-passes from one to the next as bytes on a pipe. The Java `ymx-to-ymxs`
-runs YMX's `ymx-dump`, which opens a file name rather than a stream, so it
-calls the program with `/dev/stdin` and reads its input through it. The Go
-tool decodes the file itself.
+standard error (tools.md). Each stage passes bytes on a pipe to the next.
+The Java `ymx-to-ymxs` runs YMX's `ymx-dump`, which opens a file name
+rather than a stream, so it calls the program with `/dev/stdin` and reads
+its input through it. The Go tool decodes the file itself.
 
 A YMXS multi of several tunes is a set of subtunes, one tune file each,
 which `ymxs-to-sndh` puts behind one core. `ymxs-to-ymxr` writes those
