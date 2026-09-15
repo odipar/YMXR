@@ -33,6 +33,43 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.13, 2026-09-15
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.13>, built from the commit
+tagged `v0.3.13`.
+
+Two tools come out, and one fault is reported rather than written. A dump
+converts to the same bytes as under 0.3.12: over the ten dumps under
+`ym/test` through `ym-to-ymxr`, `ym-to-ymxs`, `ymxs-to-sndh`, `ymxs-to-prg`,
+`ymxr-bind`, `ymxr-sndh` and `ymxr-prg`, over the eleven tunes of the
+conformance kit through `ymxr-trace`, and over sets of 2, 3, 5 and 10
+through `ymxr-multi` and `ymxr-sndh`, every file is byte for byte 0.3.12's,
+and every report on standard error reads the same. The format is unchanged,
+YMXS 0.3.2 and DTX 0.10.1 with it.
+
+- **`ymx-to-ymxr` and `ymx-to-ymxs` come out, leaving eleven tools.** YMX is
+  a design document now, and the format, the player and the tools it had are
+  in that repository's history. A tune packed by those tools reaches this
+  player through 0.3.12, the last release that reads a `.ymx` file. These go
+  with the two: the `.ymx` reader under each, the Go module
+  `github.com/odipar/ymx/go`, `ym/parity.py`, `ymx/` and its four `.ymx`
+  files, `ym/convert.py pairs`, and `YMX_DUMP`, `YMX_REPO`, `YMX_BIN` and
+  `YMX_PAIRS`. tools.md loses section 7, so every section after it moves
+  down one and every citation moves with it.
+- **A frame rate above 65,535 is an error.** The frame rate is a word at
+  offset 6 (BINARIES.md 1) and a YMXS rate reaches 2,147,483,647 (YMXS,
+  SPEC.md 1.3), and the write was unbounded: a tune at 70,000 Hz was written
+  at 4,464 Hz and the tool exited 0. Both trees name the rate and the bound
+  and exit 1. The Java tree ended in a stack trace where the Go tree wrote
+  one line; both write one line now.
+- **Subtune 1 of a set begins on an even address.** Every bound tune of a set
+  does (BINARIES.md 5.1), and the first was left at the byte after the last
+  image, odd where that image's length is odd. The sets measured above are
+  unchanged; a set whose first image is an odd length differs from 0.3.12's.
+- README.md, LICENSE and the documents under `doc/` were rewritten against
+  the code, and README.md, LICENSE and glossary.md name YMX as the family
+  this repository belongs to. Documentation only.
+
 ### 0.3.12, 2026-09-13
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.12>, built from the commit
