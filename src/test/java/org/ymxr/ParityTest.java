@@ -299,4 +299,28 @@ final class ParityTest {
             assertArrayEquals(java.out(), go.out(), tool + " writes the same bytes");
         }
     }
+
+    /**
+     * A frame rate the word at 6 cannot carry, in both trees. A YMXS rate
+     * reaches 2,147,483,647 (YMXS, SPEC.md 1.3) and the word reads 1 to
+     * 65,535, so a writer reports the rate rather than writing its low
+     * sixteen bits; {@code WriterTest} reads the bound, and this reads the
+     * two trees against each other, which no dump reaches, a dump's rate
+     * being a word.
+     */
+    @Test
+    void aRateThePlayerCannotReadIsOneFaultInBothTrees() throws Exception {
+        byte[] fast = ("{\"format\":\"ymxs\",\"version\":3,\"tunes\":[{\"title\":\"fast\","
+                + "\"composer\":\"\",\"writer\":\"t\",\"rate\":70000,\"rows\":2,"
+                + "\"repeat\":0,\"sources\":[],\"registers\":{\"r0\":[1,2]}}]}")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        Ran java = ran(Path.of("bin"), "ymxs-to-ymxr", fast, "-silent");
+        assertEquals(1, java.exit(), "the writer reports the rate: " + java.said());
+        assertTrue(java.said().contains("a frame rate of 70000"),
+                "the line names the rate: " + java.said());
+        Ran go = ran(built(), "ymxs-to-ymxr", fast, "-silent");
+        assertEquals(java.exit(), go.exit(), "both trees exit 1: " + go.said());
+        assertEquals(steady(java.said()), steady(go.said()), "both write one line");
+        assertEquals(0, java.out().length, "a fault writes no bytes");
+    }
 }

@@ -39,6 +39,12 @@ final class Tune {
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
     static final int VERSION = 0x0003;
     static final int FRAME_RATE_AT = 6;
+
+    /** The largest frame rate the word at {@link #FRAME_RATE_AT} reads. A
+     *  YMXS rate reaches 2,147,483,647 (YMXS, SPEC.md 1.3), so a writer
+     *  reads this bound rather than writing the low sixteen bits of a
+     *  rate above it. */
+    static final int MOST_RATE = 65535;
     static final int EFFECTS_AT = 8;
     static final int COUNT_AT = 9;
     static final int NAME_AT = 10;
@@ -99,6 +105,10 @@ final class Tune {
     /** The same, with the tune named. */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          Packer packer, Report report, String name) {
+        if (frameRate < 1 || frameRate > MOST_RATE) {
+            throw new IllegalArgumentException("a frame rate of " + frameRate
+                    + ", and the frame rate is a word, 1 to " + MOST_RATE);
+        }
         int frames = columns.column[0].length;
         int repeat = columns.repeat;
         // Padding runs before this in every tool (SPEC.md 6, rule 6), so a

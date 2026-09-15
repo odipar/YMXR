@@ -273,6 +273,9 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 		imageAt[i] = at
 		at += len(set.Images[i])
 	}
+	// Every bound tune of the set begins on an even address (5.1), the
+	// first as well as the rest: the last image's length may be odd.
+	at = even(at)
 	offsets := make([]int, n)
 	for i := 0; i < n; i++ {
 		offsets[i] = at
