@@ -4,10 +4,9 @@ import java.util.List;
 
 /**
  * The two YM dumps under {@code ym/test} that are built rather than
- * recorded, and the effects they carry that no recorded file does. Carried
- * from YMX's {@code org.ymx.rig.BuiltTunes}: the files are byte for byte
- * what YMX's builder writes, and {@code BuiltTunesTest} checks them against this
- * one.
+ * recorded, and the effects they carry that no recorded file does. The
+ * files were written by the rig YMX had, and {@code BuiltTunesTest} checks
+ * them against this one.
  *
  * <p>A YM6 frame files an effect in two slots, each three fields spread
  * across spare register bits: slot 1's code is R1 bits 7-4, its prescaler

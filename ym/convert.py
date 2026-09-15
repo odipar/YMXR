@@ -2,7 +2,6 @@
 
 Usage: convert.py corpus   - every corpus tune as whole DTX2 files at each
                              unit, the per-column breakdown, the ceilings
-       convert.py pairs    - the tunes with a .ymx beside them, against it
        convert.py envelope - the envelope columns, the reserved 0 against
                              set bits in the shape column
        convert.py frame    - what a frame procedure has to do, per frame
@@ -33,7 +32,7 @@ COUNTS = (17, 21, 25, 29)
 # the control column's high bits (SPEC 1.9)
 TIMER_RESET, PLACE_RESET = 0x40, 0x20
 
-# YM6 code nibble, type in bits 7-6 (YMX YmEffects.java) -> source kind
+# YM6 code nibble, type in bits 7-6 (ymxs.md, Reading) -> source kind
 YM_KIND = {0x00: 1, 0x40: 2, 0x80: 3, 0xC0: 4}
 DTX_WRITE = os.environ.get("DTX_WRITE", "dtx-write")
 RING = int(os.environ.get("DTX_RING", "960"))
@@ -41,8 +40,6 @@ RING = int(os.environ.get("DTX_RING", "960"))
 # "-copies" or "-copiesS" for S seconds of search (DTX, dtx-write).
 COPIES = os.environ.get("DTX_COPIES", "")
 JOBS = int(os.environ.get("JOBS", str(os.cpu_count() or 1)))
-PAIRS = os.environ.get("YMX_PAIRS", os.path.normpath(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "..", "YMX", "ym", "test")))
 
 def load(path, tmp):
     """(nf, get, ym6) for one corpus file, or None."""
@@ -57,7 +54,7 @@ def effect_slots(r, ym6):
     """The two YM effect slots of one frame: (kind, target, data, select,
     count), kind 0 for an empty slot. YM6 files each slot's kind in the
     code's bits 7-6; YM5 has no kind bits, its first slot is a SID voice
-    and its second a digidrum (YMX, YmEffects.java). The dump's prescaler
+    and its second a digidrum (ymxs.md, Reading). The dump's prescaler
     select is the MFP's, 1 to 7, as SPEC 1.9 reads it."""
     out = []
     for slot, (code_r, pre_r, cnt_r) in enumerate(((1, 6, 14), (3, 8, 15))):
@@ -254,7 +251,7 @@ def one(args):
             return None
         nf, g, ym6 = got
         out = {"name": os.path.basename(path), "nf": nf, "ym6": ym6}
-        if mode in ("corpus", "pairs"):
+        if mode == "corpus":
             cols, out["sources"], out["kinds"] = rows(nf, g, ym6)
             out["files"] = {}
             for k in (1, 2, 4):
@@ -347,32 +344,6 @@ def main():
             f"{kinds[k]} {name}" for k, name in
             ((1, "a square wave"), (2, "a digidrum"),
              (3, "a sinus SID"), (4, "a sync buzzer"))))
-    elif mode == "pairs":
-        pairs = []
-        said = set()
-        for f in sorted(os.listdir(PAIRS)):
-            if f.endswith(".ymx") and os.path.exists(os.path.join(PAIRS, f[:-4] + ".ym")):
-                at = os.path.join(PAIRS, f)
-                pairs.append((os.path.join(PAIRS, f[:-4] + ".ym"),
-                              os.path.getsize(at)))
-                # the version the file opens with, so the row below names
-                # the format these were written by rather than one a reader
-                # of this remembers (YMX, SPEC.md 2)
-                with open(at, "rb") as one:
-                    head = one.read(6)
-                if head[:4] == b"YMX!":
-                    said.add("%d.%d" % (head[4], head[5]))
-        n = frames = ymx = 0
-        total = {k: 0 for k in (1, 2, 4)}
-        for got, (_, size) in zip(each([p for p, _ in pairs], "pairs"), pairs):
-            n += 1; frames += got["nf"]; ymx += size
-            for k, (dsize, _, _) in got["files"].items():
-                total[k] += dsize
-        print(f"{n} tunes with a .ymx beside them, {frames:,} frames, ring {RING}")
-        version = ", ".join(sorted(said)) if said else "of no version read"
-        table([(f"YMX {version}, the .ymx files", ymx)]
-              + [(f"YMXR, DTX2 files at k = {k}", total[k]) for k in (1, 2, 4)],
-              frames)
     elif mode == "envelope":
         n = frames = spec = hosted = 0
         for got in each(corpus(), "envelope"):

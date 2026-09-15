@@ -53,8 +53,6 @@ build/
 # module fetched by its import path contains what a commit has in it.
 /go/ym-to-ymxs
 /go/ym-to-ymxr
-/go/ymx-to-ymxs
-/go/ymx-to-ymxr
 /go/ymxs-to-ymxr
 /go/ymxs-to-sndh
 /go/ymxs-to-prg
@@ -66,16 +64,12 @@ build/
 /go/ymxr-check
 
 # rig scratch: assembled builds, packed tunes, the SNDH build
-ymx/test/.work/
 
 # the C# tree's build outputs
 dotnet/bin/
 dotnet/obj/
 
 # the rig's output for the real-hardware harness
-ymx/test/tune.ymx
-ymx/test/ymxdata.inc
-ymx/test/YMXTEST.PRG
 
 # The play scripts build <stem>-n<ring>-c<chunk>[-k<unit>]/ beside the tune
 *-n[0-9]*-c[0-9]*/

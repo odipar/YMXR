@@ -117,19 +117,6 @@ final class ParityTest {
         }
     }
 
-    private static List<Path> files() throws IOException {
-        try (Stream<Path> at = Files.list(Path.of("ymx/test"))) {
-            return at.filter(one -> one.toString().endsWith(".ymx")).sorted().toList();
-        }
-    }
-
-    /** Whether YMX_DUMP names an executable, which the Java tools run to
-     *  read a .ymx and the Go tools do not. */
-    private static boolean dumpIsThere() {
-        String named = System.getenv("YMX_DUMP");
-        return named != null && Files.isExecutable(Path.of(named));
-    }
-
     @Test
     void everyDumpConvertsTheSameInBothTrees() throws Exception {
         for (Path dump : dumps()) {
@@ -187,30 +174,6 @@ final class ParityTest {
         assertArrayEquals(java.out(), go.out(), "ymxr-multi writes the same bytes");
         byte[] sndh = both("ymxr-sndh", java.out(), "-silent");
         both("ymxr-prg", sndh, "-silent");
-    }
-
-    /**
-     * A .ymx converted in both trees.
-     *
-     * <p>The two read the file by separate routes: a Go tool decodes it
-     * with YMX's reader, which the tree imports as a module, and a Java
-     * tool runs YMX's ymx-dump and reads the values it prints. The routes
-     * meet here, on the output and on the report.
-     *
-     * <p>Skipped where YMX_DUMP names no executable, which the Java tools
-     * need.
-     */
-    @Test
-    void everyYmxFileConvertsTheSameInBothTrees() throws Exception {
-        Assumptions.assumeTrue(dumpIsThere(), "YMX_DUMP names no ymx-dump");
-        for (Path file : files()) {
-            byte[] bytes = Files.readAllBytes(file);
-            byte[] structure = both("ymx-to-ymxs", bytes, "-silent");
-            assertTrue(structure.length > 0, file + " converts");
-            byte[] tune = both("ymx-to-ymxr", bytes, "-silent");
-            assertArrayEquals(tune, both("ymxs-to-ymxr", structure, "-silent"),
-                    file + ": the one call and the two stages write one file");
-        }
     }
 
     /** The multi file of those tune files, written by both trees, which

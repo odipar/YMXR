@@ -133,11 +133,12 @@ the VBL and no call nests inside a tick.
 
 ## Against YMX
 
-YMX's performance.md measures its player the same way, painting the
-background red while a call runs and reading the palette writes back
-from a cycle-exact Hatari (`ymx/test/cost.py` there). So the two players
-read by one method, on the same dumps, over a `VBLS=2300` run: 2,019
-calls of YMX and 2,020 of YMXR.
+YMX 0.10.1 measured its player the same way, painting the background red
+while a call runs and reading the palette writes back from a cycle-exact
+Hatari. So the two players were read by one method, on the same dumps,
+over a `VBLS=2300` run: 2,019 calls of YMX and 2,020 of YMXR. YMX is a
+design document now, and its player and these figures are in that
+repository's history.
 
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|

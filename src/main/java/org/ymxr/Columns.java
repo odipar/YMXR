@@ -8,10 +8,10 @@ import java.util.Arrays;
  * tune runs.
  *
  * <p>{@link Schema} writes them from a YMXS structure, which {@link Ym}
- * and {@link Ymx} read a dump into (doc/ymxs.md). What stands here beside
- * the columns is the arithmetic both stages read: which column a register
- * reaches, the bit beside a column that fills its byte, the prescalers,
- * and how long a source of so many rows runs at a rate.
+ * reads a dump into (doc/ymxs.md). What stands here beside the columns is
+ * the arithmetic both stages read: which column a register reaches, the
+ * bit beside a column that fills its byte, the prescalers, and how long a
+ * source of so many rows runs at a rate.
  */
 final class Columns {
 
@@ -74,8 +74,7 @@ final class Columns {
 
     /** The frames a source of `rows` rows runs for at a rate, rounded up,
      *  with a sixteenth of a frame added for a start that falls inside the
-     *  frame it begins in: the reckoning YMX's player was measured
-     *  against. */
+     *  frame it begins in. */
     static int duration(int rows, int select, int count, int frameRate) {
         long divisor = (long) PRESCALER[select] * count;
         long scaled = (long) rows * divisor * frameRate + MFP / 16;

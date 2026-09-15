@@ -666,7 +666,6 @@ final class ConsistencyTest {
     }
 
     private static final Path RIG = Path.of("68k/test/emu/test_ymxr.py");
-    private static final Path PARITY = Path.of("ym/parity.py");
 
     /** The register numbers a phrase names, in the order it names them. */
     private static Set<Integer> registers(String said) {
@@ -708,10 +707,10 @@ final class ConsistencyTest {
     }
 
     /** The bits each register reads of the byte written to it: SPEC.md 4
-     *  and section 7 name the same widths, and the rig and ym/parity.py
-     *  mask by them (AGENTS.md, Measure). */
+     *  and section 7 name the same widths, and the rig masks by them
+     *  (AGENTS.md, Measure). */
     @Test
-    void theRegisterWidthsReadTheSameInTheSpecificationAndBothMaskTables()
+    void theRegisterWidthsReadTheSameInTheSpecificationAndTheMaskTable()
             throws IOException {
         String spec = read(SPEC);
         Map<Integer, Set<Integer>> writes = widths(spec, 0);
@@ -722,8 +721,6 @@ final class ConsistencyTest {
         assertEquals(Set.of(6, 8, 9, 10), writes.get(5), "the registers of five bits");
 
         List<Integer> fits = table(RIG, "FITS");
-        assertEquals(fits, table(PARITY, "MASK"), RIG + " and " + PARITY
-                + " mask by two tables");
         assertEquals(14, fits.size(), "a mask a sound register");
         for (int r = 0; r < fits.size(); r++) {
             int bits = Integer.bitCount(fits.get(r));

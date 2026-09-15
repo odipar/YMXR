@@ -5,8 +5,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * Reads a YM5!/YM6! register dump, as
  * <a href="http://leonard.oxg.free.fr/ymformat.html">the YM format page</a>
- * describes it. Carried from YMX's {@code org.ym6.Ym6Reader}, where the
- * format's words are used because they name the bytes read: digidrums,
+ * describes it. Carried from YMX, where the format's words are used
+ * because they name the bytes read: digidrums,
  * effect slots, TP and TC. The schema's vocabulary begins downstream, in
  * {@link Columns}.
  *

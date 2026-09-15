@@ -40,8 +40,8 @@ var Prescaler = [8]int{0, 4, 10, 16, 50, 64, 100, 200}
 // columns themselves, the row the tune repeats to, and the effects the
 // tune runs.
 //
-// Schema writes them from a YMXS structure, which the ym and ymx packages
-// read a dump into (doc/ymxs.md).
+// Schema writes them from a YMXS structure, which the ym package reads a
+// dump into (doc/ymxs.md).
 type Columns struct {
 	// Column[c][frame].
 	Column [][]byte
@@ -55,8 +55,7 @@ type Columns struct {
 
 // Duration is the frames a source of that many rows runs for at a rate,
 // rounded up, with a sixteenth of a frame added for a start that falls
-// inside the frame it begins in: the reckoning YMX's player was measured
-// against.
+// inside the frame it begins in.
 func Duration(rows, selects, count, frameRate int) int {
 	divisor := int64(Prescaler[selects]) * int64(count)
 	scaled := int64(rows)*divisor*int64(frameRate) + MFP/16
