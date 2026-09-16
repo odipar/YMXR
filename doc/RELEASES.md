@@ -33,6 +33,26 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.18, 2026-09-16
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.18>, built from the commit
+tagged `v0.3.18`.
+
+DTX 0.11.4, in the pom and in `go.mod`, for the ST4 decoder that enters on
+an instruction rather than on a branch. A tune file is the bytes 0.3.17
+wrote; a bound tune is twelve bytes smaller.
+
+- Over the ten dumps under `ym/test`, `ym-to-ymxr` and `ym-to-ymxs` write
+  every one of their twenty files byte for byte as 0.3.17 did. The format
+  is unchanged: the tune file's version is 3 and the bound tune's is 3.
+- `ymxs-to-sndh` and `ymxs-to-prg` bind DTX's reader into the program, and
+  that reader lost twelve bytes, so all twenty of their files move: 428,200
+  bytes of SNDH over the ten becomes 428,080, and 446,664 of program
+  446,544.
+- The reader also runs a shorter init: three columns at `k` of 1 cost 7,700
+  cycles where they cost 7,844. A frame is unchanged, an advance landing
+  within a few cycles either way.
+
 ### 0.3.17, 2026-09-16
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.17>, built from the commit
