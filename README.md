@@ -59,9 +59,11 @@ its record excludes ticks (section 7).
 
 ## The documents
 
-For a player, begin with requirements, SPEC.md sections 1 to 5 and
-BINARIES.md. For a reader, use SPEC.md sections 1 to 3 and 7, then the
-conformance kit. Read SPEC.md with [YMXS's specification](https://github.com/odipar/YMXS/blob/main/doc/SPEC.md).
+For a player, begin with [requirements.md](doc/requirements.md),
+[SPEC.md](doc/SPEC.md) sections 1 to 5 and
+[BINARIES.md](doc/BINARIES.md). For a reader, use SPEC.md sections 1 to 3
+and 7, then the [conformance kit](doc/conformance). Read SPEC.md with
+[YMXS's specification](https://github.com/odipar/YMXS/blob/main/doc/SPEC.md).
 
 | document | contents |
 |---|---|
@@ -106,7 +108,7 @@ ym/play.sh tune.ym
 
 A tune file contains tables. An SNDH file adds DTX's reader and the
 player; a TOS program plays that SNDH file on a bare machine.
-`ym/play.sh` runs the conversion and Hatari.
+[`ym/play.sh`](ym/play.sh) runs the conversion and Hatari.
 
 `ymxr-check` compares a converted tune with its dump. `ymxr-trace`
 prints the frame record used by the conformance kit. Tools write output
