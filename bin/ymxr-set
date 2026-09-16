@@ -1,0 +1,162 @@
+#!/bin/sh
+# A set of YM dumps as one TOS program, written on standard output.
+# tools.md 14.3 defines this script, BINARIES.md 4 the program it writes.
+#
+#   bin/ymxr-set [options] tune.ym [more.ym ...] > SET.PRG
+#
+# Each dump is converted to a tune file, the tune files go into one multi
+# file, an SNDH file is made around it and the program stub is put in
+# front of that: the four calls README.md, Converting and playing, lists,
+# run for you. The subtunes stand in the order named, each under the
+# dump's song name, or under the i-th -nNAME where one is given
+# (tools.md 11.1).
+#
+# The tools are the Go tree's (tools.md 19.3), built with `go build` into
+# target/go on the first run and again where a Go source, the module
+# files or an assembled binary is newer. The Java scripts beside this one
+# are left as they are.
+#
+# The converter's options (tools.md 4, 5):
+#
+#   -kK        the unit the table packs at, 1, 2 or 4; 2 by default
+#   -mN        the ring in bytes, 960 by default
+#   -rRR       the row the tune repeats to; -r alone plays it once
+#   -copies[S] a match beyond the ring packs as a copy from the column's
+#              separate literal stream; -copiesS searches S seconds
+#
+# The set's (tools.md 11.1):
+#
+#   -nNAME     the name of the i-th subtune, for the i-th -n given
+#
+# The SNDH file's (tools.md 12):
+#
+#   -tTITLE    the title, the first subtune's name by default
+#   -cCOMPOSER the composer
+#   -perf      the core with the raster monitor in
+#   -lean      the core whose ticks neither drop the interrupt level nor
+#              write an end of interrupt
+#
+# The program's (tools.md 13):
+#
+#   -rowsN     the rows the program plays, which reaches ymxr-prg as
+#              -rN; it plays until SPACE or ESC without it
+#
+#   -silent    the tools report their notes alone
+#   -h         this text
+#
+# Examples:
+#
+#   bin/ymxr-set a.ym b.ym c.ym > SET.PRG
+#       the three as subtunes 1, 2 and 3, the program playing the first
+#
+#   bin/ymxr-set -k1 -copies -tHippel ym/test/*.ym > SET.PRG
+#       every dump under ym/test, packed a byte a unit with copies
+#
+#   bin/ymxr-set -perf -rows3000 a.ym b.ym > SET.PRG
+#       the core with the raster monitor in, the program stopping after
+#       3,000 rows
+#
+set -e
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+unit=
+ring=
+repeat=
+copies=
+title=
+composer=
+perf=
+lean=
+rows=
+silent=
+help=
+# The flags read off, and the names left in the positional parameters:
+# each argument is shifted off and a name put back at the end, so the
+# loop reaches every argument once and what remains is the names in the
+# order they were given.
+left=$#
+while [ "$left" -gt 0 ]; do
+    arg=$1
+    shift
+    left=$((left - 1))
+    case $arg in
+        -h|-help|--help) help=1 ;;
+        -perf) perf=-perf ;;
+        -lean) lean=-lean ;;
+        -silent) silent=-silent ;;
+        -k*) unit=$arg ;;
+        -m*) ring=$arg ;;
+        -copies*) copies=$arg ;;
+        -rows*) rows=-r${arg#-rows} ;;
+        -r*) repeat=$arg ;;
+        -t*) title=${arg#-t} ;;
+        -c*) composer=${arg#-c} ;;
+        -n*) set -- "$@" "$arg" ;;
+        -*) echo "bin/ymxr-set does not read $arg" >&2; exit 2 ;;
+        *) set -- "$@" "$arg" ;;
+    esac
+done
+if [ -n "$help" ]; then
+    # the head of this file, to the first line that is not a comment
+    sed -n '2,/^[^#]/p' "$0" | sed '$d' | cut -c3-
+    exit 0
+fi
+# The names left, the -nNAME flags among them, so a subtune is counted
+# by the dump it is converted from.
+dumps=0
+for arg in "$@"; do
+    case $arg in -n*) ;; *) dumps=$((dumps + 1)) ;; esac
+done
+if [ "$dumps" -eq 0 ]; then
+    # standard output carries the program, so a wrong call writes on
+    # standard error and leaves it empty.
+    sed -n '2,/^[^#]/p' "$0" | sed '$d' | cut -c3- >&2
+    exit 2
+fi
+if [ "$dumps" -gt 99 ]; then
+    echo "bin/ymxr-set: $dumps dumps, and an SNDH file has 99 subtunes at most" >&2
+    exit 1
+fi
+# The Go tools, built where one of them would be older than a source of
+# the tree it is built from. The build writes on standard error, which
+# leaves standard output the program's alone.
+tools=$root/target/go
+built=$tools/.built
+if [ ! -f "$built" ] || [ -n "$(find "$root/go" \
+        \( -name '*.go' -o -name 'go.*' -o -name '*.bin' \) \
+        -newer "$built" -print -quit 2>/dev/null)" ]; then
+    command -v go > /dev/null \
+        || { echo "bin/ymxr-set: the Go tools need go on the path" >&2; exit 2; }
+    mkdir -p "$tools"
+    (cd "$root/go" && go build -o "$tools/" ./cmd/...) >&2
+    : > "$built"
+fi
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+# Each dump converted into a separate directory, so two dumps of one name
+# convert beside each other, and the -nNAME flags kept in the order they
+# were given: ymxr-multi reads the i-th as the name of the i-th tune
+# file, and reads them after the files.
+: > "$work/names"
+at=0
+left=$#
+while [ "$left" -gt 0 ]; do
+    arg=$1
+    shift
+    left=$((left - 1))
+    case $arg in
+        -n*) printf '%s\n' "$arg" >> "$work/names" ; continue ;;
+    esac
+    at=$((at + 1))
+    name=$(basename "$arg")
+    mkdir "$work/$at"
+    "$tools/ym-to-ymxr" ${unit:+"$unit"} ${ring:+"$ring"} ${repeat:+"$repeat"} \
+        ${copies:+"$copies"} $silent < "$arg" > "$work/$at/${name%.*}.ymxr"
+    set -- "$@" "$work/$at/${name%.*}.ymxr"
+done
+while IFS= read -r named; do
+    set -- "$@" "$named"
+done < "$work/names"
+"$tools/ymxr-multi" "$@" $silent > "$work/SET.YMXR"
+"$tools/ymxr-sndh" $perf $lean $silent ${title:+"-t$title"} \
+    ${composer:+"-c$composer"} < "$work/SET.YMXR" > "$work/SET.SND"
+exec "$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"
