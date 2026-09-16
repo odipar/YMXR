@@ -33,6 +33,26 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.16, 2026-09-16
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.16>, built from the commit
+tagged `v0.3.16`.
+
+DTX 0.11.2, in the pom and in `go.mod`, for the ST4 whose search reads what
+its moves save. A dump converts to the same bytes as under 0.3.15: over the
+ten dumps under `ym/test` through `ym-to-ymxr`, `ym-to-ymxs`,
+`ymxs-to-sndh` and `ymxs-to-prg`, every one of the forty files is byte for
+byte 0.3.15's. The format is unchanged.
+
+- ST4 weighted its search's odds by what each move saved: extending a
+  literal run saves bits where freeing one at random is the walk the
+  annealing makes. A column packed with a search of a second writes 0.51
+  per cent fewer bytes, and of three seconds 1.3 per cent.
+- A column packed without a search is the bytes it was, which is why every
+  file of the ten dumps reads the same.
+- `github.com/odipar/st4/go` stands at v0.1.3 in `go.mod`, which is DTX's
+  requirement reaching this module through it.
+
 ### 0.3.15, 2026-09-16
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.15>, built from the commit
