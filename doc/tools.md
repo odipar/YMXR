@@ -565,6 +565,9 @@ the structure (ymxs.md), and `ym-to-ymxr` writes the bytes `ym-to-ymxs
 the next tool reads an empty input and reports the error of its format.
 The exit code of a pipe is the shell's.
 
+**14.3** `bin/ymxr-set` runs these calls over a set of dumps and writes
+the program on standard output (16.6).
+
 ---
 
 ## 15. The player
@@ -656,6 +659,34 @@ assembled from <source> with an assembler at <rmac>: <message>. The
 build needs rmac, and -Drmac=PATH names another.`, exit 1; a call with
 another flag or zero directories prints the usage, exit 2. The Maven
 build runs it into `target/classes/org/ymxr/68k` and `go/binaries/data`.
+
+**16.6 `bin/ymxr-set [options] tune.ym [more.ym ...]`** writes a TOS
+program of the dumps named on standard output, a subtune each in the
+order named, each under the name its tune file records (11.1): the calls
+of 14.1 run over one set. The tools are the Go tree's (19.3), built by
+`go build` into `target/go` on the first call and again where a Go
+source, the module files or an assembled binary is newer than that
+build, which writes on standard error.
+
+Every option of the four tools is the script's, under the tool's name
+but for the program's row count, which `-rRR` already spells for the
+converter:
+
+| option | reaches |
+|---|---|
+| `-kK`, `-mN`, `-rRR`, `-r`, `-copies[S]` | `ym-to-ymxr` (4, 5) |
+| `-nNAME`, the i-th naming the i-th dump | `ymxr-multi` (11.1) |
+| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean` | `ymxr-sndh` (12) |
+| `-rowsN`, the rows the program plays | `ymxr-prg` as `-rN` (13.1) |
+| `-silent` | every tool (3.3) |
+
+`-h` prints the head of the script, exit 0, and a call that names zero
+dumps prints it on standard error, exit 2. An option outside these is
+`bin/ymxr-set does not read <option>`, exit 2; a hundred dumps or more
+is `bin/ymxr-set: N dumps, and an SNDH file has 99 subtunes at most`,
+exit 1; `go` off the path is `bin/ymxr-set: the Go tools need go on the
+path`, exit 2. A tool that ends with an error ends the script at that
+tool's exit code, standard output empty.
 
 ---
 

@@ -286,4 +286,29 @@ final class ParityTest {
         assertEquals(steady(java.said()), steady(go.said()), "both write one line");
         assertEquals(0, java.out().length, "a fault writes no bytes");
     }
+
+    /**
+     * {@code bin/ymxr-set} against the calls it stands for. The script
+     * converts each dump, puts the tune files in one multi file, makes an
+     * SNDH file around them and writes the program of the stub in front
+     * of that, running the Go tools it builds (tools.md 16.6). The same
+     * four calls through the Java tools write the same program, so the
+     * set the script writes is the set README.md's four calls write.
+     */
+    @Test
+    void theSetScriptWritesWhatItsFourCallsWrite() throws Exception {
+        List<Path> two = dumps().subList(0, 2);
+        Ran script = ran(Path.of("bin"), "ymxr-set", new byte[0], "-silent",
+                two.get(0).toString(), two.get(1).toString());
+        assertEquals(0, script.exit(), "the script runs: " + script.said());
+
+        List<byte[]> tunes = new ArrayList<>();
+        for (Path dump : two) {
+            tunes.add(both("ym-to-ymxr", Files.readAllBytes(dump), "-silent"));
+        }
+        byte[] sndh = both("ymxr-sndh", multiOf(tunes, "-silent"), "-silent");
+        byte[] program = both("ymxr-prg", sndh, "-silent");
+        assertArrayEquals(program, script.out(),
+                "the script writes the program the four calls write");
+    }
 }

@@ -87,7 +87,7 @@ and 7, then the [conformance kit](doc/conformance). Read SPEC.md with
 |---|---|
 | [`src/main/java/org/ymxr/`](src/main/java/org/ymxr) | the eleven tools in Java, the reference: the converters, the check, the trace, the binder and the combiners |
 | [`go/`](go) | the same eleven in Go, the executables a release ships |
-| [`bin/`](bin) | the eleven as scripts, each writing standard output; nine read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1) |
+| [`bin/`](bin) | the eleven as scripts, each writing standard output; nine read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1), and `ymxr-set` runs the calls of a whole set (16.6) |
 | [`68k/YMXR.S`](68k/YMXR.S) | the player; `YMXR_PERF` builds the raster monitor in |
 | [`68k/YMXR_sndh.S`](68k/YMXR_sndh.S), [`68k/YMXR_prg.S`](68k/YMXR_prg.S) | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool |
 | [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 18), and [`ym/test`](ym/test), ten dumps the tests run on |
@@ -102,12 +102,15 @@ bin/ymxr-prg < tune.sndh > TUNE.PRG
 
 bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG
 bin/ymxr-multi one.ymxr two.ymxr | bin/ymxr-sndh | bin/ymxr-prg > SET.PRG
+bin/ymxr-set one.ym two.ym > SET.PRG
 bin/ymxr-trace -r4 < tune.ymxr
 ym/play.sh tune.ym
 ```
 
 A tune file contains tables. An SNDH file adds DTX's reader and the
 player; a TOS program plays that SNDH file on a bare machine.
+[`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
+the Go tools ([tools.md](doc/tools.md) 16.6), and
 [`ym/play.sh`](ym/play.sh) runs the conversion and Hatari.
 
 `ymxr-check` compares a converted tune with its dump. `ymxr-trace`
