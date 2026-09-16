@@ -4,3 +4,5 @@ github.com/odipar/st4/go v0.1.5 h1:fvp6N5Ic0ofpL1nunGG9QQjPcallNuLzx5OQgO29814=
 github.com/odipar/st4/go v0.1.5/go.mod h1:xD8FllM+rAb/78hl9IFd7L3AIz+IQuNT++L7fuBSiNM=
 github.com/odipar/ymxs/go v0.3.4 h1:gfSN22mbVzT2lNmdbqc0tmxDWVWRakeJ95N+mSFBTn8=
 github.com/odipar/ymxs/go v0.3.4/go.mod h1:1dGec133U1iy9VAgt8HOY1zIHVPpiRLaAeYYgqUpXFs=
+github.com/odipar/ymxs/go v0.3.5 h1:QTfJd4vJibiWa2gt3bzLdwM9dC3X0Ozvskc7qWoK+7Y=
+github.com/odipar/ymxs/go v0.3.5/go.mod h1:1dGec133U1iy9VAgt8HOY1zIHVPpiRLaAeYYgqUpXFs=

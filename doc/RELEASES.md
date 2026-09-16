@@ -33,6 +33,46 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.20, 2026-09-16
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.20>, built from the commit
+tagged `v0.3.20`.
+
+YMXS 0.3.5 in the pom and in `go.mod`, a script that writes a set of dumps
+as one program, and the documents read back against the tree.
+
+**No byte of this release differs from 0.3.19's.** YMXS 0.3.5 is 0.3.4's
+code, and every file under `src/main`, `go/` and `68k/` stands as v0.3.19
+has it: the forty files the ten dumps under `ym/test` convert to, a tune
+file, a structure, an SNDH file and a program each, are byte for byte
+0.3.19's.
+
+- **`bin/ymxr-set tune.ym [more.ym ...]` writes a set of dumps as one
+  program on standard output** (tools.md 16.6): each dump converted, the
+  tune files into one multi file, an SNDH file around them, and the program
+  stub in front of that. It runs the Go tools, built with `go build` into
+  `target/go` where one is older than a source of the tree, and every option
+  of the four tools reaches the tool it belongs to, the program's row count
+  under `-rowsN` since `-rRR` spells the converter's repeat row.
+  `ParityTest` requires the program the same four calls write through the
+  Java tools, byte for byte.
+- **Two checks read a pointer and a figure back.** Every clause one document
+  cites in another is one that document defines, and the releases the
+  documents name are the ones the two trees require. Both failed on the text
+  as it stood: tools.md cited ymxs.md 1, 3, 3.4, 3.6 and 5 of a numbering
+  that document never had, and tools.md 19.2 and 19.3 and requirements.md R1
+  named DTX 0.10.1 and YMXS 0.3.2 while the build required 0.11.5 and 0.3.4.
+- **experiments.md carried its crossover section twice**, the older copy
+  left behind by the rewrite that replaced it, its table header broken.
+- **performance.md read a frame procedure of 588 to 1,203 cycles**, a player
+  of nine steps ago, beside the tested 510 to 1,092 above it, and put a
+  practical ceiling of 25,600 ticks a second in terminology.md, which the
+  specification rewrite dropped from it.
+- **The house style, where no test reads it**: the cleft in terminology.md
+  2.5 and two documents besides, one verdict, one sweep, and six negations
+  where the operation has a name. AGENTS.md logs each strike, and
+  `flatters`, `however many` and `nowhere` join the ban list.
+
 ### 0.3.19, 2026-09-16
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.19>, built from the commit
