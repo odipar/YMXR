@@ -33,6 +33,19 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.19, 2026-09-16
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.19>, built from the commit
+tagged `v0.3.19`.
+
+DTX 0.11.5, in the pom and in `go.mod`, so the ST4 under this tune comes
+from ST4 go/v0.1.5 rather than from a commit no release had reached.
+
+**No byte of this release differs from 0.3.18's.** DTX 0.11.5 is 0.11.4's
+bytes, so a tune file, an SNDH and a program are what 0.3.18 wrote. The
+chain reads end to end now, each link naming a release: ST4 go/v0.1.5, DTX
+0.11.5, this.
+
 ### 0.3.18, 2026-09-16
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.18>, built from the commit
