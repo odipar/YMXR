@@ -48,6 +48,12 @@ build/
 # an assembler run by hand leaves an object file beside the source
 *.o
 
+# a tool run by hand at the root leaves its output there. The tunes under
+# doc/conformance/tunes are committed and stand outside this.
+/*.ymxr
+/*.sndh
+/*.prg
+
 # a go build run by hand leaves the executables beside the module. The
 # five 68000 binaries under go/binaries/data are committed, since a Go
 # module fetched by its import path contains what a commit has in it.
