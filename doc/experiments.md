@@ -61,6 +61,13 @@ loop of fewer than 64 rows written again or rows that set no column at
 the end ("Where a padded tune's added frame lands" below); before that
 rule it packed at `k` = 1 instead.
 
+At `k` = 1, the three tone periods, fine and coarse together, are 21.9%,
+18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen effect
+columns are 15.7%, and the envelope shape 1.4%. No corpus tune runs more
+than two effects at once, so columns 22 to 29 are zero throughout and pack
+to 20,284 bytes each: the floor a column costs, mostly the 28-byte ST4
+header its data set opens with, one a tune.
+
 The gain over YMX, on the 42 tunes it ships with both files and their
 391,193 frames. The `.ymx` files are YMX 0.10.1's, format 0.9, every one
 packed at a 960-byte ring and none with copies from its literal stream, so
@@ -78,7 +85,8 @@ YMXR packs the same music into 8% fewer bytes at `k` = 2, the unit the
 converter packs at (tools.md), and 21% fewer at `k` = 1. Both sides are
 whole files, but a `.ymx` includes its sample tables and a DTX2 file is the
 tune's table alone: a tune file keeps its sources beside it (SPEC.md 3.3)
-and the figures here leave them out. That margin flatters the DTX2 side.
+and the figures here leave them out, so both margins read wider than a tune
+file against a `.ymx` would.
 
 ## Copies from the literal stream
 
@@ -87,7 +95,7 @@ literal stream where the packer is run with `-copies` (tools.md), and the
 format block records which way the table was packed, so the binder selects
 the reader for it. It is off by default.
 
-What it is worth grows as the ring shrinks, since a smaller ring puts more
+Copies save more as the ring shrinks, since a smaller ring puts more
 matches beyond it. DBA 5 at `k` = 1, the tune file's bytes, against the
 state block the ring requires of a host:
 
@@ -114,10 +122,9 @@ run.
 
 A multi-tune program allocates a single workspace, sized for the largest
 of its tunes: `YMXR_FIXED` plus the largest state block over the set
-(BINARIES.md). So shrinking the ring saves memory once, however many tunes
-the set has, while the larger file a small ring packs to is paid for every
-tune. The saving is fixed and the cost grows with the set, and at some
-size the two cross. Measured as programs, using Deeper (9,984 rows),
+(BINARIES.md). So a smaller ring saves those bytes once for a set of any
+size, while the larger file it packs to is paid for every tune, and at
+some size the two cross. Measured as programs, using Deeper (9,984 rows),
 DitherDance (4,044) and low (9,903), repeated in that order to fill the
 set:
 
@@ -136,40 +143,10 @@ against 6,072 at 120. The bytes a tune adds are 13,889 at the defaults and
 18,135 at the small ring, 4,246 more a tune. The two meet at 25,200 over
 4,246, near six tunes, where the table turns negative.
 
-Where the crossover falls depends on how long the tunes are. The workspace
-saving is the same for any tune, because the ring alone sets it, while the
-per-tune cost grows with the row count. A set of short tunes therefore
-crosses later than these three, which are long. In practice: `-m120
--copies` is for a program of one tune or a few, and the defaults are for a
-set.
-
----|---|---|---|
-| 1 | 53,320 | 33,992 | 36.2% |
-| 2 | 69,480 | 51,208 | 26.3% |
-| 3 | 82,826 | 70,816 | 14.5% |
-| 4 | 95,878 | 89,710 | 6.4% |
-| 6 | 123,918 | 125,034 | -0.9% |
-| 9 | 165,012 | 179,254 | -8.6% |
-| 12 | 206,104 | 233,472 | -13.3% |
-
-The workspace saved is 25,200 bytes, once: 31,272 bytes at a ring of 960
-against 6,072 at 120. The bytes a tune adds are 13,889 at the defaults and
-18,135 at the small ring, 4,246 more a tune. The two meet at 25,200 over
-4,246, near six tunes, where the table turns negative.
-
-Where they meet follows the length of the tunes. The ring sets the
+Where they meet follows the length of the tunes: the ring sets the
 workspace and the rows set the file, so a set of short tunes adds less a
-tune and meets it later. So `-m120 -copies` is for a program of one tune
-or a few, and the defaults are for a set.
-
----
-
-At `k` = 1, the three tone periods, fine and coarse together, are 21.9%,
-18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen effect
-columns are 15.7%, and the envelope shape 1.4%. No corpus tune runs more
-than two effects at once, so columns 22 to 29 are zero throughout and pack
-to 20,284 bytes each: the floor a column costs, mostly the 28-byte ST4
-header its data set opens with, one a tune.
+tune and crosses later than these three, which are long. `-m120 -copies`
+is for a program of one tune or a few, and the defaults are for a set.
 
 ---
 
@@ -242,15 +219,15 @@ Twenty tunes off the corpus, every ninth, converted both ways:
 | as they come | 2 | 150,816 |
 | every dump at `-k1` | 1 | 136,668 |
 
-14,148 bytes, 9.4 per cent. The image the set stops paying for is 1,492
-of that and the tables are the rest: unit 1 packs smaller, which twenty
-eight tunes the defaults pack at unit 2, spread across the corpus, read
-at 14.4 per cent, 155,748 bytes against 133,340. One tune of them, Union
-Demo - Megadist 2, packs 43.6 per cent smaller and another, Masterblazer
-6, 0.8.
+14,148 bytes, 9.4 per cent. The image the set stops paying for is 1,492 of
+that and the tables are the rest, since unit 1 packs smaller: twenty eight
+tunes the defaults pack at unit 2, spread across the corpus, read 14.4 per
+cent smaller at unit 1, 133,340 bytes against 155,748. One of them, Union
+Demo - Megadist 2, packs 43.6 per cent smaller and another, Masterblazer 6,
+0.8.
 
-What it costs is the play call. Four of those tunes under Hatari, at unit
-2 and then at unit 1:
+The play call pays for it. Four of those tunes under Hatari, at unit 2 and
+then at unit 1:
 
 | tune | on average | at most |
 |---|---|---|
@@ -272,34 +249,35 @@ image is no part of the trade, and the tables alone are.
 
 ## Where a padded tune's added frame lands
 
-Rule 6 pads a loop of odd length by one frame a pass, and the 543 dumps of
-the corpus, converted under 0.3.11, read where that frame lands: 161 dumps
-are padded, and in 137 the frame is inside the loop. Thirteen of those
-loops are one row, an ending that sustains, which a row that sets no column
-leaves as it was; 121 are 95 rows or more, where one frame is under one per
-cent of a pass; and three are short and move every row: Masterblazer 7, a
-slide on all three tones over 7 rows, A Prehistoric Tale 6, a vibrato on
-voice B over 9, and Crapman game over, an arpeggio over 17, which one frame
-a pass slows by 14, 11 and 6 per cent. Played side by side under Hatari,
-each of the three with the frame and written again, neither version was
-heard as wrong: the difference is measured, not heard. A loop of fewer than
-64 rows is written again all the same (SPEC.md 6, rule 6), since it keeps
-the period the dump had for a few bytes: the sixteen short loops play as
-they did, and the 121 long ones keep the frame. What the second copy costs
-against the frame it replaces, on the three and on Turrican 2 - world
-completed 1: 1,768 to 1,816 bytes, 1,452 to 1,508, 2,448 to 2,508 and 2,164
-to 2,180, under four per cent, since the second copy packs as a match a
-column; a one-row loop written twice costs 0 to 16 bytes on four of the
-thirteen.
+Rule 6 pads a loop of odd length by one frame a pass. Of the 543 dumps of
+the corpus, converted under 0.3.11, 161 are padded, and in 137 that frame
+lands inside the loop: thirteen loops are one row, an ending that
+sustains, which a row that sets no column leaves as it was; 121 are 95
+rows or more, where one frame is under one per cent of a pass; and three
+are short and move every row. Masterblazer 7 slides all three tones over
+7 rows, A Prehistoric Tale 6 runs a vibrato on voice B over 9, and
+Crapman game over an arpeggio over 17, which one frame a pass slows by
+14, 11 and 6 per cent. Played side by side under Hatari, each of the
+three with the frame and written again, neither version was heard as
+wrong: the difference is measured, not heard.
+
+A loop of fewer than 64 rows is written again all the same (SPEC.md 6,
+rule 6), since it keeps the period the dump had for a few bytes: the
+sixteen short loops play as they did, and the 121 long ones keep the
+frame. The second copy packs as a match a column, so it costs under four
+per cent against the frame it replaces: on the three above and on
+Turrican 2 - world completed 1, 1,768 bytes to 1,816, 1,452 to 1,508,
+2,448 to 2,508 and 2,164 to 2,180. A one-row loop written twice costs 0
+to 16 bytes on four of the thirteen.
 
 ---
 
 ## What a square does when it starts
 
 A SID voice is a volume register moving between a level and 0 at a timer's
-rate. The YM format defines that movement nowhere across the row where one
-note ends and another begins, so the players of the era each do something
-else there and each composer heard one of them. Two are on record.
+rate. The YM format leaves that movement to the player across the row
+where one note ends and another begins, so the players of the era each do
+something else there and each composer heard one of them. Two are on record.
 
 The **ym2149-rs model**, which the reference player ships: a start writes
 0 to the voice at once and sets the alternation to its loud half, and the
@@ -308,7 +286,7 @@ first tick, one timer period later, writes that half.
 **maxYMiser's model**, the tracker most of these sections were written in:
 the start leaves the level and the half as they are. Its replayer traced
 under Hatari on *Chipping for Ca$h* writes R0 to R10 every frame and leaves
-the volume register a square owns unwritten for all 218 frames the square
+the volume register the square runs on unwritten for all 218 frames it
 runs; on the row the square starts it leaves the level as it is too, and
 the first tick writes the wave's first value. Its timer's count and control
 are rewritten every frame with the timer running, and no row stops it. Its
@@ -319,11 +297,11 @@ the gap.
 This format adopted the first model and applied it to every row that
 starts a source. In this schema the values written belong to the source
 (2.2), so a square whose level moves starts a new source on most rows: the
-lead of DBA 5
-starts one on 957 of its first 1,575 rows and Synergy Credits on 3,396 of
-5,377. Every one of those rows wrote 0 to the voice between two ticks and
-moved the place to the source's loud row, so the half those two ticks
-bound was cut in two and the one after it began early. Read off the
+lead of DBA 5 starts one on 957 of its first 1,575 rows and Synergy
+Credits on 3,396 of 5,377. Every one of those rows wrote 0 to the voice
+between two ticks and moved the place to the source's loud row, so the
+half those two ticks bound was cut in two and the one after it began
+early. Read off the
 voice's edges over 1,575 frames of DBA 5:
 
 | the row that starts a square | edges | halves short | halves long | off |
@@ -336,26 +314,25 @@ voice's edges over 1,575 frames of DBA 5:
 The middle row stood before the write of 0 was added: a start whose place
 moved to the loud row while the voice was loud wrote that level again, so
 no edge fell between the two ticks and the half ran to twice its length.
-Adding the write of 0 turned 313 long halves into 351 short ones and
-changed no other figure. Both follow from one reading: a row that starts a
-source read as a row that starts a wave.
+Adding the write of 0 turned 313 long halves into 351 short ones and left
+every other figure as it was. Both follow from one reading: a row that
+starts a source read as a row that starts a wave.
 
 The third row is the rule now. A row that starts a square where this effect
 last ran one on the same target leaves bit 5 clear and sets no volume
-column, so no write reaches the voice between the two ticks either side of
+column, so the voice is left as it is between the two ticks either side of
 it and they fall a whole period apart (1.3, 1.9, section 6 rule 3). The
 level the second writes belongs to the new source.
 
 ### The place needs no code
 
-The player was changed for this and then changed back. A row that stops
-an effect writes select 0 and drops the latched tick, and writes neither
-the handler's place nor the source's first row; a start whose row leaves
-bit 5 clear reads the place and counts that number into the new source's
-rows. So a square that stops and starts again resumes at the row it left
-off at, with no code added to the player, and the converter encodes it by
-keeping the last kind and target each effect ran rather than the one it
-runs.
+The player was changed for this and then changed back. A row that stops an
+effect writes select 0 and drops the latched tick, and leaves the handler's
+place and the source's first row as they are; a start whose row leaves bit
+5 clear reads the place and counts that number into the new source's rows.
+So a square that stops and starts again resumes at the row it left off at
+while the player stands as it is, and the converter encodes it by keeping
+the last kind and target each effect ran rather than the one it runs.
 
 The other half of maxYMiser's model, a timer that counts through the gap,
 was built and measured: the source column's 0 clears the enable bit instead
@@ -367,7 +344,7 @@ through the raster monitor against its 2,421. It buys the timer's phase
 over a gap in which the voice is silent. Measured against it on the drum
 preempt tune, which stops and starts a square on one voice 191 times, the
 two produce 2,873 and 2,874 edges, and the one whose timer counts on shows
-three short halves where the other shows none: its first half after a gap
+three short halves where the other's are whole: its first half after a gap
 runs for what the counter had left of a period, where a timer started again
 counts a whole one. It costs less and breaks fewer halves, so the timer is
 stopped and bit 5 alone moves the place.
@@ -375,13 +352,13 @@ stopped and bit 5 alone moves the place.
 ### Four rules this left behind
 
 1. **A rule written into the specification, the converter, the player and
-   the rig's model is checked by none of them.** Every rig here runs the
-   player against a model built from the tune's tables, so it proves the
-   player writes what the table encodes. It cannot see that the table
-   encodes the wrong thing. The conformance kit pins what the converter
-   writes, so it pinned the defect as the reference too, and `synergy.ymxr`
-   shrank by 244 bytes when the defect was removed. A rule about sound
-   needs a check that reads sound.
+   the rig's model agrees with every check that reads it.** Every rig here
+   runs the player against a model built from the tune's tables, so it
+   proves the player writes what the table encodes. It cannot see that the
+   table encodes the wrong thing. The conformance kit pins what the
+   converter writes, so it pinned the defect as the reference too, and
+   `synergy.ymxr` shrank by 244 bytes when the defect was removed. A rule
+   about sound needs a check that reads sound.
 2. **Compare event timing, not event values.** Every comparison made
    against the reference player before this one passed: which registers a
    frame writes, the values, the order, the counts, each register at each
@@ -390,9 +367,9 @@ stopped and bit 5 alone moves the place.
    changes the spacing between the writes to one register alone.
    `ym/halves.py` reads that spacing out of a trace; run it before reading
    a square as right.
-3. **A loudness metric over a second decides no question.** The metric used
-   for two days was a per-second correlation of level against the
-   reference, and two builds whose output was identical byte for byte
+3. **A loudness metric over a second measures the wrong thing.** The
+   metric used for two days was a per-second correlation of level against
+   the reference, and two builds whose output was identical byte for byte
    scored 0.70 and 0.28 on it, differing only in where the program landed
    in the frame. A measure that moves with the phase cannot report on the
    phase.

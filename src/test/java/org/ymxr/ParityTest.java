@@ -201,8 +201,8 @@ final class ParityTest {
      * The report a tool prints where it is not silenced.
      *
      * <p>Every other test here runs the tools with -silent, which reduces
-     * the report to what the tool wrote and its notes. The figures a reader
-     * of a run reads are in the rest of it and nowhere else: the core's
+     * the report to what the tool wrote and its notes. The rest of the
+     * report is where a reader of a run finds its figures: the core's
      * bytes and the file's parts, what an image fixes and how many tunes
      * share it, the stub's patches, and what a binding came to. Those
      * drifted between the trees while every file they name matched byte

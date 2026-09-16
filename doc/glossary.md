@@ -14,7 +14,7 @@ and this repository reads that table.
 |---|---|---|
 | bound tune | A tune file's tables bound with DTX's reader into the layout the player reads: a header, the source index, the image and the DTX1 tables. | BINARIES.md 1 |
 | `C` | The column count of a table, 1 to 256 (DTX, SPEC.md 1); at most 32 in a tune's table (R3.4): 30 here, and 1 in a source's. | requirements.md R1.1, R3.4 |
-| claim | What a player does to a timer at init, for each effect the effects used byte marks: it stops the timer, writes its vector, clears its pending bit, and sets its enable bit and its mask bit. | terminology.md, 2. The timers |
+| claim | The operation a player performs on a timer at init, for each effect the effects used byte marks: it stops the timer, writes its vector, clears its pending bit, and sets its enable bit and its mask bit. | terminology.md, 2. The timers |
 | column | One field of a row, `W` bytes wide: one byte in a tune's table. | requirements.md R1.1 |
 | conformance kit | The tune files under `doc/conformance/tunes`, each with its table unpacked beside it and, in `MANIFEST.txt`, the size and the digest of the tune file, of the unpacked table and of the record a reader produces; a reader is tested against it. | README.md |
 | control column | Column 14 + 4i + 2 of effect i: bit 7 the set bit, bit 6 the timer's reset, bit 5 the place's reset, bit 4 the count column's 0 as a value, bits 2 to 0 the select. | SPEC.md 1.9 |
@@ -57,7 +57,7 @@ and this repository reads that table.
 | reader | The program that reads a tune file and reports the record of SPEC.md 7, every register write and every timer operation recorded in place of the chips; YMXS, SPEC.md 7.1 names this role a recorder. The conformance kit is written against one. | requirements.md R2.4 |
 | record | The lines a reader produces of a tune file: the fixed values on the first line, then one entry a frame. | SPEC.md 7 |
 | register | One byte of the YM2149's settings. Sixteen: fourteen are the sound, two are I/O ports. | terminology.md, 1. The sound chip |
-| release | What a player does to a claimed timer at stop: it stops the timer, clears its enable bit and its mask bit, and clears its pending bit. | terminology.md, 2. The timers |
+| release | The operation a player performs on a claimed timer at stop: it stops the timer, clears its enable bit and its mask bit, and clears its pending bit. | terminology.md, 2. The timers |
 | ring | The bytes a column of a DTX2 table unpacks through, one size for the payload (DTX, SPEC.md 2.3): 960 by default; the tools of this repository round it to a multiple of 30, a row's bytes, from 60 to 1,110, the largest multiple of 30 a 16-bit displacement reaches. | tools.md |
 | row | One step of a table: `C` values, one a column. | terminology.md, 3. Tables, rows and procedures |
 | `RR` | The row a table repeats to after its last row; `R` where the table plays once. | requirements.md R1.1 |

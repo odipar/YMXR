@@ -53,7 +53,6 @@ A square's tick is in place: 88 cycles of instructions against 108 and
 130, and 152 with the 68000's entry and the `rte` against 172 and 194.
 Measured on the rig, and performance.md has the figure.
 
-
 A digidrum's source is many rows played once, so its tick is the row path
 every time, 172 cycles, and its place must step. Of the 108 its
 instructions cost, 40 are the chip writes, 28 the step, 16 the end of
@@ -69,8 +68,7 @@ A sample's timer is near its floor. A square's is not.
 
 ## What was measured and left
 
-**Two bits in columns the specification fixes at zero.** A bit read
-before
+**Two bits in columns the specification fixes at zero.** A bit read before
 a group of register columns, saying whether the row sets any of them,
 skips the group on one test. Measured at 62 cycles a frame weighted over
 nine tunes against the player of five steps ago, where it was the
@@ -162,12 +160,13 @@ pass has now been made, in ST4 (research.md, "A penalty a block, against
 the costliest frame"), and it moved the question.
 
 The window is 30 units at unit 1 and 15 at unit 2, and the worst refill
-measured is 15 operations at unit 1 against 9 to 11 at unit 2: 52 percent
+measured is 15 operations at unit 1 against 9 to 11 at unit 2: 52 per cent
 of R4.5's 6,656-cycle budget against 31. A tune packed at unit 1 only
 because its row count or its repeat row was odd. So the lever was the row
 count, not the packer: low with one row fewer packs at unit 2, and its
 worst refill falls from 15 to 9. A penalty a block in ST4 (`st4 -p8`) also
-helps at unit 1, from 15 to 12 for two percent more bytes, and does little
+helps at unit 1, from 15 to 12 for two per cent more bytes, and does
+little
 at unit 2; it stays a flag of ST4, since a default in DTX means changing
 three packers.
 
@@ -176,7 +175,7 @@ divide by the unit adds rows that set no column at the repeat row until it
 divides, and then writes a loop of fewer than 64 rows again or adds rows
 that set no column at the end; a row that sets no column leaves every
 register as it is and every timer running, and a loop written again plays
-as it did. The converter applies it (tools.md, `-kK`), so every tune packs
+as it did. The converter applies it (tools.md 4.4), so every tune packs
 at unit 2 and the window of every tune is 15 units. Five of the ten tunes
 packed at unit 1 before it; measured again at unit 2, their calls fell by a
 seventh to a sixth on average and by a tenth to more than a third in the

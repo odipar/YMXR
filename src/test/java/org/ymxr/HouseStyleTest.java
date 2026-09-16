@@ -90,6 +90,7 @@ final class HouseStyleTest {
             "refuse",
             // the sweep: a trailing clause generalising the sentence
             "whatever",
+            "however many",
             "whichever way",
             "where it sits",
             "stood still",
@@ -99,6 +100,7 @@ final class HouseStyleTest {
             "literally",
             "smear",
             "bears it out",
+            "flatters",
             "pressure point",
             "door left open",
             "cover version",
@@ -173,6 +175,7 @@ final class HouseStyleTest {
             "writes no ",
             "reaches no ",
             "and no other",
+            "nowhere",
             "for none",
             "on no chip",
             "with no error",

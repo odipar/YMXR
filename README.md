@@ -10,8 +10,8 @@ van Dalen's direction: he requested, read and merged every change.
 Whether to use software written that way is the reader's decision, and
 this section is here so that the decision is informed.
 
-What it is built on is older than it. DTX defines the table and the 68000
-readers a tool binds a tune with, and the ST4 compressor beneath DTX
+The pieces it is built on are older than it. DTX defines the table and the
+68000 readers a tool binds a tune with, and the ST4 compressor beneath DTX
 derives from Einar Saukas's ZX1. The YM5 and YM6 register-dump formats are
 Arnaud Carré's, and SNDH is the Atari ST scene's shared music container.
 
