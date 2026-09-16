@@ -33,6 +33,24 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.17, 2026-09-16
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.17>, built from the commit
+tagged `v0.3.17`.
+
+DTX 0.11.3, in the pom and in `go.mod`, for the ST4 whose search aims two
+moves. A dump converts to the same bytes as under 0.3.16: over the ten
+dumps under `ym/test` through `ym-to-ymxr`, `ym-to-ymxs`, `ymxs-to-sndh`
+and `ymxs-to-prg`, every one of the forty files is byte for byte 0.3.16's.
+The format is unchanged.
+
+- ST4's copies search gained a move that grows the dictionary where a copy
+  reads from, and one that fills the gap between a literal run and the one
+  after it. A column packed with a search of a second writes 1.20 per cent
+  fewer bytes, and of three seconds 2.77.
+- The converters here pack without seconds, so what a tune weighs is what
+  it weighed. The gain is for a caller that spends the seconds.
+
 ### 0.3.16, 2026-09-16
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.16>, built from the commit

@@ -6,7 +6,7 @@
 
     <groupId>org.ymx</groupId>
     <artifactId>ymxr</artifactId>
-    <version>0.3.16</version>
+    <version>0.3.17</version>
 
     <properties>
         <maven.compiler.source>23</maven.compiler.source>
@@ -33,7 +33,7 @@
                  a tool binds them with (doc/BINARIES.md 1) -->
             <groupId>org.dtx</groupId>
             <artifactId>dtx</artifactId>
-            <version>0.11.2</version>
+            <version>0.11.3</version>
         </dependency>
         <dependency>
             <!-- the tune data structure every conversion here passes
