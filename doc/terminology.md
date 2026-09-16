@@ -131,12 +131,12 @@ while the stop runs is dropped; the timer's reset, bit 6 of the control
 column, stops the timer that way before the count and the select are
 written (SPEC.md 1.9).
 
-**2.5 Claim and release.** A **claim** is what a player does to a timer
-at init, for each effect the effects used byte marks: it stops the timer,
-writes its vector, clears its pending bit, and sets its enable bit and
-its mask bit. A **release** is the reverse, at stop: the timer stopped,
-its enable bit and its mask bit cleared, its pending bit cleared. A timer
-outside the tune's is left as it is. Note: YMXS, SPEC.md 8.5 leaves what
+**2.5 Claim and release.** A player **claims** a timer at init, for each
+effect the effects used byte marks: it stops the timer, writes its
+vector, clears its pending bit, and sets its enable bit and its mask bit.
+It **releases** it at stop, the reverse: the timer stopped, its enable
+bit and its mask bit cleared, its pending bit cleared. A timer outside
+the tune's is left as it is. Note: YMXS, SPEC.md 8.5 leaves what
 a claim comprises to a later version; this format fixes it.
 
 ---

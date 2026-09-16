@@ -212,9 +212,9 @@ boundary; where the text is then empty the name word is 0.
 
 ## 5. ym-to-ymxr
 
-**5.1** The input is a dump; the output the tune file of the tune ymxs.md
-3 reads from it, padded (4.4) and encoded (ymxs.md 5), named by the
-dump's song name (4.6).
+**5.1** The input is a dump; the output the tune file of the tune the two
+stages of ymxs.md read and encode from it, padded (4.4) between them and
+named by the dump's song name (4.6).
 
 **5.2 The repeat row.** `-r` writes a tune that plays once. `-rRR`
 writes one that repeats to row RR; RR above the dump's frame count F is
@@ -262,7 +262,7 @@ errors of the encoding are those of 7.1.
 | `N digidrum triggers dropped: the file has no sample at that number` | frames whose slot flags a digidrum past the dump's samples |
 | `N effect frames dropped: a tune names at most 127 sources` | frames whose slot names a 128th source |
 | `N digidrums stopped at the row the tune repeats to` | drums running when the repeat row is read |
-| `N frames on which a drum kept a SID from running on its voice` | frames of ymxs.md 3.4 |
+| `N frames on which a drum kept a SID from running on its voice` | frames of YMXS, ym.md 7.3 |
 
 ---
 
@@ -271,7 +271,7 @@ errors of the encoding are those of 7.1.
 **6.1** The input is a dump; the output a structure of one tune, its
 title the dump's song name, its composer the author, both stripped of
 surrounding white space, its writer `ym-to-ymxs`, its rate the dump's,
-its rows the dump's frames as ymxs.md 3 reads them, unpadded. `-r` and
+its rows the dump's frames as ymxs.md reads them, unpadded. `-r` and
 `-rRR` are those of 5.2, with the same error, except that RR below 0 is
 written as the repeat row, which a tool reading the structure reports as
 an error (YMXS, SPEC.md 1.11).
@@ -287,7 +287,7 @@ follow it. The tool writes the structure before any check of it.
 **7.1 Reading a structure.** The tool reads the input as JSON (YMXS,
 json.md) and checks the structure: an error of the form or of the
 structure (YMXS, doc/tools.md 4) is written as the lines of the check
-joined, exit 1. Each tune is then padded (4.4) and encoded (ymxs.md 5);
+joined, exit 1. Each tune is then padded (4.4) and encoded (ymxs.md);
 a structure this format leaves unencoded is an error, exit 1, with the
 row where it arises:
 
@@ -366,7 +366,7 @@ frame after which the lines number 20 or more. The lines, in order:
 | `source N is C columns of R rows, not one of W` | source N's table is another shape than one column of W rows |
 | `source N row R is a marker`, `source N row R is not the marker` | bit 7 of row R differs from the marker's place, the last row |
 | `r: a row that sets no column wrote Rc`, `r: a row that sets no column wrote R13` | row r of the padding writes a register |
-| `f: effect i runs source S under a drum on its voice` | at frame f the model runs a SID where the dump's other slot runs a drum on that voice (ymxs.md 3.4) |
+| `f: effect i runs source S under a drum on its voice` | at frame f the model runs a SID where the dump's other slot runs a drum on that voice (YMXS, ym.md 7.3) |
 | `f: effect i runs no source where the dump flags kind K` | the dump flags an effect on slot i and the model's effect i is idle |
 | `f: effect i runs source S (kind K value V) on Rt at sel/cnt, not source N (kind K2 value V2) on Rt2 at sel2/cnt2` | the model's effect differs from the dump's slot in source, target, select or count |
 | `f: the drum is not started` | the dump flags a drum on slot i and row f leaves the source column of effect i unset |
@@ -375,7 +375,8 @@ frame after which the lines number 20 or more. The lines, in order:
 | `f: Rc is V, not W` | the model's register c differs from the dump's, R7 with `$09` shifted by the voice ORed in while a drum runs there |
 | `f: R13 written V, the dump writes W`, with `not written` and `does not write` for either side absent | the model's write of R13 differs from the dump's |
 
-A drum runs from its start frame for the F frames of ymxs.md 3.6.
+A drum runs from its start frame for the F frames YMXS, ym.md 7.4 step 4
+reckons.
 
 **8.4 A file that fails to read** is a verdict of one line: `unreadable:
 <message>`, `the archive does not unpack: <message>`, or `the converter
@@ -557,7 +558,7 @@ The summary line is `ymxr-prg: B bytes, until a key stops it` or
 
 **14.1** The output of one tool is the input of the next; README.md,
 Converting and playing, lists the calls. Every conversion passes through
-the structure (ymxs.md 1), and `ym-to-ymxr` writes the bytes `ym-to-ymxs
+the structure (ymxs.md), and `ym-to-ymxr` writes the bytes `ym-to-ymxs
 | ymxs-to-ymxr` writes.
 
 **14.2** A tool that ends with an error leaves standard output empty, so
@@ -726,13 +727,13 @@ a version of it a tag of that directory, `go/v0.1.0` beside `v0.1.0`.
 `pom.xml` or a `68k/*.S` source is newer than `.built`: `mvn -q
 process-classes dependency:build-classpath` with standard input closed;
 then runs the class with `java -ea`. The build needs Java 23, Maven, rmac
-(`-Drmac=PATH` names another), and DTX `0.10.1` and YMXS `0.3.2` in the
+(`-Drmac=PATH` names another), and DTX `0.11.5` and YMXS `0.3.4` in the
 local Maven repository, `mvn install` in each checkout.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the five 68000 binaries and DTX's twenty-two images
 embedded; it runs by itself. The Go tree requires the modules
-`github.com/odipar/dtx/go v0.10.1` and `github.com/odipar/ymxs/go v0.3.2`,
+`github.com/odipar/dtx/go v0.11.5` and `github.com/odipar/ymxs/go v0.3.4`,
 which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and

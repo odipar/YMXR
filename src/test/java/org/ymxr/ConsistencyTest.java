@@ -807,4 +807,132 @@ final class ConsistencyTest {
             }
         }
     }
+
+    private static final Path TOOLS = Path.of("doc/tools.md");
+    private static final Path POM = Path.of("pom.xml");
+    private static final Path GO_MOD = Path.of("go/go.mod");
+
+    /** The clause numbers a document defines: its numbered headings and
+     *  the bold number that opens a clause. */
+    private static Set<String> clauses(Path at) throws IOException {
+        Set<String> out = new TreeSet<>();
+        String said = read(at);
+        Matcher heading = Pattern.compile("^#{1,4} (\\d+(?:\\.\\d+)*)\\.?\\s",
+                Pattern.MULTILINE).matcher(said);
+        while (heading.find()) {
+            out.add(heading.group(1));
+        }
+        Matcher bold = Pattern.compile("^\\*\\*(\\d+(?:\\.\\d+)*)\\b",
+                Pattern.MULTILINE).matcher(said);
+        while (bold.find()) {
+            out.add(bold.group(1));
+        }
+        return out;
+    }
+
+    /**
+     * Every clause a document cites in another document is one that
+     * document defines. tools.md cited ymxs.md 1, 3, 3.4, 3.6 and 5 of a
+     * numbering ymxs.md never had, written the day the tools became a
+     * specification, and no check opened ymxs.md against them.
+     *
+     * <p>A citation qualified with YMXS or DTX names that repository's
+     * document, and the qualifier stands anywhere from the parenthesis it
+     * opens; a document this repository does not have is that repository's
+     * too. RELEASES.md records what was true at each release, so a clause
+     * renumbered after one leaves its entry as it was.
+     */
+    @Test
+    void everyClauseCitedInAnotherDocumentIsDefined() throws IOException {
+        Map<Path, Set<String>> defined = new LinkedHashMap<>();
+        List<String> dangling = new ArrayList<>();
+        int read = 0;
+        for (Path p : DOCUMENTS) {
+            if (p.getFileName().toString().equals("RELEASES.md")) {
+                continue;
+            }
+            String said = read(p);
+            Matcher cited = Pattern.compile("([A-Za-z_]+)\\.md (\\d+(?:\\.\\d+)*)")
+                    .matcher(said);
+            while (cited.find()) {
+                int open = said.lastIndexOf('(',
+                        Math.max(0, cited.start() - 1));
+                int from = open >= 0 && cited.start() - open <= 120
+                        ? open : Math.max(0, cited.start() - 20);
+                String before = said.substring(from, cited.start());
+                if (before.contains("YMXS") || before.contains("DTX")) {
+                    continue;
+                }
+                Path at = Path.of("doc", cited.group(1) + ".md");
+                if (!Files.exists(at)) {
+                    at = Path.of(cited.group(1) + ".md");
+                }
+                if (!Files.exists(at)) {
+                    continue;
+                }
+                if (!defined.containsKey(at)) {
+                    defined.put(at, clauses(at));
+                }
+                read++;
+                if (!defined.get(at).contains(cited.group(2))) {
+                    dangling.add(p + " cites " + cited.group());
+                }
+            }
+        }
+        final int opened = read;
+        assertTrue(opened > 100, () -> "only " + opened
+                + " citations read; the check is asleep");
+        assertTrue(dangling.isEmpty(), () -> String.join("\n", dangling));
+    }
+
+    /** The version of one Maven dependency of the pom. */
+    private static String artifact(String pom, String named) {
+        Matcher said = Pattern.compile("<artifactId>" + named
+                + "</artifactId>\\s*<version>([^<]+)</version>").matcher(pom);
+        assertTrue(said.find(), "pom.xml requires no " + named);
+        return said.group(1);
+    }
+
+    /** The version of one module of go.mod. */
+    private static String module(String mod, String named) {
+        Matcher said = Pattern.compile("github\\.com/odipar/" + named
+                + "/go (v[^\\s]+)").matcher(mod);
+        assertTrue(said.find(), "go.mod requires no " + named);
+        return said.group(1);
+    }
+
+    /**
+     * The releases of DTX and YMXS the documents name against the ones the
+     * two trees require. tools.md 19.2 and 19.3 and requirements.md R1 read
+     * DTX 0.10.1 and YMXS 0.3.2 while the pom stood at 0.11.5 and 0.3.4,
+     * five releases of one and two of the other later: the versions move
+     * with every release of either repository and the prose moved with
+     * none of them.
+     */
+    @Test
+    void everyReleaseTheDocumentsNameIsTheOneTheBuildRequires()
+            throws IOException {
+        String pom = read(POM);
+        String dtx = artifact(pom, "dtx");
+        String ymxs = artifact(pom, "ymxs");
+        String mod = read(GO_MOD);
+        assertEquals("v" + dtx, module(mod, "dtx"),
+                "go.mod and pom.xml require two releases of DTX");
+        assertEquals("v" + ymxs, module(mod, "ymxs"),
+                "go.mod and pom.xml require two releases of YMXS");
+        String tools = read(TOOLS);
+        Matcher maven = wrapped("DTX `" + dtx + "` and YMXS `" + ymxs
+                + "` in the local Maven repository").matcher(tools);
+        assertTrue(maven.find(), "tools.md 19.2 names another pair of"
+                + " releases than the pom requires, " + dtx + " and " + ymxs);
+        Matcher modules = wrapped("`github.com/odipar/dtx/go v" + dtx
+                + "` and `github.com/odipar/ymxs/go v" + ymxs + "`")
+                .matcher(tools);
+        assertTrue(modules.find(), "tools.md 19.3 names another pair of"
+                + " modules than go.mod requires, " + dtx + " and " + ymxs);
+        Matcher required = wrapped(dtx + " is the release the Java tree and"
+                + " the Go tree read").matcher(read(REQ));
+        assertTrue(required.find(), "requirements.md R1 names another"
+                + " release of DTX than the build requires, " + dtx);
+    }
 }

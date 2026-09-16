@@ -35,7 +35,7 @@ check reads a tune file beside the recording it encodes and reports the
 lines of 6.4. The host calls the player once a frame at the frame rate
 (3.3), and owns every timer outside the tune's and every register outside
 R0 to R13. [BINARIES.md](BINARIES.md) 1 defines the bound tune a player
-reads, and [tools.md](tools.md), The player, the player's three calls.
+reads, and [tools.md](tools.md) 15 the player's three calls.
 
 **Terms.** A *frame* is one call of the player (4.2); a *tick* one
 interrupt of a timer (5.1); a *row* one entry of a table. The *MFP* is

@@ -80,7 +80,7 @@ bin/ymxs-to-sndh -tTitle < tune.ymxs > tune.sndh
 
 `ym/play-ymxs.sh` runs the first of those under Hatari, from a file or
 from standard input, and records the run where it is named a WAV
-(tools.md, Playing a YMXS file):
+(tools.md 16.2):
 
 ```bash
 ym/play-ymxs.sh tune.ymxs

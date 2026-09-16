@@ -172,6 +172,18 @@ been struck so far.
 | `a writer with a tune already in the structure has a shorter route` | `a writer whose tune is already in the structure needs none of this document` |
 | `an implementer handed one of the two is reading half a document` | `an implementer handed one of the two cannot read the tunes` |
 | `the columns that carry one into the other` | `the columns that encode the second in the first` |
+| `A claim is what a player does to a timer` | `A player claims a timer` - the cleft, in a definition |
+| `That margin flatters the DTX2 side` | `so both margins read wider than a tune file against a .ymx would` |
+| `however many tunes the set has` | dropped; the sentence reads `once for a set of any size` |
+| `changed no other figure` | `left every other figure as it was` |
+| `counted nowhere where it did not` | `left out where it did not` |
+| `measured here and on the conformance kit and nowhere else` | `measured on this tune and the conformance kit alone` |
+| `the rig's model is checked by none of them` | `the rig's model agrees with every check that reads it` |
+| `writes neither the handler's place nor the source's first row` | `leaves the handler's place and the source's first row as they are` |
+| `A loudness metric over a second decides no question` | `A loudness metric over a second measures the wrong thing` |
+| `the YM format defines that movement nowhere` | `the YM format leaves that movement to the player` |
+| `with no code added to the player` | `while the player stands as it is` |
+| `the volume register a square owns` | `the volume register the square runs on` |
 
 ## A specification defines operations
 
