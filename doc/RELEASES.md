@@ -27,11 +27,58 @@ executable built from one embeds these. `BinariesTest` reads them against
 the assembly the build makes, so one that does not match what rmac writes
 today fails the build.
 
-A player pins a version of this format: the tune file's is 3 (SPEC.md 3.3)
-and the bound tune's is 3 (BINARIES.md 1), and a release's number names
-the tools rather than either.
+A player pins a version of this format: a tune file is 3 or 4 (SPEC.md
+3.3.5) and a bound tune the version of the tune file bound (BINARIES.md
+1), a writer writes 3 for a tune whose sources are one column, and a
+release's number names the tools rather than either.
 
 ## Published
+
+### 0.4.0, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.0>, built from the commit
+tagged `v0.4.0`.
+
+A target that writes several registers, and the source of several columns
+it runs. Every tune the tools converted before this is the file it was:
+the version a writer writes is the lower of the two the tune reads under,
+so the tune file of each of the ten dumps under `ym/test` is byte for byte
+0.3.27's, measured against a build of its tag, and a player of version 3
+reads it. The structure of each differs in its version word alone, which
+YMXS 0.4.0 writes as 4. The SNDH file of each is 3,260 bytes longer: 2,212
+of core, 4,736 bytes going to 6,948, and 1,048 of workspace. The program
+stub stands at 1,794 bytes.
+
+- **Targets 14 to 24** (SPEC.md 2.1): `setToneA/B/C` writes R0 R1, R2 R3,
+  R4 R5; `setVoiceA/B/C` those and the voice's volume; `setBuzzer` R11 R12
+  R13; `setNoiseA/B/C` the noise period and one voice's volume. An effect
+  runs a voice's period and its volume on one timer where it needed two.
+  `setEnvelope` writes two registers of eight bits, so a source for it has
+  no bit to spare for the marker and this version encodes none (2.1.3).
+- **The marker stands in the column the target names** (3.2.1), whose
+  register reads seven bits or fewer: the coarse nibble of a tone or a
+  voice, the envelope shape of a buzzer, the noise period of a noise. So a
+  source runs on R0, which no source of version 3 could.
+- **A tune file is version 3 or 4, and a writer writes the lower one**
+  (3.3.5). The rule runs through the multi file and the bound tune, and
+  the core's descriptor field at 18 is the highest bound tune version it
+  reads (BINARIES.md 2), which the binder reads against the version it
+  binds at.
+- **A tune of version 3 costs the player what it cost before.** Two
+  handlers an effect beside the three it had, and three branches that
+  stand elsewhere in a tune with a source of several columns, each a byte
+  init writes. `-cycles` reads every figure of performance.md back
+  unchanged. A tick of two registers is 244 cycles with the interrupt's
+  entry and its rte and one of three is 328, against 176 for one. The
+  player is 6,264 bytes where it was 4,052, and the workspace 2,120 where
+  it was 1,072.
+- **The conformance kit has a twelfth tune**, `voices`: one kind of target
+  an effect, with the marker in a different column under each, so a reader
+  that reads column 0 alone reports the wrong rows for three of the four.
+  The kit reads 12 tunes and 18,444 entries, and the exercise plays 11.
+- The tools read YMXS 0.4.0, whose structure this encodes: a start is a
+  shape a width, pairing a target with the source of the values a row it
+  reads.
 
 ### 0.3.27, 2026-09-17
 
