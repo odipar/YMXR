@@ -1,5 +1,5 @@
 #!/bin/sh
-# The standalone YMXR executables: the thirteen tools of doc/tools.md, one
+# The standalone YMXR executables: the eleven tools of doc/tools.md, one
 # set per platform, each containing the five 68000 binaries and DTX's
 # twenty-two images, so a machine with neither this repository nor a
 # toolchain can convert a dump and write a program that plays it.
