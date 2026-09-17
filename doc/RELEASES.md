@@ -33,6 +33,20 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.23, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.23>, built from the commit
+tagged `v0.3.23`.
+
+YMXS 0.3.6 in the pom and in `go.mod`, so both libraries under this one are
+their newest release: DTX 0.11.7 and YMXS 0.3.6, and ST4 go/v0.1.7 beneath
+DTX.
+
+**No byte of this release differs from 0.3.22's.** YMXS 0.3.6 moved a check
+and no code, so the forty files the ten dumps under `ym/test` convert to, a
+tune file, a structure, an SNDH file and a program each, are byte for byte
+0.3.22's, measured against a build of that tag.
+
 ### 0.3.22, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.22>, built from the commit
