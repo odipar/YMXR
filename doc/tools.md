@@ -619,9 +619,9 @@ one`, exit 2; `-tTITLE` and `-cCOMPOSER`, `-perf` and `-lean` reach
 `ymxr-sndh`, the title the first name's stem by default; `-vN` stops the
 run after N frames; `-silent` reaches every tool; `-h` prints the head
 of the script, exit 0, and a call with zero names prints it, exit 2.
-Several tunes go through `ymxr-multi`, each named by its stem, and past
-nine the script writes `ym/play.sh: N tunes, and the program's keys
-reach subtune 9`. The script writes `TUNE.SND` and `TUNE.PRG` under a
+Several tunes go through `ymxr-multi`, each named by its stem, and the
+program picks between them as 13.1 defines. The script writes `TUNE.SND`
+and `TUNE.PRG` under a
 temporary directory: `ym/play.sh: TUNE.SND and TUNE.PRG are under
 <dir>` on standard error. A second name to record to is the error
 `ym/play.sh: <a> and <b> both name a file to record to`, exit 2; an
