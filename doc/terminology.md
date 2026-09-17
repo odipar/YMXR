@@ -180,7 +180,10 @@ reports -1 (SPEC.md 4).
 
 **4.2 A tick.** The clock of a timer is its interrupt (2.2). Its table is
 a source, its procedure a target, which writes one register (SPEC.md 5),
-and one advance and call is a **tick**.
+and one advance and call is a **tick**. Note: YMXS, SPEC.md 8.6 leaves
+where a tick falls in a frame, and what a tick of a timer with no source
+connected performs, to a later version; this format fixes both (SPEC.md
+4.2.1, 5.2.1).
 
 **4.3 Row and frame.** A document about storing or packing values uses
 row (3.2); a document about playing uses frame (4.1).

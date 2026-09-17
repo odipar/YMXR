@@ -495,9 +495,10 @@ frame rate (3.3). The player, in order:
 2. Read R and RR of the tune's table and the effects used.
 3. Resolve each source of the source index: its first row, and its loop
    row, row RR where it repeats and the end where it plays once (3.1.4).
-4. Set the kept target, select and count of each effect to 0. The place
-   of each timer before its first start with bit 5 at 1 is left to a
-   later version (section 8).
+4. Set the kept target, select and count of each effect to 0; a tick
+   before the first start on a timer writes the register of the target
+   this leaves (5.2.1). The place of each timer before its first start
+   with bit 5 at 1 is left to a later version (section 8).
 5. Read row 0, the current row.
 6. At interrupt level 7, for each effect i the effects used names, 0 to
    3 in order, claim its timer (2.3.3).
@@ -527,8 +528,18 @@ One call of the player, in order:
 
 At step 3, a player processes only the effects marked in effects used;
 a reader processes all four (7.3). Register writes follow effect
-operations. A tick between two operations uses the updated effects
-before it and the previous values of those after it.
+operations.
+
+**4.2.1** A tick falls between any two operations of a frame: between
+two steps of 4.2, between two steps of 4.3, between 4.3 and 4.4, and
+between two register writes of 4.4. A tick between two operations uses
+the updated effects before it and the previous values of those after it.
+Three operations run whole against a tick: the two bytes of a register
+write (4.4), the write of the target, the place and the loop row at a
+start (4.3 step 3), and the write of a select (4.3 step 5), which on a
+control register two timers share is a read, a change and a write back.
+A stop is two writes (2.3.3), and a tick latched before the stop falls
+between them.
 
 Note: a player that reads the row of the next frame at the end of a
 call, after step 4, leaves the writes of every frame at one offset from
@@ -560,9 +571,9 @@ order:
 6. Where K is set with bit 5 at 1, and S is unset or set to 0: the place
    is row 0 of the source last started on the timer.
 
-A start updates the tick's target, place and loop row at interrupt level
-7; a tick occurs before or after the complete update. With T, S and K
-unset and N at 0, the effect continues unchanged.
+A start writes the tick's target, place and loop row as one operation
+against a tick (4.2.1). With T, S and K unset and N at 0, the effect
+continues unchanged.
 
 Note: step 4 before step 5 loads the count before the select starts a
 stopped timer (YMXS, SPEC.md 3.4.1 and 8.5).
@@ -572,11 +583,10 @@ stopped timer (YMXS, SPEC.md 3.4.1 and 8.5).
 The player writes the registers below in this order, each where the row
 sets its column (1.1), one write a register: the register's number to
 `$FFFF8800`, then the column's byte whole to `$FFFF8802`; the two bytes
-are one write, and a tick falls before both or after both. The register
-reads the bits it has: eight for R0, R2, R4, R11 and R12, four for R1,
-R3, R5 and R13, five for R6, R8, R9 and R10, and six for R7, whose bits
-7 and 6 the player writes as 1 (1.4.2). A row whose column 13 is `$AE`
-writes shape `$E`.
+are one operation against a tick (4.2.1). The register reads the bits it
+has: eight for R0, R2, R4, R11 and R12, four for R1, R3, R5 and R13, five
+for R6, R8, R9 and R10, and six for R7, whose bits 7 and 6 the player
+writes as 1 (1.4.2). A row whose column 13 is `$AE` writes shape `$E`.
 
 1. R0, then R1; R2, then R3; R4, then R5 (1.2).
 2. R6 (1.5).
@@ -655,8 +665,20 @@ A tick leaves its timer's data register unchanged and writes the control
 register only to stop the timer (5.1 step 4). The next period uses the
 current count; a count written by a row loads as YMXS, SPEC.md 3.3.5
 defines. Ticks read source rows; frames read tune rows (4.2). A select
-written before the first start breaks rule 4; ticks with a disconnected
-source are left to a later version (section 8).
+written before the first start breaks rule 4 and starts a timer with no
+source connected, whose ticks 5.2.1 defines.
+
+**5.2.1** Until the first start on it, a timer has no source connected
+(1.8.3). A tick of such a timer, in order:
+
+1. Write 0 to `$FFFF8800`, the register of the target 4.1 step 4 keeps
+   (2.1).
+2. Write `$80` to `$FFFF8802`.
+3. Stop the timer (2.3.3).
+
+A row that sets the target column moves the kept target and leaves the
+register a tick writes as it is: a start writes that register (4.3 step
+3). Rule 4(c) keeps a tune clear of such a tick.
 
 ---
 
@@ -956,8 +978,3 @@ connected (1.8.4; YMXS, SPEC.md 8.4).
 column (1.9.2), bits 5 and 4 of a coarse column (1.2.2), bits 6 and 5 of
 columns 6, 8, 9 and 10, bit 6 of column 7, bit 4 of column 13, and a
 source column above S (3.3).
-
-**8.6** What a tick performs on a timer whose source is disconnected
-(5.2), and whether a tick falls between two steps of 4.3 or between 4.3
-and 4.4 (YMXS, SPEC.md 8.6).
-

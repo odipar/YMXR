@@ -692,16 +692,23 @@ tool's exit code, standard output empty.
 
 ## 17. The rigs
 
-**17.1 `68k/test/emu/test_ymxr.py [mode] [tune ...]`** converts each
-dump named, or every dump under `ym/test`, binds it through `ymxr-bind`
-and plays it row by row on an emulated 68000 (unicorn), against a model
-of SPEC.md 4 and 5 built from the tune's tables: every frame's chip
-writes in order, each timer's programming, each handler's place, and
-every tick's write. The rig fires each tick at the time the model
-computes, in place of the interrupt the emulator lacks. A name ending
-`.ymxr` is played as it stands. A tune whose RR equals R is played one
-frame past its last row, where the call reports -1 and leaves every
-register as it is. A tune that fails is named and the run continues.
+**17.1 `68k/test/emu/test_ymxr.py [mode] [tune ...]`** converts each dump
+named, or every dump under `ym/test`, binds it through `ymxr-bind` and
+plays it row by row on an emulated 68000 (unicorn), against a model of
+SPEC.md 4 and 5 built from the tune's tables: every frame's chip writes
+in order, each timer's programming, each handler's place, and every
+tick's write. The rig fires each tick at the time the model computes, in
+place of the interrupt the emulator lacks. It fires two ticks the tune's
+timers do not: a tick of a timer no row has started, which writes `$80`
+to R0 and stops the timer (SPEC.md 5.2.1), and a tick inside a frame,
+which the rig stops at the head of each effect's step and after the last
+of them (SPEC.md 4.2.1). The frame it stops in is one whose row moves
+what the effect's tick writes, so the reading before that effect's step
+and the reading after it differ, and the run says how many of the
+boundaries a tick was fired at. A name ending `.ymxr` is played as it
+stands. A tune whose RR equals R is played one frame past its last row,
+where the call reports -1 and leaves every register as it is. A tune that
+fails is named and the run continues.
 
 | mode | reads |
 |---|---|
