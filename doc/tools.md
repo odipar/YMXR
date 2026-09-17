@@ -588,7 +588,7 @@ any interrupt level. `YMXR_init` reads the first row and claims each timer
 of the effects-used byte at level 7; a call writes the row the call
 before it read, then reads the next.
 
-**15.3 The workspace** is `YMXR_FIXED`, 1,072 bytes, then the state
+**15.3 The workspace** is `YMXR_FIXED`, 2,120 bytes, then the state
 block of the bound tune's image, whose length the bound tune records at
 offset 12 (BINARIES.md 1); a host allocates the sum, on a long.
 

@@ -96,7 +96,7 @@ and this repository reads that table.
 | voice | One of the YM2149's three outputs, A, B and C, each with a volume and a mixing setting. | terminology.md, 1. The sound chip |
 | volume | R8, R9 or R10: bits 3 to 0 the level of a voice, and bit 4 set selects the level of the envelope instead. | terminology.md, 1. The sound chip |
 | `W` | The bytes of every value of a table: 1, 2 or 4. One in a tune's table and in a source's. | requirements.md R1.1 |
-| workspace | The bytes the host allocates for the player: `YMXR_FIXED`, the 1,072 bytes of the player's fields, then the state block of the bound tune's image, on a long. | BINARIES.md 1 |
+| workspace | The bytes the host allocates for the player: `YMXR_FIXED`, the 2,120 bytes of the player's fields, then the state block of the bound tune's image, on a long. | BINARIES.md 1 |
 | writer | The program that produces a tune file, a converter or a tracker; it satisfies the rules of SPEC.md 6 and of YMXS, SPEC.md 6. | SPEC.md 6 |
 | yielding | Reading the rows of a table one at a time, in order: row 0 first, and after row `R` - 1 row `RR`, or the end where the table plays once. | terminology.md, 3. Tables, rows and procedures |
 | YM2149 | The sound chip, Yamaha's AY-3-8910, clocked at 2 MHz on an Atari ST. | terminology.md, 1. The sound chip |

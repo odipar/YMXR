@@ -177,7 +177,7 @@ selects one by name and checks its flags word (2.3, 2.10).
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
 | 18 | 2 | the bound tune's version this core reads, 3 |
-| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 1,072 |
+| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,120 |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
 | 26 | 2 | zero |
@@ -530,7 +530,7 @@ A call clobbers `d0` to `d5` and `a0` to `a5` and keeps `d6`, `d7` and
 `a6`. Init reads row 0; each play writes the row the call before it read
 and then reads the next.
 
-**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 1,072,
+**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,120,
 then the bound tune's field at 12 bytes, on a long. Before init the host
 keeps, and after stop restores, what the player writes (5.3): of each
 timer in the claims byte, the vector, the nibble of the control register,
