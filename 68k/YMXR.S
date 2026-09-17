@@ -605,6 +605,61 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_cell:   dc.l    0                       ; the loop cell
                 .endm
 
+; A tick of a target that writes several registers (SPEC.md 2.1): a
+; select and a value a column, the marker tested in the column the target
+; names, and a place a column stepped where the row is not the last. The
+; places, the registers and the loop cells are the immediates a start
+; patches, as the general handler's are, so no register is used here
+; either. A tune whose sources are one column enters none of this.
+                .macro  TICKW   name,columns,eoi,eoir,ctrl,keep,ier,bit,colour
+\name:
+                MARK    \colour
+\{name}_row:    move.b  #8,YM_SELECT.w          ; +3: register 1
+                move.b  ($12345678).l,YM_SELECT+2.w ; +8: column 1's place
+                move.b  #8,YM_SELECT.w          ; +15: register 2
+                move.b  ($12345678).l,YM_SELECT+2.w ; +20: column 2's place
+                .if     \columns=3
+                move.b  #8,YM_SELECT.w          ; +27: register 3
+                move.b  ($12345678).l,YM_SELECT+2.w ; +32: column 3's place
+                .endif
+                tst.b   ($12345678).l           ; the marker's column
+                bmi.s   .last\~
+                .if     YMXR_NEST
+                move.w  #$2500,sr
+                .endif
+                addq.l  #1,($12345678).l        ; a place a column, stepped
+                addq.l  #1,($12345678).l
+                .if     \columns=3
+                addq.l  #1,($12345678).l
+                .endif
+                COUNT   PERF_ON,PERF_DROP
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+.last\~:
+\{name}_mark:   tst.l   ($12345678).l           ; the loop cell of column 1
+                beq.s   .stop\~
+                move.l  ($12345678).l,($12345678).l ; the cell, the place
+                move.l  ($12345678).l,($12345678).l
+                .if     \columns=3
+                move.l  ($12345678).l,($12345678).l
+                .endif
+                COUNT   PERF_LOOP,0
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+.stop\~:        andi.b  #\keep,\ctrl.w
+                move.b  #255-(1<<\bit),(\ier+4).w
+                COUNT   PERF_STOP,0
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+\{name}_cells: dc.l    0,0,0                   ; the loop cell a column
+                .endm
+
 ; A square's tick: a source of two rows that repeats to row 0 is two
 ; values and no more, so this handler encodes them as its
 ; immediate and moves between them by the difference of the two. It
@@ -1116,6 +1171,18 @@ ymxr_sites:
                 ONEROW  ymxr_one1,$EF,$FFFFFA11,$007
                 ONEROW  ymxr_one2,$FE,$FFFFFA0F,$707
                 ONEROW  ymxr_one3,$DF,$FFFFFA11,$077
+
+; The handlers of a target that writes two registers, and of one that
+; writes three: one an effect, as the three above are.
+                TICKW   ymxr_two0,2,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
+                TICKW   ymxr_two1,2,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
+                TICKW   ymxr_two2,2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
+                TICKW   ymxr_two3,2,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+
+                TICKW   ymxr_three0,3,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
+                TICKW   ymxr_three1,3,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
+                TICKW   ymxr_three2,3,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
+                TICKW   ymxr_three3,3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
 
 ; The offsets the patching writes at, measured off the first handler's
 ; labels: the row it writes, the marker it reads, and its loop cell.
