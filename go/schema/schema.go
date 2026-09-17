@@ -131,21 +131,22 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		counting[i] = false
 		return 0, nil
 	case ymxs.Start:
-		reaches := ymxs.TargetNumber(e.Target)
+		reaches := ymxs.TargetNumber(ymxs.StartTarget(e))
 		if reaches != target[i] {
 			out[t] = byte(0x80 | reaches)
 			target[i] = reaches
 		}
-		out[t+1] = byte(0x80 | (indexOf(sources, e.Source) + 1))
-		now, err := selectOf(e.Prescaler)
+		out[t+1] = byte(0x80 | (indexOf(sources, ymxs.StartSource(e)) + 1))
+		timing := ymxs.StartTiming(e)
+		now, err := selectOf(timing.Prescaler)
 		if err != nil {
 			return 0, err
 		}
-		rate, err := counted(e.Count, at)
+		rate, err := counted(timing.Count, at)
 		if err != nil {
 			return 0, err
 		}
-		reset := resets(e.TimerReset, e.PlaceReset)
+		reset := resets(timing.TimerReset, timing.PlaceReset)
 		// A start on a timer already counting, at the rate it counts,
 		// sets no rate column: step 2 resolves the source and the ticks
 		// read it from here on, at the rate the control register already
@@ -158,15 +159,15 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		}
 		selects[i] = now
 		count[i] = rate
-		_, counting[i] = ymxs.SourceTable(e.Source).Repeat()
+		_, counting[i] = ymxs.SourceRows(ymxs.StartSource(e)).Repeat()
 		return 1 << i, nil
 	case ymxs.Retune:
-		now, err := selectOf(e.Prescaler)
+		now, err := selectOf(e.Timing.Prescaler)
 		if err != nil {
 			return 0, err
 		}
-		reset := resets(e.TimerReset, e.PlaceReset)
-		rate, err := counted(e.Count, at)
+		reset := resets(e.Timing.TimerReset, e.Timing.PlaceReset)
+		rate, err := counted(e.Timing.Count, at)
 		if err != nil {
 			return 0, err
 		}

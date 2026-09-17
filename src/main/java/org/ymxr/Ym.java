@@ -12,9 +12,11 @@ import org.ymxs.Tunes;
 import org.ymxs.YMXS.Effect;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Row;
+import org.ymxs.YMXS.Single;
 import org.ymxs.YMXS.Source;
-import org.ymxs.YMXS.Start;
+import org.ymxs.YMXS.StartOne;
 import org.ymxs.YMXS.Table;
+import org.ymxs.YMXS.Timing;
 import org.ymxs.YMXS.Timer;
 import org.ymxs.YMXS.Tune;
 
@@ -53,7 +55,7 @@ final class Ym {
     static Tune read(YmDump.Song song, Sources sources, int repeat, Report report) {
         int frames = song.frames();
         List<Row> rows = new ArrayList<>();
-        Map<Integer, Source> made = new LinkedHashMap<>();
+        Map<Integer, Single> made = new LinkedHashMap<>();
         int[] wrote = new int[14];
         Arrays.fill(wrote, -1);
         Effects.Slot[] running = {Effects.Slot.EMPTY, Effects.Slot.EMPTY};
@@ -168,10 +170,11 @@ final class Ym {
                         boolean unmoved = !keyframe && slot[i].kind() == Effects.SID
                                 && lastKind[i] == Effects.SID
                                 && lastTarget[i] == slot[i].target();
-                        effects.put(timer, new Start(Tunes.setting(Chip.register(slot[i].target())),
+                        effects.put(timer, new StartOne(
+                                Tunes.setting(Chip.register(slot[i].target())),
                                 source(made, sources, number[i]),
-                                Chip.prescaler(Columns.PRESCALER[slot[i].select()]),
-                                slot[i].count(), stopped, !unmoved));
+                                new Timing(Chip.prescaler(Columns.PRESCALER[slot[i].select()]),
+                                        slot[i].count(), stopped, !unmoved)));
                         running[i] = slot[i];
                         runningNumber[i] = number[i];
                         lastKind[i] = slot[i].kind();
@@ -184,8 +187,8 @@ final class Ym {
                     } else if (slot[i].select() != selectHeld[i]
                             || slot[i].count() != countHeld[i]) {
                         effects.put(timer, new org.ymxs.YMXS.Retune(
-                                Chip.prescaler(Columns.PRESCALER[slot[i].select()]),
-                                slot[i].count(), false, false));
+                                new Timing(Chip.prescaler(Columns.PRESCALER[slot[i].select()]),
+                                        slot[i].count(), false, false)));
                     }
                     selectHeld[i] = slot[i].select();
                     countHeld[i] = slot[i].count();
@@ -239,8 +242,8 @@ final class Ym {
     /** The source of that number, built on first use: its rows without the
      *  marker bit 7, which is this format's and not the structure's
      *  (SPEC.md 3.2). */
-    private static Source source(Map<Integer, Source> made, Sources sources, int number) {
-        Source known = made.get(number);
+    private static Single source(Map<Integer, Single> made, Sources sources, int number) {
+        Single known = made.get(number);
         if (known != null) {
             return known;
         }
@@ -250,7 +253,7 @@ final class Ym {
             values.add(row & ~Sources.MARK & 0xFF);
         }
         String name = name(of.kind()) + " " + of.data();
-        Source source = of.repeat() < of.rows().length
+        Single source = of.repeat() < of.rows().length
                 ? Tunes.repeating(name, values, of.repeat()) : Tunes.once(name, values);
         made.put(number, source);
         return source;

@@ -124,15 +124,15 @@ final class Schema {
                 return 0;
             }
             case Start start -> {
-                int reaches = Tunes.number(start.target());
+                int reaches = Tunes.number(Tunes.target(start));
                 if (reaches != target[i]) {
                     out[t] = (byte) (0x80 | reaches);
                     target[i] = reaches;
                 }
-                out[t + 1] = (byte) (0x80 | (sources.indexOf(start.source()) + 1));
-                int now = select(start.prescaler());
-                int rate = counted(start.count(), at);
-                int resets = resets(start.timerReset(), start.placeReset());
+                out[t + 1] = (byte) (0x80 | (sources.indexOf(Tunes.source(start)) + 1));
+                int now = select(Tunes.prescaler(start));
+                int rate = counted(Tunes.count(start), at);
+                int resets = resets(Tunes.timerReset(start), Tunes.placeReset(start));
                 // A start on a timer already counting, at the rate it
                 // counts, sets no rate column: step 2 resolves the source
                 // and the ticks read it from here on, at the rate the
@@ -146,13 +146,13 @@ final class Schema {
                 }
                 select[i] = now;
                 count[i] = rate;
-                counting[i] = Tunes.table(start.source()).repeat().isPresent();
+                counting[i] = Tunes.rows(Tunes.source(start)).repeat().isPresent();
                 return 1 << i;
             }
             case Retune retune -> {
-                int now = select(retune.prescaler());
-                int resets = resets(retune.timerReset(), retune.placeReset());
-                int rate = counted(retune.count(), at);
+                int now = select(retune.timing().prescaler());
+                int resets = resets(Tunes.timerReset(retune), Tunes.placeReset(retune));
+                int rate = counted(retune.timing().count(), at);
                 // A count of 0 is the value the MFP counts 256 for, and the
                 // count column reserves 0 for the row that does not set it,
                 // so bit 4 of the control column marks it (SPEC.md 1.9). The
@@ -239,7 +239,7 @@ final class Schema {
             }
             rows[rows.length - 1] |= (byte) Sources.MARK;
             out.add(new Sources.Source(kind(source), 0, rows,
-                    Tunes.table(source).repeat().orElse(rows.length)));
+                    Tunes.rows(source).repeat().orElse(rows.length)));
         }
         return out;
     }
@@ -247,8 +247,8 @@ final class Schema {
     /** What a source of this shape sounds, for a report: the format names
      *  no kind, and a tune's use of the shape settles it (SPEC.md 2.2). */
     private static int kind(Source source) {
-        int rows = Tunes.size(Tunes.table(source));
-        boolean repeats = Tunes.table(source).repeat().isPresent();
+        int rows = Tunes.size(Tunes.rows(source));
+        boolean repeats = Tunes.rows(source).repeat().isPresent();
         if (!repeats) {
             return Effects.DRUM;
         }

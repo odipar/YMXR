@@ -107,7 +107,7 @@ func registers(song Song, frame int) [14]int {
 func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.Tune {
 	frames := song.Frames
 	var rows []ymxs.Row
-	made := map[int]ymxs.Source{}
+	made := map[int]ymxs.Single{}
 	var wrote [14]int
 	for i := range wrote {
 		wrote[i] = -1
@@ -232,11 +232,11 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 					if err != nil {
 						panic(err)
 					}
-					effects[timer] = ymxs.Start{Target: ymxs.Setting(register),
-						Source:     source(made, sources, number[i]),
-						Prescaler:  prescaler,
-						Count:      slot[i].Count,
-						TimerReset: stopped, PlaceReset: !unmoved}
+					effects[timer] = ymxs.StartOne{Target: ymxs.Setting(register),
+						Source: source(made, sources, number[i]),
+						Timing: ymxs.Timing{Prescaler: prescaler,
+							Count:      slot[i].Count,
+							TimerReset: stopped, PlaceReset: !unmoved}}
 					running[i] = slot[i]
 					runningNumber[i] = number[i]
 					lastKind[i] = slot[i].Kind
@@ -251,8 +251,8 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 					if err != nil {
 						panic(err)
 					}
-					effects[timer] = ymxs.Retune{Prescaler: prescaler,
-						Count: slot[i].Count}
+					effects[timer] = ymxs.Retune{Timing: ymxs.Timing{
+						Prescaler: prescaler, Count: slot[i].Count}}
 				}
 				selectHeld[i] = slot[i].Select
 				countHeld[i] = slot[i].Count
@@ -309,7 +309,7 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 // source is the source of that number, built on first use: its rows
 // without the marker bit 7, which is this format's and not the
 // structure's (SPEC.md 3.2).
-func source(made map[int]ymxs.Source, sources *ymxr.Sources, number int) ymxs.Source {
+func source(made map[int]ymxs.Single, sources *ymxr.Sources, number int) ymxs.Single {
 	if known, met := made[number]; met {
 		return known
 	}
