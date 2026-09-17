@@ -810,10 +810,14 @@ YMXR_init:
                 lea     SQ_SIZE(a5),a5
                 dbra    d2,.sq
 
-; The effects' records: empty until a start.
+; The effects' records: the kept target, select, count and shape empty
+; until a start, and the first row the parked place, so a start that moves
+; no place stands at row 0 of the source it names (SPEC.md 4.1 step 4).
                 lea     WS_FX(a6),a0
-                moveq   #7,d0
+                lea     ymxr_park(pc),a1
+                moveq   #3,d0
 .clear:         clr.l   (a0)+
+                move.l  a1,(a0)+
                 dbra    d0,.clear
 
 ; The effects the tune runs are read every row; the others are jumped

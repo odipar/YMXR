@@ -706,9 +706,12 @@ of them (SPEC.md 4.2.1). The frame it stops in is one whose row moves
 what the effect's tick writes, so the reading before that effect's step
 and the reading after it differ, and the run says how many of the
 boundaries a tick was fired at. A name ending `.ymxr` is played as it
-stands. A tune whose RR equals R is played one frame past its last row,
-where the call reports -1 and leaves every register as it is. A tune that
-fails is named and the run continues.
+stands, and a run writes one such tune itself: a start that moves no
+place with no start on that timer before it, which no conversion of a
+dump writes, to read the place against SPEC.md 4.1 step 4. A tune whose
+RR equals R is played one frame past its last row, where the call reports
+-1 and leaves every register as it is. A tune that fails is named and the
+run continues.
 
 | mode | reads |
 |---|---|

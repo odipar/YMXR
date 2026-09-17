@@ -161,7 +161,9 @@ advance yields row 0, each advance the row after, and the advance after
 row `R` - 1 yields row `RR`, or ends the table where `RR` is `R`. Two
 clocks on one table keep two row numbers, and each moves its number
 alone. A table that repeats has a row after every row. A timer's row
-number in its source is its place (YMXS, SPEC.md 3.4.2).
+number in its source is its place (YMXS, SPEC.md 3.4.2). Note: YMXS,
+SPEC.md 8.4 leaves the place before the first start that resets it to a
+later version; this format fixes it at row 0 (SPEC.md 4.1 step 4).
 
 **3.4 A procedure.** A **procedure** writes a row to the chips. A clock
 advances a table one row and calls a procedure with that row. A frame
