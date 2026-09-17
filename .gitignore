@@ -69,14 +69,6 @@ build/
 /go/ymxr-trace
 /go/ymxr-check
 
-# rig scratch: assembled builds, packed tunes, the SNDH build
-
-# the C# tree's build outputs
-dotnet/bin/
-dotnet/obj/
-
-# the rig's output for the real-hardware harness
-
 # The play scripts build <stem>-n<ring>-c<chunk>[-k<unit>]/ beside the tune
 *-n[0-9]*-c[0-9]*/
 dist/
