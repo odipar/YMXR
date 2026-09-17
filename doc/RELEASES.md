@@ -34,6 +34,43 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.1, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.1>, built from the commit
+tagged `v0.4.1`.
+
+What a tick of a target of several registers writes, and the rig reading
+one on a real MFP. Every file under `68k/` but the rig stands as v0.4.0 has
+it, so the player is that release's, and the thirty files the ten dumps
+under `ym/test` convert to - the tune file, the structure and the program
+of each - are byte for byte 0.4.0's, measured against a build of its tag.
+
+- **Section 8 names what 0.4.0 defines.** 8.2 left targets 14 to 127 to a
+  later version and 8.3 a source of more than one column, and 0.4.0
+  defined targets 14 to 24 and sources of two and three columns. 8.2 is
+  targets 25 to 127, `setEnvelope` and a source of one column on the six
+  registers that read every bit of their value; 8.3 is more than three
+  columns, values wider than a byte, and RR above R.
+- **5.1 was the hole that made**: its steps wrote the register of the
+  target, and a target of several has no one register. A tick writes a
+  column at a time in column order, the column the marker stands in last,
+  so the marker is the last byte written and a player reads it there. 1.8.2,
+  1.8.3 and 4.3 step 3 read the registers of the kept target.
+- **The order is the player's**, which YMXS 0.4.1 defines: 3.1.1's table
+  read "registers, in the order it writes them", and the sound depends on
+  two of those orderings alone. The marker-last rule satisfies both, since
+  a tone and a voice name their coarse nibble for the marker and a buzzer
+  names its shape. The tools read YMXS 0.4.1.
+- **The rig reads a tick of several registers on a real MFP.** Its trace
+  path placed a chip write by the handler whose range its PC fell in, and
+  the two handlers of several registers stood in none of them, so their
+  writes were a tick of no effect: a run reported effect 0 ticking 0 times
+  where the rates said 20,483. A tick of C registers is C writes of the
+  trace besides, and the loop read one write a tick. A run that names no
+  tune plays the conformance kit's `voices` after the fixtures, since no
+  dump converts to a target of several registers: 2,000 frames and 36,675
+  ticks on Hatari's MFP.
+
 ### 0.4.0, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.0>, built from the commit
