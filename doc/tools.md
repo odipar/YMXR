@@ -716,7 +716,7 @@ fails is named and the run continues.
 | `-corpus[N]` | N tunes spread over the corpus, `YM_CORPUS`: of its F files by name, every (F divided by N)-th, the first N of those; 40 with N absent |
 | `-framesN` | each tune for N frames at most |
 | `-cycles` | the play call, DTX's advance and the tick handlers counted with DTX's cycle counter under `DTX_REPO/68k/test/emu`, against performance.md's figures |
-| `-refill` | the advance's parts, from the same counter: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the ten fixtures reads the claims over the set; a run of other tunes reads each tune alone |
+| `-refill` | `-cycles` and the advance's parts off one pass: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the ten fixtures reads the claims over the set; a run of other tunes reads each tune alone |
 | `-hatari` | each tune, at 50 Hz alone, through `ymxr-sndh` and `ymxr-prg` with 2,000 rows, run under Hatari, the trace of every chip write cut into frames at the VBL and read against the model |
 | `-perf` | the player assembled with the raster monitor, against the model |
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
