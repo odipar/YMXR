@@ -36,7 +36,12 @@ import org.jspecify.annotations.Nullable;
 final class Bound {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'B'};
-    static final int VERSION = 0x0003;
+    /** The version of a bound tune whose sources are one column (SPEC.md
+     *  3.3.5). */
+    static final int VERSION = Tune.VERSION;
+
+    /** The version of a bound tune with a source of several columns. */
+    static final int VERSION_COLUMNS = Tune.VERSION_COLUMNS;
     static final int STATE_AT = 12;
     static final int IMAGE_AT = 16;
     static final int TABLE_AT = 20;
@@ -172,7 +177,7 @@ final class Bound {
         byte[] bound = new byte[here];
         System.arraycopy(tuneFile, 0, bound, 0, Tune.TABLE_AT);
         System.arraycopy(MAGIC, 0, bound, 0, 4);
-        Tune.putWord(bound, 4, VERSION);
+        Tune.putWord(bound, 4, Tune.getWord(tuneFile, 4));
         Tune.putLong(bound, STATE_AT, state);
         Tune.putLong(bound, IMAGE_AT, imageAt);
         // Where this tune's table stands in the image it is packaged into. An

@@ -104,7 +104,7 @@ final class Sndh {
 
     /** The same, around the core named. */
     static byte[] of(byte[] core, List<byte[]> tuneFiles, Options options) {
-        checkCore(core, options.monitor(), options.lean());
+        checkCore(core, options.monitor(), options.lean(), binds(tuneFiles));
         int n = tuneFiles.size();
         if (n == 0) {
             throw new IllegalArgumentException("no tune files: an SNDH file has one subtune"
@@ -161,12 +161,21 @@ final class Sndh {
      * the core was read from does not.
      *
      * @throws IllegalArgumentException where the core is not one, is of
-     *     another descriptor version, reads bound tunes of another
-     *     version than {@link Bound} writes, has no raster monitor in
+     *     another descriptor version, reads bound tunes below the version
+     *     {@code binds} names, has no raster monitor in
      *     where {@code monitor} selects one, or its ticks are not the
      *     lean ones where {@code lean} does
      */
-    static void checkCore(byte[] core, boolean monitor, boolean lean) {
+    static int binds(List<byte[]> tuneFiles) {
+        for (byte[] file : tuneFiles) {
+            if (file.length >= 6 && Tune.getWord(file, 4) == Tune.VERSION_COLUMNS) {
+                return Bound.VERSION_COLUMNS;
+            }
+        }
+        return Bound.VERSION;
+    }
+
+    static void checkCore(byte[] core, boolean monitor, boolean lean, int binds) {
         if (core.length < CORE_DESCRIPTOR || !Arrays.equals(CORE_MAGIC,
                 Arrays.copyOfRange(core, CORE_MAGIC_AT, CORE_MAGIC_AT + 4))) {
             throw new IllegalArgumentException("not an SNDH core: no YMXS at " + CORE_MAGIC_AT);
@@ -177,9 +186,9 @@ final class Sndh {
                     + ", and this writes " + CORE_VERSION);
         }
         int reads = Tune.getWord(core, CORE_READS_AT);
-        if (reads != Bound.VERSION) {
-            throw new IllegalArgumentException("the core reads bound tunes of version " + reads
-                    + ", and this binds at " + Bound.VERSION);
+        if (reads < binds) {
+            throw new IllegalArgumentException("the core reads bound tunes to version " + reads
+                    + ", and this binds at " + binds);
         }
         int flags = Tune.getWord(core, CORE_FLAGS_AT);
         if (monitor && (flags & CORE_MONITOR) == 0) {

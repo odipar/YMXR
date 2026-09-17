@@ -56,7 +56,8 @@ final class BinariesTest {
         assertEquals(0, core.length & 1, "the core is even-sized");
         assertArrayEquals(Sndh.CORE_MAGIC, Arrays.copyOfRange(core, 12, 16));
         assertEquals(1, Tune.getWord(core, 16));
-        assertEquals(Bound.VERSION, Tune.getWord(core, 18));
+        assertEquals(Bound.VERSION_COLUMNS, Tune.getWord(core, 18),
+                "the highest bound tune version the core reads");
         assertEquals(PlayerTest.equates().get("YMXR_FIXED"), Tune.getWord(core, 20),
                 "the workspace's fixed bytes are the player's own");
         assertEquals(flags, Tune.getWord(core, 22), "the flags word");
@@ -106,7 +107,7 @@ final class BinariesTest {
             boolean lean = (setting & Sndh.CORE_LEAN) != 0;
             byte[] core = Binaries.core(monitor, lean);
             assertCore(core, setting);
-            Sndh.checkCore(core, monitor, lean);
+            Sndh.checkCore(core, monitor, lean, Bound.VERSION);
             named.add(Binaries.binary(monitor, lean).name());
         }
         assertEquals(4, named.size(), "the four settings are four binaries: " + named);
@@ -378,7 +379,8 @@ final class BinariesTest {
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(files, new Sndh.Options("Wrong", null, null, false, false)));
         assertEquals("subtune 2: version " + ConformanceTest.WRONG_VERSION
-                + " is not " + Tune.VERSION, wrong.getMessage());
+                + " is not " + Tune.VERSION + " or " + Tune.VERSION_COLUMNS,
+                wrong.getMessage());
     }
 
     @Test
@@ -464,7 +466,8 @@ final class BinariesTest {
                     () -> Sndh.of(without, files, options));
             assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
                     && said(wrong).contains("needs bit 1 set"), said(wrong));
-            Sndh.checkCore(Binaries.core(options.monitor(), true), options.monitor(), true);
+            Sndh.checkCore(Binaries.core(options.monitor(), true), options.monitor(), true,
+                    Bound.VERSION);
         }
     }
 

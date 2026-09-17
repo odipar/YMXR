@@ -57,7 +57,7 @@ func Of(song ym.Song, args []string) []string {
 	for i := 0; i < min(sources.Count(), len(tune.Sources)); i++ {
 		s := tune.Sources[i]
 		values := s.Column(0)
-		want := len(sources.At(i + 1).Rows)
+		want := sources.At(i + 1).Rows()
 		if s.Columns() != 1 || len(values) != want {
 			wrong = append(wrong, fmt.Sprintf("source %d is %d columns of %d rows, not"+
 				" one of %d", i+1, s.Columns(), len(values), want))
@@ -146,7 +146,7 @@ func Of(song ym.Song, args []string) []string {
 							wrong = append(wrong, fmt.Sprintf("%d: the drum is not started",
 								f))
 						}
-						drumEnd[i] = r + ymxr.Duration(len(s.Rows), slot.Select,
+						drumEnd[i] = r + ymxr.Duration(s.Rows(), slot.Select,
 							slot.Count, song.PlayerHz)
 					}
 				}

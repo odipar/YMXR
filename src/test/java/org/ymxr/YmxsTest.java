@@ -21,8 +21,9 @@ import org.ymxs.YMXS.Effect;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Retune;
 import org.ymxs.YMXS.Row;
-import org.ymxs.YMXS.Start;
+import org.ymxs.YMXS.StartOne;
 import org.ymxs.YMXS.Timer;
+import org.ymxs.YMXS.Timing;
 import org.ymxs.YMXS.Tune;
 
 /**
@@ -104,16 +105,16 @@ final class YmxsTest {
 
     @Test
     void aColumnIsWrittenWhereItDiffersFromWhatThePlayerKeeps() {
-        org.ymxs.YMXS.Source square = Tunes.repeating("square 12", List.of(12, 0), 0);
+        org.ymxs.YMXS.Single square = Tunes.repeating("square 12", List.of(12, 0), 0);
         List<Row> rows = new ArrayList<>();
-        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), square,
-                Chip.prescaler(4), 100, true, true)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), square, new Timing(
+                Chip.prescaler(4), 100, true, true))));
         // the rate does not move: neither rate column is written
-        rows.add(row(Map.of(), Timer.A, new Retune(Chip.prescaler(4), 100, false, false)));
+        rows.add(row(Map.of(), Timer.A, new Retune(new Timing(Chip.prescaler(4), 100, false, false))));
         // the count alone
-        rows.add(row(Map.of(), Timer.A, new Retune(Chip.prescaler(4), 90, false, false)));
+        rows.add(row(Map.of(), Timer.A, new Retune(new Timing(Chip.prescaler(4), 90, false, false))));
         // the select alone
-        rows.add(row(Map.of(), Timer.A, new Retune(Chip.prescaler(10), 90, false, false)));
+        rows.add(row(Map.of(), Timer.A, new Retune(new Timing(Chip.prescaler(10), 90, false, false))));
         byte[][] column = Schema.of(built(rows, 0)).columns().column;
         int control = Columns.EFFECT + 2;
         int count = Columns.EFFECT + 3;
@@ -130,21 +131,21 @@ final class YmxsTest {
 
     @Test
     void aStartOnATimerAtTheRateItCountsSetsNoRateColumn() {
-        org.ymxs.YMXS.Source loud = Tunes.repeating("square 12", List.of(12, 0), 0);
-        org.ymxs.YMXS.Source soft = Tunes.repeating("square 6", List.of(6, 0), 0);
+        org.ymxs.YMXS.Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        org.ymxs.YMXS.Single soft = Tunes.repeating("square 6", List.of(6, 0), 0);
         List<Row> rows = new ArrayList<>();
-        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), loud,
-                Chip.prescaler(4), 100, true, true)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), loud, new Timing(
+                Chip.prescaler(4), 100, true, true))));
         // a second source on the running timer, at the rate it counts
-        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), soft,
-                Chip.prescaler(4), 100, false, false)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), soft, new Timing(
+                Chip.prescaler(4), 100, false, false))));
         // the same, with the count moved
-        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), loud,
-                Chip.prescaler(4), 90, false, false)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), loud, new Timing(
+                Chip.prescaler(4), 90, false, false))));
         // the timer stopped, then started again at the rate it last ran
         rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP)));
-        rows.add(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8), loud,
-                Chip.prescaler(4), 90, false, false)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), loud, new Timing(
+                Chip.prescaler(4), 90, false, false))));
         byte[][] column = Schema.of(built(rows, 0)).columns().column;
         int source = Columns.EFFECT + 1;
         int control = Columns.EFFECT + 2;
@@ -173,16 +174,16 @@ final class YmxsTest {
 
     @Test
     void aStructureThisFormatCannotEncodeIsAnError() {
-        org.ymxs.YMXS.Source square = Tunes.repeating("square 12", List.of(12, 0), 0);
-        List<Row> big = List.of(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R8),
-                square, Chip.prescaler(4), Chip.MOST_COUNT + 1, true, true)));
+        org.ymxs.YMXS.Single square = Tunes.repeating("square 12", List.of(12, 0), 0);
+        List<Row> big = List.of(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8),
+                square, new Timing( Chip.prescaler(4), Chip.MOST_COUNT + 1, true, true))));
         String said = String.valueOf(assertThrows(IllegalArgumentException.class,
                 () -> Schema.of(built(big, 0))).getMessage());
         assertTrue(said.contains("count of 256"), "a count of 256 is past the timer's data"
                 + " register, which the count column is: " + said);
-        org.ymxs.YMXS.Source wide = Tunes.repeating("wide", List.of(200), 0);
-        List<Row> marked = List.of(row(Map.of(), Timer.A, new Start(Tunes.setting(Register.R0),
-                wide, Chip.prescaler(4), 100, true, true)));
+        org.ymxs.YMXS.Single wide = Tunes.repeating("wide", List.of(200), 0);
+        List<Row> marked = List.of(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R0),
+                wide, new Timing( Chip.prescaler(4), 100, true, true))));
         String wrong = String.valueOf(assertThrows(IllegalArgumentException.class,
                 () -> Schema.of(built(marked, 0))).getMessage());
         assertTrue(wrong.contains("marker"), "bit 7 of a source's row is the marker (3.2): "

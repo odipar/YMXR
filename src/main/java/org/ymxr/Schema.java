@@ -87,8 +87,8 @@ final class Schema {
                 column[c][f] = out[c];
             }
         }
-        return new Made(new Columns(column, repeat, used), new Sources(sources(sources)),
-                tune.rate());
+        return new Made(new Columns(column, repeat, used),
+                new Sources(sources(sources, markers(rows, sources))), tune.rate());
     }
 
     /** The registers the row sets, each in its column: the set bit where
@@ -124,15 +124,15 @@ final class Schema {
                 return 0;
             }
             case Start start -> {
-                int reaches = Tunes.number(start.target());
+                int reaches = Tunes.number(Tunes.target(start));
                 if (reaches != target[i]) {
                     out[t] = (byte) (0x80 | reaches);
                     target[i] = reaches;
                 }
-                out[t + 1] = (byte) (0x80 | (sources.indexOf(start.source()) + 1));
-                int now = select(start.prescaler());
-                int rate = counted(start.count(), at);
-                int resets = resets(start.timerReset(), start.placeReset());
+                out[t + 1] = (byte) (0x80 | (sources.indexOf(Tunes.source(start)) + 1));
+                int now = select(Tunes.prescaler(start));
+                int rate = counted(Tunes.count(start), at);
+                int resets = resets(Tunes.timerReset(start), Tunes.placeReset(start));
                 // A start on a timer already counting, at the rate it
                 // counts, sets no rate column: step 2 resolves the source
                 // and the ticks read it from here on, at the rate the
@@ -146,13 +146,13 @@ final class Schema {
                 }
                 select[i] = now;
                 count[i] = rate;
-                counting[i] = Tunes.table(start.source()).repeat().isPresent();
+                counting[i] = Tunes.rows(Tunes.source(start)).repeat().isPresent();
                 return 1 << i;
             }
             case Retune retune -> {
-                int now = select(retune.prescaler());
-                int resets = resets(retune.timerReset(), retune.placeReset());
-                int rate = counted(retune.count(), at);
+                int now = select(retune.timing().prescaler());
+                int resets = resets(Tunes.timerReset(retune), Tunes.placeReset(retune));
+                int rate = counted(retune.timing().count(), at);
                 // A count of 0 is the value the MFP counts 256 for, and the
                 // count column reserves 0 for the row that does not set it,
                 // so bit 4 of the control column marks it (SPEC.md 1.9). The
@@ -220,26 +220,70 @@ final class Schema {
         return TIMERS[i];
     }
 
-    /** The sources as tables of this format: the values, bit 7 set on the
-     *  last row as the marker (SPEC.md 3.2), and the row the source
-     *  repeats to, its row count where it plays once. */
-    private static List<Sources.Source> sources(List<Source> sources) {
-        List<Sources.Source> out = new ArrayList<>();
-        for (Source source : sources) {
-            List<Integer> values = Tunes.values(source);
-            byte[] rows = new byte[values.size()];
-            for (int r = 0; r < rows.length; r++) {
-                int value = values.get(r);
-                if (value < 0 || value >= Sources.MARK) {
-                    throw new IllegalArgumentException("the source " + Tunes.name(source)
-                            + " has the value " + value + " in row " + r
-                            + ", and bit 7 of a source's row is the marker");
+    /** The column of each source's row the marker stands in, off the
+     *  targets the tune starts that source on (SPEC.md 2.1, 3.2.1).
+     *
+     * @throws IllegalArgumentException where a target this version does not
+     *     encode starts a source, or where two targets of one source name
+     *     different columns (rule 2(d))
+     */
+    private static int[] markers(List<Row> rows, List<Source> sources) {
+        int[] marker = new int[sources.size()];
+        Arrays.fill(marker, -1);
+        for (Row row : rows) {
+            for (Effect one : Tunes.effects(row).values()) {
+                if (!(one instanceof Start start)) {
+                    continue;
                 }
-                rows[r] = (byte) value;
+                int n = sources.indexOf(Tunes.source(start));
+                int number = Tunes.number(Tunes.target(start));
+                int at = number < Columns.MARKER.length ? Columns.MARKER[number] : -1;
+                if (at < 0) {
+                    throw new IllegalArgumentException("the source " + Tunes.name(
+                            Tunes.source(start)) + " runs on " + Tunes.name(
+                            Tunes.target(start)) + ", whose registers read every bit of"
+                            + " their value, and bit 7 of a column is the marker"
+                            + " (SPEC.md 2.1.2, 2.1.3)");
+                }
+                if (marker[n] >= 0 && marker[n] != at) {
+                    throw new IllegalArgumentException("the source " + Tunes.name(
+                            Tunes.source(start)) + " runs on targets that mark column "
+                            + marker[n] + " and column " + at + ", and a source has one"
+                            + " marker column (SPEC.md rule 2(d))");
+                }
+                marker[n] = at;
             }
-            rows[rows.length - 1] |= (byte) Sources.MARK;
-            out.add(new Sources.Source(kind(source), 0, rows,
-                    Tunes.table(source).repeat().orElse(rows.length)));
+        }
+        return marker;
+    }
+
+    /** The sources as tables of this format: a column a value of the row,
+     *  bit 7 set on the last row of the marker's column (SPEC.md 3.2), and
+     *  the row the source repeats to, its row count where it plays once. */
+    private static List<Sources.Source> sources(List<Source> sources, int[] marker) {
+        List<Sources.Source> out = new ArrayList<>();
+        for (int n = 0; n < sources.size(); n++) {
+            Source source = sources.get(n);
+            List<List<Integer>> values = Tunes.rows(source).rows();
+            int at = Math.max(marker[n], 0);
+            byte[][] columns = new byte[Tunes.columns(source)][values.size()];
+            for (int r = 0; r < values.size(); r++) {
+                for (int c = 0; c < columns.length; c++) {
+                    int value = values.get(r).get(c);
+                    int most = c == at ? Sources.MARK - 1 : 0xFF;
+                    if (value < 0 || value > most) {
+                        throw new IllegalArgumentException("the source " + Tunes.name(source)
+                                + " has the value " + value + " in row " + r + " of column "
+                                + c + ", and " + (c == at
+                                ? "bit 7 of the marker's column is the marker"
+                                : "a column is one byte"));
+                    }
+                    columns[c][r] = (byte) value;
+                }
+            }
+            columns[at][values.size() - 1] |= (byte) Sources.MARK;
+            out.add(new Sources.Source(kind(source), 0, columns,
+                    Tunes.rows(source).repeat().orElse(values.size())));
         }
         return out;
     }
@@ -247,8 +291,8 @@ final class Schema {
     /** What a source of this shape sounds, for a report: the format names
      *  no kind, and a tune's use of the shape settles it (SPEC.md 2.2). */
     private static int kind(Source source) {
-        int rows = Tunes.size(Tunes.table(source));
-        boolean repeats = Tunes.table(source).repeat().isPresent();
+        int rows = Tunes.size(Tunes.rows(source));
+        boolean repeats = Tunes.rows(source).repeat().isPresent();
         if (!repeats) {
             return Effects.DRUM;
         }

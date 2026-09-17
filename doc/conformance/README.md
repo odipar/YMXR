@@ -1,8 +1,8 @@
 # The conformance kit
 
-**1.** The kit is 11 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
+**1.** The kit is 12 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
 beside its `.rows` (3), and a reference record of each (SPEC.md 7):
-18,283 entries over the 11 tunes, one line each, the first line of each
+18,444 entries over the 12 tunes, one line each, the first line of each
 record among them. The kit tests the two documents,
 [SPEC.md](../SPEC.md) and YMXS's `doc/SPEC.md`: an implementer who has
 read them alone writes a reader (2), and a record equal to the reference
@@ -28,10 +28,11 @@ tests a reader; the rig (7) tests the player against the same record.
 Nine tunes are converted from eight dumps under `ym/test`: six of
 published music, by Jochen Hippel, Mad Max and Scavenger as their
 headers record, one of them converted twice (`circus`, `plays-once`),
-and two built (`preempt`, `retune`); `four-timers` is built by code and
-`wrong-version` is `chambers` with the version word $0004. The music is
-its composers', and the repository's LICENSE covers the code alone: a
-copy of the kit has the tunes in it for the exercise alone.
+and two built (`preempt`, `retune`); `four-timers` and `voices` are
+built by code and `wrong-version` is `chambers` with the version word
+$0005. The music is its composers', and the repository's LICENSE covers
+the code alone: a copy of the kit has the tunes in it for the exercise
+alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of the format,
@@ -82,7 +83,8 @@ Note: the first run of the exercise is to come.
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |
 | `fine-zero` | a tone fine byte moving to 0 on each voice, with the coarse set bit set and with it clear; an odd row count, so a row of unset columns is appended at the end and the table packs at unit 2 |
 | `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and rows section 4 allows beyond those a conversion of a dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, its source with bit 7 set in nine rows before its last, outside SPEC.md 3.2 and reported as the table has it (SPEC.md 7), R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit |
-| `wrong-version` | the version word $0004: a reader produces an empty record |
+| `voices` | version 4 (SPEC.md 3.3.5): the four kinds of target that write several registers, one an effect at 50 Hz, and the marker in a different column under each - the coarse nibble of a voice on Timer A and of a tone on Timer C, the noise period on Timer D, the envelope shape of a buzzer on Timer B; a source of several columns repeating to row 0, one repeating to a row above it, one that plays once and stops its timer at its marker, and a start over a running source of the same row count that leaves the place where it stands |
+| `wrong-version` | the version word $0005: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.

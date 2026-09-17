@@ -137,7 +137,7 @@ final class PlayerTest {
         Map<String, Integer> said = layout(binaries, "2. The SNDH core");
         assertEquals(Sndh.CORE_MAGIC_AT, row(said, "`YMXS`").getValue());
         assertEquals(Sndh.CORE_VERSION_AT, row(said, "the descriptor's version").getValue());
-        assertEquals(Sndh.CORE_READS_AT, row(said, "the bound tune's version").getValue());
+        assertEquals(Sndh.CORE_READS_AT, row(said, "the highest bound tune version").getValue());
         assertEquals(Sndh.CORE_FIXED_AT, row(said, "`YMXR_FIXED`").getValue());
         assertEquals(Sndh.CORE_FLAGS_AT, row(said, "flags").getValue());
         assertEquals(Sndh.CORE_STATE_AT, row(said, "where the core's state byte").getValue());
@@ -173,7 +173,8 @@ final class PlayerTest {
         assertTrue(e.size() > 20, "the player's equates read as " + e.size());
         assertEquals(java.nio.ByteBuffer.wrap(Bound.MAGIC).getInt(), e.get("YMXR_MAGIC"),
                 "the player's magic is the bound tune's");
-        assertEquals(Bound.VERSION, e.get("YMXR_VERSION"));
+        assertEquals(Bound.VERSION_COLUMNS, e.get("YMXR_VERSION"),
+                "the newest version the player reads (SPEC.md 3.3.5)");
         assertEquals(Columns.C, e.get("YMXR_COLUMNS"));
         assertEquals(Tune.FRAME_RATE_AT, e.get("TF_RATE"));
         assertEquals(Tune.EFFECTS_AT, e.get("TF_EFFECTS"));

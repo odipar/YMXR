@@ -73,7 +73,9 @@
 ; default, no byte and no cycle of it stands.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
-YMXR_VERSION    equ     $0003           ; its version
+YMXR_VERSION    equ     $0004           ; the newest version it reads: a
+                                        ; bound tune of 3 is one whose sources
+                                        ; are one column (SPEC.md 3.3.5)
 YMXR_COLUMNS    equ     30
 YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 
@@ -155,6 +157,7 @@ IM_POINTER      equ     8               ; the state block's row pointer, which
 
 ; A DTX1 table's header, and where a source's rows begin (DTX, SPEC.md 1).
 DT_ROWS         equ     4
+DT_COLUMNS      equ     8
 DT_REPEAT       equ     10
 DT_PAYLOAD      equ     16
 
@@ -168,7 +171,11 @@ WS_EFFECTS      equ     20              ; a byte: the effects the tune runs
 WS_VECTOR       equ     21              ; a byte: the MFP's vector register as
                                         ; init found it, kept where the player
                                         ; runs automatic end of interrupt
-WS_FX           equ     24              ; four effects, FX_SIZE each
+WS_FX           equ     24              ; four effects, FX_SIZE each. The
+                                        ; instances below add FX_SIZE a time
+                                        ; rather than multiplying: rmac reads
+                                        ; an expression left to right, so
+                                        ; WS_FX+FX_SIZE*2 is (WS_FX+FX_SIZE)*2
 FX_TARGET       equ     0               ; the target the player keeps
 FX_SELECT       equ     1               ; the select it last read
 FX_COUNT        equ     2               ; the count it last read
@@ -177,15 +184,25 @@ FX_SHAPE        equ     3               ; which handler the timer's vector
                                         ; the square's, 1 the one-row
                                         ; source's. The last two encode the
                                         ; place as an immediate
-FX_FIRST        equ     4               ; the running source's first row
-FX_SIZE         equ     8
-WS_SOURCES      equ     56              ; a source's first row and its loop
+FX_FIRST        equ     4               ; the place at row 0: the running
+                                        ; source's first row, and the first row
+                                        ; of the column the running handler
+                                        ; writes first where it writes several
+FX_FIRST2       equ     8               ; the same for the second column a
+FX_FIRST3       equ     12              ; handler of several writes, and the
+                                        ; third
+FX_SIZE         equ     16
+WS_SOURCES      equ     88              ; a source's first row and its loop
                                         ; cell, eight bytes each, resolved at
                                         ; init: the source column's seven bits
                                         ; reach 127, so the room stands whether
                                         ; the tune names that many or one
-YMXR_FIXED      equ     1072
-WS_STATE        equ     1072            ; the image's state block, on a long
+WS_WIDE         equ     1104            ; a source of several columns: its loop
+                                        ; cell and the stride from one column
+                                        ; to the next, eight bytes each and one
+                                        ; a source, resolved at init beside it
+YMXR_FIXED      equ     2120
+WS_STATE        equ     2120            ; the image's state block, on a long
 
 ; The chip.
 YM_SELECT       equ     $FFFF8800
@@ -311,7 +328,7 @@ q\{col}:
 
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset.
-                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,vector
+                .macro  EFFECT  fx,ct,cs,cc,cn,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,two,three,vector
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
 ; that separates them, and the word after it has the read's
@@ -347,14 +364,14 @@ q\{ct}:         bra.w   \{tick}_done
                 lsl.w   #3,d1
                 movea.l WS_SOURCES-8(a0,d1.w),a4    ; its first row
                 move.l  WS_SOURCES-4(a0,d1.w),d0    ; the loop cell: row RR,
-\{tick}_pick:   bmi.w   \{tick}_shaped              ; 0 where it plays once,
+\{tick}_pick:   bmi.w   \{tick}_shaped  ; 0 where it plays once,
                                                     ; -1 for a square and -2
                                                     ; for a source of one row
 ; the handler's three operands stand under one mask, since the timer may
 ; run: a tick between the target register and the place writes the old
 ; source's row to the new target, and one between the place and the loop
 ; cell reads the new place against the cell the old source left
-.aim\~:         lea     \tick(pc),a5
+\{tick}_aim:    lea     \tick(pc),a5
 ; The three behind level 7, so a tick reads none of them half made. The
 ; window is three writes wide and costs no measurable jitter: the ticks
 ; of a tune running one effect keep their period to 0.31 per cent with
@@ -366,18 +383,18 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
                 move.l  a4,d1                   ; the place: the first row,
                 btst    #5,d2                   ; or the row it stands at in
-                bne.s   .put\~                  ; the rows it replaces, which
+                bne.s   \{tick}_put     ; the rows it replaces, which
                 tst.b   \fx+FX_SHAPE(a0)        ; the square keeps in bit 7 of
-                beq.s   .same\~                 ; its immediate, and a
-                bpl.s   .put\~                  ; source of one row stands at
+                beq.s   \{tick}_same    ; its immediate, and a
+\{tick}_keep:   bpl.s   \{tick}_put     ; source of one row stands at
                 lea     \sq(pc),a3              ; row 0
                 tst.b   SQ_VAL(a3)
-                bpl.s   .put\~
+                bpl.s   \{tick}_put
                 addq.l  #1,d1
-                bra.s   .put\~
-.same\~:        add.l   TICK_PTR(a5),d1
+                bra.s   \{tick}_put
+\{tick}_same:   add.l   TICK_PTR(a5),d1
                 sub.l   \fx+FX_FIRST(a0),d1
-.put\~:         move.l  d1,TICK_PTR(a5)
+\{tick}_put:    move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 move.w  (sp)+,sr
                 move.l  a4,\fx+FX_FIRST(a0)
@@ -388,11 +405,41 @@ q\{ct}:         bra.w   \{tick}_done
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 
+; A start of a source of one column, where the running source has
+; several: the place stands in the running handler's first column, and
+; the row it stands at is that place against the place at row 0. Init
+; aims the branch above here where a source of the tune has several
+; columns, and at the place below where every source is one column.
+\{tick}_wput:   cmp.b   #1,\fx+FX_SHAPE(a0)     ; a source of one row stood
+                beq.s   \{tick}_put             ; at row 0
+                lea     \two(pc),a3
+                move.l  TW2_PTR1(a3),d3
+                cmp.b   #2,\fx+FX_SHAPE(a0)
+                beq.s   .w2\~
+                lea     \three(pc),a3
+                move.l  TW3_PTR1(a3),d3
+.w2\~:          add.l   d3,d1
+                sub.l   \fx+FX_FIRST(a0),d1
+                bra.s   \{tick}_put
+
+; A start of a source of several columns (SPEC.md 3.1.3), in the routine
+; every effect shares: the effect alone stands here, since the branch
+; above has a byte's displacement and the routine stands further off than
+; that. The routine leaves
+; the handler its columns pick, or the general handler's shape where the
+; source is one row.
+\{tick}_widen:  moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                bsr.w   ymxr_widestart
+                beq.w   \{tick}_one
+                move.l  a5,\vector.w
+                bclr    #5,d2
+                bra.w   \{tick}_rate
+
 ; The cell separates the two shapes: -1 two rows alternating, -2 one
 ; row repeating. Init drops this test where the tune uses one of the two
 ; and not the other, the branch above going straight to that shape.
 \{tick}_shaped: addq.l  #1,d0
-                bne.s   \{tick}_one
+\{tick}_wide:   bne.s   \{tick}_one
 ; A square: the two rows into the handler's immediate and the difference
 ; of the two into the one instruction that moves between them. The row the
 ; immediate stands at is the place, and a start that moves no place leaves
@@ -461,10 +508,10 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  d1,\fx+FX_COUNT(a0)
                 bra.s   .sel\~
 .live\~:        tst.b   d1
-                beq.s   .done\~
+                beq.s   \{tick}_done
                 move.b  d1,\data.w            ; the count, the timer running on
                 move.b  d1,\fx+FX_COUNT(a0)
-                bra.s   .done\~
+                bra.s   \{tick}_done
 .set\~:         tst.b   d1
                 bne.s   .put\~
                 btst    #4,d2                 ; a count of 0, marked a value
@@ -496,17 +543,23 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  d1,\ctrl.w
                 .endif
                 btst    #5,d2                 ; the place's reset, on the
-                beq.s   .done\~                ; handler the effect runs
+                beq.s   \{tick}_done                ; handler the effect runs
                 tst.b   \fx+FX_SHAPE(a0)
-                beq.s   .row\~
-                bpl.s   .done\~                 ; a source of one row stands at
+                beq.s   \{tick}_place
+\{tick}_reset:  bpl.s   \{tick}_done    ; a source of one row stands at
                 lea     \sq(pc),a5              ; row 0 and moves no place
                 movea.l \fx+FX_FIRST(a0),a3
                 move.b  (a3),SQ_VAL(a5)
-                bra.s   .done\~
-.row\~:         lea     \tick(pc),a5
+                bra.s   \{tick}_done
+; The place's reset on a handler of several columns, in the routine every
+; effect shares: the effect alone stands here, since the branch that
+; reaches it has a byte's displacement and the routine stands further off.
+\{tick}_wrow:   moveq   #(\fx-WS_FX)/FX_SIZE,d3
+                bsr.w   ymxr_widereset
+                bra.s   \{tick}_done
+
+\{tick}_place: lea     \tick(pc),a5
                 move.l  \fx+FX_FIRST(a0),TICK_PTR(a5)
-.done\~:
 \{tick}_done:
                 .endm
 
@@ -605,6 +658,62 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_cell:   dc.l    0                       ; the loop cell
                 .endm
 
+; A tick of a target that writes several registers (SPEC.md 2.1): a
+; select and a value a column, a place a column stepped where the row is
+; not the last, and the column the target names for the marker written
+; last, so the move that writes it leaves the marker in N and this
+; handler tests it as the general one does. A start puts the columns in
+; that order, and the places, the registers and the loop cells are the
+; immediates it patches, so this handler uses no register either. A tune
+; whose sources are one column enters none of this.
+                .macro  TICKW   name,columns,eoi,eoir,ctrl,keep,ier,bit,colour
+\name:
+                MARK    \colour
+\{name}_sel1:   move.b  #8,YM_SELECT.w          ; +3: the first register
+\{name}_ptr1:   move.b  ($12345678).l,YM_SELECT+2.w ; +2: the first place
+\{name}_sel2:   move.b  #8,YM_SELECT.w
+\{name}_ptr2:   move.b  ($12345678).l,YM_SELECT+2.w
+                .if     \columns=3
+\{name}_sel3:   move.b  #8,YM_SELECT.w
+\{name}_ptr3:   move.b  ($12345678).l,YM_SELECT+2.w
+                .endif
+                bmi.s   \{name}_last            ; the marker of the row last
+                .if     YMXR_NEST               ; written
+                move.w  #$2500,sr
+                .endif
+\{name}_step1:  addq.l  #1,($12345678).l        ; a place a column, stepped
+\{name}_step2:  addq.l  #1,($12345678).l
+                .if     \columns=3
+\{name}_step3:  addq.l  #1,($12345678).l
+                .endif
+                COUNT   PERF_ON,PERF_DROP
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+\{name}_last:
+\{name}_loopt:  tst.l   ($12345678).l           ; the loop cell of column 0
+                beq.s   \{name}_halt
+\{name}_loop1:  move.l  ($12345678).l,($12345678).l ; the cell, the place
+\{name}_loop2:  move.l  ($12345678).l,($12345678).l
+                .if     \columns=3
+\{name}_loop3:  move.l  ($12345678).l,($12345678).l
+                .endif
+                COUNT   PERF_LOOP,0
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+\{name}_halt:   andi.b  #\keep,\ctrl.w
+                move.b  #255-(1<<\bit),(\ier+4).w
+                COUNT   PERF_STOP,0
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+\{name}_cells:  dc.l    0,0,0                   ; the loop cell a column
+                .endm
+
 ; A square's tick: a source of two rows that repeats to row 0 is two
 ; values and no more, so this handler encodes them as its
 ; immediate and moves between them by the difference of the two. It
@@ -661,8 +770,11 @@ q\{ct}:         bra.w   \{tick}_done
 YMXR_init:
                 cmp.l   #YMXR_MAGIC,(a0)
                 bne     .bad
-                cmp.w   #YMXR_VERSION,TF_VERSION(a0)
-                bne     .bad
+                move.w  TF_VERSION(a0),d0       ; version 3 or 4, the lower
+                subq.w  #3,d0                   ; where the tune's sources are
+                bcs     .bad                    ; one column (SPEC.md 3.3.5)
+                cmp.w   #YMXR_VERSION-3,d0
+                bhi     .bad
                 move.l  a6,-(sp)
                 movea.l a1,a6
                 move.l  a0,WS_TUNE(a6)
@@ -702,7 +814,7 @@ YMXR_init:
                 moveq   #0,d5                   ; bit 0 a square among the
                 move.b  TF_SOURCES(a1),d1       ; sources, bit 1 one row
                 subq.w  #1,d1
-                bmi.s   .resolved
+                bmi     .resolved
                 lea     WS_SOURCES(a6),a4
                 moveq   #0,d4
 .source:        movea.l WS_TUNE(a6),a3
@@ -714,10 +826,13 @@ YMXR_init:
                 cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
                 beq.s   .plays                  ; none where it plays once
                 add.l   a5,d0
-                tst.l   DT_REPEAT(a3)           ; a source repeating to row 0
-                bne.s   .cell                   ; of one row or of two has a
-                cmp.l   #1,DT_ROWS(a3)          ; a separate handler
-                bne.s   .pair
+                cmp.w   #1,DT_COLUMNS(a3)       ; a source of several columns
+                bne.s   .several                ; runs the handler its columns
+                tst.l   DT_REPEAT(a3)           ; pick, at any rows; and a
+                bne.s   .cell                   ; source of one column
+                                                ; repeating to row 0 of one
+                cmp.l   #1,DT_ROWS(a3)          ; row or of two has a
+                bne.s   .pair                   ; separate handler
                 moveq   #-2,d0
                 bset    #1,d5
                 bra.s   .cell
@@ -727,6 +842,21 @@ YMXR_init:
                 bset    #0,d5
                 bra.s   .cell
 .plays:         moveq   #0,d0
+                cmp.w   #1,DT_COLUMNS(a3)
+                beq.s   .cell
+; A source of several columns: its loop cell and the stride from one
+; column to the next stand in the table beside, and the tag in the cell's
+; place sends a start to the handler its columns pick.
+.several:       move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                move.l  DT_ROWS(a3),d0
+                addq.l  #1,d0                   ; DTX1 pads a column to a word
+                and.w   #$FFFE,d0               ; (DTX, SPEC.md 2.2)
+                move.w  d0,WS_WIDE-WS_SOURCES(a4)
+                moveq   #-3,d0                  ; two columns
+                cmp.w   #2,DT_COLUMNS(a3)
+                beq.s   .tagged
+                moveq   #-4,d0                  ; three
+.tagged:        bset    #2,d5
 .cell:          move.l  d0,(a4)+
                 addq.w  #4,d4
                 dbra    d1,.source
@@ -810,6 +940,47 @@ YMXR_init:
                 lea     SQ_SIZE(a5),a5
                 dbra    d2,.sq
 
+; The handlers of several columns: the loop cells they read and the
+; places they step stand in the handler, so one link writes every address
+; the loop path and the step read, as a general handler's link does. A
+; start writes the values, and no timer reaches one of these handlers
+; before a start has aimed its vector there.
+                lea     ymxr_two0(pc),a5
+                moveq   #3,d2
+.linktwo:       lea     TW2_CELLS(a5),a3
+                move.l  a3,TW2_LOOPT(a5)
+                move.l  a3,TW2_LOOP1R(a5)
+                addq.l  #4,a3
+                move.l  a3,TW2_LOOP2R(a5)
+                lea     TW2_PTR1(a5),a3
+                move.l  a3,TW2_STEP1(a5)
+                move.l  a3,TW2_LOOP1W(a5)
+                lea     TW2_PTR2(a5),a3
+                move.l  a3,TW2_STEP2(a5)
+                move.l  a3,TW2_LOOP2W(a5)
+                lea     TW2_SIZE(a5),a5
+                dbra    d2,.linktwo
+                lea     ymxr_three0(pc),a5
+                moveq   #3,d2
+.linkthree:     lea     TW3_CELLS(a5),a3
+                move.l  a3,TW3_LOOPT(a5)
+                move.l  a3,TW3_LOOP1R(a5)
+                addq.l  #4,a3
+                move.l  a3,TW3_LOOP2R(a5)
+                addq.l  #4,a3
+                move.l  a3,TW3_LOOP3R(a5)
+                lea     TW3_PTR1(a5),a3
+                move.l  a3,TW3_STEP1(a5)
+                move.l  a3,TW3_LOOP1W(a5)
+                lea     TW3_PTR2(a5),a3
+                move.l  a3,TW3_STEP2(a5)
+                move.l  a3,TW3_LOOP2W(a5)
+                lea     TW3_PTR3(a5),a3
+                move.l  a3,TW3_STEP3(a5)
+                move.l  a3,TW3_LOOP3W(a5)
+                lea     TW3_SIZE(a5),a5
+                dbra    d2,.linkthree
+
 ; The effects' records: the kept target, select, count and shape empty
 ; until a start, and the first row the parked place, so a start that moves
 ; no place stands at row 0 of the source it names (SPEC.md 4.1 step 4).
@@ -817,6 +988,8 @@ YMXR_init:
                 lea     ymxr_park(pc),a1
                 moveq   #3,d0
 .clear:         clr.l   (a0)+
+                move.l  a1,(a0)+
+                move.l  a1,(a0)+
                 move.l  a1,(a0)+
                 dbra    d0,.clear
 
@@ -857,19 +1030,34 @@ YMXR_init:
 ; subtune.
                 move.w  #PICK_BOTH,d1
                 move.b  d5,d0
-                beq.s   .only
+                btst    #2,d0                   ; a tune with a source of
+                bne.s   .only                   ; several columns keeps the
+                tst.b   d0                      ; test in: such a source's
+                beq.s   .only                   ; cell is a tag past the two
                 cmp.b   #3,d0
                 beq.s   .only
                 move.w  #PICK_ONE,d1
                 btst    #0,d0
                 beq.s   .only
                 move.w  #PICK_SQ,d1
-.only:          lea     ymxr_frame(pc),a4
+.only:          move.l  #((WIDE_ONE&$FF)<<16)|((KEEP_PUT&$FF)<<8)|(RESET_DONE&$FF),d0
+                btst    #2,d5                   ; and the three branches that
+                beq.s   .aims                   ; stand elsewhere where it has
+                move.l  #((WIDE_WIDEN&$FF)<<16)|((KEEP_WIDE&$FF)<<8)|(RESET_WIDE&$FF),d0
+.aims:          lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
+                lea     ymxr_resets(pc),a2
                 moveq   #3,d2
 .pick:          move.w  (a3)+,d4
                 lea     (a4,d4.w),a1
                 move.w  d1,PICK_AT(a1)
+                move.l  d0,d5
+                move.w  (a2)+,d4
+                move.b  d5,(a4,d4.w)            ; the place's reset, at the site
+                lsr.l   #8,d5                   ; the table names
+                move.b  d5,KEEP_AT(a1)
+                lsr.l   #8,d5
+                move.b  d5,WIDE_AT(a1)
                 dbra    d2,.pick
 
 ; The advance's address, written into the call that plays: a slot is
@@ -980,10 +1168,10 @@ YMXR_play:
 ; chip's select register, a0 the workspace.
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
-                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,$134
-                EFFECT  WS_FX+8,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,$110
-                EFFECT  WS_FX+16,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,$120
-                EFFECT  WS_FX+24,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,$114
+                EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,ymxr_two0,ymxr_three0,$134
+                EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,ymxr_two1,ymxr_three1,$110
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,ymxr_two2,ymxr_three2,$120
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,ymxr_two3,ymxr_three3,$114
 ; 4: the tone periods.
                 TONE    _0,_1,$0000,$0100
                 TONE    _2,_3,$0200,$0300
@@ -1087,6 +1275,11 @@ ymxr_overs:
 
 ; The other sites a column is read at, each with its column: the effects'
 ; one-pass tests, and the envelope period's plain path.
+ymxr_resets:    dc.w    ymxr_tick0_reset-ymxr_frame+1
+                dc.w    ymxr_tick1_reset-ymxr_frame+1
+                dc.w    ymxr_tick2_reset-ymxr_frame+1
+                dc.w    ymxr_tick3_reset-ymxr_frame+1
+
 ymxr_sites:
                 dc.w    q_14-ymxr_frame+2,14,q_15-ymxr_frame+2,15
                 dc.w    q_16-ymxr_frame+2,16,q_17-ymxr_frame+2,17
@@ -1116,6 +1309,18 @@ ymxr_sites:
                 ONEROW  ymxr_one1,$EF,$FFFFFA11,$007
                 ONEROW  ymxr_one2,$FE,$FFFFFA0F,$707
                 ONEROW  ymxr_one3,$DF,$FFFFFA11,$077
+
+; The handlers of a target that writes two registers, and of one that
+; writes three: one an effect, as the three above are.
+                TICKW   ymxr_two0,2,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
+                TICKW   ymxr_two1,2,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
+                TICKW   ymxr_two2,2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
+                TICKW   ymxr_two3,2,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+
+                TICKW   ymxr_three0,3,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
+                TICKW   ymxr_three1,3,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
+                TICKW   ymxr_three2,3,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
+                TICKW   ymxr_three3,3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
 
 ; The offsets the patching writes at, measured off the first handler's
 ; labels: the row it writes, the marker it reads, and its loop cell.
@@ -1152,6 +1357,36 @@ ONE_VAL         equ     ymxr_one0_val-ymxr_one0+3
 ONE_SR          equ     ymxr_one0_val-ymxr_one0+6
 ONE_SIZE        equ     ymxr_one1-ymxr_one0
 
+; The handlers of a target that writes several registers, the same way:
+; a register and a place a column, a place a column stepped, the loop
+; cell read and the cells written into the places. The two macro
+; instances lay out two shapes, so a shape's offsets are its four
+; handlers'.
+                .macro  TWAT    p,name
+\{p}_SEL1       equ     \{name}_sel1-\name+3
+\{p}_PTR1       equ     \{name}_ptr1-\name+2
+\{p}_SEL2       equ     \{name}_sel2-\name+3
+\{p}_PTR2       equ     \{name}_ptr2-\name+2
+\{p}_STEP1      equ     \{name}_step1-\name+2
+\{p}_STEP2      equ     \{name}_step2-\name+2
+\{p}_LOOPT      equ     \{name}_loopt-\name+2
+\{p}_LOOP1R     equ     \{name}_loop1-\name+2
+\{p}_LOOP1W     equ     \{name}_loop1-\name+6
+\{p}_LOOP2R     equ     \{name}_loop2-\name+2
+\{p}_LOOP2W     equ     \{name}_loop2-\name+6
+\{p}_CELLS      equ     \{name}_cells-\name
+                .endm
+
+                TWAT    TW2,ymxr_two0
+                TWAT    TW3,ymxr_three0
+TW3_SEL3        equ     ymxr_three0_sel3-ymxr_three0+3
+TW3_PTR3        equ     ymxr_three0_ptr3-ymxr_three0+2
+TW3_STEP3       equ     ymxr_three0_step3-ymxr_three0+2
+TW3_LOOP3R      equ     ymxr_three0_loop3-ymxr_three0+2
+TW3_LOOP3W      equ     ymxr_three0_loop3-ymxr_three0+6
+TW2_SIZE        equ     ymxr_two1-ymxr_two0
+TW3_SIZE        equ     ymxr_three1-ymxr_three0
+
 ; The start's dispatch: where the branch that leaves the general
 ; handler's path has its displacement, and where the two shapes with
 ; a separate handler stand from it. One macro lays out every effect and no
@@ -1161,6 +1396,191 @@ PICK_AT         equ     ymxr_tick0_pick-ymxr_tick0_over+2
 PICK_SQ         equ     ymxr_tick0_square-ymxr_tick0_pick-2
 PICK_ONE        equ     ymxr_tick0_one-ymxr_tick0_pick-2
 PICK_BOTH       equ     ymxr_tick0_shaped-ymxr_tick0_pick-2
+
+; The three branches a tune with a source of several columns aims
+; elsewhere: the one that tells the shapes apart, the one that places a
+; start whose running source has several columns, and the one that resets
+; such a place. Each is a byte displacement, and init writes the value the
+; tune's sources need. A tune whose sources are one column keeps all
+; three where the assembler wrote them.
+;
+; The first two stand at one offset from an effect's head under every
+; effect. The third does not: the rate's path to it runs through the
+; blocks the shared control register and the select's shift add, so the
+; table below names that site an effect.
+WIDE_AT         equ     ymxr_tick0_wide-ymxr_tick0_over+1
+WIDE_ONE        equ     ymxr_tick0_one-ymxr_tick0_wide-2
+WIDE_WIDEN      equ     ymxr_tick0_widen-ymxr_tick0_wide-2
+KEEP_AT         equ     ymxr_tick0_keep-ymxr_tick0_over+1
+KEEP_PUT        equ     ymxr_tick0_put-ymxr_tick0_keep-2
+KEEP_WIDE       equ     ymxr_tick0_wput-ymxr_tick0_keep-2
+RESET_DONE      equ     ymxr_tick0_done-ymxr_tick0_reset-2
+RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
+
+; One column of a start of a source of several columns: the register the
+; map names for the slot, the column's loop cell, its place at row 0, and
+; the row that place stands at.
+                .macro  WSLOT   sel,ptr,cell,first,at
+                moveq   #0,d5
+                move.b  \at+1(a2),d5            ; the column this slot writes
+                mulu    d1,d5                   ; where it stands from column 0
+                move.b  \at(a2),\sel(a5)        ; the register it selects
+                move.l  d0,d4                   ; the column's loop cell, or
+                beq.s   .none\~                 ; none where the source plays
+                add.l   d5,d4                   ; once
+.none\~:        move.l  d4,\cell(a5)
+                add.l   a4,d5                   ; the place at row 0, kept for
+                move.l  d5,\first(a3)           ; the place's reset
+                add.l   d3,d5                   ; and the row it stands at
+                move.l  d5,\ptr(a5)
+                .endm
+
+; The place's reset on a handler of several columns (SPEC.md 1.9): a
+; place a column, out of the places at row 0 the start wrote into the
+; effect's record. d3 the effect.
+;
+; The places stand behind level 7: a tick between two of them reads one
+; column at the row the reset names and another at the row it left.
+ymxr_widereset:
+                move.w  d3,d4
+                mulu    #FX_SIZE,d4
+                lea     WS_FX(a0),a3
+                adda.w  d4,a3                   ; the effect's record
+                cmp.b   #1,FX_SHAPE(a3)         ; a source of one row stands at
+                beq.s   .moves                  ; row 0 and moves no place
+                move.w  d3,d4
+                mulu    #TW2_SIZE,d4
+                lea     ymxr_two0(pc),a5
+                adda.w  d4,a5
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                cmp.b   #2,FX_SHAPE(a3)
+                beq.s   .two
+                move.w  d3,d4
+                mulu    #TW3_SIZE,d4
+                lea     ymxr_three0(pc),a5
+                adda.w  d4,a5
+                move.l  FX_FIRST3(a3),TW3_PTR3(a5)
+                move.l  FX_FIRST2(a3),TW3_PTR2(a5)
+                move.l  FX_FIRST(a3),TW3_PTR1(a5)
+                bra.s   .reset
+.two:           move.l  FX_FIRST2(a3),TW2_PTR2(a5)
+                move.l  FX_FIRST(a3),TW2_PTR1(a5)
+.reset:         move.w  (sp)+,sr
+.moves:         rts
+
+; The start of a source of several columns, which every effect reaches:
+; the handler its columns pick, and a register, a place and a loop cell a
+; column written into it. d4 the effect, d0 the source's cell as init
+; tagged it, d1 the source's number times eight, d2 the row's control
+; byte, a4 the source's first row. a5 the handler to aim at, and Z where
+; the source is one row, which the general handler's shape runs.
+;
+; The writes stand behind level 7, as the general handler's three do: a
+; tick between a select and a place writes one column's row to another
+; column's register, and one between two places reads two rows.
+ymxr_widestart:
+                addq.l  #1,d0                   ; -1: a source of one row, at
+                beq.w   .one                    ; any columns
+                move.l  d6,-(sp)                ; the effect, kept while the
+                move.w  d4,d6                   ; handlers are resolved
+                mulu    #FX_SIZE,d4
+                lea     WS_FX(a0),a3
+                adda.w  d4,a3                   ; the effect's record
+                lea     WS_WIDE(a0),a2
+                move.l  -8(a2,d1.w),d5          ; the source's loop cell, and
+                move.w  -4(a2,d1.w),d1          ; the stride from one column to
+                addq.l  #1,d0                   ; the next
+                bne.s   .three                  ; two columns, or three
+                moveq   #2,d4
+                move.w  d6,d0
+                mulu    #TW2_SIZE,d0
+                lea     ymxr_two0(pc),a5
+                bra.s   .handler
+.three:         moveq   #3,d4
+                move.w  d6,d0
+                mulu    #TW3_SIZE,d0
+                lea     ymxr_three0(pc),a5
+.handler:       adda.w  d0,a5                   ; this effect's handler
+                move.l  d5,d0                   ; the loop cell
+; The row the place stands at, off the running handler where the row does
+; not reset the place (SPEC.md 1.9).
+                moveq   #0,d3
+                btst    #5,d2
+                bne.s   .at
+                move.b  FX_SHAPE(a3),d5
+                beq.s   .running
+                bmi.s   .square
+                cmp.b   #1,d5
+                beq.s   .at                     ; a source of one row at row 0
+                move.w  d6,d5
+                mulu    #TW2_SIZE,d5
+                lea     ymxr_two0(pc),a2
+                cmp.b   #2,FX_SHAPE(a3)
+                beq.s   .first
+                move.w  d6,d5
+                mulu    #TW3_SIZE,d5
+                lea     ymxr_three0(pc),a2
+.first:         adda.w  d5,a2                   ; the running handler's first
+                move.l  TW2_PTR1(a2),d3         ; column, which both shapes
+                bra.s   .rows                   ; place at one offset
+.running:       move.w  d6,d5
+                mulu    #TICK_SIZE,d5
+                lea     ymxr_tick0(pc),a2
+                adda.w  d5,a2
+                move.l  TICK_PTR(a2),d3
+.rows:          sub.l   FX_FIRST(a3),d3         ; the place against the place at
+                bra.s   .at                     ; row 0
+.square:        move.w  d6,d5
+                mulu    #SQ_SIZE,d5
+                lea     ymxr_sq0(pc),a2
+                adda.w  d5,a2
+                tst.b   SQ_VAL(a2)              ; the row a square stands at, in
+                bpl.s   .at                     ; bit 7 of its immediate
+                moveq   #1,d3
+; A register, a place and a loop cell a column, out of the target's row
+; of the map.
+.at:            moveq   #0,d5
+                move.b  FX_TARGET(a3),d5
+                sub.w   #14,d5                  ; the targets of several
+                lsl.w   #3,d5                   ; registers begin at 14 (SPEC.md
+                lea     ymxr_wide(pc),a2        ; 2.1): eight bytes a target in
+                adda.w  d5,a2                   ; the map, two a column
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                cmp.w   #3,d4
+                beq.s   .slots
+                WSLOT   TW2_SEL1,TW2_PTR1,TW2_CELLS,FX_FIRST,0
+                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+4,FX_FIRST2,2
+                move.b  #2,FX_SHAPE(a3)
+                bra.s   .aimed
+.slots:         WSLOT   TW3_SEL1,TW3_PTR1,TW3_CELLS,FX_FIRST,0
+                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+4,FX_FIRST2,2
+                WSLOT   TW3_SEL3,TW3_PTR3,TW3_CELLS+8,FX_FIRST3,4
+                move.b  #3,FX_SHAPE(a3)
+.aimed:         move.w  (sp)+,sr
+                lea     YM_SELECT.w,a2          ; the chip's select register,
+                move.l  (sp)+,d6                ; which the frame reads it in
+                moveq   #1,d0                   ; a source of several columns:
+.one:           rts                             ; Z where it is one row
+
+; The targets that write several registers (SPEC.md 2.1): a register and
+; the column that writes it, one slot a column and eight bytes a target,
+; from target 14. The column the marker stands in comes last, so the move
+; that writes it leaves the marker in N and the handler tests it there.
+; Target 20 writes two registers of eight bits, which this version does
+; not encode (2.1.3), and its slots are zero.
+ymxr_wide:      dc.b    0,0,  1,1,  0,0,  0,0   ; 14 setToneA:  R0 R1
+                dc.b    2,0,  3,1,  0,0,  0,0   ; 15 setToneB:  R2 R3
+                dc.b    4,0,  5,1,  0,0,  0,0   ; 16 setToneC:  R4 R5
+                dc.b    0,0,  8,2,  1,1,  0,0   ; 17 setVoiceA: R0 R1 R8
+                dc.b    2,0,  9,2,  3,1,  0,0   ; 18 setVoiceB: R2 R3 R9
+                dc.b    4,0, 10,2,  5,1,  0,0   ; 19 setVoiceC: R4 R5 R10
+                dc.b    0,0,  0,0,  0,0,  0,0   ; 20 setEnvelope
+                dc.b   11,0, 12,1, 13,2,  0,0   ; 21 setBuzzer:  R11 R12 R13
+                dc.b    8,1,  6,0,  0,0,  0,0   ; 22 setNoiseA:  R6 R8
+                dc.b    9,1,  6,0,  0,0,  0,0   ; 23 setNoiseB:  R6 R9
+                dc.b   10,1,  6,0,  0,0,  0,0   ; 24 setNoiseC:  R6 R10
 
 ; A parked place: a marker with no loop cell, so a tick of a timer no row
 ; has started writes $80 to R0 and stops its timer (SPEC.md 5.2.1).

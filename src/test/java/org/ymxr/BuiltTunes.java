@@ -221,13 +221,120 @@ final class BuiltTunes {
         byte[] looping = {3, 6, 9, 12, (byte) (0x80 | 15)};
         byte[] fifth = {10, 5, (byte) (0x80 | 1)};
         Sources sources = new Sources(List.of(
-                new Sources.Source(Effects.SID, 12, sid, 0),
-                new Sources.Source(Effects.DRUM, 0, drum, drum.length),
-                new Sources.Source(Effects.BUZZER, 0x0A, buzzer, 0),
-                new Sources.Source(Effects.SID, 15, looping, 2),
-                new Sources.Source(Effects.SID, 10, fifth, 1)));
+                Sources.Source.of(Effects.SID, 12, sid, 0),
+                Sources.Source.of(Effects.DRUM, 0, drum, drum.length),
+                Sources.Source.of(Effects.BUZZER, 0x0A, buzzer, 0),
+                Sources.Source.of(Effects.SID, 15, looping, 2),
+                Sources.Source.of(Effects.SID, 10, fifth, 1)));
         Columns columns = new Columns(c, repeat, 0b1111);
         return Tune.write(columns, sources, 60, YmToYmxr.UNIT, Tune.RING, new Report());
+    }
+
+    /**
+     * The four kinds of target that write several registers (SPEC.md
+     * 2.1), one an effect, so the kit has a tune of version 4: a voice on
+     * Timer A, a noise on Timer D, a buzzer on Timer B and a tone on Timer
+     * C. The marker stands in a different column under each kind - the
+     * coarse nibble of a voice and a tone, the noise period of a noise,
+     * the envelope shape of a buzzer - so a reader that reads the marker
+     * in column 0 alone reports the wrong rows for three of the four.
+     *
+     * <p>The shapes beside that: a source of several columns repeating to
+     * row 0, one repeating to a row above it, one that plays once and
+     * stops its timer at its marker, and a start over a running source of
+     * the same row count on the same kept target, which leaves the place
+     * where it stands (rule 3(a)).
+     */
+    static Tune.Written voices() {
+        int frames = 96;
+        int repeat = 32;
+        byte[][] c = new byte[Columns.C][frames];
+        // The registers no effect runs: the mixer with all three voices
+        // heard and the noise on voice C, voice B's period, and voice C's
+        // fine byte. An effect owns R0, R1 and R8 on Timer A, R6 and R10
+        // on Timer D, R11 to R13 on Timer B and R2 and R3 on Timer C, and
+        // rule 1 has every row leave those columns unset.
+        for (int f : new int[] {0, repeat}) {
+            c[4][f] = (byte) 0x60;
+            c[5][f] = (byte) (0x80 | 1);
+            c[7][f] = (byte) (0x80 | 0x20);
+            c[9][f] = (byte) (0x80 | 10);
+        }
+        int start = 0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET;
+        int e0 = Columns.EFFECT;
+        int e1 = Columns.EFFECT + 4;
+        int e2 = Columns.EFFECT + 8;
+        int e3 = Columns.EFFECT + 12;
+        // effect 0, Timer A: setVoiceA, three registers, the marker in the
+        // coarse nibble; started again at the repeat row on the same target
+        c[e0][0] = (byte) (0x80 | 17);
+        c[e0 + 1][0] = (byte) (0x80 | 1);
+        c[e0 + 2][0] = (byte) (start | 5);
+        c[e0 + 3][0] = 100;
+        c[e0 + 1][repeat] = (byte) (0x80 | 1);
+        c[e0 + 2][repeat] = (byte) (start | 5);
+        c[e0 + 3][repeat] = 100;
+        c[e0 + 3][40] = 80;                              // the count alone
+        // effect 1, Timer D: setNoiseC, two registers, the marker in the
+        // noise period, which the handler writes last of the two
+        c[e1][1] = (byte) (0x80 | 24);
+        c[e1 + 1][1] = (byte) (0x80 | 2);
+        c[e1 + 2][1] = (byte) (start | 6);
+        c[e1 + 3][1] = (byte) 200;
+        c[e1 + 1][repeat] = (byte) (0x80 | 2);
+        c[e1 + 2][repeat] = (byte) (start | 6);
+        c[e1 + 3][repeat] = (byte) 200;
+        // effect 2, Timer B: setBuzzer, three registers, the marker in the
+        // envelope shape; the source plays once, so a tick stops the timer
+        // at its last row, and R13 stands outside rule 1 (1(c))
+        c[e2][2] = (byte) (0x80 | 21);
+        c[e2 + 1][2] = (byte) (0x80 | 3);
+        c[e2 + 2][2] = (byte) (start | 7);
+        c[e2 + 3][2] = (byte) 250;
+        c[13][20] = (byte) (0x80 | 8);                   // R13 set while it runs
+        c[e2 + 1][repeat] = (byte) (0x80 | 3);
+        c[e2 + 2][repeat] = (byte) (start | 7);
+        c[e2 + 3][repeat] = (byte) 250;
+        c[e2 + 1][70] = (byte) 0x80;                     // a stop, R11 to R13 set
+        c[11][70] = 0;
+        c[12][70] = 0;
+        c[13][70] = (byte) 0x80;
+        // effect 3, Timer C: setToneB, two registers, the marker in the
+        // coarse nibble; the second start has the row count of the first on
+        // the kept target and leaves bit 5 at 0, so the place stands where
+        // the ticks left it (rule 3(a))
+        c[e3][4] = (byte) (0x80 | 15);
+        c[e3 + 1][4] = (byte) (0x80 | 4);
+        c[e3 + 2][4] = (byte) (start | 4);
+        c[e3 + 3][4] = (byte) 150;
+        c[e3 + 1][48] = (byte) (0x80 | 5);               // the place kept
+        c[e3 + 2][48] = (byte) (0x80 | 4);
+        c[e3 + 1][repeat] = (byte) (0x80 | 4);
+        c[e3 + 2][repeat] = (byte) (start | 4);
+        c[e3 + 3][repeat] = (byte) 150;
+        // A source of C columns: column i is the value register i of its
+        // target reads, and the marker stands in bit 7 of the column the
+        // target names (SPEC.md 2.1, 3.2.1).
+        byte[][] voice = {{0, (byte) 0x80, 0, (byte) 0x40, 0, (byte) 0xC0},
+                          {1, 1, 2, 2, 3, (byte) (0x80 | 3)},
+                          {15, 13, 11, 9, 7, 5}};
+        byte[][] noise = {{4, 9, 14, 19, (byte) (0x80 | 24)},
+                          {15, 12, 10, 8, 6}};
+        byte[][] buzzer = {{0, 0x40, (byte) 0x80, (byte) 0xC0},
+                           {1, 1, 2, 2},
+                           {8, 10, 12, (byte) (0x80 | 14)}};
+        byte[][] tone = {{(byte) 0x30, (byte) 0x60, (byte) 0x90, (byte) 0xC0},
+                         {1, 1, 2, (byte) (0x80 | 2)}};
+        byte[][] fifth = {{(byte) 0x20, (byte) 0x50, (byte) 0x80, (byte) 0xB0},
+                          {2, 2, 3, (byte) (0x80 | 3)}};
+        Sources sources = new Sources(List.of(
+                new Sources.Source(Effects.SID, 0, voice, 0),
+                new Sources.Source(Effects.SID, 0, noise, 2),
+                new Sources.Source(Effects.BUZZER, 0, buzzer, 4),
+                new Sources.Source(Effects.SID, 0, tone, 0),
+                new Sources.Source(Effects.SID, 0, fifth, 0)));
+        Columns columns = new Columns(c, repeat, 0b1111);
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
     }
 
     /** Three tones and no noise, the same under both tunes' effects. */

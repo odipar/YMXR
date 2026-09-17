@@ -26,16 +26,18 @@ func Header(tune ymxr.File) string {
 	fmt.Fprintf(&line, "{\"rate\":%d,\"effects\":%d,\"sources\":[", tune.FrameRate,
 		tune.Effects)
 	for i, s := range tune.Sources {
-		rows := s.Column(0)
 		if i > 0 {
 			line.WriteByte(',')
 		}
 		line.WriteString("{\"rows\":[")
-		for r, value := range rows {
-			if r > 0 {
-				line.WriteByte(',')
+		// a byte a column of the row, row 0's columns first (SPEC.md 7.2)
+		for r := 0; r < s.Rows(); r++ {
+			for c := 0; c < s.Columns(); c++ {
+				if r > 0 || c > 0 {
+					line.WriteByte(',')
+				}
+				fmt.Fprintf(&line, "%d", s.Column(c)[r])
 			}
-			fmt.Fprintf(&line, "%d", value)
 		}
 		fmt.Fprintf(&line, "],\"repeat\":%d}", s.Repeat())
 	}

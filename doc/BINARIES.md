@@ -54,7 +54,7 @@ tool reads a multi file (0.4, 3.3).
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXM` |
-| 4 | 2 | the version, $0003, the version of the tune files in it |
+| 4 | 2 | the version, $0003 or $0004: the highest of the tune files in it (SPEC.md 3.3.5) |
 | 6 | 2 | `N`, the tune count, 1 to 99 |
 | 8 | 8`N` | the entries, tune 1 to `N`: a long where its tune file begins, then a long its bytes |
 | 8 + 8`N` | | the names, tune 1 to `N`, each UTF-8 text ended by a zero byte |
@@ -76,7 +76,7 @@ name runs to its zero byte or the file's end.
 | condition | reported as |
 |---|---|
 | the file is under 8 bytes, or bytes 0 to 3 are other than `YMXM` | `not a YMXM file` |
-| the version is V, other than 3 | `version V is not 3` |
+| the version is V, other than 3 or 4 | `version V is not 3 or 4` |
 | `N` is outside 1 to 99 | `N tunes, and a multi file has 1 to 99` |
 | 8 + 8`N` is past the file's F bytes | `the entries of N tunes stand past the file's F bytes` |
 | entry i has A or B below 0, or A + B past the file's F bytes | `tune i stands at A for B bytes, and the file has F` |
@@ -106,7 +106,7 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0003 |
+| 4 | 2 | the version, $0003 or $0004: the version of the tune file bound (SPEC.md 3.3.5) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
@@ -176,8 +176,8 @@ selects one by name and checks its flags word (2.3, 2.10).
 | 8 | 4 | `bra.w` to play (2.9) |
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
-| 18 | 2 | the bound tune's version this core reads, 3 |
-| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 1,072 |
+| 18 | 2 | the highest bound tune version this core reads, 4 |
+| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,120 |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
 | 26 | 2 | zero |
@@ -269,7 +269,7 @@ file (3) and reports the first condition met:
 |---|---|
 | the core is under 36 bytes, or bytes 12 to 15 are other than `YMXS` | `not an SNDH core: no YMXS at 12` |
 | the field at 16 is V, other than 1 | `the core's descriptor is version V, and this writes 1` |
-| the field at 18 is V, other than 3 | `the core reads bound tunes of version V, and this binds at 3` |
+| the field at 18 is V, below the version W the tune binds at | `the core reads bound tunes to version V, and this binds at W` |
 | the raster monitor is selected and bit 0 of the flags word F is clear | `the core's flags at 22 read F, and the raster monitor asked for needs bit 0 set` |
 | the lean tick is selected and bit 1 of the flags word F is clear | `the core's flags at 22 read F, and the lean tick asked for needs bit 1 set` |
 
@@ -530,7 +530,7 @@ A call clobbers `d0` to `d5` and `a0` to `a5` and keeps `d6`, `d7` and
 `a6`. Init reads row 0; each play writes the row the call before it read
 and then reads the next.
 
-**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 1,072,
+**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,120,
 then the bound tune's field at 12 bytes, on a long. Before init the host
 keeps, and after stop restores, what the player writes (5.3): of each
 timer in the claims byte, the vector, the nibble of the control register,

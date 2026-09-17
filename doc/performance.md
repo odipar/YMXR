@@ -310,8 +310,10 @@ cell, eight bytes each in the workspace, so a start reads two longs where
 it walked the tune's index and read the source's header: 48 cycles against
 100. That is 38 a frame on Synergy Credits, 22 on DBA 2 and 21 on DBA 5, and
 60 to 94 off their costliest frames. The source column's seven bits reach
-127, so the room is sized for 127 sources, and YMXR_FIXED is 1,072 bytes
-against 56.
+127, so the room is sized for 127 sources. A second table of the same
+room stands beside it, where a source of several columns has its loop cell
+and the stride from one column to the next, and an effect's record is 16
+bytes where it was 8, so YMXR_FIXED is 2,120 bytes against 56.
 
 The rig reads every figure here back with `-cycles`, and `-hatari` plays
 the same tunes on a cycle-exact machine, where the MFP fires the ticks.

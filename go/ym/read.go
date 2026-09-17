@@ -107,7 +107,7 @@ func registers(song Song, frame int) [14]int {
 func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.Tune {
 	frames := song.Frames
 	var rows []ymxs.Row
-	made := map[int]ymxs.Source{}
+	made := map[int]ymxs.Single{}
 	var wrote [14]int
 	for i := range wrote {
 		wrote[i] = -1
@@ -232,17 +232,17 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 					if err != nil {
 						panic(err)
 					}
-					effects[timer] = ymxs.Start{Target: ymxs.Setting(register),
-						Source:     source(made, sources, number[i]),
-						Prescaler:  prescaler,
-						Count:      slot[i].Count,
-						TimerReset: stopped, PlaceReset: !unmoved}
+					effects[timer] = ymxs.StartOne{Target: ymxs.Setting(register),
+						Source: source(made, sources, number[i]),
+						Timing: ymxs.Timing{Prescaler: prescaler,
+							Count:      slot[i].Count,
+							TimerReset: stopped, PlaceReset: !unmoved}}
 					running[i] = slot[i]
 					runningNumber[i] = number[i]
 					lastKind[i] = slot[i].Kind
 					lastTarget[i] = slot[i].Target
 					if slot[i].Kind == ymxr.Drum {
-						drumEnd[i] = f + ymxr.Duration(len(sources.At(number[i]).Rows),
+						drumEnd[i] = f + ymxr.Duration(sources.At(number[i]).Rows(),
 							slot[i].Select, slot[i].Count, song.PlayerHz)
 					}
 				} else if slot[i].Select != selectHeld[i] ||
@@ -251,8 +251,8 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 					if err != nil {
 						panic(err)
 					}
-					effects[timer] = ymxs.Retune{Prescaler: prescaler,
-						Count: slot[i].Count}
+					effects[timer] = ymxs.Retune{Timing: ymxs.Timing{
+						Prescaler: prescaler, Count: slot[i].Count}}
 				}
 				selectHeld[i] = slot[i].Select
 				countHeld[i] = slot[i].Count
@@ -309,18 +309,18 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 // source is the source of that number, built on first use: its rows
 // without the marker bit 7, which is this format's and not the
 // structure's (SPEC.md 3.2).
-func source(made map[int]ymxs.Source, sources *ymxr.Sources, number int) ymxs.Source {
+func source(made map[int]ymxs.Single, sources *ymxr.Sources, number int) ymxs.Single {
 	if known, met := made[number]; met {
 		return known
 	}
 	of := sources.At(number)
-	values := make([]int, len(of.Rows))
-	for i, row := range of.Rows {
+	values := make([]int, of.Rows())
+	for i, row := range of.Columns[0] {
 		values[i] = int(row) &^ ymxr.Mark
 	}
 	named := name(of.Kind) + " " + strconv.Itoa(of.Data)
 	built := ymxs.OnceSource(named, values)
-	if of.Repeat < len(of.Rows) {
+	if of.Repeat < of.Rows() {
 		built = ymxs.RepeatingSource(named, values, of.Repeat)
 	}
 	made[number] = built

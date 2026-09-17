@@ -97,7 +97,7 @@ func Of(tuneFiles [][]byte, options Options) ([]byte, error) {
 
 // With is the same, around the core named.
 func With(core []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
-	if err := CheckCore(core, options.Monitor, options.Lean); err != nil {
+	if err := CheckCore(core, options.Monitor, options.Lean, Binds(tuneFiles)); err != nil {
 		return nil, err
 	}
 	n := len(tuneFiles)
@@ -155,7 +155,17 @@ func With(core []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 // flags against the switches requested: the flags word records whether the
 // raster monitor is in and whether the ticks are the lean ones, and the
 // file the core was read from does not.
-func CheckCore(core []byte, monitor, lean bool) error {
+// Binds is the highest version the tune files bind at (SPEC.md 3.3.5).
+func Binds(tuneFiles [][]byte) int {
+	for _, file := range tuneFiles {
+		if len(file) >= 6 && ymxr.GetWord(file, 4) == ymxr.VersionColumns {
+			return BoundVersionColumns
+		}
+	}
+	return BoundVersion
+}
+
+func CheckCore(core []byte, monitor, lean bool, binds int) error {
 	if len(core) < coreLength ||
 		!bytes.Equal(coreMagic, core[coreMagicAt:coreMagicAt+4]) {
 		return fmt.Errorf("not an SNDH core: no YMXS at %d", coreMagicAt)
@@ -166,9 +176,9 @@ func CheckCore(core []byte, monitor, lean bool) error {
 			version, coreVersion)
 	}
 	reads := ymxr.GetWord(core, coreReadsAt)
-	if reads != BoundVersion {
-		return fmt.Errorf("the core reads bound tunes of version %d, and this binds at %d",
-			reads, BoundVersion)
+	if reads < binds {
+		return fmt.Errorf("the core reads bound tunes to version %d, and this binds at %d",
+			reads, binds)
 	}
 	flags := ymxr.GetWord(core, coreFlagsAt)
 	if monitor && flags&coreMonitor == 0 {

@@ -70,7 +70,7 @@ final class Check {
         for (int i = 0; i < Math.min(sources.count(), tune.sources().size()); i++) {
             Table s = tune.sources().get(i);
             byte[] values = s.column(0);
-            int want = sources.get(i + 1).rows().length;
+            int want = sources.get(i + 1).rows();
             if (s.columns() != 1 || values.length != want) {
                 wrong.add("source " + (i + 1) + " is " + s.columns() + " columns of "
                         + values.length + " rows, not one of " + want);
@@ -150,7 +150,7 @@ final class Check {
                             if (!e.started()) {
                                 wrong.add(f + ": the drum is not started");
                             }
-                            drumEnd[i] = r + Columns.duration(s.rows().length, slot.select(),
+                            drumEnd[i] = r + Columns.duration(s.rows(), slot.select(),
                                     slot.count(), song.playerHz());
                         }
                     }
