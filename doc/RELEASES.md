@@ -33,6 +33,32 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.27, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.27>, built from the commit
+tagged `v0.3.27`.
+
+What a reader reports of a file written wrong. Every file under `68k/`
+stands as v0.3.26 has it, so the player is that release's and the forty
+files the ten dumps under `ym/test` convert to are byte for byte 0.3.26's,
+measured against a build of its tag.
+
+- **SPEC.md 8.1 is defined at 3.3.4 and goes.** The table of conditions
+  gains a row for a table or a source that begins or ends outside the file,
+  one for a table of a DTX variant other than 2, and one for a table other
+  than 30 columns of one byte. A reader reports the first condition
+  present, in the order of the table, and reads no further field; a name
+  offset other than 16 + 4S is a field a reader follows (3.3.2).
+- **The two trees read a file written wrong the same way.** The Java tree
+  copied the bytes through the offsets before any check, so a file cut
+  short ended in the exception the copy threw where the Go tree reported
+  its line, which tools.md 19.5 carried as a difference between them; the
+  row goes with the clause. Both trees read the table's variant and shape
+  besides, which neither read before: a DTX1 table or a table of 29 columns
+  was read as a tune.
+- Section 8 says what a missing number means, since the numbers of the
+  rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
+
 ### 0.3.26, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.26>, built from the commit
