@@ -63,6 +63,7 @@ outside those is outside this task.
 | `retune.ymxr` | 1,201 |
 | `fine-zero.ymxr` | 433 |
 | `four-timers.ymxr` | 211 |
+| `voices.ymxr` | 161 |
 | `wrong-version.ymxr` | 0 |
 
 The count is the first line and `R` + `R` - `RR` frames for a tune that

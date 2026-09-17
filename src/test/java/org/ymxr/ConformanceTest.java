@@ -79,6 +79,15 @@ final class ConformanceTest {
                     + " 215 rows, odd, so a row that sets no column goes in at the end and the table packs at unit 2"),
             Fixture.built("four-timers", "`BuiltTunes.fourTimers`", BuiltTunes::fourTimers,
                     "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump produces: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with no source running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
+            Fixture.built("voices", "`BuiltTunes.voices`", BuiltTunes::voices,
+                    "version 4: the four kinds of target that write several registers, one an"
+                    + " effect, and the marker in a different column under each - the coarse"
+                    + " nibble of a voice on Timer A and of a tone on Timer C, the noise period"
+                    + " on Timer D, the envelope shape of a buzzer on Timer B; a source of"
+                    + " several columns repeating to row 0, one repeating to a row above it, one"
+                    + " that plays once and stops its timer at its marker, and a start over a"
+                    + " running source of the same row count that leaves the place where it"
+                    + " stands"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces no report of it", WRONG_VERSION)));
