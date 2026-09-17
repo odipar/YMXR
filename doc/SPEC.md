@@ -460,18 +460,23 @@ reference writer packs through a ring that is a multiple of 30 bytes, 60
 to 1,110, 960 by default.
 
 **3.3.4** Errors of the file. A reader reads a file free of the
-conditions below and reports each condition present as its line, V the
-version, N a source number, C its column count and W its width; the
-record of such a file is empty (7.4). What a reader reports of an offset
-outside the file, or of a DTX2 table of another C, W or variant, is left
-to a later version (section 8).
+conditions below and reports the first one present as its line, in the
+order of the table: V the version, X a DTX variant, N a source number, A
+and B where a table stands, F the file's bytes, C a column count and W a
+width. The record of such a file is empty (7.4), and a reader that
+reports a condition reads no further field. A name offset other than 16 +
+4S is a field a reader follows (3.3.2).
 
 | condition | reported as |
 |---|---|
+| the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
 | the version is other than 3 | `version V is not 3` |
+| the table begins or ends outside the file | `the table stands at A to B, and the file has F bytes` |
+| the table is a DTX variant other than 2 (3.3.3) | `the table is DTX X, and a tune's table is DTX2 (SPEC.md 3.3.3)` |
+| the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
+| source N begins or ends outside the file | `source N stands at A to B, and the file has F bytes` |
 | source N has C other than 1 or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one column of one (SPEC.md 3.1)` |
-| the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
 Attractions #2` begins `594D5852 0003 0032 00 00 0010 00000028`: the 22
@@ -956,13 +961,9 @@ and the length `MANIFEST.txt` lists.
 
 ## 8. What a later version defines
 
-A player of this version is unconstrained in each item below.
-
-**8.1** What a reader does with a file whose first four bytes or version
-are another, beyond reporting the error (3.3.4); what it reports of a
-table or a source whose offset is outside the file, of a name offset
-other than 16 + 4S, and of a DTX2 table whose C is other than 30, whose
-W is other than 1 or whose variant is other than 2 (3.3.3).
+A player of this version is unconstrained in each item below. A number
+missing from the list is a clause a version has defined, and the numbers
+of the rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 
 **8.2** Targets 14 to 127 (2.1), and a source on `setR0`, `setR2`,
 `setR4`, `setR7`, `setR11` or `setR12` (2.1.1).

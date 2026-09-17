@@ -192,6 +192,56 @@ final class ConversionTest {
     }
 
     @Test
+    void aFieldThatStandsOutsideTheFileIsALine() throws IOException {
+        // SPEC.md 3.3.4: a reader reads each offset against the file's
+        // length before it reads bytes through it, and reads the table's
+        // variant and shape, so a file written wrong is one line rather
+        // than the exception a copy out of range throws at the caller.
+        byte[] file = YmToYmxr.convert(
+                Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym")),
+                List.of(), new Report()).written().file();
+        int tableAt = Tune.getLong(file, Tune.TABLE_AT);
+        byte[] far = file.clone();
+        Tune.putLong(far, Tune.TABLE_AT, file.length + 8);
+        assertEquals("the table stands at " + (file.length + 8) + " to "
+                        + Tune.getLong(file, Tune.INDEX_AT) + ", and the file has "
+                        + file.length + " bytes",
+                assertThrows(IllegalArgumentException.class,
+                        () -> TuneFile.read(far)).getMessage(),
+                "a table past the file's end is read against its length");
+        // the last source's offset, since the table ends where source 1
+        // begins and a source 1 moved would be the table's line instead
+        int count = file[Tune.COUNT_AT] & 0xFF;
+        assertTrue(count > 1, "the tune has sources to move: " + count);
+        byte[] source = file.clone();
+        Tune.putLong(source, Tune.INDEX_AT + 4 * (count - 1), file.length + 4);
+        // source N - 1 ends where source N begins, so the line is its
+        // own: the reader reports the first condition in the order of
+        // SPEC.md 3.3.4's table
+        int before = Tune.getLong(file, Tune.INDEX_AT + 4 * (count - 2));
+        assertEquals("source " + (count - 1) + " stands at " + before + " to "
+                        + (file.length + 4) + ", and the file has " + file.length
+                        + " bytes",
+                assertThrows(IllegalArgumentException.class,
+                        () -> TuneFile.read(source)).getMessage(),
+                "a source past the file's end is read against its length");
+        byte[] variant = file.clone();
+        variant[tableAt + 3] = 1;
+        assertEquals("the table is DTX1, and a tune's table is DTX2 (SPEC.md 3.3.3)",
+                assertThrows(IllegalArgumentException.class,
+                        () -> TuneFile.read(variant)).getMessage(),
+                "a table of another variant is read as none");
+        // the DTX header has C at bytes 8 and 9
+        byte[] narrow = file.clone();
+        narrow[tableAt + 9] = 29;
+        assertEquals("the table is 29 columns of 1 bytes, and a tune's table is 30 of"
+                        + " one (SPEC.md 3.3.3)",
+                assertThrows(IllegalArgumentException.class,
+                        () -> TuneFile.read(narrow)).getMessage(),
+                "a table of another column count is read as none");
+    }
+
+    @Test
     void theCopiesFlagIsTakenAndStatedInTheTable() throws IOException {
         // -copies packs a match beyond the ring as a copy from the column's
         // separate literal stream, which packs a small ring far smaller

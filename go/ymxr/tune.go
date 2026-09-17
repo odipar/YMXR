@@ -360,9 +360,21 @@ func Read(file []byte) (File, error) {
 			" bytes", tableAt, end, len(file))
 	}
 	dtx2 := file[tableAt:end]
+	variant := 0
+	if len(dtx2) > 3 {
+		variant = int(dtx2[3])
+	}
+	if variant != dtx.DTX2 {
+		return File{}, fmt.Errorf("the table is DTX%d, and a tune's table is DTX2"+
+			" (SPEC.md 3.3.3)", variant)
+	}
 	table, err := dtx.Read(dtx2)
 	if err != nil {
 		return File{}, err
+	}
+	if table.Columns() != C || table.Width() != 1 {
+		return File{}, fmt.Errorf("the table is %d columns of %d bytes, and a tune's"+
+			" table is %d of one (SPEC.md 3.3.3)", table.Columns(), table.Width(), C)
 	}
 	var sources []*dtx.Table
 	for i := 0; i < count; i++ {

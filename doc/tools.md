@@ -811,7 +811,6 @@ off the path or the Java tree is unbuilt.
 | `ymxr-check` with a flag the converter rejects | the verdict `the converter refuses it: not a flag of the tool: X` (8.4) | the verdict `not a flag of the tool: X` |
 | `ymxr-check` on an LHA archive that fails to unpack | `the archive does not unpack: <message>`, counted as a dump | `not a YM5!/YM6! dump`, uncounted |
 | `ymxr-check` on several files | read in parallel | read in order |
-| a tune file whose table or source offset lies outside the file | unchecked; `ymxr-trace` on a truncated file may end in a stack trace | `the table stands at A to B, and the file has F bytes`, `source N stands at A to B, and the file has F bytes` |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |
 
 ---
