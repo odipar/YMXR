@@ -852,7 +852,7 @@ final class ConsistencyTest {
                 continue;
             }
             String said = read(p);
-            Matcher cited = Pattern.compile("([A-Za-z_]+)\\.md (\\d+(?:\\.\\d+)*)")
+            Matcher cited = Pattern.compile("([A-Za-z_]+)\\.md\\)? (\\d+(?:\\.\\d+)*)")
                     .matcher(said);
             while (cited.find()) {
                 int open = said.lastIndexOf('(',
