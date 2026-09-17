@@ -33,6 +33,26 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.22, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.22>, built from the commit
+tagged `v0.3.22`.
+
+DTX 0.11.7 in the pom and in `go.mod`, and a check that reads a citation
+written through a link.
+
+**No byte of this release differs from 0.3.21's.** DTX 0.11.7 has ST4 0.1.7
+in it, whose packer is 0.1.6's, so the forty files the ten dumps under
+`ym/test` convert to are byte for byte 0.3.21's, measured against a build
+of that tag.
+
+- `everyClauseCitedInAnotherDocumentIsDefined` read `tools.md 15` and passed
+  over `[tools.md](tools.md) 15`, the form SPEC.md's Roles paragraph writes,
+  so the clause a reader follows from there was read by no check. The
+  closing bracket is part of the pattern now: 153 citations are read where
+  140 were.
+- The chain names a release at every link: ST4 go/v0.1.7, DTX 0.11.7, this.
+
 ### 0.3.21, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.21>, built from the commit
