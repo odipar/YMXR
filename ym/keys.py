@@ -29,9 +29,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 HATARI = os.environ.get('HATARI', 'hatari')
 # Hatari ends the run itself at this many VBLs, so no dialog is opened and
-# no key of the host's is pressed: 50 a second, where the keys below run
-# for ten.
-VBLS = 900
+# no key of the host's is pressed: 50 a second, where a boot with the TOS
+# patch and the keys below run for eight.
+VBLS = 400
 TOS = os.environ.get('TOS', str(Path.home() / 'hatari-2.6.1_macos/tos-2.06.rom'))
 TUNES = 12
 
@@ -86,7 +86,7 @@ def main() -> int:
         [HATARI, '--tos', TOS, '--machine', 'st', '--cpuclock', '8',
          '--cpu-exact', 'on', '--compatible', 'on', '--memsize', '4',
          '--sound', 'off', '--log-level', 'fatal', '--alert-level', 'fatal',
-         '--confirm-quit', 'off', '--run-vbls', str(VBLS),
+         '--confirm-quit', 'off', '--fast-boot', 'on', '--run-vbls', str(VBLS),
          '--cmd-fifo', str(fifo),
          '--trace', 'psg_write', '--trace-file', str(trace),
          str(work / 'TUNE.PRG')],
@@ -108,6 +108,8 @@ def main() -> int:
             seen = playing(trace)
             if seen and seen[-1] == subtune:
                 return True
+            if hatari.poll() is not None:
+                return False            # the run ended at its VBL count
             time.sleep(0.1)
         return False
 
