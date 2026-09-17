@@ -299,17 +299,36 @@ under them (R3.2).
 
 ### 2.1 The targets
 
-| target | procedure |
-|---|---|
-| 0 to 13 | `setR0` to `setR13` (YMXS, SPEC.md 3.1.2): `setRn` writes the row to Rn |
-| 14 to 127 | unassigned; a later version assigns them (section 8) |
+| target | procedure | columns | the marker's column |
+|---|---|---|---|
+| 0 to 13 | `setR0` to `setR13` (YMXS, SPEC.md 3.1.2): `setRn` writes the row to Rn | 1 | 0 |
+| 14, 15, 16 | `setToneA`, `setToneB`, `setToneC`: R0 R1, R2 R3, R4 R5 | 2 | 1, the coarse nibble |
+| 17, 18, 19 | `setVoiceA`, `setVoiceB`, `setVoiceC`: R0 R1 R8, R2 R3 R9, R4 R5 R10 | 3 | 1, the coarse nibble |
+| 20 | `setEnvelope` | | left to a later version (section 8) |
+| 21 | `setBuzzer`: R11 R12 R13 | 3 | 2, the shape |
+| 22, 23, 24 | `setNoiseA`, `setNoiseB`, `setNoiseC`: R6 R8, R6 R9, R6 R10 | 2 | 0, the noise period |
+| 25 to 127 | unassigned; a later version assigns them (section 8) |  |  |
 
-**2.1.1** A tick writes a source's row to the register whole, the marker
-of 3.2 in bit 7, and the register reads the bits it has (4.4). The eight
-targets whose register reads seven bits or fewer are `setR1`, `setR3`,
-`setR5`, `setR6`, `setR8`, `setR9`, `setR10` and `setR13`; a source runs
-on one of these (rule 2), and a source on `setR0`, `setR2`, `setR4`,
-`setR7`, `setR11` or `setR12` is left to a later version (section 8).
+**2.1.1** A tick writes a source's row to the registers of its target,
+column i of the row to register i, each byte whole, and the register
+reads the bits it has (4.4). The marker of 3.2 stands in bit 7 of the
+column above, whose register reads seven bits or fewer, and the other
+columns are whole bytes: a source on `setToneA` writes R0 the eight bits
+it reads, where a source on `setR0` has no bit to spare for the marker.
+
+**2.1.2** A target of one register runs a source of one column, and one
+of several a source of that many columns (3.1.3; YMXS, SPEC.md 3.2.1).
+The targets of one register whose register reads seven bits or fewer are
+`setR1`, `setR3`, `setR5`, `setR6`, `setR8`, `setR9`, `setR10` and
+`setR13`; a source of one column runs on one of these (rule 2), and one
+on `setR0`, `setR2`, `setR4`, `setR7`, `setR11` or `setR12` is left to a
+later version (section 8).
+
+**2.1.3** `setEnvelope` writes R11 and R12, which read eight bits each,
+so a source for it has no bit to spare for the marker and this version
+encodes none (section 8). The structure defines the target (YMXS, SPEC.md
+3.1.1) and a later version of this format encodes it, with a column for
+the marker or an end this version has no room for.
 
 ### 2.2 The sources
 
@@ -389,9 +408,13 @@ stop (1.8.3).
 | 15 | 1 | 0 |
 | 16 | R | the rows, row n at 16 + n |
 
-**3.1.3** A reader reads a source whose C is 1 and W is 1; another is an
-error of the file (3.3.4). A source of more columns or of a wider value
-is left to a later version (section 8).
+**3.1.3** A reader reads a source whose C is the columns of the target of
+every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1; another C
+or W is an error of the file (3.3.4). DTX1 lays a table out column by
+column, so column i of a source of C columns stands at 16 + i times
+align(R), align the padding DTX1 writes between columns (DTX, SPEC.md
+2.2), and a tick reads its columns at that stride. A source of values
+wider than a byte is left to a later version (section 8).
 
 **3.1.4** RR below R marks a source that repeats: the tick that reads row
 R - 1 places the next at row RR (5.1). RR equal to R marks a source that
@@ -402,17 +425,18 @@ SPEC.md 1.9).
 
 ### 3.2 The rows
 
-**3.2.1** A row of a source is one byte: bit 7 the marker, bits 6 to 0
-the value, which fits the register the target writes (R5.3; YMXS, SPEC.md
-3.2.2). A writer writes the marker as 1 in the last row of the source and
-as 0 in every other row.
+**3.2.1** A row of a source is one byte a column, each fitting the
+register its column writes (R5.3; YMXS, SPEC.md 3.2.2). The marker stands
+in bit 7 of the column 2.1 names for the target, bits 6 to 0 of that byte
+the value; every other column is a whole byte. A writer writes the marker
+as 1 in the last row of the source and as 0 in every other row.
 
-**3.2.2** A tick writes the byte whole and tests the marker after the
-write (5.1); the register reads the bits it has (2.1.1). A source of one
-row is the marker and its value in one byte. A player tests bit 7 of
-every row it writes, so a row other than the last with bit 7 at 1 ends
-the pass through the source at that row; a check reports such a row
-(6.4).
+**3.2.2** A tick writes each byte whole and tests the marker after the
+writes (5.1); each register reads the bits it has (2.1.1). A source of
+one row is the marker and its values in one row. A player tests bit 7 of
+the marker's column in every row it writes, so a row other than the last
+with bit 7 at 1 there ends the pass through the source at that row; a
+check reports such a row (6.4).
 
 ### 3.3 The tune file
 
