@@ -170,7 +170,7 @@ func found(said *report.Report, sources *ymxr.Sources, effects int) {
 	var rows, kinds [ymxr.Buzzer + 1]int
 	for _, source := range sources.All() {
 		kinds[source.Kind]++
-		rows[source.Kind] += len(source.Rows)
+		rows[source.Kind] += source.Rows()
 	}
 	named := " sources"
 	if sources.Count() == 1 {

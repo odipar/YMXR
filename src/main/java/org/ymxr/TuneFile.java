@@ -19,9 +19,9 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
             throw new IllegalArgumentException("not a YMXR file");
         }
         int version = Tune.getWord(file, 4);
-        if (version != Tune.VERSION) {
+        if (version != Tune.VERSION && version != Tune.VERSION_COLUMNS) {
             throw new IllegalArgumentException("version " + version + " is not "
-                    + Tune.VERSION);
+                    + Tune.VERSION + " or " + Tune.VERSION_COLUMNS);
         }
         int count = file[Tune.COUNT_AT] & 0xFF;
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);
@@ -55,15 +55,24 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
                         + " to " + to + ", and the file has " + file.length + " bytes");
             }
             Table source = Dtx.read(Arrays.copyOfRange(file, at, to));
-            // SPEC.md 3.1: a source is one column of one byte at this
-            // version, the row shape 2.1's procedures read. A wider one or one of
-            // more columns is a later version's, and the player would read
+            // SPEC.md 3.1.3: a source is one, two or three columns of one
+            // byte, the row shape the target that runs it reads (2.1). A
+            // wider value is a later version's, and the player would read
             // its rows a byte at a time and play something else, so it is
             // rejected here as a tune of another version is.
-            if (source.columns() != 1 || source.width() != 1) {
+            if (source.columns() < 1 || source.columns() > 3 || source.width() != 1) {
                 throw new IllegalArgumentException("source " + (i + 1) + " is "
                         + source.columns() + " columns of " + source.width()
-                        + " bytes, and a source is one column of one (SPEC.md 3.1)");
+                        + " bytes, and a source is one, two or three columns of one"
+                        + " (SPEC.md 3.1)");
+            }
+            // SPEC.md 3.3.5: version 3 writes a source of one column, so a
+            // wider one under that version is a file written wrong rather
+            // than a tune of a version this reads.
+            if (version == Tune.VERSION && source.columns() > 1) {
+                throw new IllegalArgumentException("source " + (i + 1) + " is "
+                        + source.columns() + " columns, and version " + Tune.VERSION
+                        + " writes one");
             }
             sources.add(source);
         }

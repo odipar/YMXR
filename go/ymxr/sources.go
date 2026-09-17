@@ -31,13 +31,30 @@ const (
 	Buzzer = 4
 )
 
-// Source is one source: its rows, and the row it repeats to, R where it
-// does not repeat.
+// Source is one source: a column a value of the row (SPEC.md 2.2.1), each
+// column the R values of that column in row order, and the row it repeats
+// to, R where it plays once. The marker stands in bit 7 of the last row of
+// the column the target names (SPEC.md 3.2.1).
 type Source struct {
-	Kind   int
-	Data   int
-	Rows   []byte
-	Repeat int
+	Kind    int
+	Data    int
+	Columns [][]byte
+	Repeat  int
+}
+
+// SourceOf is a source of one column, the shape a YM dump converts to.
+func SourceOf(kind, data int, rows []byte, repeat int) Source {
+	return Source{Kind: kind, Data: data, Columns: [][]byte{rows}, Repeat: repeat}
+}
+
+// Rows is the rows of every column.
+func (s Source) Rows() int {
+	return len(s.Columns[0])
+}
+
+// Width is the values a row: C, the source's columns (SPEC.md 3.1.3).
+func (s Source) Width() int {
+	return len(s.Columns)
 }
 
 // Sources is the sources a tune names, in the order its rows first start
@@ -107,14 +124,14 @@ func (s *Sources) build(kind, data int) Source {
 	case SID:
 		// The level then the silence. The row that starts the square
 		// leaves the level as it is, so the voice keeps the value the last		// row set for a timer's period, and the first tick opens the loud half.
-		return Source{Kind: kind, Data: data, Rows: []byte{byte(data), byte(Mark)}}
+		return SourceOf(kind, data, []byte{byte(data), byte(Mark)}, 0)
 	case Buzzer:
-		return Source{Kind: kind, Data: data, Rows: []byte{byte(Mark | data)}}
+		return SourceOf(kind, data, []byte{byte(Mark | data)}, 0)
 	default:
 		rows := make([]byte, len(s.drums[data])+1)
 		copy(rows, s.drums[data])
 		rows[len(rows)-1] = byte(Mark | Park)
-		return Source{Kind: kind, Data: data, Rows: rows, Repeat: len(rows)}
+		return SourceOf(kind, data, rows, len(rows))
 	}
 }
 

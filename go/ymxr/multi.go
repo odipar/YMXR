@@ -35,6 +35,17 @@ type MultiRead struct {
 }
 
 // IsMulti is whether the file opens as a multi file.
+// multiVersion is the version of a multi file: the highest of the tune
+// files in it (SPEC.md 3.3.5).
+func multiVersion(tunes [][]byte) int {
+	for _, tune := range tunes {
+		if len(tune) >= 6 && GetWord(tune, 4) == VersionColumns {
+			return VersionColumns
+		}
+	}
+	return Version
+}
+
 func IsMulti(file []byte) bool {
 	return len(file) >= MultiIndexAt && string(file[:4]) == string(MultiMagic)
 }
@@ -67,7 +78,7 @@ func Multi(tunes [][]byte, names []string) ([]byte, error) {
 	}
 	file := make([]byte, bytes)
 	copy(file, MultiMagic)
-	PutWord(file, 4, Version)
+	PutWord(file, 4, multiVersion(tunes))
 	PutWord(file, MultiCountAt, len(tunes))
 	name := MultiIndexAt + entry*len(tunes)
 	for i, tune := range tunes {
@@ -87,8 +98,9 @@ func ReadMulti(file []byte) (MultiRead, error) {
 		return MultiRead{}, errors.New("not a YMXM file")
 	}
 	version := GetWord(file, 4)
-	if version != Version {
-		return MultiRead{}, fmt.Errorf("version %d is not %d", version, Version)
+	if version != Version && version != VersionColumns {
+		return MultiRead{}, fmt.Errorf("version %d is not %d or %d", version, Version,
+			VersionColumns)
 	}
 	count := GetWord(file, MultiCountAt)
 	if count < 1 || count > MostTunes {

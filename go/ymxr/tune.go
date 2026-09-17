@@ -34,7 +34,25 @@ import (
 var Magic = []byte{'Y', 'M', 'X', 'R'}
 
 // Version is the version of this format.
+// Version is the version of a tune whose sources are one column and whose
+// target columns are 0 to 13 (SPEC.md 3.3.5).
 const Version = 0x0003
+
+// VersionColumns is the version of a tune with a source of several
+// columns (SPEC.md 3.3.5), which a target of 14 upward runs.
+const VersionColumns = 0x0004
+
+// VersionOf is the version a tune of these sources is written at: the
+// lower of the two it reads under, so a tune both versions encode is one
+// file and a player of version 3 reads it (SPEC.md 3.3.5).
+func VersionOf(sources []Source) int {
+	for _, one := range sources {
+		if one.Width() > 1 {
+			return VersionColumns
+		}
+	}
+	return Version
+}
 
 // Where each header field stands.
 const (
@@ -173,12 +191,12 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	sourceRows := 0
 	sourceBytes := 0
 	for i, one := range all {
-		built, err := dtx.NewTable(len(one.Rows), one.Repeat, 1, [][]byte{one.Rows})
+		built, err := dtx.NewTable(one.Rows(), one.Repeat, 1, one.Columns)
 		if err != nil {
 			return Written{}, err
 		}
 		tables[i] = dtx.WriteDtx1(built)
-		sourceRows += len(one.Rows)
+		sourceRows += one.Rows()
 		sourceBytes += len(tables[i])
 	}
 	named := namedBytes(name)
@@ -197,7 +215,7 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	}
 	file := make([]byte, here)
 	copy(file, Magic)
-	PutWord(file, 4, Version)
+	PutWord(file, 4, VersionOf(all))
 	PutWord(file, FrameRateAt, frameRate)
 	file[EffectsAt] = byte(columns.Effects)
 	file[CountAt] = byte(len(tables))
@@ -346,8 +364,9 @@ func Read(file []byte) (File, error) {
 		return File{}, errors.New("not a YMXR file")
 	}
 	version := GetWord(file, 4)
-	if version != Version {
-		return File{}, fmt.Errorf("version %d is not %d", version, Version)
+	if version != Version && version != VersionColumns {
+		return File{}, fmt.Errorf("version %d is not %d or %d", version, Version,
+			VersionColumns)
 	}
 	count := int(file[CountAt])
 	tableAt := GetLong(file, TableAt)
@@ -391,15 +410,22 @@ func Read(file []byte) (File, error) {
 		if err != nil {
 			return File{}, err
 		}
-		// SPEC.md 3.1: a source is one column of one byte at this version,
-		// the row shape 2.1's procedures read. A wider one or one of more
-		// columns is a later version's, and the player would read its rows
-		// a byte at a time and play something else, so it is rejected here
-		// as a tune of another version is.
-		if source.Columns() != 1 || source.Width() != 1 {
+		// SPEC.md 3.1.3: a source is one, two or three columns of one byte,
+		// the row shape the target that runs it reads (2.1). A wider value
+		// is a later version's, and the player would read its rows a byte
+		// at a time and play something else, so it is rejected here as a
+		// tune of another version is.
+		if source.Columns() < 1 || source.Columns() > 3 || source.Width() != 1 {
 			return File{}, fmt.Errorf("source %d is %d columns of %d bytes, and a"+
-				" source is one column of one (SPEC.md 3.1)", i+1, source.Columns(),
-				source.Width())
+				" source is one, two or three columns of one (SPEC.md 3.1)", i+1,
+				source.Columns(), source.Width())
+		}
+		// SPEC.md 3.3.5: version 3 writes a source of one column, so a
+		// wider one under that version is a file written wrong rather than
+		// a tune of a version this reads.
+		if version == Version && source.Columns() > 1 {
+			return File{}, fmt.Errorf("source %d is %d columns, and version %d writes"+
+				" one", i+1, source.Columns(), Version)
 		}
 		sources = append(sources, source)
 	}

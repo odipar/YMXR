@@ -332,9 +332,10 @@ the marker or an end this version has no room for.
 
 ### 2.2 The sources
 
-**2.2.1** A source is a table of one value a row (YMXS, SPEC.md 3.2.1),
-written as a DTX1 table of R rows, one column and one byte a value,
-repeating to RR or playing once (3.1). A source's values are its rows.
+**2.2.1** A source is a table of one, two or three values a row (YMXS,
+SPEC.md 3.2.1), written as a DTX1 table of R rows, a column a value and
+one byte a value, repeating to RR or playing once (3.1). A source has as
+many columns as the target of every effect that starts it reads (2.1.2).
 
 **2.2.2** A source is numbered by its index entry, 1 to 127 (3.1), and a
 source column names one by that number (1.8.3). A tick advances a source
@@ -443,7 +444,7 @@ check reports such a row (6.4).
 | offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, `$0003` |
+| 4 | 2 | the version, `$0003` or `$0004` (3.3.5) |
 | 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
 | 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bits 7 to 4 are 0 |
 | 9 | 1 | S, the source count, 0 to 127 |
@@ -495,12 +496,20 @@ reports a condition reads no further field. A name offset other than 16 +
 |---|---|
 | the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
-| the version is other than 3 | `version V is not 3` |
+| the version is other than 3 or 4 (3.3.5) | `version V is not 3 or 4` |
 | the table begins or ends outside the file | `the table stands at A to B, and the file has F bytes` |
 | the table is a DTX variant other than 2 (3.3.3) | `the table is DTX X, and a tune's table is DTX2 (SPEC.md 3.3.3)` |
 | the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N stands at A to B, and the file has F bytes` |
-| source N has C other than 1 or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one column of one (SPEC.md 3.1)` |
+| source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
+| the version is 3 and source N has several columns (3.3.5) | `source N is C columns, and version 3 writes one` |
+
+**3.3.5** The version. A tune whose sources are one column and whose
+target columns are 0 to 13 is version 3, and one with a source of several
+columns or a target column of 14 upward is version 4 (2.1). A writer
+writes 3 for a tune of the first kind, so a tune both versions encode is
+one file and a player of version 3 reads it. A player of this version
+reads 3 and 4.
 
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
 Attractions #2` begins `594D5852 0003 0032 00 00 0010 00000028`: the 22
@@ -753,13 +762,17 @@ numbers the maps assign.**
   columns of such an effect unread (4.2), and a reader records the stop
   (7.3).
 - 2(b) A source column is 0 or 1 to S, S the source count (3.3); a
-  target column is 0 to 13 (2.1); a source runs on one of the eight
-  targets of 2.1.1.
+  target column is a target this version encodes, 0 to 19 or 21 to 24
+  (2.1). A source of one column runs on one of the eight targets of
+  2.1.2, and a source of C columns on a target of C columns.
 - 2(c) A start whose target column is unset runs on the kept target, the
   last target column set on the effect in frame order, through the wrap
   (4.5). A writer sets the target column on the first start of an
   effect in the first pass, and on the first start at or after the
   repeat row.
+- 2(d) Every target a source runs on names one column for the marker
+  (2.1), so a source of two columns runs on the tone targets or on the
+  noise targets.
 
 **Rule 3: a start sets bit 5 of the control column with it, with one
 exception, and sets bit 6 where the timer is stopped** (YMXS rules 3
@@ -908,8 +921,9 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 `effects` the effects used E as a decimal integer, 0 to 15; `sources`
 the sources in index order, source 1 first, each
 `{"rows":[...],"repeat":RR}` with `rows` the bytes of its rows in row
-order, the marker included, 0 to 255, and `repeat` its RR as its header
-has it (3.1); `[]` where S is 0.
+order, a byte a column of the row and the marker included, 0 to 255, and
+`repeat` its RR as its header has it (3.1); `[]` where S is 0. A source of
+C columns and R rows reads as C times R bytes, row 0's columns first.
 
 ### 7.3 A frame's entry
 

@@ -242,7 +242,7 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 					lastKind[i] = slot[i].Kind
 					lastTarget[i] = slot[i].Target
 					if slot[i].Kind == ymxr.Drum {
-						drumEnd[i] = f + ymxr.Duration(len(sources.At(number[i]).Rows),
+						drumEnd[i] = f + ymxr.Duration(sources.At(number[i]).Rows(),
 							slot[i].Select, slot[i].Count, song.PlayerHz)
 					}
 				} else if slot[i].Select != selectHeld[i] ||
@@ -314,13 +314,13 @@ func source(made map[int]ymxs.Single, sources *ymxr.Sources, number int) ymxs.Si
 		return known
 	}
 	of := sources.At(number)
-	values := make([]int, len(of.Rows))
-	for i, row := range of.Rows {
+	values := make([]int, of.Rows())
+	for i, row := range of.Columns[0] {
 		values[i] = int(row) &^ ymxr.Mark
 	}
 	named := name(of.Kind) + " " + strconv.Itoa(of.Data)
 	built := ymxs.OnceSource(named, values)
-	if of.Repeat < len(of.Rows) {
+	if of.Repeat < of.Rows() {
 		built = ymxs.RepeatingSource(named, values, of.Repeat)
 	}
 	made[number] = built

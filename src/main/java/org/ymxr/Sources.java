@@ -26,9 +26,26 @@ final class Sources {
      *  so the frame write that sets the register back does not click. */
     static final int PARK = 13;
 
-    /** One source: its rows, and the row it repeats to, `R` where it does
-     *  not repeat. */
-    record Source(int kind, int data, byte[] rows, int repeat) {
+    /** One source: a column a value of the row (SPEC.md 2.2.1), each
+     *  column the R values of that column in row order, and the row it
+     *  repeats to, `R` where it plays once. The marker stands in bit 7 of
+     *  the last row of the column the target names (SPEC.md 3.2.1). */
+    record Source(int kind, int data, byte[][] columns, int repeat) {
+
+        /** One column, the shape a YM dump converts to. */
+        static Source of(int kind, int data, byte[] rows, int repeat) {
+            return new Source(kind, data, new byte[][] {rows}, repeat);
+        }
+
+        /** The rows of every column. */
+        int rows() {
+            return columns[0].length;
+        }
+
+        /** The values a row: C, the source's columns (SPEC.md 3.1.3). */
+        int width() {
+            return columns.length;
+        }
     }
 
     private final List<Source> list = new ArrayList<>();
@@ -89,14 +106,14 @@ final class Sources {
                 // The level then the silence. The row that starts the square
                 // leaves the level as it is, so the voice keeps the                // value the last row set for a timer's period, and the first tick opens
                 // the loud half.
-                return new Source(kind, data, new byte[] {(byte) data, (byte) MARK}, 0);
+                return Source.of(kind, data, new byte[] {(byte) data, (byte) MARK}, 0);
             case Effects.BUZZER:
-                return new Source(kind, data, new byte[] {(byte) (MARK | data)}, 0);
+                return Source.of(kind, data, new byte[] {(byte) (MARK | data)}, 0);
             default:
                 byte[] rows = new byte[drums[data].length + 1];
                 System.arraycopy(drums[data], 0, rows, 0, drums[data].length);
                 rows[rows.length - 1] = (byte) (MARK | PARK);
-                return new Source(kind, data, rows, rows.length);
+                return Source.of(kind, data, rows, rows.length);
         }
     }
 

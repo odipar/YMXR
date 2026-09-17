@@ -152,7 +152,7 @@ public final class YmToYmxr {
         int[] kinds = new int[Effects.BUZZER + 1];
         for (Sources.Source source : sources.all()) {
             kinds[source.kind()]++;
-            rows[source.kind()] += source.rows().length;
+            rows[source.kind()] += source.rows();
         }
         report.say("the effects: " + Integer.bitCount(columns.effects) + " of 4 run, "
                 + sources.count() + (sources.count() == 1 ? " source" : " sources")

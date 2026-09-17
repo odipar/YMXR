@@ -29,7 +29,7 @@ Nine tunes are converted from eight dumps under `ym/test`: six of
 published music, by Jochen Hippel, Mad Max and Scavenger as their
 headers record, one of them converted twice (`circus`, `plays-once`),
 and two built (`preempt`, `retune`); `four-timers` is built by code and
-`wrong-version` is `chambers` with the version word $0004. The music is
+`wrong-version` is `chambers` with the version word $0005. The music is
 its composers', and the repository's LICENSE covers the code alone: a
 copy of the kit has the tunes in it for the exercise alone.
 
@@ -82,7 +82,7 @@ Note: the first run of the exercise is to come.
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |
 | `fine-zero` | a tone fine byte moving to 0 on each voice, with the coarse set bit set and with it clear; an odd row count, so a row of unset columns is appended at the end and the table packs at unit 2 |
 | `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and rows section 4 allows beyond those a conversion of a dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, its source with bit 7 set in nine rows before its last, outside SPEC.md 3.2 and reported as the table has it (SPEC.md 7), R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit |
-| `wrong-version` | the version word $0004: a reader produces an empty record |
+| `wrong-version` | the version word $0005: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.

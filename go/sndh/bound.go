@@ -39,7 +39,13 @@ var BoundMagic = []byte{'Y', 'M', 'X', 'B'}
 
 // Where a bound tune's fields stand.
 const (
-	BoundVersion = 0x0003
+	// BoundVersion is the version of a bound tune whose sources are one
+	// column (SPEC.md 3.3.5).
+	BoundVersion = ymxr.Version
+
+	// BoundVersionColumns is the version of one with a source of several
+	// columns.
+	BoundVersionColumns = ymxr.VersionColumns
 	StateAt      = 12
 	ImageAt      = 16
 	BoundTableAt = 20
@@ -206,7 +212,7 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	bound := make([]byte, here)
 	copy(bound, tuneFile[:ymxr.TableAt])
 	copy(bound, BoundMagic)
-	ymxr.PutWord(bound, 4, BoundVersion)
+	ymxr.PutWord(bound, 4, ymxr.GetWord(tuneFile, 4))
 	ymxr.PutLong(bound, StateAt, state)
 	ymxr.PutLong(bound, ImageAt, imageAt)
 	// Where this tune's table stands in the image it is packaged into. An

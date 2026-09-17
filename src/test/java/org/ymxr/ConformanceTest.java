@@ -52,9 +52,9 @@ final class ConformanceTest {
         }
     }
 
-    /** The version word in {@code wrong-version}: one past the version
-     *  the reader reads. */
-    static final int WRONG_VERSION = Tune.VERSION + 1;
+    /** The version word in {@code wrong-version}: one past the highest
+     *  version the reader reads (SPEC.md 3.3.5). */
+    static final int WRONG_VERSION = Tune.VERSION_COLUMNS + 1;
 
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(

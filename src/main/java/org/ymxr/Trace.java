@@ -32,10 +32,12 @@ final class Trace {
                 .append(",\"effects\":").append(tune.effects()).append(",\"sources\":[");
         for (int i = 0; i < tune.sources().size(); i++) {
             Table s = tune.sources().get(i);
-            byte[] rows = s.column(0);
             line.append(i == 0 ? "" : ",").append("{\"rows\":[");
-            for (int r = 0; r < rows.length; r++) {
-                line.append(r == 0 ? "" : ",").append(rows[r] & 0xFF);
+            // a byte a column of the row, row 0's columns first (SPEC.md 7.2)
+            for (int r = 0; r < s.rows(); r++) {
+                for (int c = 0; c < s.columns(); c++) {
+                    line.append(r == 0 && c == 0 ? "" : ",").append(s.column(c)[r] & 0xFF);
+                }
             }
             line.append("],\"repeat\":").append(s.repeat()).append('}');
         }

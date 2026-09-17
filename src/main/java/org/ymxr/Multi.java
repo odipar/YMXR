@@ -25,8 +25,12 @@ final class Multi {
     /** The four bytes a multi file opens with. */
     static final byte[] MAGIC = {'Y', 'M', 'X', 'M'};
 
-    /** The version of the tune files in it, which is the tune file's. */
+    /** The version of a multi file whose tune files are version 3. */
     static final int VERSION = Tune.VERSION;
+
+    /** The version of one with a tune file of version 4 in it, which is
+     *  the highest of the tune files (SPEC.md 3.3.5). */
+    static final int VERSION_COLUMNS = Tune.VERSION_COLUMNS;
 
     static final int COUNT_AT = 6;
     static final int INDEX_AT = 8;
@@ -83,7 +87,7 @@ final class Multi {
         }
         byte[] file = new byte[bytes];
         System.arraycopy(MAGIC, 0, file, 0, 4);
-        Tune.putWord(file, 4, VERSION);
+        Tune.putWord(file, 4, Sndh.binds(tunes));
         Tune.putWord(file, COUNT_AT, tunes.size());
         int name = INDEX_AT + ENTRY * tunes.size();
         for (int i = 0; i < tunes.size(); i++) {
@@ -107,8 +111,9 @@ final class Multi {
             throw new IllegalArgumentException("not a YMXM file");
         }
         int version = Tune.getWord(file, 4);
-        if (version != VERSION) {
-            throw new IllegalArgumentException("version " + version + " is not " + VERSION);
+        if (version != VERSION && version != VERSION_COLUMNS) {
+            throw new IllegalArgumentException("version " + version + " is not " + VERSION
+                    + " or " + VERSION_COLUMNS);
         }
         int count = Tune.getWord(file, COUNT_AT);
         if (count < 1 || count > MOST) {

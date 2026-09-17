@@ -73,7 +73,9 @@
 ; default, no byte and no cycle of it stands.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
-YMXR_VERSION    equ     $0003           ; its version
+YMXR_VERSION    equ     $0004           ; the newest version it reads: a
+                                        ; bound tune of 3 is one whose sources
+                                        ; are one column (SPEC.md 3.3.5)
 YMXR_COLUMNS    equ     30
 YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 
@@ -169,7 +171,11 @@ WS_EFFECTS      equ     20              ; a byte: the effects the tune runs
 WS_VECTOR       equ     21              ; a byte: the MFP's vector register as
                                         ; init found it, kept where the player
                                         ; runs automatic end of interrupt
-WS_FX           equ     24              ; four effects, FX_SIZE each
+WS_FX           equ     24              ; four effects, FX_SIZE each. The
+                                        ; instances below add FX_SIZE a time
+                                        ; rather than multiplying: rmac reads
+                                        ; an expression left to right, so
+                                        ; WS_FX+FX_SIZE*2 is (WS_FX+FX_SIZE)*2
 FX_TARGET       equ     0               ; the target the player keeps
 FX_SELECT       equ     1               ; the select it last read
 FX_COUNT        equ     2               ; the count it last read
@@ -764,8 +770,11 @@ q\{ct}:         bra.w   \{tick}_done
 YMXR_init:
                 cmp.l   #YMXR_MAGIC,(a0)
                 bne     .bad
-                cmp.w   #YMXR_VERSION,TF_VERSION(a0)
-                bne     .bad
+                move.w  TF_VERSION(a0),d0       ; version 3 or 4, the lower
+                subq.w  #3,d0                   ; where the tune's sources are
+                bcs     .bad                    ; one column (SPEC.md 3.3.5)
+                cmp.w   #YMXR_VERSION-3,d0
+                bhi     .bad
                 move.l  a6,-(sp)
                 movea.l a1,a6
                 move.l  a0,WS_TUNE(a6)
@@ -1161,8 +1170,8 @@ ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
                 EFFECT  WS_FX,_14,_15,_16,_17,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,ymxr_two0,ymxr_three0,$134
                 EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,ymxr_two1,ymxr_three1,$110
-                EFFECT  WS_FX+FX_SIZE*2,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,ymxr_two2,ymxr_three2,$120
-                EFFECT  WS_FX+FX_SIZE*3,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,ymxr_two3,ymxr_three3,$114
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,ymxr_two2,ymxr_three2,$120
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,ymxr_two3,ymxr_three3,$114
 ; 4: the tone periods.
                 TONE    _0,_1,$0000,$0100
                 TONE    _2,_3,$0200,$0300

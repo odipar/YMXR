@@ -37,7 +37,26 @@ import org.dtx.Table;
 final class Tune {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
+
+    /** The version of a tune whose sources are one column and whose target
+     *  columns are 0 to 13 (SPEC.md 3.3.5). */
     static final int VERSION = 0x0003;
+
+    /** The version of a tune with a source of several columns (SPEC.md
+     *  3.3.5), which a target of 14 upward runs. */
+    static final int VERSION_COLUMNS = 0x0004;
+
+    /** The version a tune of these sources is written at: the lower of the
+     *  two it reads under, so a tune both versions encode is one file and a
+     *  player of version 3 reads it (SPEC.md 3.3.5). */
+    static int version(List<Sources.Source> sources) {
+        for (Sources.Source source : sources) {
+            if (source.width() > 1) {
+                return VERSION_COLUMNS;
+            }
+        }
+        return VERSION;
+    }
     static final int FRAME_RATE_AT = 6;
 
     /** The largest frame rate the word at {@link #FRAME_RATE_AT} reads. A
@@ -132,9 +151,8 @@ final class Tune {
         int sourceBytes = 0;
         for (int i = 0; i < tables.length; i++) {
             Sources.Source s = all.get(i);
-            tables[i] = Dtx1.write(Table.of(s.rows().length, s.repeat(), 1,
-                    new byte[][] {s.rows()}));
-            sourceRows += s.rows().length;
+            tables[i] = Dtx1.write(Table.of(s.rows(), s.repeat(), 1, s.columns()));
+            sourceRows += s.rows();
             sourceBytes += tables[i].length;
         }
         byte[] named = named(name);
@@ -150,7 +168,7 @@ final class Tune {
         }
         byte[] file = new byte[here];
         System.arraycopy(MAGIC, 0, file, 0, 4);
-        putWord(file, 4, VERSION);
+        putWord(file, 4, version(all));
         putWord(file, FRAME_RATE_AT, frameRate);
         file[EFFECTS_AT] = (byte) columns.effects;
         file[COUNT_AT] = (byte) tables.length;

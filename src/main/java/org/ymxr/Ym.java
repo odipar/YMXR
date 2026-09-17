@@ -181,7 +181,7 @@ final class Ym {
                         lastTarget[i] = slot[i].target();
                         if (slot[i].kind() == Effects.DRUM) {
                             drumEnd[i] = f + Columns.duration(
-                                    sources.get(number[i]).rows().length,
+                                    sources.get(number[i]).rows(),
                                     slot[i].select(), slot[i].count(), song.playerHz());
                         }
                     } else if (slot[i].select() != selectHeld[i]
@@ -249,11 +249,11 @@ final class Ym {
         }
         Sources.Source of = sources.get(number);
         List<Integer> values = new ArrayList<>();
-        for (byte row : of.rows()) {
+        for (byte row : of.columns()[0]) {
             values.add(row & ~Sources.MARK & 0xFF);
         }
         String name = name(of.kind()) + " " + of.data();
-        Single source = of.repeat() < of.rows().length
+        Single source = of.repeat() < of.rows()
                 ? Tunes.repeating(name, values, of.repeat()) : Tunes.once(name, values);
         made.put(number, source);
         return source;

@@ -346,18 +346,18 @@ final class ConversionTest {
                 if (slot.kind() == Effects.BUZZER) {
                     number = sources.number(slot, report);
                     assertEquals(13, slot.target());
-                    assertEquals(1, sources.get(number).rows().length);
+                    assertEquals(1, sources.get(number).rows());
                     assertEquals(0, sources.get(number).repeat());
-                    assertEquals(Sources.MARK | (slot.data() & 15), sources.get(number).rows()[0] & 0xFF);
+                    assertEquals(Sources.MARK | (slot.data() & 15), sources.get(number).columns()[0][0] & 0xFF);
                 }
             }
         }
         assertTrue(number > 0, "the tune has a sync buzzer");
         Sources.Source sid = sources.get(sources.number(
                 new Effects.Slot(Effects.SID, 0, 8, 9, 1, 100), report));
-        assertEquals(2, sid.rows().length);
-        assertEquals(9, sid.rows()[0], "the loud half, which the first tick writes");
-        assertEquals(Sources.MARK, sid.rows()[1] & 0xFF);
+        assertEquals(2, sid.rows());
+        assertEquals(9, sid.columns()[0][0], "the loud half, which the first tick writes");
+        assertEquals(Sources.MARK, sid.columns()[0][1] & 0xFF);
         assertEquals(0, sid.repeat());
     }
 }

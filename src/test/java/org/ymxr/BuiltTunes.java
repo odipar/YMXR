@@ -221,11 +221,11 @@ final class BuiltTunes {
         byte[] looping = {3, 6, 9, 12, (byte) (0x80 | 15)};
         byte[] fifth = {10, 5, (byte) (0x80 | 1)};
         Sources sources = new Sources(List.of(
-                new Sources.Source(Effects.SID, 12, sid, 0),
-                new Sources.Source(Effects.DRUM, 0, drum, drum.length),
-                new Sources.Source(Effects.BUZZER, 0x0A, buzzer, 0),
-                new Sources.Source(Effects.SID, 15, looping, 2),
-                new Sources.Source(Effects.SID, 10, fifth, 1)));
+                Sources.Source.of(Effects.SID, 12, sid, 0),
+                Sources.Source.of(Effects.DRUM, 0, drum, drum.length),
+                Sources.Source.of(Effects.BUZZER, 0x0A, buzzer, 0),
+                Sources.Source.of(Effects.SID, 15, looping, 2),
+                Sources.Source.of(Effects.SID, 10, fifth, 1)));
         Columns columns = new Columns(c, repeat, 0b1111);
         return Tune.write(columns, sources, 60, YmToYmxr.UNIT, Tune.RING, new Report());
     }

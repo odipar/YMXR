@@ -92,7 +92,11 @@ func Of(tune ymxs.Tune) (Made, error) {
 			column[c][f] = out[c]
 		}
 	}
-	built, err := sourceTables(sources)
+	marker, err := markers(rows, sources)
+	if err != nil {
+		return Made{}, err
+	}
+	built, err := sourceTables(sources, marker)
 	if err != nil {
 		return Made{}, err
 	}
@@ -244,28 +248,86 @@ func effectOf(timer ymxs.Timer) (int, error) {
 	return 0, fmt.Errorf("no effect runs on Timer %s", timer)
 }
 
-// sourceTables is the sources as tables of this format: the values, bit 7
-// set on the last row as the marker (SPEC.md 3.2), and the row the source
-// repeats to, its row count where it plays once.
-func sourceTables(sources []ymxs.Source) ([]ymxr.Source, error) {
-	var out []ymxr.Source
-	for _, source := range sources {
-		values := ymxs.Values(source)
-		rows := make([]byte, len(values))
-		for r, value := range values {
-			if value < 0 || value >= ymxr.Mark {
-				return nil, fmt.Errorf("the source %s has the value %d in row %d, and"+
-					" bit 7 of a source's row is the marker", ymxs.SourceName(source),
-					value, r)
+// markers is the column of each source's row the marker stands in, off the
+// targets the tune starts that source on (SPEC.md 2.1, 3.2.1).
+//
+// The error names a target this version does not encode, or two targets of
+// one source that name different columns (rule 2(d)).
+func markers(rows []ymxs.Row, sources []ymxs.Source) ([]int, error) {
+	marker := make([]int, len(sources))
+	for i := range marker {
+		marker[i] = -1
+	}
+	for _, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			start, is := one.Effect.(ymxs.Start)
+			if !is {
+				continue
 			}
-			rows[r] = byte(value)
+			source := ymxs.StartSource(start)
+			target := ymxs.StartTarget(start)
+			n := indexOf(sources, source)
+			number := ymxs.TargetNumber(target)
+			at := -1
+			if number < len(ymxr.Marker) {
+				at = ymxr.Marker[number]
+			}
+			if at < 0 {
+				return nil, fmt.Errorf("the source %s runs on %s, whose registers read"+
+					" every bit of their value, and bit 7 of a column is the marker"+
+					" (SPEC.md 2.1.2, 2.1.3)", ymxs.SourceName(source),
+					ymxs.TargetName(target))
+			}
+			if marker[n] >= 0 && marker[n] != at {
+				return nil, fmt.Errorf("the source %s runs on targets that mark column"+
+					" %d and column %d, and a source has one marker column (SPEC.md"+
+					" rule 2(d))", ymxs.SourceName(source), marker[n], at)
+			}
+			marker[n] = at
 		}
-		rows[len(rows)-1] |= byte(ymxr.Mark)
-		repeat := len(rows)
-		if at, repeats := ymxs.SourceTable(source).Repeat(); repeats {
-			repeat = at
+	}
+	return marker, nil
+}
+
+// sourceTables is the sources as tables of this format: a column a value of
+// the row, bit 7 set on the last row of the marker's column (SPEC.md 3.2),
+// and the row the source repeats to, its row count where it plays once.
+func sourceTables(sources []ymxs.Source, marker []int) ([]ymxr.Source, error) {
+	var out []ymxr.Source
+	for n, source := range sources {
+		values := ymxs.SourceRows(source).Rows
+		at := marker[n]
+		if at < 0 {
+			at = 0
 		}
-		out = append(out, ymxr.Source{Kind: kind(source), Rows: rows, Repeat: repeat})
+		columns := make([][]byte, ymxs.SourceColumns(source))
+		for c := range columns {
+			columns[c] = make([]byte, len(values))
+		}
+		for r, row := range values {
+			for c := range columns {
+				value := row[c]
+				most := 0xFF
+				if c == at {
+					most = ymxr.Mark - 1
+				}
+				if value < 0 || value > most {
+					said := "a column is one byte"
+					if c == at {
+						said = "bit 7 of the marker's column is the marker"
+					}
+					return nil, fmt.Errorf("the source %s has the value %d in row %d of"+
+						" column %d, and %s", ymxs.SourceName(source), value, r, c, said)
+				}
+				columns[c][r] = byte(value)
+			}
+		}
+		columns[at][len(values)-1] |= byte(ymxr.Mark)
+		repeat := len(values)
+		if to, repeats := ymxs.SourceRows(source).Repeat(); repeats {
+			repeat = to
+		}
+		out = append(out, ymxr.Source{Kind: kind(source), Columns: columns, Repeat: repeat})
 	}
 	return out, nil
 }
