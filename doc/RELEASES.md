@@ -33,6 +33,42 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.25, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.25>, built from the commit
+tagged `v0.3.25`.
+
+SPEC.md 8.6 closed, and the play call's figures measured again. The player
+grew four bytes at init, so the SNDH file and the program of every dump are
+four bytes longer than 0.3.24's and the tune file and the structure of every
+dump are byte for byte that release's, measured against a build of its tag.
+
+- **Where a tick falls in a frame is defined (SPEC.md 4.2.1)**: between any
+  two operations of a frame, with three that run whole against a tick - the
+  two bytes of a register write, the write of the target, the place and the
+  loop row at a start, and the write of a select. The rig asserts it rather
+  than assuming it: it stops a play call at the head of each effect's step
+  and after the last of them, on a row that moves what that effect's tick
+  writes, and reads the tick against the model stepped that far.
+- **A tick of a timer no row has started is defined (SPEC.md 5.2.1)**: it
+  writes 0 to `$FFFF8800`, `$80` to `$FFFF8802` and stops the timer. The
+  player wrote R8 there, the register the assembler left in the handler's
+  immediate, which silenced voice A; init parks it at R0, the register of
+  the target 4.1 step 4 keeps, for the four bytes.
+- **performance.md's two tables are measured again.** Three DTX releases
+  have gone under them since they were last read, each carrying the ST4
+  decoder the advance calls: the call is 0 to 6 cycles cheaper on average
+  and its costliest frame up to 304, and Turrican - world 4-3's heaviest
+  refill fell from 4,130 to 3,826. plan.md's ranges, the advance's share,
+  the tick savings' calls and the budget's margin follow the tables.
+- **The advance's parts are measured rather than carried.** A refill spends
+  450 cycles outside the decoder, and 412 where a column fits the ring; one
+  that parses no operation adds 334 inside it on every tune; an operation
+  costs 199 to 271 to parse by a fit over every refill, where the paragraph
+  read 285 to 342. `test_ymxr.py -refill` measures these and reads the
+  sentences carrying them back, as `-cycles` reads the tables back
+  (tools.md 17.1).
+
 ### 0.3.24, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.24>, built from the commit
