@@ -33,6 +33,40 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.26, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.26>, built from the commit
+tagged `v0.3.26`.
+
+The place before the first start on a timer, and two measurements read
+again. The player grew six bytes at init, so the SNDH file and the program
+of every dump are six bytes longer than 0.3.25's and the tune file and the
+structure of every dump are byte for byte that release's, measured against
+a build of its tag.
+
+- **The place of a timer before its first start is row 0 (SPEC.md 4.1
+  step 4)**, which closes half of 8.4. The player computed a wild pointer
+  there: the place a start that moves no place writes is the new source's
+  first row plus the place less the source's first row, and before any
+  start those two are the parked marker and 0. Init writes the parked
+  marker into the kept first row of every effect, the six bytes, and the
+  two cancel. 8.4 keeps its other half, the row a tick reads where the
+  place is outside the rows of the source connected, which rule 3(a)
+  keeps a tune clear of.
+- **The rig writes that tune itself**, through YMXS's form and
+  `ymxs-to-ymxr`: no conversion of a dump writes a start that moves no
+  place with no start before it, and the tune fails on the player as
+  0.3.25 has it.
+- **`-refill` reads the advance's parts off the pass `-cycles` counts**,
+  where the two walked every frame of every fixture separately: 2:30 for
+  both against 2:26 for the call's figures alone (tools.md 17.1).
+- **performance.md's Against YMX table is measured again** by the method
+  the section describes, `ym/cost.sh` at `VBLS=2300`: YMXR reads 1,990 and
+  1,651 cycles a call on average against 1,995 and 1,655, and 4,296 and
+  4,692 at most against 4,464 and 5,056. At their worst YMXR is 10 per cent
+  over YMX on Turrican - world 4-3 where the sentence read 18, and the
+  section says which release each row is.
+
 ### 0.3.25, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.25>, built from the commit
