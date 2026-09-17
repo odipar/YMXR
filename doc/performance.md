@@ -14,16 +14,16 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 432 | 1292 | 1926 | 782 | 1404 |
-| Chambers of Shaolin 5 - you blew it! | 1000 | 1370 | 3396 | 806 | 2814 |
+| Big - Samantha Fox Strip Poker 6 | 432 | 1292 | 1924 | 782 | 1402 |
+| Chambers of Shaolin 5 - you blew it! | 1000 | 1367 | 3258 | 803 | 2676 |
 | Circus Attractions 2 | 8 | 1446 | 1648 | 746 | 746 |
-| DBA 2 | 19444 | 1678 | 4344 | 881 | 3044 |
-| DBA 5 | 22264 | 1759 | 3666 | 944 | 2470 |
-| Digidrum preempt, built | 800 | 1627 | 2808 | 776 | 2006 |
-| Retrigger retune, built | 1200 | 1493 | 2230 | 782 | 1052 |
-| Synergy Credits | 10756 | 2036 | 5144 | 944 | 2982 |
-| Turrican - world 4-3 | 3680 | 1608 | 4836 | 887 | 4130 |
-| Turrican 2 - world completed 1 | 182 | 1608 | 4296 | 939 | 3672 |
+| DBA 2 | 19444 | 1674 | 4272 | 877 | 2972 |
+| DBA 5 | 22264 | 1754 | 3606 | 938 | 2410 |
+| Digidrum preempt, built | 800 | 1626 | 2750 | 775 | 1948 |
+| Retrigger retune, built | 1200 | 1490 | 2220 | 779 | 1042 |
+| Synergy Credits | 10756 | 2030 | 5094 | 938 | 2932 |
+| Turrican - world 4-3 | 3680 | 1605 | 4532 | 884 | 3826 |
+| Turrican 2 - world completed 1 | 182 | 1605 | 4060 | 932 | 3436 |
 
 Five of the ten packed at unit 1 before SPEC.md 6, rule 6, since an odd
 row count or repeat row does not divide by 2, and a refill of theirs was
@@ -31,34 +31,39 @@ thirty units of a byte. The call on each, at unit 1 and padded to unit 2:
 
 | tune | on average at unit 1 | at unit 2 | at most at unit 1 | at unit 2 |
 |---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 1536 | 1292 | 2130 | 1926 |
-| DBA 2 | 1970 | 1678 | 5522 | 4344 |
-| DBA 5 | 2057 | 1759 | 5696 | 3666 |
-| Synergy Credits | 2362 | 2036 | 6358 | 5144 |
-| Turrican 2 - world completed 1 | 1908 | 1608 | 5644 | 4296 |
+| Big - Samantha Fox Strip Poker 6 | 1533 | 1292 | 2104 | 1924 |
+| DBA 2 | 1923 | 1674 | 5258 | 4272 |
+| DBA 5 | 2009 | 1754 | 4986 | 3606 |
+| Synergy Credits | 2294 | 2030 | 5778 | 5094 |
+| Turrican 2 - world completed 1 | 1896 | 1605 | 5382 | 4060 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so
 a refill is fifteen units of two bytes and one comes every row (tools.md
 4). What those units cost follows how the column packed: a run of long
 matches costs 12 cycles a unit to copy, and a short operation, a length
-and an offset read bit by bit, about 225 to 240 an operation to parse.
+and an offset read bit by bit, about 200 to 270 an operation to parse.
 The advance spends 450 cycles a refill outside the decoder, loading and
-storing the decoder's eight registers, testing its mark and stepping to
-the next, and a refill that parses no new operation adds 334 on Turrican
-- world 4-3 and 326 on Synergy Credits, 578 at unit 1.
+storing the decoder's eight registers, moving its mark and stepping to
+the next; 412 where a column fits the ring, since the mark the advance
+moves is a replayed loop and ST4 replays a loop only past the reach of a
+back reference (DTX, abi.md 4). Six of the ten tunes fit. A refill that
+parses no new operation adds 334 inside the decoder on every tune, and
+576 at unit 1.
 
-The 225 to 240 comes from the endpoints on Turrican - world 4-3: the 334
-above and 3,680 at its heaviest are 3,346 over fourteen operations, about
-239 each, against a slope of about 225 an operation in YMX. A least-squares
-fit over every refill reads higher, 285 to 342 an operation, since a
-refill that parses few operations is mostly the fixed part. A refill of
-450 outside and the heaviest 3,680 inside is the 4,130 the table above
-reads as Turrican's advance in its costliest frame.
+The 200 to 270 is a least-squares fit of the decoder's cycles against the
+operations parsed, over every refill of a tune: 199 on Turrican 2 - world
+completed 1 and 271 on Big - Samantha Fox Strip Poker 6. The endpoints of
+a tune whose heaviest refill parses ten operations or more read lower,
+179 to 217: the fit counts every refill, and a refill that parses few
+operations is mostly the fixed part. On Turrican - world 4-3 the 334
+above and 3,376 at its heaviest are 3,042 over fourteen operations, about
+217 each. A refill of 450 outside and the heaviest 3,376 inside is the
+3,826 the table above reads as Turrican's advance in its costliest frame.
 
 Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 (experiments.md) and costs more to decode: on Turrican - world 4-3 the
-advance reads 1,138 on average and 4,586 at most against 887 and 4,130,
-and the play call 1,859 and 5,240 against 1,608 and 4,836. `-k1` packs at
+advance reads 1,132 on average and 4,298 at most against 884 and 3,826,
+and the play call 1,852 and 4,952 against 1,605 and 4,532. `-k1` packs at
 it.
 
 The frame procedure is the rest, from 510 to 1,092 cycles on average:
@@ -80,7 +85,7 @@ end, so no row pays for more than one decoder's copy.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it:
 the averages by more than two thirds of it, and the costliest frame of
-every tune by 1,512 cycles or more, Synergy Credits' 5,144 the nearest.
+every tune by 1,562 cycles or more, Synergy Credits' 5,094 the nearest.
 The ticks of a frame stand beside the call and are counted in A tick below.
 
 ## The raster monitor
@@ -181,7 +186,7 @@ thirty columns here against twenty-one live streams there. The worst frame of
 each player parses one operation for every unit, fifteen of fifteen here and
 twelve of twelve there, so each worst frame is that bound. On Synergy Credits
 the run ends before YMXR's costliest frame, so its 4,464 at most is not that
-frame, which the rig counts at 5,144. Both players pad this tune to unit 2,
+frame, which the rig counts at 5,094. Both players pad this tune to unit 2,
 YMX by duplicating a frame and YMXR by a row that sets no column (SPEC.md 6,
 rule 6); before that rule the tune packed at unit 1, the refill was thirty
 units, and the same run read 5,408 at most.
@@ -221,7 +226,7 @@ between them by their difference: 88 cycles, 152 with the entry and the
 `rte`, against the 172 and 194 the two paths of the general handler cost. A
 tune whose effects are all such sources ticks 29.4 times a frame on Synergy
 Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 911, 769 and 626 cycles a
-frame come off those tunes, against a play call of 2,036, 1,678 and 1,759
+frame come off those tunes, against a play call of 2,030, 1,674 and 1,754
 (the table above).
 
 A tick drops the interrupt level and writes an end of interrupt because the

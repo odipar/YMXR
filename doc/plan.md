@@ -5,9 +5,9 @@ has what it costs today; every figure below is against those, and each one
 records whether it was measured on the rig or counted from the 68000's
 manual.
 
-Two figures matter and they are not the same. A call is 1,292 to 2,036
+Two figures matter and they are not the same. A call is 1,292 to 2,030
 cycles on average by tune, and the costliest frame of a tune is 1,648 to
-5,144. R4.5 budgets 6,656 a frame, and what it binds is the costliest
+5,094. R4.5 budgets 6,656 a frame, and what it binds is the costliest
 frame. Most of what follows moves the average; the steps that move the
 costliest frame are named where they are.
 
@@ -15,10 +15,10 @@ costliest frame are named where they are.
 
 ## Where the time is
 
-DTX's advance is 46 to 61 per cent of an average call and 58 to 85 per
-cent of the costliest frame: 4,130 of Turrican - world 4-3's 4,836 and
-2,982 of Synergy Credits' 5,144. A refill parses at most one ST4
-operation a unit at about 225 to 240 cycles each, and its unit count is
+DTX's advance is 46 to 61 per cent of an average call and 58 to 84 per
+cent of the costliest frame: 3,826 of Turrican - world 4-3's 4,532 and
+2,932 of Synergy Credits' 5,094. A refill parses at most one ST4
+operation a unit at about 200 to 270 cycles each, and its unit count is
 the column count, so fifteen operations is a tune's costliest frame and
 the schema's thirty columns set that bound.
 
@@ -125,7 +125,7 @@ and a mask column is not one.
 **Three fusions in ST4's decoder**: a one-unit literal run, a one-unit
 rep match, and a two-unit new-offset match, each fused at the gamma's
 exit. All three were counted and all three were wrong as written. ST4
-is where the costliest frame is - fifteen operations at 225 to 240 -
+is where the costliest frame is - fifteen operations at 200 to 270 -
 and it is the only place with room to move that frame far, so it needs
 a separate pass rather than these three repaired.
 
@@ -148,27 +148,27 @@ Every step this document listed is in place, each measured on the rig:
 | a separate tick for a one-row source | 74 a tick | 568 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
-its count. Synergy Credits reads 2,036 cycles a call against the 2,469
+its count. Synergy Credits reads 2,030 cycles a call against the 2,469
 this document opened at and 2,585 cycles of ticks against 5,380, so
-4,621 a frame against 7,849. performance.md has the call, and `-cycles`
+4,615 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
 What was left was the costliest frame. A refill parses at most one ST4
 operation per unit of its window, so the frame R4.5 binds is one operation
-per unit at 225 to 240 cycles each, and no step above touches it. That
+per unit at 200 to 270 cycles each, and no step above touches it. That
 pass has now been made, in ST4 (research.md, "A penalty a block, against
 the costliest frame"), and it moved the question.
 
-The window is 30 units at unit 1 and 15 at unit 2, and the worst refill
-measured is 15 operations at unit 1 against 9 to 11 at unit 2: 52 per cent
-of R4.5's 6,656-cycle budget against 31. A tune packed at unit 1 only
-because its row count or its repeat row was odd. So the lever was the row
-count, not the packer: low with one row fewer packs at unit 2, and its
-worst refill falls from 15 to 9. A penalty a block in ST4 (`st4 -p8`) also
-helps at unit 1, from 15 to 12 for two per cent more bytes, and does
-little
-at unit 2; it stays a flag of ST4, since a default in DTX means changing
-three packers.
+The window is 30 units at unit 1 and 15 at unit 2, and a refill of
+Turrican 2 - world completed 1 parses fifteen operations, the bound at
+unit 2. The heaviest refill of the ten tunes costs 3,826 cycles at unit 2
+against 4,754 at unit 1: 57 per cent of R4.5's 6,656-cycle budget against
+71. A tune packed at unit 1 only because its row count or its repeat row
+was odd. So the lever was the row count, not the packer: low with one row
+fewer packs at unit 2, and its worst refill falls from 15 to 9. A penalty
+a block in ST4 (`st4 -p8`) also helps at unit 1, from 15 to 12 for two
+per cent more bytes, and does little at unit 2; it stays a flag of ST4,
+since a default in DTX means changing three packers.
 
 SPEC.md 6, rule 6 is the rule that follows: a writer whose tune does not
 divide by the unit adds rows that set no column at the repeat row until it
@@ -178,6 +178,6 @@ register as it is and every timer running, and a loop written again plays
 as it did. The converter applies it (tools.md 4.4), so every tune packs
 at unit 2 and the window of every tune is 15 units. Five of the ten tunes
 packed at unit 1 before it; measured again at unit 2, their calls fell by a
-seventh to a sixth on average and by a tenth to more than a third in the
-costliest frame, Synergy Credits' from 6,358 to 5,144 (performance.md). The
-costliest frame of any tune is now that one, 1,512 cycles under the budget.
+ninth to a sixth on average and by a twelfth to more than a quarter in the
+costliest frame, Synergy Credits' from 5,778 to 5,094 (performance.md). The
+costliest frame of any tune is now that one, 1,562 cycles under the budget.

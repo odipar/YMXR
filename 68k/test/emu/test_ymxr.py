@@ -14,6 +14,9 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -framesN [tunes]   each tune played for N frames at most,
                                        for a short run over every shape
        test_ymxr.py -cycles [tunes]    the play call's cost as well
+       test_ymxr.py -refill [tunes]    the advance's parts, what a refill
+                                       spends outside ST4's decoder and
+                                       inside it, against performance.md
        test_ymxr.py -hatari [tunes]    the same tunes on a real MFP, under
                                        Hatari
        test_ymxr.py -perf [tunes]      the player built with the raster
@@ -53,6 +56,7 @@ DTX_REPO/68k/test/emu, counts the cycles where it is found; hatari
 """
 import copy
 import json, os
+from collections import Counter
 import re
 import struct
 import subprocess
@@ -1109,6 +1113,148 @@ VBLA = re.compile(r"^VBL=(\d+) clock=(\d+)")
 ROM = 0xE00000
 
 
+# The words performance.md spells a small count with, so the rig reads the
+# sentence back as it stands.
+WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+         7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
+         12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
+
+
+def refill(ym, code, symbols, dtx, unit=""):
+    """The advance's parts over every frame of one tune: what a refill
+    spends outside ST4's decoder, what it spends inside it, and how many
+    operations it parses (performance.md, The play call).
+
+    The image of a bound tune is DTX's packager's output, and DTX's rig
+    assembles the same template for its labels, so ST4_resume is the
+    decoder's first byte and ST4_init the byte after its last: a cycle of
+    the image is inside the decoder or outside it by its pc. An operation
+    is an entry to one of the two parse heads, a new offset or a run of
+    literals.
+    """
+    kept = os.environ.get("YMXR_FLAGS")
+    if unit:
+        os.environ["YMXR_FLAGS"] = (kept + " " + unit) if kept else unit
+    work = tempfile.mkdtemp()
+    try:
+        file, report = convert(ym, work)
+    finally:
+        if unit:
+            if kept is None:
+                del os.environ["YMXR_FLAGS"]
+            else:
+                os.environ["YMXR_FLAGS"] = kept
+    bound = bind(file, work)
+    assert bound is not None, "the binder rejected the tune"
+    tune = Tune(bound, work)
+    image, labels = dtx.package(file[long_at(file, 12):])
+    at = FILE + tune.image_at
+    assert image == bound[tune.image_at:tune.image_at + len(image)], \
+        "the packager's image is not the image the binder wrote"
+    cycles = CyclesOn(dtx, (at + labels["ST4_resume"], at + labels["ST4_init"]),
+                      (at + labels["new_offset"], at + labels["begin_literals"]))
+    m = Machine(code, symbols, bound)
+    end = FILE + (long_at(bound, 20) if bound[9] else len(bound))
+    cycles.attach(m, (at, end))
+    workspace = WORK + 0x100
+    assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
+    once = tune.RR == tune.R
+    frames = tune.R + 1 if once else min(tune.R + tune.R - tune.RR, 4 * tune.R)
+    if MOST_FRAMES and frames > MOST_FRAMES:
+        frames = MOST_FRAMES
+    rows = []
+    for f in range(frames):
+        cycles._settle(None)
+        was = (cycles.image, cycles.decoder, sum(cycles.hits.values()))
+        d0 = m.call("play", a0=workspace)
+        cycles._settle(None)
+        if d0 != 0:
+            break                       # the tune has ended (SPEC.md 4.6)
+        rows.append((cycles.image - was[0] - (cycles.decoder - was[1]),
+                     cycles.decoder - was[1],
+                     sum(cycles.hits.values()) - was[2]))
+    idle = Counter(dec for _, dec, ops in rows if ops == 0)
+    heaviest = max(rows, key=lambda row: row[1])
+    # The fit of the decoder's cycles on the operations parsed, over every
+    # refill: its slope is what an operation costs to parse. A tune whose
+    # refills all parse the same count has no slope to read.
+    mean_o = sum(ops for _, _, ops in rows) / len(rows)
+    mean_d = sum(dec for _, dec, _ in rows) / len(rows)
+    var = sum((ops - mean_o) ** 2 for _, _, ops in rows)
+    cov = sum((ops - mean_o) * (dec - mean_d) for _, dec, ops in rows)
+    return {"frames": len(rows),
+            "outside": min(out for out, _, _ in rows),
+            "idle": idle.most_common(1)[0][0] if idle else None,
+            "heaviest": heaviest[1], "operations": heaviest[2],
+            "slope": cov / var if var else None}
+
+
+def refills(tunes, code, symbols, dtx, whole=True):
+    """Every tune's refill parts, and performance.md read against them.
+
+    The document's figures are of the ten fixtures, so the claims over the
+    set are read back on a run of the set: `whole` says this is one.
+    """
+    parts = {}
+    for ym in tunes:
+        stem = os.path.basename(ym)[:-3].replace("  ", " ")
+        parts[stem] = refill(ym, code, symbols, dtx)
+        one = parts[stem]
+        print("%-45s %6d frames, a refill %4d cycles outside the decoder"
+              " and %4d inside it at no operation, %5d at its heaviest,"
+              " %2d operations%s" % (
+                  os.path.basename(ym), one["frames"], one["outside"],
+                  one["idle"], one["heaviest"], one["operations"],
+                  ", %.0f an operation fitted" % one["slope"]
+                  if one["slope"] else ""))
+    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
+    stale = []
+
+    def reads(claim, *want):
+        """One sentence of performance.md against the figures measured."""
+        m = re.search(claim, said)
+        if not m:
+            stale.append("performance.md has no \"%s\"" % claim)
+            return
+        got = tuple(str(w).lower() for w in want)
+        if tuple(g.replace(",", "").lower() for g in m.groups()) != got:
+            stale.append("performance.md reads %s where the rig counts %s"
+                         % (str(m.groups()), str(got)))
+
+    if whole:
+        floors = sorted({one["outside"] for one in parts.values()})
+        fits = sum(1 for one in parts.values() if one["outside"] == floors[0])
+        reads(r"The advance spends ([\d,]+) cycles a refill outside the"
+              r" decoder,.*?; ([\d,]+) where a column fits the ring",
+              floors[-1], floors[0])
+        reads(r"(\w+) of the ten tunes fit", WORDS.get(fits, fits))
+        idle = {one["idle"] for one in parts.values()}
+        at_one = refill(tunes[0], code, symbols, dtx, "-k1")["idle"]
+        reads(r"A refill that parses no new operation adds ([\d,]+) inside the"
+              r" decoder on every tune, and ([\d,]+) at unit 1",
+              idle.pop() if len(idle) == 1 else sorted(idle), at_one)
+        slopes = sorted((one["slope"], stem) for stem, one in parts.items()
+                        if one["slope"])
+        reads(r"about ([\d,]+) to ([\d,]+) an operation to parse",
+              round(slopes[0][0] / 10) * 10, round(slopes[-1][0] / 10) * 10)
+        reads(r"over every refill of a tune: ([\d,]+) on (.+?) and ([\d,]+)"
+              r" on (.+?)\. The endpoints",
+              round(slopes[0][0]), slopes[0][1],
+              round(slopes[-1][0]), slopes[-1][1])
+        ends = sorted((one["heaviest"] - one["idle"]) / one["operations"]
+                      for one in parts.values() if one["operations"] >= 10)
+        reads(r"read lower, ([\d,]+) to ([\d,]+):",
+              int(ends[0]), int(ends[-1]))
+    one = parts.get("Turrican - world 4-3")
+    if one:
+        reads(r"the ([\d,]+) above and ([\d,]+) at its heaviest are ([\d,]+)"
+              r" over (\w+) operations, about ([\d,]+) each",
+              one["idle"], one["heaviest"], one["heaviest"] - one["idle"],
+              WORDS.get(one["operations"], one["operations"]),
+              int((one["heaviest"] - one["idle"]) / one["operations"]))
+    return stale
+
+
 def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
     trace records, checked against the model, and the ticks counted. code
@@ -1491,6 +1637,7 @@ def core(defines, ym):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     count = "-cycles" in sys.argv
+    parts = "-refill" in sys.argv
     real = "-hatari" in sys.argv
     kit = "-kit" in sys.argv
     perf = PERF
@@ -1555,11 +1702,20 @@ def main():
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
     cycles_of = None
-    if count:
+    if count or parts:
         sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))
         import test_dtx
         with_movep(test_dtx)
         cycles_of = test_dtx
+    if parts:
+        # The advance's parts, and the sentences of performance.md that
+        # read them back: a run over the ten fixtures reads every figure
+        # of The play call that the table does not carry.
+        stale = refills(tunes, code, symbols, cycles_of,
+                        not args and wide is None and not kit)
+        assert not stale, "\n".join(sorted(set(stale)))
+        print("%d tunes' refills read as performance.md reads them" % len(tunes))
+        return
     stale = []
     wrong = []
     for ym in tunes:
@@ -1679,14 +1835,19 @@ def with_movep(module):
 
 class CyclesOn:
     """DTX's cycle counter over this rig's machine, once it exists, with
-    the cycles spent in the image, DTX's advance, told from the rest."""
+    the cycles spent in the image, DTX's advance, told from the rest, and
+    within those the cycles spent inside ST4's decoder and the entries to
+    the heads a caller counts (refill)."""
 
-    def __init__(self, module):
+    def __init__(self, module, decoder=(0, 0), heads=()):
         self.module = module
         self.counter = None
         self.cycles = 0
         self.image = 0
+        self.decoder = 0
         self.range = (0, 0)
+        self.inner = decoder
+        self.hits = {at: 0 for at in heads}
 
     def attach(self, m, image=(0, 0)):
         self.counter = self.module.Cycles(m)
@@ -1699,8 +1860,14 @@ class CyclesOn:
             pending = counter.pending
             before = counter.cycles
             inner(next_pc)
-            if pending is not None and rig.range[0] <= pending[0] < rig.range[1]:
+            if pending is None:
+                return
+            if rig.range[0] <= pending[0] < rig.range[1]:
                 rig.image += counter.cycles - before
+                if rig.inner[0] <= pending[0] < rig.inner[1]:
+                    rig.decoder += counter.cycles - before
+            if pending[0] in rig.hits:
+                rig.hits[pending[0]] += 1
         self.counter._settle = settle
 
     def _settle(self, at):
