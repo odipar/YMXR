@@ -33,6 +33,35 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.21, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.21>, built from the commit
+tagged `v0.3.21`.
+
+DTX 0.11.6 in the pom and in `go.mod`, for the ST4 packer that writes a
+copy the offsets cannot reach as literals, and two play scripts that say
+what the program does with a set of more than nine tunes.
+
+**No byte of this release differs from 0.3.20's.** The forty files the ten
+dumps under `ym/test` convert to, a tune file, a structure, an SNDH file
+and a program each, are byte for byte 0.3.20's, measured against a build
+of that tag.
+
+- **The chain each link names a release again**: ST4 go/v0.1.6, DTX
+  0.11.6, this. ST4 0.1.6 fixes a packer that read one call three ways: a
+  copy whose source lay further back than an offset reaches ended the Go
+  and C# packers and passed the Java one, which writes a container the
+  format cannot express. It needs a literal stream of more than 32,512
+  bytes behind the copy, which no tune of this repository reaches, so no
+  table here packs differently.
+- **The program picks a subtune past nine, and the scripts say so.**
+  `ym/play.sh` wrote `N tunes, and the program's keys reach subtune 9`
+  past nine tunes, and both play scripts said a tenth tune and past it
+  play only under a host that selects a subtune by number. The stub
+  selects them itself: a typed number is ten times itself plus the figure
+  (BINARIES.md 4.6), and the arrow keys walk the set. The warning is gone
+  and tools.md 16.1 cites 13.1 for what the program does.
+
 ### 0.3.20, 2026-09-16
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.20>, built from the commit
