@@ -34,14 +34,16 @@ version is checked to be rejected by the binder, the reader and, its bound
 form's version moved, the player.
 
 Under unicorn the timers are modelled here, since it raises no interrupt:
-every tick is fired here at the time the model computes. Under Hatari the
-MFP fires them: the tune goes into an SNDH file and a program around it
-through bin/ymxr-sndh and bin/ymxr-prg (BINARIES.md 3 and 4), the program
-claims the machine and plays the tune on the VBL, since the screen's rate
-is the tune's 50 Hz, and the trace of every chip write is read against the
-same model, the frames cut at the VBL and the ticks counted against the
-rates the trace shows the timers programmed at. So -hatari requires tunes
-at 50 Hz.
+every tick is fired here at the time the model computes. Two ticks the timers
+do not produce are fired besides: one of a timer no row has started (SPEC.md
+5.2.1), and one inside a frame, at each boundary SPEC.md 4.2.1 has a tick
+falling on (inside). Under Hatari the MFP fires them: the tune goes into an
+SNDH file and a program around it through bin/ymxr-sndh and bin/ymxr-prg
+(BINARIES.md 3 and 4), the program claims the machine and plays the tune on
+the VBL, since the screen's rate is the tune's 50 Hz, and the trace of every
+chip write is read against the same model, the frames cut at the VBL and the
+ticks counted against the rates the trace shows the timers programmed at. So
+-hatari requires tunes at 50 Hz.
 
 Needs rmac (RMAC, or on the path), DTX's dtx-write (DTX_WRITE, or on the
 path) to read the table back, unicorn (pip install unicorn), and the
@@ -49,6 +51,7 @@ converter, the binder and the two combiners under bin/. DTX's rig, at
 DTX_REPO/68k/test/emu, counts the cycles where it is found; hatari
 (HATARI) with a TOS image (TOS) plays the tune on a real MFP.
 """
+import copy
 import json, os
 import re
 import struct
@@ -369,7 +372,7 @@ class Model:
         """Effect i's four columns. The four effects are stepped in order,
         and every chip write of the row comes after all four, so a tick
         between two steps reads the effects before it as the row leaves
-        them and the ones after it as they were."""
+        them and the ones after it as they were (SPEC.md 4.2.1)."""
         r = self.playing
         t = EFFECT + 4 * i
         fx = self.fx[i]
@@ -469,6 +472,32 @@ class Model:
         fx["place"] += 1
         return write, "on"
 
+    def ticking(self, i):
+        """The write a tick of effect i would make, the place left where
+        it stands."""
+        fx = self.fx[i]
+        if not fx["running"]:
+            return None
+        at, R, RR, rows = self.tune.sources[fx["source"]]
+        return (fx["using"], rows[fx["place"]])
+
+    def moved(self, i):
+        """The write a tick of effect i makes before the row's step and
+        the write it makes after it, where the row moves one to the
+        other, and None where the row leaves it as it is. Read before the
+        frame, so the row is the one the next frame plays: a step moves
+        one effect alone, and the steps before it leave this one as
+        the frame before left it."""
+        was = self.ticking(i)
+        if was is None:
+            return None
+        keep, playing = copy.deepcopy(self.fx), self.playing
+        self.playing = self.tune.rows[self.row]
+        self.step(i)
+        then = self.ticking(i)
+        self.fx, self.playing = keep, playing
+        return (was, then) if then is not None and then != was else None
+
     def square(self, i):
         """Whether effect i's source is two rows repeating to row 0, which
         the player's square handler uses (68k/YMXR.S, SQUARE)."""
@@ -529,6 +558,7 @@ class Machine:
         self.palette = []
         mu.hook_add(UC_HOOK_MEM_WRITE, self._write)
         self.rte_at = None
+        self.stopped = None
         self.beam = 0
         mu.hook_add(UC_HOOK_CODE, self._code)
         # the video address counter, which moves while the chip fetches
@@ -544,6 +574,8 @@ class Machine:
         if self.rte_at is not None and bytes(mu.mem_read(address, 2)) == b"\x4e\x73":
             self.rte_at = address
             mu.emu_stop()
+        elif address == self.stopped:
+            mu.emu_stop()               # the call stopped at a boundary
 
     def _write(self, mu, access, address, size, value, data):
         if PSG <= address < PSG + 4:
@@ -567,10 +599,14 @@ class Machine:
         elif not (WORK <= address < WORK + 0x40000 or STACK <= address < STACK + 0x10000):
             self.stray.append((address, size, value))
 
-    def call(self, name, a0=0, a1=0, d0=0):
+    def call(self, name, a0=0, a1=0, d0=0, at=None):
         """One call through the jump table, back at the sentinel. The
         core's three entries stand in another order than the player's
-        (BINARIES.md 2), so each set has a name a slot."""
+        (BINARIES.md 2), so each set has a name a slot.
+
+        With at, the call stops at that address and resume runs it on:
+        a tick fired between the two falls there (SPEC.md 4.2.1), and the
+        call's chip writes keep the order the tick fell in."""
         mu = self.mu
         slot = {"init": 0, "play": 4, "stop": 8,
                 "core-init": 0, "core-exit": 4, "core-play": 8}[name]
@@ -585,10 +621,31 @@ class Machine:
         mu.mem_write(sp - 4, struct.pack(">I", DONE))
         mu.reg_write(UC_M68K_REG_A7, sp - 4)
         self.psg, self.mfp, self.stray, self.palette = [], [], [], []
+        self.stopped = at
+        self._run(CODE + slot, name)
+        if at is not None:
+            assert mu.reg_read(UC_M68K_REG_PC) == at, \
+                "%s ran past %x" % (name, at)
+            return None
+        return self._returned(name)
+
+    def resume(self, name="play"):
+        """The call stopped at an address, run on to the sentinel."""
+        at, self.stopped = self.stopped, None
+        assert at is not None, "no call stands at an address"
+        self._run(at, name)
+        return self._returned(name)
+
+    def _run(self, at, name):
         try:
-            mu.emu_start(CODE + slot, DONE, count=50_000_000)
+            self.mu.emu_start(at, DONE, count=50_000_000)
         except UcError as bad:
-            raise AssertionError("%s stopped: %s at pc %x" % (name, bad, mu.reg_read(UC_M68K_REG_PC)))
+            raise AssertionError("%s stopped: %s at pc %x"
+                                 % (name, bad, self.mu.reg_read(UC_M68K_REG_PC)))
+
+    def _returned(self, name):
+        """The call back at the sentinel, with the registers it keeps."""
+        mu = self.mu
         assert mu.reg_read(UC_M68K_REG_PC) == DONE, name + " did not return"
         assert not self.stray, name + " wrote outside its memory: " + repr(self.stray[:4])
         assert mu.reg_read(UC_M68K_REG_D6) == 0x6D6D6D6D, name + " moved d6"
@@ -596,15 +653,18 @@ class Machine:
         assert mu.reg_read(UC_M68K_REG_A6) == 0x00046000, name + " moved a6"
         return mu.reg_read(UC_M68K_REG_D0) & 0xFFFFFFFF
 
-    def interrupt(self, vector):
-        """One tick through its vector, run to the handler's rte."""
+    def fire(self, vector):
+        """One tick through its vector, run to the handler's rte, on the
+        stack and the registers as they stand: the frame the handler
+        returns through is pushed below the stack pointer it finds, so a
+        tick inside a stopped call leaves the call as it was."""
         mu = self.mu
         handler = long_at(bytes(mu.mem_read(vector, 4)), 0)
-        sp = STACK + 0x8000
-        mu.mem_write(sp - 6, struct.pack(">HI", 0x2000, DONE))
+        pc, sr, sp = (mu.reg_read(UC_M68K_REG_PC), mu.reg_read(UC_M68K_REG_SR),
+                      mu.reg_read(UC_M68K_REG_A7))
+        mu.mem_write(sp - 6, struct.pack(">HI", sr, pc))
         mu.reg_write(UC_M68K_REG_A7, sp - 6)
         mu.reg_write(UC_M68K_REG_SR, 0x2600)
-        self.psg, self.mfp, self.stray = [], [], []
         self.rte_at = 0
         try:
             mu.emu_start(handler, DONE, count=1000)
@@ -612,7 +672,19 @@ class Machine:
             raise AssertionError("a tick stopped: %s at pc %x" % (bad, mu.reg_read(UC_M68K_REG_PC)))
         assert self.rte_at, "the tick did not reach its rte"
         self.rte_at = None
+        mu.reg_write(UC_M68K_REG_A7, sp)
+        mu.reg_write(UC_M68K_REG_SR, sr)
+        mu.reg_write(UC_M68K_REG_PC, pc)
         assert not self.stray, "a tick wrote outside its memory: " + repr(self.stray[:4])
+
+    def interrupt(self, vector):
+        """One tick through its vector, outside any call."""
+        mu = self.mu
+        mu.reg_write(UC_M68K_REG_A7, STACK + 0x8000)
+        mu.reg_write(UC_M68K_REG_SR, 0x2000)
+        mu.reg_write(UC_M68K_REG_PC, DONE)
+        self.psg, self.mfp, self.stray = [], [], []
+        self.fire(vector)
 
     def byte(self, at):
         return bytes(self.mu.mem_read(at, 1))[0]
@@ -724,6 +796,93 @@ class Timers:
         return n
 
 
+# The frames a boundary run plays at most. A tick is fired at a boundary
+# on the first row that moves what the effect's tick writes, so a tune
+# whose rows move few of them is read at the boundaries its first
+# INSIDE_FRAMES rows reach.
+INSIDE_FRAMES = 2000
+
+
+def inside(code, symbols, bound, tune, workspace):
+    """A tick inside a frame (SPEC.md 4.2.1), against the model stepped
+    that far.
+
+    A tick falls between any two operations of a frame, and reads the
+    effects stepped before it as the row leaves them and the ones after
+    it as they were (4.2). The boundaries are the head of each effect's
+    step, where 4.3 has yet to run for it, and the point after the last
+    step, where the register writes of 4.4 begin. A tick is fired at one
+    of them on a row that moves what the effect's tick writes, which is
+    where the two readings differ: before the effect's step the tick
+    writes the source and the target the effect was running, and after it
+    the source and the target the row leaves. The tune plays on around
+    the boundary, every tick the timers are due fired after the frame as
+    a run does, so the places move as they move in a run. Returns the
+    boundaries a tick was fired at.
+    """
+    if not tune.effects:
+        return 0
+    at = []
+    for i in range(4):
+        if tune.effects & 1 << i:
+            # The head of an effect the tune does not run is branched
+            # over; the point after effect 3 is reached on every row.
+            at.append((i, i, CODE + symbols["ymxr_tick%d_over" % i]))
+            at.append((i, 4, CODE + symbols["ymxr_tick3_done"]))
+    m = Machine(code, symbols, bound)
+    model = Model(tune)
+    timers = Timers.of_machine(m, tune.effects)
+    assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
+    timers.apply(m.mfp)
+    clocks = MFP_CLOCK / tune.rate
+    left = list(at)
+    fired = 0
+    for f in range(min(INSIDE_FRAMES, MOST_FRAMES or INSIDE_FRAMES)):
+        if not left:
+            break
+        # the first boundary left whose effect this row moves: where the
+        # row leaves every one of them as it stands, the two readings at
+        # each boundary are one and the row plays as a frame of a run
+        pick = next(((one, moves) for one in left
+                     for moves in [model.moved(one[0])] if moves), None)
+        if pick is None:
+            d0 = m.call("play", a0=workspace)
+            want = model.frame()
+        else:
+            (i, step, address), (was, then) = pick
+            m.call("play", a0=workspace, at=address)
+            model.begin()
+            for j in range(step):
+                model.step(j)
+            write, _ = model.tick(i)    # the place stepped, as a tick steps it
+            assert write == (was if step == i else then), \
+                "frame %d: the model reads effect %d at boundary %d as %s, not %s" % (
+                    f, i, step, write, moves)
+            before = len(m.psg)
+            m.fire(TIMER[i]["vector"])
+            assert masked(m.psg[before:]) == masked([write]), \
+                "frame %d: a tick of effect %d at boundary %d wrote %s, not %s" % (
+                    f, i, step, m.psg[before:], [write])
+            left.remove((i, step, address))
+            fired += 1
+            d0 = m.resume()
+            for j in range(step, 4):
+                model.step(j)
+            want = [write] + model.writes()
+        assert masked(m.psg) == masked(want), \
+            "frame %d: the frame writes %s, not %s" % (f, m.psg, want)
+        if d0 != 0:
+            break                       # the tune has ended (4.6)
+        timers.apply(m.mfp)
+        for k in timers.due(clocks):
+            write, _ = model.tick(k)
+            m.interrupt(TIMER[k]["vector"])
+            assert masked(m.psg) == masked([write]), \
+                "frame %d: a tick of effect %d wrote %s, not %s" % (f, k, m.psg, [write])
+            timers.apply(m.mfp)
+    return fired
+
+
 def check(ym, code, symbols, cycles=None, kit=False, perf=False):
     """The tune on the player, against the model frame by frame and tick
     by tick; with kit, each frame against the reader's entry as well,
@@ -746,7 +905,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init took a bound tune of version %d" % (BOUND_VERSION + 1)
-        return 0, 0, [], {}, 0, (0, 0, 0, [])
+        return 0, 0, [], {}, 0, (0, 0, 0, []), 0
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
@@ -767,6 +926,17 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             assert timers.enabled(i), "effect %d's timer is not enabled" % i
             assert m.long(TIMER[i]["vector"]) == CODE + symbols["ymxr_tick%d" % i], \
                 "effect %d's vector" % i
+            # A tick of a timer no row has started (SPEC.md 5.2.1): init
+            # leaves the place at a marker and the register at R0, so such
+            # a tick writes $80 to R0 and stops the timer. Rule 4(c) keeps
+            # a tune clear of one, and one here leaves the player as init
+            # left it: the place stands and the timer was stopped already.
+            m.interrupt(TIMER[i]["vector"])
+            assert m.psg == [(0, 0x80)], \
+                "effect %d: a tick with no source connected wrote %s" % (i, m.psg)
+            timers.apply(m.mfp)
+            assert timers.mode[i] == 0, \
+                "effect %d: a tick with no source connected left its timer running" % i
     ticks = 0
     tick_cost = {}
     tick_cycles = 0                     # every tick's instructions
@@ -922,6 +1092,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             else:
                 at = CODE + symbols["ymxr_tick%d" % i]
                 assert m.long(at + TICK_PTR) == model.place_address(i), "frame %d: after a tick effect %d's place is off" % (f, i)
+    boundaries = inside(code, symbols, bound, tune, workspace)
     m.call("stop", a0=workspace)
     timers.apply(m.mfp)
     for i in range(4):
@@ -929,7 +1100,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False):
             assert timers.mode[i] == 0 or i == 3, "stop left effect %d's timer running" % i
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "stop moved Timer C's nibble"
     return (frames, ticks, cost, tick_cost, tick_cycles,
-            (costliest[0], tune.R, tune.RR, advance))
+            (costliest[0], tune.R, tune.RR, advance), boundaries)
 
 
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+) .* pc=([0-9a-f]+)")
@@ -1059,10 +1230,11 @@ def hatari(ym, code, symbols, perf=False):
     counted = [0, 0, 0, 0]
     expected = [0, 0, 0, 0]
     # The frame procedure runs early in a VBL: the four effect steps in
-    # order, then every chip write of the row. A tick may land anywhere
-    # between, and reads the effects stepped before it as the row leaves
-    # them and the ones after it as they were, so the model is stepped one
-    # effect at a time and the trace says how far the procedure has got.
+    # order, then every chip write of the row. A tick falls between any
+    # two of those operations (SPEC.md 4.2.1), and reads the effects
+    # stepped before it as the row leaves them and the ones after it as
+    # they were, so the model is stepped one effect at a time and the
+    # trace says how far the procedure has got.
     # Each step programs one timer, so a write to an effect's control
     # or data register places that step, and the frame's first chip write
     # places all four.
@@ -1396,9 +1568,11 @@ def main():
                 frames, ticks = hatari(ym, code, symbols, perf)
                 print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
                 continue
-            frames, ticks, cost, tick_cost, tick_cycles, where = check(
+            frames, ticks, cost, tick_cost, tick_cycles, where, boundaries = check(
                 ym, code, symbols, cycles_of and CyclesOn(cycles_of), kit, perf)
             line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
+            if boundaries:
+                line += ", a tick at %d boundaries of the frame" % boundaries
             if kit:
                 line += ", the player's frames are the reader's entries"
             if cost and perf:

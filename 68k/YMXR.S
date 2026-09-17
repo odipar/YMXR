@@ -751,7 +751,8 @@ YMXR_init:
                 dbra    d2,.site
 
 ; The tick handlers: each one's step and loop operands name a
-; separate pair of cells, and its place is parked on a marker until a start.
+; separate pair of cells, its place is parked on a marker until a start,
+; and the register it selects is R0 until a start aims it (SPEC.md 5.2.1).
                 lea     ymxr_tick0(pc),a5
                 bsr     ymxr_link
                 lea     ymxr_tick1(pc),a5
@@ -912,7 +913,8 @@ ymxr_link:
                 clr.l   TICK_CELL(a5)
                 lea     ymxr_park(pc),a3
                 move.l  a3,TICK_PTR(a5)
-                rts
+                clr.b   TICK_SEL(a5)            ; R0, the register of the kept
+                rts                             ; target init leaves (SPEC.md 5.2.1)
 
 YMXR_stop:
                 move.l  a6,-(sp)
@@ -1156,7 +1158,7 @@ PICK_SQ         equ     ymxr_tick0_square-ymxr_tick0_pick-2
 PICK_ONE        equ     ymxr_tick0_one-ymxr_tick0_pick-2
 PICK_BOTH       equ     ymxr_tick0_shaped-ymxr_tick0_pick-2
 
-; A parked place: a marker with no loop cell, so a stray tick stops its
-; timer.
+; A parked place: a marker with no loop cell, so a tick of a timer no row
+; has started writes $80 to R0 and stops its timer (SPEC.md 5.2.1).
 ymxr_park:      dc.b    $80
                 .even
