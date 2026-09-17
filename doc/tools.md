@@ -714,6 +714,19 @@ register as it is. A tune that fails is named and the run continues.
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
 
+**17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
+program of twelve subtunes, each writing the number it is to R0, starts
+Hatari with a command fifo and a trace of the chip writes, and presses the
+keys of BINARIES.md 4.6 step 4 through the fifo: RIGHT and DOWN step on,
+LEFT and UP step back, both wrap, two digits typed inside the pause reach
+subtune 12, and a digit no second can grow starts at once. The trace says
+which subtune plays, so each check reads what the chip was written rather
+than what a sleep hoped for. Hatari ends the run itself at a VBL count,
+with no dialog to answer, and a run that outlives it is killed. `--keep`
+leaves the work directory, and `HATARI` and `TOS` name the emulator and a
+TOS image as 16.3 reads them; a missing one is exit 2, a key that lands on
+another subtune exit 1.
+
 `YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs the two
 built tunes at `-frames24` on every build.
 
