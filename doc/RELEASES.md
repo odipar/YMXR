@@ -33,6 +33,29 @@ the tools rather than either.
 
 ## Published
 
+### 0.3.24, 2026-09-17
+
+<https://github.com/odipar/YMXR/releases/tag/v0.3.24>, built from the commit
+tagged `v0.3.24`.
+
+A rig that presses the program's keys. Every file under `src/main`, `go/`
+and `68k/` stands as v0.3.23 has it, so the tools and the player are that
+release's and the forty files the ten dumps under `ym/test` convert to are
+byte for byte 0.3.23's.
+
+- **`ym/keys.py` presses the keys BINARIES.md 4.6 step 4 defines**, which
+  no check pressed before: the correction to `ym/play.sh` in 0.3.21 was
+  read out of `68k/YMXR_prg.S` rather than run. The rig writes a program of
+  twelve subtunes, each writing the number it is to R0, starts Hatari with
+  a command fifo and a trace of the chip writes, and presses keys through
+  it. RIGHT and DOWN step on, LEFT and UP step back, both wrap, two digits
+  typed inside the pause reach subtune 12, and a digit no second can grow
+  starts at once.
+- The trace says which subtune plays, so each check waits for the chip
+  rather than for a sleep, and Hatari ends the run itself at a VBL count
+  with `--fast-boot` on: eleven seconds a run, with no dialog to answer and
+  no emulator left behind. tools.md 17.2 defines it.
+
 ### 0.3.23, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.3.23>, built from the commit
