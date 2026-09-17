@@ -14,10 +14,10 @@
 # beside it as a PNG of the same name.
 #
 # Several tunes go into one file, a subtune each in the order named, and
-# the program picks between them on the keys 1 to 9. Each is named by its
-# file, and an SNDH file records one rate, so a set whose tunes do not
-# share one gets a line on stderr and no file. A tenth tune and past it
-# play only under a host that selects a subtune by number.
+# the program picks between them with the arrow keys or a number typed,
+# one digit or two (BINARIES.md 4.6). Each is named by its file, and an
+# SNDH file records one rate, so a set whose tunes do not share one gets a
+# line on stderr and no file.
 #
 # The converter's options, which a tune file is packed already and needs
 # none of:
@@ -234,9 +234,6 @@ while [ "$left" -gt 0 ]; do
         set -- "$@" "$file"
     fi
 done
-if [ "$tunes" -gt 9 ]; then
-    echo "ym/play.sh: $tunes tunes, and the program's keys reach subtune 9" >&2
-fi
 # The tune files into one multi file, which an SNDH file of several
 # subtunes is made from (BINARIES.md 0); one tune goes in as the
 # tune file it is.
