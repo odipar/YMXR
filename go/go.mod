@@ -7,7 +7,7 @@ go 1.26
 // releases the pom names for their Java artifacts.
 require (
 	github.com/odipar/dtx/go v0.11.7
-	github.com/odipar/ymxs/go v0.3.5
+	github.com/odipar/ymxs/go v0.3.6
 )
 
 require github.com/odipar/st4/go v0.1.7 // indirect
