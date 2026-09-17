@@ -887,6 +887,40 @@ def inside(code, symbols, bound, tune, workspace):
     return fired
 
 
+def unplaced(code, symbols):
+    """A start that moves no place, and no start on that timer before it:
+    the place is row 0 of the source the row names (SPEC.md 4.1 step 4).
+
+    No conversion of a dump writes such a row - rule 3 of SPEC.md 6 has a
+    start set bit 5 of the control column with it, and its one exception
+    needs a source started before - so the tune is written here through
+    YMXS's form, which ymxs-to-ymxr warns about and converts. The model
+    reads the place as row 0 and check reads the player against it.
+    """
+    rows = 8
+    def column(at, value):
+        return [value if r == at else -1 for r in range(rows)]
+    tune = {"format": "ymxs", "version": 3, "tunes": [{
+        "title": "A start that moves no place", "composer": "",
+        "writer": "68k/test/emu/test_ymxr.py", "rate": 50, "rows": rows,
+        "repeat": 0,
+        "sources": [{"name": "four rows", "repeat": 0, "values": [9, 10, 11, 12]}],
+        "registers": {"r7": column(0, 56), "r0": column(0, 100)},
+        "timerA": {"shape": column(0, 0), "target": column(0, 8),
+                   "source": column(0, 1), "prescaler": column(0, 50),
+                   "count": column(0, 200), "timerReset": column(0, 1),
+                   "placeReset": column(0, 0)}}]}
+    work = tempfile.mkdtemp()
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxs-to-ymxr"), "-silent"],
+                       input=json.dumps(tune).encode(), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    at = os.path.join(work, "unplaced.ymxr")
+    with open(at, "wb") as f:
+        f.write(r.stdout)
+    frames = check(at, code, symbols)[0]
+    return "a start that moves no place stands at row 0: %d frames" % frames
+
+
 def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
     """The tune on the player, against the model frame by frame and tick
     by tick; with kit, each frame against the reader's entry as well,
@@ -1714,6 +1748,7 @@ def main():
         print("the SNDH core: %d bytes, $60 kept and put back"
               % core(defines, tunes[0]))
         print("    %s" % patched_code_follows_the_subtune(defines, tunes))
+        print("    %s" % unplaced(code, symbols))
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
     cycles_of = None

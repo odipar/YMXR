@@ -236,11 +236,11 @@ idle, and the place is left as it is.
 **1.8.4** A start places the source: where the row sets the control
 column with bit 5 at 1, the place is row 0; otherwise the place keeps its
 row number, which is then a row number of the source started (YMXS,
-SPEC.md 3.4.3). A start sets the rate where the row sets the control
-column or the count column (1.9), and leaves the timer counting at the
-kept select and count where it leaves both unset: a row that connects a
-second source to a running timer at the rate it counts sets the source
-column alone.
+SPEC.md 3.4.3); before the first start on the timer that number is 0 (4.1
+step 4). A start sets the rate where the row sets the control column or
+the count column (1.9), and leaves the timer counting at the kept select
+and count where it leaves both unset: a row that connects a second source
+to a running timer at the rate it counts sets the source column alone.
 
 **1.8.5** A stopped timer starts at the write of a select (1.9.4), bit 6
 of the control column 1 or 0; rule 3 fixes the value a writer sets.
@@ -495,10 +495,10 @@ frame rate (3.3). The player, in order:
 2. Read R and RR of the tune's table and the effects used.
 3. Resolve each source of the source index: its first row, and its loop
    row, row RR where it repeats and the end where it plays once (3.1.4).
-4. Set the kept target, select and count of each effect to 0; a tick
-   before the first start on a timer writes the register of the target
-   this leaves (5.2.1). The place of each timer before its first start
-   with bit 5 at 1 is left to a later version (section 8).
+4. Set the kept target, select and count of each effect to 0, and the
+   place of each timer to 0, the row number a start that moves no place
+   keeps (1.8.4); a tick before the first start on a timer writes the
+   register of the target this leaves (5.2.1).
 5. Read row 0, the current row.
 6. At interrupt level 7, for each effect i the effects used names, 0 to
    3 in order, claim its timer (2.3.3).
@@ -970,9 +970,10 @@ W is other than 1 or whose variant is other than 2 (3.3.3).
 **8.3** A source of more than one column or of values wider than a byte
 (3.1.3), and a source whose RR is above R.
 
-**8.4** The place of a timer before its first start with bit 5 at 1, and
-the row a tick reads where the place is outside the rows of the source
-connected (1.8.4; YMXS, SPEC.md 8.4).
+**8.4** The row a tick reads where the place is outside the rows of the
+source connected (1.8.4; YMXS, SPEC.md 8.4). A start that leaves bit 5 at
+0 names a source of the row count of the one last started (rule 3(a)), so
+a tune under the rules leaves the place inside them.
 
 **8.5** The unassigned bits and values: select 0 and bit 3 of a control
 column (1.9.2), bits 5 and 4 of a coarse column (1.2.2), bits 6 and 5 of
