@@ -288,6 +288,32 @@ final class ParityTest {
     }
 
     /**
+     * A tune file whose table stands outside it, and one whose table is
+     * another variant, read in both trees. SPEC.md 3.3.4 has a line for
+     * each; the Java tree took the bytes through the offset before any
+     * check, so a file written wrong ended in the exception the copy threw
+     * where the Go tree reported the line.
+     */
+    @Test
+    void aFileWrittenWrongIsOneLineInBothTrees() throws Exception {
+        byte[] dump = Files.readAllBytes(dumps().get(0));
+        byte[] file = ran(Path.of("bin"), "ym-to-ymxr", dump, "-silent").out();
+        int tableAt = Tune.getLong(file, Tune.TABLE_AT);
+        byte[] far = file.clone();
+        Tune.putLong(far, Tune.TABLE_AT, file.length + 8);
+        byte[] variant = file.clone();
+        variant[tableAt + 3] = 1;
+        for (byte[] wrong : List.of(far, variant)) {
+            Ran java = ran(Path.of("bin"), "ymxr-trace", wrong, "-silent");
+            Ran go = ran(built(), "ymxr-trace", wrong, "-silent");
+            assertEquals(1, java.exit(), "the reader reports it: " + java.said());
+            assertEquals(java.exit(), go.exit(), "both trees exit the same: " + go.said());
+            assertEquals(steady(java.said()), steady(go.said()), "both write one line");
+            assertEquals(0, java.out().length, "a file written wrong has no record");
+        }
+    }
+
+    /**
      * {@code bin/ymxr-set} against the calls it stands for. The script
      * converts each dump, puts the tune files in one multi file, makes an
      * SNDH file around them and writes the program of the stub in front

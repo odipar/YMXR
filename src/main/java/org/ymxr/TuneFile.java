@@ -26,12 +26,34 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
         int count = file[Tune.COUNT_AT] & 0xFF;
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);
         int end = count == 0 ? file.length : Tune.getLong(file, Tune.INDEX_AT);
+        // SPEC.md 3.3.4: each offset of the header is read against the
+        // file's length before a byte is read through it, so a file cut
+        // short or written wrong is a line rather than an exception the
+        // reader's caller sees.
+        if (tableAt < 0 || end > file.length || tableAt > end) {
+            throw new IllegalArgumentException("the table stands at " + tableAt + " to "
+                    + end + ", and the file has " + file.length + " bytes");
+        }
         byte[] dtx2 = Arrays.copyOfRange(file, tableAt, end);
+        int variant = dtx2.length > 3 ? dtx2[3] & 0xFF : 0;
+        if (variant != Dtx.DTX2) {
+            throw new IllegalArgumentException("the table is DTX" + variant
+                    + ", and a tune's table is DTX2 (SPEC.md 3.3.3)");
+        }
         Table table = Dtx.read(dtx2);
+        if (table.columns() != Columns.C || table.width() != 1) {
+            throw new IllegalArgumentException("the table is " + table.columns()
+                    + " columns of " + table.width() + " bytes, and a tune's table is "
+                    + Columns.C + " of one (SPEC.md 3.3.3)");
+        }
         List<Table> sources = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             int at = Tune.getLong(file, Tune.INDEX_AT + 4 * i);
             int to = i + 1 < count ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1)) : file.length;
+            if (at < 0 || to > file.length || at > to) {
+                throw new IllegalArgumentException("source " + (i + 1) + " stands at " + at
+                        + " to " + to + ", and the file has " + file.length + " bytes");
+            }
             Table source = Dtx.read(Arrays.copyOfRange(file, at, to));
             // SPEC.md 3.1: a source is one column of one byte at this
             // version, the row shape 2.1's procedures read. A wider one or one of
