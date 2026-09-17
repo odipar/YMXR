@@ -18,7 +18,9 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        one pass: what a refill spends
                                        outside ST4's decoder and inside it
        test_ymxr.py -hatari [tunes]    the same tunes on a real MFP, under
-                                       Hatari
+                                       Hatari, and the kit's voices beside
+                                       them: no dump converts to a target
+                                       of several registers
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
                                        the monitor moves no chip write
@@ -1483,6 +1485,14 @@ def hatari(ym, code, symbols, perf=False):
     one = symbols["ymxr_one1"] - symbols["ymxr_one0"]
     ones = [(base + symbols["ymxr_one%d" % i], base + symbols["ymxr_one%d" % i] + one)
             for i in range(4)]
+    # and the two handlers of a target that writes several registers, one
+    # an effect the same way (68k/YMXR.S, TICKW)
+    two = symbols["ymxr_two1"] - symbols["ymxr_two0"]
+    twos = [(base + symbols["ymxr_two%d" % i], base + symbols["ymxr_two%d" % i] + two)
+            for i in range(4)]
+    three = symbols["ymxr_three1"] - symbols["ymxr_three0"]
+    threes = [(base + symbols["ymxr_three%d" % i],
+               base + symbols["ymxr_three%d" % i] + three) for i in range(4)]
 
     def where(pc):
         if frame[0] <= pc < frame[1]:
@@ -1492,7 +1502,9 @@ def hatari(ym, code, symbols, perf=False):
         for i in range(4):
             if (ticks[i][0] <= pc < ticks[i][1]
                     or squares[i][0] <= pc < squares[i][1]
-                    or ones[i][0] <= pc < ones[i][1]):
+                    or ones[i][0] <= pc < ones[i][1]
+                    or twos[i][0] <= pc < twos[i][1]
+                    or threes[i][0] <= pc < threes[i][1]):
                 return i
         return None
 
@@ -1585,7 +1597,23 @@ def hatari(ym, code, symbols, perf=False):
             # for either, so they place no source
             return of[0] if of and not stepped[of[0]] else None
 
-        for kind, reg, value in events:
+        def wrote(at, kind, n):
+            """The n writes of one tick of effect `kind`, from event `at`,
+            or None where the trace has other events among them. A handler
+            writes its registers at the interrupt's level, so no tick of
+            another timer falls between two of them."""
+            if at + n > len(events):
+                return None
+            got = []
+            for one in events[at:at + n]:
+                if one[0] != kind:
+                    return None
+                got.append((one[1], one[2]))
+            return got
+
+        at = 0
+        while at < len(events):
+            kind, reg, value = events[at]
             if kind == "mfp":
                 i = owner(reg)
                 if i is not None:
@@ -1603,30 +1631,37 @@ def hatari(ym, code, symbols, perf=False):
                 assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, kind)
                 before = dict(fx)
                 w, then = model.tick(kind)
-                assert len(w) == 1, \
-                    "frame %d: effect %d writes %d registers a tick, and this trace reads" \
-                    " one chip write a tick" % (f, kind, len(w))
-                if not stepped[kind] and masked([(reg, value)]) != masked(w):
+                got = wrote(at, kind, len(w))
+                if not stepped[kind] and (got is None or masked(got) != masked(w)):
                     model.fx[kind] = before    # the tick came after the effect step
                     upto(kind)
                     assert model.fx[kind]["running"], \
                         "frame %d: a tick of effect %d with no source running" % (f, kind)
                     w, then = model.tick(kind)
-                assert masked([(reg, value)]) == masked(w), \
+                    got = wrote(at, kind, len(w))
+                assert got is not None, \
+                    "frame %d: a tick of effect %d writes %d registers and the trace has %s" % (
+                        f, kind, len(w), events[at:at + len(w)])
+                assert masked(got) == masked(w), \
                     "frame %d: a tick of effect %d wrote %s, not %s; the frame's events %s; the row %s" % (
-                        f, kind, (reg, value), w, events, model.playing)
+                        f, kind, got, w, events, model.playing)
                 counted[kind] += 1
+                at += len(w) - 1
+            at += 1
         upto(3)
         if want is None:
             want = model.writes()
         assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
     for f, (events, clocks, stops) in enumerate(frames[first:first + STUB_FRAMES]):
+        was = list(counted)
         replay(events, f)
         played += 1
         timers.apply([(reg, value) for kind, reg, value in events if kind == "mfp"])
         for i in range(4):
-            got = sum(1 for kind, _, _ in events if kind == i)
+            # the ticks replay read, since a tick of a target of several
+            # registers is several writes of the trace
+            got = counted[i] - was[i]
             # a timer its handler stopped ticks only until that write
             want_ticks = timers.expected(i, stops.get(i, clocks))
             expected[i] += want_ticks
@@ -1850,6 +1885,13 @@ def main():
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
+        # No dump converts to a target of several registers, so the kit's
+        # tune of version 4 goes on the end of a run on a real MFP: the
+        # handlers of several registers are read there against the same
+        # model as the rest.
+        if real and not args:
+            tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes",
+                                          "voices.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
