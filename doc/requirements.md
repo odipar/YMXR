@@ -50,7 +50,7 @@ R3.6; one that rests on DTX or YMXS cites the clause it rests on.
 
 ## R1. What DTX defines
 
-DTX, SPEC.md defines these; 0.11.5 is the release the Java tree and the
+DTX, SPEC.md defines these; 0.11.6 is the release the Java tree and the
 Go tree read. Note: they change in that repository.
 
 - **R1.1** A tune's data is a table: `R` rows and `C` columns, every
