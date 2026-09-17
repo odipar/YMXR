@@ -223,13 +223,13 @@ Effect i runs on the timer of 2.3.
 number, 0 to 127 (2.1). A row that sets it makes its value the kept
 target; the kept target is 0 until a row sets it. A row that sets the
 target column alone changes the kept target and leaves the effect
-running as it is: a running effect writes the register of the kept target
+running as it is: a running effect writes the registers of the kept target
 at its start (4.3 step 3).
 
 **1.8.3** The source column: bit 7 the set bit, bits 6 to 0 the source
 number, 0 to 127. A row that sets it to 1 to 127 is a start: from 4.3
 step 3 the timer runs that source of the source index (3.1) on the kept
-target, and each tick writes the register of that target (5.1). A row
+target, and each tick writes the registers of that target (5.1). A row
 that sets it to 0, the byte `$80`, is a stop: the timer stops and is
 idle, and the place is left as it is.
 
@@ -315,6 +315,13 @@ reads the bits it has (4.4). The marker of 3.2 stands in bit 7 of the
 column above, whose register reads seven bits or fewer, and the other
 columns are whole bytes: a source on `setToneA` writes R0 the eight bits
 it reads, where a source on `setR0` has no bit to spare for the marker.
+
+A tick writes the columns in column order and the marker's column last
+(5.1), so a player reads the marker off the last byte it wrote. The order
+of the writes is the player's (YMXS, SPEC.md 3.1.1), with two of them
+fixed there: a tone and a voice name their coarse nibble for the marker,
+so the fine byte stands before it, and a buzzer names its shape, so the
+envelope period stands before it.
 
 **2.1.2** A target of one register runs a source of one column, and one
 of several a source of that many columns (3.1.3; YMXS, SPEC.md 3.2.1).
@@ -593,8 +600,8 @@ order:
 2. Where T is set: the kept target is bits 6 to 0 of T.
 3. Where S is set and bits 6 to 0 are 0: stop the timer (2.3.3). Where S
    is set and bits 6 to 0 are s, 1 to 127: start source s. At interrupt
-   level 7: the register the timer's tick writes is the register of the
-   kept target; the place is row 0 of source s where K is set with bit 5
+   level 7: the registers the timer's tick writes are the registers of
+   the kept target; the place is row 0 of source s where K is set with bit 5
    at 1, and otherwise the row number the place has, in source s; the
    loop row of the tick is the loop row of source s (3.1.4). From this
    step a tick of the timer reads source s.
@@ -674,15 +681,23 @@ Every other timer is left as it is.
 
 ### 5.1 A tick
 
-A tick of a timer running an effect, in order (YMXS, SPEC.md 5.2):
+A tick of a timer running an effect, in order (YMXS, SPEC.md 5.2). The
+target is the effect's kept target at its start (4.3 step 3), and 2.1
+names its registers and the column of the source each is written from
+(2.1.1):
 
-1. Write the number of the register of the effect's kept target at its
-   start (4.3 step 3) to `$FFFF8800`.
-2. Write the byte at the place to `$FFFF8802`, whole (3.2.2).
-3. Where bit 7 of the byte is 0: the place is the row after it.
+1. For each column of the source other than the column 2.1 names for the
+   marker, in column order: write that column's register number to
+   `$FFFF8800`, then the byte at the place in that column to
+   `$FFFF8802`, whole (3.2.2). A source of one column has that column
+   alone, and step 2 writes it.
+2. Write the register number of the marker's column to `$FFFF8800`, then
+   the byte at the place in that column to `$FFFF8802`, whole.
+3. Where bit 7 of the byte written at step 2 is 0: the place is the row
+   after it, in every column.
 4. Where bit 7 is 1, the marker: for a source that repeats, the place is
    row RR; for a source that plays once, stop the timer (2.3.3). The
-   timer is idle, the place stays at row R - 1, and the register keeps
+   timer is idle, the place stays at row R - 1, and each register keeps
    the value written until a row sets it.
 5. Where bit 3 of the vector register `$FFFA17` is 1, software end of
    interrupt: clear the timer's in-service bit (2.3.2).
@@ -1003,10 +1018,11 @@ A player of this version is unconstrained in each item below. A number
 missing from the list is a clause a version has defined, and the numbers
 of the rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 
-**8.2** Targets 14 to 127 (2.1), and a source on `setR0`, `setR2`,
-`setR4`, `setR7`, `setR11` or `setR12` (2.1.1).
+**8.2** Targets 25 to 127 (2.1), `setEnvelope` (2.1.3), and a source of
+one column on `setR0`, `setR2`, `setR4`, `setR7`, `setR11` or `setR12`
+(2.1.2).
 
-**8.3** A source of more than one column or of values wider than a byte
+**8.3** A source of more than three columns or of values wider than a byte
 (3.1.3), and a source whose RR is above R.
 
 **8.4** The row a tick reads where the place is outside the rows of the
