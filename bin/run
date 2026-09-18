@@ -6,21 +6,54 @@
 set -e
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 classes=$root/target/classes
+path=$root/target/classpath
 built=$classes/.built
-# A tool is asked for any of the four cores and for the stub, so all five
-# are looked for.
-missing=
-for core in YMXR_sndh.bin YMXR_sndh-perf.bin YMXR_sndh-lean.bin YMXR_sndh-perf-lean.bin \
-            YMXR_prg.bin; do
-    [ -f "$classes/org/ymxr/68k/$core" ] || missing=1
-done
-if [ ! -f "$built" ] || [ -n "$missing" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]; then
+lock=$root/target/.building
+
+# Whether a build is owed: no build yet, no classpath written, a core not
+# assembled, or a source newer than the last build. A tool is asked for any
+# of the four cores and for the stub, so all five are looked for.
+owed() {
+    for core in YMXR_sndh.bin YMXR_sndh-perf.bin YMXR_sndh-lean.bin \
+                YMXR_sndh-perf-lean.bin YMXR_prg.bin; do
+        [ -f "$classes/org/ymxr/68k/$core" ] || return 0
+    done
+    [ ! -f "$built" ] || [ ! -f "$path" ] \
+        || [ -n "$(find "$root/src/main/java" "$root/pom.xml" \
+        "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]
+}
+
+build() {
     # The build reads standard input, which for a filter has the file
     # to convert, so it reads none.
     (cd "$root" && mvn -q process-classes dependency:build-classpath \
         -Dmdep.outputFile=target/classpath </dev/null >/dev/null)
     : > "$built"
+}
+
+if owed; then
+    # A pipe starts every tool at once, so two of them can owe the same
+    # build. mkdir either makes the directory or does not, so the first
+    # one through builds and the rest wait on it.
+    mkdir -p "$root/target"
+    waited=0
+    while ! mkdir "$lock" 2>/dev/null; do
+        waited=$((waited + 1))
+        if [ "$waited" -gt 180 ]; then
+            echo "run: a build has held $lock for three minutes" >&2
+            exit 2
+        fi
+        sleep 1
+    done
+    trap 'rmdir "$lock" 2>/dev/null || true' EXIT INT TERM
+    # The one that waited may find the build already done.
+    if owed; then
+        build
+    fi
+    rmdir "$lock" 2>/dev/null || true
+    trap - EXIT INT TERM
 fi
+
 class=$1
 shift
-exec java -ea -cp "$classes:$(cat "$root/target/classpath")" "$class" "$@"
+exec java -ea -cp "$classes:$(cat "$path")" "$class" "$@"
