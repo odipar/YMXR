@@ -92,11 +92,11 @@ func Of(tune ymxs.Tune) (Made, error) {
 			column[c][f] = out[c]
 		}
 	}
-	marker, err := markers(rows, sources)
+	marker, runsOn, err := markers(rows, sources)
 	if err != nil {
 		return Made{}, err
 	}
-	built, err := sourceTables(sources, marker)
+	built, err := sourceTables(sources, marker, runsOn)
 	if err != nil {
 		return Made{}, err
 	}
@@ -253,13 +253,15 @@ func effectOf(timer ymxs.Timer) (int, error) {
 //
 // The error names a target this version does not encode, or two targets of
 // one source that name different columns (rule 2(d)).
-func markers(rows []ymxs.Row, sources []ymxs.Source) ([]int, error) {
+func markers(rows []ymxs.Row, sources []ymxs.Source) ([]int, []int, error) {
 	marker := make([]int, len(sources))
+	target := make([]int, len(sources))
 	// unstarted: no row starts the source, so no target names a column and
 	// the marker stands in column 0, as every version before this one
 	// wrote every source.
 	for i := range marker {
 		marker[i] = unstarted
+		target[i] = unstarted
 	}
 	for _, row := range rows {
 		for _, one := range ymxs.Effects(row) {
@@ -268,26 +270,27 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) ([]int, error) {
 				continue
 			}
 			source := ymxs.StartSource(start)
-			target := ymxs.StartTarget(start)
+			runs := ymxs.StartTarget(start)
 			n := indexOf(sources, source)
-			number := ymxs.TargetNumber(target)
+			number := ymxs.TargetNumber(runs)
 			if number >= len(ymxr.Marker) {
-				return nil, fmt.Errorf("the source %s runs on %s, a target this version"+
-					" leaves to a later one (SPEC.md section 8)", ymxs.SourceName(source),
-					ymxs.TargetName(target))
+				return nil, nil, fmt.Errorf("the source %s runs on %s, a target this"+
+					" version leaves to a later one (SPEC.md section 8)",
+					ymxs.SourceName(source), ymxs.TargetName(runs))
 			}
 			// -1: the target's register fills its byte, so the rows carry no
 			// marker and a player counts them (SPEC.md 3.1).
 			at := ymxr.Marker[number]
 			if marker[n] != unstarted && marker[n] != at {
-				return nil, fmt.Errorf("the source %s runs on targets that mark column"+
-					" %d and column %d, and a source has one marker column (SPEC.md"+
-					" rule 2(d))", ymxs.SourceName(source), marker[n], at)
+				return nil, nil, fmt.Errorf("the source %s runs on targets that mark"+
+					" column %d and column %d, and a source has one marker column"+
+					" (SPEC.md rule 2(d))", ymxs.SourceName(source), marker[n], at)
 			}
 			marker[n] = at
+			target[n] = number
 		}
 	}
-	return marker, nil
+	return marker, target, nil
 }
 
 // unstarted marks a source no row starts, which no target names a marker
@@ -297,11 +300,18 @@ const unstarted = -1 << 30
 // sourceTables is the sources as tables of this format: a column a value of
 // the row, bit 7 set on the last row of the marker's column (SPEC.md 3.2),
 // and the row the source repeats to, its row count where it plays once.
-func sourceTables(sources []ymxs.Source, marker []int) ([]ymxr.Source, error) {
+func sourceTables(sources []ymxs.Source, marker, target []int) ([]ymxr.Source, error) {
 	var out []ymxr.Source
 	for n, source := range sources {
 		values := ymxs.SourceRows(source).Rows
 		counted := marker[n] == -1
+		// A tick of a counted source on setR7 writes the row whole, so the
+		// two port directions stand in the source rather than in the
+		// player (SPEC.md rule 2(f)).
+		ports := 0
+		if counted && target[n] == ymxr.MixerTarget {
+			ports = ymxr.Ports
+		}
 		at := marker[n]
 		if counted || at == unstarted {
 			at = 0
@@ -325,7 +335,7 @@ func sourceTables(sources []ymxs.Source, marker []int) ([]ymxr.Source, error) {
 					return nil, fmt.Errorf("the source %s has the value %d in row %d of"+
 						" column %d, and %s", ymxs.SourceName(source), value, r, c, said)
 				}
-				columns[c][r] = byte(value)
+				columns[c][r] = byte(value | ports)
 			}
 		}
 		if !counted {

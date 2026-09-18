@@ -174,8 +174,10 @@ column unset, and the row that stops the effect may set it (rule 1).
 
 **1.4.2** Bits 7 and 6 of R7 are the directions of the two I/O ports
 (YMXS, SPEC.md 2.4, 8.8). A player writes both as 1 on every write of R7
-(4.4 step 5), the directions of an Atari ST; a reader reports bits 5 to
-0 (7.3).
+a row makes (4.4 step 5), the directions of an Atari ST; a reader reports
+bits 5 to 0 (7.3). A tick of a counted source on `setR7` writes the row
+whole (5.1), so the two bits stand in the source, where a writer sets
+them (rule 2(f)).
 
 ### 1.5 Noise period
 
@@ -821,6 +823,11 @@ numbers the maps assign.**
   of every other target writes a register that reads seven bits or
   fewer, and every column beside it is a whole byte, as is every column
   of a counted source (3.1.6).
+- 2(f) A counted source on `setR7` has bits 7 and 6 of every row set, the
+  directions of the two I/O ports (1.4.2): a tick writes the row whole,
+  so a writer sets the two bits where a row's write reads them from the
+  player. The structure's value for such a row is the mixer's six bits,
+  0 to 63 (YMXS, SPEC.md 5.1).
 
 **Rule 3: a start sets bit 5 of the control column with it, with one
 exception, and sets bit 6 where the timer is stopped** (YMXS rules 3
