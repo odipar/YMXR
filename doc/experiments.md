@@ -378,3 +378,33 @@ stopped and bit 5 alone moves the place.
    says which is which: "a fresh square restarts at phase zero … Retunes
    and resumes never come here". Reading the fresh-start routine and
    applying its rule to every start put the defect here.
+
+---
+
+## The targets of several registers, heard
+
+A target of several registers (SPEC.md 2.1) writes a voice from one
+effect where version 3 needs one effect a register. Whether the tune that
+comes out is the same music is a question about sound, so the three forms
+were heard side by side. `dist/ab/AB.PRG` plays one piece three ways, a
+subtune each, 1,536 rows at 50 Hz: two timers under version 3, one
+`setVoiceA`, and one `setToneA` with the fine byte beside the coarse
+nibble. Under Hatari the three sound the same.
+
+The records agree as far as they reach. Each has 3,072 frames (SPEC.md 7),
+and 3,024 of them are equal byte for byte across the three. The 48 that
+differ are the 48 that start a timer, and in each the difference is R0
+alone: under version 3 the frame writes the tone's fine byte at a section's
+first row, and under a target of several registers the first tick of the
+effect starting there writes it. At select 4 and count 96, the rate these
+subtunes run their effects at, a tick is every 1.95 ms.
+
+A record leaves the ticks out (YMXS, SPEC.md 7.1), and the ticks are where
+the three forms differ most: one tick writing R0, R1 and R8 stands where
+two ticks on two timers wrote R1 and R8 and a frame wrote R0. That
+difference stands below the record, and the listening reaches it.
+
+The three tune files stand beside the program: 3,356 bytes under version 3,
+3,108 for `setVoiceA` and 3,116 for `setToneA`, 24 sources against 48, and
+one timer claimed against two, which leaves a timer for the tune to use.
+`dist/` is outside the repository, as `YM_CORPUS` is.
