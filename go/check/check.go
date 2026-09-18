@@ -18,7 +18,7 @@ import (
 // Most is the wrong frames listed for one tune, at most.
 const Most = 20
 
-// Of is what is wrong with the dump's conversion at the tool's flags, or
+// Of lists what is wrong with the dump's conversion at the tool's flags, or
 // an empty list where every frame replays to the dump: the tune's rows are
 // stepped through one pass and the loop once, as the kit's record runs
 // (SPEC.md 7), each row checked against its frame of the dump.

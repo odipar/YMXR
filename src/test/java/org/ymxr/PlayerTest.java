@@ -209,7 +209,7 @@ final class PlayerTest {
         // The raster monitor burns a bar for the ticks' counted cost
         // (68k/YMXR.S, YMXR_PERF), and a count is the path's cycles with
         // what the two switches add, rounded to the nearest turn of ten.
-        // The player's figure for a path is what it costs with neither
+        // The player's figure for a path is its cost with neither
         // the level dropped nor an end of interrupt written, which is
         // performance.md's lean column, and the two switches add back
         // what its other column measures.

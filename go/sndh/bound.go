@@ -82,7 +82,7 @@ type Set struct {
 // Bind is the set of tunes bound with as few images as the figures allow.
 func Bind(tuneFiles [][]byte) (Set, error) {
 	// A tune joins the first group whose image would carry its table: the
-	// packager reads a table that does not fit, so the key is what it
+	// packager reads a table that does not fit, so the key names what it
 	// reads it against.
 	var groups [][]int
 	var keys []string

@@ -137,7 +137,7 @@ final class BinariesTest {
     /**
      * The five under {@code go/binaries/data} are the five the classes
      * carry. A Go module fetched by its import path contains the files a
-     * commit has in it, so those are what a Go executable embeds, and a
+     * commit has in it, so a Go executable embeds those, and a
      * stale one would put another core under a tune.
      */
     @Test

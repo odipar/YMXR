@@ -42,7 +42,7 @@ var (
 // MFP is the timer chip's clock, in ticks a second.
 const MFP = 2457600
 
-// Prescaler is what each select divides that clock by (SPEC.md 1.9).
+// Prescaler is the number each select divides that clock by (SPEC.md 1.9).
 var Prescaler = [8]int{0, 4, 10, 16, 50, 64, 100, 200}
 
 // Columns is a tune's thirty columns, one byte a column a frame: the

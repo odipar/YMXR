@@ -216,7 +216,7 @@ final class ConversionTest {
         byte[] source = file.clone();
         Tune.putLong(source, Tune.INDEX_AT + 4 * (count - 1), file.length + 4);
         // source N - 1 ends where source N begins, so the line is its
-        // own: the reader reports the first condition in the order of
+        // alone: the reader reports the first condition in the order of
         // SPEC.md 3.3.4's table
         int before = Tune.getLong(file, Tune.INDEX_AT + 4 * (count - 2));
         assertEquals("source " + (count - 1) + " stands at " + before + " to "
@@ -247,7 +247,7 @@ final class ConversionTest {
         // separate literal stream, which packs a small ring far smaller
         // (DTX, dtx-write). The format block's byte 3 records it, and the binder
         // reads that byte to pick the reader that reads such a table, so a
-        // table packed one way and read the other is what this separates.
+        // table packed one way and read the other, which this separates.
         byte[] dump = Files.readAllBytes(Path.of("ym/test/DBA 5.ym"));
         byte[] plain = YmToYmxr.convert(dump, List.of(), new Report()).written().file();
         byte[] copies = YmToYmxr.convert(dump, List.of("-copies"), new Report())

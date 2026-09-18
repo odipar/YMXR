@@ -8,7 +8,7 @@ import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 
-/** The two built dumps under {@code ym/test} are what {@link BuiltTunes}
+/** The two built dumps under {@code ym/test}, which {@link BuiltTunes}
  *  builds, so a file and the account of how it is made stay one thing. */
 final class BuiltTunesTest {
 

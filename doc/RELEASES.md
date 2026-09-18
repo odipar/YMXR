@@ -348,7 +348,7 @@ DTX 0.11.5, in the pom and in `go.mod`, so the ST4 under this tune comes
 from ST4 go/v0.1.5 rather than from a commit no release had reached.
 
 **No byte of this release differs from 0.3.18's.** DTX 0.11.5 is 0.11.4's
-bytes, so a tune file, an SNDH and a program are what 0.3.18 wrote. The
+bytes, so a tune file, an SNDH and a program read as 0.3.18 wrote them. The
 chain reads end to end now, each link naming a release: ST4 go/v0.1.5, DTX
 0.11.5, this.
 
@@ -387,7 +387,7 @@ The format is unchanged.
   reads from, and one that fills the gap between a literal run and the one
   after it. A column packed with a search of a second writes 1.20 per cent
   fewer bytes, and of three seconds 2.77.
-- The converters here pack without seconds, so what a tune weighs is what
+- The converters here pack without seconds, so a tune weighs what
   it weighed. The gain is for a caller that spends the seconds.
 
 ### 0.3.16, 2026-09-16
@@ -688,7 +688,7 @@ tagged `v0.3.6`.
 
 The program a tool writes lists its subtunes, walks them and plays on to
 the next. The player and the four cores are unchanged, so a tune file and
-a bound tune are what 0.3.5 wrote, both version 3, and the program stub
+a bound tune read as 0.3.5 wrote them, both version 3, and the program stub
 is 1,682 bytes against 836.
 
 - **The set is on the screen, one subtune a line**: its number and the
@@ -775,7 +775,7 @@ SPEC.md 6 where its errors already stood. `Ymxs.read` and `flags.Read`
 call them, which is the one place each tree reads a structure, so
 `ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg` name a fault a writer left
 in rather than converting in silence. `-silent` does not quiet a warning:
-that flag is about what a tool reports of its work, and a warning is what
+that flag is about what a tool reports of its work, and a warning reports what
 the tune gets wrong.
 
 What YMXS 0.3.1 reads that 0.3.0 did not:
@@ -833,7 +833,7 @@ wrote, byte for byte.
   keypress away.
 - The banner named SPACE alone, where ESC has stopped the program since
   the stub was written. It names both. The rows field of the stub's
-  descriptor is what it always was, and 0 in it means what the stub always
+  descriptor reads as it always did, and 0 in it means what the stub always
   did with it: play on. Every document and both trees called that "the
   tune's row count", which was true only of a tune that plays once.
 - SPEC.md 4 defines what reaches the chip, which section 7 defined for a
@@ -924,7 +924,7 @@ round.
 **A spurious interrupt on real hardware is not fixed here.** A player that
 changes a timer's parameters while an interrupt on that timer is live
 races the 68000's acknowledge, and the remedy is a dummy handler at vector
-`$60`. This release is what the fault is measured against.
+`$60`. The fault is measured against this release.
 
 ### 0.3.0, 2026-09-11
 
@@ -1004,7 +1004,7 @@ tree fails the build.
 Every file a tool writes is unchanged: a tune file, an SNDH file or a
 program from 0.1.1 is byte for byte what 0.1.2 writes, and the five
 68000 binaries an executable contains are the same bytes. The report is
-what moved.
+the one field that moved.
 
 ### 0.1.1, 2026-09-11
 

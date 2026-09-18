@@ -75,7 +75,7 @@ final class Sources {
 
     /** The number of the source a slot names, built on first use, or 0
      *  where the slot names none: a dropped kind, a digidrum the file does
-     *  not hold, or one past the ceiling. */
+     *  not have, or one past the ceiling. */
     int number(Effects.Slot slot, Report report) {
         int data = slot.kind() == Effects.DRUM ? slot.data() & 31 : slot.data() & 15;
         if (slot.kind() == Effects.SINUS) {

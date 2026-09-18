@@ -2,7 +2,7 @@
 // writes the YMXS structure as JSON on standard output.
 //
 // The first stage of every conversion here (doc/ymxs.md). What comes out
-// is what ym-to-ymxr converts through, so ym-to-ymxs | ymxs-to-ymxr writes
+// is the structure ym-to-ymxr converts through, so ym-to-ymxs | ymxs-to-ymxr writes
 // the tune file that tool writes.
 //
 // -r produces a tune that plays once, and -rROW one that repeats to that

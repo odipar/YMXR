@@ -91,7 +91,7 @@ func Drums(drums [][]byte, fourBit bool) *Sources {
 
 // Number is the number of the source a slot names, built on first use, or
 // 0 where the slot names none: a dropped kind, a digidrum the file does
-// not hold, or one past the ceiling. The three counts are the caller's
+// not have, or one past the ceiling. The three counts are the caller's
 // report.
 func (s *Sources) Number(kind, given int, sinus, missing, overflow *int) int {
 	data := given & 15

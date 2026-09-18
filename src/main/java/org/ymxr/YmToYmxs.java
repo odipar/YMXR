@@ -13,7 +13,7 @@ import org.ymxs.tool.Tool;
  * YMXS structure as JSON on standard output.
  *
  * <p>The first stage of every conversion here (doc/ymxs.md). What comes
- * out is what {@code ym-to-ymxr} converts through, so
+ * out is the structure {@code ym-to-ymxr} converts through, so
  * {@code ym-to-ymxs | ymxs-to-ymxr} writes the tune file that tool
  * writes.
  *

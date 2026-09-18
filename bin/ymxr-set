@@ -8,7 +8,7 @@
 # file, an SNDH file is made around it and the program stub is put in
 # front of that: the four calls README.md, Converting and playing, lists,
 # run for you. The subtunes stand in the order named, each under the
-# dump's song name, or under the i-th -nNAME where one is given
+# dump's song name, or under the i-th -nNAME where one stands
 # (tools.md 11.1).
 #
 # The tools are the Go tree's (tools.md 19.3), built with `go build` into
@@ -26,7 +26,7 @@
 #
 # The set's (tools.md 11.1):
 #
-#   -nNAME     the name of the i-th subtune, for the i-th -n given
+#   -nNAME     the name of the i-th subtune, for the i-th -n named
 #
 # The SNDH file's (tools.md 12):
 #
@@ -72,7 +72,7 @@ help=
 # The flags read off, and the names left in the positional parameters:
 # each argument is shifted off and a name put back at the end, so the
 # loop reaches every argument once and what remains is the names in the
-# order they were given.
+# order they were named.
 left=$#
 while [ "$left" -gt 0 ]; do
     arg=$1
@@ -107,7 +107,7 @@ for arg in "$@"; do
     case $arg in -n*) ;; *) dumps=$((dumps + 1)) ;; esac
 done
 if [ "$dumps" -eq 0 ]; then
-    # standard output carries the program, so a wrong call writes on
+    # standard output has the program, so a wrong call writes on
     # standard error and leaves it empty.
     sed -n '2,/^[^#]/p' "$0" | sed '$d' | cut -c3- >&2
     exit 2
@@ -132,9 +132,9 @@ if [ ! -f "$built" ] || [ -n "$(find "$root/go" \
 fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-# Each dump converted into a separate directory, so two dumps of one name
+# Each dump converted into a directory beside the rest, so two dumps of one name
 # convert beside each other, and the -nNAME flags kept in the order they
-# were given: ymxr-multi reads the i-th as the name of the i-th tune
+# were named: ymxr-multi reads the i-th as the name of the i-th tune
 # file, and reads them after the files.
 : > "$work/names"
 at=0

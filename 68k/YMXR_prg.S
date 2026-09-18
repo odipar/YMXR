@@ -77,7 +77,7 @@ LIST_WIDE       equ     96
 LIST_ROWS       equ     18
 
 ; The columns the line that says which subtune plays leaves a name: the
-; screen's, less "playing NN/NN  " and the column an auto-wrap would take.
+; screen's, less "playing NN/NN  " and the column an auto-wrap would use.
 SAYING_LESS     equ     16
 
 stub:           bra.w   main
