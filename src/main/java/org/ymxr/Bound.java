@@ -27,8 +27,8 @@ import org.jspecify.annotations.Nullable;
  *  16      4      where the image begins, signed
  *  20      4      where this tune's table stands, from the image's first byte
  *  24      4S     the source index: where source 1 to S's DTX1 table begins
- *          ..     the image, on a long
  *          ..     the DTX1 tables, each on a long
+ *          ..     the image, on a long
  * </pre>
  *
  * Every offset counts from the first byte.
@@ -169,15 +169,19 @@ final class Bound {
                     : tuneFile.length;
             tables[i] = Arrays.copyOfRange(tuneFile, at, to);
         }
+        // The DTX1 tables first and the image after them, so that a
+        // source's rows stand beside the header however long the image is:
+        // a player whose ticks read a row through a displacement reaches
+        // 32,767 bytes (68k/YMXR.S, YMXR_PCREL).
         int here = Tune.align(INDEX_AT + 4 * count);
-        int imageAt = image == null ? 0 : here;
-        if (image != null) {
-            here = Tune.align(here + image.length);
-        }
         int[] sourceAt = new int[count];
         for (int i = 0; i < count; i++) {
             sourceAt[i] = here;
             here = Tune.align(here + tables[i].length);
+        }
+        int imageAt = image == null ? 0 : here;
+        if (image != null) {
+            here = Tune.align(here + image.length);
         }
         byte[] bound = new byte[here];
         System.arraycopy(tuneFile, 0, bound, 0, Tune.TABLE_AT);

@@ -27,6 +27,10 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -kit [tunes]       the conformance kit's tune files, the
                                        player's frames against the reader's
                                        entries a frame at a time
+       test_ymxr.py -pcrel [tunes]     the player built with YMXR_PCREL=1,
+                                       whose ticks read a row through a
+                                       displacement (68k/YMXR.S): the same
+                                       model, and it joins the switches above
 
 The fixtures under ym/test are chosen for the shapes a tune has, one of
 each; -corpus reads the corpus instead, which no fixture was chosen for. A
@@ -104,6 +108,11 @@ PERF_BAR = 0x0770
 # returns to.
 CODE = 0x1000
 FILE = 0x10000 + 2
+# Where a tune is loaded under -pcrel: a tick reads its row through a
+# signed word displacement from the handler, so the tune stands within
+# 32,767 bytes of the code, as an SNDH file and a program lay it out
+# (doc/BINARIES.md 2 and 3).
+PCREL_FILE = 0x5000 + 2
 WORK = 0x40000
 STACK = 0x80000
 DONE = 0x90000
@@ -199,6 +208,11 @@ def equate(name, symbols=None):
 # stands at; and a one-row source handler's, the same two. Every offset
 # is measured off its handler's labels, so they stand once the
 # player is assembled (main).
+# The player assembled with YMXR_PCREL=1: a handler reads its row through
+# a displacement from the instruction that reads it, and the rig reads the
+# place the same way (-pcrel).
+PCREL = False
+
 TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = ONE_SEL = ONE_VAL = 0
 TICKC_SEL = TICKC_PTR = TICKC_LEFT = 0
 TW_SEL1 = TW_PTR1 = (0, 0)
@@ -346,8 +360,9 @@ class Tune:
         entries = [long_at(file, 24 + 4 * i) for i in range(count)]
         index = [at & ~COUNTED for at in entries]
         self.counted = [False] + [bool(at & COUNTED) for at in entries]
-        end = index[0] if count else len(file)
-        image = file[self.image_at:end]
+        # The image stands after the sources' tables and runs to the end of
+        # the bound tune (doc/BINARIES.md 1.2).
+        image = file[self.image_at:]
         table_at = self.table_at
         csv = os.path.join(work, "table.csv")
         # dtx-write reads its input on standard input and writes its
@@ -615,7 +630,10 @@ class Machine:
         self.symbols = symbols
         mu = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN)
         mu.ctl_set_cpu_model(UC_CPU_M68K_M68000)
-        for at, size in ((0, 0x1000), (CODE, 0xF000), (FILE & ~0xFFF, 0x30000),
+        # The code runs to the page the tune is loaded in, and the tune to
+        # the workspace: -pcrel loads the tune nearer the code (PCREL_FILE).
+        for at, size in ((0, 0x1000), (CODE, (FILE & ~0xFFF) - CODE),
+                         (FILE & ~0xFFF, WORK - (FILE & ~0xFFF)),
                          (WORK, 0x40000), (STACK, 0x10000), (DONE, 0x1000),
                          (0xFFFF8000, 0x1000), (0xFFFFF000, 0x1000)):
             mu.mem_map(at, size)
@@ -765,6 +783,14 @@ class Machine:
 
     def byte(self, at):
         return bytes(self.mu.mem_read(at, 1))[0]
+
+    def place(self, at, off):
+        """The row a handler reads: the field is the row's address, and
+        under the PC-relative build its displacement from the field."""
+        if not PCREL:
+            return self.long(at + off)
+        one = self.word(at + off)
+        return at + off + (one - 0x10000 if one >= 0x8000 else one)
 
     def word(self, at):
         return struct.unpack(">H", self.mu.mem_read(at, 2))[0]
@@ -1084,6 +1110,28 @@ def envelope(code, symbols):
             % (frames, ticks))
 
 
+def outofreach(code, symbols):
+    """A tune past the reach of a displacement: init reports -1
+    (doc/BINARIES.md 5.5). Every other run loads its tune at FILE, which
+    the handlers reach; this one is loaded far up the mapped region, so
+    the rows of its sources stand past the 32,767 bytes a signed word
+    carries."""
+    work = tempfile.mkdtemp()
+    with open(os.path.join(ROOT, "doc", "conformance", "tunes",
+                           "turrican.ymxr"), "rb") as f:
+        bound = bind(f.read(), work)
+    assert bound is not None, "the binder rejected the tune"
+    workspace = WORK + 0x100
+    assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) == 0, \
+        "init rejected a tune the handlers reach"
+    far = WORK - 0x10000
+    m = Machine(code, symbols, bound)
+    m.mu.mem_write(far, bound)
+    assert m.call("init", a0=far, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
+        "init took a tune %d bytes from the handlers" % (far - CODE)
+    return "a tune %d bytes off: init reports -1" % (far - CODE)
+
+
 def wholebyte(code, symbols):
     """A source whose one column fills its byte (SPEC.md 3.1): setR0 is
     the tone's fine byte, which reads every bit, so its rows carry no
@@ -1157,8 +1205,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
     assert tune.version in BOUND_VERSIONS, "the binder wrote version %d" % tune.version
     m = Machine(code, symbols, bound)
     if cycles:
-        end = FILE + (long_at(bound, 20) if bound[9] else len(bound))
-        cycles.attach(m, (FILE + tune.image_at, end),
+        # The image is the bound tune's last part (doc/BINARIES.md 1.2),
+        # so it runs from the field at 16 to the end: the cycles the
+        # counter reads there are the reader's, the tables below it
+        # holding no code.
+        cycles.attach(m, (FILE + tune.image_at, FILE + len(bound)),
                       *(decoder_of(file, bound, tune, cycles.module)
                         if parts else ()))
     model = Model(tune)
@@ -1295,9 +1346,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                     # the counted handler: its place, the register it
                     # selects and the rows it has left (68k/YMXR.S, TICKC)
                     at = CODE + symbols["ymxr_cnt%d" % i]
-                    assert m.long(at + TICKC_PTR) == place, \
+                    assert m.place(at, TICKC_PTR) == place, \
                         "frame %d: effect %d's place is %x, not %x" % (
-                            f, i, m.long(at + TICKC_PTR), place)
+                            f, i, m.place(at, TICKC_PTR), place)
                     assert m.byte(at + TICKC_SEL) == fx["using"], \
                         "frame %d: effect %d's counted handler selects R%d, not R%d" % (
                             f, i, m.byte(at + TICKC_SEL), fx["using"])
@@ -1334,9 +1385,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                     at = CODE + symbols["ymxr_%s%d" % ("two" if columns == 2
                                                        else "three", i)]
                     sel, ptr = TW_SEL1[columns - 2], TW_PTR1[columns - 2]
-                    assert m.long(at + ptr) == place, \
+                    assert m.place(at, ptr) == place, \
                         "frame %d: effect %d's place is %x, not %x" % (
-                            f, i, m.long(at + ptr), place)
+                            f, i, m.place(at, ptr), place)
                     assert m.byte(at + sel) == TARGETS[fx["using"]][0][0], \
                         "frame %d: effect %d's handler selects R%d first, not R%d" % (
                             f, i, m.byte(at + sel), TARGETS[fx["using"]][0][0])
@@ -1344,7 +1395,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                         "frame %d: effect %d's vector is not its columns' handler" % (f, i)
                 else:
                     at = CODE + symbols["ymxr_tick%d" % i]
-                    assert m.long(at + TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.long(at + TICK_PTR), place)
+                    assert m.place(at, TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.place(at, TICK_PTR), place)
                     assert m.byte(at + TICK_SEL) == fx["using"], "frame %d: effect %d's handler selects R%d, not R%d" % (f, i, m.byte(at + TICK_SEL), fx["using"])
         for i in timers.due(clocks):
             fx = model.fx[i]
@@ -1371,7 +1422,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
             if model.counted(i):
                 if then != "stop":
                     at = CODE + symbols["ymxr_cnt%d" % i]
-                    assert m.long(at + TICKC_PTR) == model.place_address(i), \
+                    assert m.place(at, TICKC_PTR) == model.place_address(i), \
                         "frame %d: after a tick effect %d's place is off" % (f, i)
                     assert m.word(at + TICKC_LEFT) == model.left(i), \
                         "frame %d: after a tick effect %d has %d rows left, not %d" % (
@@ -1395,11 +1446,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                 columns = model.wide(i)
                 at = CODE + symbols["ymxr_%s%d" % ("two" if columns == 2
                                                    else "three", i)]
-                assert m.long(at + TW_PTR1[columns - 2]) == model.place_address(i), \
+                assert m.place(at, TW_PTR1[columns - 2]) == model.place_address(i), \
                     "frame %d: after a tick effect %d's place is off" % (f, i)
             else:
                 at = CODE + symbols["ymxr_tick%d" % i]
-                assert m.long(at + TICK_PTR) == model.place_address(i), "frame %d: after a tick effect %d's place is off" % (f, i)
+                assert m.place(at, TICK_PTR) == model.place_address(i), "frame %d: after a tick effect %d's place is off" % (f, i)
     boundaries = inside(code, symbols, bound, tune, workspace)
     m.call("stop", a0=workspace)
     timers.apply(m.mfp)
@@ -1869,6 +1920,21 @@ def patched_code_follows_the_subtune(defines, tunes):
         bound = bind(file, work)
         if bound is not None:
             bounds.append((os.path.basename(ym), bound))
+    # Under -pcrel a tick reads its row through a signed word
+    # displacement, so a subtune whose rows stand past the reach is left
+    # out: these are bound one by one and each carries its own image,
+    # where a set's subtunes share one image and stand together
+    # (doc/BINARIES.md 2).
+    left = 0
+    if PCREL:
+        fits, at = [], 0
+        for name, bound in bounds:
+            at = (at + 3) & ~3
+            if FILE + at + len(bound) - (CODE + symbols["ymxr_tick0"]) <= 32767:
+                fits.append((name, bound))
+                at += len(bound)
+        left = len(bounds) - len(fits)
+        bounds = fits
     if len(bounds) < 2:
         return "one subtune: no pair to init one after the other"
     offsets, blob = [], b""
@@ -1920,7 +1986,9 @@ def patched_code_follows_the_subtune(defines, tunes):
                             alone[b][region][where[0]]))
             pairs += 1
     return "%d subtunes in one set: the code after any one then another is the " \
-        "code after the other alone, %d ordered pairs" % (len(bounds), pairs)
+        "code after the other alone, %d ordered pairs%s" % (
+            len(bounds), pairs,
+            "" if left == 0 else "; %d past the displacement's reach left out" % left)
 
 
 def core(defines, ym):
@@ -1980,6 +2048,10 @@ def main():
     parts = "-refill" in sys.argv
     real = "-hatari" in sys.argv
     kit = "-kit" in sys.argv
+    global PCREL, FILE
+    PCREL = "-pcrel" in sys.argv
+    if PCREL:
+        FILE = PCREL_FILE
     perf = PERF
     wide = next((a for a in sys.argv[1:] if a.startswith("-corpus")), None)
     capped = next((a for a in sys.argv[1:] if a.startswith("-frames")), None)
@@ -2030,6 +2102,8 @@ def main():
             tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes", one)
                              for one in ("voices.ymxr", "counted.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
+    if PCREL:
+        defines += ["-dYMXR_PCREL=1"]
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
     code, symbols = assemble(defines=defines)
@@ -2057,6 +2131,8 @@ def main():
         print("    %s" % voices(code, symbols))
         print("    %s" % envelope(code, symbols))
         print("    %s" % wholebyte(code, symbols))
+        if PCREL:
+            print("    %s" % outofreach(code, symbols))
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
     cycles_of = None
@@ -2109,7 +2185,10 @@ def main():
                                 open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
                 said = row and tuple(int(x) for x in row.groups())
                 counted = (frames, average, max(cost), int(sum(adv) / len(adv)), adv[where[0]])
-                if said != counted:
+                # A play call's figures a tune are the plain build's: the
+                # ticks of -pcrel cost less and move them, and the figures
+                # of that build are its table of tick paths.
+                if not PCREL and said != counted:
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
                 # plan.md's closing figures, on the tune it names. No
@@ -2119,7 +2198,7 @@ def main():
                 # figures are the core the document reckons against, whose
                 # ticks drop the level and write an end of interrupt, so
                 # the lean core reads its ticks and not these.
-                if stem == "Synergy Credits" and not LEAN:
+                if stem == "Synergy Credits" and not LEAN and not PCREL:
                     plan = " ".join(open(os.path.join(ROOT, "doc", "plan.md")).read().split())
                     closing = re.search(
                         r"Synergy Credits reads ([\d,]+) cycles a call against the"
@@ -2153,8 +2232,12 @@ def main():
                         row = r"^\| %s \| \d+ \| (\d+) \|$" % re.escape(name)
                     else:
                         row = r"^\| %s \| (\d+) \|$" % re.escape(name)
-                    tick = re.search(row,
-                                     open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
+                    said_doc = open(os.path.join(ROOT, "doc", "performance.md")).read()
+                    if PCREL:
+                        # that build's own table, under its heading
+                        said_doc = said_doc.split(
+                            "## A tick through the program counter")[1]
+                    tick = re.search(row, said_doc, re.M)
                     if not tick or {int(tick.group(1))} != tick_cost[then]:
                         stale.append("performance.md's tick %s is not %s" % (then, tick_cost[then]))
             if refills_of:

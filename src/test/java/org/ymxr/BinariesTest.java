@@ -267,33 +267,39 @@ final class BinariesTest {
         assertArrayEquals(core, patched, "the core as assembled, its two offsets aside");
         assertEquals(Sndh.even(core.length), tableAt);
         assertEquals(files.size(), Tune.getWord(sndh, header + tableAt));
-        // The images stand between the subtune table and the tunes: those
-        // that agree on what an image fixes once share one, so the reader's
-        // code stands once for them (DTX abi.md 1, BINARIES.md 2).
+        // The tunes stand between the subtune table and the images, so
+        // that a tune's sources stand beside the core (68k/YMXR.S,
+        // YMXR_PCREL); the tunes that agree on what an image fixes once
+        // share one image, so the reader's code stands once for them (DTX
+        // abi.md 1, BINARIES.md 2).
         Bound.Set set = Bound.of(files);
         int state = 0;
         int next = tableAt + 2 + 4 * files.size();
+        int[] at = new int[files.size()];
+        for (int i = 0; i < files.size(); i++) {
+            at[i] = Tune.getLong(sndh, header + tableAt + 2 + 4 * i);
+            assertEquals(0, at[i] & 1, "subtune " + (i + 1) + " on an even address");
+            assertEquals(next, at[i], "subtune " + (i + 1) + " follows what stands before it");
+            next = Sndh.even(at[i] + set.tunes().get(i).length);
+        }
         int[] imageAt = new int[set.images().size()];
         for (int i = 0; i < imageAt.length; i++) {
             next = Tune.align(next);
             imageAt[i] = next;
             next += set.images().get(i).length;
         }
+        next = Sndh.even(next);
         for (int i = 0; i < files.size(); i++) {
-            int at = Tune.getLong(sndh, header + tableAt + 2 + 4 * i);
-            assertEquals(0, at & 1, "subtune " + (i + 1) + " on an even address");
-            assertEquals(next, at, "subtune " + (i + 1) + " follows what stands before it");
             byte[] bound = set.tunes().get(i).clone();
             // The tune reaches its image from its first byte, which the
             // combine put in and the set left at zero.
-            Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - at);
-            assertArrayEquals(bound, Arrays.copyOfRange(sndh, header + at,
-                    header + at + bound.length), "subtune " + (i + 1) + " is its bound tune");
-            assertEquals("YMXB", ascii(sndh, header + at, 4));
+            Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - at[i]);
+            assertArrayEquals(bound, Arrays.copyOfRange(sndh, header + at[i],
+                    header + at[i] + bound.length), "subtune " + (i + 1) + " is its bound tune");
+            assertEquals("YMXB", ascii(sndh, header + at[i], 4));
             state = Math.max(state, Tune.getLong(bound, Bound.STATE_AT));
-            next = Sndh.even(at + bound.length);
         }
-        assertEquals(next, workAt, "the workspace follows the last tune");
+        assertEquals(next, workAt, "the workspace follows the last image");
         int workspace = Tune.align(Tune.getWord(core, Sndh.CORE_FIXED_AT) + state) + 2;
         assertEquals(header + workAt + workspace, sndh.length,
                 "the workspace is last, two bytes more than the state needs");

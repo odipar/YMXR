@@ -315,5 +315,50 @@ room stands beside it, where a source of several columns has its loop cell
 and the stride from one column to the next, and an effect's record is 16
 bytes where it was 8, so YMXR_FIXED is 2,120 bytes against 56.
 
+## A tick through the program counter
+
+`YMXR_PCREL=1` assembles a player whose tick reads its row through a
+signed word displacement from the instruction that reads it rather than
+through an absolute address (68k/YMXR.S; BINARIES.md 5.5). The read costs
+16 cycles where it cost 20; the step that moves the place is an `addq.w`
+on that displacement, 20 against the 28 an `addq.l` on a long address
+cost; and the loop's test and its reload move the same way, 16 against 20
+and 28 against 36. A square's handler and a one-row source's write a
+value the start patched into them, so both cost what they cost:
+
+| tick | cycles |
+|---|---|
+| a row written, the place stepped | 96 |
+| the marker, the place to row `RR` | 114 |
+| the marker, the timer stopped | 124 |
+| a square's two rows, no place stepped | 88 |
+| a source of one row, no place stepped | 64 |
+| a row written, the tune running one effect | 88 |
+| the marker to row `RR`, one effect | 114 |
+| the marker and the stop, one effect | 124 |
+| a square's two rows, one effect | 80 |
+| a source of one row, one effect | 56 |
+
+So 12 cycles a tick that writes a row and steps its place, 16 on the loop
+and 8 on the stop: at a digidrum's 6,000 ticks a second, 1,440 cycles a
+frame. A handler of two columns saves twice that a tick and one of three
+three times, since a column is a read and a step of its own; the counted
+handler saves the same 12 as the general one.
+
+A start writes the place it patches behind level 7, so that a tick reads
+no half-made handler, and under this build that window carries the
+arithmetic turning a row's address into a displacement as well: a dozen
+instructions more, which a tick of a timer due inside it waits for.
+
+The displacement is a signed word, so every row of every source stands
+within 32,767 bytes of the handlers. Init measures each source against
+them and reports -1 for one further off (BINARIES.md 1.5), and the
+layouts put a tune's DTX1 tables before its image and a set's subtunes
+before the images, so the rows of the tune a host loads stand beside the
+player whatever the images come to. The player is 7,298 bytes against
+6,934: the handlers lose 120 bytes, a place being a word where it was a
+long, and the starts that write one gain 484 for the arithmetic that
+turns a row's address into a displacement.
+
 The rig reads every figure here back with `-cycles`, and `-hatari` plays
 the same tunes on a cycle-exact machine, where the MFP fires the ticks.

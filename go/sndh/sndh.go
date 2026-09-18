@@ -265,9 +265,9 @@ func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, erro
 // a bra.w to the same entry of the core's triple, so all three
 // displacements are the header's bytes less 2.
 //
-// The images of the set stand behind the subtune table and every bound
-// tune's ImageAt is patched to reach the one with its table in it, from
-// its first byte.
+// The bound tunes stand behind the subtune table, the images of the set
+// behind them, and every bound tune's ImageAt is patched to reach the one
+// with its table in it, from its first byte.
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	tunes := set.Tunes
 	header := even(12 + len(tags))
@@ -278,7 +278,16 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	n := len(tunes)
 	tableAt := even(len(core))
 	at := tableAt + 2 + 4*n
-	// The images first, each on a long: the reader's code stands once a
+	// The bound tunes first, each on an even address (5.1), so that a
+	// tune's sources stand beside the core: a player whose ticks read a
+	// row through a displacement reaches 32,767 bytes (68k/YMXR.S,
+	// YMXR_PCREL), and an image between the two would be in the way.
+	offsets := make([]int, n)
+	for i := 0; i < n; i++ {
+		offsets[i] = at
+		at = even(at + len(tunes[i]))
+	}
+	// Then the images, each on a long: the reader's code stands once a
 	// set of tunes that agree on what an image fixes once (DTX abi.md 1),
 	// and every bound tune of that set reaches it.
 	imageAt := make([]int, len(set.Images))
@@ -287,14 +296,7 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 		imageAt[i] = at
 		at += len(set.Images[i])
 	}
-	// Every bound tune of the set begins on an even address (5.1), the
-	// first as well as the rest: the last image's length may be odd.
 	at = even(at)
-	offsets := make([]int, n)
-	for i := 0; i < n; i++ {
-		offsets[i] = at
-		at = even(at + len(tunes[i]))
-	}
 	workAt := at
 	file := make([]byte, header+workAt+workspace)
 	for entry := 0; entry < 12; entry += 4 {
@@ -314,7 +316,7 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 		copy(file[header+offsets[i]:], tunes[i])
 		if len(imageAt) > 0 {
 			// The bound tune reaches its image from its first byte, and
-			// the images stand before it, so the reach is negative.
+			// the images stand after it.
 			ymxr.PutLong(file, header+offsets[i]+ImageAt,
 				imageAt[set.Image[i]]-offsets[i])
 		}
