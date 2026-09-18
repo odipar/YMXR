@@ -360,5 +360,19 @@ player at any length of image. The player is 7,298 bytes against
 long, and the starts that write one gain 484 for the arithmetic that
 turns a row's address into a displacement.
 
+What the two cores do to a tune, under Hatari over 900 frames of
+Turrican - world 4-3, counted from the frame the player first writes in:
+both write 9,589 values, and 9,583 of them are the same value to the
+same register in the same order, the six that part being a tick's write
+crossing a frame's. A write lands at another cycle inside the frame: 24
+later at the median and 20 on average, from 32 earlier to 1,168 later.
+That is the arithmetic a start does to turn a row's address into a
+displacement, and a tick of another length returning inside the call at
+another point. A sample at 44,100 Hz is 181 cycles of an 8 MHz 68000, so
+the largest of those shifts is six samples: two recordings of the same
+minute part where a square's edge crosses a sample and rejoin after it,
+at one loudness - 4,572 against 4,558 over the minute - and one set of
+partials. `ym/writes.py` reads the two traces back.
+
 The rig reads every figure here back with `-cycles`, and `-hatari` plays
 the same tunes on a cycle-exact machine, where the MFP fires the ticks.
