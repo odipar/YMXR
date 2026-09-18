@@ -34,6 +34,67 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.4, 2026-09-18
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.4>, built from the commit
+tagged `v0.4.4`.
+
+`setEnvelope` is a target this version encodes, and the targets of several
+registers are heard as one form. The player is the size 0.4.3 has: the row
+for target 20 stood in `ymxr_wide` as zeros and this release fills it, so
+a version 3 tune plays as it did and performance.md stands as it was.
+
+- **The envelope period is a target this version encodes.** Target 20,
+  `setEnvelope`, was the one target of 14 to 24 left out: both its
+  registers read eight bits, so no column of its rows had a bit to spare
+  for the marker. The marker stands in bit 7 of R12's column now, the
+  envelope period's high byte, which leaves a source on this target a
+  period of 0 to 32,767. The envelope frequency is 2,000,000 / (256 x
+  envelope period), so 32,767 is one cycle in 4.19 seconds and 65,535 one
+  in 8.39 seconds: the half this target leaves out is the envelope slower
+  than 4.19 seconds a cycle, which a frame's R11 and R12 columns write.
+  SPEC.md 2.1.3 defines the encoding and rule 2(e) the range, and
+  `ConsistencyTest` recomputes the two cycles from terminology.md 1.4.
+- **The kit has a thirteenth tune**, `envelope`, which reaches that target
+  and the whole byte beside the marker's column: a source of two columns
+  repeating to a row above 0, one that plays once and stops its timer at
+  its marker with 127 in a row of its marked column, a start that changes
+  the source on a running timer, and the envelope shape set from column 13
+  while the period ticks. It plays 128 frames and 201 ticks on the player,
+  the player's frames the reader's entries.
+- **The targets of several registers are heard as one form.**
+  `dist/ab/AB.PRG` plays one piece three ways, 1,536 rows at 50 Hz a
+  subtune - two timers under version 3, one `setVoiceA`, one `setToneA` -
+  and under Hatari the three sound the same. Of the 3,072 frames each
+  record has, 3,024 are equal byte for byte across the three, and the 48
+  that differ are the 48 that start a timer, where R0 moves from the
+  frame's column to the first tick of the effect starting there.
+  experiments.md records the run and what a record cannot reach: the ticks
+  are outside it, and the ticks are where the three forms differ most.
+- **A record reports the six bits of R7 alone.** SPEC.md 7.3 read "six for
+  R7, whose bits 7 and 6 the player writes as 1" after "the value the
+  register reads", which reads as an instruction to report those two bits
+  with the six: 248 where the reference reports 56. A reader written from
+  that section alone made that reading, and its first comparison failed on
+  R7. The clause says which of the two a record reports, and names the
+  range.
+- **The task names the versions and the targets the kit reaches**, which
+  it read as version 3 and targets 0 to 13 while the kit has carried a
+  version 4 tune since 0.4.2.
+- **One build runs at a time.** `bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg`
+  starts both tools at once, and with a source newer than the last build
+  both found a build owed and both ran Maven into the same
+  `target/classes`. `bin/run` builds under the lock `target/.building`
+  now, and an absent `target/classpath` owes a build as well.
+- **A code span that wraps, and a fenced block, are quoted whole.** The
+  style check read the words of a quoted message as prose: doc/tools.md
+  19.2 carried the build lock's message and fired on a word inside it
+  until the span was moved onto a separate line. 19.2 is rewrapped at
+  the width of the document, so the document reads the check back.
+- **DTX 0.11.10 and YMXS 0.4.4.** The three tools here that read YMXS JSON
+  report `this is not JSON: EOF` for an empty input now, as the Go tree
+  does; the parity tests read the error paths.
+
 ### 0.4.3, 2026-09-18
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.3>, built from the commit

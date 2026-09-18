@@ -786,13 +786,13 @@ and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has held <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The
 build needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX
-`0.11.9` and YMXS `0.4.3` in the local Maven repository, `mvn install` in
+`0.11.10` and YMXS `0.4.4` in the local Maven repository, `mvn install` in
 each checkout.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the five 68000 binaries and DTX's twenty-two images
 embedded; it runs by itself. The Go tree requires the modules
-`github.com/odipar/dtx/go v0.11.9` and `github.com/odipar/ymxs/go v0.4.3`,
+`github.com/odipar/dtx/go v0.11.10` and `github.com/odipar/ymxs/go v0.4.4`,
 which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and
