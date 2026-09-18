@@ -330,6 +330,38 @@ final class ConsistencyTest {
         assertEquals(1, Columns.MARKER[20], "target 20 marks another column");
     }
 
+    /**
+     * The payload of a DTX1 table against the row it has in SPEC.md 3.1.2.
+     * That row read "C times align(R)" for a release, which is a byte too
+     * long for an odd R: the last column of a table has no padding after
+     * it, as the writer shows at every R and C below.
+     */
+    @Test
+    void theDtx1PayloadIsTheRowOfTheTable() throws IOException {
+        assertTrue(read(SPEC).contains(
+                "| 16 | (C - 1) times align(R) + R |"),
+                "SPEC.md 3.1.2 has another length for the payload");
+        for (int columns = 1; columns <= 3; columns++) {
+            for (int rows = 1; rows <= 7; rows++) {
+                byte[][] values = new byte[columns][rows];
+                for (int c = 0; c < columns; c++) {
+                    for (int r = 0; r < rows; r++) {
+                        values[c][r] = (byte) (c * 16 + r + 1);
+                    }
+                }
+                byte[] table = org.dtx.Dtx1.write(
+                        org.dtx.Table.of(rows, 0, 1, values));
+                int align = rows + (rows & 1);
+                int said = 16 + (columns - 1) * align + rows;
+                final int c = columns;
+                final int r = rows;
+                assertEquals(said, table.length, () -> "a table of " + r
+                        + " rows and " + c + " columns is " + said
+                        + " bytes under 3.1.2");
+            }
+        }
+    }
+
     private static long number(String said) {
         return Long.parseLong(said.replace(",", ""));
     }

@@ -98,6 +98,30 @@ the run: six clauses of SPEC.md were reworded for them.
 The seventh entry read 7.3's mask of a register's width as
 underspecified, where the clause defines it; that clause stands.
 
+**5.2 The second run**, the same day, against the kit with the six
+clauses of 5.1 written into it and a fresh implementer. Every record byte
+for byte again, `READ.md` documents alone, and `NOTES.md` 24 entries with
+9 marked *decides output* - of a different kind from the first run's: 2
+are choices the documents leave open and 7 are readings the documents
+settle where two clauses are read together. None of the six clauses of
+5.1 was read wrong, which the rewording was for.
+
+Three clauses changed for it.
+
+- 3.1.2's payload row, which 5.1 had written as C times align(R), is a
+  byte too long for an odd R: `dtx-write` reports a DTX1 table of 21, 27
+  and 33 bytes for C of 1, 2 and 3 at R = 5, so the last column of a
+  table has no padding after it and the payload is (C - 1) times
+  align(R) plus R. The run caught a defect the fix of the first run had
+  put there.
+- 4.3 step 4 said what the kept count becomes on a row that writes one
+  and left the rest to the reader, while 7.3 reports the kept count on
+  every row. The step covers every row now, in one condition rather than
+  two branches.
+- `TASK.md` 2 asked for "at most `<lines>` lines" without saying whether
+  the figure counts the lines or the frames of 7.4, which differ by the
+  first line. It says the lines.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |
