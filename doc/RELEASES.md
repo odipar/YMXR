@@ -10,7 +10,7 @@ below it.
 
 - one zip a platform, over six: Windows, macOS and Linux, each on x64 and
   arm64. A zip contains the eleven tools as executables, and each
-  executable contains the five 68000 binaries of BINARIES.md and DTX's
+  executable contains the nine 68000 binaries of BINARIES.md and DTX's
   twenty-two images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed
 - `MANIFEST.txt`: every zip's size and sha256, what it contains, and the
@@ -19,7 +19,7 @@ below it.
 The version names every file. It is read out of `pom.xml`, or stands as
 the script's one argument.
 
-The five binaries are assembled from `68k/` by rmac on the machine that
+The nine binaries are assembled from `68k/` by rmac on the machine that
 cuts the release, so the caller's machine has an assembler to install or
 not as it pleases. They are committed under `go/binaries/data`: a Go module
 fetched by its import path contains the files a commit has in it, and an
@@ -27,12 +27,54 @@ executable built from one embeds these. `BinariesTest` reads them against
 the assembly the build makes, so one that does not match what rmac writes
 today fails the build.
 
-A player pins a version of this format: a tune file is 3 or 4 (SPEC.md
+A player pins a version of this format: a tune file is 3, 4 or 5 (SPEC.md
 3.3.5) and a bound tune the version of the tune file bound (BINARIES.md
-1), a writer writes 3 for a tune whose sources are one column, and a
+1), a writer writes the lowest version a tune reads under, and a
 release's number names the tools rather than either.
 
 ## Published
+
+### 0.4.5, 2026-09-18
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.5>, built from the commit
+tagged `v0.4.5`.
+
+A source whose column fills its byte, and a tick that reads its row
+through the program counter. Version 5 of the tune file encodes the
+first; the second is a build of the player, and the tools stand it under
+a file unasked, so an SNDH file written by this release ticks 12 cycles
+cheaper on every row it writes.
+
+- **A source on a register that reads every bit of its byte.** `setR0`,
+  `setR2`, `setR4`, `setR7`, `setR11` and `setR12` were left to a later
+  version: the marker stands in bit 7 of a row and those registers read
+  that bit.
+  A source on one of them is counted instead - bit 31 of its index entry
+  marks it, every byte of a row is a value, and a tick reads R rows -
+  and a file with one is version 5 (SPEC.md 3.1.6, 3.3.5). The player
+  runs a fifth handler shape for it, 100 bytes an instance, whose word
+  counter a start patches beside the place.
+- **The kit has a fourteenth tune**, `counted`: a counted source on each
+  of the six targets, rows with bit 7 set in every one of them, and a
+  square on R8 beside them which the marker ends, so a player that reads
+  the end of a source from the version word rather than from the index
+  entry fails on it. Eighty frames and 154 ticks.
+- **A tick reads its row through the program counter.** `YMXR_PCREL=1`
+  builds a player whose place is a signed word displacement in the
+  instruction that reads it: 96 cycles where a tick that writes a row and
+  steps its place cost 108, 114 where the marker's loop cost 130 and 124
+  where its stop cost 132. A square's handler and a one-row source's
+  write a value the start patched into them and cost what they cost.
+- **A file reads its rows that way unasked.** The tools read a file's
+  last bound tune against the core's first byte: within the 32,767 bytes
+  a displacement reaches they write the core that reads through the
+  program counter, and further off the one that reads an address.
+  `-pcrel` requires it and `-abs` stands the other core under the tunes.
+  The cores are eight, one a setting of the three switches.
+- **Two layouts moved** so the rows stand beside the player: a bound
+  tune's DTX1 tables now stand before its image, and an SNDH file's
+  subtunes before the images. Both are offsets the player follows rather
+  than a fixed order, so no format moved.
 
 ### 0.4.4, 2026-09-18
 

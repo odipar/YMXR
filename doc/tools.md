@@ -807,7 +807,7 @@ it so that no check skips. No push starts it: a caller starts it from the
 Actions tab or by `gh workflow run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
-./cmd/...`, with the five 68000 binaries and DTX's twenty-two images
+./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.11.10` and `github.com/odipar/ymxs/go v0.4.4`,
 which a build fetches.
@@ -866,7 +866,7 @@ each zip's name, size and sha256, its contents, and the source commit,
 
 | variable | names | read by |
 |---|---|---|
-| `YMXR_68K` | a directory of the five binaries in place of the embedded ones | the Go tools |
+| `YMXR_68K` | a directory of the nine binaries in place of the embedded ones | the Go tools |
 | `YMXR_FLAGS` | flags added to the rig's conversions | `test_ymxr.py` |
 | `YMXR_TICKS` | set, each frame whose tick count differs from the rates' by more than 1 is printed | `test_ymxr.py -hatari` |
 | `COMMIT` | the source commit recorded, `HEAD` by default | `release/manifest.sh` |
