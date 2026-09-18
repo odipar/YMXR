@@ -96,6 +96,18 @@ final class ConformanceTest {
                     + " stops its timer at its marker with 127 in a row of its marked"
                     + " column, a start that changes the source on a running timer, and the"
                     + " envelope shape set from column 13 while the period ticks"),
+            Fixture.built("counted", "`BuiltTunes.counted`", BuiltTunes::counted,
+                    "version 5: a counted source on each of the six targets whose"
+                    + " register reads every bit of its byte - `setR0` and `setR4` on"
+                    + " Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and"
+                    + " `setR2` on Timer C - with rows of bit 7 set in every one of"
+                    + " them, and index entries whose bit 31 is 1 and whose bits 30"
+                    + " to 0 are the offset; a square on R8 in the same file, which the"
+                    + " marker ends; a counted source of one row, one that plays once"
+                    + " and stops its timer at its count, one repeating to a row above"
+                    + " 0; a target set while an effect runs and read at the next"
+                    + " start; a row that sets R12 as it stops the effect running on"
+                    + " it"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces no report of it", WRONG_VERSION)));
@@ -246,7 +258,8 @@ final class ConformanceTest {
     @Test
     void theTaskNamesTheVersionsAndTheTargetsTheKitReaches() throws IOException {
         String task = Files.readString(KIT.resolve("TASK.md"));
-        for (int version : new int[] {Tune.VERSION, Tune.VERSION_COLUMNS}) {
+        for (int version : new int[] {Tune.VERSION, Tune.VERSION_COLUMNS,
+                                      Tune.VERSION_COUNTED}) {
             assertTrue(task.contains(String.format(Locale.ROOT, "$%04X", version)),
                     "TASK.md leaves out version " + version + ", which a reader"
                     + " of this kit reads");
@@ -254,8 +267,7 @@ final class ConformanceTest {
         int most = 0;
         for (Fixture f : FIXTURES) {
             byte[] file = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));
-            if (Tune.getWord(file, 4) != Tune.VERSION
-                    && Tune.getWord(file, 4) != Tune.VERSION_COLUMNS) {
+            if (Tune.getWord(file, 4) > Tune.VERSION_COUNTED) {
                 continue;
             }
             for (List<Integer> row : targets(file)) {

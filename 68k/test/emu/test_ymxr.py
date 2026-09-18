@@ -2021,13 +2021,14 @@ def main():
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
-        # No dump converts to a target of several registers, so the kit's
-        # tune of version 4 goes on the end of a run on a real MFP: the
-        # handlers of several registers are read there against the same
-        # model as the rest.
+        # No dump converts to a target of several registers or to a
+        # counted source, so the kit's tunes of versions 4 and 5 go on the
+        # end of a run on a real MFP: the handlers of several registers
+        # and the counted handler are read there against the same model as
+        # the rest.
         if real and not args:
-            tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes",
-                                          "voices.ymxr")]
+            tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes", one)
+                             for one in ("voices.ymxr", "counted.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]

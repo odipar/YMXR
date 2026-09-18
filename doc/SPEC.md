@@ -327,9 +327,11 @@ envelope period stands before it.
 of several a source of that many columns (3.1.3; YMXS, SPEC.md 3.2.1).
 The targets of one register whose register reads seven bits or fewer are
 `setR1`, `setR3`, `setR5`, `setR6`, `setR8`, `setR9`, `setR10` and
-`setR13`; a source of one column runs on one of these (rule 2), and one
-on `setR0`, `setR2`, `setR4`, `setR7`, `setR11` or `setR12` is left to a
-later version (section 8).
+`setR13`, and a source on one of these writes its rows with the marker
+in bit 7 (3.2.1). `setR0`, `setR2`, `setR4`, `setR7`, `setR11` and
+`setR12` write a register that reads every bit of its byte, so a source
+on one of these spends every bit of a row on the value and a player
+counts its rows (3.1.6).
 
 **2.1.3** `setEnvelope` writes R11 and R12, the low and the high byte of
 the envelope period (YMXS, SPEC.md 2.5), and both registers read eight
@@ -406,8 +408,9 @@ defines the bytes of each.
 ### 3.1 The source index
 
 **3.1.1** The source index is S index entries, S the source count, 0 to
-127: index entry n, 1 to S, is 4 bytes at 16 + 4(n - 1), the offset of
-the DTX1 table of source n. The index begins at source 1: source 0 is the
+127: index entry n, 1 to S, is 4 bytes at 16 + 4(n - 1), bits 30 to 0
+the offset of the DTX1 table of source n and bit 31 the mark of a
+counted source (3.1.6). The index begins at source 1: source 0 is the
 stop (1.8.3).
 
 **3.1.2** A source's table is a DTX1 file (DTX, SPEC.md 1 and 2.2):
@@ -440,33 +443,44 @@ plays once: the tick that reads row R - 1 stops the timer (5.1).
 **3.1.5** A writer numbers the sources in first-start order (YMXS,
 SPEC.md 1.9).
 
+**3.1.6** A counted source is one whose target writes a register that
+reads every bit of its byte (2.1.2): each of the eight bits of a row is
+a value, where the marker of 3.2.1 requires bit 7. Bit 31 of its index
+entry is 1, and a tick reads R rows from the row it starts at (5.1). Bit
+31 of the index entry of every other source is 0, and a file with a
+counted source is version 5 (3.3.5).
+
 ### 3.2 The rows
 
 **3.2.1** A row of a source is one byte a column, each fitting the
-register its column writes (R5.3; YMXS, SPEC.md 3.2.2). The marker stands
-in bit 7 of the column 2.1 names for the target, bits 6 to 0 of that byte
-the value; every other column is a whole byte. A writer writes the marker
-as 1 in the last row of the source and as 0 in every other row.
+register its column writes (R5.3; YMXS, SPEC.md 3.2.2). The marker
+stands in bit 7 of the column 2.1 names for the target, bits 6 to 0 of
+that byte the value; every other column is a whole byte. A writer writes
+the marker as 1 in the last row of the source and as 0 in every other
+row. Every byte of every row of a counted source is a whole value, and
+R ends the source (3.1.6).
 
-**3.2.2** A tick writes each byte whole and tests the marker after the
-writes (5.1); each register reads the bits it has (2.1.1). A source of
-one row is the marker and its values in one row. A player tests bit 7 of
-the marker's column in every row it writes, so a row other than the last
-with bit 7 at 1 there ends the pass through the source at that row; a
-check reports such a row (6.4).
+**3.2.2** A tick writes each byte whole and, for a source the marker
+ends, tests the marker after the writes (5.1); each register reads the
+bits it has (2.1.1). A source of one row is the marker and its values in
+one row. A player tests bit 7 of the marker's column in every row it
+writes, so a row other than the last with bit 7 at 1 there ends the pass
+through the source at that row; a check reports such a row (6.4). A
+counted source ends on the count of 3.1.6, and every byte of its rows is
+a value.
 
 ### 3.3 The tune file
 
 | offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, `$0003` or `$0004` (3.3.5) |
+| 4 | 2 | the version, `$0003`, `$0004` or `$0005` (3.3.5) |
 | 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
 | 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bits 7 to 4 are 0 |
 | 9 | 1 | S, the source count, 0 to 127 |
 | 10 | 2 | the offset of the name, or 0 for a tune with an empty name |
 | 12 | 4 | the offset of the DTX2 table |
-| 16 | 4S | the source index: index entry 1 to S (3.1) |
+| 16 | 4S | the source index: index entry 1 to S, bit 31 of each the mark of a counted source (3.1.1) |
 | 16 + 4S | 2 to 256 | the name, where the word at 10 is other than 0: its UTF-8 bytes, 1 to 255, and a zero byte |
 | on a long | | the DTX2 table (3.3.3) |
 | on a long each | | the DTX1 tables of sources 1 to S, in that order (3.1.2) |
@@ -512,20 +526,23 @@ reports a condition reads no further field. A name offset other than 16 +
 |---|---|
 | the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
-| the version is other than 3 or 4 (3.3.5) | `version V is not 3 or 4` |
+| the version is other than 3, 4 or 5 (3.3.5) | `version V is not 3, 4 or 5` |
 | the table begins or ends outside the file | `the table stands at A to B, and the file has F bytes` |
 | the table is a DTX variant other than 2 (3.3.3) | `the table is DTX X, and a tune's table is DTX2 (SPEC.md 3.3.3)` |
 | the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N stands at A to B, and the file has F bytes` |
 | source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
 | the version is 3 and source N has several columns (3.3.5) | `source N is C columns, and version 3 writes one` |
+| the version is other than 5 and bit 31 of source N's index entry is 1 (3.1.6) | `source N is counted, and version V writes the marker` |
 
 **3.3.5** The version. A tune whose sources are one column and whose
-target columns are 0 to 13 is version 3, and one with a source of several
-columns or a target column of 14 upward is version 4 (2.1). A writer
-writes 3 for a tune of the first kind, so a tune both versions encode is
-one file and a player of version 3 reads it. A player of this version
-reads 3 and 4.
+target columns are 0 to 13 is version 3; one with a source of several
+columns or a target column of 14 upward is version 4 (2.1); and one with
+a counted source is version 5 (3.1.6), whichever its targets are, since
+a player of 3 or 4 would read bit 31 of that source's index entry as
+part of an offset. A writer writes the lowest of the three a tune reads
+under, so a tune two of them encode is one file and the older player
+reads it. A player of this version reads 3, 4 and 5.
 
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
 Attractions #2` begins `594D5852 0003 0032 00 00 0010 00000028`: the 22
@@ -544,7 +561,7 @@ reading only set columns and keeping values needed by later rows (R4.6).
 The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
-1. Read the version; for a version other than 3 or 4 (3.3.5), report -1
+1. Read the version; for a version other than 3, 4 or 5 (3.3.5), report -1
    and leave every register and every timer as it is. A reader reports
    the line of 3.3.4 in place of that, and its record is empty (7.4).
 2. Read R and RR of the tune's table and the effects used.
@@ -702,13 +719,16 @@ names its registers and the column of the source each is written from
    alone, and step 2 writes it.
 2. Write the register number of the marker's column to `$FFFF8800`, then
    the byte at the place in that column to `$FFFF8802`, whole.
-3. Where bit 7 of the byte written at step 2 is 0: the place is the row
-   after it, in every column.
-4. Where bit 7 is 1, the marker: for a source that repeats, the place is
+3. Test whether the row is the last of the source: where the source is
+   counted (3.1.6), row R - 1 is the last; where it is any other, a row
+   whose byte written at step 2 has bit 7 set, the marker, is the last.
+4. Where the row is before the last: the place is the row after it, in
+   every column.
+5. Where the row is the last: for a source that repeats, the place is
    row RR; for a source that plays once, stop the timer (2.3.3). The
    timer is idle, the place stays at row R - 1, and each register keeps
    the value written until a row sets it.
-5. Where bit 3 of the vector register `$FFFA17` is 1, software end of
+6. Where bit 3 of the vector register `$FFFA17` is 1, software end of
    interrupt: clear the timer's in-service bit (2.3.2).
 
 **5.1.1** A player runs the MFP in the mode the host leaves it, bit 3 of
@@ -724,7 +744,7 @@ one; a tick of the same timer or of a lower one is served after it.
 ### 5.2 The timer at a tick
 
 A tick leaves its timer's data register unchanged and writes the control
-register only to stop the timer (5.1 step 4). The next period uses the
+register only to stop the timer (5.1 step 5). The next period uses the
 current count; a count written by a row loads as YMXS, SPEC.md 3.3.5
 defines. Ticks read source rows; frames read tune rows (4.2). A select
 written before the first start breaks rule 4 and starts a timer with no
@@ -787,20 +807,20 @@ numbers the maps assign.**
   (7.3).
 - 2(b) A source column is 0 or 1 to S, S the source count (3.3); a
   target column is a target this version encodes, 0 to 24 (2.1). A source
-  of one column runs on one of the eight targets of 2.1.2, and a source of
-  C columns on a target of C columns.
+  of C columns runs on a target of C registers (2.1.2).
 - 2(c) A start whose target column is unset runs on the kept target, the
   last target column set on the effect in frame order, through the wrap
   (4.5). A writer sets the target column on the first start of an
   effect in the first pass, and on the first start at or after the
   repeat row.
-- 2(d) Every target a source runs on names one column for the marker
-  (2.1), so a source of two columns runs on the tone targets, on the
-  noise targets or on `setEnvelope`, and on one of the three alone.
+- 2(d) A target of two registers names one column for the marker (2.1),
+  so a source of two columns runs on the tone targets, on the noise
+  targets or on `setEnvelope`, and on one of the three alone.
 - 2(e) A source on `setEnvelope` writes R12 a value of 0 to 127, the
-  marker standing in bit 7 of that column (2.1.3). Every other column of
-  every source is a whole byte, and the marker's column of every other
-  target is a register that reads seven bits or fewer.
+  marker standing in bit 7 of that column (2.1.3). The marker's column
+  of every other target writes a register that reads seven bits or
+  fewer, and every column beside it is a whole byte, as is every column
+  of a counted source (3.1.6).
 
 **Rule 3: a start sets bit 5 of the control column with it, with one
 exception, and sets bit 6 where the timer is stopped** (YMXS rules 3
@@ -812,7 +832,7 @@ and 4).
   stop between the two starts leaves the place as it is (YMXS, SPEC.md
   3.4.3).
 - 3(b) A timer is stopped before its first start, after a stop, and
-  after its source that plays once has run out (5.1 step 4). Where the
+  after its source that plays once has run out (5.1 step 5). Where the
   rows leave open whether a source has run out at the start row, bit 6
   at either value is correct: a stopped timer starts on the select
   either way (4.3 step 5).
@@ -950,13 +970,13 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 the sources in index order, source 1 first, each
 `{"rows":[...],"repeat":RR}` with `rows` the bytes of its rows in row
 order and, inside a row, in column order, column 0 first: a byte a
-column of the row, the marker included, 0 to 255, and `repeat` its RR as
-its DTX1 header has it, an integer, RR equal to R included (3.1.4),
-where the record of the structure writes `null` for a source that plays
-once (YMXS, SPEC.md 7.3); `[]` where S is 0. A source of C columns and R
-rows reads as C times R bytes, row 0's columns first. A row reads in the
-order of its columns rather than the order a tick writes them, which
-puts the marker's column last (2.1.1).
+column of the row, 0 to 255, the marker of a source that has one
+included, and `repeat` its RR as its DTX1 header has it, an integer, RR
+equal to R included (3.1.4), where the record of the structure writes
+`null` for a source that plays once (YMXS, SPEC.md 7.3); `[]` where S is
+0. A source of C columns and R rows reads as C times R bytes, row 0's
+columns first. A row reads in the order of its columns rather than the
+order a tick writes them, which puts the marker's column last (2.1.1).
 
 ### 7.3 A frame's entry
 
@@ -1039,8 +1059,7 @@ A player of this version is unconstrained in each item below. A number
 missing from the list is a clause a version has defined, and the numbers
 of the rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 
-**8.2** Targets 25 to 127 (2.1), and a source of one column on `setR0`,
-`setR2`, `setR4`, `setR7`, `setR11` or `setR12` (2.1.2).
+**8.2** Targets 25 to 127 (2.1).
 
 **8.3** A source of more than three columns or of values wider than a byte
 (3.1.3), and a source whose RR is above R.
