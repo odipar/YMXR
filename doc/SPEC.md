@@ -409,9 +409,9 @@ defines the bytes of each.
 
 **3.1.1** The source index is S index entries, S the source count, 0 to
 127: index entry n, 1 to S, is 4 bytes at 16 + 4(n - 1), bits 30 to 0
-the offset of the DTX1 table of source n and bit 31 the mark of a
-counted source (3.1.6). The index begins at source 1: source 0 is the
-stop (1.8.3).
+the offset of the DTX1 table of source n, whichever the version, and bit
+31 the mark of a counted source (3.1.6). The index begins at source 1:
+source 0 is the stop (1.8.3).
 
 **3.1.2** A source's table is a DTX1 file (DTX, SPEC.md 1 and 2.2):
 
@@ -1000,9 +1000,10 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   `{"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b}`:
   `target` the kept target after 4.3 step 2, 0 to 127; `source` the
   number the last row that set the effect's source column set it to, 0
-  to 127, 0 until a row sets it; a row that stops the timer through its
-  control column (4.3 step 1) leaves it as it is, and so does the tick
-  that ends a source that plays once; `select`, 0 to 7, and `count`, 0 to
+  to 127, a row that sets a stop setting it to 0 (1.8.3), and 0 until a
+  row sets it; a row that stops the timer through its control column (4.3
+  step 1) leaves it as it is, and so does the tick that ends a source
+  that plays once; `select`, 0 to 7, and `count`, 0 to
   255, the kept select and count after 4.3 steps 4 and 5, 0 until a row
   sets them and kept through a stop; `timer` bit 6 of the row's control
   column and `place` bit 5, each `true` or `false`, both `false` where the
