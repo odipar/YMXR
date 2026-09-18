@@ -18,7 +18,11 @@ set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}
 TOS=${TOS:-$HOME/hatari-2.6.1_macos/tos-2.06.rom}
-work=$1
+# The run happens inside WORK, and the AVI is named from there, so a
+# relative WORK would name a path under itself and Hatari would write no
+# file: the emulator runs with its output closed, and the read of the AVI
+# below is where that lands. The path is resolved here instead.
+work=$(CDPATH= cd -- "$1" && pwd)
 vbls=$2
 out=$3
 set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \
