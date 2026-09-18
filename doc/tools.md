@@ -781,6 +781,12 @@ part, counted from the frame the player first writes in.
 **18.5 `ym/avi.py in.avi out.wav [frame.png]`** writes the sound of a
 Hatari recording as a WAV and its last frame as a PNG.
 
+**18.6 `ym/whole-byte.py`** writes the structure of a tune a timer drives
+a whole byte with, five sections of 800 rows at 50 Hz, one a register
+version 5 opened (SPEC.md 3.1.6): `python3 ym/whole-byte.py |
+bin/ymxs-to-prg -r4000 > dist/whole/TUNE.PRG` makes a program of it, and
+experiments.md reads what the sections come to.
+
 ---
 
 ## 19. The two trees
