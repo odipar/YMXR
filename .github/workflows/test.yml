@@ -1,0 +1,72 @@
+# The Java suite, run by hand. The Python rigs under 68k/test/emu stand
+# outside it but for the one RigCallsTest drives; doc/tools.md lists them.
+name: test
+
+# Off by default: no push and no pull request starts it. A caller starts
+# it from the Actions tab, or with `gh workflow run test.yml`.
+on:
+  workflow_dispatch:
+
+jobs:
+  maven:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '23'
+          cache: maven
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      # The build assembles the five binaries of BINARIES.md at
+      # process-classes, and BinariesTest reads the copies under
+      # go/binaries/data against that assembly. The version is pinned:
+      # another rmac writes other bytes and a red run.
+      - name: rmac 2.4.3
+        run: |
+          curl -fsSL -o /tmp/rmac.zip \
+            https://rmac.is-slick.com/static/rmac-2.4.3-lin-x64.zip
+          unzip -j -o /tmp/rmac.zip -d /tmp/rmac
+          sudo install -m 755 /tmp/rmac/rmac /usr/local/bin/rmac
+      # RigCallsTest plays the built tunes on the 68000 player under
+      # emulation, which wants unicorn.
+      - run: python3 -m pip install --quiet unicorn
+      # This tree resolves DTX and YMXS out of the local repository
+      # alone, since pom.xml names no <repositories>: both are built here
+      # at the release pom.xml requires, read from pom.xml so the two
+      # cannot drift. DTX assembles its images, so rmac stands above this.
+      - name: DTX and YMXS at the releases pom.xml requires
+        run: |
+          dtx=$(grep -A1 '<artifactId>dtx</artifactId>' pom.xml \
+              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          ymxs=$(grep -A1 '<artifactId>ymxs</artifactId>' pom.xml \
+              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          echo "DTX $dtx, YMXS $ymxs"
+          git clone --depth 1 --branch "v$dtx" \
+              https://github.com/odipar/DTX "$RUNNER_TEMP/DTX"
+          git clone --depth 1 --branch "v$ymxs" \
+              https://github.com/odipar/YMXS "$RUNNER_TEMP/YMXS"
+          mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/DTX" install -DskipTests
+          mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/YMXS" install -DskipTests
+          # RigCallsTest reads the packer DTX_WRITE names (doc/tools.md).
+          echo "DTX_WRITE=$RUNNER_TEMP/DTX/bin/dtx-write" >> "$GITHUB_ENV"
+      # ParityTest runs the two trees against one another and skips where
+      # go is absent, so a runner without it is green and asleep.
+      - run: go version && rmac | sed -n '7p' && "$DTX_WRITE" -help | head -1
+      # A skipped test is a check that did not run, and a run that skips
+      # one is green and asleep. Every skip has a cause the steps above
+      # remove, so the count stands at 0 - one better than a machine
+      # without dtx-write on it, where RigCallsTest leaves one behind.
+      - name: the suite, and no skip
+        run: |
+          set -o pipefail
+          mvn -B --no-transfer-progress test | tee /tmp/test.log
+          skipped=$(grep -oE 'Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+$' \
+              /tmp/test.log | tail -1 | grep -oE '[0-9]+$')
+          if [ "$skipped" != "0" ]; then
+              echo "::error::$skipped skipped, and this workflow reads 0"
+              grep -E 'Skipped: [1-9]' /tmp/test.log
+              exit 1
+          fi
