@@ -658,6 +658,56 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_cell:   dc.l    0                       ; the loop cell
                 .endm
 
+; A tick of a source whose one column fills its byte: every bit of the
+; byte is the register's, so bit 7 is a value rather than a marker and
+; the end of the source stands in a counter beside the place. A word
+; counts the rows left; the subq that steps it leaves Z on the row last,
+; and the loop reloads it with the rows of a pass through the loop. The register, the
+; place, the counter and that reload are the immediates a start patches,
+; so this handler uses no register either. A source whose column leaves
+; bit 7 runs the handler above, which reads the marker and costs 20
+; cycles less (doc/performance.md).
+;
+; The two branch targets are named rather than local: the labels the
+; patching reads stand between a branch and its target, and a label ends
+; the run a local one belongs to.
+                .macro  TICKC   name,eoi,eoir,ctrl,keep,ier,bit,colour
+\name:
+                MARK    \colour
+\{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
+                move.b  ($12345678).l,YM_SELECT+2.w ; +8: the place
+\{name}_step:   addq.l  #1,($12345678).l        ; +2: the place, stepped
+\{name}_cnt:    subq.w  #1,($12345678).l        ; +2: the rows left
+                beq.s   \{name}_last
+                .if     YMXR_NEST
+                move.w  #$2500,sr
+                .endif
+                COUNT   PERF_ON,PERF_DROP
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+\{name}_last:
+\{name}_mark:   tst.l   ($12345678).l           ; +2: the loop cell
+                beq.s   \{name}_halt
+                move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
+\{name}_reld:   move.w  #1,($12345678).l        ; +2: the rows of a pass, +4:
+                COUNT   PERF_LOOP,0             ; the counter
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+\{name}_halt:   andi.b  #\keep,\ctrl.w
+                move.b  #255-(1<<\bit),(\ier+4).w
+                COUNT   PERF_STOP,0
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+\{name}_cell:   dc.l    0                       ; the loop cell
+\{name}_left:   dc.w    0                       ; the rows left
+                .endm
+
 ; A tick of a target that writes several registers (SPEC.md 2.1): a
 ; select and a value a column, a place a column stepped where the row is
 ; not the last, and the column the target names for the marker written
@@ -819,6 +869,8 @@ YMXR_init:
                 moveq   #0,d4
 .source:        movea.l WS_TUNE(a6),a3
                 move.l  TF_INDEX(a3,d4.w),d0
+                bclr    #31,d0                  ; the index's bit 31: a source
+                bne.s   .counted                ; whose column fills its byte
                 adda.l  d0,a3                   ; the source's DTX1 table
                 lea     DT_PAYLOAD(a3),a5       ; its first row
                 move.l  a5,(a4)+
@@ -860,6 +912,30 @@ YMXR_init:
 .cell:          move.l  d0,(a4)+
                 addq.w  #4,d4
                 dbra    d1,.source
+                bra.s   .resolved
+
+; A source whose one column fills its byte: its rows carry no marker, so
+; the rows of a pass and the rows of the loop stand in the table beside,
+; with its loop cell, and the tag in the cell's place sends a start to
+; the routine every effect shares, which tells this tag from the tags of
+; a source of several columns.
+.counted:       adda.l  d0,a3                   ; the source's DTX1 table
+                lea     DT_PAYLOAD(a3),a5       ; its first row
+                move.l  a5,(a4)+
+                move.l  DT_ROWS(a3),d0
+                move.w  d0,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
+                sub.l   DT_REPEAT(a3),d0
+                move.w  d0,WS_WIDE-WS_SOURCES+2(a4) ; R less RR, the loop
+                move.l  DT_REPEAT(a3),d0
+                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
+                beq.s   .conce                  ; none where it plays once
+                add.l   a5,d0
+                bra.s   .ccell
+.conce:         moveq   #0,d0
+.ccell:         move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                moveq   #-5,d0
+                bset    #2,d5
+                bra.s   .cell
 .resolved:
 
 ; The row's columns stand a stride apart (DTX, abi.md 2): column i's read
@@ -891,6 +967,14 @@ YMXR_init:
                 bsr     ymxr_link
                 lea     ymxr_tick3(pc),a5
                 bsr     ymxr_link
+                lea     ymxr_cnt0(pc),a5
+                bsr     ymxr_linkc
+                lea     ymxr_cnt1(pc),a5
+                bsr     ymxr_linkc
+                lea     ymxr_cnt2(pc),a5
+                bsr     ymxr_linkc
+                lea     ymxr_cnt3(pc),a5
+                bsr     ymxr_linkc
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
@@ -1108,6 +1192,26 @@ ymxr_link:
                 clr.b   TICK_SEL(a5)            ; R0, the register of the kept
                 rts                             ; target init leaves (SPEC.md 5.2.1)
 
+; a5 a counted handler, the same way: its operands linked, its counter
+; at 1 and its cell at 0, so a tick before the first start writes the
+; parked marker and stops the timer, as the handler above does.
+ymxr_linkc:
+                lea     TICKC_PTR(a5),a3
+                move.l  a3,TICKC_STEP(a5)
+                move.l  a3,TICKC_LOOPW(a5)
+                lea     TICKC_CELL(a5),a3
+                move.l  a3,TICKC_LOOPT(a5)
+                move.l  a3,TICKC_LOOPR(a5)
+                clr.l   TICKC_CELL(a5)
+                lea     TICKC_LEFT(a5),a3
+                move.l  a3,TICKC_CNTA(a5)
+                move.l  a3,TICKC_RELDA(a5)
+                move.w  #1,TICKC_LEFT(a5)
+                lea     ymxr_park(pc),a3
+                move.l  a3,TICKC_PTR(a5)
+                clr.b   TICKC_SEL(a5)           ; R0, as init leaves the kept
+                rts                             ; target (SPEC.md 5.2.1)
+
 YMXR_stop:
                 move.l  a6,-(sp)
                 movea.l a0,a6
@@ -1310,6 +1414,11 @@ ymxr_sites:
                 ONEROW  ymxr_one2,$FE,$FFFFFA0F,$707
                 ONEROW  ymxr_one3,$DF,$FFFFFA11,$077
 
+                TICKC   ymxr_cnt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
+                TICKC   ymxr_cnt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
+                TICKC   ymxr_cnt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
+                TICKC   ymxr_cnt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+
 ; The handlers of a target that writes two registers, and of one that
 ; writes three: one an effect, as the three above are.
                 TICKW   ymxr_two0,2,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
@@ -1339,6 +1448,23 @@ TICK_LOOPW      equ     ymxr_tick0_mark-ymxr_tick0+14 ; the place's address
 TICK_CELL       equ     ymxr_tick0_cell-ymxr_tick0    ; row RR, or 0 once
 TICK_SR         equ     ymxr_tick0_row-ymxr_tick0+16  ; the level it drops
 TICK_SIZE       equ     ymxr_tick1-ymxr_tick0
+
+; The counted handler, the same way: the register it selects, the place,
+; the address of the place, the counter's address in the subq that steps
+; it, the loop cell and its address, the rows of a pass through the loop
+; and the counter the reload writes to.
+TICKC_SEL       equ     ymxr_cnt0_row-ymxr_cnt0+3
+TICKC_PTR       equ     ymxr_cnt0_row-ymxr_cnt0+8
+TICKC_STEP      equ     ymxr_cnt0_step-ymxr_cnt0+2
+TICKC_CNTA      equ     ymxr_cnt0_cnt-ymxr_cnt0+2
+TICKC_LOOPT     equ     ymxr_cnt0_mark-ymxr_cnt0+2
+TICKC_LOOPR     equ     ymxr_cnt0_mark-ymxr_cnt0+10
+TICKC_LOOPW     equ     ymxr_cnt0_mark-ymxr_cnt0+14
+TICKC_RELD      equ     ymxr_cnt0_reld-ymxr_cnt0+2
+TICKC_RELDA     equ     ymxr_cnt0_reld-ymxr_cnt0+4
+TICKC_CELL      equ     ymxr_cnt0_cell-ymxr_cnt0
+TICKC_LEFT      equ     ymxr_cnt0_left-ymxr_cnt0
+TICKC_SIZE      equ     ymxr_cnt1-ymxr_cnt0
 
 ; A square's handler, the same way: the register it selects, the row it
 ; stands at, the two rows' difference, and the address of the row it
@@ -1488,19 +1614,22 @@ ymxr_widestart:
                 lea     WS_FX(a0),a3
                 adda.w  d4,a3                   ; the effect's record
                 lea     WS_WIDE(a0),a2
-                move.l  -8(a2,d1.w),d5          ; the source's loop cell, and
+                move.l  -8(a2,d1.w),d5          ; the source's loop cell
+                addq.l  #1,d0
+                beq.s   .two                    ; two columns
+                addq.l  #1,d0
+                bne.w   .counted                ; three columns, or the tag of
+                moveq   #3,d4                   ; a source whose column fills
+                move.w  d6,d0                   ; its byte
+                mulu    #TW3_SIZE,d0
                 move.w  -4(a2,d1.w),d1          ; the stride from one column to
-                addq.l  #1,d0                   ; the next
-                bne.s   .three                  ; two columns, or three
-                moveq   #2,d4
+                lea     ymxr_three0(pc),a5      ; the next
+                bra.s   .handler
+.two:           moveq   #2,d4
                 move.w  d6,d0
                 mulu    #TW2_SIZE,d0
+                move.w  -4(a2,d1.w),d1
                 lea     ymxr_two0(pc),a5
-                bra.s   .handler
-.three:         moveq   #3,d4
-                move.w  d6,d0
-                mulu    #TW3_SIZE,d0
-                lea     ymxr_three0(pc),a5
 .handler:       adda.w  d0,a5                   ; this effect's handler
                 move.l  d5,d0                   ; the loop cell
 ; The row the place stands at, off the running handler where the row does
@@ -1513,6 +1642,8 @@ ymxr_widestart:
                 bmi.s   .square
                 cmp.b   #1,d5
                 beq.s   .at                     ; a source of one row at row 0
+                cmp.b   #4,d5
+                beq.s   .wascounted
                 move.w  d6,d5
                 mulu    #TW2_SIZE,d5
                 lea     ymxr_two0(pc),a2
@@ -1524,6 +1655,12 @@ ymxr_widestart:
 .first:         adda.w  d5,a2                   ; the running handler's first
                 move.l  TW2_PTR1(a2),d3         ; column, which both shapes
                 bra.s   .rows                   ; place at one offset
+.wascounted:    move.w  d6,d5
+                mulu    #TICKC_SIZE,d5
+                lea     ymxr_cnt0(pc),a2
+                adda.w  d5,a2
+                move.l  TICKC_PTR(a2),d3
+                bra.s   .rows
 .running:       move.w  d6,d5
                 mulu    #TICK_SIZE,d5
                 lea     ymxr_tick0(pc),a2
@@ -1540,7 +1677,9 @@ ymxr_widestart:
                 moveq   #1,d3
 ; A register, a place and a loop cell a column, out of the target's row
 ; of the map.
-.at:            moveq   #0,d5
+.at:            cmp.w   #1,d4                   ; a source whose column fills
+                beq.w   .countedaim             ; its byte
+                moveq   #0,d5
                 move.b  FX_TARGET(a3),d5
                 sub.w   #14,d5                  ; the targets of several
                 lsl.w   #3,d5                   ; registers begin at 14 (SPEC.md
@@ -1563,6 +1702,32 @@ ymxr_widestart:
                 move.l  (sp)+,d6                ; which the frame reads it in
                 moveq   #1,d0                   ; a source of several columns:
 .one:           rts                             ; Z where it is one row
+
+; A start of a source whose one column fills its byte: the counted
+; handler aimed at its rows, its counter at the rows from the place to
+; the end and its reload at the rows of the loop, which init resolved
+; beside the source's loop cell.
+.counted:       moveq   #1,d4                   ; the shape this start leaves
+                move.w  d6,d0
+                mulu    #TICKC_SIZE,d0
+                lea     ymxr_cnt0(pc),a5
+                bra.w   .handler
+.countedaim:    lea     WS_WIDE(a0),a2
+                move.w  -4(a2,d1.w),d4          ; R, a pass through the source
+                sub.w   d3,d4                   ; the rows from the place on
+                move.w  -2(a2,d1.w),d5          ; R less RR, the rows of a pass
+                move.l  a4,d1                   ; through the loop
+                add.l   d3,d1                   ; the row the place stands at
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                move.b  FX_TARGET(a3),TICKC_SEL(a5)
+                move.l  d1,TICKC_PTR(a5)
+                move.w  d4,TICKC_LEFT(a5)
+                move.w  d5,TICKC_RELD(a5)
+                move.l  d0,TICKC_CELL(a5)
+                move.b  #4,FX_SHAPE(a3)
+                move.l  a4,FX_FIRST(a3)
+                bra.w   .aimed
 
 ; The targets that write several registers (SPEC.md 2.1): a register and
 ; the column that writes it, one slot a column and eight bytes a target,
