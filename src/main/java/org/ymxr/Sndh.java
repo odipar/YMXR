@@ -86,17 +86,29 @@ final class Sndh {
      *  effects 0 to 3 run Timers A, D, B and C. */
     private static final int[] TIMER_OF_EFFECT = {0, 3, 1, 2};
 
+    /**
+     * Which ticks the file's core reads a row with (BINARIES.md 2.1).
+     * A tool writes {@code CHOSEN} unasked: it stands the core that reads
+     * a row through the program counter under a file whose tunes end
+     * within the reach (5.5), and the one that reads an absolute address
+     * under a file whose tunes end further off. {@code PCREL} reports
+     * such a file rather than standing the other core under it, and
+     * {@code ABSOLUTE} writes the core that reads an address at any
+     * length of file.
+     */
+    enum Ticks { CHOSEN, PCREL, ABSOLUTE }
+
     /** The tag block's text: the title, the composer where there is one,
      *  and a name a subtune where the caller names them; and the core the
-     *  file uses, which {@code monitor}, {@code lean} and {@code pcrel}
-     *  select a switch each. */
+     *  file uses, which {@code monitor} and {@code lean} select a switch
+     *  of and {@code ticks} the third. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor, boolean lean, boolean pcrel) {
+            boolean monitor, boolean lean, Ticks ticks) {
 
-        /** The two switches the tag block reads, with the third off. */
+        /** The two switches the tag block reads, the third chosen. */
         Options(String title, @Nullable String composer, @Nullable List<String> names,
                 boolean monitor, boolean lean) {
-            this(title, composer, names, monitor, lean, false);
+            this(title, composer, names, monitor, lean, Ticks.CHOSEN);
         }
     }
 
@@ -117,13 +129,16 @@ final class Sndh {
      *     numbers
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
-        return of(Binaries.core(options.monitor(), options.lean(), options.pcrel()),
-                tuneFiles, options);
+        return build(null, tuneFiles, options);
     }
 
     /** The same, around the core named. */
     static byte[] of(byte[] core, List<byte[]> tuneFiles, Options options) {
-        checkCore(core, options.monitor(), options.lean(), options.pcrel(), binds(tuneFiles));
+        return build(core, tuneFiles, options);
+    }
+
+    private static byte[] build(byte @Nullable [] given, List<byte[]> tuneFiles,
+                                Options options) {
         int n = tuneFiles.size();
         if (n == 0) {
             throw new IllegalArgumentException("no tune files: an SNDH file has one subtune"
@@ -168,27 +183,54 @@ final class Sndh {
             state = Math.max(state, Tune.getLong(b, Bound.STATE_AT));
         }
         byte[] tags = tags(options, rate, n, frames, claimed);
-        int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
-        byte[] file = combine(core, set, tags, workspace);
-        if (options.pcrel()) {
+        // Which core stands under the tunes: the one the caller named, or
+        // the one the switches select, which reads a row through the
+        // program counter unless the file's tunes end past the reach
+        // (BINARIES.md 5.5).
+        boolean pcrel = options.ticks() != Ticks.ABSOLUTE;
+        byte[] core = given;
+        if (core != null && options.ticks() == Ticks.CHOSEN) {
+            // the caller chose by handing a core over: its flags word says
+            // which ticks it has
+            pcrel = (Tune.getWord(core, CORE_FLAGS_AT) & CORE_PCREL) != 0;
+        }
+        if (core == null) {
+            core = Binaries.core(options.monitor(), options.lean(), pcrel);
+            if (pcrel && options.ticks() == Ticks.CHOSEN
+                    && tunesEnd(core, set, tags) > PCREL_REACH) {
+                pcrel = false;
+                core = Binaries.core(options.monitor(), options.lean(), false);
+            }
+        }
+        checkCore(core, options.monitor(), options.lean(), pcrel, binds(tuneFiles));
+        if (pcrel) {
             // A tick of this core reads its row through a displacement
             // from the instruction that reads it, which reaches
             // PCREL_REACH bytes, so every row of every subtune stands
-            // within that of the handlers (BINARIES.md 5.5). The handlers
-            // stand inside the core, so this reads the last bound tune's
-            // end against the core's first byte and spends the bytes of
-            // the core as the margin.
-            int header = even(12 + tags.length);
-            int tableAt = even(core.length);
-            int last = Tune.getLong(file, header + tableAt + 2 + 4 * (n - 1))
-                    + set.tunes().get(n - 1).length;
+            // within that of the handlers (BINARIES.md 5.5).
+            int last = tunesEnd(core, set, tags);
             if (last > PCREL_REACH) {
                 throw new IllegalArgumentException("the tunes end " + last + " bytes past the"
                         + " core's first byte, and a tick that reads a row through the program"
                         + " counter reaches " + PCREL_REACH);
             }
         }
-        return file;
+        int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
+        return combine(core, set, tags, workspace);
+    }
+
+    /** Where the last bound tune of a file on this core ends, counted from
+     *  the core's first byte (BINARIES.md 3.1): the handlers stand inside
+     *  the core, so a displacement is read against this, and the bytes of
+     *  the core are the margin it spends. */
+    static int tunesEnd(byte[] core, Bound.Set set, byte[] tags) {
+        int at = even(core.length) + 2 + 4 * set.tunes().size();
+        int end = at;
+        for (byte[] tune : set.tunes()) {
+            end = at + tune.length;
+            at = even(end);
+        }
+        return end;
     }
 
     /**
@@ -453,14 +495,16 @@ final class Sndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
-        boolean pcrel = false;
+        Ticks ticks = Ticks.CHOSEN;
         for (String flag : flags) {
             if (flag.equals("-perf")) {
                 monitor = true;
             } else if (flag.equals("-lean")) {
                 lean = true;
             } else if (flag.equals("-pcrel")) {
-                pcrel = true;
+                ticks = Ticks.PCREL;
+            } else if (flag.equals("-abs")) {
+                ticks = Ticks.ABSOLUTE;
             } else if (flag.startsWith("-copies")) {
                 throw tool.usage("not a flag of the tool: " + flag
                         + "; a tune file is packed already");
@@ -491,7 +535,7 @@ final class Sndh {
             title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
         Options options = new Options(title, composer,
-                tunes.size() > 1 ? names : null, monitor, lean, pcrel);
+                tunes.size() > 1 ? names : null, monitor, lean, ticks);
         byte[] sndh;
         try {
             sndh = of(tunes, options);
@@ -504,27 +548,37 @@ final class Sndh {
         Out.write(tool, sndh);
     }
 
-    /** What the file was made of: the core the switches picked, the tags
-     *  written, each subtune's bound tune, and the workspace under them. */
+    /** What the file was made of: the core that went under the tunes,
+     *  read back off the file's flags word, the tags written, each
+     *  subtune's bound tune, and the workspace under them. */
     private static void made(Report report, Options options, List<String> names,
                              List<byte[]> tunes, byte[] sndh) {
         if (!report.says()) {
             return;
         }
-        Binaries.Binary binary = Binaries.binary(options.monitor(), options.lean(),
-                options.pcrel());
-        int core = Binaries.core(options.monitor(), options.lean(), options.pcrel()).length;
+        int at = even(Tune.getWord(sndh, 2) + 2);
+        int flags = Tune.getWord(sndh, at + CORE_FLAGS_AT);
+        boolean monitor = (flags & CORE_MONITOR) != 0;
+        boolean lean = (flags & CORE_LEAN) != 0;
+        boolean pcrel = (flags & CORE_PCREL) != 0;
+        Binaries.Binary binary = Binaries.binary(monitor, lean, pcrel);
+        int core = Binaries.core(monitor, lean, pcrel).length;
         report.say("the core: " + binary.name() + ", " + core + " bytes");
         List<String> switches = new ArrayList<>();
-        if (options.monitor()) {
+        if (monitor) {
             switches.add("-perf, the raster monitor in");
         }
-        if (options.lean()) {
+        if (lean) {
             switches.add("-lean, ticks that neither drop the interrupt level nor write"
                     + " an end of interrupt");
         }
-        if (options.pcrel()) {
-            switches.add("-pcrel, ticks that read a row through the program counter");
+        if (pcrel) {
+            switches.add("ticks that read a row through the program counter");
+        } else if (options.ticks() == Ticks.CHOSEN) {
+            switches.add("ticks that read a row through an absolute address: the tunes end"
+                    + " past the " + PCREL_REACH + " bytes a displacement reaches");
+        } else {
+            switches.add("-abs, ticks that read a row through an absolute address");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));

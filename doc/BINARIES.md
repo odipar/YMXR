@@ -177,6 +177,14 @@ tool selects one by name and checks its flags word (2.3, 2.10).
 | `YMXR_sndh-lean-pcrel.bin` | the lean tick and that row | 6 |
 | `YMXR_sndh-perf-lean-pcrel.bin` | all three | 7 |
 
+A tool asked for a switch selects a core that has it. Where the caller
+names none of the third, the tool selects the core that reads a row
+through the program counter for a file whose last bound tune ends within
+32,767 bytes of the core's first byte, and the core that reads an
+absolute address for a file whose tunes end further off (5.5). A caller
+that names the third reads back that core, or the line of 2.10 where the
+file's tunes end past the reach.
+
 **2.2 Layout**, from the core's first byte:
 
 | offset | bytes | what it is |

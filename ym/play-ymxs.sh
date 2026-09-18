@@ -42,6 +42,11 @@
 #              what each call costs (performance.md, Measure)
 #   -lean      the core whose ticks neither drop the interrupt level nor
 #              write an end of interrupt (performance.md, BINARIES.md)
+#   -pcrel     the core whose ticks read a row through the program
+#              counter, which the tool writes unasked where the file's
+#              tunes stand within the reach (BINARIES.md 5.5)
+#   -abs       the core whose ticks read a row through an absolute
+#              address
 #
 # The run:
 #
@@ -78,7 +83,7 @@ while [ "$left" -gt 0 ]; do
         -v*) vbls=${arg#-v} ;;
         -r*) rows=$arg ;;
         -silent) silent=$arg ;;
-        -k*|-m*|-copies*|-t*|-c*|-perf|-lean) set -- "$@" "$arg" ;;
+        -k*|-m*|-copies*|-t*|-c*|-perf|-lean|-pcrel|-abs) set -- "$@" "$arg" ;;
         -*) echo "ym/play-ymxs.sh does not read $arg" >&2; exit 2 ;;
         *) set -- "$@" "$arg" ;;
     esac

@@ -37,7 +37,9 @@ func main() {
 		case flag == "-lean":
 			options.Lean = true
 		case flag == "-pcrel":
-			options.Pcrel = true
+			options.Ticks = sndh.Pcrel
+		case flag == "-abs":
+			options.Ticks = sndh.Absolute
 		case strings.HasPrefix(flag, "-copies"):
 			t.Usage("not a flag of the tool: " + flag + "; a tune file is packed already")
 		case strings.HasPrefix(flag, "-t"):
@@ -81,29 +83,40 @@ func main() {
 	t.WriteBytes(out)
 }
 
-// made says what the file was made of: the core the switches picked, the
-// tags written, and each subtune's bound tune.
+// made says what the file was made of: the core that went under the
+// tunes, read back off the file's flags word, the tags written, and each
+// subtune's bound tune.
 func made(said *report.Report, options sndh.Options, names []string, tunes [][]byte,
 	file []byte) {
 	if !said.Says() {
 		return
 	}
-	core, err := binaries.Read(binaries.Named(options.Monitor, options.Lean, options.Pcrel))
+	at := even(int(ymxr.GetWord(file, 2)) + 2)
+	flags := ymxr.GetWord(file, at+sndh.CoreFlagsAt)
+	monitor, lean := flags&1 != 0, flags&2 != 0
+	pcrel := flags&4 != 0
+	core, err := binaries.Read(binaries.Named(monitor, lean, pcrel))
 	if err != nil {
 		return
 	}
-	said.Say(fmt.Sprintf("the core: %s, %d bytes", binaryName(options), len(core)))
+	said.Say(fmt.Sprintf("the core: %s, %d bytes",
+		binaries.Named(monitor, lean, pcrel), len(core)))
 	var switches []string
-	if options.Monitor {
+	if monitor {
 		switches = append(switches, "-perf, the raster monitor in")
 	}
-	if options.Lean {
+	if lean {
 		switches = append(switches, "-lean, ticks that neither drop the interrupt level"+
 			" nor write an end of interrupt")
 	}
-	if options.Pcrel {
-		switches = append(switches, "-pcrel, ticks that read a row through the program"+
-			" counter")
+	if pcrel {
+		switches = append(switches, "ticks that read a row through the program counter")
+	} else if options.Ticks == sndh.Chosen {
+		switches = append(switches, fmt.Sprintf("ticks that read a row through an absolute"+
+			" address: the tunes end past the %d bytes a displacement reaches", 32767))
+	} else {
+		switches = append(switches, "-abs, ticks that read a row through an absolute"+
+			" address")
 	}
 	if len(switches) == 0 {
 		said.Row("the switches", "none, the plain core")
@@ -170,6 +183,8 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 		len(file)-len(core)-images-bound))
 }
 
-func binaryName(options sndh.Options) string {
-	return binaries.Named(options.Monitor, options.Lean, options.Pcrel)
+// even is at rounded up to an even address, as the file's parts stand
+// (doc/BINARIES.md 3.1).
+func even(at int) int {
+	return (at + 1) &^ 1
 }
