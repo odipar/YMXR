@@ -143,6 +143,27 @@ the value the register keeps is reported, which 1.1.1 allows and 7.3
 reports through 4.4; the reading that passes is the one the clauses have,
 and they stand.
 
+**5.4 The fourth run**, the same day, against the kit at 14 tunes, with
+`counted` in it and a fourth implementer. Every record byte for byte,
+`wrong-version` included; `READ.md` named documents alone; and `NOTES.md`
+had 10 entries with 1 marked *decides output*, so the run failed rule 3
+on that one. Version 5, bit 31 of an index entry and the layout that puts
+a tune's DTX1 tables before its image were read as they stand, and the
+reader reached the counted source of each of the six targets. Two clauses
+changed:
+
+- 7.3 defined `source` as the number the last row set the column to and
+  then named two events that leave it as it is, neither of them a stop
+  through the source column. The rule covers that stop, since the number
+  the row sets is 0, and the two exceptions invite the reading that a
+  stop keeps the number of the source it stopped: 228 rows of these tunes
+  set the source column to 0 over an earlier 1 to 127. The clause names
+  the stop now.
+- 3.1.1 reads an index entry as bits 30 to 0 the offset and bit 31 the
+  mark of a counted source, where a reader of a version 3 or 4 file could
+  read the four bytes as one offset, since 3.1.6 keeps bit 31 at 0 there.
+  The clause reads "whichever the version" now.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |
