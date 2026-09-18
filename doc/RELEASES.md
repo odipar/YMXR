@@ -34,6 +34,30 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.3, 2026-09-18
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.3>, built from the commit
+tagged `v0.4.3`.
+
+The document checks are one package. Every file a tool is built from stands
+as 0.4.2 has it - `go/`, `68k/`, `bin/` and every document - so the player
+is that release's, the eleven tools are its executables, and the ten dumps
+under `ym/test` convert to the tune files it wrote.
+
+- **`org.ymxr.doc.Documents`** reads a link that resolves, one wrap width, a
+  glossary in order and the rows it is read from. Those four were written
+  in each of the four repositories of the family, and the copies had
+  drifted in both directions: this tree read fenced blocks and anchors
+  where ST4 skipped them, and reported the line of no broken link, which
+  YMXS did. The count of documents read, which says the check is awake,
+  came from here. The package is carried from DTX, where it is kept, as
+  `org.ymxr.style` is.
+- **One drift the package exposed.** The row parser here returned two
+  cells, the term and the third column, where the other three return all
+  three; its two callers read `row[2]` now. The check that caught the shift
+  is the one asserting it had opened more than twenty rows.
+- The tools read DTX 0.11.9 and YMXS 0.4.3.
+
 ### 0.4.2, 2026-09-18
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.2>, built from the commit
