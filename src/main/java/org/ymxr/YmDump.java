@@ -1,6 +1,7 @@
 package org.ymxr;
 
 import java.nio.charset.StandardCharsets;
+import org.ymxs.ym.Lha;
 
 /**
  * Reads a YM5!/YM6! register dump, as
@@ -16,7 +17,7 @@ import java.nio.charset.StandardCharsets;
  * come out as 16 register vectors.
  *
  * <p>Distributed {@code .ym} files are usually LHA archives containing this data;
- * the reader unpacks them itself, through {@link Lha}.
+ * the reader unpacks them itself, through {@link org.ymxs.ym.Lha}.
  */
 public final class YmDump {
 

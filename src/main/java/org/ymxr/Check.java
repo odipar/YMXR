@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.dtx.Table;
 import org.ymxs.tool.Tool;
+import org.ymxs.ym.Lha;
 
 /**
  * A dump converted and replayed against itself: the tune file's table

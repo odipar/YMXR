@@ -782,13 +782,13 @@ a version of it a tag of that directory, `go/v0.1.0` beside `v0.1.0`.
 `pom.xml` or a `68k/*.S` source is newer than `.built`: `mvn -q
 process-classes dependency:build-classpath` with standard input closed;
 then runs the class with `java -ea`. The build needs Java 23, Maven, rmac
-(`-Drmac=PATH` names another), and DTX `0.11.7` and YMXS `0.4.1` in the
+(`-Drmac=PATH` names another), and DTX `0.11.8` and YMXS `0.4.2` in the
 local Maven repository, `mvn install` in each checkout.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the five 68000 binaries and DTX's twenty-two images
 embedded; it runs by itself. The Go tree requires the modules
-`github.com/odipar/dtx/go v0.11.7` and `github.com/odipar/ymxs/go v0.4.1`,
+`github.com/odipar/dtx/go v0.11.8` and `github.com/odipar/ymxs/go v0.4.2`,
 which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and

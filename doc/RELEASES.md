@@ -34,6 +34,34 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.2, 2026-09-18
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.2>, built from the commit
+tagged `v0.4.2`.
+
+The style check, and the LHA decoder read from YMXS rather than copied.
+Every file under `68k/` stands as v0.4.1 has it, so the player is that
+release's, and the ten dumps under `ym/test` convert to the tune files a
+build of the tag before writes, measured.
+
+- **The struck list is a document.** The check was a list of 104 phrases in
+  a test class, matched as substrings. `org.ymxr.style` reads `STRUCK.md` -
+  a section a rule of AGENTS.md, an entry a name, a pattern and the samples
+  the pattern is and is not in - and runs over every document and every
+  code comment. The package is carried from DTX, which wrote it, and the
+  four repositories of the family run the same 370 lines. The cleft, struck
+  in AGENTS.md since it was written and encoded in no list, found 30 of the
+  50 lines reworded.
+- **A code span is quoted material.** The check read what stands between
+  backticks as prose, so tools.md reported a hit on two of the messages the
+  tools write, which it quotes. That line stands in every copy now.
+- **`Lha.java` goes.** It was 351 lines of code identical to YMXS's but for
+  the class modifier, carried because the two calls it needs were
+  package-private there, beside a Go tree that already imported the module
+  and called the exported pair. YMXS 0.4.2 makes them public and this reads
+  them.
+- The tools read DTX 0.11.8 and YMXS 0.4.2.
+
 ### 0.4.1, 2026-09-17
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.1>, built from the commit
