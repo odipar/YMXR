@@ -201,13 +201,12 @@ TW_SEL1 = TW_PTR1 = (0, 0)
 # The registers a target writes and the column of the row each writes,
 # in the order a tick writes them (SPEC.md 2.1): the column the marker
 # stands in comes last, so the move that writes it leaves the marker in N
-# and the handler tests it there (3.2.1). Target 20 writes two registers
-# of eight bits, which this version does not encode (2.1.3).
+# and the handler tests it there (3.2.1).
 TARGETS = {n: [(n, 0)] for n in range(14)}
 TARGETS.update({14: [(0, 0), (1, 1)], 15: [(2, 0), (3, 1)], 16: [(4, 0), (5, 1)],
                 17: [(0, 0), (8, 2), (1, 1)], 18: [(2, 0), (9, 2), (3, 1)],
                 19: [(4, 0), (10, 2), (5, 1)],
-                21: [(11, 0), (12, 1), (13, 2)],
+                20: [(11, 0), (12, 1)], 21: [(11, 0), (12, 1), (13, 2)],
                 22: [(8, 1), (6, 0)], 23: [(9, 1), (6, 0)], 24: [(10, 1), (6, 0)]})
 
 
@@ -931,6 +930,19 @@ def inside(code, symbols, bound, tune, workspace):
     return fired
 
 
+def built(name, tune):
+    """A tune written here through YMXS's form rather than converted from a
+    dump, as a file to play: ymxs-to-ymxr converts it, and the version word
+    of the file comes back beside its path (SPEC.md 3.3.5)."""
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxs-to-ymxr"), "-silent"],
+                       input=json.dumps(tune).encode(), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    at = os.path.join(tempfile.mkdtemp(), name + ".ymxr")
+    with open(at, "wb") as f:
+        f.write(r.stdout)
+    return at, struct.unpack(">H", r.stdout[4:6])[0]
+
+
 def unplaced(code, symbols):
     """A start that moves no place, and no start on that timer before it:
     the place is row 0 of the source the row names (SPEC.md 4.1 step 4).
@@ -954,13 +966,7 @@ def unplaced(code, symbols):
                    "source": column(0, 1), "prescaler": column(0, 50),
                    "count": column(0, 200), "timerReset": column(0, 1),
                    "placeReset": column(0, 0)}}]}
-    work = tempfile.mkdtemp()
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxs-to-ymxr"), "-silent"],
-                       input=json.dumps(tune).encode(), capture_output=True)
-    assert r.returncode == 0, r.stderr.decode()
-    at = os.path.join(work, "unplaced.ymxr")
-    with open(at, "wb") as f:
-        f.write(r.stdout)
+    at = built("unplaced", tune)[0]
     frames = check(at, code, symbols)[0]
     return "a start that moves no place stands at row 0: %d frames" % frames
 
@@ -1000,17 +1006,48 @@ def voices(code, symbols):
                    "source": column(starts, 2), "prescaler": column(starts, 100),
                    "count": column(starts, 90), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
-    work = tempfile.mkdtemp()
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxs-to-ymxr"), "-silent"],
-                       input=json.dumps(tune).encode(), capture_output=True)
-    assert r.returncode == 0, r.stderr.decode()
-    at = os.path.join(work, "voices.ymxr")
-    with open(at, "wb") as f:
-        f.write(r.stdout)
-    assert struct.unpack(">H", r.stdout[4:6])[0] == TUNE_VERSIONS[1], \
+    at, version = built("voices", tune)
+    assert version == TUNE_VERSIONS[1], \
         "a tune with a source of several columns is version 4 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
     return ("a target of three registers and one of two: %d frames, %d ticks"
+            % (frames, ticks))
+
+
+def envelope(code, symbols):
+    """setEnvelope (SPEC.md 2.1.3): a source of two columns on target 20,
+    the marker in bit 7 of the envelope period's high byte, so that column
+    is a value of 0 to 127. The rows sweep the period under a repeating
+    shape, with voice A on the envelope (R8 bit 4) and its tone open.
+
+    The two registers of this target are R11 and R12, both of eight bits,
+    where every other wide target marks a register of seven bits or fewer;
+    the model reads the marker off the high byte and check reads the
+    player against it.
+    """
+    rows = 24
+    def column(ats, value):
+        return [value if r in ats else -1 for r in range(rows)]
+    starts = (0, 12)
+    tune = {"format": "ymxs", "version": 4, "tunes": [{
+        "title": "The envelope period a source", "composer": "",
+        "writer": "68k/test/emu/test_ymxr.py", "rate": 50, "rows": rows,
+        "repeat": 0,
+        "sources": [
+            {"name": "sweep", "repeat": 0,
+             "values": [[0, 2], [128, 3], [0, 5], [64, 8], [0, 13], [192, 21]]}],
+        "registers": {"r7": column((0,), 0x3E), "r0": column((0,), 0x80),
+                      "r1": column((0,), 1), "r8": column((0,), 0x10),
+                      "r13": column(starts, 10)},
+        "timerB": {"shape": column(starts, 0), "target": column(starts, 20),
+                   "source": column(starts, 1), "prescaler": column(starts, 64),
+                   "count": column(starts, 120), "timerReset": column(starts, 1),
+                   "placeReset": column(starts, 1)}}]}
+    at, version = built("envelope", tune)
+    assert version == TUNE_VERSIONS[1], \
+        "a tune with a source of several columns is version 4 (SPEC.md 3.3.5)"
+    frames, ticks = check(at, code, symbols)[:2]
+    return ("the envelope period a source of two columns: %d frames, %d ticks"
             % (frames, ticks))
 
 
@@ -1914,6 +1951,7 @@ def main():
         print("    %s" % patched_code_follows_the_subtune(defines, tunes))
         print("    %s" % unplaced(code, symbols))
         print("    %s" % voices(code, symbols))
+        print("    %s" % envelope(code, symbols))
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
     cycles_of = None
