@@ -787,7 +787,10 @@ which a waiting process writes `run: a build has held <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The
 build needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX
 `0.11.10` and YMXS `0.4.4` in the local Maven repository, `mvn install` in
-each checkout.
+each checkout. `.github/workflows/test.yml` does that on a GitHub runner
+and then runs `mvn test`, with Go, rmac, unicorn and DTX's `dtx-write` on
+it so that no check skips. No push starts it: a caller starts it from the
+Actions tab or by `gh workflow run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the five 68000 binaries and DTX's twenty-two images
