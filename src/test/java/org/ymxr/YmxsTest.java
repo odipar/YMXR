@@ -201,6 +201,32 @@ final class YmxsTest {
     }
 
     @Test
+    void aSourceOnTheEnvelopePeriodIsCountedAndReachesTheWholeRange() {
+        // Both registers of `setEnvelope` read every bit of their byte, so
+        // a source on it is counted: its two columns are whole bytes, it
+        // reaches a period of 0 to 65,535, and the file is version 6
+        // (SPEC.md 2.1.3, 3.3.5).
+        org.ymxs.YMXS.Pair sweep = new org.ymxs.YMXS.Pair("period",
+                Tunes.repeating(List.of(new org.ymxs.YMXS.Two(0, 200),
+                        new org.ymxs.YMXS.Two(255, 255)), 0));
+        List<Row> rows = List.of(row(Map.of(), Timer.A, new org.ymxs.YMXS.StartPair(
+                new org.ymxs.YMXS.SetEnvelope(), sweep,
+                new Timing(Chip.prescaler(4), 100, true, true))));
+        Schema.Made made = Schema.of(built(rows, 0));
+        byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
+                YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report()).file();
+        assertEquals(org.ymxr.Tune.VERSION_WIDE_COUNTED, org.ymxr.Tune.getWord(file, 4),
+                "a tune with a counted source of several columns is version "
+                        + org.ymxr.Tune.VERSION_WIDE_COUNTED);
+        TuneFile read = TuneFile.read(file);
+        assertTrue(read.counted().get(0), "bit 31 of the index entry marks it counted");
+        assertEquals(200, read.sources().get(0).column(1)[0] & 0xFF,
+                "row 0 of the high byte's column is the value");
+        assertEquals(255, read.sources().get(0).column(1)[1] & 0xFF,
+                "and its last row is 255, where a marker would leave 127");
+    }
+
+    @Test
     void aCountedSourceOnTheMixerCarriesTheTwoPortDirections() {
         // A tick of a counted source writes the row whole, so the two
         // port directions of R7 stand in the source: the structure's

@@ -50,6 +50,10 @@ const (
 	// BoundVersionCounted is the version of one with a source whose column
 	// fills its byte, which a player counts the rows of.
 	BoundVersionCounted = ymxr.VersionCounted
+
+	// BoundVersionWideCounted is the version of one with a counted source
+	// of several columns.
+	BoundVersionWideCounted = ymxr.VersionWideCounted
 	StateAt      = 12
 	ImageAt      = 16
 	BoundTableAt = 20

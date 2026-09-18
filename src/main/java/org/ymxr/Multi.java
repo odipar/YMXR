@@ -36,6 +36,10 @@ final class Multi {
      *  fills its byte. */
     static final int VERSION_COUNTED = Tune.VERSION_COUNTED;
 
+    /** The version of a multi file with a counted source of several
+     *  columns in a tune of it (SPEC.md 3.3.5). */
+    static final int VERSION_WIDE_COUNTED = Tune.VERSION_WIDE_COUNTED;
+
     static final int COUNT_AT = 6;
     static final int INDEX_AT = 8;
 
@@ -115,10 +119,10 @@ final class Multi {
             throw new IllegalArgumentException("not a YMXM file");
         }
         int version = Tune.getWord(file, 4);
-        if (version != VERSION && version != VERSION_COLUMNS
-                && version != VERSION_COUNTED) {
+        if (version < VERSION || version > VERSION_WIDE_COUNTED) {
             throw new IllegalArgumentException("version " + version + " is not " + VERSION
-                    + ", " + VERSION_COLUMNS + " or " + VERSION_COUNTED);
+                    + ", " + VERSION_COLUMNS + ", " + VERSION_COUNTED + " or "
+                    + VERSION_WIDE_COUNTED);
         }
         int count = Tune.getWord(file, COUNT_AT);
         if (count < 1 || count > MOST) {

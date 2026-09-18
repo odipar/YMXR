@@ -1,8 +1,8 @@
 # The conformance kit
 
-**1.** The kit is 14 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
+**1.** The kit is 15 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
 beside its `.rows` (3), and a reference record of each (SPEC.md 7):
-18,654 entries over the 14 tunes, one line each, the first line of each
+18,783 entries over the 15 tunes, one line each, the first line of each
 record among them. The kit tests the two documents,
 [SPEC.md](../SPEC.md) and YMXS's `doc/SPEC.md`: an implementer who has
 read them alone writes a reader (2), and a record equal to the reference
@@ -30,7 +30,7 @@ published music, by Jochen Hippel, Mad Max and Scavenger as their
 headers record, one of them converted twice (`circus`, `plays-once`),
 and two built (`preempt`, `retune`); `four-timers`, `voices`, `envelope`
 and `counted` are built by code and `wrong-version` is `chambers` with
-the version word $0006. The music is its composers', and the
+the version word $0007. The music is its composers', and the
 repository's LICENSE covers the code alone: a copy of the kit has the
 tunes in it for the exercise alone.
 
@@ -181,7 +181,8 @@ changed:
 | `voices` | version 4 (SPEC.md 3.3.5): the four kinds of target that write several registers, one an effect at 50 Hz, and the marker in a different column under each - the coarse nibble of a voice on Timer A and of a tone on Timer C, the noise period on Timer D, the envelope shape of a buzzer on Timer B; a source of several columns repeating to row 0, one repeating to a row above it, one that plays once and stops its timer at its marker, and a start over a running source of the same row count that leaves the place where it stands |
 | `envelope` | version 4 (SPEC.md 3.3.5): `setEnvelope`, the one target whose marked register reads eight bits, so the marker's column is the envelope period's high byte, 0 to 127, and the column beside it a whole byte; a source of two columns repeating to a row above 0, one that plays once and stops its timer at its marker with 127 in a row of its marked column, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `counted` | version 5 (SPEC.md 3.3.5): a counted source on each of the six targets whose register reads every bit of its byte - `setR0` and `setR4` on Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and `setR2` on Timer C - each with rows whose bit 7 is set, where a source the marker ends reads that bit as its end; an index entry whose bit 31 is 1 and whose bits 30 to 0 are the offset (SPEC.md 3.1.1); a square on R8 in the same file, which the marker ends, so a player reads the end of a source from its index entry rather than from the version word; a counted source of one row, one that plays once and stops its timer at its count, one repeating to a row above 0; a target set while an effect runs and read at the next start; a row that sets R12 as it stops the effect running on it |
-| `wrong-version` | the version word $0006: a reader produces an empty record |
+| `envelope-counted` | version 6 (SPEC.md 3.3.5): a counted source of two columns on `setEnvelope`, whose two registers read every bit of their byte, so its rows are whole bytes and a tick counts them; the high byte runs past 127, where a marked source of that target stops, and reaches 255, an envelope period of 65,323; one source repeating to a row above 0 and one that plays once and stops its timer at its count, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
+| `wrong-version` | the version word $0007: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.

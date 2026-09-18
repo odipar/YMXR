@@ -524,6 +524,58 @@ final class BuiltTunes {
         return new Sources.Source(Effects.SID, 0, new byte[][] {rows}, repeat, true);
     }
 
+    /**
+     * `setEnvelope` with a counted source (SPEC.md 2.1.3), so the kit has
+     * a tune of version 6: both registers of that target read every bit of
+     * their byte, so the rows of a source on it are whole bytes and a tick
+     * counts them. The high byte reaches 255, an envelope period of 65,323
+     * and a cycle of 8.36 seconds, which a marked source could not write:
+     * bit 7 of its column would be the marker.
+     *
+     * <p>The shapes beside that: a counted source of two columns repeating
+     * to a row above 0, one that plays once and stops its timer at its
+     * count, a start that changes the source on a running timer, and the
+     * envelope shape set from column 13 while the period ticks.
+     */
+    static Tune.Written envelopeCounted() {
+        int frames = 64;
+        byte[][] c = new byte[Columns.C][frames];
+        // The registers no effect runs: the mixer with voice A's tone
+        // alone, voice A's period, and its volume on the envelope. The
+        // effect owns R11 and R12, which rule 1 has every row leave unset.
+        c[7][0] = (byte) (0x80 | 0x3E);
+        c[0][0] = 0x60;
+        c[1][0] = (byte) (0x80 | 1);
+        c[8][0] = (byte) (0x80 | 0x10);
+        c[13][0] = (byte) (0x80 | 10);
+        c[13][20] = (byte) (0x80 | 14);                  // the shape while it runs
+        int start = 0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET;
+        int e0 = Columns.EFFECT;
+        // effect 0, Timer A: setEnvelope, the period swept by a source
+        // repeating to row 2, and at row 40 a second source on the running
+        // timer, which plays once and stops the timer at its count
+        c[e0][0] = (byte) (0x80 | 20);
+        c[e0 + 1][0] = (byte) (0x80 | 1);
+        c[e0 + 2][0] = (byte) (start | 5);
+        c[e0 + 3][0] = 100;
+        c[e0 + 1][40] = (byte) (0x80 | 2);
+        c[e0 + 2][40] = (byte) (start | 7);
+        c[e0 + 3][40] = (byte) 200;
+        // A counted source of two columns: column 0 the low byte of the
+        // period and column 1 the high byte, both whole (SPEC.md 3.1.6).
+        // The high byte runs past 127 in both, which is where a marked
+        // source of this target stops.
+        byte[][] sweep = {{0, (byte) 0x80, 0x40, (byte) 0xC0, 0x20, (byte) 0xA0},
+                          {1, 60, (byte) 130, (byte) 200, (byte) 255, (byte) 180}};
+        byte[][] fall = {{(byte) 0xFF, (byte) 0xAA, 0x55, (byte) 0xEB},
+                         {(byte) 255, (byte) 200, (byte) 140, 20}};
+        Sources sources = new Sources(List.of(
+                new Sources.Source(Effects.BUZZER, 0, sweep, 2, true),
+                new Sources.Source(Effects.BUZZER, 0, fall, fall[0].length, true)));
+        Columns columns = new Columns(c, 0, 0b0001);
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
+    }
+
     /** Three tones and no noise, the same under both tunes' effects. */
     private static byte[][] bed(int frames) {
         byte[][] v = new byte[16][frames];

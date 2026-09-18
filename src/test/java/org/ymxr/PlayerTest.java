@@ -177,7 +177,7 @@ final class PlayerTest {
         assertTrue(e.size() > 20, "the player's equates read as " + e.size());
         assertEquals(java.nio.ByteBuffer.wrap(Bound.MAGIC).getInt(), e.get("YMXR_MAGIC"),
                 "the player's magic is the bound tune's");
-        assertEquals(Bound.VERSION_COUNTED, e.get("YMXR_VERSION"),
+        assertEquals(Bound.VERSION_WIDE_COUNTED, e.get("YMXR_VERSION"),
                 "the newest version the player reads (SPEC.md 3.3.5)");
         assertEquals(Columns.C, e.get("YMXR_COLUMNS"));
         assertEquals(Tune.FRAME_RATE_AT, e.get("TF_RATE"));

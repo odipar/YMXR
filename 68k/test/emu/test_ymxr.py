@@ -89,12 +89,12 @@ STUB_FRAMES = 2000
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
 # (BINARIES.md 1): 3 where every source of the tune is one column and 4
 # where one has several, and a reader and the player read both.
-TUNE_VERSIONS = (3, 4, 5)
+TUNE_VERSIONS = (3, 4, 5, 6)
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
 COUNTED = 1 << 31
-BOUND_VERSIONS = (3, 4, 5)
+BOUND_VERSIONS = (3, 4, 5, 6)
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209
@@ -215,6 +215,7 @@ PCREL = False
 
 TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = ONE_SEL = ONE_VAL = 0
 TICKC_SEL = TICKC_PTR = TICKC_LEFT = 0
+TWC_SEL1 = TWC_PTR1 = TWC_LEFT = 0
 TW_SEL1 = TW_PTR1 = (0, 0)
 
 # The registers a target writes and the column of the row each writes,
@@ -1103,10 +1104,10 @@ def envelope(code, symbols):
                    "count": column(starts, 120), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
     at, version = built("envelope", tune)
-    assert version == TUNE_VERSIONS[1], \
-        "a tune with a source of several columns is version 4 (SPEC.md 3.3.5)"
+    assert version == TUNE_VERSIONS[3], \
+        "a source on setEnvelope is counted, so the tune is version 6 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
-    return ("the envelope period a source of two columns: %d frames, %d ticks"
+    return ("the envelope period a counted source of two columns: %d frames, %d ticks"
             % (frames, ticks))
 
 
@@ -1342,7 +1343,23 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                 assert timers.mode[i] == 0, "frame %d: effect %d's timer runs with no source" % (f, i)
             place = model.place_address(i)
             if place is not None and fx["running"]:
-                if model.counted(i):
+                if model.counted(i) and model.wide(i):
+                    # the counted handler of several columns: the place of
+                    # the column it writes first, that column's register,
+                    # and the rows it has left (68k/YMXR.S, TICKW counted)
+                    at = CODE + symbols["ymxr_env%d" % i]
+                    assert m.place(at, TWC_PTR1) == place, \
+                        "frame %d: effect %d's place is %x, not %x" % (
+                            f, i, m.place(at, TWC_PTR1), place)
+                    assert m.byte(at + TWC_SEL1) == TARGETS[fx["using"]][0][0], \
+                        "frame %d: effect %d's counted handler selects R%d first, not R%d" % (
+                            f, i, m.byte(at + TWC_SEL1), TARGETS[fx["using"]][0][0])
+                    assert m.word(at + TWC_LEFT) == model.left(i), \
+                        "frame %d: effect %d has %d rows left, not %d" % (
+                            f, i, m.word(at + TWC_LEFT), model.left(i))
+                    assert m.long(TIMER[i]["vector"]) == at, \
+                        "frame %d: effect %d's vector is not its counted handler's" % (f, i)
+                elif model.counted(i):
                     # the counted handler: its place, the register it
                     # selects and the rows it has left (68k/YMXR.S, TICKC)
                     at = CODE + symbols["ymxr_cnt%d" % i]
@@ -1421,12 +1438,14 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
             timers.apply(m.mfp)
             if model.counted(i):
                 if then != "stop":
-                    at = CODE + symbols["ymxr_cnt%d" % i]
-                    assert m.place(at, TICKC_PTR) == model.place_address(i), \
+                    wide = model.wide(i)
+                    at = CODE + symbols["ymxr_%s%d" % ("env" if wide else "cnt", i)]
+                    ptr, left = (TWC_PTR1, TWC_LEFT) if wide else (TICKC_PTR, TICKC_LEFT)
+                    assert m.place(at, ptr) == model.place_address(i), \
                         "frame %d: after a tick effect %d's place is off" % (f, i)
-                    assert m.word(at + TICKC_LEFT) == model.left(i), \
+                    assert m.word(at + left) == model.left(i), \
                         "frame %d: after a tick effect %d has %d rows left, not %d" % (
-                            f, i, m.word(at + TICKC_LEFT), model.left(i))
+                            f, i, m.word(at + left), model.left(i))
                 else:
                     assert timers.mode[i] == 0, \
                         "frame %d: effect %d ran out and its timer runs on" % (f, i)
@@ -2112,6 +2131,7 @@ def main():
     code, symbols = assemble(defines=defines)
     global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL, ONE_SEL, ONE_VAL, TW_SEL1, TW_PTR1
     global TICKC_SEL, TICKC_PTR, TICKC_LEFT
+    global TWC_SEL1, TWC_PTR1, TWC_LEFT
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
     SQ_SEL = equate("SQ_SEL", symbols)
@@ -2122,6 +2142,9 @@ def main():
     TW_PTR1 = (equate("TW2_PTR1", symbols), equate("TW3_PTR1", symbols))
     TICKC_SEL = equate("TICKC_SEL", symbols)
     TICKC_PTR = equate("TICKC_PTR", symbols)
+    TWC_SEL1 = equate("TWC_SEL1", symbols)
+    TWC_PTR1 = equate("TWC_PTR1", symbols)
+    TWC_LEFT = equate("TWC_LEFT", symbols)
     TICKC_LEFT = equate("TICKC_LEFT", symbols)
     print("the player: %d bytes%s%s" % (len(code),
                                        ", the raster monitor in" if perf else "",

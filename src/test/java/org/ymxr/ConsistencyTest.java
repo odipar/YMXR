@@ -324,10 +324,11 @@ final class ConsistencyTest {
                     + " sentence reads " + reads);
         }
         assertEquals(0x7F * 256L + 0xFF, number(said.group(1)),
-                "the period the marker's bit leaves is not the one 2.1.3 names");
+                "the period 2.1.3 names for 4.19 seconds is another");
         assertEquals(0xFFFF, number(said.group(3)),
-                "the period a row writes is not the one 2.1.3 names");
-        assertEquals(1, Columns.MARKER[20], "target 20 marks another column");
+                "the period a source of this target reaches is not the one 2.1.3 names");
+        assertEquals(-1, Columns.MARKER[20],
+                "a source on target 20 is counted, so no column of it marks (2.1.3)");
     }
 
     /**

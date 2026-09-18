@@ -23,7 +23,7 @@ frame reporting -1 is one line, and the record ends with it. `<lines>`
 counts the lines, the first line among them, so the program reads at
 most `<lines>` - 1 frames, and fewer where the record ends first; it is
 not the F of `SPEC.md` 7.4, which counts frames alone. For a file
-whose version word is other than $0003, $0004 or $0005 (`SPEC.md`
+whose version word is other than $0003, $0004, $0005 or $0006 (`SPEC.md`
 3.3.5), the
 record is empty and the program's output is empty.
 
@@ -71,6 +71,7 @@ a file outside those is outside this task.
 | `four-timers.ymxr` | 211 |
 | `voices.ymxr` | 161 |
 | `envelope.ymxr` | 129 |
+| `envelope-counted.ymxr` | 129 |
 | `counted.ymxr` | 81 |
 | `wrong-version.ymxr` | 0 |
 
