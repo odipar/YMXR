@@ -112,19 +112,23 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | 9 | 1 | `S`, the source count, from the tune file |
 | 10 | 2 | bytes 10 and 11 of the tune file, copied; the player skips them |
 | 12 | 4 | the state block's bytes: the format block's field at +4 of the image the table is in |
-| 16 | 4 | where the image begins, signed: align(24 + 4`S`) in a bound tune written alone (1.3), and negative in an SNDH file (3.1) |
+| 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
 | 20 | 4 | where this tune's table stands, from the image's first byte: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
 | 24 | 4`S` | the source index: for source 1 to `S`, a long where its DTX1 table begins |
-| | | the image, on a long, in a bound tune written alone |
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
+| | | the image, on a long, in a bound tune written alone |
+
+The tables stand before the image so that a source's rows stand beside
+the header however long the image is: a player whose ticks read a row
+through a displacement reaches 32,767 bytes (5.5).
 
 **1.3 A bound tune written alone.** A tool writes it from one tune file:
 bytes 6 to 11 are the tune file's; the field at 12 is the field at +4 of
 the format block of the image the packager makes of the tune's DTX2 table
-alone; the field at 16 is align(24 + 4`S`); the field at 20 is that
-format block's field at +8; the image is at the field at 16; DTX1 table 1
-is at align(the image's end) and each next at align(the end of the one
-before); the index is those offsets.
+alone; the field at 20 is that format block's field at +8; DTX1 table 1
+is at align(24 + 4`S`) and each next at align(the end of the one before);
+the index is those offsets; the field at 16 is align(the last table's
+end), where the image stands.
 
 **1.4 A set.** A set shares images. The *shape* of a DTX2 table is its
 variant, its unit `k`, its ring `N`, its width `W` and its copies flag
@@ -145,7 +149,9 @@ field at 16 written 0; 3.1 places the images and patches the field.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
    header, `R` and `RR` (DTX, SPEC.md 1).
 5. The field at 9 and the index, then of each source's table its `R`,
-   its `RR` and its rows from byte 16.
+   its `RR` and its rows from byte 16. A player of 5.5 measures each
+   source against its handlers here and reports -1 for one past their
+   reach.
 6. Report 0.
 
 The player skips fields 6, 10 and 12. The host supplies the frame clock
@@ -288,9 +294,14 @@ the core's first byte, at H.
 | a pad | 12 + T | a zero byte where 12 + T is odd |
 | the core | H | the core (2), its field at 28 patched with even(L) and its field at 32 with W below |
 | the subtune table | even(L) from the core | the word `N`, then `N` longs, each a bound tune's offset from the core (2.5) |
-| the images | from even(L) + 2 + 4`N`, each on a long, from the core | the images of the set (1.4), in group order |
-| the bound tunes | subtune 1 at even(the end of the last image), subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset, a negative figure |
-| the workspace | W = even(the end of the last bound tune), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
+| the bound tunes | subtune 1 at even(L) + 2 + 4`N`, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset |
+| the images | from even(the end of the last bound tune), each on a long, from the core | the images of the set (1.4), in group order |
+| the workspace | W = even(the end of the last image), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
+
+The subtunes stand before the images so that a subtune's sources stand
+beside the core: a player whose ticks read a row through a displacement
+reaches 32,767 bytes (5.5), and an image between the two would be in the
+way.
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
@@ -563,6 +574,18 @@ row for each 200 the accumulator reaches (4.7, 4.8), and restores the
 vector at the end (4.6 step 6). The `FLAG` letters list the timers the
 set claims: a host that ticks from a timer selects one outside them, and
 a set whose letters contain `c` plays from the VBL or another clock.
+
+**5.5 A player that reads a row through a displacement.** `YMXR_PCREL=1`
+assembles a player whose tick reads its row through a signed word
+displacement from the instruction that reads it rather than through an
+absolute address, 12 cycles less a tick that writes a row
+([performance.md](performance.md)). Every row of every source then stands
+within 32,767 bytes of the player's handlers: init measures each source
+against them and reports -1 for one further off (1.5 step 5). The layouts
+of 1.3 and 3.1 put a tune's DTX1 tables beside its header and a set's
+subtunes beside the core, so a host that loads one file and passes the
+player a tune inside it meets the requirement. A host that loads the
+player and the tune separately places them within that reach.
 
 Note: the tools that write the files of this document are
 `bin/ymxr-multi`, `bin/ymxr-bind`, `bin/ymxr-sndh` and `bin/ymxr-prg`

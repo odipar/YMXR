@@ -29,8 +29,8 @@ import (
 //	16      4      where the image begins, signed
 //	20      4      where this tune's table stands, from the image's first byte
 //	24      4S     the source index: where source 1 to S's DTX1 table begins
-//	        ..     the image, on a long
 //	        ..     the DTX1 tables, each on a long
+//	        ..     the image, on a long
 //
 // Every offset counts from the first byte.
 
@@ -202,16 +202,20 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 		}
 		tables[i] = tuneFile[at:to]
 	}
+	// The DTX1 tables first and the image after them, so that a source's
+	// rows stand beside the header however long the image is: a player
+	// whose ticks read a row through a displacement reaches 32,767 bytes
+	// (68k/YMXR.S, YMXR_PCREL).
 	here := ymxr.Align(BoundIndexAt + 4*count)
-	imageAt := 0
-	if image != nil {
-		imageAt = here
-		here = ymxr.Align(here + len(image))
-	}
 	sourceAt := make([]int, count)
 	for i := 0; i < count; i++ {
 		sourceAt[i] = here
 		here = ymxr.Align(here + len(tables[i]))
+	}
+	imageAt := 0
+	if image != nil {
+		imageAt = here
+		here = ymxr.Align(here + len(image))
 	}
 	bound := make([]byte, here)
 	copy(bound, tuneFile[:ymxr.TableAt])

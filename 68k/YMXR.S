@@ -110,6 +110,25 @@ YMXR_AEOI       equ     0
                 .if     YMXR_AEOI&YMXR_NEST
                 .error  "YMXR_AEOI=1 requires YMXR_NEST=0"
                 .endif
+; A tick reads its row through the program counter rather than through an
+; absolute address (rmac -dYMXR_PCREL=1): the place is a displacement in
+; the instruction that reads it, so the read costs 4 cycles less and the
+; step that moves it 8. The displacement is a signed word, so this build
+; requires every row of every source within 32,767 bytes of the handlers;
+; init measures each source against them and reports -1 for one further
+; off. A square's handler and a one-row source's write a value the start
+; patched into them, so both cost under it what they cost.
+                .if     ^^defined YMXR_PCREL
+                .else
+YMXR_PCREL      equ     0
+                .endif
+; The bytes of a handler's loop cell: a row's address, or its
+; displacement from the instruction that reads the row.
+                .if     YMXR_PCREL
+CELL_SIZE       equ     2
+                .else
+CELL_SIZE       equ     4
+                .endif
 MFP_VECTOR      equ     $FFFFFA17       ; bits 7 to 4 the vector's high half,
                                         ; bit 3 the software end of interrupt
 
@@ -128,11 +147,23 @@ PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
 ; add to that path, rounded to the nearest turn of ten cycles, and the
 ; call burns a bar for the total. performance.md, A tick, measures each
 ; of the five, and PlayerTest checks the five against those figures.
+; Under YMXR_PCREL a row is read through a displacement rather than an
+; absolute address: the read costs 4 cycles less, the step 8 and the
+; loop's test 4, so the three paths that read a row cost less and the two
+; that write a patched value cost what they cost.
+                .if     YMXR_PCREL
+PERF_ON         equ     64      ; a row written, the place stepped
+PERF_SQ         equ     56      ; a square's two rows, no place stepped
+PERF_ONEROW     equ     32      ; a source of one row, no place stepped
+PERF_LOOP       equ     98      ; the marker, the place to row RR
+PERF_STOP       equ     108     ; the marker, the timer stopped
+                .else
 PERF_ON         equ     76      ; a row written, the place stepped
 PERF_SQ         equ     56      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     32      ; a source of one row, no place stepped
 PERF_LOOP       equ     114     ; the marker, the place to row RR
 PERF_STOP       equ     116     ; the marker, the timer stopped
+                .endif
 
 ; What each switch adds to a path: the level is dropped on the three
 ; paths that write a row's value, and an end of interrupt on all five.
@@ -380,7 +411,9 @@ q\{ct}:         bra.w   \{tick}_done
 ; of a tune running one effect keep their period to 0.31 per cent with
 ; it and to 0.31 without, where the reference player's keep 0.33. The
 ; place the row does not reset is read in the window too, since a tick
-; between the read and the write steps it (1.9).
+; between the read and the write steps it (1.9). Under YMXR_PCREL the
+; window carries the arithmetic that turns a row's address into a
+; displacement as well, a dozen instructions more.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
@@ -395,10 +428,30 @@ q\{ct}:         bra.w   \{tick}_done
                 bpl.s   \{tick}_put
                 addq.l  #1,d1
                 bra.s   \{tick}_put
-\{tick}_same:   add.l   TICK_PTR(a5),d1
+\{tick}_same:
+                .if     YMXR_PCREL
+                move.w  TICK_PTR(a5),d3         ; the place, a displacement
+                ext.l   d3                      ; from the instruction that
+                lea     TICK_PTR(a5),a3         ; reads the row
+                add.l   a3,d3
+                add.l   d3,d1
+                .else
+                add.l   TICK_PTR(a5),d1
+                .endif
                 sub.l   \fx+FX_FIRST(a0),d1
-\{tick}_put:    move.l  d1,TICK_PTR(a5)
+\{tick}_put:
+                .if     YMXR_PCREL
+                lea     TICK_PTR(a5),a3
+                sub.l   a3,d1
+                move.w  d1,TICK_PTR(a5)
+                move.l  d0,d3                   ; the loop cell, 0 where the
+                beq.s   .once\~                 ; source plays once
+                sub.l   a3,d3
+.once\~:        move.w  d3,TICK_CELL(a5)
+                .else
+                move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
+                .endif
                 move.w  (sp)+,sr
                 move.l  a4,\fx+FX_FIRST(a0)
                 move.l  a5,\vector.w
@@ -415,13 +468,24 @@ q\{ct}:         bra.w   \{tick}_done
 ; columns, and at the place below where every source is one column.
 \{tick}_wput:   cmp.b   #1,\fx+FX_SHAPE(a0)     ; a source of one row stood
                 beq.s   \{tick}_put             ; at row 0
-                lea     \two(pc),a3
+                lea     \two(pc),a3             ; both shapes place their
+                .if     YMXR_PCREL=0            ; first column at one offset
                 move.l  TW2_PTR1(a3),d3
+                .endif
                 cmp.b   #2,\fx+FX_SHAPE(a0)
                 beq.s   .w2\~
                 lea     \three(pc),a3
+                .if     YMXR_PCREL=0
                 move.l  TW3_PTR1(a3),d3
-.w2\~:          add.l   d3,d1
+                .endif
+.w2\~:
+                .if     YMXR_PCREL
+                move.w  TW2_PTR1(a3),d3
+                ext.l   d3
+                add.l   a3,d3
+                add.l   #TW2_PTR1,d3
+                .endif
+                add.l   d3,d1
                 sub.l   \fx+FX_FIRST(a0),d1
                 bra.s   \{tick}_put
 
@@ -465,7 +529,14 @@ q\{ct}:         bra.w   \{tick}_done
                 bmi.s   .marked\~
                 bra.s   .first\~
 .fromrow\~:     lea     \tick(pc),a3
+                .if     YMXR_PCREL
+                move.w  TICK_PTR(a3),d0
+                ext.l   d0
+                add.l   a3,d0
+                add.l   #TICK_PTR,d0
+                .else
                 move.l  TICK_PTR(a3),d0
+                .endif
                 sub.l   \fx+FX_FIRST(a0),d0
                 btst    #0,d0
                 bne.s   .marked\~
@@ -562,7 +633,14 @@ q\{ct}:         bra.w   \{tick}_done
                 bra.s   \{tick}_done
 
 \{tick}_place: lea     \tick(pc),a5
+                .if     YMXR_PCREL
+                move.l  \fx+FX_FIRST(a0),d1
+                lea     TICK_PTR(a5),a3
+                sub.l   a3,d1
+                move.w  d1,TICK_PTR(a5)
+                .else
                 move.l  \fx+FX_FIRST(a0),TICK_PTR(a5)
+                .endif
 \{tick}_done:
                 .endm
 
@@ -626,27 +704,43 @@ q\{ct}:         bra.w   \{tick}_done
 \name:
                 MARK    \colour
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
+                .if     YMXR_PCREL
+                move.b  \{name}_cell(pc),YM_SELECT+2.w ; +8: the place, a
+                .else                           ; displacement under YMXR_PCREL
                 move.b  ($12345678).l,YM_SELECT+2.w ; +8: the place
-                bmi.s   .last\~
-                .if     YMXR_NEST
-                move.w  #$2500,sr
                 .endif
-                addq.l  #1,($12345678).l        ; +22: the place, stepped
+                bmi.s   \{name}_last
+                .if     YMXR_NEST
+\{name}_sr:     move.w  #$2500,sr
+                .endif
+\{name}_step:
+                .if     YMXR_PCREL
+                addq.w  #1,($12345678).l        ; +2: the place, stepped
+                .else
+                addq.l  #1,($12345678).l        ; +2: the place, stepped
+                .endif
                 COUNT   PERF_ON,PERF_DROP
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-.last\~:
-\{name}_mark:   tst.l   ($12345678).l           ; +2: the loop cell
-                beq.s   .stop\~
+\{name}_last:
+\{name}_mark:
+                .if     YMXR_PCREL
+                tst.w   ($12345678).l           ; +2: the loop cell
+                beq.s   \{name}_halt
+                move.w  ($12345678).l,($12345678).l ; +10 the cell, +14 the
+                .else                           ; place
+                tst.l   ($12345678).l           ; +2: the loop cell
+                beq.s   \{name}_halt
                 move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
+                .endif
                 COUNT   PERF_LOOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-.stop\~:        andi.b  #\keep,\ctrl.w
+\{name}_halt:   andi.b  #\keep,\ctrl.w
 ; The timer may have counted to zero again while this handler ran, which
 ; latches a tick the stop above does not withdraw: at a rate whose
 ; period is near the handler's cost the two race, and that tick would
@@ -658,7 +752,12 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_cell:   dc.l    0                       ; the loop cell
+\{name}_cell:
+                .if     YMXR_PCREL
+                dc.w    0                       ; the loop cell
+                .else
+                dc.l    0                       ; the loop cell
+                .endif
                 .endm
 
 ; A tick of a source whose one column fills its byte: every bit of the
@@ -678,8 +777,13 @@ q\{ct}:         bra.w   \{tick}_done
 \name:
                 MARK    \colour
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
-                move.b  ($12345678).l,YM_SELECT+2.w ; +8: the place
-\{name}_step:   addq.l  #1,($12345678).l        ; +2: the place, stepped
+                .if     YMXR_PCREL
+                move.b  \{name}_cell(pc),YM_SELECT+2.w ; +8: the place, a
+\{name}_step:   addq.w  #1,($12345678).l        ; displacement under
+                .else                           ; YMXR_PCREL; +2: the place,
+                move.b  ($12345678).l,YM_SELECT+2.w ; stepped
+\{name}_step:   addq.l  #1,($12345678).l
+                .endif
 \{name}_cnt:    subq.w  #1,($12345678).l        ; +2: the rows left
                 beq.s   \{name}_last
                 .if     YMXR_NEST
@@ -691,9 +795,16 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 rte
 \{name}_last:
-\{name}_mark:   tst.l   ($12345678).l           ; +2: the loop cell
+\{name}_mark:
+                .if     YMXR_PCREL
+                tst.w   ($12345678).l           ; +2: the loop cell
+                beq.s   \{name}_halt
+                move.w  ($12345678).l,($12345678).l ; +10 the cell, +14 the
+                .else                           ; place
+                tst.l   ($12345678).l           ; +2: the loop cell
                 beq.s   \{name}_halt
                 move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
+                .endif
 \{name}_reld:   move.w  #1,($12345678).l        ; +2: the rows of a pass, +4:
                 COUNT   PERF_LOOP,0             ; the counter
                 .if     YMXR_AEOI=0
@@ -707,7 +818,12 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_cell:   dc.l    0                       ; the loop cell
+\{name}_cell:
+                .if     YMXR_PCREL
+                dc.w    0                       ; the loop cell
+                .else
+                dc.l    0                       ; the loop cell
+                .endif
 \{name}_left:   dc.w    0                       ; the rows left
                 .endm
 
@@ -723,6 +839,15 @@ q\{ct}:         bra.w   \{tick}_done
 \name:
                 MARK    \colour
 \{name}_sel1:   move.b  #8,YM_SELECT.w          ; +3: the first register
+                .if     YMXR_PCREL
+\{name}_ptr1:   move.b  \{name}_cells(pc),YM_SELECT+2.w ; +2: the first place
+\{name}_sel2:   move.b  #8,YM_SELECT.w
+\{name}_ptr2:   move.b  \{name}_cells(pc),YM_SELECT+2.w
+                .if     \columns=3
+\{name}_sel3:   move.b  #8,YM_SELECT.w
+\{name}_ptr3:   move.b  \{name}_cells(pc),YM_SELECT+2.w
+                .endif
+                .else
 \{name}_ptr1:   move.b  ($12345678).l,YM_SELECT+2.w ; +2: the first place
 \{name}_sel2:   move.b  #8,YM_SELECT.w
 \{name}_ptr2:   move.b  ($12345678).l,YM_SELECT+2.w
@@ -730,14 +855,23 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_sel3:   move.b  #8,YM_SELECT.w
 \{name}_ptr3:   move.b  ($12345678).l,YM_SELECT+2.w
                 .endif
+                .endif
                 bmi.s   \{name}_last            ; the marker of the row last
                 .if     YMXR_NEST               ; written
                 move.w  #$2500,sr
                 .endif
+                .if     YMXR_PCREL
+\{name}_step1:  addq.w  #1,($12345678).l        ; a place a column, stepped
+\{name}_step2:  addq.w  #1,($12345678).l
+                .if     \columns=3
+\{name}_step3:  addq.w  #1,($12345678).l
+                .endif
+                .else
 \{name}_step1:  addq.l  #1,($12345678).l        ; a place a column, stepped
 \{name}_step2:  addq.l  #1,($12345678).l
                 .if     \columns=3
 \{name}_step3:  addq.l  #1,($12345678).l
+                .endif
                 .endif
                 COUNT   PERF_ON,PERF_DROP
                 .if     YMXR_AEOI=0
@@ -745,12 +879,22 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 rte
 \{name}_last:
+                .if     YMXR_PCREL
+\{name}_loopt:  tst.w   ($12345678).l           ; the loop cell of column 0
+                beq.s   \{name}_halt
+\{name}_loop1:  move.w  ($12345678).l,($12345678).l ; the cell, the place
+\{name}_loop2:  move.w  ($12345678).l,($12345678).l
+                .if     \columns=3
+\{name}_loop3:  move.w  ($12345678).l,($12345678).l
+                .endif
+                .else
 \{name}_loopt:  tst.l   ($12345678).l           ; the loop cell of column 0
                 beq.s   \{name}_halt
 \{name}_loop1:  move.l  ($12345678).l,($12345678).l ; the cell, the place
 \{name}_loop2:  move.l  ($12345678).l,($12345678).l
                 .if     \columns=3
 \{name}_loop3:  move.l  ($12345678).l,($12345678).l
+                .endif
                 .endif
                 COUNT   PERF_LOOP,0
                 .if     YMXR_AEOI=0
@@ -764,7 +908,12 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_cells:  dc.l    0,0,0                   ; the loop cell a column
+\{name}_cells:
+                .if     YMXR_PCREL
+                dc.w    0,0,0                   ; the loop cell a column
+                .else
+                dc.l    0,0,0                   ; the loop cell a column
+                .endif
                 .endm
 
 ; A square's tick: a source of two rows that repeats to row 0 is two
@@ -874,10 +1023,18 @@ YMXR_init:
 .source:        movea.l WS_TUNE(a6),a3
                 move.l  TF_INDEX(a3,d4.w),d0
                 bclr    #31,d0                  ; the index's bit 31: a source
-                bne.s   .counted                ; whose column fills its byte
+                .if     YMXR_PCREL              ; whose column fills its byte
+                bne.w   .counted
+                .else
+                bne.s   .counted
+                .endif
                 adda.l  d0,a3                   ; the source's DTX1 table
                 lea     DT_PAYLOAD(a3),a5       ; its first row
                 move.l  a5,(a4)+
+                .if     YMXR_PCREL
+                bsr.w   ymxr_inreach
+                bcs     .bad6
+                .endif
                 move.l  DT_REPEAT(a3),d0
                 cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
                 beq.s   .plays                  ; none where it plays once
@@ -926,6 +1083,10 @@ YMXR_init:
 .counted:       adda.l  d0,a3                   ; the source's DTX1 table
                 lea     DT_PAYLOAD(a3),a5       ; its first row
                 move.l  a5,(a4)+
+                .if     YMXR_PCREL
+                bsr.w   ymxr_inreach
+                bcs     .bad6
+                .endif
                 move.l  DT_ROWS(a3),d0
                 move.w  d0,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
                 sub.l   DT_REPEAT(a3),d0
@@ -1038,7 +1199,7 @@ YMXR_init:
 .linktwo:       lea     TW2_CELLS(a5),a3
                 move.l  a3,TW2_LOOPT(a5)
                 move.l  a3,TW2_LOOP1R(a5)
-                addq.l  #4,a3
+                addq.l  #CELL_SIZE,a3
                 move.l  a3,TW2_LOOP2R(a5)
                 lea     TW2_PTR1(a5),a3
                 move.l  a3,TW2_STEP1(a5)
@@ -1053,9 +1214,9 @@ YMXR_init:
 .linkthree:     lea     TW3_CELLS(a5),a3
                 move.l  a3,TW3_LOOPT(a5)
                 move.l  a3,TW3_LOOP1R(a5)
-                addq.l  #4,a3
+                addq.l  #CELL_SIZE,a3
                 move.l  a3,TW3_LOOP2R(a5)
-                addq.l  #4,a3
+                addq.l  #CELL_SIZE,a3
                 move.l  a3,TW3_LOOP3R(a5)
                 lea     TW3_PTR1(a5),a3
                 move.l  a3,TW3_STEP1(a5)
@@ -1182,6 +1343,42 @@ YMXR_init:
 .bad:           moveq   #-1,d0
                 rts
 
+; Under YMXR_PCREL a tick reads its row through a signed word
+; displacement from the instruction that reads it, so every row of every
+; source stands within reach of every handler. a5 the source's first row,
+; a3 its DTX1 table: the rows run (C - 1) strides and R bytes from the
+; first (SPEC.md 3.1.2), and the handlers run from ymxr_tick0 to
+; ymxr_reach. Carry marks a source a displacement does not reach, which
+; init reports -1 for.
+                .if     YMXR_PCREL
+ymxr_inreach:   movem.l d0-d1/a0-a1,-(sp)
+                move.l  DT_ROWS(a3),d0
+                addq.l  #1,d0
+                and.w   #$FFFE,d0               ; align(R), a column's stride
+                moveq   #0,d1                   ; (DTX, SPEC.md 2.2)
+                move.w  DT_COLUMNS(a3),d1
+                subq.w  #1,d1
+                mulu    d1,d0                   ; the columns before the last
+                add.l   DT_ROWS(a3),d0
+                lea     -1(a5,d0.l),a0          ; the source's last byte
+                lea     ymxr_tick0(pc),a1
+                move.l  a0,d0
+                sub.l   a1,d0                   ; from the first handler
+                cmp.l   #32767,d0
+                bgt.s   .far
+                lea     ymxr_reach(pc),a1
+                move.l  a1,d0
+                sub.l   a5,d0                   ; to the source's first byte
+                cmp.l   #32768,d0
+                bgt.s   .far
+                movem.l (sp)+,d0-d1/a0-a1
+                andi.b  #$FE,ccr
+                rts
+.far:           movem.l (sp)+,d0-d1/a0-a1
+                ori.b   #1,ccr
+                rts
+                .endif
+
 ; a5 a tick handler: its operands linked, its place parked.
 ymxr_link:
                 lea     TICK_PTR(a5),a3
@@ -1190,9 +1387,17 @@ ymxr_link:
                 lea     TICK_CELL(a5),a3
                 move.l  a3,TICK_LOOPT(a5)
                 move.l  a3,TICK_LOOPR(a5)
+                .if     YMXR_PCREL
+                clr.w   TICK_CELL(a5)
+                lea     ymxr_park(pc),a3
+                suba.l  a5,a3
+                suba.w  #TICK_PTR,a3
+                move.w  a3,TICK_PTR(a5)
+                .else
                 clr.l   TICK_CELL(a5)
                 lea     ymxr_park(pc),a3
                 move.l  a3,TICK_PTR(a5)
+                .endif
                 clr.b   TICK_SEL(a5)            ; R0, the register of the kept
                 rts                             ; target init leaves (SPEC.md 5.2.1)
 
@@ -1206,13 +1411,23 @@ ymxr_linkc:
                 lea     TICKC_CELL(a5),a3
                 move.l  a3,TICKC_LOOPT(a5)
                 move.l  a3,TICKC_LOOPR(a5)
+                .if     YMXR_PCREL
+                clr.w   TICKC_CELL(a5)
+                .else
                 clr.l   TICKC_CELL(a5)
+                .endif
                 lea     TICKC_LEFT(a5),a3
                 move.l  a3,TICKC_CNTA(a5)
                 move.l  a3,TICKC_RELDA(a5)
                 move.w  #1,TICKC_LEFT(a5)
                 lea     ymxr_park(pc),a3
+                .if     YMXR_PCREL
+                suba.l  a5,a3
+                suba.w  #TICKC_PTR,a3
+                move.w  a3,TICKC_PTR(a5)
+                .else
                 move.l  a3,TICKC_PTR(a5)
+                .endif
                 clr.b   TICKC_SEL(a5)           ; R0, as init leaves the kept
                 rts                             ; target (SPEC.md 5.2.1)
 
@@ -1434,7 +1649,8 @@ ymxr_sites:
                 TICKW   ymxr_three1,3,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
                 TICKW   ymxr_three2,3,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
                 TICKW   ymxr_three3,3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
-
+ymxr_reach:                             ; past the last handler, which the
+                                        ; reach init measures runs to
 ; The offsets the patching writes at, measured off the first handler's
 ; labels: the row it writes, the marker it reads, and its loop cell.
 ; A monitor's mark stands between those blocks, and the distances follow
@@ -1442,15 +1658,14 @@ ymxr_sites:
 ; offsets are all four handlers'. The rig reads them back.
 TICK_SEL        equ     ymxr_tick0_row-ymxr_tick0+3   ; the target register
 TICK_PTR        equ     ymxr_tick0_row-ymxr_tick0+8   ; the place: a tick's row
-TICK_STEP       equ     ymxr_tick0_row-ymxr_tick0+18+(YMXR_NEST*4)
-                                        ; the place's address, which the
-                                        ; level's drop stands in front of
-                                        ; where a tick drops it
+TICK_STEP       equ     ymxr_tick0_step-ymxr_tick0+2  ; the place's address
 TICK_LOOPT      equ     ymxr_tick0_mark-ymxr_tick0+2  ; the loop cell's address
 TICK_LOOPR      equ     ymxr_tick0_mark-ymxr_tick0+10 ; the same
 TICK_LOOPW      equ     ymxr_tick0_mark-ymxr_tick0+14 ; the place's address
 TICK_CELL       equ     ymxr_tick0_cell-ymxr_tick0    ; row RR, or 0 once
-TICK_SR         equ     ymxr_tick0_row-ymxr_tick0+16  ; the level it drops
+                .if     YMXR_NEST
+TICK_SR         equ     ymxr_tick0_sr-ymxr_tick0      ; the level it drops
+                .endif
 TICK_SIZE       equ     ymxr_tick1-ymxr_tick0
 
 ; The counted handler, the same way: the register it selects, the place,
@@ -1558,11 +1773,26 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 move.l  d0,d4                   ; the column's loop cell, or
                 beq.s   .none\~                 ; none where the source plays
                 add.l   d5,d4                   ; once
-.none\~:        move.l  d4,\cell(a5)
+                .if     YMXR_PCREL
+                sub.l   a5,d4                   ; the displacement from the
+                sub.l   #\ptr,d4                ; instruction that reads the
+                .endif                          ; column
+.none\~:
+                .if     YMXR_PCREL
+                move.w  d4,\cell(a5)
+                .else
+                move.l  d4,\cell(a5)
+                .endif
                 add.l   a4,d5                   ; the place at row 0, kept for
                 move.l  d5,\first(a3)           ; the place's reset
                 add.l   d3,d5                   ; and the row it stands at
+                .if     YMXR_PCREL
+                sub.l   a5,d5
+                sub.l   #\ptr,d5
+                move.w  d5,\ptr(a5)
+                .else
                 move.l  d5,\ptr(a5)
+                .endif
                 .endm
 
 ; The place's reset on a handler of several columns (SPEC.md 1.9): a
@@ -1571,6 +1801,20 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
 ;
 ; The places stand behind level 7: a tick between two of them reads one
 ; column at the row the reset names and another at the row it left.
+; A place into the instruction that reads a column: the row's address, or
+; its displacement from that instruction under YMXR_PCREL. a3 the
+; effect's record, a5 the handler, d0 scratch.
+                .macro  WPLACE  first,ptr
+                .if     YMXR_PCREL
+                move.l  \first(a3),d0
+                sub.l   a5,d0
+                sub.l   #\ptr,d0
+                move.w  d0,\ptr(a5)
+                .else
+                move.l  \first(a3),\ptr(a5)
+                .endif
+                .endm
+
 ymxr_widereset:
                 move.w  d3,d4
                 mulu    #FX_SIZE,d4
@@ -1590,12 +1834,12 @@ ymxr_widereset:
                 mulu    #TW3_SIZE,d4
                 lea     ymxr_three0(pc),a5
                 adda.w  d4,a5
-                move.l  FX_FIRST3(a3),TW3_PTR3(a5)
-                move.l  FX_FIRST2(a3),TW3_PTR2(a5)
-                move.l  FX_FIRST(a3),TW3_PTR1(a5)
+                WPLACE  FX_FIRST3,TW3_PTR3
+                WPLACE  FX_FIRST2,TW3_PTR2
+                WPLACE  FX_FIRST,TW3_PTR1
                 bra.s   .reset
-.two:           move.l  FX_FIRST2(a3),TW2_PTR2(a5)
-                move.l  FX_FIRST(a3),TW2_PTR1(a5)
+.two:           WPLACE  FX_FIRST2,TW2_PTR2
+                WPLACE  FX_FIRST,TW2_PTR1
 .reset:         move.w  (sp)+,sr
 .moves:         rts
 
@@ -1640,12 +1884,20 @@ ymxr_widestart:
 ; not reset the place (SPEC.md 1.9).
                 moveq   #0,d3
                 btst    #5,d2
+                .if     YMXR_PCREL
+                bne.w   .at
+                .else
                 bne.s   .at
+                .endif
                 move.b  FX_SHAPE(a3),d5
                 beq.s   .running
                 bmi.s   .square
-                cmp.b   #1,d5
-                beq.s   .at                     ; a source of one row at row 0
+                cmp.b   #1,d5                   ; a source of one row at row 0
+                .if     YMXR_PCREL
+                beq.w   .at
+                .else
+                beq.s   .at
+                .endif
                 cmp.b   #4,d5
                 beq.s   .wascounted
                 move.w  d6,d5
@@ -1657,19 +1909,40 @@ ymxr_widestart:
                 mulu    #TW3_SIZE,d5
                 lea     ymxr_three0(pc),a2
 .first:         adda.w  d5,a2                   ; the running handler's first
-                move.l  TW2_PTR1(a2),d3         ; column, which both shapes
-                bra.s   .rows                   ; place at one offset
+                .if     YMXR_PCREL
+                move.w  TW2_PTR1(a2),d3         ; column, which both shapes
+                ext.l   d3                      ; place at one offset
+                add.l   a2,d3
+                add.l   #TW2_PTR1,d3
+                .else
+                move.l  TW2_PTR1(a2),d3
+                .endif
+                bra.s   .rows
 .wascounted:    move.w  d6,d5
                 mulu    #TICKC_SIZE,d5
                 lea     ymxr_cnt0(pc),a2
                 adda.w  d5,a2
+                .if     YMXR_PCREL
+                move.w  TICKC_PTR(a2),d3
+                ext.l   d3
+                add.l   a2,d3
+                add.l   #TICKC_PTR,d3
+                .else
                 move.l  TICKC_PTR(a2),d3
+                .endif
                 bra.s   .rows
 .running:       move.w  d6,d5
                 mulu    #TICK_SIZE,d5
                 lea     ymxr_tick0(pc),a2
                 adda.w  d5,a2
+                .if     YMXR_PCREL
+                move.w  TICK_PTR(a2),d3
+                ext.l   d3
+                add.l   a2,d3
+                add.l   #TICK_PTR,d3
+                .else
                 move.l  TICK_PTR(a2),d3
+                .endif
 .rows:          sub.l   FX_FIRST(a3),d3         ; the place against the place at
                 bra.s   .at                     ; row 0
 .square:        move.w  d6,d5
@@ -1694,12 +1967,16 @@ ymxr_widestart:
                 cmp.w   #3,d4
                 beq.s   .slots
                 WSLOT   TW2_SEL1,TW2_PTR1,TW2_CELLS,FX_FIRST,0
-                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+4,FX_FIRST2,2
+                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+CELL_SIZE,FX_FIRST2,2
                 move.b  #2,FX_SHAPE(a3)
+                .if     YMXR_PCREL
+                bra.w   .aimed
+                .else
                 bra.s   .aimed
+                .endif
 .slots:         WSLOT   TW3_SEL1,TW3_PTR1,TW3_CELLS,FX_FIRST,0
-                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+4,FX_FIRST2,2
-                WSLOT   TW3_SEL3,TW3_PTR3,TW3_CELLS+8,FX_FIRST3,4
+                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+CELL_SIZE,FX_FIRST2,2
+                WSLOT   TW3_SEL3,TW3_PTR3,TW3_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
                 move.b  #3,FX_SHAPE(a3)
 .aimed:         move.w  (sp)+,sr
                 lea     YM_SELECT.w,a2          ; the chip's select register,
@@ -1725,10 +2002,24 @@ ymxr_widestart:
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  FX_TARGET(a3),TICKC_SEL(a5)
+                .if     YMXR_PCREL
+                sub.l   a5,d1                   ; the displacement from the
+                sub.l   #TICKC_PTR,d1           ; instruction that reads the row
+                move.w  d1,TICKC_PTR(a5)
+                .else
                 move.l  d1,TICKC_PTR(a5)
+                .endif
                 move.w  d4,TICKC_LEFT(a5)
                 move.w  d5,TICKC_RELD(a5)
+                .if     YMXR_PCREL
+                tst.l   d0                      ; 0: the source plays once
+                beq.s   .celled
+                sub.l   a5,d0
+                sub.l   #TICKC_PTR,d0
+.celled:        move.w  d0,TICKC_CELL(a5)
+                .else
                 move.l  d0,TICKC_CELL(a5)
+                .endif
                 move.b  #4,FX_SHAPE(a3)
                 move.l  a4,FX_FIRST(a3)
                 bra.w   .aimed

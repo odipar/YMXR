@@ -287,11 +287,11 @@ final class Sndh {
     }
 
     /**
-     * The same, of a set whose tunes share their images: the images stand
-     * behind the subtune table and every bound tune's {@code IMAGE_AT} is
-     * patched to reach the one with its table in it, from its first
-     * byte. A tune whose set has no image is packaged with one, as a bound tune
-     * written by itself does.
+     * The same, of a set whose tunes share their images: the bound tunes
+     * stand behind the subtune table, the images behind them, and every
+     * bound tune's {@code IMAGE_AT} is patched to reach the one with its
+     * table in it, from its first byte. A tune whose set has no image is
+     * packaged with one, as a bound tune written by itself does.
      */
     static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace) {
         List<byte[]> tunes = set.tunes();
@@ -303,7 +303,16 @@ final class Sndh {
         int n = tunes.size();
         int tableAt = even(core.length);
         int at = tableAt + 2 + 4 * n;
-        // The images first, each on a long: the reader's code stands once a
+        // The bound tunes first, each on an even address (5.1), so that a
+        // tune's sources stand beside the core: a player whose ticks read a
+        // row through a displacement reaches 32,767 bytes (68k/YMXR.S,
+        // YMXR_PCREL), and an image between the two would be in the way.
+        int[] offsets = new int[n];
+        for (int i = 0; i < n; i++) {
+            offsets[i] = at;
+            at = even(at + tunes.get(i).length);
+        }
+        // Then the images, each on a long: the reader's code stands once a
         // set of tunes that agree on what an image fixes once (DTX abi.md
         // 1), and every bound tune of that set reaches it.
         int[] imageAt = new int[set.images().size()];
@@ -312,14 +321,7 @@ final class Sndh {
             imageAt[i] = at;
             at += set.images().get(i).length;
         }
-        // Every bound tune of the set begins on an even address (5.1), the
-        // first as well as the rest: the last image's length may be odd.
         at = even(at);
-        int[] offsets = new int[n];
-        for (int i = 0; i < n; i++) {
-            offsets[i] = at;
-            at = even(at + tunes.get(i).length);
-        }
         int workAt = at;
         byte[] file = new byte[header + workAt + workspace];
         for (int entry = 0; entry < 12; entry += 4) {
@@ -340,7 +342,7 @@ final class Sndh {
             System.arraycopy(tunes.get(i), 0, file, header + offsets[i], tunes.get(i).length);
             if (imageAt.length > 0) {
                 // The bound tune reaches its image from its first byte,
-                // and the images stand before it, so the reach is negative.
+                // and the images stand after it.
                 Tune.putLong(file, header + offsets[i] + Bound.IMAGE_AT,
                         imageAt[set.image()[i]] - offsets[i]);
             }

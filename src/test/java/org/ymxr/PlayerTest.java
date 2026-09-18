@@ -258,23 +258,28 @@ final class PlayerTest {
                 Arrays.copyOfRange(bound, Tune.FRAME_RATE_AT, Tune.TABLE_AT));
         int count = tune.sources().size();
         int imageAt = Tune.getLong(bound, Bound.IMAGE_AT);
-        assertEquals(Tune.align(Bound.INDEX_AT + 4 * count), imageAt);
         // the state block's bytes are the image's format block's
         assertEquals(Tune.getLong(bound, imageAt + Bound.FORMAT_AT + Bound.FORMAT_STATE_AT),
                 Tune.getLong(bound, Bound.STATE_AT));
-        // the DTX1 tables stand past the image, each on a long, as the file
-        // has them
-        int end = bound.length;
-        for (int i = count - 1; i >= 0; i--) {
+        // the DTX1 tables stand between the index and the image, each on a
+        // long, as the file has them
+        assertEquals(Tune.align(Bound.INDEX_AT + 4 * count),
+                Tune.getLong(bound, Bound.INDEX_AT), "source 1 follows the index");
+        for (int i = 0; i < count; i++) {
             int at = Tune.getLong(bound, Bound.INDEX_AT + 4 * i);
             assertEquals(0, at & 3, "source " + (i + 1) + " begins on a long");
+            int end = i + 1 < count
+                    ? Tune.getLong(bound, Bound.INDEX_AT + 4 * (i + 1)) : imageAt;
             int fileAt = Tune.getLong(file, Tune.INDEX_AT + 4 * i);
             int fileEnd = i + 1 < count ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1))
                     : file.length;
             assertArrayEquals(Arrays.copyOfRange(file, fileAt, fileEnd),
                     Arrays.copyOfRange(bound, at, end), "source " + (i + 1));
-            end = at;
         }
+        int lastAt = Tune.getLong(bound, Bound.INDEX_AT + 4 * (count - 1));
+        int lastBytes = file.length - Tune.getLong(file, Tune.INDEX_AT + 4 * (count - 1));
+        assertEquals(Tune.align(lastAt + lastBytes), imageAt,
+                "the image follows the tables");
         assertTrue(count > 0, "four-timers runs sources");
     }
 
