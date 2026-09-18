@@ -249,6 +249,52 @@ final class ParityTest {
         both("ymxr-prg", both("ymxr-sndh", split));
     }
 
+    /** Every tool of the eleven, for a check that runs them all. */
+    private static final List<String> EVERY_TOOL = List.of("ym-to-ymxs",
+            "ym-to-ymxr", "ymxs-to-ymxr", "ymxs-to-sndh", "ymxs-to-prg",
+            "ymxr-bind", "ymxr-multi", "ymxr-sndh", "ymxr-prg", "ymxr-trace");
+
+    /**
+     * The tools whose input is YMXS's JSON form, which read it through the
+     * release this build names.
+     *
+     * <p>An empty text parsed to an absent format in that tree's Java reader
+     * and to a text that is not JSON in its Go one; odipar/YMXS#58 reports
+     * the second in both, and these three read an empty input alike once
+     * this build reads a release carrying it. The other tools read one here
+     * already.
+     */
+    private static final List<String> READ_THE_STRUCTURE =
+            List.of("ymxs-to-ymxr", "ymxs-to-sndh", "ymxs-to-prg");
+
+    @Test
+    void anEmptyInputIsOneFaultInBothTrees() throws Exception {
+        for (String tool : EVERY_TOOL) {
+            if (READ_THE_STRUCTURE.contains(tool)) {
+                continue;
+            }
+            Ran java = ran(Path.of("bin"), tool, new byte[0], "-silent");
+            Ran go = ran(built(), tool, new byte[0], "-silent");
+            assertTrue(java.exit() != 0, tool + " reads an empty input: "
+                    + java.said());
+            assertEquals(java.exit(), go.exit(), tool + " exits the same: "
+                    + go.said());
+            assertEquals(java.said(), go.said(), tool + " reports the same");
+        }
+    }
+
+    @Test
+    void anUnknownFlagIsOneFaultInBothTrees() throws Exception {
+        for (String tool : EVERY_TOOL) {
+            Ran java = ran(Path.of("bin"), tool, new byte[0], "-zz");
+            Ran go = ran(built(), tool, new byte[0], "-zz");
+            assertTrue(java.exit() != 0, tool + " reads -zz: " + java.said());
+            assertEquals(java.exit(), go.exit(), tool + " exits the same: "
+                    + go.said());
+            assertEquals(java.said(), go.said(), tool + " reports the same");
+        }
+    }
+
     @Test
     void aWrongInputIsWrongInBothTrees() throws Exception {
         byte[] nonsense = "not a file of any of these".getBytes();
