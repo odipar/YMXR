@@ -45,7 +45,7 @@ final class RigCallsTest {
      *  emulator keeps up with a build. */
     private static final String FRAMES = "-frames24";
 
-    /** The two tunes built for the shapes an effect takes: a drum
+    /** The two tunes built for the shapes an effect runs: a drum
      *  preempting a square on its voice, and a note struck again at the
      *  rate already running. */
     private static final List<String> TUNES =

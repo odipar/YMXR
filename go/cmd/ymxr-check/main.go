@@ -24,7 +24,7 @@ import (
 	"github.com/odipar/ymxr/go/ym"
 )
 
-// result is what one line of the tool reports of a file: no dump where the
+// result is one line of the tool's report on a file: no dump where the
 // file is not a YM5!/YM6! dump, and otherwise an empty list, or the
 // faults.
 type result struct {

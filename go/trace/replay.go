@@ -24,7 +24,7 @@ import (
 // effect reports whether the row touched it and which control bits the row
 // set.
 
-// Effect is what one effect runs after a row: source 0 where it runs no
+// Effect records one effect's run after a row: source 0 where it runs no
 // source. Touched says the row set one of its columns, Timer that the
 // row's control column had bit 6 and Place bit 5.
 type Effect struct {

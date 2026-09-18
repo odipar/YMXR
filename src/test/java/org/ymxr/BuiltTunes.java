@@ -127,7 +127,7 @@ final class BuiltTunes {
             if (f % 11 == 4) {
                 c[6][f] = (byte) (0x80 | f % 32);
             }
-            // what an unset column may hold: values under a clear bit 7,
+            // what an unset column may have in it: values under a clear bit 7,
             // off bits 6 and 5 of the columns beside a fine byte and R13
             if (f % 9 == 8) {
                 c[8][f] = 0x0F;

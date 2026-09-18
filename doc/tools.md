@@ -380,7 +380,7 @@ reckons.
 
 **8.4 A file that fails to read** is a verdict of one line: `unreadable:
 <message>`, `the archive does not unpack: <message>`, or `the converter
-refuses it: <message>` for a dump the converter rejects. A flag
+rejects it: <message>` for a dump the converter rejects. A flag
 outside the converter's is that verdict with the message `not a flag of
 the tool: X`, exit 1, in place of the wrong call of 3.2 (19.5).
 

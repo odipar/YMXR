@@ -53,7 +53,7 @@ def bands(writes, at, under):
         if nest and colour == (nest[-2][0] if len(nest) > 1 else under):
             _, began, inner = nest.pop()
             took = span(began, now)
-            own.append(took - inner)     # a band of its own, its nest out
+            own.append(took - inner)     # a band alone, its nest out
             if nest:
                 nest[-1][2] += took
             else:

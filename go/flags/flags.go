@@ -66,7 +66,7 @@ func PackingOf(t *tool.Tool, args []string) Packing {
 	return out
 }
 
-// Packer is what packs a column under this packing.
+// Packer packs a column under this packing.
 func (p Packing) Packer() dtx.Packer {
 	return st4.Packer{CopiesFlag: p.Copies, Seconds: p.Seconds}
 }

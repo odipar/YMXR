@@ -66,7 +66,7 @@ const (
 	EffectsAt = 8
 	CountAt   = 9
 	NameAt    = 10
-	// MostName is the most bytes a name takes, its zero aside.
+	// MostName is the most bytes a name reaches, its zero aside.
 	MostName = 255
 	TableAt  = 12
 	IndexAt  = 16
@@ -110,7 +110,7 @@ func WriteWith(columns Columns, sources *Sources, frameRate, unit, ring int,
 	return WriteNamed(columns, sources, frameRate, unit, ring, packer, said, "")
 }
 
-// namedBytes is what a name comes to in the file: its UTF-8 and a zero,
+// namedBytes is a name as the file has it: its UTF-8 and a zero,
 // cut to MostName bytes. A name of no printable characters writes none,
 // and the file records zero for it. Bytes under a space are dropped, since
 // a name reaches an ST screen and an SNDH tag.

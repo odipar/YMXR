@@ -77,7 +77,7 @@ final class Bound {
     /** The set of tunes bound with as few images as the figures allow. */
     static Set of(List<byte[]> tuneFiles) {
         // A tune joins the first group whose image would carry its table:
-        // the packager reads a table that does not fit, so the key is what
+        // the packager reads a table that does not fit, so the key names what
         // it reads it against.
         List<List<Integer>> groups = new ArrayList<>();
         List<String> keys = new ArrayList<>();

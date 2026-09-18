@@ -15,8 +15,8 @@ for core in YMXR_sndh.bin YMXR_sndh-perf.bin YMXR_sndh-lean.bin YMXR_sndh-perf-l
     [ -f "$classes/org/ymxr/68k/$core" ] || missing=1
 done
 if [ ! -f "$built" ] || [ -n "$missing" ] || [ -n "$(find "$root/src/main/java" "$root/pom.xml" "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]; then
-    # The build reads standard input, which for a filter carries the file
-    # to convert, so it is given none.
+    # The build reads standard input, which for a filter has the file
+    # to convert, so it reads none.
     (cd "$root" && mvn -q process-classes dependency:build-classpath \
         -Dmdep.outputFile=target/classpath </dev/null >/dev/null)
     : > "$built"

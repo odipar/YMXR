@@ -4,7 +4,7 @@ Every tune under ym/test is converted, then played row by row on an
 emulated 68000: the chip writes of every frame against the frame
 procedure's, the timers' programming against the rate columns', the place
 each handler keeps against the source's rows, and every tick's write
-against the row its place stands on. The model is built here from the
+against the row its place names. The model is built here from the
 tune's tables, so the player is checked against the specification and not
 against the converter.
 
@@ -243,7 +243,7 @@ CORPUS = os.environ.get("YM_CORPUS",
 CORPUS_TUNES = 40
 
 # The frames a tune is played for at most, which -frames sets. None plays
-# every tune whole, which is what a full run does.
+# every tune whole, as a full run does.
 MOST_FRAMES = None
 
 
@@ -829,7 +829,7 @@ class Timers:
                 self.phase[i] -= clocks
 
     def expected(self, i, clocks):
-        """How many ticks of effect i the next `clocks` hold, the phase
+        """How many ticks of effect i the next `clocks` have room for, the phase
         advanced: the count the real MFP fires, within one."""
         if not self.live(i):
             return 0
@@ -1155,7 +1155,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         for i in range(4):
             fx = model.fx[i]
             # A restart is due where the row sets bit 6, and where the timer
-            # stood stopped and the row writes it a select: a select is what
+            # stood stopped and the row writes it a select: a select
             # runs an MFP timer, so a stopped one starts on it either way
             # (SPEC.md 1.9). A source that plays once stops its timer at
             # its last row, so a writer cannot always determine which
@@ -1314,7 +1314,7 @@ def parts_of(rows):
     idle = Counter(dec for _, dec, ops in rows if ops == 0)
     heaviest = max(rows, key=lambda row: row[1])
     # The fit of the decoder's cycles on the operations parsed, over every
-    # refill: its slope is what an operation costs to parse. A tune whose
+    # refill: its slope is an operation's cost to parse. A tune whose
     # refills all parse the same count has no slope to read.
     mean_o = sum(ops for _, _, ops in rows) / len(rows)
     mean_d = sum(dec for _, dec, _ in rows) / len(rows)
@@ -1858,7 +1858,7 @@ def main():
         tunes = args or sorted(os.path.join(where, f) for f in os.listdir(where)
                                if f.endswith(".ymxr"))
         # The kit's wrong-version tune has no record to play against: the
-        # binder and the reader both reject it, which is what the kit reads
+        # binder and the reader both reject it, as the kit reads
         # of it (doc/conformance/README.md). So it is checked to be rejected
         # and left out of the tunes played.
         left = [one for one in tunes

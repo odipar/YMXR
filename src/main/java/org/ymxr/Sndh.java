@@ -36,7 +36,7 @@ import org.ymxs.tool.Tool;
  */
 final class Sndh {
 
-    /** What the '##' tag's two digits hold. */
+    /** The most the '##' tag's two digits reach. */
     static final int MAX_SUBTUNES = 99;
 
     static final byte[] CORE_MAGIC = {'Y', 'M', 'X', 'S'};
@@ -491,7 +491,7 @@ final class Sndh {
         report.say("the images: " + set.images().size()
                 + (set.images().size() == 1 ? " image of " : " images of ") + images
                 + " bytes, DTX's reader once a set of tunes that share one");
-        // What an image fixes once is what splits a set into more than one,
+        // What an image fixes once splits a set into more than one,
         // and only a flag moves the unit, -k on one dump and not another:
         // a tune whose row count or repeat row is odd is padded to the
         // unit named (SPEC.md 6, rule 6; tools.md, experiments.md).

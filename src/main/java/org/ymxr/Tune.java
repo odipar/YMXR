@@ -29,7 +29,7 @@ import org.dtx.Table;
  *          ..     the DTX1 tables, each on a long
  * </pre>
  *
- * Every offset counts from the file's first byte. The name is what the
+ * Every offset counts from the file's first byte. The name reads as the
  * dump or the YMXS file titles the tune, in UTF-8 and ended by a zero
  * byte. It lies between the index and the table, so its offset fits the
  * word that records it however large the tables are.
@@ -70,7 +70,7 @@ final class Tune {
     static final int TABLE_AT = 12;
     static final int INDEX_AT = 16;
 
-    /** The most bytes a name takes, its zero aside. A longer one is cut
+    /** The most bytes a name reaches, its zero aside. A longer one is cut
      *  to this: the player reads a name onto a screen of forty columns and
      *  an SNDH tag numbers its bytes in a word. */
     static final int MOST_NAME = 255;
@@ -246,7 +246,7 @@ final class Tune {
     /**
      * A packer that reports: it packs a column through the one the file
      * reads, records what each column came to, and reports how far through the
-     * thirty it is. The packer is what {@link Dtx2#write} calls a column
+     * thirty it is. The packer is the one {@link Dtx2#write} calls a column
      * at a time, so this is where a column's packed bytes are to be had
      * without unpacking the file again.
      */
