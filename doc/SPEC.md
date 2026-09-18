@@ -948,11 +948,12 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   `"13"`, in ascending numeric order, `"2"` before `"10"`, each with the
   value the register reads: for a column with a set bit, bits 6 to 0
   masked to the register's width, four for R1, R3, R5 and R13, five for
-  R6, R8, R9 and R10, and six for R7, whose bits 7 and 6 the player
-  writes as 1 (1.4.2); for a column that fills its byte, the byte
-  (1.1.3). `{}` for a row that leaves every register column unset. A
-  register an effect runs on is included where the row sets its column
-  (6.1).
+  R6, R8, R9 and R10, and six for R7; for a column that fills its byte,
+  the byte (1.1.3). A record reports the six bits of R7 alone: a player
+  writes bits 7 and 6 of that register as 1 (1.4.2), and a record leaves
+  the two out, so R7's value here is 0 to 63. `{}` for a row that leaves
+  every register column unset. A register an effect runs on is included
+  where the row sets its column (6.1).
 - `e` is the effects the row sets a column of, regardless of the effects
   used byte (4.2): those whose target, source or control column is set,
   or whose count column is other than 0; keyed by number as text, `"0"`
