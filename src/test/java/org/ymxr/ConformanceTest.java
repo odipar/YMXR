@@ -225,6 +225,55 @@ final class ConformanceTest {
                 "MANIFEST.txt does not match the tunes and the reader; MANIFEST.generated.txt does");
     }
 
+    /**
+     * The task names the versions a reader of the kit reads, and the
+     * targets its tunes name.
+     *
+     * <p>TASK.md is what an implementer works from, and nothing read it
+     * back: it said a version word other than $0003 gives an empty record
+     * and that every tune names targets 0 to 13, where the kit has carried
+     * a tune of version 4 on targets 14 to 24 since 0.4.2. An implementer
+     * following it wrote an empty record for that tune.
+     */
+    @Test
+    void theTaskNamesTheVersionsAndTheTargetsTheKitReaches() throws IOException {
+        String task = Files.readString(KIT.resolve("TASK.md"));
+        for (int version : new int[] {Tune.VERSION, Tune.VERSION_COLUMNS}) {
+            assertTrue(task.contains(String.format(Locale.ROOT, "$%04X", version)),
+                    "TASK.md leaves out version " + version + ", which a reader"
+                    + " of this kit reads");
+        }
+        int most = 0;
+        for (Fixture f : FIXTURES) {
+            byte[] file = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));
+            if (Tune.getWord(file, 4) != Tune.VERSION
+                    && Tune.getWord(file, 4) != Tune.VERSION_COLUMNS) {
+                continue;
+            }
+            for (List<Integer> row : targets(file)) {
+                most = Math.max(most, row.get(0));
+            }
+        }
+        assertTrue(most > 13, "no tune of the kit names a target above 13,"
+                + " so this check reads nothing");
+        assertTrue(task.contains("0 to " + most), "TASK.md names targets up to"
+                + " another number than " + most + ", which the kit reaches");
+    }
+
+    /** The targets the rows of {@code file} name, each as a one-element row
+     *  so the caller reads the number alone. */
+    private static List<List<Integer>> targets(byte[] file) {
+        List<List<Integer>> out = new ArrayList<>();
+        for (String line : new String(reference(file),
+                java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+            Matcher m = Pattern.compile("\"target\":(\\d+)").matcher(line);
+            while (m.find()) {
+                out.add(List.of(Integer.parseInt(m.group(1))));
+            }
+        }
+        return out;
+    }
+
     @Test
     void theReadmeCountsTheKit() throws IOException {
         String readme = Files.readString(KIT.resolve("README.md"));

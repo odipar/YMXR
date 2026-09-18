@@ -20,8 +20,8 @@ structure, and is outside this task.
 It prints at most `<lines>` lines of the record `SPEC.md` 7 defines: the
 first line, the tune's fixed values, then one line of JSON a frame. A
 frame reporting -1 is one line, and the record ends with it. For a file
-whose version word is other than $0003 (`SPEC.md` 3.3), the record is
-empty and the program's output is empty.
+whose version word is other than $0003 or $0004 (`SPEC.md` 3.3.5), the
+record is empty and the program's output is empty.
 
 The output is compared with the reference byte for byte: each line free
 of spaces, integers in decimal, names in the order `SPEC.md` 7 defines,
@@ -45,11 +45,12 @@ it out. The DTX2 table in the tune file packs the same rows in a form
 another format defines; the rows file stands in for it.
 
 **4. The tunes.** Each is a `.ymxr` beside its `.rows`; the tunes differ
-in what they reach. Every tune satisfies `SPEC.md` 6, names targets 0 to
-13, selects 1 to 7 and sources 0 to `S`, 0 the stop (`SPEC.md` 1.8); a
-reader records a source's rows as the table has them, a set bit 7 before
-the last row included (`SPEC.md` 7); what a reader does with a file
-outside those is outside this task.
+in what they reach. Every tune satisfies `SPEC.md` 6, names the targets
+`SPEC.md` 2.1 assigns, 0 to 24, selects 1 to 7 and sources 0 to `S`, 0 the
+stop (`SPEC.md` 1.8); a reader records a source's rows as the table has
+them, a byte a column and a set bit 7 before the last row included
+(`SPEC.md` 7.2); what a reader does with a file outside those is outside
+this task.
 
 | file | lines to produce |
 |---|---:|
