@@ -34,6 +34,41 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.6, 2026-09-19
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.6>, built from the commit
+tagged `v0.4.6`.
+
+A structure reaches the mixer. The 68000 binaries are 0.4.5's bytes, and
+the tools write one file differently: a counted source on `setR7` now has
+the two port directions in its rows, which no structure could express
+before.
+
+- **A writer sets the port directions of a counted source on `setR7`.**
+  2.1.2 names that target one whose register reads every bit of its byte,
+  so a counted source may drive the mixer, and the structure's value for
+  R7 is the mixer's six bits, 0 to 63: the converter reported a row above
+  that, and such a tune file was writable by hand alone. Bits 7 and 6 are
+  the directions of the two I/O ports, which a player writes as 1 on
+  every write a row makes (1.4.2); a tick of a counted source writes the
+  row whole, so rule 2(f) has the writer set them. A structure whose
+  source reads 56 and 57 writes `$F8` and `$F9`.
+- **A tune that spends version 5, in the tree.** `ym/whole-byte.py`
+  writes five sections of 800 rows at 50 Hz, a timer driving `setR0`,
+  `setR4`, `setR11` and `setR7` in turn under one melody, and
+  experiments.md reads back what the sections come to. tools.md 18.6
+  names it.
+- **What the two cores do to a tune, measured.** Over 900 frames of
+  Turrican under Hatari both write 9,589 values and 9,583 of them are the
+  same value to the same register in the same order; a write lands at
+  another cycle inside the frame, 24 later at the median. performance.md
+  records that, the lean column of the new build, and what the raster
+  monitor makes of it.
+- **A relative work directory records its run.** `ym/hatari.sh` named its
+  AVI under the directory it then ran inside, so a relative WORK left the
+  run unrecorded and the read of the AVI reported a file that was never
+  there.
+
 ### 0.4.5, 2026-09-18
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.5>, built from the commit
