@@ -1115,7 +1115,7 @@ def outofreach(code, symbols):
     (doc/BINARIES.md 5.5). Every other run loads its tune at FILE, which
     the handlers reach; this one is loaded far up the mapped region, so
     the rows of its sources stand past the 32,767 bytes a signed word
-    carries."""
+    reaches."""
     work = tempfile.mkdtemp()
     with open(os.path.join(ROOT, "doc", "conformance", "tunes",
                            "turrican.ymxr"), "rb") as f:
@@ -1207,8 +1207,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
     if cycles:
         # The image is the bound tune's last part (doc/BINARIES.md 1.2),
         # so it runs from the field at 16 to the end: the cycles the
-        # counter reads there are the reader's, the tables below it
-        # holding no code.
+        # counter reads there are the reader's, since the tables below it
+        # are data.
         cycles.attach(m, (FILE + tune.image_at, FILE + len(bound)),
                       *(decoder_of(file, bound, tune, cycles.module)
                         if parts else ()))
@@ -1630,7 +1630,7 @@ def hatari(ym, code, symbols, perf=False):
     # missed here fails there rather than running the plain core.
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent",
                         "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
-                       + (["-lean"] if LEAN else []),
+                       + (["-lean"] if LEAN else []) + (["-pcrel"] if PCREL else []),
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     sndh_bytes = r.stdout
@@ -1922,8 +1922,8 @@ def patched_code_follows_the_subtune(defines, tunes):
             bounds.append((os.path.basename(ym), bound))
     # Under -pcrel a tick reads its row through a signed word
     # displacement, so a subtune whose rows stand past the reach is left
-    # out: these are bound one by one and each carries its own image,
-    # where a set's subtunes share one image and stand together
+    # out: these are bound one by one, so each has an image in it, where
+    # a set's subtunes share one image and stand together
     # (doc/BINARIES.md 2).
     left = 0
     if PCREL:
@@ -2234,7 +2234,7 @@ def main():
                         row = r"^\| %s \| (\d+) \|$" % re.escape(name)
                     said_doc = open(os.path.join(ROOT, "doc", "performance.md")).read()
                     if PCREL:
-                        # that build's own table, under its heading
+                        # the table of that build, under its heading
                         said_doc = said_doc.split(
                             "## A tick through the program counter")[1]
                     tick = re.search(row, said_doc, re.M)

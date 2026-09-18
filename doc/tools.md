@@ -70,7 +70,7 @@ within the packing report (4.5).
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
 | `ymxr-multi` | the tune files named | a multi file | `-nNAME` |
-| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean` |
+| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel` |
 | `ymxr-prg` | an SNDH file | a TOS program | `-rROWS` |
 
 **2.1** Each tool is written twice, under one name, in the two trees of
@@ -476,8 +476,10 @@ tunes the subtunes in order, each named by the name the multi file
 records. The output is the SNDH file of BINARIES.md 3 around the core the
 switches select: the plain core; `-perf` the core with the raster monitor
 in; `-lean` the core whose ticks omit the interrupt-level drop and the
-end-of-interrupt write (performance.md); both together the core that is
-both. The title is `-tTITLE`, else the first name, `(untitled)` where a
+end-of-interrupt write (performance.md); `-pcrel` the core whose ticks
+read a row through the program counter (BINARIES.md 5.5); any two
+together the core that is both, and all three the core that is all
+three. The title is `-tTITLE`, else the first name, `(untitled)` where a
 tune file was read or the name is blank; the composer `-cCOMPOSER`, or
 absent. In the tags (BINARIES.md 3) each text is reduced to its
 characters $20 to $7E; the report of 12.4 prints the text as passed.
@@ -493,18 +495,21 @@ characters $20 to $7E; the report of 12.4 prints the text as passed.
 | subtune N has a rate other than subtune 1's | `subtune N plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
 | the core's descriptor fails its check (12.3) | the line of 12.3 |
+| `-pcrel` was passed and the last bound tune ends B bytes past the core's first byte, B above 32,767 | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
 
 **12.3 The core's descriptor** (BINARIES.md 2) is checked before the
 combine: `not an SNDH core: no YMXS at 12`; `the core's descriptor is
 version V, and this writes 1`; `the core reads bound tunes of version V,
 and this binds at 3`; `the core's flags at 22 read F, and the raster
-monitor asked for needs bit 0 set`, or `... the lean tick asked for needs
-bit 1 set`.
+monitor asked for needs bit 0 set`; `... the lean tick asked for needs
+bit 1 set`, or `... the row read through the program counter asked for
+needs bit 2 set`.
 
 **12.4 The report:** the heading `the core: <file>, B bytes` with the row
-`the switches`, `none, the plain core`, or `-perf, the raster monitor in`
-and `-lean, ticks that neither drop the interrupt level nor write an end
-of interrupt`, joined by `; `; the heading `the tags: TITL <title>`, then
+`the switches`, `none, the plain core`, or `-perf, the raster monitor in`,
+`-lean, ticks that neither drop the interrupt level nor write an end of
+interrupt` and `-pcrel, ticks that read a row through the program
+counter`, joined by `; `; the heading `the tags: TITL <title>`, then
 `, COMM <composer>` where present and `, !#SN with N name(s)` for several
 subtunes; a row a subtune, its name or `the tune`, `B bytes bound to B2,
 its table in image I`, B the tune file's bytes, B2 the bound tune's, I
@@ -676,7 +681,7 @@ converter:
 |---|---|
 | `-kK`, `-mN`, `-rRR`, `-r`, `-copies[S]` | `ym-to-ymxr` (4, 5) |
 | `-nNAME`, the i-th naming the i-th dump | `ymxr-multi` (11.1) |
-| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean` | `ymxr-sndh` (12) |
+| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel` | `ymxr-sndh` (12) |
 | `-rowsN`, the rows the program plays | `ymxr-prg` as `-rN` (13.1) |
 | `-silent` | every tool (3.3) |
 

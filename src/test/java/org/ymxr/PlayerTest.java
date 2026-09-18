@@ -71,8 +71,9 @@ final class PlayerTest {
         return out;
     }
 
-    /** The bit numbers of the flags table under one section, by what sets them. */
-    private static Map<String, Integer> flags(String said, String section) {
+    /** The bit numbers of the flags table under one section, by what sets
+     *  them, where the table has {@code bits} rows. */
+    private static Map<String, Integer> flags(String said, String section, int bits) {
         int at = said.indexOf("## " + section);
         assertTrue(at >= 0, "BINARIES.md has no section " + section);
         int table = said.indexOf("The flags word:", at);
@@ -87,7 +88,8 @@ final class PlayerTest {
                 break;
             }
         }
-        assertTrue(out.size() == 2, () -> section + "'s flags word read as " + out.size());
+        assertTrue(out.size() == bits,
+                () -> section + "'s flags word read as " + out.size() + " bits");
         return out;
     }
 
@@ -143,9 +145,11 @@ final class PlayerTest {
         assertEquals(Sndh.CORE_STATE_AT, row(said, "where the core's state byte").getValue());
         assertEquals(Sndh.CORE_TABLE_AT, row(said, "the subtune table").getValue());
         assertEquals(Sndh.CORE_WORK_AT, row(said, "the workspace").getValue());
-        Map<String, Integer> bits = flags(binaries, "2. The SNDH core");
+        Map<String, Integer> bits = flags(binaries, "2. The SNDH core", 3);
         assertEquals(Sndh.CORE_MONITOR, 1 << row(bits, "the player's raster monitor").getValue());
         assertEquals(Sndh.CORE_LEAN, 1 << row(bits, "the lean tick").getValue());
+        assertEquals(Sndh.CORE_PCREL,
+                1 << row(bits, "the row read through the program counter").getValue());
     }
 
     /**
@@ -163,7 +167,7 @@ final class PlayerTest {
         assertEquals(Prg.STUB_RATE_AT, row(said, "the rate, rows a second").getValue());
         assertEquals(Prg.STUB_ROWS_AT, row(said, "the rows to play").getValue());
         assertEquals(Prg.STUB_CORE_AT, row(said, "the core's offset").getValue());
-        Map<String, Integer> bits = flags(binaries, "4. The program stub");
+        Map<String, Integer> bits = flags(binaries, "4. The program stub", 2);
         assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the set claims Timer C").getValue());
     }
 

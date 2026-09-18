@@ -155,6 +155,8 @@ final class ParityTest {
         byte[] tune = both("ym-to-ymxr", dump, "-silent");
         both("ymxr-sndh", tune, "-silent", "-tOne", "-cTwo", "-perf");
         both("ymxr-sndh", tune, "-silent", "-lean");
+        both("ymxr-sndh", tune, "-silent", "-pcrel");
+        both("ymxr-sndh", tune, "-silent", "-lean", "-pcrel");
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-tOne"), "-silent", "-r2000");
     }
 

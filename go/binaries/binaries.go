@@ -3,9 +3,10 @@
 // file's entries, and the program stub, which goes in front of an SNDH
 // file.
 //
-// Two switches of the player's stand in the core, the raster monitor and
-// the lean tick, and each of their four settings is a separate core, so a
-// file that requests both uses the core that is both.
+// Three switches of the player's stand in the core, the raster monitor,
+// the lean tick and the row read through the program counter, and each of
+// their eight settings is a separate core, so a file that requests two
+// uses the core that is both.
 //
 // The files are build output. The Maven build writes them into data/,
 // which go:embed reads only inside its module. A tree built without
@@ -27,24 +28,45 @@ import (
 //go:embed data
 var data embed.FS
 
-// The five, by the file each is carried as.
+// The nine, by the file each is carried as. The four with pcrel in the
+// name are the four above with the player's YMXR_PCREL set: a tick reads
+// its row through a displacement from the instruction that reads it
+// (doc/performance.md, A tick through the program counter).
 const (
-	Core        = "YMXR_sndh.bin"
-	Monitor     = "YMXR_sndh-perf.bin"
-	Lean        = "YMXR_sndh-lean.bin"
-	MonitorLean = "YMXR_sndh-perf-lean.bin"
-	Stub        = "YMXR_prg.bin"
+	Core             = "YMXR_sndh.bin"
+	Monitor          = "YMXR_sndh-perf.bin"
+	Lean             = "YMXR_sndh-lean.bin"
+	MonitorLean      = "YMXR_sndh-perf-lean.bin"
+	Pcrel            = "YMXR_sndh-pcrel.bin"
+	MonitorPcrel     = "YMXR_sndh-perf-pcrel.bin"
+	LeanPcrel        = "YMXR_sndh-lean-pcrel.bin"
+	MonitorLeanPcrel = "YMXR_sndh-perf-lean-pcrel.bin"
+	Stub             = "YMXR_prg.bin"
 )
 
-// All is the five, in the order the build writes them.
+// All is the nine, in the order the build writes them.
 func All() []string {
-	return []string{Core, Monitor, Lean, MonitorLean, Stub}
+	return []string{Core, Monitor, Lean, MonitorLean,
+		Pcrel, MonitorPcrel, LeanPcrel, MonitorLeanPcrel, Stub}
 }
 
-// Named is the core of the two switches: the raster monitor in where
+// Named is the core of the three switches: the raster monitor in where
 // monitor, ticks that neither drop the interrupt level nor write their end
-// of interrupt where lean.
-func Named(monitor, lean bool) string {
+// of interrupt where lean, and a row read through the program counter
+// where pcrel.
+func Named(monitor, lean, pcrel bool) string {
+	if pcrel {
+		if monitor {
+			if lean {
+				return MonitorLeanPcrel
+			}
+			return MonitorPcrel
+		}
+		if lean {
+			return LeanPcrel
+		}
+		return Pcrel
+	}
 	if monitor {
 		if lean {
 			return MonitorLean

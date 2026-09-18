@@ -15,9 +15,10 @@ import java.util.stream.Stream;
  * The 68000 binaries the tools combine with bound tunes
  * (doc/BINARIES.md): the SNDH core, which {@link Sndh} puts under an SNDH
  * file's entries, and the program stub, which {@link Prg} puts in front
- * of an SNDH file. Two switches of the player's stand in the core, the
- * raster monitor and the lean tick, and each of their four settings is a
- * a separate core, so a file that requests both uses the core that is both.
+ * of an SNDH file. Three switches of the player's stand in the core, the
+ * raster monitor, the lean tick and the row read through the program
+ * counter, and each of their eight settings is a separate core, so a file
+ * that requests two uses the core that is both.
  * The build assembles each once from its source under {@code 68k} and
  * writes it into the classes, the one step rmac is needed for; a tool
  * reads them there and runs no assembler.
@@ -66,30 +67,60 @@ final class Binaries {
     static final Binary MONITOR_LEAN = new Binary("YMXR_sndh-perf-lean.bin", "YMXR_sndh.S",
             List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1"));
 
+    /**
+     * The four cores of the switches above with the player's
+     * {@code YMXR_PCREL} set (doc/performance.md, A tick through the
+     * program counter): a tick reads its row through a signed word
+     * displacement from the instruction that reads it, 12 cycles less a
+     * tick that writes a row, and every row of every source stands within
+     * 32,767 bytes of the handlers, which {@link Sndh} reads a file's
+     * layout against (BINARIES.md 5.5).
+     */
+    static final Binary PCREL = new Binary("YMXR_sndh-pcrel.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_PCREL=1"));
+
+    static final Binary MONITOR_PCREL = new Binary("YMXR_sndh-perf-pcrel.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_PERF=1", "-dYMXR_PCREL=1"));
+
+    static final Binary LEAN_PCREL = new Binary("YMXR_sndh-lean-pcrel.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_NEST=0", "-dYMXR_AEOI=1", "-dYMXR_PCREL=1"));
+
+    static final Binary MONITOR_LEAN_PCREL = new Binary("YMXR_sndh-perf-lean-pcrel.bin",
+            "YMXR_sndh.S",
+            List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1", "-dYMXR_PCREL=1"));
+
     static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S", List.of());
 
     private Binaries() {
     }
 
-    /** All five, in the order the build writes them. */
+    /** All nine, in the order the build writes them. */
     static List<Binary> all() {
-        return List.of(CORE, MONITOR, LEAN, MONITOR_LEAN, STUB);
+        return List.of(CORE, MONITOR, LEAN, MONITOR_LEAN,
+                PCREL, MONITOR_PCREL, LEAN_PCREL, MONITOR_LEAN_PCREL, STUB);
     }
 
     /** The core with neither switch set, as carried. */
     static byte[] core() {
-        return core(false, false);
+        return core(false, false, false);
     }
 
-    /** The core of the two switches, as carried: the raster monitor in
+    /** The core of the three switches, as carried: the raster monitor in
      *  where {@code monitor}, ticks that neither drop the interrupt level
-     *  nor write their end of interrupt where {@code lean}. */
-    static byte[] core(boolean monitor, boolean lean) {
-        return carried(binary(monitor, lean).name());
+     *  nor write their end of interrupt where {@code lean}, and a row read
+     *  through the program counter where {@code pcrel}. */
+    static byte[] core(boolean monitor, boolean lean, boolean pcrel) {
+        return carried(binary(monitor, lean, pcrel).name());
     }
 
-    /** The binary of the two switches. */
-    static Binary binary(boolean monitor, boolean lean) {
+    /** The binary of the three switches. */
+    static Binary binary(boolean monitor, boolean lean, boolean pcrel) {
+        if (pcrel) {
+            if (monitor) {
+                return lean ? MONITOR_LEAN_PCREL : MONITOR_PCREL;
+            }
+            return lean ? LEAN_PCREL : PCREL;
+        }
         if (monitor) {
             return lean ? MONITOR_LEAN : MONITOR;
         }

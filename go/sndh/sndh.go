@@ -23,7 +23,8 @@ import (
 //	16      2      the descriptor's version, 1
 //	18      2      the bound tune's version the core reads
 //	20      2      YMXR_FIXED, the workspace's bytes before the state block
-//	22      2      flags: bit 0 the raster monitor, bit 1 the lean tick
+//	22      2      flags: bit 0 the raster monitor, bit 1 the lean tick,
+//	               bit 2 the row read through the program counter
 //	24      2      where the core's state byte is
 //	26      2      zero
 //	28      4      the subtune table's offset, patched here
@@ -56,6 +57,17 @@ const coreMonitor = 1
 // level nor writes an end of interrupt (doc/performance.md).
 const coreLean = 2
 
+// corePcrel is the core's flag bit 2: a tick reads its row through a
+// displacement from the instruction that reads it (the player's
+// YMXR_PCREL=1, doc/performance.md), which reaches 32,767 bytes, so the
+// file's tunes stand within that of the core (BINARIES.md 5.5).
+const corePcrel = 4
+
+// pcrelReach is the bytes from the core's first byte a bound tune of a
+// file built on the core above ends within, which a displacement
+// reaches.
+const pcrelReach = 32767
+
 // braW is the word of a bra.w, before its displacement.
 const braW = 0x6000
 
@@ -74,21 +86,24 @@ var timerOfEffect = [4]int{0, 3, 1, 2}
 
 // Options is the tag block's text: the title, the composer where there is
 // one, and a name a subtune where the caller names them; and the core the
-// file uses, which monitor and lean select a switch each.
+// file uses, which Monitor, Lean and Pcrel select a switch each.
 type Options struct {
 	Title    string
 	Composer string
 	Names    []string
 	Monitor  bool
 	Lean     bool
+	Pcrel    bool
 }
 
 // Of is the file, from the tune files as subtunes 1 up, around the core
-// the options' two switches select: the raster monitor in where they ask
-// to read the run, the lean tick where the options select it, both where
-// they select both, and the plain core where neither.
+// the options' three switches select: the raster monitor in where they
+// ask to read the run, the lean tick where the options select it, ticks
+// that read a row through the program counter where they select that, the
+// core of any two or three where they select them, and the plain core
+// where none.
 func Of(tuneFiles [][]byte, options Options) ([]byte, error) {
-	core, err := binaries.Read(binaries.Named(options.Monitor, options.Lean))
+	core, err := binaries.Read(binaries.Named(options.Monitor, options.Lean, options.Pcrel))
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +112,8 @@ func Of(tuneFiles [][]byte, options Options) ([]byte, error) {
 
 // With is the same, around the core named.
 func With(core []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
-	if err := CheckCore(core, options.Monitor, options.Lean, Binds(tuneFiles)); err != nil {
+	if err := checkCore(core, options.Monitor, options.Lean, options.Pcrel,
+		Binds(tuneFiles)); err != nil {
 		return nil, err
 	}
 	n := len(tuneFiles)
@@ -148,7 +164,27 @@ func With(core []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		return nil, err
 	}
 	workspace := ymxr.Align(ymxr.GetWord(core, CoreFixedAt)+state) + WorkRounding
-	return Combine(core, set, tags, workspace)
+	file, err := Combine(core, set, tags, workspace)
+	if err != nil {
+		return nil, err
+	}
+	if options.Pcrel {
+		// A tick of this core reads its row through a displacement from
+		// the instruction that reads it, which reaches pcrelReach bytes,
+		// so every row of every subtune stands within that of the
+		// handlers (BINARIES.md 5.5). The handlers stand inside the core,
+		// so this reads the last bound tune's end against the core's
+		// first byte and spends the bytes of the core as the margin.
+		header := even(12 + len(tags))
+		tableAt := even(len(core))
+		last := ymxr.GetLong(file, header+tableAt+2+4*(n-1)) + len(set.Tunes[n-1])
+		if last > pcrelReach {
+			return nil, fmt.Errorf("the tunes end %d bytes past the core's first byte,"+
+				" and a tick that reads a row through the program counter reaches %d",
+				last, pcrelReach)
+		}
+	}
+	return file, nil
 }
 
 // CheckCore reads the core's descriptor against what this writes, and its
@@ -170,6 +206,10 @@ func Binds(tuneFiles [][]byte) int {
 }
 
 func CheckCore(core []byte, monitor, lean bool, binds int) error {
+	return checkCore(core, monitor, lean, false, binds)
+}
+
+func checkCore(core []byte, monitor, lean, pcrel bool, binds int) error {
 	if len(core) < coreLength ||
 		!bytes.Equal(coreMagic, core[coreMagicAt:coreMagicAt+4]) {
 		return fmt.Errorf("not an SNDH core: no YMXS at %d", coreMagicAt)
@@ -192,6 +232,10 @@ func CheckCore(core []byte, monitor, lean bool, binds int) error {
 	if lean && flags&coreLean == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and the lean tick asked for"+
 			" needs bit 1 set", coreFlagsAt, flags)
+	}
+	if pcrel && flags&corePcrel == 0 {
+		return fmt.Errorf("the core's flags at %d read %d, and the row read through the"+
+			" program counter asked for needs bit 2 set", coreFlagsAt, flags)
 	}
 	return nil
 }

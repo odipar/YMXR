@@ -412,8 +412,8 @@ q\{ct}:         bra.w   \{tick}_done
 ; it and to 0.31 without, where the reference player's keep 0.33. The
 ; place the row does not reset is read in the window too, since a tick
 ; between the read and the write steps it (1.9). Under YMXR_PCREL the
-; window carries the arithmetic that turns a row's address into a
-; displacement as well, a dozen instructions more.
+; arithmetic that turns a row's address into a displacement stands in the
+; window as well, a dozen instructions more.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
