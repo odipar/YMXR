@@ -379,7 +379,8 @@ final class BinariesTest {
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(files, new Sndh.Options("Wrong", null, null, false, false)));
         assertEquals("subtune 2: version " + ConformanceTest.WRONG_VERSION
-                + " is not " + Tune.VERSION + " or " + Tune.VERSION_COLUMNS,
+                + " is not " + Tune.VERSION + ", " + Tune.VERSION_COLUMNS + " or "
+                + Tune.VERSION_COUNTED,
                 wrong.getMessage());
     }
 

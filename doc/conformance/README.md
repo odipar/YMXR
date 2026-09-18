@@ -30,7 +30,7 @@ published music, by Jochen Hippel, Mad Max and Scavenger as their
 headers record, one of them converted twice (`circus`, `plays-once`),
 and two built (`preempt`, `retune`); `four-timers`, `voices` and
 `envelope` are built by code and `wrong-version` is `chambers` with the
-version word $0005. The music is its composers', and the repository's
+version word $0006. The music is its composers', and the repository's
 LICENSE covers the code alone: a copy of the kit has the tunes in it for
 the exercise alone.
 
@@ -159,7 +159,7 @@ and they stand.
 | `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and rows section 4 allows beyond those a conversion of a dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, its source with bit 7 set in nine rows before its last, outside SPEC.md 3.2 and reported as the table has it (SPEC.md 7), R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit |
 | `voices` | version 4 (SPEC.md 3.3.5): the four kinds of target that write several registers, one an effect at 50 Hz, and the marker in a different column under each - the coarse nibble of a voice on Timer A and of a tone on Timer C, the noise period on Timer D, the envelope shape of a buzzer on Timer B; a source of several columns repeating to row 0, one repeating to a row above it, one that plays once and stops its timer at its marker, and a start over a running source of the same row count that leaves the place where it stands |
 | `envelope` | version 4 (SPEC.md 3.3.5): `setEnvelope`, the one target whose marked register reads eight bits, so the marker's column is the envelope period's high byte, 0 to 127, and the column beside it a whole byte; a source of two columns repeating to a row above 0, one that plays once and stops its timer at its marker with 127 in a row of its marked column, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
-| `wrong-version` | the version word $0005: a reader produces an empty record |
+| `wrong-version` | the version word $0006: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.

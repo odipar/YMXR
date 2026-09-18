@@ -42,10 +42,24 @@ const Version = 0x0003
 // columns (SPEC.md 3.3.5), which a target of 14 upward runs.
 const VersionColumns = 0x0004
 
+// VersionCounted is the version of a tune with a source whose column
+// fills its byte (SPEC.md 3.3.5): bit 31 of its index entry marks it,
+// which a reader of the two versions above would read as an offset.
+const VersionCounted = 0x0005
+
+// Counted is bit 31 of a source's index entry: the source's rows are
+// whole bytes and a player counts them (SPEC.md 3.1).
+const Counted = 1 << 31
+
 // VersionOf is the version a tune of these sources is written at: the
 // lower of the two it reads under, so a tune both versions encode is one
 // file and a player of version 3 reads it (SPEC.md 3.3.5).
 func VersionOf(sources []Source) int {
+	for _, one := range sources {
+		if one.Counted {
+			return VersionCounted
+		}
+	}
 	for _, one := range sources {
 		if one.Width() > 1 {
 			return VersionColumns
@@ -223,7 +237,11 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	PutLong(file, TableAt, tableAt)
 	copy(file[nameAt:], named)
 	for i := range tables {
-		PutLong(file, IndexAt+4*i, sourceAt[i])
+		entry := sourceAt[i]
+		if all[i].Counted {
+			entry |= Counted
+		}
+		PutLong(file, IndexAt+4*i, entry)
 	}
 	copy(file[tableAt:], table)
 	for i := range tables {
@@ -356,6 +374,7 @@ type File struct {
 	Dtx2      []byte
 	Table     *dtx.Table
 	Sources   []*dtx.Table
+	Counted   []bool
 }
 
 // Read is the tune file in those bytes.
@@ -364,15 +383,15 @@ func Read(file []byte) (File, error) {
 		return File{}, errors.New("not a YMXR file")
 	}
 	version := GetWord(file, 4)
-	if version != Version && version != VersionColumns {
-		return File{}, fmt.Errorf("version %d is not %d or %d", version, Version,
-			VersionColumns)
+	if version != Version && version != VersionColumns && version != VersionCounted {
+		return File{}, fmt.Errorf("version %d is not %d, %d or %d", version, Version,
+			VersionColumns, VersionCounted)
 	}
 	count := int(file[CountAt])
 	tableAt := GetLong(file, TableAt)
 	end := len(file)
 	if count != 0 {
-		end = GetLong(file, IndexAt)
+		end = GetLong(file, IndexAt) &^ Counted
 	}
 	if tableAt < 0 || end > len(file) || tableAt > end {
 		return File{}, fmt.Errorf("the table stands at %d to %d, and the file has %d"+
@@ -396,11 +415,14 @@ func Read(file []byte) (File, error) {
 			" table is %d of one (SPEC.md 3.3.3)", table.Columns(), table.Width(), C)
 	}
 	var sources []*dtx.Table
+	var counted []bool
 	for i := 0; i < count; i++ {
-		at := GetLong(file, IndexAt+4*i)
+		entry := GetLong(file, IndexAt+4*i)
+		at := entry &^ Counted
+		counted = append(counted, entry&Counted != 0)
 		to := len(file)
 		if i+1 < count {
-			to = GetLong(file, IndexAt+4*(i+1))
+			to = GetLong(file, IndexAt+4*(i+1)) &^ Counted
 		}
 		if at < 0 || to > len(file) || at > to {
 			return File{}, fmt.Errorf("source %d stands at %d to %d, and the file has"+
@@ -427,8 +449,15 @@ func Read(file []byte) (File, error) {
 			return File{}, fmt.Errorf("source %d is %d columns, and version %d writes"+
 				" one", i+1, source.Columns(), Version)
 		}
+		// SPEC.md 3.3.5: the versions below this one write no counted
+		// source, so bit 31 under one of them is a file written wrong.
+		if version != VersionCounted && counted[i] {
+			return File{}, fmt.Errorf("source %d is counted, and version %d writes the"+
+				" marker", i+1, version)
+		}
 		sources = append(sources, source)
 	}
 	return File{Version: version, FrameRate: GetWord(file, FrameRateAt),
-		Effects: int(file[EffectsAt]), Dtx2: dtx2, Table: table, Sources: sources}, nil
+		Effects: int(file[EffectsAt]), Dtx2: dtx2, Table: table, Sources: sources,
+		Counted: counted}, nil
 }

@@ -181,13 +181,23 @@ final class YmxsTest {
                 () -> Schema.of(built(big, 0))).getMessage());
         assertTrue(said.contains("count of 256"), "a count of 256 is past the timer's data"
                 + " register, which the count column is: " + said);
-        org.ymxs.YMXS.Single wide = Tunes.repeating("wide", List.of(200), 0);
-        List<Row> marked = List.of(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R0),
-                wide, new Timing( Chip.prescaler(4), 100, true, true))));
-        String wrong = String.valueOf(assertThrows(IllegalArgumentException.class,
-                () -> Schema.of(built(marked, 0))).getMessage());
-        assertTrue(wrong.contains("marker"), "bit 7 of a source's row is the marker (3.2): "
-                + wrong);
+        // A source on a register that fills its byte has no marker in it:
+        // its rows are whole bytes and a player counts them (3.1), which
+        // the version word says (3.3.5).
+        org.ymxs.YMXS.Single whole = Tunes.repeating("whole", List.of(200), 0);
+        List<Row> counted = List.of(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R0),
+                whole, new Timing(Chip.prescaler(4), 100, true, true))));
+        Schema.Made made = Schema.of(built(counted, 0));
+        byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
+                YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report()).file();
+        assertEquals(org.ymxr.Tune.VERSION_COUNTED, org.ymxr.Tune.getWord(file, 4),
+                "a tune with a counted source is version "
+                        + org.ymxr.Tune.VERSION_COUNTED);
+        TuneFile read = TuneFile.read(file);
+        assertEquals(200, read.sources().get(0).column(0)[0] & 0xFF,
+                "the row is the value, with no marker in bit 7");
+        assertTrue(read.counted().get(0),
+                "bit 31 of the index entry marks the source counted");
     }
 
     @Test

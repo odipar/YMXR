@@ -12,20 +12,23 @@ import org.dtx.Table;
  * sources. What a reader reports (R2.4).
  */
 record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table table,
-                List<Table> sources) {
+                List<Table> sources, List<Boolean> counted) {
 
     static TuneFile read(byte[] file) {
         if (file.length < Tune.INDEX_AT || !Arrays.equals(Arrays.copyOf(file, 4), Tune.MAGIC)) {
             throw new IllegalArgumentException("not a YMXR file");
         }
         int version = Tune.getWord(file, 4);
-        if (version != Tune.VERSION && version != Tune.VERSION_COLUMNS) {
+        if (version != Tune.VERSION && version != Tune.VERSION_COLUMNS
+                && version != Tune.VERSION_COUNTED) {
             throw new IllegalArgumentException("version " + version + " is not "
-                    + Tune.VERSION + " or " + Tune.VERSION_COLUMNS);
+                    + Tune.VERSION + ", " + Tune.VERSION_COLUMNS + " or "
+                    + Tune.VERSION_COUNTED);
         }
         int count = file[Tune.COUNT_AT] & 0xFF;
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);
-        int end = count == 0 ? file.length : Tune.getLong(file, Tune.INDEX_AT);
+        int end = count == 0 ? file.length
+                : Tune.getLong(file, Tune.INDEX_AT) & ~Tune.COUNTED;
         // SPEC.md 3.3.4: each offset of the header is read against the
         // file's length before a byte is read through it, so a file cut
         // short or written wrong is a line rather than an exception the
@@ -47,9 +50,14 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
                     + Columns.C + " of one (SPEC.md 3.3.3)");
         }
         List<Table> sources = new ArrayList<>();
+        List<Boolean> counted = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            int at = Tune.getLong(file, Tune.INDEX_AT + 4 * i);
-            int to = i + 1 < count ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1)) : file.length;
+            int entry = Tune.getLong(file, Tune.INDEX_AT + 4 * i);
+            int at = entry & ~Tune.COUNTED;
+            counted.add((entry & Tune.COUNTED) != 0);
+            int to = i + 1 < count
+                    ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1)) & ~Tune.COUNTED
+                    : file.length;
             if (at < 0 || to > file.length || at > to) {
                 throw new IllegalArgumentException("source " + (i + 1) + " stands at " + at
                         + " to " + to + ", and the file has " + file.length + " bytes");
@@ -74,9 +82,15 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
                         + source.columns() + " columns, and version " + Tune.VERSION
                         + " writes one");
             }
+            // SPEC.md 3.3.5: the versions below this one write no counted
+            // source, so bit 31 under one of them is a file written wrong.
+            if (version != Tune.VERSION_COUNTED && counted.get(i)) {
+                throw new IllegalArgumentException("source " + (i + 1) + " is counted,"
+                        + " and version " + version + " writes the marker");
+            }
             sources.add(source);
         }
         return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT),
-                file[Tune.EFFECTS_AT] & 0xFF, dtx2, table, sources);
+                file[Tune.EFFECTS_AT] & 0xFF, dtx2, table, sources, counted);
     }
 }
