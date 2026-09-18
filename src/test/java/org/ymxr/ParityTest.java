@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
@@ -249,30 +251,44 @@ final class ParityTest {
         both("ymxr-prg", both("ymxr-sndh", split));
     }
 
-    /** Every tool of the eleven, for a check that runs them all. */
+    /** Every tool of the eleven (tools.md 2), for a check that runs them
+     *  all. `ymxr-check` stood outside this list while the comment over it
+     *  read eleven. */
     private static final List<String> EVERY_TOOL = List.of("ym-to-ymxs",
             "ym-to-ymxr", "ymxs-to-ymxr", "ymxs-to-sndh", "ymxs-to-prg",
-            "ymxr-bind", "ymxr-multi", "ymxr-sndh", "ymxr-prg", "ymxr-trace");
+            "ymxr-bind", "ymxr-check", "ymxr-multi", "ymxr-sndh", "ymxr-prg",
+            "ymxr-trace");
 
     /**
-     * The tools whose input is YMXS's JSON form, which read it through the
-     * release this build names.
-     *
-     * <p>An empty text parsed to an absent format in that tree's Java reader
-     * and to a text that is not JSON in its Go one; odipar/YMXS#58 reports
-     * the second in both, and these three read an empty input alike once
-     * this build reads a release carrying it. The other tools read one here
-     * already.
+     * The tools this runs against the tools tools.md 2 lists. The list
+     * here named ten while the comment over it read eleven, and the tool
+     * left out, {@code ymxr-check}, stood outside the two checks below.
      */
-    private static final List<String> READ_THE_STRUCTURE =
-            List.of("ymxs-to-ymxr", "ymxs-to-sndh", "ymxs-to-prg");
+    @Test
+    void everyToolTheDocumentListsIsRunHere() throws Exception {
+        String tools = Files.readString(Path.of("doc", "tools.md"));
+        int at = tools.indexOf("## 2. The eleven tools");
+        assertTrue(at >= 0, "tools.md lists no tools");
+        String table = tools.substring(at, tools.indexOf("\n\n", tools.indexOf("|", at)));
+        List<String> listed = new ArrayList<>();
+        Matcher row = Pattern.compile("^\\| `([a-z0-9-]+)` \\|", Pattern.MULTILINE)
+                .matcher(table);
+        while (row.find()) {
+            listed.add(row.group(1));
+        }
+        assertEquals(11, listed.size(), "tools.md 2 lists " + listed);
+        assertEquals(new TreeSet<>(listed), new TreeSet<>(EVERY_TOOL),
+                "a tool of tools.md 2 is run here, and one run here is listed there");
+    }
 
     @Test
     void anEmptyInputIsOneFaultInBothTrees() throws Exception {
+        // The three tools whose input is YMXS's JSON form stood outside
+        // this check: an empty text parsed to an absent format in that
+        // tree's Java reader and to a text that is not JSON in its Go one,
+        // and odipar/YMXS#58 reports the second in both. This build reads
+        // YMXS 0.4.4, where the second stands, so the three read one here now.
         for (String tool : EVERY_TOOL) {
-            if (READ_THE_STRUCTURE.contains(tool)) {
-                continue;
-            }
             Ran java = ran(Path.of("bin"), tool, new byte[0], "-silent");
             Ran go = ran(built(), tool, new byte[0], "-silent");
             assertTrue(java.exit() != 0, tool + " reads an empty input: "
