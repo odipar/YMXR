@@ -781,13 +781,13 @@ a version of it a tag of that directory, `go/v0.1.0` beside `v0.1.0`.
 BINARIES.md is absent from `target/classes/org/ymxr/68k`, or a file under
 `src/main/java`, `pom.xml` or a `68k/*.S` source is newer than `.built`:
 `mvn -q process-classes dependency:build-classpath` with standard input
-closed, under the lock `target/.building`, a directory one process
-creates and the others wait for, one second at a time, up to 180 seconds,
-after which a waiting process writes
-`run: a build has held <lock> for three minutes` and exits with 2. Then
-it runs the class with `java -ea`. The build needs Java 23, Maven, rmac
-(`-Drmac=PATH` names another), and DTX `0.11.9` and YMXS `0.4.3` in the
-local Maven repository, `mvn install` in each checkout.
+closed, under the lock `target/.building`, a directory one process creates
+and the others wait for, one second at a time, up to 180 seconds, after
+which a waiting process writes `run: a build has held <lock> for three
+minutes` and exits with 2. Then it runs the class with `java -ea`. The
+build needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX
+`0.11.9` and YMXS `0.4.3` in the local Maven repository, `mvn install` in
+each checkout.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the five 68000 binaries and DTX's twenty-two images
