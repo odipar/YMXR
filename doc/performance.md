@@ -315,6 +315,37 @@ room stands beside it, where a source of several columns has its loop cell
 and the stride from one column to the next, and an effect's record is 16
 bytes where it was 8, so YMXR_FIXED is 2,120 bytes against 56.
 
+## A counted tick of two columns
+
+`setEnvelope` writes R11 and R12, and both read every bit of their byte,
+so a source on that target is counted: its rows are whole bytes and a
+tick counts them (SPEC.md 2.1.3). The wide handler runs that source with
+a word counter where the marked one tests bit 7, 138 bytes an instance
+against 122, and four instances of it stand beside the two marked shapes.
+
+Both tunes of the kit that sweep the envelope period run one effect, so
+their ticks drop no level and the figures below are the second column's
+of the lean table:
+
+| tick | marked | counted |
+|---|---|---|
+| a row written, the places stepped | 176 | 196 |
+| the end, the places to row `RR` | 206 | 246 |
+| the end, the timer stopped | 172 | 192 |
+
+So 20 cycles a tick that writes a row, as the counted handler of one
+column costs against the general one, and 40 on the path that loops,
+where the reload of the counter stands too. What that buys is the half of
+the envelope period a marked source cannot reach and the row it would
+spoil: the tick that reads the last row of a marked source on this target
+writes the marker's bit into R12 with the value, a period 32,768 above
+the rows before it, which the kit's `envelope` tune does at 800 and
+33,696.
+
+The player is 7,804 bytes against 6,934 before the counted shape of one
+column, and 8,160 against 7,298 with a row read through the program
+counter.
+
 ## A tick through the program counter
 
 `YMXR_PCREL=1` assembles a player whose tick reads its row through a

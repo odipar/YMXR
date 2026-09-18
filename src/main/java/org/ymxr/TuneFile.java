@@ -19,11 +19,10 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
             throw new IllegalArgumentException("not a YMXR file");
         }
         int version = Tune.getWord(file, 4);
-        if (version != Tune.VERSION && version != Tune.VERSION_COLUMNS
-                && version != Tune.VERSION_COUNTED) {
+        if (version < Tune.VERSION || version > Tune.VERSION_WIDE_COUNTED) {
             throw new IllegalArgumentException("version " + version + " is not "
-                    + Tune.VERSION + ", " + Tune.VERSION_COLUMNS + " or "
-                    + Tune.VERSION_COUNTED);
+                    + Tune.VERSION + ", " + Tune.VERSION_COLUMNS + ", "
+                    + Tune.VERSION_COUNTED + " or " + Tune.VERSION_WIDE_COUNTED);
         }
         int count = file[Tune.COUNT_AT] & 0xFF;
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);
@@ -82,11 +81,18 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
                         + source.columns() + " columns, and version " + Tune.VERSION
                         + " writes one");
             }
-            // SPEC.md 3.3.5: the versions below this one write no counted
-            // source, so bit 31 under one of them is a file written wrong.
-            if (version != Tune.VERSION_COUNTED && counted.get(i)) {
+            // SPEC.md 3.3.5: a version below 5 marks every source and one
+            // below 6 counts a source of one column, so bit 31 under
+            // either is a file written wrong.
+            if (version < Tune.VERSION_COUNTED && counted.get(i)) {
                 throw new IllegalArgumentException("source " + (i + 1) + " is counted,"
                         + " and version " + version + " writes the marker");
+            }
+            if (version < Tune.VERSION_WIDE_COUNTED && counted.get(i)
+                    && source.columns() > 1) {
+                throw new IllegalArgumentException("source " + (i + 1) + " is counted and "
+                        + source.columns() + " columns, and version " + version
+                        + " counts one");
             }
             sources.add(source);
         }

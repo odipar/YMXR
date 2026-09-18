@@ -47,14 +47,24 @@ const VersionColumns = 0x0004
 // which a reader of the two versions above would read as an offset.
 const VersionCounted = 0x0005
 
+// VersionWideCounted is the version of a tune with a counted source of
+// several columns (SPEC.md 3.3.5), which setEnvelope runs: a player of
+// the version above would read it as a counted source of one column.
+const VersionWideCounted = 0x0006
+
 // Counted is bit 31 of a source's index entry: the source's rows are
 // whole bytes and a player counts them (SPEC.md 3.1).
 const Counted = 1 << 31
 
 // VersionOf is the version a tune of these sources is written at: the
-// lower of the two it reads under, so a tune both versions encode is one
-// file and a player of version 3 reads it (SPEC.md 3.3.5).
+// lowest it reads under, so a tune two versions encode is one file and
+// the older player reads it (SPEC.md 3.3.5).
 func VersionOf(sources []Source) int {
+	for _, one := range sources {
+		if one.Counted && one.Width() > 1 {
+			return VersionWideCounted
+		}
+	}
 	for _, one := range sources {
 		if one.Counted {
 			return VersionCounted
@@ -383,9 +393,9 @@ func Read(file []byte) (File, error) {
 		return File{}, errors.New("not a YMXR file")
 	}
 	version := GetWord(file, 4)
-	if version != Version && version != VersionColumns && version != VersionCounted {
-		return File{}, fmt.Errorf("version %d is not %d, %d or %d", version, Version,
-			VersionColumns, VersionCounted)
+	if version < Version || version > VersionWideCounted {
+		return File{}, fmt.Errorf("version %d is not %d, %d, %d or %d", version, Version,
+			VersionColumns, VersionCounted, VersionWideCounted)
 	}
 	count := int(file[CountAt])
 	tableAt := GetLong(file, TableAt)
@@ -449,11 +459,16 @@ func Read(file []byte) (File, error) {
 			return File{}, fmt.Errorf("source %d is %d columns, and version %d writes"+
 				" one", i+1, source.Columns(), Version)
 		}
-		// SPEC.md 3.3.5: the versions below this one write no counted
-		// source, so bit 31 under one of them is a file written wrong.
-		if version != VersionCounted && counted[i] {
+		// SPEC.md 3.3.5: a version below 5 marks every source and one
+		// below 6 counts a source of one column, so bit 31 under either
+		// is a file written wrong.
+		if version < VersionCounted && counted[i] {
 			return File{}, fmt.Errorf("source %d is counted, and version %d writes the"+
 				" marker", i+1, version)
+		}
+		if version < VersionWideCounted && counted[i] && source.Columns() > 1 {
+			return File{}, fmt.Errorf("source %d is counted and %d columns, and version"+
+				" %d counts one", i+1, source.Columns(), version)
 		}
 		sources = append(sources, source)
 	}

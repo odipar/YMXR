@@ -337,16 +337,19 @@ counts its rows (3.1.6).
 
 **2.1.3** `setEnvelope` writes R11 and R12, the low and the high byte of
 the envelope period (YMXS, SPEC.md 2.5), and both registers read eight
-bits. The marker stands in bit 7 of the high byte's column, so a source on
-this target writes R12 a value of 0 to 127 and reaches an envelope period
-of 0 to 32,767 (rule 2(e)).
+bits. A source on this target is counted (3.1.6): its rows are whole
+bytes, so it writes R12 a value of 0 to 255 and reaches an envelope
+period of 0 to 65,535, the whole range a frame's R11 and R12 columns
+reach (1.1). The envelope frequency is 2,000,000 / (256 x envelope
+period) (terminology.md 1.4): period 32,767 is one cycle in 4.19 seconds
+and period 65,535 one in 8.39 seconds.
 
-The period a row writes reaches 65,535, and this target reaches half of
-it. The envelope frequency is 2,000,000 / (256 x envelope period)
-(terminology.md 1.4): period 32,767 is one cycle in 4.19 seconds and
-period 65,535 one in 8.39 seconds, so the half this target leaves out is
-the envelope slower than 4.19 seconds a cycle. A frame's R11 and R12
-columns (1.1) write those periods.
+**2.1.4** A file of version 4 or 5 writes a marked source on that target
+(3.3.5): bits 6 to 0 of R12's column are the value, the marker stands in
+bit 7, and the tick that reads the last row writes that bit into R12 with
+the value, a period 32,768 above the one the rows before it write. A
+player reads such a source as this clause defines it, and a writer of
+this version writes a counted source in its place.
 
 ### 2.2 The sources
 
@@ -445,12 +448,16 @@ plays once: the tick that reads row R - 1 stops the timer (5.1).
 **3.1.5** A writer numbers the sources in first-start order (YMXS,
 SPEC.md 1.9).
 
-**3.1.6** A counted source is one whose target writes a register that
-reads every bit of its byte (2.1.2): each of the eight bits of a row is
-a value, where the marker of 3.2.1 requires bit 7. Bit 31 of its index
-entry is 1, and a tick reads R rows from the row it starts at (5.1). Bit
-31 of the index entry of every other source is 0, and a file with a
-counted source is version 5 (3.3.5).
+**3.1.6** A counted source is one whose rows carry no marker: each of the
+eight bits of a row is a value, where the marker of 3.2.1 requires bit 7.
+Bit 31 of its index entry is 1, and a tick reads R rows from the row it
+starts at (5.1). Bit 31 of the index entry of every other source is 0.
+
+A writer writes a source counted where the column the marker would stand
+in writes a register that reads every bit of its byte: a source of one
+column on a target of 2.1.2, and a source of two columns on `setEnvelope`
+(2.1.3). A file with a counted source of one column is version 5, and one
+with a counted source of several columns version 6 (3.3.5).
 
 ### 3.2 The rows
 
@@ -476,7 +483,7 @@ a value.
 | offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, `$0003`, `$0004` or `$0005` (3.3.5) |
+| 4 | 2 | the version, `$0003`, `$0004`, `$0005` or `$0006` (3.3.5) |
 | 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
 | 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bits 7 to 4 are 0 |
 | 9 | 1 | S, the source count, 0 to 127 |
@@ -528,23 +535,26 @@ reports a condition reads no further field. A name offset other than 16 +
 |---|---|
 | the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
-| the version is other than 3, 4 or 5 (3.3.5) | `version V is not 3, 4 or 5` |
+| the version is other than 3, 4, 5 or 6 (3.3.5) | `version V is not 3, 4, 5 or 6` |
 | the table begins or ends outside the file | `the table stands at A to B, and the file has F bytes` |
 | the table is a DTX variant other than 2 (3.3.3) | `the table is DTX X, and a tune's table is DTX2 (SPEC.md 3.3.3)` |
 | the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N stands at A to B, and the file has F bytes` |
 | source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
 | the version is 3 and source N has several columns (3.3.5) | `source N is C columns, and version 3 writes one` |
-| the version is other than 5 and bit 31 of source N's index entry is 1 (3.1.6) | `source N is counted, and version V writes the marker` |
+| the version is below 5 and bit 31 of source N's index entry is 1 (3.1.6) | `source N is counted, and version V writes the marker` |
+| the version is below 6 and source N is counted with several columns (3.1.6) | `source N is counted and C columns, and version V counts one` |
 
 **3.3.5** The version. A tune whose sources are one column and whose
 target columns are 0 to 13 is version 3; one with a source of several
-columns or a target column of 14 upward is version 4 (2.1); and one with
-a counted source is version 5 (3.1.6), whichever its targets are, since
-a player of 3 or 4 would read bit 31 of that source's index entry as
-part of an offset. A writer writes the lowest of the three a tune reads
-under, so a tune two of them encode is one file and the older player
-reads it. A player of this version reads 3, 4 and 5.
+columns or a target column of 14 upward is version 4 (2.1); one with a
+counted source of one column is version 5 (3.1.6), whichever its targets
+are, since a player of 3 or 4 would read bit 31 of that source's index
+entry as part of an offset; and one with a counted source of several
+columns is version 6, which a player of 5 would read as a counted source
+of one column. A writer writes the lowest of the four a tune reads under,
+so a tune two of them encode is one file and the older player reads it. A
+player of this version reads 3, 4, 5 and 6.
 
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
 Attractions #2` begins `594D5852 0003 0032 00 00 0010 00000028`: the 22
@@ -563,9 +573,10 @@ reading only set columns and keeping values needed by later rows (R4.6).
 The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
-1. Read the version; for a version other than 3, 4 or 5 (3.3.5), report -1
-   and leave every register and every timer as it is. A reader reports
-   the line of 3.3.4 in place of that, and its record is empty (7.4).
+1. Read the version; for a version other than 3, 4, 5 or 6 (3.3.5),
+   report -1 and leave every register and every timer as it is. A reader
+   reports the line of 3.3.4 in place of that, and its record is empty
+   (7.4).
 2. Read R and RR of the tune's table and the effects used.
 3. Resolve each source of the source index: its first row, and its loop
    row, row RR where it repeats and the end where it plays once (3.1.4).
@@ -818,11 +829,11 @@ numbers the maps assign.**
 - 2(d) A target of two registers names one column for the marker (2.1),
   so a source of two columns runs on the tone targets, on the noise
   targets or on `setEnvelope`, and on one of the three alone.
-- 2(e) A source on `setEnvelope` writes R12 a value of 0 to 127, the
-  marker standing in bit 7 of that column (2.1.3). The marker's column
-  of every other target writes a register that reads seven bits or
-  fewer, and every column beside it is a whole byte, as is every column
-  of a counted source (3.1.6).
+- 2(e) The marker's column of a target other than `setEnvelope` writes a
+  register that reads seven bits or fewer, and every column beside it is
+  a whole byte, as is every column of a counted source (3.1.6). A source
+  on `setEnvelope` is counted, so both its columns are whole bytes
+  (2.1.3).
 - 2(f) A counted source on `setR7` has bits 7 and 6 of every row set, the
   directions of the two I/O ports (1.4.2): a tick writes the row whole,
   so a writer sets the two bits where a row's write reads them from the

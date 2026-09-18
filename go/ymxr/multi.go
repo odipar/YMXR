@@ -44,8 +44,8 @@ func multiVersion(tunes [][]byte) int {
 			most = GetWord(tune, 4)
 		}
 	}
-	if most > VersionCounted {
-		most = VersionCounted
+	if most > VersionWideCounted {
+		most = VersionWideCounted
 	}
 	return most
 }
@@ -102,9 +102,9 @@ func ReadMulti(file []byte) (MultiRead, error) {
 		return MultiRead{}, errors.New("not a YMXM file")
 	}
 	version := GetWord(file, 4)
-	if version != Version && version != VersionColumns && version != VersionCounted {
-		return MultiRead{}, fmt.Errorf("version %d is not %d, %d or %d", version,
-			Version, VersionColumns, VersionCounted)
+	if version < Version || version > VersionWideCounted {
+		return MultiRead{}, fmt.Errorf("version %d is not %d, %d, %d or %d", version,
+			Version, VersionColumns, VersionCounted, VersionWideCounted)
 	}
 	count := GetWord(file, MultiCountAt)
 	if count < 1 || count > MostTunes {

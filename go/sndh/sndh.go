@@ -245,8 +245,8 @@ func Binds(tuneFiles [][]byte) int {
 			most = ymxr.GetWord(file, 4)
 		}
 	}
-	if most > BoundVersionCounted {
-		most = BoundVersionCounted
+	if most > BoundVersionWideCounted {
+		most = BoundVersionWideCounted
 	}
 	return most
 }

@@ -54,7 +54,7 @@ final class ConformanceTest {
 
     /** The version word in {@code wrong-version}: one past the highest
      *  version the reader reads (SPEC.md 3.3.5). */
-    static final int WRONG_VERSION = Tune.VERSION_COUNTED + 1;
+    static final int WRONG_VERSION = Tune.VERSION_WIDE_COUNTED + 1;
 
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(
@@ -108,6 +108,16 @@ final class ConformanceTest {
                     + " 0; a target set while an effect runs and read at the next"
                     + " start; a row that sets R12 as it stops the effect running on"
                     + " it"),
+            Fixture.built("envelope-counted", "`BuiltTunes.envelopeCounted`",
+                    BuiltTunes::envelopeCounted,
+                    "version 6: a counted source of two columns on `setEnvelope`, whose"
+                    + " two registers read every bit of their byte, so its rows are whole"
+                    + " bytes and a tick counts them; the high byte runs past 127, where"
+                    + " a marked source of this target stops, and reaches 255, a period"
+                    + " of 65,323; one source repeating to a row above 0 and one that"
+                    + " plays once and stops its timer at its count, a start that changes"
+                    + " the source on a running timer, and the envelope shape set from"
+                    + " column 13 while the period ticks"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces no report of it", WRONG_VERSION)));

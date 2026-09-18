@@ -253,7 +253,7 @@ final class Sndh {
                 most = Math.max(most, Tune.getWord(file, 4));
             }
         }
-        return Math.min(most, Bound.VERSION_COUNTED);
+        return Math.min(most, Bound.VERSION_WIDE_COUNTED);
     }
 
     static void checkCore(byte[] core, boolean monitor, boolean lean, int binds) {

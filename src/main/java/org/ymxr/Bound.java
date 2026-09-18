@@ -46,6 +46,9 @@ final class Bound {
     /** The version of a bound tune with a source whose column fills its
      *  byte, which a player counts the rows of. */
     static final int VERSION_COUNTED = Tune.VERSION_COUNTED;
+
+    /** The version of one with a counted source of several columns. */
+    static final int VERSION_WIDE_COUNTED = Tune.VERSION_WIDE_COUNTED;
     static final int STATE_AT = 12;
     static final int IMAGE_AT = 16;
     static final int TABLE_AT = 20;

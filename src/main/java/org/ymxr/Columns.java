@@ -34,13 +34,15 @@ final class Columns {
 
     /** The column of a source's row the marker stands in, a target
      *  (SPEC.md 2.1): the column whose register reads seven bits or fewer,
-     *  and -1 for a target this version does not encode. Targets 0 to 13
-     *  write one register, so the marker stands in their one column where
-     *  the register leaves bit 7; 14 to 19 mark the coarse nibble, 20 the
-     *  envelope period's high byte, 21 the envelope shape, and 22 to 24 the
-     *  noise period. */
+     *  and -1 where every column writes a register that reads all eight,
+     *  which is a counted source (3.1.6). Targets 0 to 13 write one
+     *  register, so the marker stands in their one column where the
+     *  register leaves bit 7 and the source is counted where it does not;
+     *  14 to 19 mark the coarse nibble, 20, `setEnvelope`, writes two
+     *  whole bytes and is counted, 21 marks the envelope shape, and 22 to
+     *  24 the noise period. */
     static final int[] MARKER = {-1, 0, -1, 0, -1, 0, 0, -1, 0, 0, 0, -1, -1, 0,
-                                 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0};
+                                 1, 1, 1, 1, 1, 1, -1, 2, 0, 0, 0};
 
     /** Bits 7 and 6 of R7, the directions of the two I/O ports, which an
      *  Atari ST writes as 1 (SPEC.md 1.4.2). A row's write reads them

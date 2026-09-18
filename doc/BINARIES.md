@@ -54,7 +54,7 @@ tool reads a multi file (0.4, 3.3).
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXM` |
-| 4 | 2 | the version, $0003, $0004 or $0005: the highest of the tune files in it (SPEC.md 3.3.5) |
+| 4 | 2 | the version, $0003 to $0006: the highest of the tune files in it (SPEC.md 3.3.5) |
 | 6 | 2 | `N`, the tune count, 1 to 99 |
 | 8 | 8`N` | the entries, tune 1 to `N`: a long where its tune file begins, then a long its bytes |
 | 8 + 8`N` | | the names, tune 1 to `N`, each UTF-8 text ended by a zero byte |
@@ -76,7 +76,7 @@ name runs to its zero byte or the file's end.
 | condition | reported as |
 |---|---|
 | the file is under 8 bytes, or bytes 0 to 3 are other than `YMXM` | `not a YMXM file` |
-| the version is V, other than 3, 4 or 5 | `version V is not 3, 4 or 5` |
+| the version is V, other than 3, 4, 5 or 6 | `version V is not 3, 4, 5 or 6` |
 | `N` is outside 1 to 99 | `N tunes, and a multi file has 1 to 99` |
 | 8 + 8`N` is past the file's F bytes | `the entries of N tunes stand past the file's F bytes` |
 | entry i has A or B below 0, or A + B past the file's F bytes | `tune i stands at A for B bytes, and the file has F` |
@@ -106,7 +106,7 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0003, $0004 or $0005: the version of the tune file bound (SPEC.md 3.3.5) |
+| 4 | 2 | the version, $0003 to $0006: the version of the tune file bound (SPEC.md 3.3.5) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
@@ -142,7 +142,7 @@ field at 16 written 0; 3.1 places the images and patches the field.
 **1.5 What the player reads.** At init (5.1), in order:
 
 1. Bytes 0 to 5; where they are other than `YMXB` and a version $0003
-   to $0005 (SPEC.md 3.3.5), report -1 and stop.
+   to $0006 (SPEC.md 3.3.5), report -1 and stop.
 2. The field at 16 and the field at 8.
 3. Byte 19 of the image, the variant; where it is other than 2, report
    -1 and stop.
@@ -194,7 +194,7 @@ file's tunes end past the reach.
 | 8 | 4 | `bra.w` to play (2.9) |
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
-| 18 | 2 | the highest bound tune version this core reads, 5 |
+| 18 | 2 | the highest bound tune version this core reads, 6 |
 | 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,120 |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
