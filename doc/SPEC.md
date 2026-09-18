@@ -949,11 +949,14 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 `effects` the effects used E as a decimal integer, 0 to 15; `sources`
 the sources in index order, source 1 first, each
 `{"rows":[...],"repeat":RR}` with `rows` the bytes of its rows in row
-order, a byte a column of the row and the marker included, 0 to 255, and
-`repeat` its RR as its DTX1 header has it, an integer, RR equal to R
-included (3.1.4), where the record of the structure writes `null` for a
-source that plays once (YMXS, SPEC.md 7.3); `[]` where S is 0. A source of
-C columns and R rows reads as C times R bytes, row 0's columns first.
+order and, inside a row, in column order, column 0 first: a byte a
+column of the row, the marker included, 0 to 255, and `repeat` its RR as
+its DTX1 header has it, an integer, RR equal to R included (3.1.4),
+where the record of the structure writes `null` for a source that plays
+once (YMXS, SPEC.md 7.3); `[]` where S is 0. A source of C columns and R
+rows reads as C times R bytes, row 0's columns first. A row reads in the
+order of its columns rather than the order a tick writes them, which
+puts the marker's column last (2.1.1).
 
 ### 7.3 A frame's entry
 
@@ -995,7 +998,8 @@ frames the host requires, except that the record of a tune that plays
 once ends with its `{"result":-1}` entry. Where the host leaves F
 unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
 loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
-record of a file with an error of 3.3.4 is empty, 0 bytes. Two readers of
+record of a file with an error of 3.3.4 is empty, 0 bytes, and the line a
+reader reports of that error stands outside the record. Two readers of
 one tune file over one F produce one record, byte for byte.
 
 ### 7.5 The example
