@@ -339,11 +339,31 @@ value the start patched into them, so both cost what they cost:
 | a square's two rows, one effect | 80 |
 | a source of one row, one effect | 56 |
 
+The lean tick of the table above leaves the same two writes out of these
+paths, the level's drop on the three that write a row's value and the end
+of interrupt on all five:
+
+| tick | as it stands | lean |
+|---|---|---|
+| a row written, the place stepped | 96 | 64 |
+| the marker, the place to row `RR` | 114 | 98 |
+| the marker, the timer stopped | 124 | 108 |
+| a square's two rows, no place stepped | 88 | 56 |
+| a source of one row, no place stepped | 64 | 32 |
+
 So 12 cycles a tick that writes a row and steps its place, 16 on the loop
 and 8 on the stop: at a digidrum's 6,000 ticks a second, 1,440 cycles a
 frame. A handler of two columns saves twice that a tick and one of three
 three times, since each column is a read and a step; the counted handler
 saves the same 12 as the general one.
+
+The raster monitor reads this build as it reads the others, and the bar
+it burns for the ticks is the figure that moves. Under Hatari over 420
+calls of Turrican - world 4-3 on a `-perf` core, against the same run on
+the core that reads an address: the call costs 1,675 cycles on average
+against 1,674, and a tick 144 against 156, so the bar is 2.23 lines on
+average and 28.57 at most against 2.47 and 31.70. `ym/cost.py` reads the
+colour writes back.
 
 A start writes the place it patches behind level 7, so that a tick reads
 a handler once it is made, and under this build the arithmetic turning a
