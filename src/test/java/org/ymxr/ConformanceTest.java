@@ -88,6 +88,14 @@ final class ConformanceTest {
                     + " that plays once and stops its timer at its marker, and a start over a"
                     + " running source of the same row count that leaves the place where it"
                     + " stands"),
+            Fixture.built("envelope", "`BuiltTunes.envelope`", BuiltTunes::envelope,
+                    "version 4: `setEnvelope`, the one target whose marked register reads"
+                    + " eight bits, so the marker's column is the envelope period's high"
+                    + " byte, 0 to 127, and the column beside it a whole byte; a source of"
+                    + " two columns repeating to a row above 0, one that plays once and"
+                    + " stops its timer at its marker with 127 in a row of its marked"
+                    + " column, a start that changes the source on a running timer, and the"
+                    + " envelope shape set from column 13 while the period ticks"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces no report of it", WRONG_VERSION)));

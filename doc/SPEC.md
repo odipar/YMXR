@@ -304,7 +304,7 @@ under them (R3.2).
 | 0 to 13 | `setR0` to `setR13` (YMXS, SPEC.md 3.1.2): `setRn` writes the row to Rn | 1 | 0 |
 | 14, 15, 16 | `setToneA`, `setToneB`, `setToneC`: R0 R1, R2 R3, R4 R5 | 2 | 1, the coarse nibble |
 | 17, 18, 19 | `setVoiceA`, `setVoiceB`, `setVoiceC`: R0 R1 R8, R2 R3 R9, R4 R5 R10 | 3 | 1, the coarse nibble |
-| 20 | `setEnvelope` | | left to a later version (section 8) |
+| 20 | `setEnvelope`: R11 R12 | 2 | 1, the period's high byte |
 | 21 | `setBuzzer`: R11 R12 R13 | 3 | 2, the shape |
 | 22, 23, 24 | `setNoiseA`, `setNoiseB`, `setNoiseC`: R6 R8, R6 R9, R6 R10 | 2 | 0, the noise period |
 | 25 to 127 | unassigned; a later version assigns them (section 8) |  |  |
@@ -331,11 +331,18 @@ The targets of one register whose register reads seven bits or fewer are
 on `setR0`, `setR2`, `setR4`, `setR7`, `setR11` or `setR12` is left to a
 later version (section 8).
 
-**2.1.3** `setEnvelope` writes R11 and R12, which read eight bits each,
-so a source for it has no bit to spare for the marker and this version
-encodes none (section 8). The structure defines the target (YMXS, SPEC.md
-3.1.1) and a later version of this format encodes it, with a column for
-the marker or an end this version has no room for.
+**2.1.3** `setEnvelope` writes R11 and R12, the low and the high byte of
+the envelope period (YMXS, SPEC.md 2.5), and both registers read eight
+bits. The marker stands in bit 7 of the high byte's column, so a source on
+this target writes R12 a value of 0 to 127 and reaches an envelope period
+of 0 to 32,767 (rule 2(e)).
+
+The period a row writes reaches 65,535, and this target reaches half of
+it. The envelope frequency is 2,000,000 / (256 x envelope period)
+(terminology.md 1.4): period 32,767 is one cycle in 4.19 seconds and
+period 65,535 one in 8.39 seconds, so the half this target leaves out is
+the envelope slower than 4.19 seconds a cycle. A frame's R11 and R12
+columns (1.1) write those periods.
 
 ### 2.2 The sources
 
@@ -777,17 +784,21 @@ numbers the maps assign.**
   columns of such an effect unread (4.2), and a reader records the stop
   (7.3).
 - 2(b) A source column is 0 or 1 to S, S the source count (3.3); a
-  target column is a target this version encodes, 0 to 19 or 21 to 24
-  (2.1). A source of one column runs on one of the eight targets of
-  2.1.2, and a source of C columns on a target of C columns.
+  target column is a target this version encodes, 0 to 24 (2.1). A source
+  of one column runs on one of the eight targets of 2.1.2, and a source of
+  C columns on a target of C columns.
 - 2(c) A start whose target column is unset runs on the kept target, the
   last target column set on the effect in frame order, through the wrap
   (4.5). A writer sets the target column on the first start of an
   effect in the first pass, and on the first start at or after the
   repeat row.
 - 2(d) Every target a source runs on names one column for the marker
-  (2.1), so a source of two columns runs on the tone targets or on the
-  noise targets.
+  (2.1), so a source of two columns runs on the tone targets, on the
+  noise targets or on `setEnvelope`, and on one of the three alone.
+- 2(e) A source on `setEnvelope` writes R12 a value of 0 to 127, the
+  marker standing in bit 7 of that column (2.1.3). Every other column of
+  every source is a whole byte, and the marker's column of every other
+  target is a register that reads seven bits or fewer.
 
 **Rule 3: a start sets bit 5 of the control column with it, with one
 exception, and sets bit 6 where the timer is stopped** (YMXS rules 3
@@ -1019,9 +1030,8 @@ A player of this version is unconstrained in each item below. A number
 missing from the list is a clause a version has defined, and the numbers
 of the rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 
-**8.2** Targets 25 to 127 (2.1), `setEnvelope` (2.1.3), and a source of
-one column on `setR0`, `setR2`, `setR4`, `setR7`, `setR11` or `setR12`
-(2.1.2).
+**8.2** Targets 25 to 127 (2.1), and a source of one column on `setR0`,
+`setR2`, `setR4`, `setR7`, `setR11` or `setR12` (2.1.2).
 
 **8.3** A source of more than three columns or of values wider than a byte
 (3.1.3), and a source whose RR is above R.

@@ -299,6 +299,37 @@ final class ConsistencyTest {
                 + row.group(1));
     }
 
+    /**
+     * The two envelope cycles of SPEC.md 2.1.3 against the formula of
+     * terminology.md 1.4 at the periods the clause names, and the high
+     * period against the marker's bit.
+     */
+    @Test
+    void theEnvelopeCyclesAreTheFormulaAtThosePeriods() throws IOException {
+        Matcher formula = wrapped("envelope frequency = ([\\d,]+) / \\("
+                + "(\\d+) x envelope period\\)").matcher(read(TERM));
+        assertTrue(formula.find(), "terminology.md has no envelope formula");
+        long clock = number(formula.group(1));
+        long steps = number(formula.group(2));
+        Matcher said = wrapped("period ([\\d,]+) is one cycle in (\\d+\\.\\d+)"
+                + " seconds and period ([\\d,]+) one in (\\d+\\.\\d+)"
+                + " seconds").matcher(read(SPEC));
+        assertTrue(said.find(), "SPEC.md 2.1.3 has no envelope cycles");
+        for (int pair = 1; pair <= 3; pair += 2) {
+            long period = number(said.group(pair));
+            double seconds = Math.round(steps * period * 100.0 / clock) / 100.0;
+            double reads = Double.parseDouble(said.group(pair + 1));
+            assertTrue(seconds == reads, () -> "period " + string(period)
+                    + " is one cycle in " + seconds + " seconds, and the"
+                    + " sentence reads " + reads);
+        }
+        assertEquals(0x7F * 256L + 0xFF, number(said.group(1)),
+                "the period the marker's bit leaves is not the one 2.1.3 names");
+        assertEquals(0xFFFF, number(said.group(3)),
+                "the period a row writes is not the one 2.1.3 names");
+        assertEquals(1, Columns.MARKER[20], "target 20 marks another column");
+    }
+
     private static long number(String said) {
         return Long.parseLong(said.replace(",", ""));
     }
