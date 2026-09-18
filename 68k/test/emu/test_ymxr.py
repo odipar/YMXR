@@ -85,8 +85,12 @@ STUB_FRAMES = 2000
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
 # (BINARIES.md 1): 3 where every source of the tune is one column and 4
 # where one has several, and a reader and the player read both.
-TUNE_VERSIONS = (3, 4)
-BOUND_VERSIONS = (3, 4)
+TUNE_VERSIONS = (3, 4, 5)
+
+# Bit 31 of a source's index entry: the source's rows are whole bytes and
+# a player counts them (SPEC.md 3.1).
+COUNTED = 1 << 31
+BOUND_VERSIONS = (3, 4, 5)
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209
@@ -196,6 +200,7 @@ def equate(name, symbols=None):
 # is measured off its handler's labels, so they stand once the
 # player is assembled (main).
 TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = ONE_SEL = ONE_VAL = 0
+TICKC_SEL = TICKC_PTR = TICKC_LEFT = 0
 TW_SEL1 = TW_PTR1 = (0, 0)
 
 # The registers a target writes and the column of the row each writes,
@@ -335,7 +340,12 @@ class Tune:
         # separate offset
         # (BINARIES.md 2, DTX abi.md 1).
         self.table_at = long_at(file, 20)
-        index = [long_at(file, 24 + 4 * i) for i in range(count)]
+        # bit 31 of an index entry marks a source whose column fills its
+        # byte: its rows carry no marker and a player counts them
+        # (SPEC.md 3.1).
+        entries = [long_at(file, 24 + 4 * i) for i in range(count)]
+        index = [at & ~COUNTED for at in entries]
+        self.counted = [False] + [bool(at & COUNTED) for at in entries]
         end = index[0] if count else len(file)
         image = file[self.image_at:end]
         table_at = self.table_at
@@ -493,8 +503,14 @@ class Model:
         at, R, RR, columns = self.tune.sources[fx["source"]]
         write = [(register, columns[c][fx["place"]])
                  for register, c in TARGETS[fx["using"]]]
-        value = write[-1][1]            # the marker's column, written last
-        if value & 0x80:
+        # A source whose column fills its byte ends on the row its count
+        # runs out at; every other ends on the marker, bit 7 of the
+        # column written last (SPEC.md 3.2, 5.1).
+        if self.tune.counted[fx["source"]]:
+            last = fx["place"] == R - 1
+        else:
+            last = bool(write[-1][1] & 0x80)
+        if last:
             if RR < R:
                 fx["place"] = RR
                 return write, "loop"
@@ -530,11 +546,18 @@ class Model:
         self.fx, self.playing = keep, playing
         return (was, then) if then is not None and then != was else None
 
+    def counted(self, i):
+        """Whether effect i's source has its column filling its byte, which
+        the player's counted handler runs (68k/YMXR.S, TICKC)."""
+        fx = self.fx[i]
+        return fx["source"] != 0 and self.tune.counted[fx["source"]]
+
     def square(self, i):
         """Whether effect i's source is two rows repeating to row 0, which
-        the player's square handler uses (68k/YMXR.S, SQUARE)."""
+        the player's square handler uses (68k/YMXR.S, SQUARE). A counted
+        source runs the counted handler at any shape."""
         fx = self.fx[i]
-        if fx["source"] == 0:
+        if fx["source"] == 0 or self.counted(i):
             return False
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return len(columns) == 1 and R == 2 and RR == 0
@@ -543,7 +566,7 @@ class Model:
         """Whether effect i's source is one row repeating, which the
         player's one-row handler uses (68k/YMXR.S, ONEROW)."""
         fx = self.fx[i]
-        if fx["source"] == 0:
+        if fx["source"] == 0 or self.counted(i):
             return False
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return len(columns) == 1 and R == 1 and RR == 0
@@ -565,6 +588,13 @@ class Model:
             return 0
         columns = len(self.tune.sources[fx["source"]][3])
         return columns if columns > 1 else 0
+
+    def left(self, i):
+        """The rows a counted handler has left: from the row its place
+        stands at to the end of the source (68k/YMXR.S, TICKC)."""
+        fx = self.fx[i]
+        at, R, RR, columns = self.tune.sources[fx["source"]]
+        return R - fx["place"]
 
     def place_address(self, i):
         """The address the running handler's place stands at: the row it
@@ -735,6 +765,9 @@ class Machine:
 
     def byte(self, at):
         return bytes(self.mu.mem_read(at, 1))[0]
+
+    def word(self, at):
+        return struct.unpack(">H", self.mu.mem_read(at, 2))[0]
 
     def long(self, at):
         return long_at(bytes(self.mu.mem_read(at, 4)), 0)
@@ -1051,6 +1084,46 @@ def envelope(code, symbols):
             % (frames, ticks))
 
 
+def wholebyte(code, symbols):
+    """A source whose one column fills its byte (SPEC.md 3.1): setR0 is
+    the tone's fine byte, which reads every bit, so its rows carry no
+    marker and the player counts them. Bit 31 of the source's index entry
+    marks it and the version word is 5.
+
+    The rows here run to 255, which the marker's 0 to 127 could not carry,
+    so this tune is one no version before wrote. The model counts the rows
+    as the handler does and check reads the player against it, handler,
+    place, counter and vector.
+    """
+    rows = 24
+    def column(ats, value):
+        return [value if r in ats else -1 for r in range(rows)]
+    starts = (0, 12)
+    tune = {"format": "ymxs", "version": 4, "tunes": [{
+        "title": "A column that fills its byte", "composer": "",
+        "writer": "68k/test/emu/test_ymxr.py", "rate": 50, "rows": rows,
+        "repeat": 0,
+        "sources": [
+            {"name": "sweep", "repeat": 0,
+             "values": [200, 220, 240, 255, 240, 220]},
+            {"name": "fall", "repeat": None,
+             "values": [128, 160, 192, 224]}],
+        "registers": {"r7": column((0,), 0x3E), "r1": column((0,), 1),
+                      "r8": column((0,), 12)},
+        "timerA": {"shape": column(starts, 0), "target": column(starts, 0),
+                   "source": [1 if r == 0 else (2 if r == 12 else -1)
+                              for r in range(rows)],
+                   "prescaler": column(starts, 50),
+                   "count": column(starts, 100), "timerReset": column(starts, 1),
+                   "placeReset": column(starts, 1)}}]}
+    at, version = built("wholebyte", tune)
+    assert version == TUNE_VERSIONS[2], \
+        "a tune with a counted source is version 5 (SPEC.md 3.3.5)"
+    frames, ticks = check(at, code, symbols)[:2]
+    return ("a column that fills its byte: %d frames, %d ticks"
+            % (frames, ticks))
+
+
 def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
     """The tune on the player, against the model frame by frame and tick
     by tick; with kit, each frame against the reader's entry as well,
@@ -1218,7 +1291,22 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                 assert timers.mode[i] == 0, "frame %d: effect %d's timer runs with no source" % (f, i)
             place = model.place_address(i)
             if place is not None and fx["running"]:
-                if model.square(i):
+                if model.counted(i):
+                    # the counted handler: its place, the register it
+                    # selects and the rows it has left (68k/YMXR.S, TICKC)
+                    at = CODE + symbols["ymxr_cnt%d" % i]
+                    assert m.long(at + TICKC_PTR) == place, \
+                        "frame %d: effect %d's place is %x, not %x" % (
+                            f, i, m.long(at + TICKC_PTR), place)
+                    assert m.byte(at + TICKC_SEL) == fx["using"], \
+                        "frame %d: effect %d's counted handler selects R%d, not R%d" % (
+                            f, i, m.byte(at + TICKC_SEL), fx["using"])
+                    assert m.word(at + TICKC_LEFT) == model.left(i), \
+                        "frame %d: effect %d has %d rows left, not %d" % (
+                            f, i, m.word(at + TICKC_LEFT), model.left(i))
+                    assert m.long(TIMER[i]["vector"]) == at, \
+                        "frame %d: effect %d's vector is not its counted handler's" % (f, i)
+                elif model.square(i):
                     at = CODE + symbols["ymxr_sq%d" % i]
                     assert m.byte(at + SQ_VAL) == model.value(i), \
                         "frame %d: effect %d's square stands at %02x, not %02x" % (
@@ -1280,7 +1368,18 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
             ticks += 1
             assert masked(m.psg) == masked(want), "frame %d: tick of effect %d wrote %s, not %s" % (f, i, m.psg, want)
             timers.apply(m.mfp)
-            if model.square(i):
+            if model.counted(i):
+                if then != "stop":
+                    at = CODE + symbols["ymxr_cnt%d" % i]
+                    assert m.long(at + TICKC_PTR) == model.place_address(i), \
+                        "frame %d: after a tick effect %d's place is off" % (f, i)
+                    assert m.word(at + TICKC_LEFT) == model.left(i), \
+                        "frame %d: after a tick effect %d has %d rows left, not %d" % (
+                            f, i, m.word(at + TICKC_LEFT), model.left(i))
+                else:
+                    assert timers.mode[i] == 0, \
+                        "frame %d: effect %d ran out and its timer runs on" % (f, i)
+            elif model.square(i):
                 at = CODE + symbols["ymxr_sq%d" % i]
                 assert m.byte(at + SQ_VAL) == model.value(i), \
                     "frame %d: after a tick effect %d's square stands at %02x, not %02x" % (
@@ -1922,18 +2021,20 @@ def main():
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
-        # No dump converts to a target of several registers, so the kit's
-        # tune of version 4 goes on the end of a run on a real MFP: the
-        # handlers of several registers are read there against the same
-        # model as the rest.
+        # No dump converts to a target of several registers or to a
+        # counted source, so the kit's tunes of versions 4 and 5 go on the
+        # end of a run on a real MFP: the handlers of several registers
+        # and the counted handler are read there against the same model as
+        # the rest.
         if real and not args:
-            tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes",
-                                          "voices.ymxr")]
+            tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes", one)
+                             for one in ("voices.ymxr", "counted.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
     code, symbols = assemble(defines=defines)
     global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL, ONE_SEL, ONE_VAL, TW_SEL1, TW_PTR1
+    global TICKC_SEL, TICKC_PTR, TICKC_LEFT
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
     SQ_SEL = equate("SQ_SEL", symbols)
@@ -1942,6 +2043,9 @@ def main():
     ONE_VAL = equate("ONE_VAL", symbols)
     TW_SEL1 = (equate("TW2_SEL1", symbols), equate("TW3_SEL1", symbols))
     TW_PTR1 = (equate("TW2_PTR1", symbols), equate("TW3_PTR1", symbols))
+    TICKC_SEL = equate("TICKC_SEL", symbols)
+    TICKC_PTR = equate("TICKC_PTR", symbols)
+    TICKC_LEFT = equate("TICKC_LEFT", symbols)
     print("the player: %d bytes%s%s" % (len(code),
                                        ", the raster monitor in" if perf else "",
                                        ", the lean tick" if LEAN else ""))
@@ -1952,6 +2056,7 @@ def main():
         print("    %s" % unplaced(code, symbols))
         print("    %s" % voices(code, symbols))
         print("    %s" % envelope(code, symbols))
+        print("    %s" % wholebyte(code, symbols))
     if real:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
     cycles_of = None

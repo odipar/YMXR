@@ -46,10 +46,24 @@ final class Tune {
      *  3.3.5), which a target of 14 upward runs. */
     static final int VERSION_COLUMNS = 0x0004;
 
+    /** The version of a tune with a source whose column fills its byte
+     *  (SPEC.md 3.3.5): bit 31 of its index entry marks it, which a
+     *  reader of the two versions above would read as an offset. */
+    static final int VERSION_COUNTED = 0x0005;
+
+    /** Bit 31 of a source's index entry: the source's rows are whole
+     *  bytes and a player counts them (SPEC.md 3.1). */
+    static final int COUNTED = 0x80000000;
+
     /** The version a tune of these sources is written at: the lower of the
      *  two it reads under, so a tune both versions encode is one file and a
      *  player of version 3 reads it (SPEC.md 3.3.5). */
     static int version(List<Sources.Source> sources) {
+        for (Sources.Source source : sources) {
+            if (source.counted()) {
+                return VERSION_COUNTED;
+            }
+        }
         for (Sources.Source source : sources) {
             if (source.width() > 1) {
                 return VERSION_COLUMNS;
@@ -176,7 +190,8 @@ final class Tune {
         putLong(file, TABLE_AT, tableAt);
         System.arraycopy(named, 0, file, nameAt, named.length);
         for (int i = 0; i < tables.length; i++) {
-            putLong(file, INDEX_AT + 4 * i, sourceAt[i]);
+            putLong(file, INDEX_AT + 4 * i,
+                    sourceAt[i] | (all.get(i).counted() ? COUNTED : 0));
         }
         System.arraycopy(table, 0, file, tableAt, table.length);
         for (int i = 0; i < tables.length; i++) {

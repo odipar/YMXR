@@ -220,6 +220,11 @@ final class Schema {
         return TIMERS[i];
     }
 
+    /** A source no row starts: no target names a column for its marker,
+     *  so the marker stands in column 0, as every version before this one
+     *  wrote every source. */
+    private static final int UNSTARTED = Integer.MIN_VALUE;
+
     /** The column of each source's row the marker stands in, off the
      *  targets the tune starts that source on (SPEC.md 2.1, 3.2.1).
      *
@@ -229,7 +234,10 @@ final class Schema {
      */
     private static int[] markers(List<Row> rows, List<Source> sources) {
         int[] marker = new int[sources.size()];
-        Arrays.fill(marker, -1);
+        Arrays.fill(marker, UNSTARTED);   // no row starts it, so no target
+                                          // names a column and the marker
+                                          // stands in column 0, as every
+                                          // version before this one wrote it
         for (Row row : rows) {
             for (Effect one : Tunes.effects(row).values()) {
                 if (!(one instanceof Start start)) {
@@ -237,15 +245,16 @@ final class Schema {
                 }
                 int n = sources.indexOf(Tunes.source(start));
                 int number = Tunes.number(Tunes.target(start));
-                int at = number < Columns.MARKER.length ? Columns.MARKER[number] : -1;
-                if (at < 0) {
+                if (number >= Columns.MARKER.length) {
                     throw new IllegalArgumentException("the source " + Tunes.name(
                             Tunes.source(start)) + " runs on " + Tunes.name(
-                            Tunes.target(start)) + ", whose registers read every bit of"
-                            + " their value, and bit 7 of a column is the marker"
-                            + " (SPEC.md 2.1.2, 2.1.3)");
+                            Tunes.target(start)) + ", a target this version leaves"
+                            + " to a later one (SPEC.md section 8)");
                 }
-                if (marker[n] >= 0 && marker[n] != at) {
+                // -1: the target's register fills its byte, so the rows carry
+                // no marker and a player counts them (SPEC.md 3.1).
+                int at = Columns.MARKER[number];
+                if (marker[n] != UNSTARTED && marker[n] != at) {
                     throw new IllegalArgumentException("the source " + Tunes.name(
                             Tunes.source(start)) + " runs on targets that mark column "
                             + marker[n] + " and column " + at + ", and a source has one"
@@ -259,31 +268,36 @@ final class Schema {
 
     /** The sources as tables of this format: a column a value of the row,
      *  bit 7 set on the last row of the marker's column (SPEC.md 3.2), and
-     *  the row the source repeats to, its row count where it plays once. */
+     *  the row the source repeats to, its row count where it plays once. A
+     *  source whose target's register fills its byte has no bit for the
+     *  marker: every row is a whole byte and a player counts them (3.1). */
     private static List<Sources.Source> sources(List<Source> sources, int[] marker) {
         List<Sources.Source> out = new ArrayList<>();
         for (int n = 0; n < sources.size(); n++) {
             Source source = sources.get(n);
             List<List<Integer>> values = Tunes.rows(source).rows();
-            int at = Math.max(marker[n], 0);
+            boolean counted = marker[n] == -1;
+            int at = counted || marker[n] == UNSTARTED ? 0 : marker[n];
             byte[][] columns = new byte[Tunes.columns(source)][values.size()];
             for (int r = 0; r < values.size(); r++) {
                 for (int c = 0; c < columns.length; c++) {
                     int value = values.get(r).get(c);
-                    int most = c == at ? Sources.MARK - 1 : 0xFF;
+                    int most = !counted && c == at ? Sources.MARK - 1 : 0xFF;
                     if (value < 0 || value > most) {
                         throw new IllegalArgumentException("the source " + Tunes.name(source)
                                 + " has the value " + value + " in row " + r + " of column "
-                                + c + ", and " + (c == at
+                                + c + ", and " + (!counted && c == at
                                 ? "bit 7 of the marker's column is the marker"
                                 : "a column is one byte"));
                     }
                     columns[c][r] = (byte) value;
                 }
             }
-            columns[at][values.size() - 1] |= (byte) Sources.MARK;
+            if (!counted) {
+                columns[at][values.size() - 1] |= (byte) Sources.MARK;
+            }
             out.add(new Sources.Source(kind(source), 0, columns,
-                    Tunes.rows(source).repeat().orElse(values.size())));
+                    Tunes.rows(source).repeat().orElse(values.size()), counted));
         }
         return out;
     }

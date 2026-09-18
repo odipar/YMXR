@@ -34,12 +34,15 @@ const (
 // Source is one source: a column a value of the row (SPEC.md 2.2.1), each
 // column the R values of that column in row order, and the row it repeats
 // to, R where it plays once. The marker stands in bit 7 of the last row of
-// the column the target names (SPEC.md 3.2.1).
+// the column the target names (SPEC.md 3.2.1), other than on a source
+// whose column fills its byte, where every row is a whole byte and the end
+// stands in the count a player keeps.
 type Source struct {
 	Kind    int
 	Data    int
 	Columns [][]byte
 	Repeat  int
+	Counted bool
 }
 
 // SourceOf is a source of one column, the shape a YM dump converts to.

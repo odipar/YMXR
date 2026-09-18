@@ -389,6 +389,141 @@ final class BuiltTunes {
         return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
     }
 
+    /**
+     * The six targets whose register reads every bit of its byte (SPEC.md
+     * 2.1.2), each running a counted source, so the kit has a tune of
+     * version 5: `setR0` and `setR4` on Timer A, `setR7` on Timer D,
+     * `setR11` on Timer B, and `setR12` and `setR2` on Timer C. Rows with
+     * bit 7 set stand in every one of the six sources, where a source the
+     * marker ends reads that bit as its end (3.2.1), and bit 31 of each of
+     * their index entries is 1, where bits 30 to 0 are the offset
+     * (3.1.1).
+     *
+     * <p>The shapes beside that: a square on R8 in the same file, which
+     * the marker ends, so a player reads the end of a source from its
+     * index entry rather than from the version word; a counted source of
+     * one row, one that plays once and stops its timer at its count, one
+     * repeating to a row above 0; a target set while an effect runs and
+     * read at the next start; and a row that sets R12 as it stops the
+     * effect running on it (rule 1(a)).
+     */
+    static Tune.Written counted() {
+        int frames = 64;
+        int repeat = 48;
+        byte[][] c = new byte[Columns.C][frames];
+        // The registers no effect runs at row 0: the mixer, which effect 1
+        // runs on from row 2, the three volumes, R8 until effect 1 runs on
+        // it at row 20, the three coarse bytes beside the fine bytes the
+        // counted sources sweep, and the envelope shape.
+        c[7][0] = (byte) (0x80 | 0x38);
+        c[8][0] = (byte) (0x80 | 12);
+        c[9][0] = (byte) (0x80 | 12);
+        c[10][0] = (byte) (0x80 | 12);
+        c[1][0] = (byte) (0x80 | 1);
+        c[3][0] = (byte) (0x80 | 2);
+        c[5][0] = (byte) (0x80 | 3);
+        c[13][0] = (byte) (0x80 | 10);
+        c[13][52] = (byte) (0x80 | 14);                  // R13 while R11 ticks (1(c))
+        c[12][54] = (byte) (0x80 | 0x10);                // R12 once its effect left it
+        int start = 0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET;
+        int e0 = Columns.EFFECT;
+        int e1 = Columns.EFFECT + 4;
+        int e2 = Columns.EFFECT + 8;
+        int e3 = Columns.EFFECT + 12;
+        // effect 0, Timer A: setR0, the tone A fine byte swept by a source
+        // repeating to its row 2; at row 40 the target setR4, read at the
+        // start two rows later on the running timer
+        c[e0][0] = (byte) (0x80 | 0);
+        c[e0 + 1][0] = (byte) (0x80 | 1);
+        c[e0 + 2][0] = (byte) (start | 5);
+        c[e0 + 3][0] = 100;
+        c[e0 + 3][24] = 80;                              // the count alone
+        c[e0][40] = (byte) (0x80 | 4);                   // the target, for the next start
+        c[e0 + 1][42] = (byte) (0x80 | 4);
+        c[e0 + 2][42] = (byte) (0x80 | Columns.PLACE_RESET | 5);
+        // effect 1, Timer D: setR7, the mixer, a source of three rows that
+        // plays once, so the tick that reads row 2 stops the timer; at row
+        // 20 the target setR8 and a square the marker ends; at row 56 a
+        // counted source of one row on setR7, which stops the timer again
+        c[e1][2] = (byte) (0x80 | 7);
+        c[e1 + 1][2] = (byte) (0x80 | 2);
+        c[e1 + 2][2] = (byte) (start | 6);
+        c[e1 + 3][2] = (byte) 200;
+        c[e1][20] = (byte) (0x80 | 8);
+        c[e1 + 1][20] = (byte) (0x80 | 5);
+        c[e1 + 2][20] = (byte) (start | 6);
+        c[e1 + 3][20] = (byte) 180;
+        c[e1][56] = (byte) (0x80 | 7);
+        c[e1 + 1][56] = (byte) (0x80 | 8);
+        c[e1 + 2][56] = (byte) (start | 7);
+        c[e1 + 3][56] = (byte) 220;
+        // effect 2, Timer B: setR11, the envelope period's low byte,
+        // repeating to its row 1 under the shape R13 sets
+        c[e2][4] = (byte) (0x80 | 11);
+        c[e2 + 1][4] = (byte) (0x80 | 3);
+        c[e2 + 2][4] = (byte) (start | 7);
+        c[e2 + 3][4] = (byte) 250;
+        // effect 3, Timer C: setR12, the envelope period's high byte,
+        // stopped at row 30 by a row that sets R12 with it (1(a)), then
+        // setR2, the tone B fine byte, from row 32
+        c[e3][6] = (byte) (0x80 | 12);
+        c[e3 + 1][6] = (byte) (0x80 | 6);
+        c[e3 + 2][6] = (byte) (start | 4);
+        c[e3 + 3][6] = (byte) 150;
+        c[e3 + 1][30] = (byte) 0x80;                     // the stop, R12 set
+        c[12][30] = (byte) (0x80 | 0x30);
+        c[e3][32] = (byte) (0x80 | 2);
+        c[e3 + 1][32] = (byte) (0x80 | 7);
+        c[e3 + 2][32] = (byte) (start | 3);
+        c[e3 + 3][32] = (byte) 120;
+        // The repeat row starts every effect on the target it names, so the
+        // first start at or after it sets the target column (rule 2(c)).
+        c[e0][repeat] = (byte) (0x80 | 0);
+        c[e0 + 1][repeat] = (byte) (0x80 | 1);
+        c[e0 + 2][repeat] = (byte) (start | 5);
+        c[e0 + 3][repeat] = 100;
+        c[e1][repeat] = (byte) (0x80 | 8);
+        c[e1 + 1][repeat] = (byte) (0x80 | 5);
+        c[e1 + 2][repeat] = (byte) (start | 6);
+        c[e1 + 3][repeat] = (byte) 180;
+        c[e2][repeat] = (byte) (0x80 | 11);
+        c[e2 + 1][repeat] = (byte) (0x80 | 3);
+        c[e2 + 2][repeat] = (byte) (start | 7);
+        c[e2 + 3][repeat] = (byte) 250;
+        c[e3][repeat] = (byte) (0x80 | 2);
+        c[e3 + 1][repeat] = (byte) (0x80 | 7);
+        c[e3 + 2][repeat] = (byte) (start | 3);
+        c[e3 + 3][repeat] = (byte) 120;
+        // Every row of a counted source is a whole byte, bit 7 the value's
+        // (SPEC.md 3.1.6). The mixer's rows write bits 7 and 6 as 1, the
+        // two port directions a player writes for a row (1.4.2).
+        byte[] tone = {0x40, (byte) 0x80, (byte) 0xC0, (byte) 0xFF, 0x20, (byte) 0x90};
+        byte[] mixer = {(byte) 0xF8, (byte) 0xC7, (byte) 0xFE};
+        byte[] fine = {0, 0x33, (byte) 0x80, (byte) 0xCC, (byte) 0xFF, 0x11};
+        byte[] toneC = {(byte) 0x81, 0x42, (byte) 0xA5, (byte) 0xFF};
+        byte[] square = {12, (byte) 0x80};
+        byte[] coarse = {0, 1, (byte) 0x80, (byte) 0xC0};
+        byte[] toneB = {(byte) 0x88, 0x44};
+        byte[] one = {(byte) 0xFC};
+        Sources sources = new Sources(List.of(
+                source(tone, 2),
+                source(mixer, mixer.length),
+                source(fine, 1),
+                source(toneC, 0),
+                Sources.Source.of(Effects.SID, 12, square, 0),
+                source(coarse, 0),
+                source(toneB, 0),
+                source(one, one.length)));
+        Columns columns = new Columns(c, repeat, 0b1111);
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
+    }
+
+    /** A counted source of one column: the rows and the row it repeats to,
+     *  R where it plays once (SPEC.md 3.1.6). */
+    private static Sources.Source source(byte[] rows, int repeat) {
+        return new Sources.Source(Effects.SID, 0, new byte[][] {rows}, repeat, true);
+    }
+
     /** Three tones and no noise, the same under both tunes' effects. */
     private static byte[][] bed(int frames) {
         byte[][] v = new byte[16][frames];
