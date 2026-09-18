@@ -30,6 +30,7 @@ names
 
 carried
     /org/ymxr/style/
+    /org/ymxr/doc/
 
 own
 

@@ -16,6 +16,7 @@ import java.util.TreeSet;
 import java.util.function.ToLongFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.ymxr.doc.Documents;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -199,33 +200,12 @@ final class ConsistencyTest {
     }
 
     /** Every row of the glossary's table, its term and where it points. */
-    private static List<String[]> glossaryRows(String glo) {
-        List<String[]> out = new ArrayList<>();
-        for (String line : glo.split("\n")) {
-            if (!line.startsWith("| ") || line.startsWith("| term")) {
-                continue;
-            }
-            String[] cells = line.split("\\|");
-            if (cells.length >= 4) {
-                out.add(new String[] {cells[1].trim(), cells[3].trim()});
-            }
-        }
-        return out;
-    }
-
     @Test
     void theGlossaryIsInOrder() throws IOException {
-        List<String[]> rows = glossaryRows(read(GLO));
+        List<String[]> rows = Documents.glossaryRows(read(GLO));
         assertTrue(rows.size() > 40, () -> "the glossary read as " + rows.size()
                 + " rows");
-        List<String> wrong = new ArrayList<>();
-        for (int i = 1; i < rows.size(); i++) {
-            String before = rows.get(i - 1)[0].replace("`", "").toLowerCase();
-            String after = rows.get(i)[0].replace("`", "").toLowerCase();
-            if (before.compareTo(after) > 0) {
-                wrong.add('"' + before + "\" stands before \"" + after + '"');
-            }
-        }
+        List<String> wrong = Documents.outOfOrder(rows);
         assertTrue(wrong.isEmpty(), () -> String.join("\n", wrong));
     }
 
@@ -238,8 +218,8 @@ final class ConsistencyTest {
             sections.add(h.group(1).trim().toLowerCase());
         }
         List<String> bad = new ArrayList<>();
-        for (String[] row : glossaryRows(read(GLO))) {
-            String where = row[1];
+        for (String[] row : Documents.glossaryRows(read(GLO))) {
+            String where = row[2];
             if (where.startsWith("terminology.md,")) {
                 String named = where.substring("terminology.md,".length())
                         .trim().toLowerCase();
@@ -262,22 +242,7 @@ final class ConsistencyTest {
 
     @Test
     void everyLinkResolves() throws IOException {
-        List<String> broken = new ArrayList<>();
-        for (Path p : DOCUMENTS) {
-            Matcher m = Pattern.compile("\\[([^\\]]+)\\]\\(([^)]+)\\)")
-                    .matcher(read(p));
-            while (m.find()) {
-                String target = m.group(2);
-                if (target.startsWith("http")) {
-                    continue;
-                }
-                Path base = p.getParent() == null ? Path.of(".") : p.getParent();
-                Path at = base.resolve(target.split("#")[0]).normalize();
-                if (!Files.exists(at)) {
-                    broken.add(p + ": [" + m.group(1) + "](" + target + ')');
-                }
-            }
-        }
+        List<String> broken = Documents.links(DOCUMENTS);
         assertTrue(broken.isEmpty(), () -> String.join("\n", broken));
     }
 
@@ -617,8 +582,8 @@ final class ConsistencyTest {
     void everyGlossaryTermIsNamedWhereItIsExplained() throws IOException {
         List<String> quiet = new ArrayList<>();
         int opened = 0;
-        for (String[] row : glossaryRows(read(GLO))) {
-            String file = row[1].split("[ ,;]")[0];
+        for (String[] row : Documents.glossaryRows(read(GLO))) {
+            String file = row[2].split("[ ,;]")[0];
             if (!file.endsWith(".md")) {
                 continue;
             }
@@ -645,22 +610,9 @@ final class ConsistencyTest {
 
     @Test
     void everyDocumentKeepsOneWrapWidth() throws IOException {
-        List<String> wide = new ArrayList<>();
-        for (Path p : DOCUMENTS) {
-            List<String> lines = Files.readAllLines(p);
-            for (int at = 0; at < lines.size(); at++) {
-                String line = lines.get(at);
-                if (line.startsWith("|") || line.startsWith("    ")
-                        || line.contains("](")) {
-                    continue;
-                }
-                if (line.length() > 78) {
-                    wide.add(p + ":" + (at + 1) + " runs to " + line.length());
-                }
-            }
-        }
         assertTrue(DOCUMENTS.size() > 12, () -> "only " + DOCUMENTS.size()
                 + " documents read; the check is asleep");
+        List<String> wide = Documents.wide(DOCUMENTS, 78);
         assertTrue(wide.isEmpty(), () -> String.join("\n", wide)
                 + "\nAGENTS.md requires one width.");
     }
