@@ -114,7 +114,7 @@ final class Ymxs {
 
     /** The tags {@code ymxs-to-sndh} reads, and the switches that select
      *  the core among the eight (BINARIES.md 2.1). */
-    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel"};
+    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel", "-abs"};
 
     /** The row count {@code ymxs-to-prg} reads. */
     static final String[] ROWS = {"-r"};

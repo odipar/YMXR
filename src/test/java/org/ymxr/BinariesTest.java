@@ -340,7 +340,7 @@ final class BinariesTest {
         assertEquals("y", tags.flag(), "neither tune runs an effect");
         assertArrayEquals(new int[] {0, 0}, tags.frames(), "both tunes repeat");
         assertEquals(List.of("Chambers", "Circus"), tags.names());
-        assertCombined(Binaries.core(), sndh, files, tags);
+        assertCombined(Binaries.core(false, false, true), sndh, files, tags);
     }
 
     @Test
@@ -350,7 +350,7 @@ final class BinariesTest {
         Tags tags = tags(sndh);
         assertEquals(List.of("TITL", "CONV", "##", "TC", "FLAG", "FRMS", "HDNS"), tags.order());
         assertEquals(1, tags.subtunes());
-        assertCombined(Binaries.core(), sndh, files, tags);
+        assertCombined(Binaries.core(false, false, true), sndh, files, tags);
     }
 
     @Test
@@ -450,8 +450,10 @@ final class BinariesTest {
         List<byte[]> files = List.of(tune("chambers"));
         byte[] plain = Sndh.of(files, new Sndh.Options("Plain", null, null, false, false));
         byte[] watched = Sndh.of(files, new Sndh.Options("Watched", null, null, true, false));
-        assertCombined(Binaries.core(), plain, files, tags(plain));
-        assertCombined(Binaries.core(true, false, false), watched, files, tags(watched));
+        // the core under a file written unasked reads a row through the
+        // program counter (Sndh.Ticks)
+        assertCombined(Binaries.core(false, false, true), plain, files, tags(plain));
+        assertCombined(Binaries.core(true, false, true), watched, files, tags(watched));
         assertEquals(0, Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
                 "a set with no Timer C sets no flag");
         assertEquals(Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
@@ -469,8 +471,8 @@ final class BinariesTest {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
             boolean lean = (setting & Sndh.CORE_LEAN) != 0;
             boolean pcrel = (setting & Sndh.CORE_PCREL) != 0;
-            byte[] sndh = Sndh.of(files,
-                    new Sndh.Options("Both", null, null, monitor, lean, pcrel));
+            byte[] sndh = Sndh.of(files, new Sndh.Options("Both", null, null, monitor, lean,
+                    pcrel ? Sndh.Ticks.PCREL : Sndh.Ticks.ABSOLUTE));
             assertEquals(setting, Tune.getWord(sndh,
                     Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
                     "the file's core reads back the switches asked for");
@@ -492,7 +494,8 @@ final class BinariesTest {
         // the reach rather than the file filled with subtunes.
         List<byte[]> files = List.of(tune("turrican"));
         byte[] core = Arrays.copyOf(Binaries.core(false, false, true), Sndh.PCREL_REACH);
-        Sndh.Options options = new Sndh.Options("Far", null, null, false, false, true);
+        Sndh.Options options = new Sndh.Options("Far", null, null, false, false,
+                Sndh.Ticks.PCREL);
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(core, files, options));
         assertTrue(said(wrong).contains("past the core's first byte")
@@ -504,10 +507,52 @@ final class BinariesTest {
     }
 
     @Test
+    void aFileWhoseTunesEndPastTheReachStandsOnTheCoreThatReadsAnAddress() throws IOException {
+        // A source of 30,000 rows puts the file's one bound tune past the
+        // reach by itself, so the core chosen for it reads a row through
+        // an absolute address (Sndh.Ticks), and -pcrel reports such a file
+        // rather than standing that core under it.
+        List<byte[]> files = List.of(longSource(30000));
+        byte[] sndh = Sndh.of(files, new Sndh.Options("Long", null, null, false, false));
+        int flags = Tune.getWord(sndh, Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT);
+        assertEquals(0, flags & Sndh.CORE_PCREL,
+                "the core under a file past the reach reads an address");
+        assertCombined(Binaries.core(), sndh, files, tags(sndh));
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(files, new Sndh.Options("Long", null, null, false, false,
+                        Sndh.Ticks.PCREL)));
+        assertTrue(said(wrong).contains("past the core's first byte")
+                && said(wrong).contains(String.valueOf(Sndh.PCREL_REACH)), said(wrong));
+    }
+
+    /** A tune file of one source of that many rows, on `setR8`, so that
+     *  its bound tune runs past {@link Sndh#PCREL_REACH} by itself. */
+    private static byte[] longSource(int rows) {
+        byte[][] c = new byte[Columns.C][8];
+        c[7][0] = (byte) (0x80 | 0x3E);                  // voice A's tone alone
+        c[0][0] = 0x40;
+        c[1][0] = (byte) (0x80 | 1);
+        int e0 = Columns.EFFECT;
+        c[e0][0] = (byte) (0x80 | 8);                    // setR8
+        c[e0 + 1][0] = (byte) (0x80 | 1);
+        c[e0 + 2][0] = (byte) (0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET | 5);
+        c[e0 + 3][0] = 100;
+        byte[] source = new byte[rows];
+        for (int i = 0; i < rows; i++) {
+            source[i] = (byte) (i % 16);
+        }
+        source[rows - 1] = (byte) (0x80 | 12);           // the marker
+        Sources sources = new Sources(List.of(Sources.Source.of(Effects.SID, 0, source, rows)));
+        return Tune.write(new Columns(c, 0, 0b0001), sources, 50, YmToYmxr.UNIT,
+                Tune.RING, new Report()).file();
+    }
+
+    @Test
     void aCoreWithoutTheRowReadThroughTheProgramCounterIsRejectedWhereItWasAskedFor()
             throws IOException {
         List<byte[]> files = List.of(tune("chambers"));
-        Sndh.Options options = new Sndh.Options("Pcrel", null, null, false, false, true);
+        Sndh.Options options = new Sndh.Options("Pcrel", null, null, false, false,
+                Sndh.Ticks.PCREL);
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(Binaries.core(), files, options));
         assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)

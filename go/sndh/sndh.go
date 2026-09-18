@@ -42,7 +42,7 @@ const (
 	coreVersionAt = 16
 	coreReadsAt   = 18
 	CoreFixedAt   = 20
-	coreFlagsAt   = 22
+	CoreFlagsAt   = 22
 	coreStateAt   = 24
 	coreTableAt   = 28
 	coreWorkAt    = 32
@@ -84,16 +84,33 @@ const Converter = "YMXR (ym-to-ymxr)"
 // A to D: effects 0 to 3 run Timers A, D, B and C.
 var timerOfEffect = [4]int{0, 3, 1, 2}
 
+// Ticks names the ticks the file's core reads a row with (BINARIES.md
+// 2.1). A tool writes Chosen unasked: it stands the core that reads a row
+// through the program counter under a file whose tunes end within the
+// reach (5.5), and the one that reads an absolute address under a file
+// whose tunes end further off. Pcrel reports such a file rather than standing the other
+// core under it, and Absolute writes the core that reads an address at
+// any length of file.
+type Ticks int
+
+// The three.
+const (
+	Chosen Ticks = iota
+	Pcrel
+	Absolute
+)
+
 // Options is the tag block's text: the title, the composer where there is
 // one, and a name a subtune where the caller names them; and the core the
-// file uses, which Monitor, Lean and Pcrel select a switch each.
+// file uses, which Monitor and Lean select a switch of and Ticks the
+// third.
 type Options struct {
 	Title    string
 	Composer string
 	Names    []string
 	Monitor  bool
 	Lean     bool
-	Pcrel    bool
+	Ticks    Ticks
 }
 
 // Of is the file, from the tune files as subtunes 1 up, around the core
@@ -103,19 +120,15 @@ type Options struct {
 // core of any two or three where they select them, and the plain core
 // where none.
 func Of(tuneFiles [][]byte, options Options) ([]byte, error) {
-	core, err := binaries.Read(binaries.Named(options.Monitor, options.Lean, options.Pcrel))
-	if err != nil {
-		return nil, err
-	}
-	return With(core, tuneFiles, options)
+	return around(nil, tuneFiles, options)
 }
 
 // With is the same, around the core named.
 func With(core []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
-	if err := checkCore(core, options.Monitor, options.Lean, options.Pcrel,
-		Binds(tuneFiles)); err != nil {
-		return nil, err
-	}
+	return around(core, tuneFiles, options)
+}
+
+func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	n := len(tuneFiles)
 	if n == 0 {
 		return nil, errors.New("no tune files: an SNDH file has one subtune at least")
@@ -163,28 +176,61 @@ func With(core []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	workspace := ymxr.Align(ymxr.GetWord(core, CoreFixedAt)+state) + WorkRounding
-	file, err := Combine(core, set, tags, workspace)
-	if err != nil {
+	// Which core stands under the tunes: the one the caller named, or the
+	// one the switches select, which reads a row through the program
+	// counter unless the file's tunes end past the reach (BINARIES.md
+	// 5.5).
+	pcrel := options.Ticks != Absolute
+	core := given
+	if core != nil && options.Ticks == Chosen {
+		// the caller chose by handing a core over: its flags word says
+		// which ticks it has
+		pcrel = ymxr.GetWord(core, CoreFlagsAt)&corePcrel != 0
+	}
+	if core == nil {
+		core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, pcrel))
+		if err != nil {
+			return nil, err
+		}
+		if pcrel && options.Ticks == Chosen && TunesEnd(core, set, tags) > pcrelReach {
+			pcrel = false
+			core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, false))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := checkCore(core, options.Monitor, options.Lean, pcrel,
+		Binds(tuneFiles)); err != nil {
 		return nil, err
 	}
-	if options.Pcrel {
+	if pcrel {
 		// A tick of this core reads its row through a displacement from
 		// the instruction that reads it, which reaches pcrelReach bytes,
 		// so every row of every subtune stands within that of the
-		// handlers (BINARIES.md 5.5). The handlers stand inside the core,
-		// so this reads the last bound tune's end against the core's
-		// first byte and spends the bytes of the core as the margin.
-		header := even(12 + len(tags))
-		tableAt := even(len(core))
-		last := ymxr.GetLong(file, header+tableAt+2+4*(n-1)) + len(set.Tunes[n-1])
-		if last > pcrelReach {
+		// handlers (BINARIES.md 5.5).
+		if last := TunesEnd(core, set, tags); last > pcrelReach {
 			return nil, fmt.Errorf("the tunes end %d bytes past the core's first byte,"+
 				" and a tick that reads a row through the program counter reaches %d",
 				last, pcrelReach)
 		}
 	}
-	return file, nil
+	workspace := ymxr.Align(ymxr.GetWord(core, CoreFixedAt)+state) + WorkRounding
+	return Combine(core, set, tags, workspace)
+}
+
+// TunesEnd is where the last bound tune of a file on this core ends,
+// counted from the core's first byte (BINARIES.md 3.1): the handlers
+// stand inside the core, so a displacement is read against this, and the
+// bytes of the core are the margin it spends.
+func TunesEnd(core []byte, set Set, tags []byte) int {
+	at := even(len(core)) + 2 + 4*len(set.Tunes)
+	end := at
+	for _, tune := range set.Tunes {
+		end = at + len(tune)
+		at = even(end)
+	}
+	return end
 }
 
 // CheckCore reads the core's descriptor against what this writes, and its
@@ -224,18 +270,18 @@ func checkCore(core []byte, monitor, lean, pcrel bool, binds int) error {
 		return fmt.Errorf("the core reads bound tunes to version %d, and this binds at %d",
 			reads, binds)
 	}
-	flags := ymxr.GetWord(core, coreFlagsAt)
+	flags := ymxr.GetWord(core, CoreFlagsAt)
 	if monitor && flags&coreMonitor == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and the raster monitor asked"+
-			" for needs bit 0 set", coreFlagsAt, flags)
+			" for needs bit 0 set", CoreFlagsAt, flags)
 	}
 	if lean && flags&coreLean == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and the lean tick asked for"+
-			" needs bit 1 set", coreFlagsAt, flags)
+			" needs bit 1 set", CoreFlagsAt, flags)
 	}
 	if pcrel && flags&corePcrel == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and the row read through the"+
-			" program counter asked for needs bit 2 set", coreFlagsAt, flags)
+			" program counter asked for needs bit 2 set", CoreFlagsAt, flags)
 	}
 	return nil
 }

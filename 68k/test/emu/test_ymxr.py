@@ -1627,10 +1627,13 @@ def hatari(ym, code, symbols, perf=False):
     sndh = os.path.join(work, "TUNE.SND")
     # These switches select the core in the file; the rig assembled the same
     # core, and the comparison below fails where the two differ. A switch
-    # missed here fails there rather than running the plain core.
+    # missed here fails there rather than running the plain core. The tool
+    # reads a row through the program counter unasked, so a run without
+    # -pcrel passes -abs for the core the rig assembled.
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent",
                         "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
-                       + (["-lean"] if LEAN else []) + (["-pcrel"] if PCREL else []),
+                       + (["-lean"] if LEAN else [])
+                       + (["-pcrel"] if PCREL else ["-abs"]),
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     sndh_bytes = r.stdout
