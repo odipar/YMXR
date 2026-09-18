@@ -44,7 +44,11 @@ of YMXS, of DTX and of ST4.
    an implementer who can check an answer is outside the exercise.
 2. Name to the implementer the directories of the YMXR, YMXS and DTX
    repositories, which `TASK.md` rule 2 excludes. Note: a checkout is at
-   a separate path on every machine.
+   a separate path on every machine. An implementer that reads a
+   project's files as it starts - a house style, a memory, a status of
+   the tree - has read something of the family before rule 1 reaches it;
+   the first run listed that in `READ.md` rather than ruling it out, and
+   none of it defines the format.
 3. Where several implementers run at once, each has a directory the
    others leave alone.
 4. The implementer produces `decode.py`, `READ.md` and `NOTES.md` as
@@ -67,7 +71,32 @@ of YMXS, of DTX and of ST4.
    An entry marked *decides output* is a sentence the documents lack, a
    guess that matches the reference included.
 
-Note: the first run of the exercise is to come.
+**5.1 The first run**, 2026-09-18, against the kit at 13 tunes. The
+implementer wrote a `decode.py` of 177 lines and produced every record
+byte for byte, the empty record of `wrong-version` included, and
+`READ.md` named documents alone. `NOTES.md` had 18 entries and marked 7
+*decides output*, so the run failed rule 3. Those 7 carry the worth of
+the run: six clauses of SPEC.md were reworded for them.
+
+- 4.1 step 1 read "a version other than 3" where 3.3.5 reads 3 and 4, so
+  a reader following it wrote an empty record for both version 4 tunes,
+  290 lines. That clause was the one defect of the run.
+- 3.1.3 named DTX's SPEC.md for the stride of a source's columns, a
+  document the kit leaves out, so the implementer recovered the stride
+  from the files: at a stride of R the table of one source leaves a byte
+  3.3.1 requires to be 0. 3.1.3 defines the stride now.
+- 3.1.2's header table read C as 1 and its payload as R bytes, the
+  layout of a source of one column, against 3.1.3.
+- 7.2's `repeat` is the RR of the header, and the record of the
+  structure writes `null` for the same key on a source that plays once
+  (YMXS, SPEC.md 7.3).
+- 7.3's `source` read "the last start or stop", where a stop is a source
+  column set to 0 in the Terms and stopping the timer in 4.3 step 1, and
+  4.3 step 4's "write it and keep it" read as keeping a count of 0. Row
+  42 of `four-timers` is the one row of the kit under both.
+
+The seventh entry read 7.3's mask of a register's width as
+underspecified, where the clause defines it; that clause stands.
 
 **6. What each tune reaches.**
 

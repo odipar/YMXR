@@ -417,19 +417,21 @@ stop (1.8.3).
 | 0 | 3 | `DTX` |
 | 3 | 1 | the variant, 1 |
 | 4 | 4 | R, the row count, 1 upward |
-| 8 | 2 | C, the column count, 1 |
+| 8 | 2 | C, the column count, 1, 2 or 3 (3.1.3) |
 | 10 | 4 | RR, the row the source repeats to, 0 to R - 1, or R for a source that plays once |
 | 14 | 1 | W, the bytes a value, 1 |
 | 15 | 1 | 0 |
-| 16 | R | the rows, row n at 16 + n |
+| 16 | C times align(R) | the rows, a column at a time (3.1.3); for C = 1 that is R bytes, row n at 16 + n |
 
-**3.1.3** A reader reads a source whose C is the columns of the target of
-every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1; another C
-or W is an error of the file (3.3.4). DTX1 lays a table out column by
-column, so column i of a source of C columns stands at 16 + i times
-align(R), align the padding DTX1 writes between columns (DTX, SPEC.md
-2.2), and a tick reads its columns at that stride. A source of values
-wider than a byte is left to a later version (section 8).
+**3.1.3** A reader reads a source whose C is the columns of the target
+of every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1;
+another C or W is an error of the file (3.3.4). DTX1 lays a table out
+column by column, so column i of a source of C columns stands at 16 + i
+times align(R), align(R) the row count rounded up to a multiple of 2,
+which is the stride DTX1 lays its columns at (DTX, SPEC.md 2.2), and a
+tick reads its columns at that stride. Where R is odd, the byte between
+one column and the next is 0. A source of values wider than a byte is
+left to a later version (section 8).
 
 **3.1.4** RR below R marks a source that repeats: the tick that reads row
 R - 1 places the next at row RR (5.1). RR equal to R marks a source that
@@ -542,8 +544,9 @@ reading only set columns and keeping values needed by later rows (R4.6).
 The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
-1. Read the version; for a version other than 3, report -1 and leave
-   every register and every timer as it is.
+1. Read the version; for a version other than 3 or 4 (3.3.5), report -1
+   and leave every register and every timer as it is. A reader reports
+   the line of 3.3.4 in place of that, and its record is empty (7.4).
 2. Read R and RR of the tune's table and the effects used.
 3. Resolve each source of the source index: its first row, and its loop
    row, row RR where it repeats and the end where it plays once (3.1.4).
@@ -612,11 +615,12 @@ order:
    at 1, and otherwise the row number the place has, in source s; the
    loop row of the tick is the loop row of source s (3.1.4). From this
    step a tick of the timer reads source s.
-4. Where K is set with bit 6 at 1: the count is N where N is other than
-   0 or bit 4 of K is 1, and the kept count otherwise; write it to the
-   timer's data register and keep it. Otherwise, where N is other than
-   0, or K is set with bit 4 at 1: write N to the data register and keep
-   it.
+4. Where K is set with bit 6 at 1: where N is other than 0 or bit 4 of
+   K is 1, the count is N, and the step writes it to the timer's data
+   register and keeps it; otherwise the step writes the kept count to
+   the data register, which leaves the kept count as it was. Otherwise,
+   where N is other than 0, or K is set with bit 4 at 1: write N to the
+   data register and keep it.
 5. Where K is set: write bits 2 to 0 of K, the select, to the timer's
    control register (1.9.4) and keep it. A stopped timer starts at this
    write on a whole period at the count its data register has.
@@ -948,7 +952,9 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 the sources in index order, source 1 first, each
 `{"rows":[...],"repeat":RR}` with `rows` the bytes of its rows in row
 order, a byte a column of the row and the marker included, 0 to 255, and
-`repeat` its RR as its header has it (3.1); `[]` where S is 0. A source of
+`repeat` its RR as its DTX1 header has it, an integer, RR equal to R
+included (3.1.4), where the record of the structure writes `null` for a
+source that plays once (YMXS, SPEC.md 7.3); `[]` where S is 0. A source of
 C columns and R rows reads as C times R bytes, row 0's columns first.
 
 ### 7.3 A frame's entry
@@ -972,13 +978,14 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   column unset. Each is
   `{"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b}`:
   `target` the kept target after 4.3 step 2, 0 to 127; `source` the
-  source number of the last start or stop on the effect, 0 to 127, 0
-  until a row sets it and left as it is by the tick that ends a source
-  that plays once; `select`, 0 to 7, and `count`, 0 to 255, the kept
-  select and count after 4.3 steps 4 and 5, 0 until a row sets them and
-  kept through a stop; `timer` bit 6 of the row's control column and
-  `place` bit 5, each `true` or `false`, both `false` where the row
-  leaves the control column unset.
+  number the last row that set the effect's source column set it to, 0
+  to 127, 0 until a row sets it; a row that stops the timer through its
+  control column (4.3 step 1) leaves it as it is, and so does the tick
+  that ends a source that plays once; `select`, 0 to 7, and `count`, 0 to
+  255, the kept select and count after 4.3 steps 4 and 5, 0 until a row
+  sets them and kept through a stop; `timer` bit 6 of the row's control
+  column and `place` bit 5, each `true` or `false`, both `false` where the
+  row leaves the control column unset.
 
 For the first frame after the end (4.6), `{"result":-1}`, where the
 record ends.
