@@ -421,7 +421,7 @@ stop (1.8.3).
 | 10 | 4 | RR, the row the source repeats to, 0 to R - 1, or R for a source that plays once |
 | 14 | 1 | W, the bytes a value, 1 |
 | 15 | 1 | 0 |
-| 16 | C times align(R) | the rows, a column at a time (3.1.3); for C = 1 that is R bytes, row n at 16 + n |
+| 16 | (C - 1) times align(R) + R | the rows, a column at a time (3.1.3), the last column R bytes with no padding after it; for C = 1 that is R bytes, row n at 16 + n |
 
 **3.1.3** A reader reads a source whose C is the columns of the target
 of every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1;
@@ -615,12 +615,10 @@ order:
    at 1, and otherwise the row number the place has, in source s; the
    loop row of the tick is the loop row of source s (3.1.4). From this
    step a tick of the timer reads source s.
-4. Where K is set with bit 6 at 1: where N is other than 0 or bit 4 of
-   K is 1, the count is N, and the step writes it to the timer's data
-   register and keeps it; otherwise the step writes the kept count to
-   the data register, which leaves the kept count as it was. Otherwise,
-   where N is other than 0, or K is set with bit 4 at 1: write N to the
-   data register and keep it.
+4. Where N is other than 0, or K is set with bit 4 at 1: the count is N,
+   and the step writes it to the timer's data register and keeps it.
+   Otherwise the count keeps the value it has, and where K is set with
+   bit 6 at 1 the step writes that kept count to the data register.
 5. Where K is set: write bits 2 to 0 of K, the select, to the timer's
    control register (1.9.4) and keep it. A stopped timer starts at this
    write on a whole period at the count its data register has.
