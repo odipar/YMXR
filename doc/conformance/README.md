@@ -122,6 +122,27 @@ Three clauses changed for it.
   the figure counts the lines or the frames of 7.4, which differ by the
   first line. It says the lines.
 
+**5.3 The third run**, the same day, against the kit with the clauses of
+5.1 and 5.2 in it and a third implementer. Every record byte for byte
+again, and `NOTES.md` 17 entries with 8 marked *decides output*. Every
+clause either earlier run wrote was read as it stands. Two changed for
+it, both of them places where a second reading stands in the document
+itself.
+
+- 7.2 fixed the rows of a source by row and left the order inside a row
+  to inference, where 2.1.1 defines another order for the same bytes: a
+  tick writes the columns with the marker's column last. A reader
+  following the tick reports the columns of `voices` source 1 as 0, 2, 1.
+  7.2 names column order and says which of the two it is.
+- 7.4 read that the record of a file with an error of 3.3.4 is empty,
+  while 3.3.4 has a reader report a line for that error, and where the
+  line stands was left open. It stands outside the record.
+
+The third entry that changed bytes was whether a row setting a column to
+the value the register keeps is reported, which 1.1.1 allows and 7.3
+reports through 4.4; the reading that passes is the one the clauses have,
+and they stand.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |
