@@ -5,9 +5,11 @@
 // name the multi file records for it. The title is the first tune's name
 // unless -tTITLE names another. -lean puts the core whose ticks neither
 // drop the interrupt level nor write an end of interrupt under the tunes,
-// and -perf puts the core with the raster monitor in there, for reading a
-// run. The two are one switch each, and both together select the core that
-// is both, which reads what a lean run costs.
+// -perf puts the core with the raster monitor in there, for reading a run,
+// and -pcrel the core whose ticks read a row through the program counter
+// (BINARIES.md 5.5). The three are one switch each, and any two together
+// select the core that is both, so -perf -lean reads what a lean run
+// costs.
 package main
 
 import (
@@ -34,6 +36,8 @@ func main() {
 			options.Monitor = true
 		case flag == "-lean":
 			options.Lean = true
+		case flag == "-pcrel":
+			options.Pcrel = true
 		case strings.HasPrefix(flag, "-copies"):
 			t.Usage("not a flag of the tool: " + flag + "; a tune file is packed already")
 		case strings.HasPrefix(flag, "-t"):
@@ -84,7 +88,7 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if !said.Says() {
 		return
 	}
-	core, err := binaries.Read(binaries.Named(options.Monitor, options.Lean))
+	core, err := binaries.Read(binaries.Named(options.Monitor, options.Lean, options.Pcrel))
 	if err != nil {
 		return
 	}
@@ -96,6 +100,10 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if options.Lean {
 		switches = append(switches, "-lean, ticks that neither drop the interrupt level"+
 			" nor write an end of interrupt")
+	}
+	if options.Pcrel {
+		switches = append(switches, "-pcrel, ticks that read a row through the program"+
+			" counter")
 	}
 	if len(switches) == 0 {
 		said.Row("the switches", "none, the plain core")
@@ -163,5 +171,5 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 }
 
 func binaryName(options sndh.Options) string {
-	return binaries.Named(options.Monitor, options.Lean)
+	return binaries.Named(options.Monitor, options.Lean, options.Pcrel)
 }

@@ -60,6 +60,16 @@ final class Sndh {
      *  YMXR_AEOI=1, doc/performance.md). */
     static final int CORE_LEAN = 2;
 
+    /** The core's flag bit 2: a tick reads its row through a displacement
+     *  from the instruction that reads it (the player's YMXR_PCREL=1,
+     *  doc/performance.md), which reaches 32,767 bytes, so the file's
+     *  tunes stand within that of the core (BINARIES.md 5.5). */
+    static final int CORE_PCREL = 4;
+
+    /** What a displacement reaches, the bytes from the core's first byte
+     *  a bound tune of a file built on the core above ends within. */
+    static final int PCREL_REACH = 32767;
+
     /** The word of a bra.w, before its displacement. */
     static final int BRA_W = 0x6000;
 
@@ -78,10 +88,16 @@ final class Sndh {
 
     /** The tag block's text: the title, the composer where there is one,
      *  and a name a subtune where the caller names them; and the core the
-     *  file uses, which {@code monitor} and {@code lean} select a switch
-     *  each. */
+     *  file uses, which {@code monitor}, {@code lean} and {@code pcrel}
+     *  select a switch each. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor, boolean lean) {
+            boolean monitor, boolean lean, boolean pcrel) {
+
+        /** The two switches the tag block reads, with the third off. */
+        Options(String title, @Nullable String composer, @Nullable List<String> names,
+                boolean monitor, boolean lean) {
+            this(title, composer, names, monitor, lean, false);
+        }
     }
 
     private Sndh() {
@@ -89,9 +105,11 @@ final class Sndh {
 
     /**
      * The file, from the tune files as subtunes 1 up, around the core the
-     * options' two switches select: the raster monitor in where they ask
-     * to read the run, the lean tick where the options select it, both
-     * where they select both, and the plain core where neither.
+     * options' three switches select: the raster monitor in where they ask
+     * to read the run, the lean tick where the options select it, ticks
+     * that read a row through the program counter where they select that,
+     * the core of any two or three where they select them, and the plain
+     * core where none.
      *
      * @throws IllegalArgumentException where a tune file is not one this
      *     reads, the bound tunes are not of the version the core reads,
@@ -99,12 +117,13 @@ final class Sndh {
      *     numbers
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
-        return of(Binaries.core(options.monitor(), options.lean()), tuneFiles, options);
+        return of(Binaries.core(options.monitor(), options.lean(), options.pcrel()),
+                tuneFiles, options);
     }
 
     /** The same, around the core named. */
     static byte[] of(byte[] core, List<byte[]> tuneFiles, Options options) {
-        checkCore(core, options.monitor(), options.lean(), binds(tuneFiles));
+        checkCore(core, options.monitor(), options.lean(), options.pcrel(), binds(tuneFiles));
         int n = tuneFiles.size();
         if (n == 0) {
             throw new IllegalArgumentException("no tune files: an SNDH file has one subtune"
@@ -150,7 +169,26 @@ final class Sndh {
         }
         byte[] tags = tags(options, rate, n, frames, claimed);
         int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
-        return combine(core, set, tags, workspace);
+        byte[] file = combine(core, set, tags, workspace);
+        if (options.pcrel()) {
+            // A tick of this core reads its row through a displacement
+            // from the instruction that reads it, which reaches
+            // PCREL_REACH bytes, so every row of every subtune stands
+            // within that of the handlers (BINARIES.md 5.5). The handlers
+            // stand inside the core, so this reads the last bound tune's
+            // end against the core's first byte and spends the bytes of
+            // the core as the margin.
+            int header = even(12 + tags.length);
+            int tableAt = even(core.length);
+            int last = Tune.getLong(file, header + tableAt + 2 + 4 * (n - 1))
+                    + set.tunes().get(n - 1).length;
+            if (last > PCREL_REACH) {
+                throw new IllegalArgumentException("the tunes end " + last + " bytes past the"
+                        + " core's first byte, and a tick that reads a row through the program"
+                        + " counter reaches " + PCREL_REACH);
+            }
+        }
+        return file;
     }
 
     /**
@@ -177,6 +215,11 @@ final class Sndh {
     }
 
     static void checkCore(byte[] core, boolean monitor, boolean lean, int binds) {
+        checkCore(core, monitor, lean, false, binds);
+    }
+
+    static void checkCore(byte[] core, boolean monitor, boolean lean, boolean pcrel,
+                          int binds) {
         if (core.length < CORE_DESCRIPTOR || !Arrays.equals(CORE_MAGIC,
                 Arrays.copyOfRange(core, CORE_MAGIC_AT, CORE_MAGIC_AT + 4))) {
             throw new IllegalArgumentException("not an SNDH core: no YMXS at " + CORE_MAGIC_AT);
@@ -199,6 +242,11 @@ final class Sndh {
         if (lean && (flags & CORE_LEAN) == 0) {
             throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
                     + flags + ", and the lean tick asked for needs bit 1 set");
+        }
+        if (pcrel && (flags & CORE_PCREL) == 0) {
+            throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
+                    + flags + ", and the row read through the program counter asked for needs"
+                    + " bit 2 set");
         }
     }
 
@@ -391,10 +439,11 @@ final class Sndh {
      * multi file records for it. The title is the first tune's name unless
      * {@code -tTITLE} names another. {@code -lean} puts the core whose
      * ticks neither drop the interrupt level nor write an end of interrupt
-     * under the tunes, and {@code -perf} puts the core with the raster
-     * monitor in there, for reading a run. The two are one switch each,
-     * and both together select the core that is both, which reads what a
-     * lean run costs.
+     * under the tunes, {@code -perf} puts the core with the raster monitor
+     * in there, for reading a run, and {@code -pcrel} the core whose ticks
+     * read a row through the program counter (BINARIES.md 5.5). The three
+     * are one switch each, and any two together select the core that is
+     * both, so {@code -perf -lean} reads what a lean run costs.
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
@@ -404,11 +453,14 @@ final class Sndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
+        boolean pcrel = false;
         for (String flag : flags) {
             if (flag.equals("-perf")) {
                 monitor = true;
             } else if (flag.equals("-lean")) {
                 lean = true;
+            } else if (flag.equals("-pcrel")) {
+                pcrel = true;
             } else if (flag.startsWith("-copies")) {
                 throw tool.usage("not a flag of the tool: " + flag
                         + "; a tune file is packed already");
@@ -439,7 +491,7 @@ final class Sndh {
             title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
         Options options = new Options(title, composer,
-                tunes.size() > 1 ? names : null, monitor, lean);
+                tunes.size() > 1 ? names : null, monitor, lean, pcrel);
         byte[] sndh;
         try {
             sndh = of(tunes, options);
@@ -459,8 +511,9 @@ final class Sndh {
         if (!report.says()) {
             return;
         }
-        Binaries.Binary binary = Binaries.binary(options.monitor(), options.lean());
-        int core = Binaries.core(options.monitor(), options.lean()).length;
+        Binaries.Binary binary = Binaries.binary(options.monitor(), options.lean(),
+                options.pcrel());
+        int core = Binaries.core(options.monitor(), options.lean(), options.pcrel()).length;
         report.say("the core: " + binary.name() + ", " + core + " bytes");
         List<String> switches = new ArrayList<>();
         if (options.monitor()) {
@@ -469,6 +522,9 @@ final class Sndh {
         if (options.lean()) {
             switches.add("-lean, ticks that neither drop the interrupt level nor write"
                     + " an end of interrupt");
+        }
+        if (options.pcrel()) {
+            switches.add("-pcrel, ticks that read a row through the program counter");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));

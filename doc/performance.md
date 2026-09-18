@@ -342,12 +342,12 @@ value the start patched into them, so both cost what they cost:
 So 12 cycles a tick that writes a row and steps its place, 16 on the loop
 and 8 on the stop: at a digidrum's 6,000 ticks a second, 1,440 cycles a
 frame. A handler of two columns saves twice that a tick and one of three
-three times, since a column is a read and a step of its own; the counted
-handler saves the same 12 as the general one.
+three times, since each column is a read and a step; the counted handler
+saves the same 12 as the general one.
 
 A start writes the place it patches behind level 7, so that a tick reads
-no half-made handler, and under this build that window carries the
-arithmetic turning a row's address into a displacement as well: a dozen
+a handler once it is made, and under this build the arithmetic turning a
+row's address into a displacement stands in that window as well: a dozen
 instructions more, which a tick of a timer due inside it waits for.
 
 The displacement is a signed word, so every row of every source stands
@@ -355,7 +355,7 @@ within 32,767 bytes of the handlers. Init measures each source against
 them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads stand beside the
-player whatever the images come to. The player is 7,298 bytes against
+player at any length of image. The player is 7,298 bytes against
 6,934: the handlers lose 120 bytes, a place being a word where it was a
 long, and the starts that write one gain 484 for the arithmetic that
 turns a row's address into a displacement.

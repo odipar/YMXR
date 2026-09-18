@@ -112,9 +112,9 @@ final class Ymxs {
      *  {@link Tool#of} leaves them for the tool. */
     static final String[] PACKING = {"-k", "-m", "-copies"};
 
-    /** The tags {@code ymxs-to-sndh} reads, and the two cores it selects
-     *  between. */
-    static final String[] TAGS = {"-t", "-c", "-perf", "-lean"};
+    /** The tags {@code ymxs-to-sndh} reads, and the switches that select
+     *  the core among the eight (BINARIES.md 2.1). */
+    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel"};
 
     /** The row count {@code ymxs-to-prg} reads. */
     static final String[] ROWS = {"-r"};

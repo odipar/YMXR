@@ -82,7 +82,7 @@ final class BinariesTest {
     @Test
     void theMonitorCoreIsTheSameCoreWithTheMonitorIn() throws IOException {
         byte[] core = Binaries.core();
-        byte[] monitor = Binaries.core(true, false);
+        byte[] monitor = Binaries.core(true, false, false);
         assertCore(monitor, Sndh.CORE_MONITOR);
         assertTrue(monitor.length > core.length, "the monitor core is " + monitor.length
                 + " bytes and the plain core " + core.length);
@@ -97,31 +97,45 @@ final class BinariesTest {
     }
 
     @Test
-    void eachOfTheTwoSwitchesFourSettingsIsACoreWhoseFlagsSayWhichItIs() throws IOException {
+    void eachOfTheThreeSwitchesEightSettingsIsACoreWhoseFlagsSayWhichItIs() throws IOException {
         // The tool selects a core by the switches passed and checks it against
-        // the flags word (Sndh.checkCore), so each of the four settings
+        // the flags word (Sndh.checkCore), so each of the eight settings
         // needs a separate core whose word reads the setting back.
         Set<String> named = new LinkedHashSet<>();
-        for (int setting = 0; setting < 4; setting++) {
+        for (int setting = 0; setting < 8; setting++) {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
             boolean lean = (setting & Sndh.CORE_LEAN) != 0;
-            byte[] core = Binaries.core(monitor, lean);
+            boolean pcrel = (setting & Sndh.CORE_PCREL) != 0;
+            byte[] core = Binaries.core(monitor, lean, pcrel);
             assertCore(core, setting);
-            Sndh.checkCore(core, monitor, lean, Bound.VERSION);
-            named.add(Binaries.binary(monitor, lean).name());
+            Sndh.checkCore(core, monitor, lean, pcrel, Bound.VERSION);
+            named.add(Binaries.binary(monitor, lean, pcrel).name());
         }
-        assertEquals(4, named.size(), "the four settings are four binaries: " + named);
+        assertEquals(8, named.size(), "the eight settings are eight binaries: " + named);
     }
 
     @Test
     void theLeanTickIsTheSameBytesOffEitherCore() throws IOException {
         // Both switches belong to the player, so the lean tick uses the
         // same code off the core with the monitor in as off the plain one.
-        int off = Binaries.core().length - Binaries.core(false, true).length;
-        assertEquals(off, Binaries.core(true, false).length
-                - Binaries.core(true, true).length,
+        int off = Binaries.core().length - Binaries.core(false, true, false).length;
+        assertEquals(off, Binaries.core(true, false, false).length
+                - Binaries.core(true, true, false).length,
                 "the lean tick is " + off + " bytes off the plain core");
         assertTrue(off > 0, "the lean core is smaller by " + off + " bytes");
+    }
+
+    @Test
+    void theRowReadThroughTheProgramCounterIsTheSameBytesOnEitherCore() throws IOException {
+        // The third switch belongs to the player as the other two do, so
+        // it puts the same code into the core with the monitor in as into
+        // the plain one: the handlers lose what a place saves as a word
+        // and the starts gain what turns an address into a displacement.
+        int on = Binaries.core(false, false, true).length - Binaries.core().length;
+        assertEquals(on, Binaries.core(true, false, true).length
+                - Binaries.core(true, false, false).length,
+                "the row read through the program counter is " + on + " bytes on the core");
+        assertTrue(on > 0, "that core is larger by " + on + " bytes");
     }
 
     @Test
@@ -275,12 +289,13 @@ final class BinariesTest {
         Bound.Set set = Bound.of(files);
         int state = 0;
         int next = tableAt + 2 + 4 * files.size();
-        int[] at = new int[files.size()];
+        int[] tuneAt = new int[files.size()];
         for (int i = 0; i < files.size(); i++) {
-            at[i] = Tune.getLong(sndh, header + tableAt + 2 + 4 * i);
-            assertEquals(0, at[i] & 1, "subtune " + (i + 1) + " on an even address");
-            assertEquals(next, at[i], "subtune " + (i + 1) + " follows what stands before it");
-            next = Sndh.even(at[i] + set.tunes().get(i).length);
+            tuneAt[i] = Tune.getLong(sndh, header + tableAt + 2 + 4 * i);
+            assertEquals(0, tuneAt[i] & 1, "subtune " + (i + 1) + " on an even address");
+            assertEquals(next, tuneAt[i],
+                    "subtune " + (i + 1) + " follows what stands before it");
+            next = Sndh.even(tuneAt[i] + set.tunes().get(i).length);
         }
         int[] imageAt = new int[set.images().size()];
         for (int i = 0; i < imageAt.length; i++) {
@@ -293,10 +308,11 @@ final class BinariesTest {
             byte[] bound = set.tunes().get(i).clone();
             // The tune reaches its image from its first byte, which the
             // combine put in and the set left at zero.
-            Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - at[i]);
-            assertArrayEquals(bound, Arrays.copyOfRange(sndh, header + at[i],
-                    header + at[i] + bound.length), "subtune " + (i + 1) + " is its bound tune");
-            assertEquals("YMXB", ascii(sndh, header + at[i], 4));
+            Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - tuneAt[i]);
+            assertArrayEquals(bound, Arrays.copyOfRange(sndh, header + tuneAt[i],
+                    header + tuneAt[i] + bound.length),
+                    "subtune " + (i + 1) + " is its bound tune");
+            assertEquals("YMXB", ascii(sndh, header + tuneAt[i], 4));
             state = Math.max(state, Tune.getLong(bound, Bound.STATE_AT));
         }
         assertEquals(next, workAt, "the workspace follows the last image");
@@ -435,7 +451,7 @@ final class BinariesTest {
         byte[] plain = Sndh.of(files, new Sndh.Options("Plain", null, null, false, false));
         byte[] watched = Sndh.of(files, new Sndh.Options("Watched", null, null, true, false));
         assertCombined(Binaries.core(), plain, files, tags(plain));
-        assertCombined(Binaries.core(true, false), watched, files, tags(watched));
+        assertCombined(Binaries.core(true, false, false), watched, files, tags(watched));
         assertEquals(0, Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
                 "a set with no Timer C sets no flag");
         assertEquals(Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
@@ -444,22 +460,58 @@ final class BinariesTest {
     }
 
     @Test
-    void aFileUsesTheCoreTheTwoSwitchesSelect() throws IOException {
+    void aFileUsesTheCoreTheThreeSwitchesSelect() throws IOException {
         // The failure this covers: a file asked for the monitor and the
         // lean tick used the monitor's core, whose flags record no
         // the lean tick, and checkCore rejected it.
         List<byte[]> files = List.of(tune("chambers"));
-        for (int setting = 0; setting < 4; setting++) {
+        for (int setting = 0; setting < 8; setting++) {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
             boolean lean = (setting & Sndh.CORE_LEAN) != 0;
-            byte[] sndh = Sndh.of(files, new Sndh.Options("Both", null, null, monitor, lean));
+            boolean pcrel = (setting & Sndh.CORE_PCREL) != 0;
+            byte[] sndh = Sndh.of(files,
+                    new Sndh.Options("Both", null, null, monitor, lean, pcrel));
             assertEquals(setting, Tune.getWord(sndh,
                     Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
                     "the file's core reads back the switches asked for");
-            assertCombined(Binaries.core(monitor, lean), sndh, files, tags(sndh));
+            assertCombined(Binaries.core(monitor, lean, pcrel), sndh, files, tags(sndh));
             assertEquals(0, Tune.getWord(Prg.of(sndh, 0), 28 + Prg.STUB_FLAGS_AT),
-                    "neither switch sets a stub flag: the screen is cleared every run");
+                    "no switch sets a stub flag: the screen is cleared every run");
         }
+    }
+
+    @Test
+    void aFileWhoseTunesEndPastTheReachIsRefusedWhereTheDisplacementWasAskedFor()
+            throws IOException {
+        // A tick of that core reads its row through a signed word
+        // displacement from the instruction that reads it, so the tool
+        // reads the file's last bound tune against the core's first byte
+        // (BINARIES.md 5.5): the tool reports a file whose tunes end
+        // further off, where init would report -1 on the machine. The tunes
+        // of a set are a few hundred bytes each, so the core is padded to
+        // the reach rather than the file filled with subtunes.
+        List<byte[]> files = List.of(tune("turrican"));
+        byte[] core = Arrays.copyOf(Binaries.core(false, false, true), Sndh.PCREL_REACH);
+        Sndh.Options options = new Sndh.Options("Far", null, null, false, false, true);
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(core, files, options));
+        assertTrue(said(wrong).contains("past the core's first byte")
+                && said(wrong).contains(String.valueOf(Sndh.PCREL_REACH)), said(wrong));
+        // the same tunes on the core as it stands, whose tunes end within
+        // the reach
+        assertTrue(Sndh.of(files, options).length > 0,
+                "the core as assembled takes the tunes it ends in reach of");
+    }
+
+    @Test
+    void aCoreWithoutTheRowReadThroughTheProgramCounterIsRejectedWhereItWasAskedFor()
+            throws IOException {
+        List<byte[]> files = List.of(tune("chambers"));
+        Sndh.Options options = new Sndh.Options("Pcrel", null, null, false, false, true);
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(Binaries.core(), files, options));
+        assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
+                && said(wrong).contains("needs bit 2 set"), said(wrong));
     }
 
     @Test
@@ -468,13 +520,13 @@ final class BinariesTest {
         Sndh.Options lean = new Sndh.Options("Lean", null, null, false, true);
         Sndh.Options both = new Sndh.Options("Both", null, null, true, true);
         for (Sndh.Options options : List.of(lean, both)) {
-            byte[] without = Binaries.core(options.monitor(), false);
+            byte[] without = Binaries.core(options.monitor(), false, false);
             IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                     () -> Sndh.of(without, files, options));
             assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
                     && said(wrong).contains("needs bit 1 set"), said(wrong));
-            Sndh.checkCore(Binaries.core(options.monitor(), true), options.monitor(), true,
-                    Bound.VERSION);
+            Sndh.checkCore(Binaries.core(options.monitor(), true, false), options.monitor(),
+                    true, Bound.VERSION);
         }
     }
 
@@ -487,7 +539,7 @@ final class BinariesTest {
                 () -> Sndh.of(core, files, options));
         assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
                 && said(wrong).contains("read 0"), said(wrong));
-        byte[] sndh = Sndh.of(Binaries.core(true, false), files, options);
+        byte[] sndh = Sndh.of(Binaries.core(true, false, false), files, options);
         assertEquals(Sndh.CORE_MONITOR, Tune.getWord(sndh,
                 Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
                 "the monitor core passes the same check");

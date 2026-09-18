@@ -42,7 +42,7 @@ var PackingFlags = []string{"-k", "-m", "-copies"}
 
 // Tags is the tags ymxs-to-sndh reads, and the two cores it selects
 // between.
-var Tags = []string{"-t", "-c", "-perf", "-lean"}
+var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel"}
 
 // Rows is the row count a program stops after.
 var Rows = []string{"-r"}
@@ -201,6 +201,8 @@ func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 			options.Monitor = true
 		case flag == "-lean":
 			options.Lean = true
+		case flag == "-pcrel":
+			options.Pcrel = true
 		case strings.HasPrefix(flag, "-copies"):
 		case strings.HasPrefix(flag, "-t"):
 			title = flag[2:]

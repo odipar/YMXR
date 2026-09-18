@@ -162,16 +162,20 @@ The player skips fields 6, 10 and 12. The host supplies the frame clock
 ## 2. The SNDH core
 
 **2.1** The core is position-independent code: the player under three
-entries, with the procedures of 2.7 to 2.9. Four cores are assembled from
-one source, one for each setting of the player's two switches; a tool
-selects one by name and checks its flags word (2.3, 2.10).
+entries, with the procedures of 2.7 to 2.9. Eight cores are assembled
+from one source, one for each setting of the player's three switches; a
+tool selects one by name and checks its flags word (2.3, 2.10).
 
 | core | switches | flags word |
 |---|---|---|
-| `YMXR_sndh.bin` | both off | 0 |
+| `YMXR_sndh.bin` | all three off | 0 |
 | `YMXR_sndh-perf.bin` | the raster monitor, `YMXR_PERF=1` | 1 |
 | `YMXR_sndh-lean.bin` | the lean tick, `YMXR_NEST=0` and `YMXR_AEOI=1` | 2 |
-| `YMXR_sndh-perf-lean.bin` | both | 3 |
+| `YMXR_sndh-perf-lean.bin` | the two above | 3 |
+| `YMXR_sndh-pcrel.bin` | the row read through the program counter, `YMXR_PCREL=1` | 4 |
+| `YMXR_sndh-perf-pcrel.bin` | the raster monitor and that row | 5 |
+| `YMXR_sndh-lean-pcrel.bin` | the lean tick and that row | 6 |
+| `YMXR_sndh-perf-lean-pcrel.bin` | all three | 7 |
 
 **2.2 Layout**, from the core's first byte:
 
@@ -199,6 +203,7 @@ core's first byte and are even.
 |---|---|---|
 | 0 | the player's raster monitor (`YMXR_PERF=1`): play and each tick handler write the background colour register as performance.md defines | a screen on which those writes are read |
 | 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires `YMXR_NEST=0` with; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
+| 2 | the row read through the program counter (`YMXR_PCREL=1`, performance.md): a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte, which the tool that writes it reads (2.10, 5.5) |
 
 **2.4 The state byte**, at the offset the field at 24 names: bit 0 is
 set from init's step 8 to exit's step 1, while a tune plays; bit 1 is set
@@ -278,6 +283,8 @@ file (3) and reports the first condition met:
 | the field at 18 is V, below the version W the tune binds at | `the core reads bound tunes to version V, and this binds at W` |
 | the raster monitor is selected and bit 0 of the flags word F is clear | `the core's flags at 22 read F, and the raster monitor asked for needs bit 0 set` |
 | the lean tick is selected and bit 1 of the flags word F is clear | `the core's flags at 22 read F, and the lean tick asked for needs bit 1 set` |
+| the row read through the program counter is selected and bit 2 of the flags word F is clear | `the core's flags at 22 read F, and the row read through the program counter asked for needs bit 2 set` |
+| that row is selected and the file's last bound tune ends B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
 
 ---
 
