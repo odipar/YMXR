@@ -73,9 +73,12 @@
 ; default, no byte and no cycle of it stands.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
-YMXR_VERSION    equ     $0004           ; the newest version it reads: a
+YMXR_VERSION    equ     $0005           ; the newest version it reads: a
                                         ; bound tune of 3 is one whose sources
-                                        ; are one column (SPEC.md 3.3.5)
+                                        ; are one column, of 4 one with a
+                                        ; source of several, and of 5 one with
+                                        ; a source its column fills the byte
+                                        ; of (SPEC.md 3.3.5)
 YMXR_COLUMNS    equ     30
 YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 
@@ -820,9 +823,10 @@ q\{ct}:         bra.w   \{tick}_done
 YMXR_init:
                 cmp.l   #YMXR_MAGIC,(a0)
                 bne     .bad
-                move.w  TF_VERSION(a0),d0       ; version 3 or 4, the lower
-                subq.w  #3,d0                   ; where the tune's sources are
-                bcs     .bad                    ; one column (SPEC.md 3.3.5)
+                move.w  TF_VERSION(a0),d0       ; version 3, 4 or 5, the
+                subq.w  #3,d0                   ; lowest where the tune's
+                bcs     .bad                    ; sources are one column
+                                                ; (SPEC.md 3.3.5)
                 cmp.w   #YMXR_VERSION-3,d0
                 bhi     .bad
                 move.l  a6,-(sp)

@@ -46,6 +46,10 @@ const (
 	// BoundVersionColumns is the version of one with a source of several
 	// columns.
 	BoundVersionColumns = ymxr.VersionColumns
+
+	// BoundVersionCounted is the version of one with a source whose column
+	// fills its byte, which a player counts the rows of.
+	BoundVersionCounted = ymxr.VersionCounted
 	StateAt      = 12
 	ImageAt      = 16
 	BoundTableAt = 20
@@ -191,10 +195,10 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	count := len(read.Sources)
 	tables := make([][]byte, count)
 	for i := 0; i < count; i++ {
-		at := ymxr.GetLong(tuneFile, ymxr.IndexAt+4*i)
+		at := ymxr.GetLong(tuneFile, ymxr.IndexAt+4*i) &^ ymxr.Counted
 		to := len(tuneFile)
 		if i+1 < count {
-			to = ymxr.GetLong(tuneFile, ymxr.IndexAt+4*(i+1))
+			to = ymxr.GetLong(tuneFile, ymxr.IndexAt+4*(i+1)) &^ ymxr.Counted
 		}
 		tables[i] = tuneFile[at:to]
 	}
@@ -220,7 +224,13 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	// first, so a tune past the first records a separate offset.
 	ymxr.PutLong(bound, BoundTableAt, table)
 	for i := 0; i < count; i++ {
-		ymxr.PutLong(bound, BoundIndexAt+4*i, sourceAt[i])
+		// A counted source's mark stands in the index a player reads, so
+		// bit 31 stands in the binding beside the offset (SPEC.md 3.1).
+		entry := sourceAt[i]
+		if read.Counted[i] {
+			entry |= ymxr.Counted
+		}
+		ymxr.PutLong(bound, BoundIndexAt+4*i, entry)
 	}
 	if image != nil {
 		copy(bound[imageAt:], image)

@@ -32,6 +32,10 @@ final class Multi {
      *  the highest of the tune files (SPEC.md 3.3.5). */
     static final int VERSION_COLUMNS = Tune.VERSION_COLUMNS;
 
+    /** The version of a multi file with a tune of a source whose column
+     *  fills its byte. */
+    static final int VERSION_COUNTED = Tune.VERSION_COUNTED;
+
     static final int COUNT_AT = 6;
     static final int INDEX_AT = 8;
 
@@ -111,9 +115,10 @@ final class Multi {
             throw new IllegalArgumentException("not a YMXM file");
         }
         int version = Tune.getWord(file, 4);
-        if (version != VERSION && version != VERSION_COLUMNS) {
+        if (version != VERSION && version != VERSION_COLUMNS
+                && version != VERSION_COUNTED) {
             throw new IllegalArgumentException("version " + version + " is not " + VERSION
-                    + " or " + VERSION_COLUMNS);
+                    + ", " + VERSION_COLUMNS + " or " + VERSION_COUNTED);
         }
         int count = Tune.getWord(file, COUNT_AT);
         if (count < 1 || count > MOST) {

@@ -42,6 +42,10 @@ final class Bound {
 
     /** The version of a bound tune with a source of several columns. */
     static final int VERSION_COLUMNS = Tune.VERSION_COLUMNS;
+
+    /** The version of a bound tune with a source whose column fills its
+     *  byte, which a player counts the rows of. */
+    static final int VERSION_COUNTED = Tune.VERSION_COUNTED;
     static final int STATE_AT = 12;
     static final int IMAGE_AT = 16;
     static final int TABLE_AT = 20;
@@ -159,8 +163,9 @@ final class Bound {
         int count = tune.sources().size();
         byte[][] tables = new byte[count][];
         for (int i = 0; i < count; i++) {
-            int at = Tune.getLong(tuneFile, Tune.INDEX_AT + 4 * i);
-            int to = i + 1 < count ? Tune.getLong(tuneFile, Tune.INDEX_AT + 4 * (i + 1))
+            int at = Tune.getLong(tuneFile, Tune.INDEX_AT + 4 * i) & ~Tune.COUNTED;
+            int to = i + 1 < count
+                    ? Tune.getLong(tuneFile, Tune.INDEX_AT + 4 * (i + 1)) & ~Tune.COUNTED
                     : tuneFile.length;
             tables[i] = Arrays.copyOfRange(tuneFile, at, to);
         }
@@ -184,8 +189,11 @@ final class Bound {
         // image of one names it in its format block; one of several
         // names the first, so a tune past the first records a separate offset.
         Tune.putLong(bound, TABLE_AT, table);
+        // A counted source's mark stands in the index a player reads, so
+        // bit 31 stands in the binding beside the offset (SPEC.md 3.1).
         for (int i = 0; i < count; i++) {
-            Tune.putLong(bound, INDEX_AT + 4 * i, sourceAt[i]);
+            Tune.putLong(bound, INDEX_AT + 4 * i,
+                    sourceAt[i] | (tune.counted().get(i) ? Tune.COUNTED : 0));
         }
         if (image != null) {
             System.arraycopy(image, 0, bound, imageAt, image.length);

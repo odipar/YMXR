@@ -157,12 +157,16 @@ func With(core []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 // file the core was read from does not.
 // Binds is the highest version the tune files bind at (SPEC.md 3.3.5).
 func Binds(tuneFiles [][]byte) int {
+	most := BoundVersion
 	for _, file := range tuneFiles {
-		if len(file) >= 6 && ymxr.GetWord(file, 4) == ymxr.VersionColumns {
-			return BoundVersionColumns
+		if len(file) >= 6 && ymxr.GetWord(file, 4) > most {
+			most = ymxr.GetWord(file, 4)
 		}
 	}
-	return BoundVersion
+	if most > BoundVersionCounted {
+		most = BoundVersionCounted
+	}
+	return most
 }
 
 func CheckCore(core []byte, monitor, lean bool, binds int) error {
