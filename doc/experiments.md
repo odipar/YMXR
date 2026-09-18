@@ -408,3 +408,44 @@ The three tune files stand beside the program: 3,356 bytes under version 3,
 3,108 for `setVoiceA` and 3,116 for `setToneA`, 24 sources against 48, and
 one timer claimed against two, which leaves a timer for the tune to use.
 `dist/` is outside the repository, as `YM_CORPUS` is.
+
+---
+
+## A timer on a whole byte, heard
+
+The marker stands in bit 7 of a row, so a source drove a register of seven
+bits or fewer until version 5: a volume, a coarse nibble, the envelope
+shape. A counted source has no marker and its rows are whole bytes
+(SPEC.md 3.1.6), which opens the six registers that read all eight. What
+that sounds like is a question for the ear, so `ym/whole-byte.py` writes
+a tune that spends it and `bin/ymxs-to-prg` makes a program of it:
+
+    python3 ym/whole-byte.py | bin/ymxs-to-prg -r4000 > dist/whole/TUNE.PRG
+    ym/hatari.sh dist/whole
+
+Five sections of 800 rows at 50 Hz, 16 seconds each, one melody on voice
+B under all five, and the note a sweep drives at a period of 256 to 511,
+so a fine byte over its whole range moves the pitch by an octave. Under
+Hatari, over the middle twelve seconds of each section, with the forty
+strongest bins of a spectrum to 12 kHz as the measure of how far a
+section spreads its energy:
+
+| section | what a timer drives | the ticks | the forty strongest bins |
+|---|---|---|---|
+| 1 | the rows alone, voice A at 440 Hz | none | 9.4% |
+| 2 | `setR0`, the tone's fine byte | 768 a second, then 3,072 | 7.3% |
+| 3 | `setR4`, voice C's fine byte | 1,536 a second, then 6,144 | 8.9% |
+| 4 | `setR11`, the envelope period's low byte | 320 a second | 2.8% |
+| 5 | `setR7`, the mixer gating voice A | 384 a second | 6.1% |
+
+A steady tone keeps its energy in a few bins and a swept one spreads it,
+so the figure falls as a section moves its register faster over a wider
+range: the envelope sweeping 1,953 Hz down to 30 five times a second
+spreads it furthest. The five sections stand at one loudness, 3,309 to
+4,274 rms, so the spread is the pitch moving rather than a section
+playing louder.
+
+The tune file is 1,732 bytes at version 5, with four counted sources of
+32, 16, 64 and 2 rows. The two rows of the last are `$FC` and `$FD`: the
+mixer's 60 and 61 with the two port directions the writer sets (rule
+2(f)). `dist/` is outside the repository.
