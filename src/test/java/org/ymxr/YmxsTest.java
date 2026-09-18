@@ -201,6 +201,27 @@ final class YmxsTest {
     }
 
     @Test
+    void aCountedSourceOnTheMixerCarriesTheTwoPortDirections() {
+        // A tick of a counted source writes the row whole, so the two
+        // port directions of R7 stand in the source: the structure's
+        // value is the mixer's six bits and the writer sets bits 7 and 6
+        // (SPEC.md rule 2(f), 1.4.2).
+        org.ymxs.YMXS.Single gate = Tunes.repeating("gate", List.of(56, 57), 0);
+        List<Row> rows = List.of(row(Map.of(), Timer.A, new StartOne(
+                Tunes.setting(Register.R7), gate,
+                new Timing(Chip.prescaler(4), 100, true, true))));
+        Schema.Made made = Schema.of(built(rows, 0));
+        byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
+                YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report()).file();
+        TuneFile read = TuneFile.read(file);
+        assertTrue(read.counted().get(0), "a source on setR7 is counted");
+        assertEquals(0xF8, read.sources().get(0).column(0)[0] & 0xFF,
+                "row 0 is the mixer's 56 with both port directions");
+        assertEquals(0xF9, read.sources().get(0).column(0)[1] & 0xFF,
+                "and row 1 the mixer's 57 with them");
+    }
+
+    @Test
     void everyTimerRunsTheEffectTheSpecificationAssignsIt() {
         assertEquals(Timer.A, Schema.timer(0));
         assertEquals(Timer.D, Schema.timer(1));

@@ -23,6 +23,15 @@ const CountValue = 0x10
 var Mask = [14]int{0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0x3F,
 	0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F}
 
+// Ports is bits 7 and 6 of R7, the directions of the two I/O ports, which
+// an Atari ST writes as 1 (SPEC.md 1.4.2). A row's write reads them from
+// the player; a tick of a counted source on setR7 writes the row whole,
+// so a writer sets them in every row of such a source (rule 2(f)).
+const Ports = 0xC0
+
+// MixerTarget is the target whose register is R7, the mixer (SPEC.md 2.1).
+const MixerTarget = 7
+
 // Marker is the column of a source's row the marker stands in, a target
 // (SPEC.md 2.1): the column whose register reads seven bits or fewer, and
 // -1 for a target this version does not encode. Targets 0 to 13 write one

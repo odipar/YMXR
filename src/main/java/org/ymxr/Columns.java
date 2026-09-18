@@ -42,6 +42,16 @@ final class Columns {
     static final int[] MARKER = {-1, 0, -1, 0, -1, 0, 0, -1, 0, 0, 0, -1, -1, 0,
                                  1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0};
 
+    /** Bits 7 and 6 of R7, the directions of the two I/O ports, which an
+     *  Atari ST writes as 1 (SPEC.md 1.4.2). A row's write reads them
+     *  from the player; a tick of a counted source on `setR7` writes the
+     *  row whole, so a writer sets them in every row of such a source
+     *  (rule 2(f)). */
+    static final int PORTS = 0xC0;
+
+    /** The target whose register is R7, the mixer (SPEC.md 2.1). */
+    static final int MIXER_TARGET = 7;
+
     /** A column that fills its byte, and the column and bit beside it that
      *  keep its 0 a value (SPEC.md 1.1). */
     static final int[] BESIDE_COLUMN = {1, -1, 3, -1, 5, -1, -1, -1, -1, -1, -1, 13, 13};

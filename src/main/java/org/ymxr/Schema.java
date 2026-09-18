@@ -232,12 +232,21 @@ final class Schema {
      *     encode starts a source, or where two targets of one source name
      *     different columns (rule 2(d))
      */
-    private static int[] markers(List<Row> rows, List<Source> sources) {
+    /** Where each source's marker stands and which target it runs on: the
+     *  column bit 7 marks, -1 where the target's register fills its byte,
+     *  and the target's number, which a counted source on `setR7` reads
+     *  the port directions in for (rule 2(f)). */
+    private record Marks(int[] column, int[] target) {
+    }
+
+    private static Marks markers(List<Row> rows, List<Source> sources) {
         int[] marker = new int[sources.size()];
+        int[] target = new int[sources.size()];
         Arrays.fill(marker, UNSTARTED);   // no row starts it, so no target
                                           // names a column and the marker
                                           // stands in column 0, as every
                                           // version before this one wrote it
+        Arrays.fill(target, UNSTARTED);
         for (Row row : rows) {
             for (Effect one : Tunes.effects(row).values()) {
                 if (!(one instanceof Start start)) {
@@ -261,9 +270,10 @@ final class Schema {
                             + " marker column (SPEC.md rule 2(d))");
                 }
                 marker[n] = at;
+                target[n] = number;
             }
         }
-        return marker;
+        return new Marks(marker, target);
     }
 
     /** The sources as tables of this format: a column a value of the row,
@@ -271,12 +281,18 @@ final class Schema {
      *  the row the source repeats to, its row count where it plays once. A
      *  source whose target's register fills its byte has no bit for the
      *  marker: every row is a whole byte and a player counts them (3.1). */
-    private static List<Sources.Source> sources(List<Source> sources, int[] marker) {
+    private static List<Sources.Source> sources(List<Source> sources, Marks marks) {
+        int[] marker = marks.column();
         List<Sources.Source> out = new ArrayList<>();
         for (int n = 0; n < sources.size(); n++) {
             Source source = sources.get(n);
             List<List<Integer>> values = Tunes.rows(source).rows();
             boolean counted = marker[n] == -1;
+            // A tick of a counted source on `setR7` writes the row whole,
+            // so the two port directions stand in the source rather than
+            // in the player (SPEC.md rule 2(f)).
+            int ports = counted && marks.target()[n] == Columns.MIXER_TARGET
+                    ? Columns.PORTS : 0;
             int at = counted || marker[n] == UNSTARTED ? 0 : marker[n];
             byte[][] columns = new byte[Tunes.columns(source)][values.size()];
             for (int r = 0; r < values.size(); r++) {
@@ -290,7 +306,7 @@ final class Schema {
                                 ? "bit 7 of the marker's column is the marker"
                                 : "a column is one byte"));
                     }
-                    columns[c][r] = (byte) value;
+                    columns[c][r] = (byte) (value | ports);
                 }
             }
             if (!counted) {
