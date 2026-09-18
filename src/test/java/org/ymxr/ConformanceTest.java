@@ -229,8 +229,8 @@ final class ConformanceTest {
      * The task names the versions a reader of the kit reads, and the
      * targets its tunes name.
      *
-     * <p>TASK.md is what an implementer works from, and nothing read it
-     * back: it said a version word other than $0003 gives an empty record
+     * <p>An implementer of the kit works from TASK.md, and no check read it
+     * back: it said a version word other than $0003 leaves the record empty
      * and that every tune names targets 0 to 13, where the kit has carried
      * a tune of version 4 on targets 14 to 24 since 0.4.2. An implementer
      * following it wrote an empty record for that tune.
