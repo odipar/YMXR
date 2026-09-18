@@ -34,6 +34,39 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.7, 2026-09-19
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.7>, built from the commit
+tagged `v0.4.7`.
+
+The envelope period reaches its whole range. Version 6 of the tune file
+counts a source of several columns, the player runs it on a sixth handler
+shape, and a tune whose envelope a timer drives sounds the half it could
+not reach.
+
+- **A source on `setEnvelope` is counted.** Both registers of that target
+  read every bit of their byte, so bit 7 of a row is a value and the
+  marker took it: a source on it reached a period of 0 to 32,767, half
+  what a row writes,
+  and the tick that read its last row wrote the marker's bit into R12
+  with the value, a period 32,768 above the rows before it. The kit's
+  `envelope` tune jumps from 800 to 33,696 there. Such a source is
+  counted now: its rows are whole bytes, a tick counts them, and it
+  reaches 0 to 65,535, an envelope cycle of 8.39 seconds where it reached
+  4.19 (SPEC.md 2.1.3, 3.1.6). The marked form stands for the files that
+  have it, which 2.1.4 defines.
+- **Version 6**, since a player of 5 would read a counted source of
+  several columns as a counted source of one (3.3.5). It runs through the
+  multi file, the bound tune, the core's descriptor and the player's init
+  (BINARIES.md).
+- **A sixth handler shape**: the wide handler with a word counter where
+  the marked one tests bit 7, four instances of 138 bytes against the
+  marked shape's 122. A tick that writes a row costs 196 cycles against
+  176 and one that loops 246 against 206, measured on the kit's two
+  envelope tunes; the player is 7,804 bytes against 6,934.
+- **The kit has a fifteenth tune**, `envelope-counted`, whose high byte
+  reaches 255 and whose two sources are counted.
+
 ### 0.4.6, 2026-09-19
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.6>, built from the commit
