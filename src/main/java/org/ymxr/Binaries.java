@@ -16,9 +16,11 @@ import java.util.stream.Stream;
  * (doc/BINARIES.md): the SNDH core, which {@link Sndh} puts under an SNDH
  * file's entries, and the program stub, which {@link Prg} puts in front
  * of an SNDH file. Three switches of the player's stand in the core, the
- * raster monitor, the lean tick and the row read through the program
- * counter, and each of their eight settings is a separate core, so a file
- * that requests two uses the core that is both.
+ * raster monitor, the lean tick and the row read through an absolute
+ * address, and each of their eight settings is a separate core, so a file
+ * that requests two uses the core that is both. A tick reads its row
+ * through the program counter where {@code YMXR_PCREL} stands at 1, its
+ * value unasked (doc/performance.md).
  * The build assembles each once from its source under {@code 68k} and
  * writes it into the classes, the one step rmac is needed for; a tool
  * reads them there and runs no assembler.
@@ -35,6 +37,12 @@ final class Binaries {
 
     static final Binary CORE = new Binary("YMXR_sndh.bin", "YMXR_sndh.S", List.of());
 
+    /** The core whose ticks read a row through an absolute address (the
+     *  player's {@code YMXR_PCREL=0}, doc/performance.md), which a host
+     *  that places a tune further off than a displacement reaches uses. */
+    static final Binary ABSOLUTE = new Binary("YMXR_sndh-abs.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_PCREL=0"));
+
     /**
      * The core with the player's raster monitor assembled in (the
      * player's {@code YMXR_PERF}, doc/performance.md): the play call
@@ -46,6 +54,9 @@ final class Binaries {
      */
     static final Binary MONITOR = new Binary("YMXR_sndh-perf.bin", "YMXR_sndh.S",
             List.of("-dYMXR_PERF=1"));
+
+    static final Binary MONITOR_ABSOLUTE = new Binary("YMXR_sndh-perf-abs.bin",
+            "YMXR_sndh.S", List.of("-dYMXR_PERF=1", "-dYMXR_PCREL=0"));
 
     /**
      * The core with the player's two tick switches the other way (the
@@ -59,6 +70,9 @@ final class Binaries {
     static final Binary LEAN = new Binary("YMXR_sndh-lean.bin", "YMXR_sndh.S",
             List.of("-dYMXR_NEST=0", "-dYMXR_AEOI=1"));
 
+    static final Binary LEAN_ABSOLUTE = new Binary("YMXR_sndh-lean-abs.bin", "YMXR_sndh.S",
+            List.of("-dYMXR_NEST=0", "-dYMXR_AEOI=1", "-dYMXR_PCREL=0"));
+
     /**
      * The core with both switches set: the raster monitor reads what a
      * run costs, and the ticks it reads are the lean ones. A file made
@@ -67,27 +81,9 @@ final class Binaries {
     static final Binary MONITOR_LEAN = new Binary("YMXR_sndh-perf-lean.bin", "YMXR_sndh.S",
             List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1"));
 
-    /**
-     * The four cores of the switches above with the player's
-     * {@code YMXR_PCREL} set (doc/performance.md, A tick through the
-     * program counter): a tick reads its row through a signed word
-     * displacement from the instruction that reads it, 12 cycles less a
-     * tick that writes a row, and every row of every source stands within
-     * 32,767 bytes of the handlers, which {@link Sndh} reads a file's
-     * layout against (BINARIES.md 5.5).
-     */
-    static final Binary PCREL = new Binary("YMXR_sndh-pcrel.bin", "YMXR_sndh.S",
-            List.of("-dYMXR_PCREL=1"));
-
-    static final Binary MONITOR_PCREL = new Binary("YMXR_sndh-perf-pcrel.bin", "YMXR_sndh.S",
-            List.of("-dYMXR_PERF=1", "-dYMXR_PCREL=1"));
-
-    static final Binary LEAN_PCREL = new Binary("YMXR_sndh-lean-pcrel.bin", "YMXR_sndh.S",
-            List.of("-dYMXR_NEST=0", "-dYMXR_AEOI=1", "-dYMXR_PCREL=1"));
-
-    static final Binary MONITOR_LEAN_PCREL = new Binary("YMXR_sndh-perf-lean-pcrel.bin",
+    static final Binary MONITOR_LEAN_ABSOLUTE = new Binary("YMXR_sndh-perf-lean-abs.bin",
             "YMXR_sndh.S",
-            List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1", "-dYMXR_PCREL=1"));
+            List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1", "-dYMXR_PCREL=0"));
 
     static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S", List.of());
 
@@ -97,18 +93,19 @@ final class Binaries {
     /** All nine, in the order the build writes them. */
     static List<Binary> all() {
         return List.of(CORE, MONITOR, LEAN, MONITOR_LEAN,
-                PCREL, MONITOR_PCREL, LEAN_PCREL, MONITOR_LEAN_PCREL, STUB);
+                ABSOLUTE, MONITOR_ABSOLUTE, LEAN_ABSOLUTE, MONITOR_LEAN_ABSOLUTE, STUB);
     }
 
     /** The core with neither switch set, as carried. */
     static byte[] core() {
-        return core(false, false, false);
+        return core(false, false, true);
     }
 
     /** The core of the three switches, as carried: the raster monitor in
      *  where {@code monitor}, ticks that neither drop the interrupt level
      *  nor write their end of interrupt where {@code lean}, and a row read
-     *  through the program counter where {@code pcrel}. */
+     *  through the program counter where {@code pcrel}, which every core
+     *  but the four named for an absolute address does. */
     static byte[] core(boolean monitor, boolean lean, boolean pcrel) {
         return carried(binary(monitor, lean, pcrel).name());
     }
@@ -117,14 +114,14 @@ final class Binaries {
     static Binary binary(boolean monitor, boolean lean, boolean pcrel) {
         if (pcrel) {
             if (monitor) {
-                return lean ? MONITOR_LEAN_PCREL : MONITOR_PCREL;
+                return lean ? MONITOR_LEAN : MONITOR;
             }
-            return lean ? LEAN_PCREL : PCREL;
+            return lean ? LEAN : CORE;
         }
         if (monitor) {
-            return lean ? MONITOR_LEAN : MONITOR;
+            return lean ? MONITOR_LEAN_ABSOLUTE : MONITOR_ABSOLUTE;
         }
-        return lean ? LEAN : CORE;
+        return lean ? LEAN_ABSOLUTE : ABSOLUTE;
     }
 
     /** The program stub as carried. */

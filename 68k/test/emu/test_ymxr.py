@@ -27,10 +27,11 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -kit [tunes]       the conformance kit's tune files, the
                                        player's frames against the reader's
                                        entries a frame at a time
-       test_ymxr.py -pcrel [tunes]     the player built with YMXR_PCREL=1,
-                                       whose ticks read a row through a
-                                       displacement (68k/YMXR.S): the same
-                                       model, and it joins the switches above
+       test_ymxr.py -abs [tunes]       the player built with YMXR_PCREL=0,
+                                       whose ticks read a row through an
+                                       absolute address (68k/YMXR.S): the
+                                       same model, and it joins the switches
+                                       above
 
 The fixtures under ym/test are chosen for the shapes a tune has, one of
 each; -corpus reads the corpus instead, which no fixture was chosen for. A
@@ -107,12 +108,13 @@ PERF_BAR = 0x0770
 # assumes one, the workspace on a long, a stack, and a sentinel a call
 # returns to.
 CODE = 0x1000
-FILE = 0x10000 + 2
-# Where a tune is loaded under -pcrel: a tick reads its row through a
-# signed word displacement from the handler, so the tune stands within
-# 32,767 bytes of the code, as an SNDH file and a program lay it out
-# (doc/BINARIES.md 2 and 3).
-PCREL_FILE = 0x5000 + 2
+# A tick reads its row through a signed word displacement from the
+# handler, so the tune stands within 32,767 bytes of the code, as an SNDH
+# file and a program lay it out (doc/BINARIES.md 2 and 3).
+FILE = 0x5000 + 2
+# Where a tune is loaded under -abs, whose ticks read an absolute address
+# and reach any offset.
+ABS_FILE = 0x10000 + 2
 WORK = 0x40000
 STACK = 0x80000
 DONE = 0x90000
@@ -156,8 +158,8 @@ def masked(writes):
 # What the player is assembled with: the raster monitor's switch, which
 # an equate of the source reads as the assembly defines it.
 # The 68000's interrupt entry and its rte, which the cycle counter here
-# does not reach: 44 and 20 from the manual. performance.md's 172 for a
-# tick is its 108 and these.
+# does not reach: 44 and 20 from the manual. performance.md's 160 for a
+# tick is its 96 and these.
 ENTRY = 64
 
 PERF = "-perf" in sys.argv
@@ -208,10 +210,11 @@ def equate(name, symbols=None):
 # stands at; and a one-row source handler's, the same two. Every offset
 # is measured off its handler's labels, so they stand once the
 # player is assembled (main).
-# The player assembled with YMXR_PCREL=1: a handler reads its row through
-# a displacement from the instruction that reads it, and the rig reads the
-# place the same way (-pcrel).
-PCREL = False
+# The player as it is assembled: a handler reads its row through a
+# displacement from the instruction that reads it, and the rig reads the
+# place the same way. -abs assembles the player that reads an absolute
+# address, and clears this.
+PCREL = True
 
 TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = ONE_SEL = ONE_VAL = 0
 TICKC_SEL = TICKC_PTR = TICKC_LEFT = 0
@@ -632,7 +635,7 @@ class Machine:
         mu = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN)
         mu.ctl_set_cpu_model(UC_CPU_M68K_M68000)
         # The code runs to the page the tune is loaded in, and the tune to
-        # the workspace: -pcrel loads the tune nearer the code (PCREL_FILE).
+        # the workspace: -abs loads the tune further off (ABS_FILE).
         for at, size in ((0, 0x1000), (CODE, (FILE & ~0xFFF) - CODE),
                          (FILE & ~0xFFF, WORK - (FILE & ~0xFFF)),
                          (WORK, 0x40000), (STACK, 0x10000), (DONE, 0x1000),
@@ -1647,12 +1650,12 @@ def hatari(ym, code, symbols, perf=False):
     # These switches select the core in the file; the rig assembled the same
     # core, and the comparison below fails where the two differ. A switch
     # missed here fails there rather than running the plain core. The tool
-    # reads a row through the program counter unasked, so a run without
-    # -pcrel passes -abs for the core the rig assembled.
+    # reads a row through the program counter unasked, so a run under
+    # -abs passes -abs for the core the rig assembled.
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent",
                         "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
                        + (["-lean"] if LEAN else [])
-                       + (["-pcrel"] if PCREL else ["-abs"]),
+                       + ([] if PCREL else ["-abs"]),
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     sndh_bytes = r.stdout
@@ -1942,8 +1945,8 @@ def patched_code_follows_the_subtune(defines, tunes):
         bound = bind(file, work)
         if bound is not None:
             bounds.append((os.path.basename(ym), bound))
-    # Under -pcrel a tick reads its row through a signed word
-    # displacement, so a subtune whose rows stand past the reach is left
+    # A tick reads its row through a signed word displacement, so a
+    # subtune whose rows stand past the reach is left
     # out: these are bound one by one, so each has an image in it, where
     # a set's subtunes share one image and stand together
     # (doc/BINARIES.md 2).
@@ -2071,9 +2074,9 @@ def main():
     real = "-hatari" in sys.argv
     kit = "-kit" in sys.argv
     global PCREL, FILE
-    PCREL = "-pcrel" in sys.argv
-    if PCREL:
-        FILE = PCREL_FILE
+    PCREL = "-abs" not in sys.argv
+    if not PCREL:
+        FILE = ABS_FILE
     perf = PERF
     wide = next((a for a in sys.argv[1:] if a.startswith("-corpus")), None)
     capped = next((a for a in sys.argv[1:] if a.startswith("-frames")), None)
@@ -2124,8 +2127,8 @@ def main():
             tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes", one)
                              for one in ("voices.ymxr", "counted.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
-    if PCREL:
-        defines += ["-dYMXR_PCREL=1"]
+    if not PCREL:
+        defines += ["-dYMXR_PCREL=0"]
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
     code, symbols = assemble(defines=defines)
@@ -2198,7 +2201,7 @@ def main():
                 # A tick costs the frame its instructions and the
                 # 68000's entry and rte besides, which no emulated cycle
                 # here counts: 44 and 20 from the manual, the 64 that
-                # separates performance.md's 108 from its 172.
+                # separates performance.md's 96 from its 160.
                 ticked = int(round((tick_cycles + ENTRY * ticks) / float(frames)))
                 if ticks:
                     line += "; the ticks %5d cycles a frame, %5d with the call" % (
@@ -2211,10 +2214,12 @@ def main():
                                 open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
                 said = row and tuple(int(x) for x in row.groups())
                 counted = (frames, average, max(cost), int(sum(adv) / len(adv)), adv[where[0]])
-                # A play call's figures a tune are the plain build's: the
-                # ticks of -pcrel cost less and move them, and the figures
-                # of that build are its table of tick paths.
-                if not PCREL and said != counted:
+                # A play call's figures a tune are the player as it is
+                # assembled. A start of -abs does less arithmetic and its
+                # ticks cost more, which moves three of the ten tunes, and
+                # the table of tick paths under that build's heading is
+                # what those ticks read against.
+                if PCREL and said != counted:
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
                 # plan.md's closing figures, on the tune it names. No
@@ -2223,8 +2228,10 @@ def main():
                 # while performance.md's table beside them stayed fixed. The
                 # figures are the core the document reckons against, whose
                 # ticks drop the level and write an end of interrupt, so
-                # the lean core reads its ticks and not these.
-                if stem == "Synergy Credits" and not LEAN and not PCREL:
+                # the lean core reads its ticks and not these. Every effect
+                # of this tune is a square, whose tick costs the same under
+                # both builds, so the three figures stand under -abs too.
+                if stem == "Synergy Credits" and not LEAN and PCREL:
                     plan = " ".join(open(os.path.join(ROOT, "doc", "plan.md")).read().split())
                     closing = re.search(
                         r"Synergy Credits reads ([\d,]+) cycles a call against the"
@@ -2259,10 +2266,10 @@ def main():
                     else:
                         row = r"^\| %s \| (\d+) \|$" % re.escape(name)
                     said_doc = open(os.path.join(ROOT, "doc", "performance.md")).read()
-                    if PCREL:
+                    if not PCREL:
                         # the table of that build, under its heading
                         said_doc = said_doc.split(
-                            "## A tick through the program counter")[1]
+                            "## A tick through an absolute address")[1]
                     tick = re.search(row, said_doc, re.M)
                     if not tick or {int(tick.group(1))} != tick_cost[then]:
                         stale.append("performance.md's tick %s is not %s" % (then, tick_cost[then]))

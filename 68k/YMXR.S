@@ -111,17 +111,21 @@ YMXR_AEOI       equ     0
                 .if     YMXR_AEOI&YMXR_NEST
                 .error  "YMXR_AEOI=1 requires YMXR_NEST=0"
                 .endif
-; A tick reads its row through the program counter rather than through an
-; absolute address (rmac -dYMXR_PCREL=1): the place is a displacement in
-; the instruction that reads it, so the read costs 4 cycles less and the
-; step that moves it 8. The displacement is a signed word, so this build
-; requires every row of every source within 32,767 bytes of the handlers;
-; init measures each source against them and reports -1 for one further
-; off. A square's handler and a one-row source's write a value the start
-; patched into them, so both cost under it what they cost.
+; A tick reads its row through the program counter: the place is a
+; displacement in the instruction that reads it, so the read costs 4
+; cycles less than an absolute address and the step that moves it 8. The
+; displacement is a signed word, so this player requires every row of
+; every source within 32,767 bytes of the handlers; init measures each
+; source against them and reports -1 for one further off. A square's
+; handler and a one-row source's write a value the start patched into
+; them, so both cost the same either way.
+;
+; A host that places a tune further off assembles the player with
+; YMXR_PCREL=0 (rmac -dYMXR_PCREL=0), whose ticks read an absolute
+; address and reach any offset.
                 .if     ^^defined YMXR_PCREL
                 .else
-YMXR_PCREL      equ     0
+YMXR_PCREL      equ     1
                 .endif
 ; The bytes of a handler's loop cell: a row's address, or its
 ; displacement from the instruction that reads the row.

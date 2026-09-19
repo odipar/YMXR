@@ -30,15 +30,44 @@ final class PlayerTest {
 
     private static final Path BINARIES = Path.of("doc/BINARIES.md");
 
-    /** Every {@code NAME equ VALUE} in the player, decimal or hex. */
+    /** Every {@code NAME equ VALUE} in the player, decimal or hex, as it
+     *  is assembled: {@code YMXR_PCREL} stands at 1 unless a host defines
+     *  it, so the else branch of a block that tests it is left out
+     *  (68k/YMXR.S). */
     static Map<String, Integer> equates() throws IOException {
         Map<String, Integer> out = new HashMap<>();
-        Matcher m = Pattern.compile("^(\\w+)\\s+equ\\s+(\\$?[0-9A-Fa-f]+)", Pattern.MULTILINE)
-                .matcher(Files.readString(PLAYER));
-        while (m.find()) {
-            String value = m.group(2);
-            out.put(m.group(1), value.startsWith("$") ? (int) Long.parseLong(value.substring(1), 16)
-                    : Integer.parseInt(value));
+        Pattern equate = Pattern.compile("^(\\w+)\\s+equ\\s+(\\$?[0-9A-Fa-f]+)");
+        int depth = 0;
+        int pcrel = 0;
+        boolean left = false;
+        for (String line : Files.readString(PLAYER).split("\n")) {
+            String said = line.trim();
+            if (said.startsWith(".if")) {
+                depth++;
+                if (pcrel == 0 && said.matches("\\.if\\s+YMXR_PCREL")) {
+                    pcrel = depth;
+                }
+                continue;
+            }
+            if (said.startsWith(".else")) {
+                left = left || depth == pcrel;
+                continue;
+            }
+            if (said.startsWith(".endif")) {
+                if (depth == pcrel) {
+                    pcrel = 0;
+                    left = false;
+                }
+                depth--;
+                continue;
+            }
+            Matcher m = equate.matcher(line);
+            if (!left && m.find()) {
+                String value = m.group(2);
+                out.put(m.group(1), value.startsWith("$")
+                        ? (int) Long.parseLong(value.substring(1), 16)
+                        : Integer.parseInt(value));
+            }
         }
         return out;
     }
