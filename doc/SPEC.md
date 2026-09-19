@@ -267,7 +267,8 @@ reads bit 4 where the row sets the control column (1.1.4).
 | 0 | 0, or the control column unset | leaves the count unset |
 | 0 | 1 | sets the count to 0, which counts 256 |
 
-**1.9.2** The control column:
+**1.9.2** The control column, whose bits 6 to 0 a player reads where the
+row sets it (1.1.1):
 
 | bit | meaning |
 |---|---|
@@ -342,19 +343,21 @@ and a writer sets in the rows of a counted source on `setR7` (rule
 
 **2.1.3** `setEnvelope` writes R11 and R12, the low and the high byte of
 the envelope period (YMXS, SPEC.md 2.5), and both registers read eight
-bits. A source on this target is counted (3.1.6): its rows are whole
-bytes, so it writes R12 a value of 0 to 255 and reaches an envelope
-period of 0 to 65,535, the whole range a frame's R11 and R12 columns
-reach (1.1). The envelope frequency is 2,000,000 / (256 x envelope
-period) (terminology.md 1.4): period 32,767 is one cycle in 4.19 seconds
-and period 65,535 one in 8.39 seconds.
+bits. A writer writes a source on this target counted (3.1.6), which
+makes the file version 6 (3.3.5): its rows are whole bytes, so it writes
+R12 a value of 0 to 255 and reaches an envelope period of 0 to 65,535,
+the whole range a frame's R11 and R12 columns reach (1.1). A file of
+version 4 or 5 has the marked form of 2.1.4 in its place, whose rows
+before the last write R12 0 to 127. The envelope frequency is 2,000,000
+/ (256 x envelope period) (terminology.md 1.4): period 32,767 is one
+cycle in 4.19 seconds and period 65,535 one in 8.39 seconds.
 
 **2.1.4** A file of version 4 or 5 writes a marked source on that target
 (3.3.5): bits 6 to 0 of R12's column are the value, the marker stands in
 bit 7, and the tick that reads the last row writes that bit into R12 with
 the value, a period 32,768 above the one the rows before it write. A
 player reads such a source as this clause defines it, and a writer of
-this version writes a counted source in its place.
+version 6 writes a counted source in its place.
 
 ### 2.2 The sources
 
@@ -837,7 +840,8 @@ numbers the maps assign.**
   register that reads seven bits or fewer, and every column beside it is
   a whole byte, as is every column of a counted source (3.1.6). A source
   on `setEnvelope` is counted, so both its columns are whole bytes
-  (2.1.3).
+  (2.1.3), except in a file of version 4 or 5, which has the marked form
+  of 2.1.4.
 - 2(f) A counted source on `setR7` has bits 7 and 6 of every row set, the
   directions of the two I/O ports (1.4.2): a tick writes the row whole,
   so a writer sets the two bits where a row's write reads them from the
@@ -993,14 +997,14 @@ the sources in index order, source 1 first, each
 `{"rows":[...],"repeat":RR}` with `rows` one list of C times R integers,
 0 to 255: the C columns of row 0, then those of row 1, and so on, column
 0 of a row first; and `repeat` its RR as its DTX1 header has it, an
-integer, RR equal to R included (3.1.4), where the record of the
-structure writes `null` for a source that plays once (YMXS, SPEC.md
-7.3); `[]` where S is 0. `rows` is every row of the table as the table
-has it: the marker of a source that has one, a row with bit 7 set
-before the last (3.2.1, 6.4), and the bytes of a counted source and of a
-marked one alike, bit 31 of an index entry absent from the record
-(3.1.1). A row reads in the order of its columns rather than the order a
-tick writes them, which puts the marker's column last (2.1.1).
+integer, RR equal to R included (3.1.4); `[]` where S is 0. Note: the
+record of the structure writes `null` there for a source that plays once
+(YMXS, SPEC.md 7.3). `rows` is every row of the table as the table has
+it: the marker of a source that has one, a row with bit 7 set before the
+last (3.2.1, 6.4), and the bytes of a counted source and of a marked one
+alike, bit 31 of an index entry absent from the record (3.1.1). A row
+reads in the order of its columns rather than the order a tick writes
+them, which puts the marker's column last (2.1.1).
 
 ### 7.3 A frame's entry
 
@@ -1032,9 +1036,9 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   1) leaves it as it is, and so does the tick that ends a source that
   plays once; `select`, 0 to 7, and `count`, 0 to 255, the kept select and
   count after 4.3 steps 4 and 5, 0 until a row sets them and kept through
-  a stop; `timer` bit 6 of the row's control column and `place` bit 5,
-  each `true` or `false`, both `false` where the row leaves the control
-  column unset.
+  a stop; `timer` and `place`, each `true` or `false`: bits 6 and 5 of the
+  row's control column where the row sets it, and `false` where it leaves
+  that column unset.
 
 For the first frame after the end (4.6), `{"result":-1}`, where the
 record ends.
@@ -1046,11 +1050,11 @@ frames the host requires, except that the record of a tune that plays
 once ends with its `{"result":-1}` entry. Where the host leaves F
 unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
 loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
-record of a file with an error of 3.3.4 is empty, 0 bytes, and the line a
-reader reports of that error stands outside the record: a reader that
+record of a file with an error of 3.3.4 is empty, 0 bytes, and the line
+a reader reports of that error stands outside the record: a reader that
 writes the record to a stream writes that line to another, which the
-host names. Two readers of
-one tune file over one F produce one record, byte for byte.
+host names. Two readers of one tune file over one F produce one record,
+byte for byte.
 
 ### 7.5 The example
 

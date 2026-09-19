@@ -260,6 +260,45 @@ left which to the reader; the host names it.
 SPEC.md that the clauses above now define: it describes the tunes and
 leaves the rules to the documents.
 
+**5.7 The seventh run**, the same day, against the kit at 15 tunes with
+the clauses of 5.6 in it and a seventh implementer, whose `TASK.md` left
+the two rules 5.6 moved into SPEC.md to the documents. Every record byte
+for byte, `wrong-version` included; `READ.md` named documents alone; and
+`NOTES.md` had 26 entries with 14 marked *decides output*, so the run
+failed rule 3 on those. The run found the first outright contradiction
+since 5.1, and four more places changed:
+
+- Rule 2(e) read "A source on `setEnvelope` is counted, so both its
+  columns are whole bytes", and 2.1.3 read the same flat, while 2.1.4
+  has a file of version 4 or 5 write a marked source on that target and
+  the kit's `envelope` tune is one: version 4, two marked sources on
+  target 20. The rule and 2.1.3 name the version now, and 2.1.4's "a
+  writer of this version" is version 6.
+- 2.1.3's range, "it writes R12 a value of 0 to 255 and reaches an
+  envelope period of 0 to 65,535", is the counted form's alone. The
+  clause reads the marked form's 0 to 127 beside it.
+- 1.9.2's table reads bits 2 to 0 of the control column as the select
+  and leaves the condition on the set bit to 1.1.1 and 1.9.3. A
+  reader that follows the table alone reads a select off an unset
+  column: `four-timers` has `$07` there on twelve rows, and 8,322
+  entries of eight tunes change. The clause names the condition where
+  the table stands.
+- 7.2's `repeat` ended "RR equal to R included (3.1.4), where the record
+  of the structure writes `null` for a source that plays once", which
+  reads as a condition on the same key. The structure's record is a Note
+  beside it now.
+- 7.3 gave `timer` and `place` as bits of the control column and then
+  read both as `false` where the row leaves that column unset. The
+  clause reads the condition first.
+
+Two of the run's readings stand. 3.1.2 sets the size of a source's rows
+at (C - 1) times align(R) + R, which reads as a stride of R until the
+offset of row n of column i in the same cell settles it, and that offset
+stands. 3.3.4 requires the first condition present to be reported where
+three of its eleven read the DTX2 table, which `TASK.md` 3 replaces with
+the rows file: the conditions are a reader's with the table in front of
+it, and none of the three is present in a tune of the kit.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |
