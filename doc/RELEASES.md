@@ -34,6 +34,46 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.9, 2026-09-19
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.9>, built from the commit
+tagged `v0.4.9`.
+
+The 68000 binaries are 0.4.8's bytes, every one of the nine: no source
+under `68k/` moved. What moves is one figure a check reckons, and the
+documents the tools are read against.
+
+- **A digidrum's end row is reckoned from the count the timer counts.**
+  6.4 read the count column where YMXS's 6.4 reads counted(C), and a
+  count of 0 is the 256 the MFP counts down (1.9.1), so a drum started at
+  0 was reckoned to end a frame after it began. `Columns.duration` reads
+  counted(C) in both trees. Over the corpus's 543 readable dumps every
+  start has a count of 1 to 255, measured through `ym-to-ymxs`, so the
+  fix moves what a structure written by hand reckons and leaves every
+  converted byte and every verdict of the corpus as it was.
+- **Four readers read the specification cold**, runs 5.6 to 5.9 of the
+  conformance kit, and every record of the kit came back byte for byte
+  from each. Twenty-two places changed for what they marked: rule 2(e)
+  forbade a tune the kit ships, 1.9.2 left the select's condition to two
+  other clauses where 8,322 entries turn on it, 7.2 gave `rows` an order
+  and no shape, and 7.4 never said which stream has the record on it.
+  conformance/README.md records the four runs.
+- **Every shape a tick has is read on a real MFP.** The rig told a chip
+  write from the handler that wrote it by five shapes of seven, so the
+  two counted shapes stood outside the comparison since the counted
+  handler arrived: `counted.ymxr` now plays 70,239 ticks on Hatari's MFP
+  against the model, and `envelope-counted.ymxr` 9,722.
+- **A run over the corpus plays 542 of 543 tunes** as the specification
+  reads, the one failure being a YM3 dump, which the converter reads as
+  another format and names.
+  The rig took a directory for a dump before this and converted every
+  dump of the corpus to build a set of four.
+- **A citation of a specification lands on a clause**, which
+  `ConsistencyTest` reads; `release/publish.sh` requires the nine
+  binaries `go/binaries/binaries.go` embeds rather than the five it named;
+  and tools.md 20.3 reads that a release is tagged twice, `v0.4.9` and
+  `go/v0.4.9`.
+
 ### 0.4.8, 2026-09-19
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.8>, built from the commit
