@@ -324,7 +324,10 @@ Two more places changed. 6.4's reckoning of a digidrum's end row reads
 the count C where YMXS's 6.4 reads counted(C), which is 256 for a count
 of 0 (1.9.1): the two documents parted on that count, and the reckoning
 of both trees read C. The clause and the two trees read counted(C) now,
-and `ConversionTest` reads a count of 0 as 256 frames' worth. 3.3.4's
+and `ConversionTest` reads a count of 0 as 256 frames' worth. The fix
+moves what a structure written by hand reckons and leaves the corpus as
+it was: over its 543 dumps every start has a count of 1 to 255, measured
+through `ym-to-ymxs`. 3.3.4's
 condition on the table's variant names DTX's SPEC.md 2.3 for the header
 the three conditions of that kind read.
 
