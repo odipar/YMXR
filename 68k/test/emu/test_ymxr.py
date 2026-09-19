@@ -1705,6 +1705,16 @@ def hatari(ym, code, symbols, perf=False):
     three = symbols["ymxr_three1"] - symbols["ymxr_three0"]
     threes = [(base + symbols["ymxr_three%d" % i],
                base + symbols["ymxr_three%d" % i] + three) for i in range(4)]
+    # and the two counted shapes, of one column and of several (68k/YMXR.S,
+    # TICKC and TICKW with a counter): a write of a shape this misses is a
+    # write of no effect, so its tick stands outside the count below and
+    # its registers outside the comparison with the model.
+    cnt = symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]
+    cnts = [(base + symbols["ymxr_cnt%d" % i], base + symbols["ymxr_cnt%d" % i] + cnt)
+            for i in range(4)]
+    env = symbols["ymxr_env1"] - symbols["ymxr_env0"]
+    envs = [(base + symbols["ymxr_env%d" % i], base + symbols["ymxr_env%d" % i] + env)
+            for i in range(4)]
 
     def where(pc):
         if frame[0] <= pc < frame[1]:
@@ -1716,7 +1726,9 @@ def hatari(ym, code, symbols, perf=False):
                     or squares[i][0] <= pc < squares[i][1]
                     or ones[i][0] <= pc < ones[i][1]
                     or twos[i][0] <= pc < twos[i][1]
-                    or threes[i][0] <= pc < threes[i][1]):
+                    or threes[i][0] <= pc < threes[i][1]
+                    or cnts[i][0] <= pc < cnts[i][1]
+                    or envs[i][0] <= pc < envs[i][1]):
                 return i
         return None
 
@@ -2119,13 +2131,15 @@ def main():
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
         # No dump converts to a target of several registers or to a
-        # counted source, so the kit's tunes of versions 4 and 5 go on the
-        # end of a run on a real MFP: the handlers of several registers
-        # and the counted handler are read there against the same model as
-        # the rest.
+        # counted source, so the kit's tunes of versions 4 to 6 go on the
+        # end of a run on a real MFP: with the dumps before them every
+        # handler shape of the player is read there against the same model
+        # as the rest, the counted shapes of one column and of several
+        # among them.
         if real and not args:
             tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes", one)
-                             for one in ("voices.ymxr", "counted.ymxr")]
+                             for one in ("voices.ymxr", "counted.ymxr",
+                                         "envelope-counted.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]
