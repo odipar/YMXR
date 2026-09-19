@@ -782,10 +782,12 @@ part, counted from the frame the player first writes in.
 Hatari recording as a WAV and its last frame as a PNG.
 
 **18.6 `ym/whole-byte.py`** writes the structure of a tune a timer drives
-a whole byte with, five sections of 800 rows at 50 Hz, one a register
-version 5 opened (SPEC.md 3.1.6): `python3 ym/whole-byte.py |
-bin/ymxs-to-prg -r4000 > dist/whole/TUNE.PRG` makes a program of it, and
-experiments.md reads what the sections come to.
+a whole byte with, six sections of 800 rows at 50 Hz: four on a register
+version 5 opened (SPEC.md 3.1.6), one on the envelope period's two bytes
+from one timer, which version 6 counts (SPEC.md 2.1.3), and one written
+by rows alone. `python3 ym/whole-byte.py | bin/ymxs-to-prg -r4800 >
+dist/whole/TUNE.PRG` makes a program of it, and experiments.md reads what
+the sections come to.
 
 ---
 

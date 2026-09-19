@@ -416,36 +416,49 @@ one timer claimed against two, which leaves a timer for the tune to use.
 The marker stands in bit 7 of a row, so a source drove a register of seven
 bits or fewer until version 5: a volume, a coarse nibble, the envelope
 shape. A counted source has no marker and its rows are whole bytes
-(SPEC.md 3.1.6), which opens the six registers that read all eight. What
-that sounds like is a question for the ear, so `ym/whole-byte.py` writes
-a tune that spends it and `bin/ymxs-to-prg` makes a program of it:
+(SPEC.md 3.1.6), which opens the six registers that read all eight, and
+version 6 counts such a source of several columns, so one timer drives
+the envelope period's two bytes together (SPEC.md 2.1.3). What that
+sounds like is a question for the ear, so `ym/whole-byte.py` writes a
+tune that spends it and `bin/ymxs-to-prg` makes a program of it:
 
-    python3 ym/whole-byte.py | bin/ymxs-to-prg -r4000 > dist/whole/TUNE.PRG
+    python3 ym/whole-byte.py | bin/ymxs-to-prg -r4800 > dist/whole/TUNE.PRG
     ym/hatari.sh dist/whole
 
-Five sections of 800 rows at 50 Hz, 16 seconds each, one melody on voice
-B under all five, and the note a sweep drives at a period of 256 to 511,
+Six sections of 800 rows at 50 Hz, 16 seconds each, one melody on voice
+B under all six, and the note a sweep drives at a period of 256 to 511,
 so a fine byte over its whole range moves the pitch by an octave. Under
-Hatari, over the middle twelve seconds of each section, with the forty
-strongest bins of a spectrum to 12 kHz as the measure of how far a
-section spreads its energy:
+Hatari, over the middle twelve seconds of each section, one spectrum of
+that window measures how far a section spreads its energy: the forty
+strongest bins to 12 kHz as a share of the magnitude to 12 kHz.
 
 | section | what a timer drives | the ticks | the forty strongest bins |
 |---|---|---|---|
-| 1 | the rows alone, voice A at 440 Hz | none | 9.4% |
-| 2 | `setR0`, the tone's fine byte | 768 a second, then 3,072 | 7.3% |
-| 3 | `setR4`, voice C's fine byte | 1,536 a second, then 6,144 | 8.9% |
-| 4 | `setR11`, the envelope period's low byte | 320 a second | 2.8% |
-| 5 | `setR7`, the mixer gating voice A | 384 a second | 6.1% |
+| 1 | the rows alone, voice A at 440 Hz | none | 9.1% |
+| 2 | `setR0`, the tone's fine byte | 768 a second, then 3,072 | 6.7% |
+| 3 | `setR4`, voice C's fine byte | 1,536 a second, then 6,144 | 8.1% |
+| 4 | `setR11`, the envelope period's low byte | 320 a second | 3.8% |
+| 5 | `setR7`, the mixer gating voice A | 384 a second | 4.2% |
+| 6 | `setEnvelope`, both period bytes | 64 a second | 4.8% |
 
 A steady tone keeps its energy in a few bins and a swept one spreads it,
 so the figure falls as a section moves its register faster over a wider
 range: the envelope sweeping 1,953 Hz down to 30 five times a second
-spreads it furthest. The five sections stand at one loudness, 3,309 to
-4,274 rms, so the spread is the pitch moving rather than a section
+spreads it furthest. The six sections stand at one loudness, 3,292 to
+4,317 rms, so the spread is the pitch moving rather than a section
 playing louder.
 
-The tune file is 1,732 bytes at version 5, with four counted sources of
-32, 16, 64 and 2 rows. The two rows of the last are `$FC` and `$FD`: the
-mixer's 60 and 61 with the two port directions the writer sets (rule
-2(f)). `dist/` is outside the repository.
+The sixth section is the range version 6 adds. Its source is 512 rows of
+two columns on `setEnvelope`, stepping the period from 64 to 65,535 over
+eight seconds at 64 ticks a second, and it plays once, so the last row's
+period stands for the eight seconds after it. Under Hatari the player
+writes those 512 periods, 52 of them above 32,767 - the half a source
+that spends bit 7 on the marker leaves unreachable (SPEC.md 2.1.4) - and
+the last is one cycle in 8.39 seconds, heard as a swell over voice A's
+tone rather than as a pitch.
+
+The tune file is 2,804 bytes at version 6, with five counted sources of
+32, 16, 64, 2 and 512 rows, the last of two columns. The two rows of the
+fourth are `$FC` and `$FD`: the mixer's 60 and 61 with the two port
+directions the writer sets (rule 2(f)). `dist/` is outside the
+repository.
