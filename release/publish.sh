@@ -41,12 +41,19 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-# What go:embed reads: the nine binaries the build assembles. A tree whose
-# build has not run has none, and a tool would then have no core to put
-# a tune behind.
+# What go:embed reads: the nine binaries the build assembles, the eight
+# cores of BINARIES.md 2.1 and the program stub. A tree whose build has
+# not run has none of them, and a tool would then have no core to put a
+# tune behind. The names are read off the Go file that embeds them, so
+# the list here and the list there cannot drift.
 BINARIES=go/binaries/data
-for binary in YMXR_sndh.bin YMXR_sndh-perf.bin YMXR_sndh-lean.bin \
-              YMXR_sndh-perf-lean.bin YMXR_prg.bin; do
+EMBEDS=go/binaries/binaries.go
+names=$(grep -oE 'YMXR_[A-Za-z0-9_-]*\.bin' "$EMBEDS" | sort -u)
+if [ -z "$names" ]; then
+    echo "publish: $EMBEDS names no binary" >&2
+    exit 1
+fi
+for binary in $names; do
     if [ ! -f "$BINARIES/$binary" ]; then
         echo "publish: $BINARIES/$binary is not built: run mvn process-classes" >&2
         exit 1
