@@ -51,9 +51,11 @@ another format defines; the rows file stands in for it.
 **4. The tunes.** Each is a `.ymxr` beside its `.rows`; the tunes differ
 in what they reach. Every tune names the targets `SPEC.md` 2.1 assigns,
 0 to 24, selects 1 to 7 and sources 0 to `S`, 0 the stop (`SPEC.md`
-1.8), and satisfies `SPEC.md` 6 but for one source of one tune, which
-has bit 7 set on rows before its last, the condition 6.4 reports; what a
-reader does with a file outside those is outside this task.
+1.8), and satisfies `SPEC.md` 6 but for two conditions in one tune: a
+source with bit 7 set on rows before its last, and a row that sets the
+column of a register an effect starts on at that row, each of which 6.4
+reports; what a reader does with a file outside those is outside this
+task.
 
 | file | lines to produce |
 |---|---:|

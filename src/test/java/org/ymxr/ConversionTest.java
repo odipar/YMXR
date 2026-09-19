@@ -360,4 +360,19 @@ final class ConversionTest {
         assertEquals(Sources.MARK, sid.columns()[0][1] & 0xFF);
         assertEquals(0, sid.repeat());
     }
+
+    /**
+     * A count of 0 is the 256 the MFP counts down, so the frames a source
+     * that plays once runs for are reckoned from 256 (SPEC.md 1.9.1, 6.4;
+     * YMXS, SPEC.md 6.4, which reads counted(C)). The reckoning read the
+     * column as it stands, so a drum started at a count of 0 ended a frame
+     * after it began.
+     */
+    @Test
+    void theReckoningReadsACountOf0AsTheCountTheTimerCounts() {
+        assertEquals(Columns.duration(1000, 5, 256, 50), Columns.duration(1000, 5, 0, 50),
+                "a count of 0 runs the frames a count of 256 runs");
+        assertTrue(Columns.duration(1000, 5, 0, 50) > Columns.duration(1000, 5, 1, 50),
+                "a count of 0 runs longer than a count of 1");
+    }
 }

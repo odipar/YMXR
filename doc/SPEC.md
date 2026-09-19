@@ -544,7 +544,7 @@ reports a condition reads no further field. A name offset other than 16 +
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
 | the version is other than 3, 4, 5 or 6 (3.3.5) | `version V is not 3, 4, 5 or 6` |
 | the table begins or ends outside the file | `the table stands at A to B, and the file has F bytes` |
-| the table is a DTX variant other than 2 (3.3.3) | `the table is DTX X, and a tune's table is DTX2 (SPEC.md 3.3.3)` |
+| the table is a DTX variant other than 2 (3.3.3), its header read as DTX defines it (DTX, SPEC.md 2.3) | `the table is DTX X, and a tune's table is DTX2 (SPEC.md 3.3.3)` |
 | the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N stands at A to B, and the file has F bytes` |
 | source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
@@ -939,8 +939,10 @@ count; it names source N, the source the writer produced from that kind and
 value, or 0 for a kind 3, a digidrum outside the recording, or a source
 past 127. A source produced from a digidrum plays once; its end row, for a
 start at row r of a source of J rows at the flag's select, divisor D, and
-count C, at H frames a second, is r + (J × D × C × H + 153,600 + 2,457,599)
-divided by 2,457,600, the arithmetic exact.
+count C, at H frames a second, is r + (J × D × counted(C) × H + 153,600
++ 2,457,599) divided by 2,457,600, counted(C) the count the timer counts
+down, 256 where C is 0 (1.9.1), the arithmetic exact (YMXS, SPEC.md
+6.4).
 
 | condition | reported as |
 |---|---|
@@ -996,7 +998,8 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 the sources in index order, source 1 first, each
 `{"rows":[...],"repeat":RR}` with `rows` one list of C times R integers,
 0 to 255: the C columns of row 0, then those of row 1, and so on, column
-0 of a row first; and `repeat` its RR as its DTX1 header has it, an
+0 of a row first, each column read at the stride 3.1.2 lays the table
+at; and `repeat` its RR as its DTX1 header has it, an
 integer, RR equal to R included (3.1.4); `[]` where S is 0. Note: the
 record of the structure writes `null` there for a source that plays once
 (YMXS, SPEC.md 7.3). `rows` is every row of the table as the table has
@@ -1036,9 +1039,9 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   1) leaves it as it is, and so does the tick that ends a source that
   plays once; `select`, 0 to 7, and `count`, 0 to 255, the kept select and
   count after 4.3 steps 4 and 5, 0 until a row sets them and kept through
-  a stop; `timer` and `place`, each `true` or `false`: bits 6 and 5 of the
-  row's control column where the row sets it, and `false` where it leaves
-  that column unset.
+  a stop; `timer` and `place`, each `true` or `false`: where the row sets
+  the control column, `timer` is its bit 6 and `place` its bit 5 (1.9.2),
+  and where the row leaves that column unset, both are `false`.
 
 For the first frame after the end (4.6), `{"result":-1}`, where the
 record ends.
@@ -1052,8 +1055,8 @@ unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
 loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
 record of a file with an error of 3.3.4 is empty, 0 bytes, and the line
 a reader reports of that error stands outside the record: a reader that
-writes the record to a stream writes that line to another, which the
-host names. Two readers of one tune file over one F produce one record,
+writes the record to a stream writes 0 bytes to it and that line to
+another. Two readers of one tune file over one F produce one record,
 byte for byte.
 
 ### 7.5 The example

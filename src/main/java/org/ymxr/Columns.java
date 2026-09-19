@@ -96,9 +96,10 @@ final class Columns {
 
     /** The frames a source of `rows` rows runs for at a rate, rounded up,
      *  with a sixteenth of a frame added for a start that falls inside the
-     *  frame it begins in. */
+     *  frame it begins in. A count of 0 is the 256 the MFP counts
+     *  (SPEC.md 1.9.1, 6.4). */
     static int duration(int rows, int select, int count, int frameRate) {
-        long divisor = (long) PRESCALER[select] * count;
+        long divisor = (long) PRESCALER[select] * (count == 0 ? 256 : count);
         long scaled = (long) rows * divisor * frameRate + MFP / 16;
         return (int) ((scaled + MFP - 1) / MFP);
     }

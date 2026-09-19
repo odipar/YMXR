@@ -299,6 +299,40 @@ three of its eleven read the DTX2 table, which `TASK.md` 3 replaces with
 the rows file: the conditions are a reader's with the table in front of
 it, and none of the three is present in a tune of the kit.
 
+**5.8 The eighth run**, the same day, against the kit at 15 tunes with
+the clauses of 5.7 in it and an eighth implementer. Every record byte for
+byte, `wrong-version` included; `READ.md` named documents alone; and
+`NOTES.md` had 11 entries with 3 marked *decides output*, where 5.7 had
+26 with 14. The three are the clauses 5.7 reworded and one it left:
+
+- 7.3 read "`timer` and `place`, each `true` or `false`: bits 6 and 5 of
+  the row's control column where the row sets it", which pairs the two
+  names with the two bits by word order alone, and 7.5's one example has
+  both bits at 1. Rows 34 and 42 of `four-timers` have one bit each, and
+  a reader that paired them the other way writes both entries
+  differently. The clause names bit 6 as `timer` and bit 5 as `place`.
+- 7.2 reads `rows` as C times R integers and left the stride to 3.1.2,
+  so a reader that lays the payload out as adjoining bytes matches the
+  sentence and reads `voices` source 2 wrong. The clause names the
+  stride.
+- 7.4 read that a reader writes the error line "to another, which the
+  host names", where the host of this exercise names one stream. The
+  clause reads that the stream with the record on it has 0 bytes, and
+  the line goes to another.
+
+Two more places changed. 6.4's reckoning of a digidrum's end row reads
+the count C where YMXS's 6.4 reads counted(C), which is 256 for a count
+of 0 (1.9.1): the two documents parted on that count, and the reckoning
+of both trees read C. The clause and the two trees read counted(C) now,
+and `ConversionTest` reads a count of 0 as 256 frames' worth. 3.3.4's
+condition on the table's variant names DTX's SPEC.md 2.3 for the header
+the three conditions of that kind read.
+
+The run also found row 30 of `four-timers`, the repeat row, setting R8,
+R9 and R10 while starting effects on those three registers, which rule
+1(a) forbids and 6.4 reports. The row is the tune's, as its early marker
+is; section 6 of this document and `TASK.md` 4 name both now.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |
@@ -312,7 +346,7 @@ it, and none of the three is present in a tune of the kit.
 | `preempt` | a drum starting on the voice a SID runs on stops the SID first; R8 passed between them with its column unset, written by ticks alone |
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |
 | `fine-zero` | a tone fine byte moving to 0 on each voice, with the coarse set bit set and with it clear; an odd row count, so a row of unset columns is appended at the end and the table packs at unit 2 |
-| `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and rows section 4 allows beyond those a conversion of a dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, its source with bit 7 set in nine rows before its last, outside SPEC.md 3.2 and reported as the table has it (SPEC.md 7), R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit |
+| `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and rows section 4 allows beyond those a conversion of a dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, its source with bit 7 set in nine rows before its last, outside SPEC.md 3.2 and reported as the table has it (SPEC.md 7), R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit, and a repeat row that sets R8, R9 and R10 while starting effects on those three registers, outside rule 1(a) and reported by SPEC.md 6.4 |
 | `voices` | version 4 (SPEC.md 3.3.5): the four kinds of target that write several registers, one an effect at 50 Hz, and the marker in a different column under each - the coarse nibble of a voice on Timer A and of a tone on Timer C, the noise period on Timer D, the envelope shape of a buzzer on Timer B; a source of several columns repeating to row 0, one repeating to a row above it, one that plays once and stops its timer at its marker, and a start over a running source of the same row count that leaves the place where it stands |
 | `envelope` | version 4 (SPEC.md 3.3.5): `setEnvelope`, the one target whose marked register reads eight bits, so the marker's column is the envelope period's high byte, 0 to 127, and the column beside it a whole byte; a source of two columns repeating to a row above 0, one that plays once and stops its timer at its marker with 127 in a row of its marked column, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `counted` | version 5 (SPEC.md 3.3.5): a counted source on each of the six targets whose register reads every bit of its byte - `setR0` and `setR4` on Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and `setR2` on Timer C - each with rows whose bit 7 is set, where a source the marker ends reads that bit as its end; an index entry whose bit 31 is 1 and whose bits 30 to 0 are the offset (SPEC.md 3.1.1); a square on R8 in the same file, which the marker ends, so a player reads the end of a source from its index entry rather than from the version word; a counted source of one row, one that plays once and stops its timer at its count, one repeating to a row above 0; a target set while an effect runs and read at the next start; a row that sets R12 as it stops the effect running on it |
