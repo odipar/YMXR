@@ -56,6 +56,16 @@ jobs:
       # ParityTest runs the two trees against one another and skips where
       # go is absent, so a runner without it is green and asleep.
       - run: go version && rmac | sed -n '7p' && "$DTX_WRITE" -help | head -1
+      # The Go tree is gofmt's. ParityTest reads it against the Java tree
+      # byte for byte in what the tools write and leaves its shape alone,
+      # so a file the formatter would rewrite drifts unread.
+      - name: gofmt leaves the Go tree as it stands
+        run: |
+          said=$(gofmt -l go)
+          if [ -n "$said" ]; then
+              echo "::error::gofmt would rewrite $said"
+              exit 1
+          fi
       # A skipped test is a check that did not run, and a run that skips
       # one is green and asleep. Every skip has a cause the steps above
       # remove, so the count stands at 0 - one better than a machine
