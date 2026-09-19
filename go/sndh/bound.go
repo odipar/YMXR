@@ -54,10 +54,10 @@ const (
 	// BoundVersionWideCounted is the version of one with a counted source
 	// of several columns.
 	BoundVersionWideCounted = ymxr.VersionWideCounted
-	StateAt      = 12
-	ImageAt      = 16
-	BoundTableAt = 20
-	BoundIndexAt = 24
+	StateAt                 = 12
+	ImageAt                 = 16
+	BoundTableAt            = 20
+	BoundIndexAt            = 24
 )
 
 // The image's format block, and where the state block's bytes and the
