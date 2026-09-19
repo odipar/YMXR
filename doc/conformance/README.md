@@ -336,6 +336,38 @@ R9 and R10 while starting effects on those three registers, which rule
 1(a) forbids and 6.4 reports. The row is the tune's, as its early marker
 is; section 6 of this document and `TASK.md` 4 name both now.
 
+**5.9 The ninth run**, the same day, against the kit at 15 tunes with the
+clauses of 5.8 in it and a ninth implementer, who measured each reading
+rather than weighing it: every competing reading was run as a separate
+reader over the fifteen tunes and diffed against the record. Every record
+byte for byte, `wrong-version` included; `READ.md` named documents alone;
+and `NOTES.md` had 21 entries with 8 marked *decides output*, each with
+the lines the other reading moves - 10,966 for bit 7 of a column that
+fills its byte, 4,150 for the effects `e` names, 1,741 for a marking bit
+on an unset column, and 2 to 8 for the other five. Every one of the eight
+is a clause the documents settle, and the reader read each as it stands;
+none of the three clauses 5.8 sent back was read wrong.
+
+Five places changed, all where a rule stands away from the clause that
+needs it:
+
+- 7.4 read that a reader "writes the record to a stream writes 0 bytes to
+  it and that line to another", which leaves open which stream has the
+  record. A reader writes the record to one stream, which has the record
+  alone on it, and reports the line on another.
+- 3.3.4 reports the first condition present "in the order of the table",
+  where five of its conditions read a source number N and the sweep over
+  N was left open. The clause reads ascending N.
+- 7.3 named the effects of `e` by a count column "other than 0" where 1.1
+  defines when a row sets a column, and the two pick the same effects
+  through 1.1.3. The clause reads the four columns the row sets.
+- 4.5 read that the wrap preserves "kept values", which 4.1 step 4 names
+  and 7.3 reports. The clause names the four.
+- 7.3 has a register an effect runs on in `w` where the row sets its
+  column, which rule 1(a) tells a writer to leave unset: a Note reads
+  that a reader reports the row it reads, and row 30 of `four-timers` is
+  one.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |

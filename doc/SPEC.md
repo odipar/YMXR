@@ -532,7 +532,8 @@ to 1,110, 960 by default.
 
 **3.3.4** Errors of the file. A reader reads a file free of the
 conditions below and reports the first one present as its line, in the
-order of the table: V the version, X a DTX variant, N a source number, A
+order of the table and, for a condition that reads a source number N, in
+ascending N: V the version, X a DTX variant, N a source number, A
 and B where a table stands, F the file's bytes, C a column count and W a
 width. The record of such a file is empty (7.4), and a reader that
 reports a condition reads no further field. A name offset other than 16 +
@@ -695,8 +696,9 @@ Note: on a 68000 the two bytes of a write are one `movep.w`.
 ### 4.5 The wrap
 
 When RR is below R, the frame after row R - 1 reads row RR and performs
-it as any row. The wrap preserves timers, places and kept values (YMXS,
-SPEC.md 4.5). YMXS, SPEC.md 6 rules 1(d) and 6(a) define the repeat row's
+it as any row. The wrap preserves timers, places and the kept target,
+source, select and count of each effect (4.1 step 4; YMXS, SPEC.md
+4.5). YMXS, SPEC.md 6 rules 1(d) and 6(a) define the repeat row's
 operations on a running timer.
 
 ### 4.6 The end
@@ -1024,11 +1026,13 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   leaves the two out, so R7's value here is 0 to 63. A register whose
   column the row leaves unset is absent, its bits 6 to 0 unread (1.1.1),
   and `{}` is a row that leaves every register column unset. A register an
-  effect runs on is included where the row sets its column (6.1).
-- `e` is the effects whose target, source or control column the row sets,
-  or whose count column is other than 0, regardless of the effects used
-  byte (4.2); keyed by number as text, `"0"` to `"3"`, in ascending order;
-  `{}` for a row that leaves every effect column unset. Each is
+  effect runs on is included where the row sets its column (6.1). Note:
+  rule 1(a) keeps a writer clear of such a row, and a reader reports the
+  one it reads.
+- `e` is the effects whose target, source, control or count column the row
+  sets (1.1.3), regardless of the effects used byte (4.2); keyed by number
+  as text, `"0"` to `"3"`, in ascending order; `{}` for a row that leaves
+  every effect column unset. Each is
   `{"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b}`,
   where each of `target`, `source`, `select` and `count` is the value kept
   for the effect (4.3), which a row that leaves its column unset leaves as
@@ -1054,10 +1058,10 @@ once ends with its `{"result":-1}` entry. Where the host leaves F
 unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
 loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
 record of a file with an error of 3.3.4 is empty, 0 bytes, and the line
-a reader reports of that error stands outside the record: a reader that
-writes the record to a stream writes 0 bytes to it and that line to
-another. Two readers of one tune file over one F produce one record,
-byte for byte.
+a reader reports of that error stands outside the record: a reader
+writes the record to one stream, which has the record alone on it, and
+reports that line on another. Two readers of one tune file over one F
+produce one record, byte for byte.
 
 ### 7.5 The example
 
