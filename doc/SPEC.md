@@ -20,11 +20,11 @@ and a section of DTX's as (DTX, SPEC.md 1). `Note:` begins an
 informative sentence. A range includes both ends. `$` prefixes a
 hexadecimal figure. The bits of a byte are numbered 7 to 0, bit 7 the
 most significant, and a bit is 1 or 0. A field of more than one byte is
-most significant byte first. An offset counts from the first byte of the
-file, and an offset *on a long* divides by 4. A row *sets* a column where
-the column is set as 1.1 defines, and otherwise leaves it *unset*. In a
-reported text, `Rn` is a register and each other capital letter a decimal
-figure defined beside the text.
+most significant byte first. An offset counts bytes from the first byte
+of the file, and an offset *on a long* is a multiple of 4. A row *sets*
+a column where the column is set as 1.1 defines, and otherwise leaves it
+*unset*. In a reported text, `Rn` is a register and each other capital
+letter a decimal figure defined beside the text.
 
 **Roles.** A player performs sections 4 and 5 on the two chips. A reader
 reads a tune file (3.3) and performs section 4 with every register write
@@ -100,17 +100,17 @@ has.
 17, 21, 25 and 29. Each reserves the value 0 for a row that leaves it
 unset (R3.7), and a bit of a column beside it marks its 0 as a value:
 
-| column | its 0 is a value where |
-|---|---|
-| 0 | bit 6 of column 1 is 1 |
-| 2 | bit 6 of column 3 is 1 |
-| 4 | bit 6 of column 5 is 1 |
-| 11 | bit 6 of column 13 is 1 |
-| 12 | bit 5 of column 13 is 1 |
-| 17 | bit 4 of column 16 is 1 |
-| 21 | bit 4 of column 20 is 1 |
-| 25 | bit 4 of column 24 is 1 |
-| 29 | bit 4 of column 28 is 1 |
+| column | its 0 is a value where | a player reads that bit |
+|---|---|---|
+| 0 | bit 6 of column 1 is 1 | on every row |
+| 2 | bit 6 of column 3 is 1 | on every row |
+| 4 | bit 6 of column 5 is 1 | on every row |
+| 11 | bit 6 of column 13 is 1 | on every row |
+| 12 | bit 5 of column 13 is 1 | on every row |
+| 17 | bit 4 of column 16 is 1 | where the row sets column 16 |
+| 21 | bit 4 of column 20 is 1 | where the row sets column 20 |
+| 25 | bit 4 of column 24 is 1 | where the row sets column 24 |
+| 29 | bit 4 of column 28 is 1 | where the row sets column 28 |
 
 **1.1.3** A player reads such a column and the bit beside it together,
 and writes the column's register where the row sets the column (4.3,
@@ -122,12 +122,11 @@ and writes the column's register where the row sets the column (4.3,
 | 0 | 0 | leaves the column unset |
 | 0 | 1 | sets the column to 0 |
 
-**1.1.4** A player reads the five bits in columns 1, 3, 5 and 13 on every
-row, that column's set bit 1 or 0: a row may set a fine column to 0 and
-leave the coarse column unset (1.2), or mark a period byte 0 and leave
-R13 as it is (1.6). A player reads the four bits in the control columns
-where the row sets the control column (1.9); where it leaves that column
-unset, a count column of 0 is unset. Every other bit of a column is part
+**1.1.4** A player reads a marking bit where 1.1.2's table has it, the
+set bit of the column it stands in 1 or 0: a row may set a fine column
+to 0 and leave the coarse column unset (1.2), or mark a period byte 0
+and leave R13 as it is (1.6). Where a row leaves a control column unset,
+a count column of 0 is unset (1.9). Every other bit of a column is part
 of its value, read where the row sets the column.
 
 ### 1.2 Tone period
@@ -253,11 +252,11 @@ each with a separate place (YMXS, SPEC.md 3.2.3).
 
 ### 1.9 Effect rate
 
-**1.9.1** The count column is the count, the byte written to the timer's
-data register (YMXS, SPEC.md 3.3.3). It fills its byte (1.1.2): 0 marks a
-row that leaves it unset, and bit 4 of the control column marks 0 as the
-value, which the timer counts as 256. A player reads bit 4 where the row
-sets the control column (1.1.4).
+**1.9.1** The count column is the count, 0 to 255, the byte written to
+the timer's data register (YMXS, SPEC.md 3.3.3). It fills its byte
+(1.1.2): 0 marks a row that leaves it unset, and bit 4 of the control
+column marks 0 as the value, which the timer counts as 256. A player
+reads bit 4 where the row sets the control column (1.1.4).
 
 | the count column | bit 4 of the control column | the row |
 |---|---|---|
@@ -429,7 +428,7 @@ source 0 is the stop (1.8.3).
 | 10 | 4 | RR, the row the source repeats to, 0 to R - 1, or R for a source that plays once |
 | 14 | 1 | W, the bytes a value, 1 |
 | 15 | 1 | 0 |
-| 16 | (C - 1) times align(R) + R | the rows, a column at a time (3.1.3), the last column R bytes with no padding after it; for C = 1 that is R bytes, row n at 16 + n |
+| 16 | (C - 1) times align(R) + R | the rows, a column at a time (3.1.3): row n of column i at 16 + i times align(R) + n, the last column R bytes and the table ends; for C = 1 that is R bytes, row n at 16 + n |
 
 **3.1.3** A reader reads a source whose C is the columns of the target
 of every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1;
@@ -1005,27 +1004,30 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   value the register reads: for a column with a set bit, bits 6 to 0
   masked to the register's width, four for R1, R3, R5 and R13, five for
   R6, R8, R9 and R10, and six for R7; for a column that fills its byte,
-  the byte (1.1.3). A record reports the six bits of R7 alone: a player
+  the byte (1.1.3). Note: the width drops the marking bits of 1.1.2 with
+  the bits 1.1 leaves unassigned. A record reports the six bits of R7
+  alone: a player
   writes bits 7 and 6 of that register as 1 (1.4.2), and a record leaves
   the two out, so R7's value here is 0 to 63. `{}` for a row that leaves
   every register column unset. A register an effect runs on is included
   where the row sets its column (6.1).
-- `e` is the effects the row sets a column of, regardless of the effects
-  used byte (4.2): those whose target, source or control column is set,
-  or whose count column is other than 0; keyed by number as text, `"0"`
-  to `"3"`, in ascending order; `{}` for a row that leaves every effect
-  column unset. Each is
-  `{"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b}`:
-  `target` the kept target after 4.3 step 2, 0 to 127; `source` the
-  number the last row that set the effect's source column set it to, 0
-  to 127, a row that sets a stop setting it to 0 (1.8.3), and 0 until a
-  row sets it; a row that stops the timer through its control column (4.3
-  step 1) leaves it as it is, and so does the tick that ends a source
-  that plays once; `select`, 0 to 7, and `count`, 0 to
-  255, the kept select and count after 4.3 steps 4 and 5, 0 until a row
-  sets them and kept through a stop; `timer` bit 6 of the row's control
-  column and `place` bit 5, each `true` or `false`, both `false` where the
-  row leaves the control column unset.
+- `e` is the effects whose target, source or control column the row sets,
+  or whose count column is other than 0, regardless of the effects used
+  byte (4.2); keyed by number as text, `"0"` to `"3"`, in ascending order;
+  `{}` for a row that leaves every effect column unset. Each is
+  `{"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b}`,
+  where each of `target`, `source`, `select` and `count` is the value kept
+  for the effect (4.3), which a row that leaves its column unset leaves as
+  it is: `target` the kept target after 4.3 step 2, 0 to 127; `source` the
+  number the last row that set the effect's source column set it to, 0 to
+  127, a row that sets a stop setting it to 0 (1.8.3), and 0 until a row
+  sets it; a row that stops the timer through its control column (4.3 step
+  1) leaves it as it is, and so does the tick that ends a source that
+  plays once; `select`, 0 to 7, and `count`, 0 to 255, the kept select and
+  count after 4.3 steps 4 and 5, 0 until a row sets them and kept through
+  a stop; `timer` bit 6 of the row's control column and `place` bit 5,
+  each `true` or `false`, both `false` where the row leaves the control
+  column unset.
 
 For the first frame after the end (4.6), `{"result":-1}`, where the
 record ends.
@@ -1038,7 +1040,8 @@ once ends with its `{"result":-1}` entry. Where the host leaves F
 unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
 loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
 record of a file with an error of 3.3.4 is empty, 0 bytes, and the line a
-reader reports of that error stands outside the record. Two readers of
+reader reports of that error stands outside the record: a reader that
+writes the record to a stream writes that line to another. Two readers of
 one tune file over one F produce one record, byte for byte.
 
 ### 7.5 The example
@@ -1081,7 +1084,8 @@ of the rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 **8.2** Targets 25 to 127 (2.1).
 
 **8.3** A source of more than three columns or of values wider than a byte
-(3.1.3), and a source whose RR is above R.
+(3.1.3), and a source (3.1.4) or a tune's table (3.3.3) whose RR is above
+R.
 
 **8.4** The row a tick reads where the place is outside the rows of the
 source connected (1.8.4; YMXS, SPEC.md 8.4). A start that leaves bit 5 at

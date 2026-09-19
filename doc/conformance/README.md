@@ -164,6 +164,51 @@ changed:
   read the four bytes as one offset, since 3.1.6 keeps bit 31 at 0 there.
   The clause reads "whichever the version" now.
 
+**5.5 The fifth run**, 2026-09-19, against the kit at 15 tunes, with
+`envelope-counted` in it and a fifth implementer. Every record byte for
+byte, `wrong-version` included; `READ.md` named documents alone; and
+`NOTES.md` had 20 entries with 7 marked *decides output*, so the run
+failed rule 3 on those. Version 6, the counted source of several columns,
+and rule 2(f)'s bits 7 and 6 on a counted source of `setR7` were read as
+they stand. Seven places changed:
+
+- The Conventions read "an offset counts from the first byte of the file,
+  and an offset *on a long* divides by 4", where "divides by 4" reads as
+  a unit as well as an alignment and no clause fixes the unit of a source
+  index entry. A unit of longs puts the first source of `counted.ymxr` at
+  byte 6,352 of a 1,756-byte file. An offset counts bytes now, and one on
+  a long is a multiple of 4.
+- 3.1.2's row-layout cell gave the size of a source's rows and left where
+  a column begins to 3.1.3, which cites DTX's SPEC.md for the stride, a
+  document outside the exercise. The cell has the offset of row n of
+  column i now. Read row by row, source 2 of `voices.ymxr` reports
+  `[4,9,14,19,152,0,15,12,10,8]` for `[4,15,9,12,14,10,19,8,152,6]`.
+- 1.1.2's table assigned the nine marking bits and 1.1.4 alone said that
+  five of them are read on every row and four where the row sets the
+  control column. The table has the condition a row now, and 1.1.4 reads
+  it off the table. 872 rows of nine tunes leave column 13 unset with bit
+  6 or bit 5 at 1.
+- 1.9.1 read "the count column is the count, the byte written to the
+  timer's data register", where a reader carrying the set bit of 1.1.1
+  across reports bits 6 to 0. The clause reads 0 to 255 now, as 3,368
+  count columns of six tunes are above 127.
+- 7.3 defined the effects of `e` twice, as "the effects the row sets a
+  column of" and as those whose target, source or control column is set
+  or whose count column is other than 0. The second stands alone now.
+- 7.3's four numbers read as the row's four columns, each being the kept
+  value: 3,574 starts leave the target column unset and 1,685 starts in
+  `synergy.ymxr` leave the control column unset. The clause defines the
+  four as kept values before it reads them one by one, and a Note records
+  that the width of a register column drops the marking bits of 1.1.2.
+- 7.4 put the line of an error of the file "outside the record" without
+  saying where it goes, which decides the output of `wrong-version.ymxr`
+  on one stream. A reader that writes the record to a stream writes that
+  line to another.
+
+8.3 changed beside them: it left a source whose RR is above R to a later
+version and left a tune's table with RR above R unnamed, where 3.3.3
+defines that RR as the repeat row or R. It names both now.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |
