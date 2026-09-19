@@ -20,10 +20,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
-      # The build assembles the five binaries of BINARIES.md at
-      # process-classes, and BinariesTest reads the copies under
-      # go/binaries/data against that assembly. The version is pinned:
-      # another rmac writes other bytes and a red run.
+      # The build assembles the nine binaries of BINARIES.md at
+      # process-classes, eight cores and the program stub, and
+      # BinariesTest reads the copies under go/binaries/data against that
+      # assembly. The version is pinned: another rmac writes other bytes
+      # and a red run.
       - name: rmac 2.4.3
         run: |
           curl -fsSL -o /tmp/rmac.zip \
