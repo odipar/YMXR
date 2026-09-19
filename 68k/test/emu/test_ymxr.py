@@ -264,6 +264,12 @@ CORPUS = os.environ.get("YM_CORPUS",
 # eleven minutes, which is a net a reader runs and waits for.
 CORPUS_TUNES = 40
 
+# The tunes the check of init's patching reads to build one set, and how
+# many of those it stands in the set: it inits every ordered pair, so the
+# second bounds the work, and the first bounds what a run converts for it.
+SET_READS = 24
+SET_TUNES = 10
+
 # The frames a tune is played for at most, which -frames sets. None plays
 # every tune whole, as a full run does.
 MOST_FRAMES = None
@@ -274,8 +280,11 @@ def spread(most):
     a sample covers the corpus rather than one composer's run of it."""
     if not os.path.isdir(CORPUS):
         raise SystemExit("no corpus at " + CORPUS + ": YM_CORPUS names it")
+    # a dump is a file: the corpus has a directory named like one in it,
+    # and a converter reading it stops the run
     every = sorted(os.path.join(CORPUS, f) for f in os.listdir(CORPUS)
-                   if f.lower().endswith(".ym"))
+                   if f.lower().endswith(".ym")
+                   and os.path.isfile(os.path.join(CORPUS, f)))
     if not every:
         raise SystemExit("no .ym file under " + CORPUS)
     return every[::max(1, len(every) // most)][:most]
@@ -1952,11 +1961,16 @@ def patched_code_follows_the_subtune(defines, tunes):
     code, symbols = assemble("YMXR_sndh.S", defines=defines)
     work = tempfile.mkdtemp()
     bounds = []
-    for ym in tunes:
+    # The set is the tunes at the head of the list, and a few are enough:
+    # the pairs below are the square of the set, and a run over the corpus
+    # would otherwise convert every dump of it for a set of four.
+    for ym in tunes[:SET_READS]:
         file, _ = convert(ym, work)
         bound = bind(file, work)
         if bound is not None:
             bounds.append((os.path.basename(ym), bound))
+        if len(bounds) == SET_TUNES:
+            break
     # A tick reads its row through a signed word displacement, so a
     # subtune whose rows stand past the reach is left
     # out: these are bound one by one, so each has an image in it, where
