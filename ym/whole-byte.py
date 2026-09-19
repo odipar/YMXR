@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""A tune a timer drives a whole byte with, for hearing what version 5
-encodes (SPEC.md 3.1.6).
+"""A tune a timer drives a whole byte with, for hearing what versions 5
+and 6 encode (SPEC.md 3.1.6).
 
-  python3 ym/whole-byte.py | bin/ymxs-to-prg -r4000 > dist/whole/TUNE.PRG
+  python3 ym/whole-byte.py | bin/ymxs-to-prg -r4800 > dist/whole/TUNE.PRG
   ym/hatari.sh dist/whole
 
 The marker stands in bit 7 of a row, so until version 5 a source drove
@@ -10,12 +10,14 @@ only a register that reads seven bits or fewer: a volume, a coarse
 nibble, the envelope shape. A counted source has no marker and its rows
 are whole bytes, which opens the six registers that read all eight -
 the three tone fine bytes, the mixer and the envelope period's two bytes
-(SPEC.md 2.1.2). No dump converts to one, since a YM file records the
-registers a frame writes and names no effect, so a tune that spends this
-is written through the structure, as this one is.
+(SPEC.md 2.1.2) - and version 6 counts such a source of several columns,
+so one timer drives the envelope period's two bytes together (SPEC.md
+2.1.3). No dump converts to one, since a YM file records the registers a
+frame writes and names no effect, so a tune that spends this is written
+through the structure, as this one is.
 
-Five sections of 800 rows at 50 Hz, 16 seconds each, with one melody on
-voice B under all five:
+Six sections of 800 rows at 50 Hz, 16 seconds each, with one melody on
+voice B under all six:
 
   1. voice A at 440 Hz, written by rows alone: the reference
   2. setR0: the tone's fine byte swept 24 times a second, then 96
@@ -23,6 +25,8 @@ voice B under all five:
   4. setR11: voice A on the envelope, its period's low byte swept 5
      times a second, 1,953 Hz down to 30
   5. setR7: the mixer gating voice A's tone 192 times a second
+  6. setEnvelope: both period bytes from one timer, 122 Hz down to one
+     cycle in 8.39 seconds
 
 The note a sweep drives stands at a period of 256 to 511, a coarse byte
 of 1, so a fine byte over its whole range moves the pitch by an octave:
@@ -33,7 +37,7 @@ experiments.md reads what the five sections come to.
 import json
 
 ROWS_A_SECTION = 800
-SECTIONS = 5
+SECTIONS = 6
 ROWS = ROWS_A_SECTION * SECTIONS
 RATE = 50
 
@@ -130,7 +134,22 @@ stop(4 * ROWS_A_SECTION - 1)
 gate = [MIXER, MIXER | 1]
 at(4 * ROWS_A_SECTION, r7=MIXER, r8=13, r0=DRONE & 255, r1=DRONE >> 8, r11=0)
 start(4 * ROWS_A_SECTION + 2, 7, 4, 64, 100)
-stop(ROWS - 1)
+stop(5 * ROWS_A_SECTION - 1)
+
+# 6. The envelope period over its whole range, both bytes from one timer:
+#    a counted source of two columns on setEnvelope, whose 512 rows step
+#    the period from 64 to 65,535 at 64 ticks a second, ten octaves in
+#    eight seconds under voice A's tone. The source plays once, so the
+#    last row's period stands for the eight seconds after it: one cycle
+#    in 8.39 seconds, and the half above 32,767 is the half a marked
+#    source leaves unreachable (SPEC.md 2.1.3, 2.1.4).
+DESCENT_ROWS = 512
+descent = []
+for i in range(DESCENT_ROWS):
+    p = int(round(64 * (65535.0 / 64) ** (i / float(DESCENT_ROWS - 1))))
+    descent.append([p & 255, p >> 8])
+at(5 * ROWS_A_SECTION, r7=MIXER, r8=16, r0=DRONE & 255, r1=DRONE >> 8, r13=10)
+start(5 * ROWS_A_SECTION + 2, 20, 5, 200, 192)
 
 print(json.dumps({"format": "ymxs", "version": 4, "tunes": [{
     "title": "A timer on a whole byte", "composer": "",
@@ -140,6 +159,8 @@ print(json.dumps({"format": "ymxs", "version": 4, "tunes": [{
         {"name": "voice C's fine byte swept", "repeat": 0, "values": lead},
         {"name": "the envelope period swept", "repeat": 0,
          "values": [(i * 4 + 4) & 255 for i in range(64)]},
-        {"name": "the mixer gating voice A", "repeat": 0, "values": gate}],
+        {"name": "the mixer gating voice A", "repeat": 0, "values": gate},
+        {"name": "the envelope period over its whole range", "repeat": None,
+         "values": descent}],
     "registers": {"r%d" % n: r[n] for n in range(14)},
     "timerA": timer}]}))
