@@ -76,14 +76,14 @@ final class BinariesTest {
 
     @Test
     void theCoreMatchesItsDescriptor() throws IOException {
-        assertCore(Binaries.core(), 0);
+        assertCore(Binaries.core(), Sndh.CORE_PCREL);
     }
 
     @Test
     void theMonitorCoreIsTheSameCoreWithTheMonitorIn() throws IOException {
         byte[] core = Binaries.core();
-        byte[] monitor = Binaries.core(true, false, false);
-        assertCore(monitor, Sndh.CORE_MONITOR);
+        byte[] monitor = Binaries.core(true, false, true);
+        assertCore(monitor, Sndh.CORE_MONITOR | Sndh.CORE_PCREL);
         assertTrue(monitor.length > core.length, "the monitor core is " + monitor.length
                 + " bytes and the plain core " + core.length);
         assertEquals(Tune.getWord(core, 16), Tune.getWord(monitor, 16),
@@ -118,9 +118,9 @@ final class BinariesTest {
     void theLeanTickIsTheSameBytesOffEitherCore() throws IOException {
         // Both switches belong to the player, so the lean tick uses the
         // same code off the core with the monitor in as off the plain one.
-        int off = Binaries.core().length - Binaries.core(false, true, false).length;
-        assertEquals(off, Binaries.core(true, false, false).length
-                - Binaries.core(true, true, false).length,
+        int off = Binaries.core().length - Binaries.core(false, true, true).length;
+        assertEquals(off, Binaries.core(true, false, true).length
+                - Binaries.core(true, true, true).length,
                 "the lean tick is " + off + " bytes off the plain core");
         assertTrue(off > 0, "the lean core is smaller by " + off + " bytes");
     }
@@ -129,9 +129,9 @@ final class BinariesTest {
     void theRowReadThroughTheProgramCounterIsTheSameBytesOnEitherCore() throws IOException {
         // The third switch belongs to the player as the other two do, so
         // it puts the same code into the core with the monitor in as into
-        // the plain one: the handlers lose what a place saves as a word
-        // and the starts gain what turns an address into a displacement.
-        int on = Binaries.core(false, false, true).length - Binaries.core().length;
+        // the plain one: a place is a word where it was a long and a start
+        // does the arithmetic that turns an address into a displacement.
+        int on = Binaries.core().length - Binaries.core(false, false, false).length;
         assertEquals(on, Binaries.core(true, false, true).length
                 - Binaries.core(true, false, false).length,
                 "the row read through the program counter is " + on + " bytes on the core");
@@ -517,7 +517,7 @@ final class BinariesTest {
         int flags = Tune.getWord(sndh, Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT);
         assertEquals(0, flags & Sndh.CORE_PCREL,
                 "the core under a file past the reach reads an address");
-        assertCombined(Binaries.core(), sndh, files, tags(sndh));
+        assertCombined(Binaries.core(false, false, false), sndh, files, tags(sndh));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(files, new Sndh.Options("Long", null, null, false, false,
                         Sndh.Ticks.PCREL)));
@@ -553,8 +553,9 @@ final class BinariesTest {
         List<byte[]> files = List.of(tune("chambers"));
         Sndh.Options options = new Sndh.Options("Pcrel", null, null, false, false,
                 Sndh.Ticks.PCREL);
+        byte[] address = Binaries.core(false, false, false);
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(Binaries.core(), files, options));
+                () -> Sndh.of(address, files, options));
         assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
                 && said(wrong).contains("needs bit 2 set"), said(wrong));
     }
@@ -583,9 +584,9 @@ final class BinariesTest {
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(core, files, options));
         assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
-                && said(wrong).contains("read 0"), said(wrong));
-        byte[] sndh = Sndh.of(Binaries.core(true, false, false), files, options);
-        assertEquals(Sndh.CORE_MONITOR, Tune.getWord(sndh,
+                && said(wrong).contains("needs bit 0 set"), said(wrong));
+        byte[] sndh = Sndh.of(Binaries.core(true, false, true), files, options);
+        assertEquals(Sndh.CORE_MONITOR | Sndh.CORE_PCREL, Tune.getWord(sndh,
                 Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
                 "the monitor core passes the same check");
     }

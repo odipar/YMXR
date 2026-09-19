@@ -49,18 +49,18 @@ the rest a gate reads the bit and finds the group set.
 
 ## What a sample's tick costs
 
-A square's tick is in place: 88 cycles of instructions against 108 and
-130, and 152 with the 68000's entry and the `rte` against 172 and 194.
+A square's tick is in place: 88 cycles of instructions against 96 and
+114, and 152 with the 68000's entry and the `rte` against 160 and 178.
 Measured on the rig, and performance.md has the figure.
 
 A digidrum's source is many rows played once, so its tick is the row path
-every time, 172 cycles, and its place must step. Of the 108 its
-instructions cost, 40 are the chip writes, 28 the step, 16 the end of
+every time, 160 cycles, and its place must step. Of the 96 its
+instructions cost, 36 are the chip writes, 20 the step, 16 the end of
 interrupt, 16 the level dropped and 8 the marker test. Only the
 16 is removable without a register the player does not have: reading and
 stepping through an address register, `move.b (a0)+,YM_SELECT+2.w`, is 16
-against the 52 the two absolute longs cost, but a library cannot claim four
-of its host's registers.
+against the 36 the read through the program counter and its step cost, but
+a library cannot claim four of its host's registers.
 
 A sample's timer is near its floor. A square's is not.
 
@@ -142,10 +142,10 @@ Every step this document listed is in place, each measured on the rig:
 | one branch over a run of effects | 19 | 30, 20 or 10 by the effects a tune runs |
 | an effect's head is its first read | 8 an effect | 16, 8 or 0 |
 | the shape's test dropped | 14 | 12 to 14, no tune more |
-| a separate tick for a square | 31 a tick | 88 against 108 and 130 |
+| a separate tick for a square | 31 a tick | 88 against 96 and 114 |
 | every source resolved at init | 52 a start | 21 to 38 a frame |
 | DTX's state block in a6 | 36 | 36 off the advance, 12 off the call |
-| a separate tick for a one-row source | 74 a tick | 568 a frame on the kit's retune |
+| a separate tick for a one-row source | 74 a tick | 445 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
 its count. Synergy Credits reads 2,030 cycles a call against the 2,469

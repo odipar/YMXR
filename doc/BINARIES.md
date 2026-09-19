@@ -168,14 +168,14 @@ tool selects one by name and checks its flags word (2.3, 2.10).
 
 | core | switches | flags word |
 |---|---|---|
-| `YMXR_sndh.bin` | all three off | 0 |
-| `YMXR_sndh-perf.bin` | the raster monitor, `YMXR_PERF=1` | 1 |
-| `YMXR_sndh-lean.bin` | the lean tick, `YMXR_NEST=0` and `YMXR_AEOI=1` | 2 |
-| `YMXR_sndh-perf-lean.bin` | the two above | 3 |
-| `YMXR_sndh-pcrel.bin` | the row read through the program counter, `YMXR_PCREL=1` | 4 |
-| `YMXR_sndh-perf-pcrel.bin` | the raster monitor and that row | 5 |
-| `YMXR_sndh-lean-pcrel.bin` | the lean tick and that row | 6 |
-| `YMXR_sndh-perf-lean-pcrel.bin` | all three | 7 |
+| `YMXR_sndh.bin` | the row read through the program counter, which the player reads by default | 4 |
+| `YMXR_sndh-perf.bin` | that row and the raster monitor, `YMXR_PERF=1` | 5 |
+| `YMXR_sndh-lean.bin` | that row and the lean tick, `YMXR_NEST=0` and `YMXR_AEOI=1` | 6 |
+| `YMXR_sndh-perf-lean.bin` | all three | 7 |
+| `YMXR_sndh-abs.bin` | the row read through an absolute address, `YMXR_PCREL=0` | 0 |
+| `YMXR_sndh-perf-abs.bin` | that row and the raster monitor | 1 |
+| `YMXR_sndh-lean-abs.bin` | that row and the lean tick | 2 |
+| `YMXR_sndh-perf-lean-abs.bin` | that row and the two above | 3 |
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
@@ -211,7 +211,7 @@ core's first byte and are even.
 |---|---|---|
 | 0 | the player's raster monitor (`YMXR_PERF=1`): play and each tick handler write the background colour register as performance.md defines | a screen on which those writes are read |
 | 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires `YMXR_NEST=0` with; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
-| 2 | the row read through the program counter (`YMXR_PCREL=1`, performance.md): a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte, which the tool that writes it reads (2.10, 5.5) |
+| 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` stands at 1, its value unasked: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte, which the tool that writes it reads (2.10, 5.5) |
 
 **2.4 The state byte**, at the offset the field at 24 names: bit 0 is
 set from init's step 8 to exit's step 1, while a tune plays; bit 1 is set
@@ -590,17 +590,18 @@ vector at the end (4.6 step 6). The `FLAG` letters list the timers the
 set claims: a host that ticks from a timer selects one outside them, and
 a set whose letters contain `c` plays from the VBL or another clock.
 
-**5.5 A player that reads a row through a displacement.** `YMXR_PCREL=1`
-assembles a player whose tick reads its row through a signed word
-displacement from the instruction that reads it rather than through an
-absolute address, 12 cycles less a tick that writes a row
-([performance.md](performance.md)). Every row of every source then stands
-within 32,767 bytes of the player's handlers: init measures each source
-against them and reports -1 for one further off (1.5 step 5). The layouts
-of 1.3 and 3.1 put a tune's DTX1 tables beside its header and a set's
-subtunes beside the core, so a host that loads one file and passes the
-player a tune inside it meets the requirement. A host that loads the
-player and the tune separately places them within that reach.
+**5.5 A player that reads a row through a displacement.** A tick reads
+its row through a signed word displacement from the instruction that
+reads it, 12 cycles less a tick that writes a row than an absolute
+address costs ([performance.md](performance.md)). Every row of every
+source stands within 32,767 bytes of the player's handlers: init measures
+each source against them and reports -1 for one further off (1.5 step 5).
+The layouts of 1.3 and 3.1 put a tune's DTX1 tables beside its header and
+a set's subtunes beside the core, so a host that loads one file and
+passes the player a tune inside it meets the requirement. A host that
+loads the player and the tune separately places them within that reach,
+or assembles the player with `YMXR_PCREL=0`, whose ticks read an absolute
+address and reach any offset.
 
 Note: the tools that write the files of this document are
 `bin/ymxr-multi`, `bin/ymxr-bind`, `bin/ymxr-sndh` and `bin/ymxr-prg`
