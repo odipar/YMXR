@@ -846,21 +846,24 @@ off the path or the Java tree is unbuilt.
 
 ## 20. A release
 
-**20.1** `release/publish.sh [version]` builds the eleven tools from
-the Go tree for `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`,
-`linux-x64` and `linux-arm64`, one zip a platform in `dist/release`,
-named `ymxr-tools-<platform>-v<version>.zip`, the Windows executables
-with `.exe`. The version is the argument, or the first `<version>` of
+**20.1** `release/publish.sh [version]` builds the eleven tools from the
+Go tree for `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64`
+and `linux-arm64`, one zip a platform in `dist/release`, named
+`ymxr-tools-<platform>-v<version>.zip`, the Windows executables with
+`.exe`. The version is the argument, or the first `<version>` of
 `pom.xml`. `TARGETS`, a space-separated list, limits the platforms;
 `OUT` replaces `dist`. A platform outside the six is `publish: <target>
-is not a platform this builds`, exit 1; a missing binary under
-`go/binaries/data` is `publish: <path> is not built: run mvn
-process-classes`, exit 1. After the zips the script runs `manifest.sh`
-(20.2); then, where the host is macOS or Linux on x64 or arm64 and its
-platform was built, it runs the host's executables from a directory
-outside the repository with an empty environment, `ym/test/Turrican -
-world 4-3.ym` through `ym-to-ymxs` and `ymxs-to-prg`, and prints the byte
-count of the program.
+is not a platform this builds`, exit 1. The nine binaries it requires
+under `go/binaries/data` are the ones `go/binaries/binaries.go` names,
+so one list cannot drift from the other: a missing one is `publish:
+<path> is not built: run mvn process-classes` and a Go file naming none
+is `publish: go/binaries/binaries.go names no binary`, exit 1 either
+way. After the zips the script runs `manifest.sh` (20.2); then, where
+the host is macOS or Linux on x64 or arm64 and its platform was built,
+it runs the host's executables from a directory outside the repository
+with an empty environment, `ym/test/Turrican - world 4-3.ym` through
+`ym-to-ymxs` and `ymxs-to-prg`, and prints the byte count of the
+program.
 
 **20.2** `release/manifest.sh VERSION DIR` writes `DIR/MANIFEST.txt`:
 each zip's name, size and sha256, its contents, and the source commit,
