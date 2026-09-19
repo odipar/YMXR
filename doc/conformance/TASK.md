@@ -49,13 +49,11 @@ it out. The DTX2 table in the tune file packs the same rows in a form
 another format defines; the rows file stands in for it.
 
 **4. The tunes.** Each is a `.ymxr` beside its `.rows`; the tunes differ
-in what they reach. Every tune satisfies `SPEC.md` 6, names the targets
-`SPEC.md` 2.1 assigns, 0 to 24, selects 1 to 7 and sources 0 to `S`, 0 the
-stop (`SPEC.md` 1.8); a reader records a source's rows as the table has
-them, a byte a column and a set bit 7 before the last row included
-(`SPEC.md` 7.2), and bit 31 of an index entry marks a counted source
-with bits 30 to 0 the offset (`SPEC.md` 3.1.1); what a reader does with
-a file outside those is outside this task.
+in what they reach. Every tune names the targets `SPEC.md` 2.1 assigns,
+0 to 24, selects 1 to 7 and sources 0 to `S`, 0 the stop (`SPEC.md`
+1.8), and satisfies `SPEC.md` 6 but for one source of one tune, which
+has bit 7 set on rows before its last, the condition 6.4 reports; what a
+reader does with a file outside those is outside this task.
 
 | file | lines to produce |
 |---|---:|

@@ -112,6 +112,9 @@ unset (R3.7), and a bit of a column beside it marks its 0 as a value:
 | 25 | bit 4 of column 24 is 1 | where the row sets column 24 |
 | 29 | bit 4 of column 28 is 1 | where the row sets column 28 |
 
+The bit marks a 0 alone: a byte other than 0 is the column's value with
+that bit at 1 and at 0 (1.1.3).
+
 **1.1.3** A player reads such a column and the bit beside it together,
 and writes the column's register where the row sets the column (4.3,
 4.4):
@@ -332,7 +335,10 @@ The targets of one register whose register reads seven bits or fewer are
 in bit 7 (3.2.1). `setR0`, `setR2`, `setR4`, `setR7`, `setR11` and
 `setR12` write a register that reads every bit of its byte, so a source
 on one of these spends every bit of a row on the value and a player
-counts its rows (3.1.6).
+counts its rows (3.1.6). R7 reads every bit of its byte with bits 7 and
+6 the directions of the two ports, which a player writes as 1 (1.4.2)
+and a writer sets in the rows of a counted source on `setR7` (rule
+2(f)); a register column of R7 is the six bits below them (1.4.1).
 
 **2.1.3** `setEnvelope` writes R11 and R12, the low and the high byte of
 the envelope period (YMXS, SPEC.md 2.5), and both registers read eight
@@ -428,17 +434,16 @@ source 0 is the stop (1.8.3).
 | 10 | 4 | RR, the row the source repeats to, 0 to R - 1, or R for a source that plays once |
 | 14 | 1 | W, the bytes a value, 1 |
 | 15 | 1 | 0 |
-| 16 | (C - 1) times align(R) + R | the rows, a column at a time (3.1.3): row n of column i at 16 + i times align(R) + n, the last column R bytes and the table ends; for C = 1 that is R bytes, row n at 16 + n |
+| 16 | (C - 1) times align(R) + R | the rows, a column at a time (3.1.3): row n of column i at 16 + i times align(R) + n, align(R) the row count rounded up to a multiple of 2; the last column is R bytes and the table ends; for C = 1 that is R bytes, row n at 16 + n |
 
 **3.1.3** A reader reads a source whose C is the columns of the target
 of every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1;
 another C or W is an error of the file (3.3.4). DTX1 lays a table out
 column by column, so column i of a source of C columns stands at 16 + i
-times align(R), align(R) the row count rounded up to a multiple of 2,
-which is the stride DTX1 lays its columns at (DTX, SPEC.md 2.2), and a
-tick reads its columns at that stride. Where R is odd, the byte between
-one column and the next is 0. A source of values wider than a byte is
-left to a later version (section 8).
+times align(R) (3.1.2), which is the stride DTX1 lays its columns at
+(DTX, SPEC.md 2.2), and a tick reads its columns at that stride. Where R
+is odd, the byte between one column and the next is 0. A source of
+values wider than a byte is left to a later version (section 8).
 
 **3.1.4** RR below R marks a source that repeats: the tick that reads row
 R - 1 places the next at row RR (5.1). RR equal to R marks a source that
@@ -579,10 +584,10 @@ frame rate (3.3). The player, in order:
 2. Read R and RR of the tune's table and the effects used.
 3. Resolve each source of the source index: its first row, and its loop
    row, row RR where it repeats and the end where it plays once (3.1.4).
-4. Set the kept target, select and count of each effect to 0, and the
-   place of each timer to 0, the row number a start that moves no place
-   keeps (1.8.4); a tick before the first start on a timer writes the
-   register of the target this leaves (5.2.1).
+4. Set the kept target, source, select and count of each effect to 0,
+   and the place of each timer to 0, the row number a start that moves
+   no place keeps (1.8.4); a tick before the first start on a timer
+   writes the register of the target this leaves (5.2.1).
 5. Read row 0, the current row.
 6. At interrupt level 7, for each effect i the effects used names, 0 to
    3 in order, claim its timer (2.3.3).
@@ -985,15 +990,17 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 `{"rate":H,"effects":E,"sources":[...]}`: `rate` the frame rate H (3.3);
 `effects` the effects used E as a decimal integer, 0 to 15; `sources`
 the sources in index order, source 1 first, each
-`{"rows":[...],"repeat":RR}` with `rows` the bytes of its rows in row
-order and, inside a row, in column order, column 0 first: a byte a
-column of the row, 0 to 255, the marker of a source that has one
-included, and `repeat` its RR as its DTX1 header has it, an integer, RR
-equal to R included (3.1.4), where the record of the structure writes
-`null` for a source that plays once (YMXS, SPEC.md 7.3); `[]` where S is
-0. A source of C columns and R rows reads as C times R bytes, row 0's
-columns first. A row reads in the order of its columns rather than the
-order a tick writes them, which puts the marker's column last (2.1.1).
+`{"rows":[...],"repeat":RR}` with `rows` one list of C times R integers,
+0 to 255: the C columns of row 0, then those of row 1, and so on, column
+0 of a row first; and `repeat` its RR as its DTX1 header has it, an
+integer, RR equal to R included (3.1.4), where the record of the
+structure writes `null` for a source that plays once (YMXS, SPEC.md
+7.3); `[]` where S is 0. `rows` is every row of the table as the table
+has it: the marker of a source that has one, a row with bit 7 set
+before the last (3.2.1, 6.4), and the bytes of a counted source and of a
+marked one alike, bit 31 of an index entry absent from the record
+(3.1.1). A row reads in the order of its columns rather than the order a
+tick writes them, which puts the marker's column last (2.1.1).
 
 ### 7.3 A frame's entry
 
@@ -1001,16 +1008,16 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
 
 - `w` is the registers 4.4 writes, keyed by number as text, `"0"` to
   `"13"`, in ascending numeric order, `"2"` before `"10"`, each with the
-  value the register reads: for a column with a set bit, bits 6 to 0
-  masked to the register's width, four for R1, R3, R5 and R13, five for
-  R6, R8, R9 and R10, and six for R7; for a column that fills its byte,
-  the byte (1.1.3). Note: the width drops the marking bits of 1.1.2 with
-  the bits 1.1 leaves unassigned. A record reports the six bits of R7
-  alone: a player
-  writes bits 7 and 6 of that register as 1 (1.4.2), and a record leaves
-  the two out, so R7's value here is 0 to 63. `{}` for a row that leaves
-  every register column unset. A register an effect runs on is included
-  where the row sets its column (6.1).
+  value the register reads: for a column with a set bit, the byte masked
+  to the register's width, four for R1, R3, R5 and R13, five for R6, R8,
+  R9 and R10, and six for R7; for a column that fills its byte, the byte
+  (1.1.3). Note: the width drops the marking bits of 1.1.2 with the bits
+  1.1 leaves unassigned. A record reports the six bits of R7 alone: a
+  player writes bits 7 and 6 of that register as 1 (1.4.2), and a record
+  leaves the two out, so R7's value here is 0 to 63. A register whose
+  column the row leaves unset is absent, its bits 6 to 0 unread (1.1.1),
+  and `{}` is a row that leaves every register column unset. A register an
+  effect runs on is included where the row sets its column (6.1).
 - `e` is the effects whose target, source or control column the row sets,
   or whose count column is other than 0, regardless of the effects used
   byte (4.2); keyed by number as text, `"0"` to `"3"`, in ascending order;
@@ -1041,7 +1048,8 @@ unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
 loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
 record of a file with an error of 3.3.4 is empty, 0 bytes, and the line a
 reader reports of that error stands outside the record: a reader that
-writes the record to a stream writes that line to another. Two readers of
+writes the record to a stream writes that line to another, which the
+host names. Two readers of
 one tune file over one F produce one record, byte for byte.
 
 ### 7.5 The example
