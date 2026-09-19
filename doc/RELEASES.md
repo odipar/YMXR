@@ -27,12 +27,60 @@ executable built from one embeds these. `BinariesTest` reads them against
 the assembly the build makes, so one that does not match what rmac writes
 today fails the build.
 
-A player pins a version of this format: a tune file is 3, 4 or 5 (SPEC.md
-3.3.5) and a bound tune the version of the tune file bound (BINARIES.md
-1), a writer writes the lowest version a tune reads under, and a
-release's number names the tools rather than either.
+A player pins a version of this format: a tune file is 3, 4, 5 or 6
+(SPEC.md 3.3.5) and a bound tune the version of the tune file bound
+(BINARIES.md 1), a writer writes the lowest version a tune reads under,
+and a release's number names the tools rather than either.
 
 ## Published
+
+### 0.4.8, 2026-09-19
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.8>, built from the commit
+tagged `v0.4.8`.
+
+The player reads a row through the program counter unasked. The eight
+cores move their bytes, four of them change name, and a fifth reader of
+the specification moved seven of its clauses.
+
+- **`YMXR_PCREL` stands at 1.** A player assembled by hand reads each row
+  through a signed word displacement from the instruction that reads it,
+  where it read an absolute address: 96 cycles a tick that writes a row
+  against 108, 114 on the loop against 130 and 124 on the stop against
+  132, and 160 with the interrupt's entry and its `rte`. Every row of
+  every source stands within 32,767 bytes of the handlers, and a host
+  that places a tune further off assembles the player with
+  `-dYMXR_PCREL=0` (68k/YMXR.S; BINARIES.md 5.5). The player is 8,160
+  bytes against 7,804.
+- **The four cores that read an absolute address are named for it**:
+  `YMXR_sndh-abs.bin`, `-perf-abs`, `-lean-abs` and `-perf-lean-abs`,
+  where `-pcrel` named the other four before, and the four the tools
+  choose keep the plain names, so a flags word of 4 to 7 is the ordinary
+  case (BINARIES.md 2.1). A tool passed neither switch reads the
+  displacement core and stands the absolute one under a file whose tunes
+  end past the reach, as it did.
+- **performance.md is the player as it stands**, and an absolute address
+  has a section with the figures it costs. Three of the ten fixture tunes
+  read a cycle or two more a call, where a start turns a row's address
+  into a displacement, and what a square's tick and a one-row source's
+  save comes down with the general handler: 343 to 500 cycles a frame,
+  and 445 on the kit's `retune`.
+- **A fifth reader read the specification cold** and produced all fifteen
+  records of the kit byte for byte. Seven places moved for what it marked
+  as deciding output: the Conventions' offset counts bytes and one on a
+  long is a multiple of 4; 3.1.2 has the offset of row n of column i, so
+  the stride stands without DTX's SPEC.md; 1.1.2's table records which
+  marking bits a player reads on every row; 1.9.1 reads the count as 0 to
+  255; 7.3 defines the effects of `e` once and names its four numbers as
+  the kept values; 7.4 says where the line of an error of the file goes;
+  and 8.3 names a tune's table whose RR is above R (conformance/README.md
+  5.5).
+- **The envelope's whole range, heard.** `ym/whole-byte.py` gains a sixth
+  section, a counted source of two columns on `setEnvelope` whose 512
+  rows step the period from 64 to 65,535 over eight seconds and then
+  stand: under Hatari the player writes 52 periods above 32,767, the half
+  a marked source leaves unreachable, and the last is one cycle in 8.39
+  seconds (experiments.md).
 
 ### 0.4.7, 2026-09-19
 
