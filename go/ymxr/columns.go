@@ -75,9 +75,14 @@ type Columns struct {
 
 // Duration is the frames a source of that many rows runs for at a rate,
 // rounded up, with a sixteenth of a frame added for a start that falls
-// inside the frame it begins in.
+// inside the frame it begins in. A count of 0 is the 256 the MFP counts
+// (SPEC.md 1.9.1, 6.4).
 func Duration(rows, selects, count, frameRate int) int {
-	divisor := int64(Prescaler[selects]) * int64(count)
+	counted := count
+	if counted == 0 {
+		counted = 256
+	}
+	divisor := int64(Prescaler[selects]) * int64(counted)
 	scaled := int64(rows)*divisor*int64(frameRate) + MFP/16
 	return int((scaled + MFP - 1) / MFP)
 }
