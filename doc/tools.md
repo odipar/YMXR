@@ -866,7 +866,14 @@ count of the program.
 each zip's name, size and sha256, its contents, and the source commit,
 `COMMIT` or `HEAD`.
 
-**20.3** [RELEASES.md](RELEASES.md) lists the releases.
+**20.3** A release is the commit tagged `v<version>`, the tag's message
+`YMXR <version>`, and the Go tree of that commit is tagged
+`go/v<version>` beside it (19.1), which is the version a caller reaches
+the module at. The published release has the six zips and the
+`MANIFEST.txt` of 20.1 under it, and its text is the newest entry of
+[RELEASES.md](RELEASES.md).
+
+**20.4** [RELEASES.md](RELEASES.md) lists the releases.
 
 ---
 
