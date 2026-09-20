@@ -196,6 +196,9 @@ final class PlayerTest {
         assertEquals(Prg.STUB_RATE_AT, row(said, "the rate, rows a second").getValue());
         assertEquals(Prg.STUB_ROWS_AT, row(said, "the rows to play").getValue());
         assertEquals(Prg.STUB_CORE_AT, row(said, "the core's offset").getValue());
+        assertEquals(Prg.STUB_PRESCALER_AT, row(said, "the prescaler").getValue());
+        assertEquals(Prg.STUB_COUNT_AT, row(said, "the timer's count").getValue());
+        assertEquals(Prg.STUB_TICKS_AT, row(said, "the timer's rate").getValue());
         Map<String, Integer> bits = flags(binaries, "4. The program stub", 2);
         assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the clock tag is `!V`").getValue());
     }

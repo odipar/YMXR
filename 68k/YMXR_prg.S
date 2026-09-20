@@ -13,6 +13,10 @@
 ;   +14  the rate, a word, rows a second
 ;   +16  the rows to play, a long, 0 to play on until a key stops it
 ;   +20  the core's offset from the SNDH file's first byte, a long
+;   +24  the prescaler, a word: TCDCR's nibble, 1 to 7
+;   +26  the timer's count, a word: 1 to 255, or 0 for the 256 the MFP
+;        counts
+;   +28  the timer's rate, a word: the ticks a row is counted against
 ;
 ; The machine is claimed under Supexec: the VBL vector, the four
 ; timers' vectors and the enable, mask and control registers kept, every
@@ -82,12 +86,16 @@ SAYING_LESS     equ     16
 
 stub:           bra.w   main
                 dc.b    'YMXT'
-                dc.w    1
+                dc.w    2
 subtunes:       dc.w    1
 flags:          dc.w    0
 rate:           dc.w    50
 rows:           dc.l    0
 core:           dc.l    0
+prescaler:      dc.w    5                       ; TCDCR's nibble, the divisor 64
+counted:        dc.w    192                     ; the count, 0 for 256
+ticked:         dc.w    200                     ; the timer's rate, a row a
+                                                ; count of it
 
 main:           move.w  #Getrez,-(sp)           ; forty columns in low
                 trap    #XBIOS                  ; resolution, eighty in the
@@ -558,9 +566,11 @@ start:
                 move.l  a0,$114.w               ; rate's share of its ticks
                 lea     accumulated(pc),a0
                 clr.w   (a0)
-                move.b  #192,$FFFFFA23.w
+                move.b  counted+1(pc),$FFFFFA23.w
+                move.b  prescaler+1(pc),d0      ; the nibble, into bits 7 to 4
+                lsl.b   #4,d0
                 and.b   #$0F,$FFFFFA1D.w
-                or.b    #$50,$FFFFFA1D.w
+                or.b    d0,$FFFFFA1D.w
                 bclr    #5,$FFFFFA0D.w
                 bset    #5,$FFFFFA09.w
                 bset    #5,$FFFFFA15.w
@@ -613,10 +623,14 @@ tick:
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts
 
-; Timer C, 200 times a second: the rate counted against 200, a row for
-; every 200 the count reaches and the remainder carried, so a rate that
-; does not divide 200 lands its rows over the second without drift and a
-; rate above 200 lands more than one row on a tick. The interrupt is
+; Timer C, the descriptor's ticks times a second: the rate counted
+; against that figure, a row for every one of it the count reaches and
+; the remainder carried. The tool arms the timer at the lowest multiple
+; of the rate the MFP counts exactly (BINARIES.md 4.10), so a row lands
+; every few ticks and the count returns to zero; where the MFP counts no
+; multiple of the rate, the tool arms 200 Hz and a rate that does not
+; divide 200 lands its rows over the second without drift. A rate above
+; the ticks lands more than one row on a tick. The interrupt is
 ; ended first and the level lowered so that the effects' timers tick
 ; through the row; a tick of this timer that lands inside the row adds
 ; its rate to the count and plays no row, and the row's caller, or the
@@ -629,16 +643,17 @@ timer_c:
                 lea     accumulated(pc),a0
                 move.w  (a0),d0
                 add.w   rate(pc),d0
-                cmp.w   #200,d0
+                cmp.w   ticked(pc),d0
                 bcs.s   .kept
                 tas     busy-accumulated(a0)
                 bne.s   .kept                   ; inside a row
                 move.w  d0,(a0)
                 move.w  #$2500,sr
-.row:           sub.w   #200,(a0)
+.row:           move.w  ticked(pc),d0
+                sub.w   d0,(a0)
                 bsr     tick
-                cmpi.w  #200,(a0)
-                bcc.s   .row
+                cmp.w   (a0),d0
+                bls.s   .row
                 lea     busy(pc),a0
                 clr.b   (a0)
                 bra.s   .out

@@ -388,12 +388,15 @@ the SNDH file begins at the byte after the stub's last.
 |---|---|---|
 | 0 | 4 | `bra.w` to the program (4.6) |
 | 4 | 4 | `YMXT` |
-| 8 | 2 | the descriptor's version, 1 |
+| 8 | 2 | the descriptor's version, 2 |
 | 10 | 2 | the subtunes: patched from the `##` tag |
 | 12 | 2 | flags: patched; the word of 4.3 |
 | 14 | 2 | the rate, rows a second: patched from the clock tag |
 | 16 | 4 | the rows to play: patched; 0 plays until a key stops it |
 | 20 | 4 | the core's offset from the SNDH file's first byte: patched |
+| 24 | 2 | the prescaler: patched; TCDCR's nibble, 1 to 7, the divisors 4, 10, 16, 50, 64, 100 and 200 (SPEC.md 1.9.2) |
+| 26 | 2 | the timer's count: patched; 1 to 255, or 0 for the 256 the MFP counts |
+| 28 | 2 | the timer's rate, `ticks`: patched; the ticks a second the prescaler and the count make, which a row is counted against (4.8) |
 
 **4.3 The flags word:**
 
@@ -407,9 +410,10 @@ a row count `rows` writes, in order:
 
 1. The PRG header, 28 bytes: the word $601A; a long, the stub's bytes
    plus F; five zero longs; a zero word.
-2. The stub, its fields at 10, 12, 14, 16 and 20 patched: `N` of the
-   `##` tag; the flags of 4.3; the rate of the clock tag; `rows`; the
-   core's offset, H of 3.1.
+2. The stub, its fields at 10, 12, 14, 16, 20, 24, 26 and 28 patched:
+   `N` of the `##` tag; the flags of 4.3; the rate of the clock tag;
+   `rows`; the core's offset, H of 3.1; and the prescaler, the count and
+   the ticks of the timer 4.10 picks for the rate.
 3. The SNDH file, byte for byte.
 4. One zero long, the relocation table.
 
@@ -506,27 +510,31 @@ at 16.
 4. Where bit 1 of the flags is set: write the VBL vector with the handler
    of 4.8, and stop.
 5. Otherwise: write the Timer C vector with the handler of 4.8; write 0
-   to the accumulator (4.8); write 192 to Timer C's data register; write
-   bits 7 to 4 of TCDCR as $5, bits 3 to 0 as they are; clear bit 5 of
-   IPRB; set bit 5 of IERB and of IMRB.
+   to the accumulator (4.8); write the field at 26 to Timer C's data
+   register; write bits 7 to 4 of TCDCR as the field at 24, bits 3 to 0
+   as they are; clear bit 5 of IPRB; set bit 5 of IERB and of IMRB.
 
 Where init reports -1 (2.7 step 5), the clock is armed as above, each
 tick's play returns at once (2.9), and the program runs until a key or
 `rows`.
 
-Note: TCDCR's $5 selects the divisor 64, and 2,457,600 / 64 / 192 is
-200 ticks a second.
+Note: the two fields make the ticks the field at 28 reads, 2,457,600
+divided by the prescaler's divisor and by the count; the operating
+system's clock, which 4.10 falls back to, is $5 and 192, the divisor 64
+and 200 ticks a second.
 
 **4.8 A tick.** Terms: the *accumulator* is a word; the *busy flag* is a
-byte, 0 at load; *over* and *done* are two marks, 0 at start (4.7). From
-the VBL, one tick a frame. From Timer C, in order:
+byte, 0 at load; *over* and *done* are two marks, 0 at start (4.7);
+`ticks` is the field at 28. From the VBL, one tick a frame. From Timer
+C, in order:
 
 1. Clear bit 5 of ISRB.
 2. Add `rate` to the accumulator.
-3. Where the accumulator is below 200, or the busy flag is set, return.
+3. Where the accumulator is below `ticks`, or the busy flag is set,
+   return.
 4. Set the busy flag; set level 5.
-5. While the accumulator is at least 200: subtract 200 and perform the
-   tick.
+5. While the accumulator is at least `ticks`: subtract `ticks` and
+   perform the tick.
 6. Clear the busy flag and return.
 
 The tick, in order:
@@ -545,6 +553,20 @@ Every register is kept.
 two digits, `/`, `N` in two digits, two spaces, and the name of 4.6 step
 2 cut or padded with spaces to the screen's width less 16. Note: the
 padding covers the line before it.
+
+**4.10 The timer for a rate.** A tool writes the fields at 24, 26 and 28
+from the rate R: for `ticks` = R, 2R, 3R and up to 400, the first for
+which 2,457,600 / `ticks` is a whole number and equals a prescaler's
+divisor times a count of 1 to 256, the prescalers read in the order
+SPEC.md 1.9.2 numbers them; the prescaler's nibble goes in the field at
+24, the count in the field at 26 as the MFP reads it, 0 for 256, and
+`ticks` in the field at 28. Where no `ticks` up to 400 meets that, the
+fields are $5, 192 and 200, the operating system's clock, and the
+accumulator of 4.8 spreads the rows over the second.
+
+A row then lands every `ticks` / R ticks, and the count returns to zero:
+R = 50 is 150 ticks a second and a row every third, R = 60 is 240 and a
+row every fourth, and R = 200 is 200 and a row a tick.
 
 ---
 

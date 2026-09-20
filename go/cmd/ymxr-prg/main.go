@@ -76,10 +76,13 @@ func made(said *report.Report, file, prg []byte, rows int64, asked sndh.Asked) {
 // caller, the file's clock tag, or its claims.
 func from(tags sndh.Tagged, flags int, asked sndh.Asked) string {
 	if flags&sndh.FlagVBL == 0 {
+		timer := sndh.TimerFor(tags.Rate)
+		at := fmt.Sprintf("Timer C, %d ticks a second and a row every %d",
+			timer.Ticks, timer.Ticks/tags.Rate)
 		if asked == sndh.AskedTimerC {
-			return "Timer C, asked for"
+			return at + ", asked for"
 		}
-		return "Timer C, 200 ticks a second and the rate's share of them"
+		return at
 	}
 	if asked == sndh.AskedVBL {
 		return "the VBL, asked for"

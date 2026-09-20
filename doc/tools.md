@@ -573,12 +573,14 @@ the FLAG letters have `c`.
 **13.3 The report:** the heading `the SNDH file: B bytes, N subtune(s)
 at H Hz, FLAG <letters>`; the heading `the stub: B bytes, patched` with
 the rows `the subtunes`, N; `the rows to play`, `0, until a key stops
-it` or ROWS; `it plays from`, one of `Timer C, 200 ticks a second and
-the rate's share of them`, `Timer C, asked for`, `the VBL, asked for`,
-`the VBL, the file's clock tag` and `the VBL, the set claims Timer C`;
-`the screen`, `cleared before the banner`; the heading `the program: B
-bytes`. The summary line is `ymxr-prg: B bytes, until a key stops it` or
-`ymxr-prg: B bytes, ROWS rows`.
+it` or ROWS; `it plays from`, one of `Timer C, T ticks a second and a
+row every K`, T the stub's field at 28 and K T divided by the rate
+(BINARIES.md 4.10), the same with `, asked for` after it where `-tc`
+named the clock, `the VBL, asked for`, `the VBL, the file's clock tag`
+and `the VBL, the set claims Timer C`; `the screen`, `cleared before the
+banner`; the heading `the program: B bytes`. The summary line is
+`ymxr-prg: B bytes, until a key stops it` or `ymxr-prg: B bytes, ROWS
+rows`.
 
 ---
 

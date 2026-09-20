@@ -23,20 +23,26 @@ import org.ymxs.tool.Tool;
  *  14      2      the rate, rows a second, patched here from the clock tag
  *  16      4      the rows to play, patched here; 0 plays on until a key stops it
  *  20      4      the core's offset from the SNDH file's first byte, patched here
+ *  24      2      the prescaler, TCDCR's nibble, patched here
+ *  26      2      the timer's count, 1 to 255 or 0 for 256, patched here
+ *  28      2      the timer's rate, the ticks a row is counted against
  * </pre>
  */
 final class Prg {
 
     static final byte[] STUB_MAGIC = {'Y', 'M', 'X', 'T'};
     static final int STUB_MAGIC_AT = 4;
-    static final int STUB_VERSION = 1;
+    static final int STUB_VERSION = 2;
     static final int STUB_VERSION_AT = 8;
     static final int STUB_SUBTUNES_AT = 10;
     static final int STUB_FLAGS_AT = 12;
     static final int STUB_RATE_AT = 14;
     static final int STUB_ROWS_AT = 16;
     static final int STUB_CORE_AT = 20;
-    static final int STUB_DESCRIPTOR = 24;
+    static final int STUB_PRESCALER_AT = 24;
+    static final int STUB_COUNT_AT = 26;
+    static final int STUB_TICKS_AT = 28;
+    static final int STUB_DESCRIPTOR = 30;
 
     /** Flag bit 1: play from the VBL. Set where the clock tag names the
      *  VBL, where the `FLAG` letters claim Timer C, since the stub then
@@ -46,6 +52,50 @@ final class Prg {
      *  where that equals the descriptor's rate and from Timer C where
      *  not. */
     static final int FLAG_VBL = 2;
+
+    /** The timer the stub arms for a rate (BINARIES.md 4.10): the
+     *  prescaler, TCDCR's nibble; the count, 1 to 256; and the ticks a
+     *  second the two make, which a row is counted against. */
+    record Timer(int prescaler, int count, int ticks) {
+    }
+
+    /** The MFP's clock, and the divisor each of the seven nibbles
+     *  selects (SPEC.md 1.9.2). */
+    static final int MFP_CLOCK = 2457600;
+    private static final int[] DIVISOR = {0, 4, 10, 16, 50, 64, 100, 200};
+
+    /** The ticks a second the timer is armed at, at most: twice the
+     *  operating system's clock. */
+    private static final int MOST_TICKS = 400;
+
+    /** The operating system's clock, which the stub arms where the MFP
+     *  counts no multiple of the rate: 2,457,600 / 64 / 192. */
+    static final Timer OS_CLOCK = new Timer(5, 192, 200);
+
+    /**
+     * The timer for a rate: the lowest multiple of the rate the MFP
+     * counts exactly, so a row lands every few ticks and the count
+     * returns to zero, and the operating system's clock where it counts
+     * none. A
+     * tune at 50 Hz is 150 ticks a second and a row every third, one at
+     * 60 Hz is 240 and a row every fourth.
+     */
+    static Timer timer(int rate) {
+        for (int k = 1; rate > 0 && k * rate <= MOST_TICKS; k++) {
+            int ticks = k * rate;
+            if (MFP_CLOCK % ticks != 0) {
+                continue;
+            }
+            int of = MFP_CLOCK / ticks;
+            for (int nibble = 1; nibble <= 7; nibble++) {
+                int count = of / DIVISOR[nibble];
+                if (count * DIVISOR[nibble] == of && count >= 1 && count <= 256) {
+                    return new Timer(nibble, count, ticks);
+                }
+            }
+        }
+        return OS_CLOCK;
+    }
 
     /** The PRG header's bytes, and its magic. */
     static final int HEADER = 28;
@@ -125,6 +175,10 @@ final class Prg {
         Tune.putWord(prg, HEADER + STUB_RATE_AT, tags.rate());
         Tune.putLong(prg, HEADER + STUB_ROWS_AT, (int) rows);
         Tune.putLong(prg, HEADER + STUB_CORE_AT, core);
+        Timer timer = timer(tags.rate());
+        Tune.putWord(prg, HEADER + STUB_PRESCALER_AT, timer.prescaler());
+        Tune.putWord(prg, HEADER + STUB_COUNT_AT, timer.count() & 0xFF);
+        Tune.putWord(prg, HEADER + STUB_TICKS_AT, timer.ticks());
         System.arraycopy(sndh, 0, prg, HEADER + stub.length, sndh.length);
         return prg;
     }
@@ -154,9 +208,10 @@ final class Prg {
      *  the file's clock tag, or its claims. */
     private static String from(Tags tags, int flags, Sndh.Asked asked) {
         if ((flags & FLAG_VBL) == 0) {
-            return asked == Sndh.Asked.TIMER_C
-                    ? "Timer C, asked for"
-                    : "Timer C, 200 ticks a second and the rate's share of them";
+            Timer timer = timer(tags.rate());
+            String at = "Timer C, " + timer.ticks() + " ticks a second and a row every "
+                    + timer.ticks() / tags.rate();
+            return asked == Sndh.Asked.TIMER_C ? at + ", asked for" : at;
         }
         if (asked == Sndh.Asked.VBL) {
             return "the VBL, asked for";
