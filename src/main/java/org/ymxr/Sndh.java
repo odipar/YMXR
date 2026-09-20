@@ -89,6 +89,10 @@ final class Sndh {
     /** Timer C's bit in a claims byte, the third of A to D. */
     static final int TIMER_C = 1 << 2;
 
+    /** The clock tag's two names: Timer C, and the VBL. */
+    static final String TIMER_C_CLOCK = "TC";
+    static final String VBL_CLOCK = "!V";
+
     /**
      * Which ticks the file's core reads a row with (BINARIES.md 2.1).
      * A tool writes {@code CHOSEN} unasked: it stands the core that reads
@@ -106,12 +110,19 @@ final class Sndh {
      *  file uses, which {@code monitor} and {@code lean} select a switch
      *  of and {@code ticks} the third. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor, boolean lean, Ticks ticks) {
+            boolean monitor, boolean lean, Ticks ticks, boolean vbl) {
 
-        /** The two switches the tag block reads, the third chosen. */
+        /** The two switches the tag block reads, the third chosen, and the
+         *  clock tag left to the set. */
         Options(String title, @Nullable String composer, @Nullable List<String> names,
                 boolean monitor, boolean lean) {
-            this(title, composer, names, monitor, lean, Ticks.CHOSEN);
+            this(title, composer, names, monitor, lean, Ticks.CHOSEN, false);
+        }
+
+        /** The same, with the ticks named. */
+        Options(String title, @Nullable String composer, @Nullable List<String> names,
+                boolean monitor, boolean lean, Ticks ticks) {
+            this(title, composer, names, monitor, lean, ticks, false);
         }
     }
 
@@ -320,9 +331,10 @@ final class Sndh {
 
     /** The clock tag: 'TC' and the rate, Timer C, where the claims byte
      *  leaves Timer C free, and '!V' and the rate, the VBL, where it has
-     *  Timer C. A host calls play from that clock (BINARIES.md 5.4). */
-    static String clock(int claimed, int rate) {
-        return ((claimed & TIMER_C) != 0 ? "!V" : "TC") + rate;
+     *  Timer C or the VBL is asked for. A host calls play from that
+     *  clock (BINARIES.md 5.4). */
+    static String clock(int claimed, int rate, boolean vbl) {
+        return (vbl || (claimed & TIMER_C) != 0 ? VBL_CLOCK : TIMER_C_CLOCK) + rate;
     }
 
     /**
@@ -333,7 +345,9 @@ final class Sndh {
      * word a subtune, the name's offset from the tag's first byte, then
      * the names each ended by a zero byte, a pad to an even length, and
      * HDNS. The '##' count stands before FRMS and the names, since a
-     * reader sizes both by it.
+     * reader sizes both by it. The raster monitor paints one frame of
+     * calls (performance.md), so a core with it in names the VBL as the
+     * clock.
      */
     static byte[] tags(Options options, int rate, int n, int[] frames, int claimed) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -345,7 +359,7 @@ final class Sndh {
         }
         tag(out, "CONV", CONVERTER);
         tag(out, String.format(Locale.ROOT, "##%02d", n), "");
-        tag(out, clock(claimed, rate), "");
+        tag(out, clock(claimed, rate, options.vbl() || options.monitor()), "");
         tag(out, "FLAG", flag(claimed));
         pad(out);
         text(out, "FRMS");
@@ -505,6 +519,7 @@ final class Sndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
+        boolean vbl = false;
         Ticks ticks = Ticks.CHOSEN;
         for (String flag : flags) {
             if (flag.equals("-perf")) {
@@ -515,6 +530,8 @@ final class Sndh {
                 ticks = Ticks.PCREL;
             } else if (flag.equals("-abs")) {
                 ticks = Ticks.ABSOLUTE;
+            } else if (flag.equals("-vbl")) {
+                vbl = true;
             } else if (flag.startsWith("-copies")) {
                 throw tool.usage("not a flag of the tool: " + flag
                         + "; a tune file is packed already");
@@ -545,7 +562,7 @@ final class Sndh {
             title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
         Options options = new Options(title, composer,
-                tunes.size() > 1 ? names : null, monitor, lean, ticks);
+                tunes.size() > 1 ? names : null, monitor, lean, ticks, vbl);
         byte[] sndh;
         try {
             sndh = of(tunes, options);
@@ -592,8 +609,10 @@ final class Sndh {
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));
+        Prg.Tags tags = Prg.tags(sndh);
         report.say("the tags: TITL " + options.title()
                 + (options.composer() == null ? "" : ", COMM " + options.composer())
+                + ", " + tags.clock() + tags.rate() + ", FLAG ~" + tags.flag()
                 + (options.names() == null ? "" : ", !#SN with " + options.names().size()
                 + (options.names().size() == 1 ? " name" : " names")));
         Bound.Set set = Bound.of(tunes);

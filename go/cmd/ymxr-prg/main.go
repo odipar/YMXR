@@ -19,15 +19,21 @@ import (
 
 func main() {
 	t, args := tool.Of("ymxr-prg", os.Args[1:], flags.Rows...)
-	flags.Only(t, args, flags.Rows)
+	flags.Only(t, args, flags.Rows, flags.VBL)
 	rows := flags.RowsOf(t, args, 0)
+	vbl := false
+	for _, flag := range args {
+		if flag == "-vbl" {
+			vbl = true
+		}
+	}
 	said := report.Of(t.Reports())
 	file := t.Bytes()
-	prg, err := sndh.Program(file, rows)
+	prg, err := sndh.Program(file, rows, vbl)
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
-	made(said, file, prg, rows)
+	made(said, file, prg, rows, vbl)
 	rowed := "until a key stops it"
 	if rows != 0 {
 		rowed = fmt.Sprintf("%d rows", rows)
@@ -38,7 +44,7 @@ func main() {
 
 // made says what the program was made of: the file under it, and what the
 // stub was patched with.
-func made(said *report.Report, file, prg []byte, rows int64) {
+func made(said *report.Report, file, prg []byte, rows int64, vbl bool) {
 	if !said.Says() {
 		return
 	}
@@ -64,11 +70,22 @@ func made(said *report.Report, file, prg []byte, rows int64) {
 	} else {
 		said.Row("the rows to play", fmt.Sprintf("%d", rows))
 	}
-	from := "the VBL where the screen's rate is the tune's, and Timer C where it is not"
-	if flags&sndh.FlagVBL != 0 {
-		from = "the VBL, the set claims Timer C"
-	}
-	said.Row("it plays from", from)
+	said.Row("it plays from", from(tags, flags, vbl))
 	said.Row("the screen", "cleared before the banner")
 	said.Say(fmt.Sprintf("the program: %d bytes", len(prg)))
+}
+
+// from is the clock the program plays from, and what named it: the
+// caller, the file's clock tag, or its claims.
+func from(tags sndh.Tagged, flags int, vbl bool) string {
+	if flags&sndh.FlagVBL == 0 {
+		return "Timer C, 200 ticks a second and the rate's share of them"
+	}
+	if vbl {
+		return "the VBL, asked for"
+	}
+	if tags.Clock == sndh.ClockVBL {
+		return "the VBL, the file's clock tag"
+	}
+	return "the VBL, the set claims Timer C"
 }

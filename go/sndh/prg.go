@@ -39,9 +39,11 @@ const (
 	stubLength     = 24
 )
 
-// FlagVBL is flag bit 1: play from the VBL, a 50 Hz clock. Set where the
-// set claims Timer C, since the stub then has no timer to play from; such
-// a set is at 50 Hz, or there is no program.
+// FlagVBL is flag bit 1: play from the VBL. Set where the clock tag names
+// the VBL, where the FLAG letters claim Timer C, since the stub then has
+// no timer to play from, or where the VBL is asked for; a file that
+// names the VBL itself is at 50 Hz, or there is no program. Clear, the
+// stub plays from Timer C.
 const FlagVBL = 2
 
 // The PRG header's bytes, and its magic.
@@ -54,27 +56,29 @@ const (
 // triple: its SNDH, then the tags.
 const tagsAt = 12
 
-// Tagged is the tag block read out: the subtunes, the rate, the FLAG
-// letters and where the block ends.
+// Tagged is the tag block read out: the subtunes, the clock tag and its
+// rate, the FLAG letters and where the block ends.
 type Tagged struct {
 	Subtunes int
+	Clock    string
 	Rate     int
 	Flag     string
 	End      int
 }
 
 // Program is the program around an SNDH file, playing that many rows, or
-// playing on where rows is 0.
-func Program(sndh []byte, rows int64) ([]byte, error) {
+// playing on where rows is 0, from the clock the file names. vbl plays
+// from the VBL over that clock, at the file's rate.
+func Program(sndh []byte, rows int64, vbl bool) ([]byte, error) {
 	stub, err := binaries.Read(binaries.Stub)
 	if err != nil {
 		return nil, err
 	}
-	return ProgramWith(stub, sndh, rows)
+	return ProgramWith(stub, sndh, rows, vbl)
 }
 
 // ProgramWith is the same, from the stub named.
-func ProgramWith(stub, sndh []byte, rows int64) ([]byte, error) {
+func ProgramWith(stub, sndh []byte, rows int64, vbl bool) ([]byte, error) {
 	if err := CheckStub(stub); err != nil {
 		return nil, err
 	}
@@ -85,10 +89,13 @@ func ProgramWith(stub, sndh []byte, rows int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	timerC := strings.ContainsRune(tags.Flag, 'c')
-	if timerC && tags.Rate != 50 {
-		return nil, fmt.Errorf("the set claims Timer C and plays at %d Hz: the stub then"+
-			" plays from the VBL, a 50 Hz clock, so this set needs a separate host",
+	// The file leaves the stub the VBL where its clock tag names the VBL
+	// and where its set claims Timer C; the VBL asked for stands over
+	// either (BINARIES.md 4.3).
+	named := tags.Clock == ClockVBL || strings.ContainsRune(tags.Flag, 'c')
+	if named && !vbl && tags.Rate != 50 {
+		return nil, fmt.Errorf("the file plays from the VBL at %d Hz: the stub's VBL is"+
+			" a 50 Hz clock, so this set needs a separate host or the VBL asked for",
 			tags.Rate)
 	}
 	core, err := Core(sndh, tags.End+4)
@@ -101,7 +108,7 @@ func ProgramWith(stub, sndh []byte, rows int64) ([]byte, error) {
 	copy(prg[Header:], stub)
 	ymxr.PutWord(prg, Header+stubSubtunesAt, tags.Subtunes)
 	flags := 0
-	if timerC {
+	if named || vbl {
 		flags |= FlagVBL
 	}
 	ymxr.PutWord(prg, Header+StubFlagsAt, flags)
@@ -143,6 +150,7 @@ func ReadTags(sndh []byte) (Tagged, error) {
 		return Tagged{}, fmt.Errorf("not an SNDH file: no SNDH at %d", tagsAt)
 	}
 	subtunes := -1
+	clock := ""
 	rate := -1
 	flag := ""
 	at := tagsAt + 4
@@ -166,7 +174,8 @@ func ReadTags(sndh []byte) (Tagged, error) {
 			}
 			subtunes = int(sndh[at+2]-'0')*10 + int(sndh[at+3]-'0')
 			at += 4
-		case strings.HasPrefix(name, "TC") || strings.HasPrefix(name, "!V"):
+		case strings.HasPrefix(name, ClockTimerC) || strings.HasPrefix(name, ClockVBL):
+			clock = name[:2]
 			to, err := zero(sndh, at+2)
 			if err != nil {
 				return Tagged{}, err
@@ -220,7 +229,8 @@ func ReadTags(sndh []byte) (Tagged, error) {
 	if rate < 0 {
 		return Tagged{}, fmt.Errorf("the SNDH file's tags have no TC or !V rate")
 	}
-	return Tagged{Subtunes: subtunes, Rate: rate, Flag: flag, End: at}, nil
+	return Tagged{Subtunes: subtunes, Clock: clock, Rate: rate, Flag: flag,
+		End: at}, nil
 }
 
 // zero is where the next zero byte from there stands.

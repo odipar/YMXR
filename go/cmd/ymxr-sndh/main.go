@@ -40,6 +40,8 @@ func main() {
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":
 			options.Ticks = sndh.Absolute
+		case flag == "-vbl":
+			options.VBL = true
 		case strings.HasPrefix(flag, "-copies"):
 			t.Usage("not a flag of the tool: " + flag + "; a tune file is packed already")
 		case strings.HasPrefix(flag, "-t"):
@@ -135,7 +137,12 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 		}
 		named = fmt.Sprintf(", !#SN with %d%s", len(options.Names), name)
 	}
-	said.Say("the tags: TITL " + options.Title + composer + named)
+	tags, err := sndh.ReadTags(file)
+	if err != nil {
+		return
+	}
+	said.Say(fmt.Sprintf("the tags: TITL %s%s, %s%d, FLAG ~%s%s", options.Title, composer,
+		tags.Clock, tags.Rate, tags.Flag, named))
 	set, err := sndh.Bind(tunes)
 	if err != nil {
 		return

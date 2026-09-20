@@ -44,6 +44,7 @@ public final class YmxsToSndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
+        boolean vbl = false;
         Sndh.Ticks ticks = Sndh.Ticks.CHOSEN;
         for (String flag : flags) {
             if (flag.startsWith("-t")) {
@@ -58,6 +59,8 @@ public final class YmxsToSndh {
                 ticks = Sndh.Ticks.PCREL;
             } else if (flag.equals("-abs")) {
                 ticks = Sndh.Ticks.ABSOLUTE;
+            } else if (flag.equals("-vbl")) {
+                vbl = true;
             }
         }
         org.ymxs.YMXS.Tune first = multi.tunes().get(0);
@@ -74,7 +77,7 @@ public final class YmxsToSndh {
         List<byte[]> tunes = Ymxs.tuneFiles(tool, multi, Ymxs.Packing.of(tool, flags), report);
         try {
             return Sndh.of(tunes, new Sndh.Options(title, composer,
-                    tunes.size() > 1 ? names : null, monitor, lean, ticks));
+                    tunes.size() > 1 ? names : null, monitor, lean, ticks, vbl));
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
