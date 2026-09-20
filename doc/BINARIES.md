@@ -56,7 +56,7 @@ tool reads a multi file (0.4, 3.3).
 | 0 | 4 | `YMXM` |
 | 4 | 2 | the version, $0003 to $0006: the highest of the tune files in it (SPEC.md 3.3.5) |
 | 6 | 2 | `N`, the tune count, 1 to 99 |
-| 8 | 8`N` | the entries, tune 1 to `N`: a long where its tune file begins, then a long its bytes |
+| 8 | 8`N` | the entries, tune 1 to `N`: a long where its tune file begins, signed, then a long its bytes, signed |
 | 8 + 8`N` | | the names, tune 1 to `N`, each UTF-8 text ended by a zero byte |
 | | | the tune files, tune 1 to `N`, each on a long, each byte for byte the tune file |
 
@@ -114,7 +114,7 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | 12 | 4 | the state block's bytes: the format block's field at +4 of the image the table is in |
 | 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
 | 20 | 4 | where this tune's table stands, from the image's first byte: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
-| 24 | 4`S` | the source index: for source 1 to `S`, a long where its DTX1 table begins |
+| 24 | 4`S` | the source index: for source 1 to `S`, a long, unsigned, where its DTX1 table begins |
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
 
@@ -418,12 +418,12 @@ table is empty since every address in the stub and the file is relative.
 
 1. Check the stub and `rows`, the table's first four conditions.
 2. Read `SNDH` at 12, then the tags from 16 to `HDNS`: a zero byte where
-   a tag name would begin is a pad of one byte; `##` is 4 bytes, its two
-   digits `N`; the clock tag, `TC` or `!V`, runs to its zero byte, its
-   leading decimal digits the rate; `TITL`, `COMM`, `CONV` and `FLAG`
-   run to their zero byte, of `FLAG` the letters after `~` kept, or the
-   whole text where `~` is absent; `FRMS` is 4 + 4`N` bytes; `!#SN` is
-   4 + 2`N` bytes then `N` texts each to its zero byte.
+   a tag name would begin is a pad of one byte; `##` is 4 bytes and a
+   zero byte, its two digits `N`; the clock tag, `TC` or `!V`, runs to
+   its zero byte, its leading decimal digits the rate; `TITL`, `COMM`,
+   `CONV` and `FLAG` run to their zero byte, of `FLAG` the letters after
+   `~` kept, or the whole text where `~` is absent; `FRMS` is 4 + 4`N`
+   bytes; `!#SN` is 4 + 2`N` bytes then `N` texts each to its zero byte.
 3. Where the clock tag is `!V` or the `FLAG` letters contain `c`, check
    the rate.
 4. C is where `YMXS` first stands from the byte after `HDNS`, less 12;
@@ -613,3 +613,95 @@ address and reach any offset.
 Note: the tools that write the files of this document are
 `bin/ymxr-multi`, `bin/ymxr-bind`, `bin/ymxr-sndh` and `bin/ymxr-prg`
 ([tools.md](tools.md)).
+
+---
+
+## 6. What a reader reports
+
+**6.1 The record.** A reader reads a file this document defines and
+reports its parts, one a line: lines of JSON in US-ASCII, one part a
+line, each line free of spaces but for those inside a text, integers in
+decimal, the keys of each object in the order this section lists them,
+and a line feed, byte 10, ending every line. An `at` is an offset from
+the file's first byte, and so is every other offset the record reports
+but for `table`, which 6.3 defines. A text of the record is UTF-8 read
+out, each character above $7E escaped as JSON escapes it.
+
+The first line is `{"kind":"K","bytes":F}`, F the file's bytes and K the
+first kind of the four the file meets, read in this order: `multi` where
+bytes 0 to 3 are `YMXM` (0.2), `bound` where they are `YMXB` (1.2),
+`program` where the word at 0 is $601A (4.4), and `sndh` where bytes 12
+to 15 are `SNDH` (3.1). The lines after it are 6.2 to 6.5, by kind. A
+reader of a file that breaks a rule of 0.4 or 4.5 reports that line and
+stops.
+
+**6.2 A multi file** (0.2), after the first line:
+
+- `{"part":"header","version":V,"tunes":N}`, the fields at 4 and 6.
+- a line a tune, 1 to `N`, in order: `{"part":"tune","number":i,"at":A,
+  "bytes":B,"name":"T"}`, A and B of entry i and T its name (0.3, 0.4).
+  A name is JSON text, its UTF-8 read out.
+
+**6.3 A bound tune** (1.2), after the first line:
+
+- `{"part":"header","version":V,"rate":H,"effects":E,"sources":S,
+  "state":B,"image":I,"table":C}`, the fields at 4, 6, 8, 9, 12, 16 and
+  20, I the field at 16 plus the tune's first byte, which is the tune's
+  first byte for a bound tune of a set (1.4), and C the field at 20 as
+  the file has it, an offset from the image's first byte.
+- a line a source, 1 to `S`, in index order: `{"part":"source",
+  "number":i,"at":A}`, A the index entry plus the tune's first byte.
+- `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0,
+  B the file's bytes less I: the image of a bound tune written alone
+  (1.3). A bound tune of a set has that field written 0 (1.4), and the
+  line stands in the record of the SNDH file instead (6.4).
+
+**6.4 An SNDH file** (3.1), after the first line:
+
+- `{"part":"entry","to":[a,b,c]}`, entry i at 4i and its target
+  4i + 2 + the word at 4i + 2, read signed.
+- a line a tag, in the order they stand, from 16 to `HDNS` (3.2), a
+  zero byte where a tag name would begin skipped, A its first byte:
+  `{"part":"tag","name":"TITL","at":A,"text":"T"}` for `TITL`, `COMM`,
+  `CONV` and `FLAG`, T the bytes after the four of the name to its zero
+  byte, the `~` of `FLAG` among them, where 4.5 step 2 keeps the
+  letters after it; `{"part":"tag","name":"##","at":A,"subtunes":N}`, N
+  its two digits; `{"part":"tag","name":"TC","at":A,"rate":H}`, or `!V`
+  in place of `TC`, H the leading decimal digits after the two of the
+  name;
+  `{"part":"tag","name":"FRMS","at":A,"frames":[...]}`, the `N` longs;
+  `{"part":"tag","name":"!#SN","at":A,"names":[...]}`, the `N` names in
+  subtune order, read as 4.5 step 2 reads them; and
+  `{"part":"tag","name":"HDNS","at":A}`, last.
+- `{"part":"core","at":H,"version":V,"binds":R,"fixed":F,"flags":G,
+  "state":S,"subtunes":T,"work":W}`, H the core's first byte,
+  even(12 + T) of 3.1, the fields at 16, 18, 20, 22, 24, 28 and 32
+  (2.2), S, T and W each plus H.
+- `{"part":"subtunes","at":T,"tunes":[...]}`, the word `N` at T and the
+  `N` longs after it, each plus H (2.5).
+- a line a subtune, 1 to `N`, in order: `{"part":"tune","number":i,
+  "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
+  "state":D,"image":I,"table":C}`, A its offset from the subtune table,
+  the fields of 1.2 read at A as 6.3 reads them, and B the bytes to the
+  next subtune, or, for the last, to the image at the lowest offset;
+  then a line a source of that subtune, as 6.3 defines them, each `at`
+  the index entry plus A.
+- a line an image: `{"part":"image","number":i,"at":I}`, each offset the
+  subtunes name once, in increasing order of offset, i counting from 1.
+- `{"part":"workspace","at":W,"bytes":B}`, B the bytes from W to the end
+  of the SNDH file, which the workspace stands last in (3.1).
+
+**6.5 A program** (4.4), after the first line:
+
+- `{"part":"prg","text":B}`, the long at 2.
+- `{"part":"stub","at":28,"bytes":S,"version":V,"subtunes":N,
+  "flags":G,"rate":H,"rows":R,"core":C}`, the fields at 8, 10, 12, 14,
+  16 and 20 counted from 28 (4.2), S the stub's bytes, the SNDH file's
+  first byte less 28, and C the core's offset plus the SNDH file's
+  first byte.
+- `{"part":"sndh","at":A}`, A the SNDH file's first byte: the lowest
+  even offset from 28 where bytes A + 12 to A + 15 are `SNDH`.
+- the lines 6.4 defines for the SNDH file at A, its first line left
+  out, every offset counted from the program's first byte. The SNDH
+  file ends at 28 plus the long at 2, the relocation table standing
+  after it (4.4), and the workspace's `bytes` counts to that end.

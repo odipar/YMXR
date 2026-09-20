@@ -1,0 +1,22 @@
+{"kind":"program","bytes":47132}
+{"part":"prg","text":47100}
+{"part":"stub","at":28,"bytes":1760,"version":1,"subtunes":1,"flags":2,"rate":60,"rows":0,"core":1870}
+{"part":"sndh","at":1788}
+{"part":"entry","to":[1870,1874,1878]}
+{"part":"tag","name":"TITL","at":1804,"text":"Timers"}
+{"part":"tag","name":"CONV","at":1815,"text":"YMXR (ym-to-ymxr)"}
+{"part":"tag","name":"##","at":1837,"subtunes":1}
+{"part":"tag","name":"!V","at":1842,"rate":60}
+{"part":"tag","name":"FLAG","at":1847,"text":"~abcdy"}
+{"part":"tag","name":"FRMS","at":1858,"frames":[0]}
+{"part":"tag","name":"HDNS","at":1866}
+{"part":"core","at":1870,"version":1,"binds":6,"fixed":2120,"flags":4,"state":2524,"subtunes":10714,"work":14694}
+{"part":"subtunes","at":10714,"tunes":[10720]}
+{"part":"tune","number":1,"at":10720,"bytes":186,"version":3,"rate":60,"effects":15,"sources":5,"state":30312,"image":10906,"table":1928}
+{"part":"source","number":1,"at":10764}
+{"part":"source","number":2,"at":10784}
+{"part":"source","number":3,"at":10840}
+{"part":"source","number":4,"at":10860}
+{"part":"source","number":5,"at":10884}
+{"part":"image","number":1,"at":10906}
+{"part":"workspace","at":14694,"bytes":32434}
