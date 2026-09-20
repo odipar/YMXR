@@ -34,6 +34,52 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.10, 2026-09-20
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.10>, built from the commit
+tagged `v0.4.10`.
+
+The program stub is 1,760 bytes, 34 fewer than 0.4.9's, and the eight
+cores are 0.4.9's bytes. What moves is the clock a host and a program
+play from, which the SNDH header now names.
+
+- **A set that claims Timer C names the VBL.** The tag block wrote `TC`
+  and the rate for every set, so one whose tunes run an effect on Timer
+  C asked its host for the timer the player's handler claims at init.
+  SNDH v2.2 names a tag for each clock, `TA` to `TD` and `!V`, and the
+  block's clock tag is now `!V` and the rate where the claims byte has
+  Timer C, and `TC` and the rate where it leaves that timer free
+  (BINARIES.md 3.2). `four-timers.ymxr` reads `!V60` and `chambers.ymxr`
+  `TC50`. The `FLAG` letters are as they were, and a host that reads
+  them sees the same claims.
+- **A program plays from the clock its file names.** The stub read the
+  screen's rate and played from the VBL where it matched the tune's rate,
+  from Timer C where it did not, so a file naming Timer C was played from
+  the VBL on a 50 Hz screen. It reads flag bit 1 alone now: the VBL where
+  the clock tag names the VBL, where the `FLAG` letters claim Timer C, or
+  where the VBL is asked for, and Timer C otherwise (BINARIES.md 4.3,
+  4.7). The code that read the screen's rate is gone with it, and the
+  stub loses 34 bytes.
+- **`-vbl` is the VBL asked for** in `ymxr-sndh`, `ymxs-to-sndh`,
+  `ymxr-prg` and `ymxs-to-prg`, and in `bin/ymxr-set`, `ym/play.sh` and
+  `ym/play-ymxs.sh`, where it is read before `-vN`. The two writers put
+  `!V` in the tag block and the two program tools set bit 1. `-perf`
+  names the VBL too: the raster monitor paints one frame of calls, which
+  reads against the raster where the tick comes from the VBL
+  (performance.md).
+- **The stub's reader reads either clock tag**, and the tags without one
+  are `the SNDH file's tags have no TC or !V rate`. A file that names the
+  VBL at a rate other than 50 is `the file plays from the VBL at H Hz:
+  the stub's VBL is a 50 Hz clock, so this set needs a separate host or
+  the VBL asked for`, and `-vbl` writes that program at the caller's
+  asking. `bin/ymxr-set` reads `-pcrel` and `-abs`, which tools.md
+  already listed among the flags reaching `ymxr-sndh` through it.
+
+Checks: `mvn -o clean test` green, 156 tests and no skip; the rig green
+under its default, `-abs`, `-lean` and `-kit`; `chambers.ymxr` played 300
+frames from each clock under Hatari, and the report of every case read
+back.
+
 ### 0.4.9, 2026-09-19
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.9>, built from the commit
