@@ -111,9 +111,9 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
 | 10 | 2 | bytes 10 and 11 of the tune file, copied; the player skips them |
-| 12 | 4 | the state block's bytes: the format block's field at +4 of the image the table is in |
+| 12 | 4 | the state block's bytes, unsigned: the format block's field at +4 of the image the table is in |
 | 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
-| 20 | 4 | where this tune's table stands, from the image's first byte: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
+| 20 | 4 | where this tune's table stands, from the image's first byte, unsigned: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
 | 24 | 4`S` | the source index: for source 1 to `S`, a long, unsigned, where its DTX1 table begins |
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
@@ -220,8 +220,8 @@ are 0. Note: play keeps every register, so the state byte is where an
 SNDH host reads the end of a tune that plays once.
 
 **2.5 The subtune table**, at the offset the field at 28 names: a word
-`N`, then `N` longs, subtune 1 to `N`, each the offset of its bound tune
-from the core's first byte (3.1).
+`N`, then `N` longs, unsigned, subtune 1 to `N`, each the offset of its
+bound tune from the core's first byte (3.1).
 
 **2.6 The workspace**, at the offset the field at 32 names: the core's
 address plus that offset, rounded up to a long (2.7 step 4), then
@@ -298,7 +298,8 @@ file (3) and reports the first condition met:
 
 ## 3. The SNDH file
 
-**3.1 Layout.** T is the tag block's bytes, H = even(12 + T), L the
+**3.1 Layout.** T is the tag block's bytes, from `SNDH` at 12 through
+the last byte of `HDNS`; H = even(12 + T), L the
 core's bytes, `N` the subtunes. Offsets under *from the core* count from
 the core's first byte, at H.
 
@@ -450,6 +451,11 @@ tags stand:
 | `YMXS` is absent past `HDNS` | `the SNDH file has no core: no YMXS past its tags` |
 | C is before the byte after `HDNS`, or R is other than C | `the core begins at C, and the entry triple reaches R` |
 | C plus 36 is past the file, B bytes remaining from C | `the core begins at C and the file ends B bytes on, short of the core's descriptor, 36 bytes` |
+
+A reader of 6.1 reports a condition of this table that reads the file's
+bytes. The condition that reads the caller's clock is the tool's alone,
+and a reader of a file whose clock tag is `!V` at a rate other than 50
+reports the record of 6.4.
 
 **4.6 The program**, as the stub runs it under TOS. Scan codes are the
 IKBD's; `N` is the field at 10, `rate` the field at 14, `rows` the field
@@ -631,9 +637,10 @@ The first line is `{"kind":"K","bytes":F}`, F the file's bytes and K the
 first kind of the four the file meets, read in this order: `multi` where
 bytes 0 to 3 are `YMXM` (0.2), `bound` where they are `YMXB` (1.2),
 `program` where the word at 0 is $601A (4.4), and `sndh` where bytes 12
-to 15 are `SNDH` (3.1). The lines after it are 6.2 to 6.5, by kind. A
-reader of a file that breaks a rule of 0.4 or 4.5 reports that line and
-stops.
+to 15 are `SNDH` (3.1). The lines after it are 6.2 to 6.5, by kind.
+Where the file meets none of the four, report `not a file BINARIES.md
+defines: no YMXM, YMXB, $601A or SNDH` and stop; where it breaks a rule
+of 0.4 or 4.5, report that line alone and stop.
 
 **6.2 A multi file** (0.2), after the first line:
 
@@ -664,14 +671,15 @@ stops.
   zero byte where a tag name would begin skipped, A its first byte:
   `{"part":"tag","name":"TITL","at":A,"text":"T"}` for `TITL`, `COMM`,
   `CONV` and `FLAG`, T the bytes after the four of the name to its zero
-  byte, the `~` of `FLAG` among them, where 4.5 step 2 keeps the
+  byte; of `FLAG` the `~` stands in T, where 4.5 step 2 keeps the
   letters after it; `{"part":"tag","name":"##","at":A,"subtunes":N}`, N
   its two digits; `{"part":"tag","name":"TC","at":A,"rate":H}`, or `!V`
   in place of `TC`, H the leading decimal digits after the two of the
   name;
   `{"part":"tag","name":"FRMS","at":A,"frames":[...]}`, the `N` longs;
   `{"part":"tag","name":"!#SN","at":A,"names":[...]}`, the `N` names in
-  subtune order, read as 4.5 step 2 reads them; and
+  subtune order, each read to its zero byte from the byte after the
+  offset words (4.5 step 2); and
   `{"part":"tag","name":"HDNS","at":A}`, last.
 - `{"part":"core","at":H,"version":V,"binds":R,"fixed":F,"flags":G,
   "state":S,"subtunes":T,"work":W}`, H the core's first byte,
@@ -681,7 +689,8 @@ stops.
   `N` longs after it, each plus H (2.5).
 - a line a subtune, 1 to `N`, in order: `{"part":"tune","number":i,
   "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
-  "state":D,"image":I,"table":C}`, A its offset from the subtune table,
+  "state":D,"image":I,"table":C}`, A the offset subtune i has in the
+  subtune table, plus H,
   the fields of 1.2 read at A as 6.3 reads them, and B the bytes to the
   next subtune, or, for the last, to the image at the lowest offset;
   then a line a source of that subtune, as 6.3 defines them, each `at`
@@ -700,8 +709,8 @@ stops.
   first byte less 28, and C the core's offset plus the SNDH file's
   first byte.
 - `{"part":"sndh","at":A}`, A the SNDH file's first byte: the lowest
-  even offset from 28 where bytes A + 12 to A + 15 are `SNDH`.
-- the lines 6.4 defines for the SNDH file at A, its first line left
-  out, every offset counted from the program's first byte. The SNDH
+  even offset, 28 or above, where bytes A + 12 to A + 15 are `SNDH`.
+- the lines 6.4 defines for the SNDH file at A, the first line of 6.1
+  left out, every offset counted from the program's first byte. The SNDH
   file ends at 28 plus the long at 2, the relocation table standing
   after it (4.4), and the workspace's `bytes` counts to that end.
