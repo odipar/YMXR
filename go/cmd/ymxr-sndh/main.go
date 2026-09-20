@@ -30,7 +30,7 @@ import (
 func main() {
 	t, args := tool.Of("ymxr-sndh", os.Args[1:], flags.Tags...)
 	flags.Only(t, args, flags.Tags)
-	options := sndh.Options{}
+	options := sndh.Options{Asked: flags.AskedOf(t, args)}
 	for _, flag := range args {
 		switch {
 		case flag == "-perf":
@@ -41,8 +41,8 @@ func main() {
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":
 			options.Ticks = sndh.Absolute
-		case flag == "-vbl":
-			options.VBL = true
+		case flag == "-vbl" || flag == "-tc":
+			// the clock asked for, read by AskedOf above
 		case strings.HasPrefix(flag, "-copies"):
 			t.Usage("not a flag of the tool: " + flag + "; a tune file is packed already")
 		case strings.HasPrefix(flag, "-t"):

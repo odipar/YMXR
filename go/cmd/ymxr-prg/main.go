@@ -21,21 +21,16 @@ import (
 
 func main() {
 	t, args := tool.Of("ymxr-prg", os.Args[1:], flags.Rows...)
-	flags.Only(t, args, flags.Rows, flags.VBL)
+	flags.Only(t, args, flags.Rows, flags.Clocks)
 	rows := flags.RowsOf(t, args, 0)
-	vbl := false
-	for _, flag := range args {
-		if flag == "-vbl" {
-			vbl = true
-		}
-	}
+	asked := flags.AskedOf(t, args)
 	said := report.Of(t.Reports())
 	file := t.Bytes()
-	prg, err := sndh.Program(file, rows, vbl)
+	prg, err := sndh.Program(file, rows, asked)
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
-	made(said, file, prg, rows, vbl)
+	made(said, file, prg, rows, asked)
 	rowed := "until a key stops it"
 	if rows != 0 {
 		rowed = fmt.Sprintf("%d rows", rows)
@@ -46,7 +41,7 @@ func main() {
 
 // made says what the program was made of: the file under it, and what the
 // stub was patched with.
-func made(said *report.Report, file, prg []byte, rows int64, vbl bool) {
+func made(said *report.Report, file, prg []byte, rows int64, asked sndh.Asked) {
 	if !said.Says() {
 		return
 	}
@@ -72,18 +67,21 @@ func made(said *report.Report, file, prg []byte, rows int64, vbl bool) {
 	} else {
 		said.Row("the rows to play", fmt.Sprintf("%d", rows))
 	}
-	said.Row("it plays from", from(tags, flags, vbl))
+	said.Row("it plays from", from(tags, flags, asked))
 	said.Row("the screen", "cleared before the banner")
 	said.Say(fmt.Sprintf("the program: %d bytes", len(prg)))
 }
 
 // from is the clock the program plays from, and what named it: the
 // caller, the file's clock tag, or its claims.
-func from(tags sndh.Tagged, flags int, vbl bool) string {
+func from(tags sndh.Tagged, flags int, asked sndh.Asked) string {
 	if flags&sndh.FlagVBL == 0 {
+		if asked == sndh.AskedTimerC {
+			return "Timer C, asked for"
+		}
 		return "Timer C, 200 ticks a second and the rate's share of them"
 	}
-	if vbl {
+	if asked == sndh.AskedVBL {
 		return "the VBL, asked for"
 	}
 	if tags.Clock == sndh.ClockVBL {

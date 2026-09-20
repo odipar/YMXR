@@ -158,12 +158,14 @@ final class ParityTest {
         both("ymxr-sndh", tune, "-silent", "-pcrel");
         both("ymxr-sndh", tune, "-silent", "-lean", "-pcrel");
         both("ymxr-sndh", tune, "-silent", "-vbl");
+        both("ymxr-sndh", tune, "-silent", "-perf", "-tc");
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-tOne"), "-silent", "-r2000");
         // the clock the file names, the VBL asked for over it, and the
         // VBL the monitor names
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent"), "-silent", "-vbl");
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-vbl"), "-silent");
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-perf"), "-silent");
+        both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-perf"), "-silent", "-tc");
     }
 
     @Test
@@ -231,6 +233,7 @@ final class ParityTest {
         both("ymxs-to-sndh", structure, "-vbl");
         both("ymxs-to-prg", structure);
         both("ymxs-to-prg", structure, "-vbl");
+        both("ymxs-to-prg", structure, "-perf", "-tc");
         both("ymxr-bind", tune);
         both("ymxr-trace", tune, "-r200");
         both("ymxr-check", dump);

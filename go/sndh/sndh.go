@@ -110,6 +110,17 @@ const (
 	Absolute
 )
 
+// Asked is the clock the caller asks the tag block to name: the one the
+// set and the core select, the VBL, or Timer C (tools.md 12.1).
+type Asked int
+
+// The three.
+const (
+	AskedChosen Asked = iota
+	AskedVBL
+	AskedTimerC
+)
+
 // Options is the tag block's text: the title, the composer where there is
 // one, and a name a subtune where the caller names them; and the core the
 // file uses, which Monitor and Lean select a switch of and Ticks the
@@ -121,7 +132,7 @@ type Options struct {
 	Monitor  bool
 	Lean     bool
 	Ticks    Ticks
-	VBL      bool
+	Asked    Asked
 }
 
 // Of is the file, from the tune files as subtunes 1 up, around the core
@@ -320,15 +331,33 @@ func Flag(claimed int) string {
 	return text + "y"
 }
 
-// Clock is the clock tag: 'TC' and the rate, Timer C, where the claims
-// byte leaves Timer C free, and '!V' and the rate, the VBL, where it has
-// Timer C or the VBL is asked for. A host calls play from that
-// clock (BINARIES.md 5.4).
-func Clock(claimed, rate int, vbl bool) string {
-	if vbl || claimed&TimerC != 0 {
-		return ClockVBL + fmt.Sprintf("%d", rate)
+// Clock is the clock tag: '!V' and the rate, the VBL, where the claims
+// byte has Timer C, since the player's handler then has that timer, or
+// where the VBL is asked for; 'TC' and the rate, Timer C, otherwise. A
+// host calls play from that clock (BINARIES.md 5.4).
+func Clock(claimed, rate int, asked Asked) (string, error) {
+	if claimed&TimerC != 0 {
+		if asked == AskedTimerC {
+			return "", fmt.Errorf("the set claims Timer C and the clock asked for is" +
+				" Timer C: the player's handler has that timer")
+		}
+		return ClockVBL + fmt.Sprintf("%d", rate), nil
 	}
-	return ClockTimerC + fmt.Sprintf("%d", rate)
+	if asked == AskedVBL {
+		return ClockVBL + fmt.Sprintf("%d", rate), nil
+	}
+	return ClockTimerC + fmt.Sprintf("%d", rate), nil
+}
+
+// AskedOf is the clock the tag block names: the one asked for, and the
+// VBL where the raster monitor is in and the caller leaves the clock to
+// the tool, since the monitor paints one frame of calls and reads
+// against the raster where the tick comes from the VBL.
+func AskedOf(options Options) Asked {
+	if options.Asked == AskedChosen && options.Monitor {
+		return AskedVBL
+	}
+	return options.Asked
 }
 
 // Tags is the tag block, 'SNDH' through 'HDNS': TITL, COMM where there is
@@ -349,7 +378,11 @@ func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, erro
 	}
 	tag(&out, "CONV", Converter)
 	tag(&out, fmt.Sprintf("##%02d", n), "")
-	tag(&out, Clock(claimed, rate, options.VBL || options.Monitor), "")
+	clock, err := Clock(claimed, rate, AskedOf(options))
+	if err != nil {
+		return nil, err
+	}
+	tag(&out, clock, "")
 	tag(&out, "FLAG", Flag(claimed))
 	pad(&out)
 	text(&out, "FRMS")

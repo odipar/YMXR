@@ -38,8 +38,8 @@
 #              write an end of interrupt
 #   -pcrel     the core whose ticks read a row through the program
 #              counter, -abs the one whose ticks read an address
-#   -vbl       the VBL as the clock the program plays from, Timer C
-#              without it
+#   -vbl       the VBL as the clock the program plays from, and -tc
+#              Timer C, which -perf would otherwise name the VBL over
 #
 # The program's (tools.md 13):
 #
@@ -72,7 +72,7 @@ composer=
 perf=
 lean=
 ticks=
-vbl=
+clock=
 rows=
 silent=
 help=
@@ -90,7 +90,7 @@ while [ "$left" -gt 0 ]; do
         -perf) perf=-perf ;;
         -lean) lean=-lean ;;
         -pcrel|-abs) ticks=$arg ;;
-        -vbl) vbl=-vbl ;;
+        -vbl|-tc) clock=$arg ;;
         -silent) silent=-silent ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
@@ -166,6 +166,6 @@ while IFS= read -r named; do
     set -- "$@" "$named"
 done < "$work/names"
 "$tools/ymxr-multi" "$@" $silent > "$work/SET.YMXR"
-"$tools/ymxr-sndh" $perf $lean $ticks $vbl $silent ${title:+"-t$title"} \
+"$tools/ymxr-sndh" $perf $lean $ticks $clock $silent ${title:+"-t$title"} \
     ${composer:+"-c$composer"} < "$work/SET.YMXR" > "$work/SET.SND"
 exec "$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"

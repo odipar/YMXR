@@ -74,36 +74,43 @@ final class Prg {
      *     other than 50
      */
     static byte[] of(byte[] sndh, long rows) {
-        return of(sndh, rows, false);
+        return of(sndh, rows, Sndh.Asked.CHOSEN);
     }
 
     /**
-     * The same, the VBL asked for or the file's clock read.
+     * The same, a clock asked for or the file's clock read.
      *
-     * @param vbl the program plays from the VBL over the file's clock tag
-     *     and its claims, at the file's rate
+     * @param asked the clock the program plays from over the file's
+     *     clock tag and its claims, at the file's rate
      */
-    static byte[] of(byte[] sndh, long rows, boolean vbl) {
-        return of(Binaries.stub(), sndh, rows, vbl);
+    static byte[] of(byte[] sndh, long rows, Sndh.Asked asked) {
+        return of(Binaries.stub(), sndh, rows, asked);
     }
 
     /** The same, from the stub named. */
     static byte[] of(byte[] stub, byte[] sndh, long rows) {
-        return of(stub, sndh, rows, false);
+        return of(stub, sndh, rows, Sndh.Asked.CHOSEN);
     }
 
-    /** The same, from the stub named, the VBL asked for or read. */
-    static byte[] of(byte[] stub, byte[] sndh, long rows, boolean vbl) {
+    /** The same, from the stub named, a clock asked for or read. */
+    static byte[] of(byte[] stub, byte[] sndh, long rows, Sndh.Asked asked) {
         checkStub(stub);
         if (rows < 0 || rows > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("rows " + rows + " does not fit a long");
         }
         Tags tags = tags(sndh);
         // The file leaves the stub the VBL where its clock tag names the
-        // VBL and where its set claims Timer C; the VBL asked for stands
+        // VBL and where its set claims Timer C; a clock asked for stands
         // over either (BINARIES.md 4.3).
-        boolean named = tags.clock().equals(Sndh.VBL_CLOCK) || tags.flag().indexOf('c') >= 0;
-        if (named && !vbl && tags.rate() != 50) {
+        boolean claimed = tags.flag().indexOf('c') >= 0;
+        boolean named = tags.clock().equals(Sndh.VBL_CLOCK) || claimed;
+        if (claimed && asked == Sndh.Asked.TIMER_C) {
+            throw new IllegalArgumentException("the set claims Timer C and the clock asked"
+                    + " for is Timer C: the player's handler has that timer");
+        }
+        boolean vbl = asked == Sndh.Asked.VBL
+                || (asked == Sndh.Asked.CHOSEN && named);
+        if (named && asked == Sndh.Asked.CHOSEN && tags.rate() != 50) {
             throw new IllegalArgumentException("the file plays from the VBL at " + tags.rate()
                     + " Hz: the stub's VBL is a 50 Hz clock, so this set needs a separate host"
                     + " or the VBL asked for");
@@ -114,7 +121,7 @@ final class Prg {
         Tune.putLong(prg, 2, stub.length + sndh.length);
         System.arraycopy(stub, 0, prg, HEADER, stub.length);
         Tune.putWord(prg, HEADER + STUB_SUBTUNES_AT, tags.subtunes());
-        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, named || vbl ? FLAG_VBL : 0);
+        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, vbl ? FLAG_VBL : 0);
         Tune.putWord(prg, HEADER + STUB_RATE_AT, tags.rate());
         Tune.putLong(prg, HEADER + STUB_ROWS_AT, (int) rows);
         Tune.putLong(prg, HEADER + STUB_CORE_AT, core);
@@ -124,7 +131,8 @@ final class Prg {
 
     /** What the program was made of: the file under it, the stub's bytes,
      *  and what the stub was patched with. */
-    private static void made(Report report, byte[] sndh, byte[] prg, long rows, boolean vbl) {
+    private static void made(Report report, byte[] sndh, byte[] prg, long rows,
+                             Sndh.Asked asked) {
         if (!report.says()) {
             return;
         }
@@ -137,18 +145,20 @@ final class Prg {
         report.row("the subtunes", String.valueOf(tags.subtunes()));
         report.row("the rows to play", rows == 0 ? "0, until a key stops it"
                 : String.valueOf(rows));
-        report.row("it plays from", from(tags, flags, vbl));
+        report.row("it plays from", from(tags, flags, asked));
         report.row("the screen", "cleared before the banner");
         report.say("the program: " + prg.length + " bytes");
     }
 
     /** The clock the program plays from, and what named it: the caller,
      *  the file's clock tag, or its claims. */
-    private static String from(Tags tags, int flags, boolean vbl) {
+    private static String from(Tags tags, int flags, Sndh.Asked asked) {
         if ((flags & FLAG_VBL) == 0) {
-            return "Timer C, 200 ticks a second and the rate's share of them";
+            return asked == Sndh.Asked.TIMER_C
+                    ? "Timer C, asked for"
+                    : "Timer C, 200 ticks a second and the rate's share of them";
         }
-        if (vbl) {
+        if (asked == Sndh.Asked.VBL) {
             return "the VBL, asked for";
         }
         return tags.clock().equals(Sndh.VBL_CLOCK) ? "the VBL, the file's clock tag"
@@ -347,18 +357,18 @@ final class Prg {
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymxr-prg", flags, Ymxs.ROWS);
-        Ymxs.only(tool, flags, Ymxs.ROWS, Ymxs.VBL);
+        Ymxs.only(tool, flags, Ymxs.ROWS, Ymxs.CLOCKS);
         long rows = Ymxs.rows(tool, flags, 0);
-        boolean vbl = flags.contains("-vbl");
+        Sndh.Asked asked = Ymxs.asked(tool, flags);
         Report report = new Report(tool.reports());
         byte[] sndh = tool.bytes();
         byte[] prg;
         try {
-            prg = of(sndh, rows, vbl);
+            prg = of(sndh, rows, asked);
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
-        made(report, sndh, prg, rows, vbl);
+        made(report, sndh, prg, rows, asked);
         tool.report(prg.length + " bytes, "
                 + (rows == 0 ? "until a key stops it" : rows + " rows"));
         Out.write(tool, prg);

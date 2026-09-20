@@ -33,7 +33,7 @@ public final class YmxsToPrg {
         byte[] sndh = YmxsToSndh.of(tool, multi, flags, report);
         byte[] program;
         try {
-            program = Prg.of(sndh, rows, flags.contains("-vbl"));
+            program = Prg.of(sndh, rows, Ymxs.asked(tool, flags));
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }

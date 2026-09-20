@@ -360,7 +360,9 @@ tool reads.
 4. Bind the set (1.4).
 5. Write the tag block (3.2), its clock tag `!V` where the claims byte of
    the set has Timer C, whose handler is then the player's, or where the
-   VBL is asked for, and `TC` otherwise.
+   VBL is asked for, and `TC` otherwise. Where Timer C is asked for and
+   the claims byte has it, report `the set claims Timer C and the clock
+   asked for is Timer C: the player's handler has that timer`.
 6. Lay the file out as 3.1, reporting the table's last condition where
    it is met.
 

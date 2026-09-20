@@ -392,10 +392,31 @@ final class BinariesTest {
         assertEquals("!V", claimed.clock(), "a host cannot call play from a claimed timer");
         assertEquals("abcdy", claimed.flag());
         assertEquals(60, claimed.rate(), "the clock tag carries the rate either way");
-        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, false));
-        assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50, false), "Timers A, D and B");
-        assertEquals("!V50", Sndh.clock(Sndh.claims(8), 50, false), "effect 3 runs Timer C");
-        assertEquals("!V50", Sndh.clock(Sndh.claims(0), 50, true), "the VBL asked for");
+        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, Sndh.Asked.CHOSEN));
+        assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50, Sndh.Asked.CHOSEN),
+                "Timers A, D and B");
+        assertEquals("!V50", Sndh.clock(Sndh.claims(8), 50, Sndh.Asked.CHOSEN),
+                "effect 3 runs Timer C");
+        assertEquals("!V50", Sndh.clock(Sndh.claims(0), 50, Sndh.Asked.VBL),
+                "the VBL asked for");
+        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, Sndh.Asked.TIMER_C),
+                "Timer C asked for");
+        IllegalArgumentException both = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.clock(Sndh.claims(8), 50, Sndh.Asked.TIMER_C));
+        assertEquals("the set claims Timer C and the clock asked for is Timer C: the"
+                + " player's handler has that timer", both.getMessage());
+    }
+
+    @Test
+    void theMonitorsVblIsAskedAwayByTimerC() throws IOException {
+        List<byte[]> files = List.of(tune("chambers"));
+        Sndh.Options watched = new Sndh.Options("Watched", null, null, true, false);
+        assertEquals("!V", tags(Sndh.of(files, watched)).clock(), "-perf names the VBL");
+        Sndh.Options asked = new Sndh.Options("Watched", null, null, true, false,
+                Sndh.Ticks.CHOSEN, Sndh.Asked.TIMER_C);
+        assertEquals("TC", tags(Sndh.of(files, asked)).clock(), "-tc names Timer C over it");
+        assertEquals(0, Tune.getWord(Prg.of(Sndh.of(files, asked), 0), 28 + Prg.STUB_FLAGS_AT),
+                "and the program plays from Timer C");
     }
 
     @Test
@@ -623,7 +644,12 @@ final class BinariesTest {
         assertEquals("the file plays from the VBL at 60 Hz: the stub's VBL is a 50 Hz clock,"
                 + " so this set needs a separate host or the VBL asked for", wrong.getMessage());
         // the VBL asked for is that separate host named
-        assertEquals(Prg.FLAG_VBL, Tune.getWord(Prg.of(sndh, 0, true), 28 + Prg.STUB_FLAGS_AT));
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(Prg.of(sndh, 0, Sndh.Asked.VBL),
+                28 + Prg.STUB_FLAGS_AT));
+        IllegalArgumentException timer = assertThrows(IllegalArgumentException.class,
+                () -> Prg.of(sndh, 0, Sndh.Asked.TIMER_C));
+        assertEquals("the set claims Timer C and the clock asked for is Timer C: the"
+                + " player's handler has that timer", timer.getMessage());
     }
 
     @Test

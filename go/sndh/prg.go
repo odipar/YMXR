@@ -67,18 +67,18 @@ type Tagged struct {
 }
 
 // Program is the program around an SNDH file, playing that many rows, or
-// playing on where rows is 0, from the clock the file names. vbl plays
-// from the VBL over that clock, at the file's rate.
-func Program(sndh []byte, rows int64, vbl bool) ([]byte, error) {
+// playing on where rows is 0, from the clock the file names. A clock
+// asked for stands over that one, at the file's rate.
+func Program(sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	stub, err := binaries.Read(binaries.Stub)
 	if err != nil {
 		return nil, err
 	}
-	return ProgramWith(stub, sndh, rows, vbl)
+	return ProgramWith(stub, sndh, rows, asked)
 }
 
 // ProgramWith is the same, from the stub named.
-func ProgramWith(stub, sndh []byte, rows int64, vbl bool) ([]byte, error) {
+func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	if err := CheckStub(stub); err != nil {
 		return nil, err
 	}
@@ -90,10 +90,16 @@ func ProgramWith(stub, sndh []byte, rows int64, vbl bool) ([]byte, error) {
 		return nil, err
 	}
 	// The file leaves the stub the VBL where its clock tag names the VBL
-	// and where its set claims Timer C; the VBL asked for stands over
+	// and where its set claims Timer C; a clock asked for stands over
 	// either (BINARIES.md 4.3).
-	named := tags.Clock == ClockVBL || strings.ContainsRune(tags.Flag, 'c')
-	if named && !vbl && tags.Rate != 50 {
+	claimed := strings.ContainsRune(tags.Flag, 'c')
+	named := tags.Clock == ClockVBL || claimed
+	if claimed && asked == AskedTimerC {
+		return nil, fmt.Errorf("the set claims Timer C and the clock asked for is Timer" +
+			" C: the player's handler has that timer")
+	}
+	vbl := asked == AskedVBL || (asked == AskedChosen && named)
+	if named && asked == AskedChosen && tags.Rate != 50 {
 		return nil, fmt.Errorf("the file plays from the VBL at %d Hz: the stub's VBL is"+
 			" a 50 Hz clock, so this set needs a separate host or the VBL asked for",
 			tags.Rate)
@@ -108,7 +114,7 @@ func ProgramWith(stub, sndh []byte, rows int64, vbl bool) ([]byte, error) {
 	copy(prg[Header:], stub)
 	ymxr.PutWord(prg, Header+stubSubtunesAt, tags.Subtunes)
 	flags := 0
-	if named || vbl {
+	if vbl {
 		flags |= FlagVBL
 	}
 	ymxr.PutWord(prg, Header+StubFlagsAt, flags)

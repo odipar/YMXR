@@ -114,14 +114,31 @@ final class Ymxs {
 
     /** The tags {@code ymxs-to-sndh} reads, the switches that select the
      *  core among the eight (BINARIES.md 2.1), and the clock asked for. */
-    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl"};
+    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel", "-abs",
+        "-vbl", "-tc"};
 
     /** The row count {@code ymxs-to-prg} reads. */
     static final String[] ROWS = {"-r"};
 
-    /** The clock {@code ymxr-prg} reads: the VBL over the clock the file
+    /** The clocks {@code ymxr-prg} reads, each over the clock the file
      *  names. */
-    static final String[] VBL = {"-vbl"};
+    static final String[] CLOCKS = {"-vbl", "-tc"};
+
+    /** The clock asked for, where the two flags name one; a call that
+     *  names both is wrong (exit 2). */
+    static Sndh.Asked asked(Tool tool, List<String> flags) {
+        Sndh.Asked asked = Sndh.Asked.CHOSEN;
+        for (String flag : flags) {
+            if (flag.equals("-vbl") || flag.equals("-tc")) {
+                Sndh.Asked one = flag.equals("-vbl") ? Sndh.Asked.VBL : Sndh.Asked.TIMER_C;
+                if (asked != Sndh.Asked.CHOSEN && asked != one) {
+                    throw tool.usage("-vbl and -tc name two clocks");
+                }
+                asked = one;
+            }
+        }
+        return asked;
+    }
 
     /** Every argument checked against the flags the tool reads: a call
      *  that passes another, or a file name, is wrong (exit 2). */

@@ -42,14 +42,34 @@ var PackingFlags = []string{"-k", "-m", "-copies"}
 
 // Tags is the tags ymxs-to-sndh reads, the two cores it selects between,
 // and the clock asked for.
-var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl"}
+var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl", "-tc"}
 
 // Rows is the row count a program stops after.
 var Rows = []string{"-r"}
 
-// VBL is the clock ymxr-prg reads: the VBL over the clock the file
+// Clocks are the clocks ymxr-prg reads, each over the clock the file
 // names.
-var VBL = []string{"-vbl"}
+var Clocks = []string{"-vbl", "-tc"}
+
+// AskedOf is the clock the flags ask for, where the two name one; a call
+// that names both is wrong (exit 2).
+func AskedOf(t *tool.Tool, args []string) sndh.Asked {
+	asked := sndh.AskedChosen
+	for _, flag := range args {
+		if flag != "-vbl" && flag != "-tc" {
+			continue
+		}
+		one := sndh.AskedVBL
+		if flag == "-tc" {
+			one = sndh.AskedTimerC
+		}
+		if asked != sndh.AskedChosen && asked != one {
+			t.Usage("-vbl and -tc name two clocks")
+		}
+		asked = one
+	}
+	return asked
+}
 
 // PackingOf is the packing the flags ask for.
 func PackingOf(t *tool.Tool, args []string) Packing {
@@ -197,7 +217,7 @@ func decimal(t *tool.Tool, said, flag string) float64 {
 // several.
 func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 	said *report.Report) []byte {
-	options := sndh.Options{}
+	options := sndh.Options{Asked: AskedOf(t, args)}
 	title, composer := "", ""
 	for _, flag := range args {
 		switch {
@@ -209,8 +229,8 @@ func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":
 			options.Ticks = sndh.Absolute
-		case flag == "-vbl":
-			options.VBL = true
+		case flag == "-vbl" || flag == "-tc":
+			// the clock asked for, read by AskedOf below
 		case strings.HasPrefix(flag, "-copies"):
 		case strings.HasPrefix(flag, "-t"):
 			title = flag[2:]

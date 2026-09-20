@@ -29,13 +29,7 @@ func main() {
 	said := report.Of(t.Reports())
 	multi := flags.Read(t)
 	file := flags.SndhOf(t, multi, args, said)
-	vbl := false
-	for _, flag := range args {
-		if flag == "-vbl" {
-			vbl = true
-		}
-	}
-	prg, err := sndh.Program(file, rows, vbl)
+	prg, err := sndh.Program(file, rows, flags.AskedOf(t, args))
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
