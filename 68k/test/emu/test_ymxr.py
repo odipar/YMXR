@@ -21,6 +21,10 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        Hatari, and the kit's voices beside
                                        them: no dump converts to a target
                                        of several registers
+       test_ymxr.py -stub [tunes]      the program stub's two clocks under
+                                       Hatari: one SNDH file played from
+                                       Timer C and from the VBL, the rows
+                                       one stream either way
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
                                        the monitor moves no chip write
@@ -87,6 +91,10 @@ HATARI = os.environ.get("HATARI", "hatari")
 TOS = os.environ.get("TOS", os.path.expanduser("~/hatari-2.6.1_macos/tos-2.06.rom"))
 # The rows the program is asked to play before it stops (bin/ymxr-prg -r).
 STUB_FRAMES = 2000
+
+# The frames a run of -stub plays from each clock, where the row stream is
+# read rather than the tune.
+STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
 # (BINARIES.md 1): 3 where every source of the tune is one column and 4
 # where one has several, and a reader and the player read both.
@@ -1650,6 +1658,96 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
     return stale
 
 
+def under_hatari(work, name, vbls, trace_kinds="psg_write,video_vbl"):
+    """One program under Hatari for that many VBLs: the chip writes in
+    order, each with the VBL it lands in and the address that wrote it,
+    and where the SNDH file loaded."""
+    trace = os.path.join(work, name + ".trace")
+    r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+                        "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                        "--sound", "off", "--conout", "2", "--fast-forward", "on",
+                        "--disable-video", "1", "--run-vbls", str(vbls),
+                        "--log-level", "fatal", "--trace", trace_kinds,
+                        "--trace-file", trace, name], cwd=work, capture_output=True)
+    said = re.search(r"YMXR at \$([0-9A-F]{8})", r.stdout.decode(errors="replace"))
+    assert said, "%s printed no address: %s" % (
+        name, r.stdout.decode(errors="replace")[-300:])
+    at = int(said.group(1), 16)
+    writes = []
+    frame = 0
+    for line in open(trace, errors="replace"):
+        if VBLA.match(line):
+            frame += 1
+            continue
+        w = WRITE.search(line)
+        if w and int(w.group(3), 16) < ROM:
+            writes.append((frame, int(w.group(1), 16), int(w.group(2), 16),
+                           int(w.group(3), 16)))
+    return writes, at
+
+
+def clocks(ym, code, symbols):
+    """The stub's two clocks over one SNDH file (BINARIES.md 4.3, 4.7):
+    the program plays from Timer C, which the file's clock tag names, and
+    from the VBL where -vbl names it. The rows the frame procedure
+    writes are one stream either way, and each run plays one row a frame.
+    An effect's handler writes the chip from its timer, which runs at its
+    period, so the two clocks interleave those writes among the rows
+    differently: they are counted here and left out of the comparison."""
+    work = tempfile.mkdtemp()
+    file, report = convert(ym, work)
+    bound = bind(file, work)
+    assert bound is not None, "the binder rejected the tune"
+    rate = Tune(bound, work).rate
+    assert rate == 50, "-stub requires tunes at 50 Hz, and this one plays at %d" % rate
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent",
+                        "-t" + os.path.basename(ym)] + ([] if PCREL else ["-abs"]),
+                       input=file, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    sndh_bytes = r.stdout
+    tags = sndh_bytes[12:sndh_bytes.find(b"HDNS")]
+    assert b"TC" in tags, "the file names Timer C: " + repr(tags)
+    played = {}
+    for name, asked in (("TIMERC.PRG", False), ("VBL.PRG", True)):
+        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
+                            "-r%d" % STUB_CLOCKS] + (["-vbl"] if asked else []),
+                           input=sndh_bytes, capture_output=True)
+        assert r.returncode == 0, r.stderr.decode()
+        open(os.path.join(work, name), "wb").write(r.stdout)
+        flags = r.stdout[28 + 12] << 8 | r.stdout[28 + 13]
+        assert flags == (2 if asked else 0), "%s reads flags %d" % (name, flags)
+        writes, at = under_hatari(work, name, STUB_CLOCKS + 400)
+        core = sndh_bytes.find(b"YMXS") - 12
+        assert core >= 12, "the core is not in the SNDH file"
+        assert sndh_bytes[core:core + 28] == code[:28] \
+            and sndh_bytes[core + 36:core + len(code)] == code[36:], \
+            "the core in the file is not the one assembled, its two patched longs aside"
+        base = at + core
+        frame = (base + symbols["ymxr_frame"], base + symbols["ymxr_reads"])
+        played[name] = [(f, reg, value, frame[0] <= pc < frame[1])
+                        for f, reg, value, pc in writes]
+    timer, vbl = played["TIMERC.PRG"], played["VBL.PRG"]
+    rows = [[(reg, value) for _, reg, value, row in w if row] for w in (timer, vbl)]
+    assert rows[0] == rows[1], \
+        "the two clocks played %d writes of a row and %d, or wrote different values" % (
+            len(rows[0]), len(rows[1]))
+    assert rows[0], "the frame procedure wrote no register"
+    spans = []
+    for w in (timer, vbl):
+        of = [f for f, _, _, row in w if row]
+        spans.append(of[-1] - of[0])
+    # A row whose columns are unset leaves every register as it is, so
+    # the span runs short of the rows played, and a tune ends its writes
+    # where it ends them; the two clocks run those writes over the same
+    # frames, one row a frame under either, the phase of the first row
+    # and the last aside.
+    assert abs(spans[0] - spans[1]) <= 2 and max(spans) <= STUB_CLOCKS + 1, \
+        "%d rows took %d frames from Timer C and %d from the VBL" % (
+            STUB_CLOCKS, spans[0], spans[1])
+    ticked = len(timer) - len(rows[0])
+    return len(rows[0]), ticked, spans[0], spans[1]
+
+
 def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
     trace records, checked against the model, and the ticks counted. code
@@ -1661,8 +1759,9 @@ def hatari(ym, code, symbols, perf=False):
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
-    # the frames are cut at the VBL, which the program plays from where the
-    # screen's rate is the tune's: Hatari's ST here refreshes at 50 Hz
+    # the frames are cut at the VBL, and -vbl below names the VBL as the
+    # clock the program plays from (BINARIES.md 4.3): Hatari's ST here
+    # refreshes at 50 Hz, the rate the tune plays at
     assert tune.rate == 50, "-hatari requires tunes at 50 Hz, and this one plays at %d" % tune.rate
     sndh = os.path.join(work, "TUNE.SND")
     # These switches select the core in the file; the rig assembled the same
@@ -1670,7 +1769,7 @@ def hatari(ym, code, symbols, perf=False):
     # missed here fails there rather than running the plain core. The tool
     # reads a row through the program counter unasked, so a run under
     # -abs passes -abs for the core the rig assembled.
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent",
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-vbl",
                         "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
                        + (["-lean"] if LEAN else [])
                        + ([] if PCREL else ["-abs"]),
@@ -2110,6 +2209,7 @@ def main():
     count = "-cycles" in sys.argv
     parts = "-refill" in sys.argv
     real = "-hatari" in sys.argv
+    stub = "-stub" in sys.argv
     kit = "-kit" in sys.argv
     global PCREL, FILE
     PCREL = "-abs" not in sys.argv
@@ -2214,7 +2314,7 @@ def main():
         print("    %s" % wholebyte(code, symbols))
         if PCREL:
             print("    %s" % outofreach(code, symbols))
-    if real:
+    if real or stub:
         code, symbols = assemble("YMXR_sndh.S", defines=defines)
     cycles_of = None
     if count or parts:
@@ -2228,6 +2328,15 @@ def main():
     another = []
     for ym in tunes:
         try:
+            if stub:
+                writes, ticked, timed, framed = clocks(ym, code, symbols)
+                line = ("%-45s %6d writes of a row, one stream from both clocks, over %d"
+                        " frames from Timer C and %d from the VBL"
+                        % (os.path.basename(ym), writes, timed, framed))
+                if ticked:
+                    line += ", %d writes of a tick beside them" % ticked
+                print(line)
+                continue
             if real:
                 frames, ticks = hatari(ym, code, symbols, perf)
                 print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
