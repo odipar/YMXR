@@ -9,7 +9,8 @@
 // and -pcrel the core whose ticks read a row through the program counter
 // (BINARIES.md 5.5). The three are one switch each, and any two together
 // select the core that is both, so -perf -lean reads what a lean run
-// costs.
+// costs. The clock tag names Timer C, or the VBL where -vbl or -perf is
+// passed, and a host plays from the clock it names (BINARIES.md 3.2).
 package main
 
 import (

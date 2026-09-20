@@ -8,7 +8,9 @@
 //
 // -perf selects the core with the raster monitor in and -lean the core
 // whose ticks neither drop the interrupt level nor write an end of
-// interrupt (doc/performance.md); the packer's flags are ymxs-to-ymxr's.
+// interrupt (doc/performance.md); -vbl names the VBL as the clock a host
+// plays from, and -perf names it too (BINARIES.md 3.2); the packer's
+// flags are ymxs-to-ymxr's.
 package main
 
 import (

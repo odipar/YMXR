@@ -50,7 +50,7 @@ and this repository reads that table.
 | player | The program that reads the tune's table one row a frame, writes the columns that row sets to the YM2149 and the MFP, and at each tick of a timer writes one row of its source. | requirements.md R4 |
 | prescaler | The first divisor of a timer: 4, 10, 16, 50, 64, 100 or 200, its select in the timer control register 1 to 7. | terminology.md, 2. The timers |
 | procedure | What a clock calls with a row: it writes the row to the chips. The frame's procedure writes the columns a row of the tune's table sets, a target a row of a source. | terminology.md, 3. Tables, rows and procedures |
-| program stub | A block prepended to an SNDH file, making a TOS program: it keeps the vectors and the timer registers it uses, plays the file from the VBL or Timer C, and restores them when a key or the row count ends the program. | BINARIES.md 4 |
+| program stub | A block prepended to an SNDH file, making a TOS program: it keeps the vectors and the timer registers it uses, plays the file from the clock its tag names, the VBL or Timer C, and restores them when a key or the row count ends the program. | BINARIES.md 4 |
 | `R` | The row count of a table, 1 upward. | requirements.md R1.1 |
 | raster monitor | A build of the player, `YMXR_PERF`, off by default, whose play call sets the background colour red for its duration and yellow for the counted cost of the ticks, and whose tick handlers each set a colour; the cycles are measured off the screen of a cycle-exact machine. | performance.md |
 | rate | The ticks a second of a timer (terminology.md 2.2); the frames a second of a tune is its frame rate. | terminology.md, 2. The timers |
