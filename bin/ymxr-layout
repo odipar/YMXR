@@ -1,0 +1,3 @@
+#!/bin/sh
+# What a reader reports of a file this writes (BINARIES.md 6). doc/tools.md, Layout.
+exec "$(dirname -- "$0")/run" org.ymxr.Layout "$@"

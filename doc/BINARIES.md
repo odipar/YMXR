@@ -617,8 +617,8 @@ or assembles the player with `YMXR_PCREL=0`, whose ticks read an absolute
 address and reach any offset.
 
 Note: the tools that write the files of this document are
-`bin/ymxr-multi`, `bin/ymxr-bind`, `bin/ymxr-sndh` and `bin/ymxr-prg`
-([tools.md](tools.md)).
+`bin/ymxr-multi`, `bin/ymxr-bind`, `bin/ymxr-sndh` and `bin/ymxr-prg`,
+and `bin/ymxr-layout` writes the record of 6 ([tools.md](tools.md)).
 
 ---
 

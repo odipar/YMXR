@@ -261,13 +261,13 @@ final class ParityTest {
         both("ymxr-prg", both("ymxr-sndh", split));
     }
 
-    /** Every tool of the eleven (tools.md 2), for a check that runs them
+    /** Every tool of the twelve (tools.md 2), for a check that runs them
      *  all. `ymxr-check` stood outside this list while the comment over it
      *  read eleven. */
     private static final List<String> EVERY_TOOL = List.of("ym-to-ymxs",
             "ym-to-ymxr", "ymxs-to-ymxr", "ymxs-to-sndh", "ymxs-to-prg",
             "ymxr-bind", "ymxr-check", "ymxr-multi", "ymxr-sndh", "ymxr-prg",
-            "ymxr-trace");
+            "ymxr-trace", "ymxr-layout");
 
     /**
      * The tools this runs against the tools tools.md 2 lists. The list
@@ -277,7 +277,7 @@ final class ParityTest {
     @Test
     void everyToolTheDocumentListsIsRunHere() throws Exception {
         String tools = Files.readString(Path.of("doc", "tools.md"));
-        int at = tools.indexOf("## 2. The eleven tools");
+        int at = tools.indexOf("## 2. The twelve tools");
         assertTrue(at >= 0, "tools.md lists no tools");
         String table = tools.substring(at, tools.indexOf("\n\n", tools.indexOf("|", at)));
         List<String> listed = new ArrayList<>();
@@ -286,7 +286,7 @@ final class ParityTest {
         while (row.find()) {
             listed.add(row.group(1));
         }
-        assertEquals(11, listed.size(), "tools.md 2 lists " + listed);
+        assertEquals(12, listed.size(), "tools.md 2 lists " + listed);
         assertEquals(new TreeSet<>(listed), new TreeSet<>(EVERY_TOOL),
                 "a tool of tools.md 2 is run here, and one run here is listed there");
     }
@@ -321,12 +321,27 @@ final class ParityTest {
         }
     }
 
+    /** The record of every file of the binaries kit, from both trees:
+     *  the four kinds of BINARIES.md 6 read the same. */
+    @Test
+    void everyFileOfTheBinariesKitRecordsTheSameInBothTrees() throws Exception {
+        Path files = Path.of("doc", "conformance-binaries", "files");
+        try (Stream<Path> found = Files.list(files)) {
+            for (Path file : found.sorted().toList()) {
+                byte[] record = both("ymxr-layout", Files.readAllBytes(file));
+                assertArrayEquals(Files.readAllBytes(Path.of("doc", "conformance-binaries",
+                        "records", file.getFileName() + ".jsonl")), record,
+                        file + "'s record is the kit's");
+            }
+        }
+    }
+
     @Test
     void aWrongInputIsWrongInBothTrees() throws Exception {
         byte[] nonsense = "not a file of any of these".getBytes();
         for (String tool : List.of("ym-to-ymxs", "ym-to-ymxr", "ymxs-to-ymxr",
                 "ymxs-to-sndh", "ymxs-to-prg", "ymxr-bind", "ymxr-sndh", "ymxr-prg",
-                "ymxr-trace")) {
+                "ymxr-trace", "ymxr-layout")) {
             Ran java = ran(Path.of("bin"), tool, nonsense, "-silent");
             Ran go = ran(built(), tool, nonsense, "-silent");
             assertEquals(1, java.exit(), tool + " reads no such input: " + java.said());

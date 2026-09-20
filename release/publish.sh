@@ -1,5 +1,5 @@
 #!/bin/sh
-# The standalone YMXR executables: the eleven tools of doc/tools.md, one
+# The standalone YMXR executables: the twelve tools of doc/tools.md, one
 # set per platform, each containing the nine 68000 binaries and DTX's
 # twenty-two images, so a machine with neither this repository nor a
 # toolchain can convert a dump and write a program that plays it.
@@ -31,7 +31,7 @@ case $OUT in /*) ;; *) OUT=$REPO/$OUT ;; esac
 TARGETS=${TARGETS:-"win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64"}
 TOOLS="ym-to-ymxs ymxs-to-ymxr ymxs-to-sndh ymxs-to-prg \
        ym-to-ymxr ymxr-multi ymxr-bind ymxr-sndh ymxr-prg \
-       ymxr-trace ymxr-check"
+       ymxr-trace ymxr-layout ymxr-check"
 
 # The version names the zips. The pom is where it is recorded, and this
 # reads the text rather than running anything.

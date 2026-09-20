@@ -85,9 +85,9 @@ and 7, then the [conformance kit](doc/conformance). Read SPEC.md with
 
 | source | contents |
 |---|---|
-| [`src/main/java/org/ymxr/`](src/main/java/org/ymxr) | the eleven tools in Java, the reference: the converters, the check, the trace, the binder and the combiners |
-| [`go/`](go) | the same eleven in Go, the executables a release ships |
-| [`bin/`](bin) | the eleven as scripts, each writing standard output; nine read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1), and `ymxr-set` runs the calls of a whole set (16.6) |
+| [`src/main/java/org/ymxr/`](src/main/java/org/ymxr) | the twelve tools in Java, the reference: the converters, the check, the two records, the binder and the combiners |
+| [`go/`](go) | the same twelve in Go, the executables a release ships |
+| [`bin/`](bin) | the twelve as scripts, each writing standard output; ten read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1), and `ymxr-set` runs the calls of a whole set (16.6) |
 | [`68k/YMXR.S`](68k/YMXR.S) | the player; `YMXR_PERF` builds the raster monitor in |
 | [`68k/YMXR_sndh.S`](68k/YMXR_sndh.S), [`68k/YMXR_prg.S`](68k/YMXR_prg.S) | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool |
 | [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 18), and [`ym/test`](ym/test), ten dumps the tests run on |

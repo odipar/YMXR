@@ -57,7 +57,7 @@ within the packing report (4.5).
 
 ---
 
-## 2. The eleven tools
+## 2. The twelve tools
 
 | tool | reads | writes | flags other than `-silent` |
 |---|---|---|---|
@@ -68,6 +68,7 @@ within the packing report (4.5).
 | `ymxs-to-prg` | a structure | a TOS program (BINARIES.md 4) | the flags of `ymxs-to-sndh` and `-rROWS` |
 | `ymxr-check` | a dump, or the files named | one verdict a dump, on standard output | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
+| `ymxr-layout` | a multi file, a bound tune, an SNDH file or a program | the record of BINARIES.md 6 | - |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
 | `ymxr-multi` | the tune files named | a multi file | `-nNAME` |
 | `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
@@ -399,7 +400,7 @@ list or, in the Go tree, a named file fails to stat (19.5).
 
 ---
 
-## 9. ymxr-trace
+## 9. ymxr-trace and ymxr-layout
 
 **9.1** The input is a tune file; the output its record (SPEC.md 7):
 the first line, then one entry a frame for ROWS frames, `-rROWS`, or by
@@ -421,6 +422,27 @@ after the report.
 
 **9.4** The conformance kit's references are this tool's output
 ([conformance/README.md](conformance/README.md)).
+
+**9.5 `ymxr-layout`.** The input is a file of BINARIES.md 0, 1, 3 or 4,
+a multi file, a bound tune, an SNDH file or a TOS program; the output is
+its record (BINARIES.md 6), one line of JSON a part: the tags and their
+values, the core's descriptor, the subtune table, each bound tune with
+its sources, the images and the workspace, and of a program the PRG
+header, the stub's descriptor and where the SNDH file begins. The tool
+reads a file, so `-silent` is its one flag.
+
+**9.6 The report** is the heading `the file: B bytes, kind K`, K one of
+`multi`, `bound`, `sndh` and `program`, and a row for each part the
+record has more than none of: `the tag(s)`, `the tune(s)`, `the
+source(s)` and `the image(s)`, each the lines of that part. The summary
+line is `ymxr-layout: N line(s)`.
+
+**9.7 Errors.** A file of no kind of 6.1 is `not a file BINARIES.md
+defines: no YMXM, YMXB, $601A or SNDH`, exit 1; a file whose record runs
+past its end is `the record runs past the file's B bytes`, exit 1.
+
+**9.8** The binaries kit's references are this tool's output
+([conformance-binaries/README.md](conformance-binaries/README.md)).
 
 ---
 
@@ -862,7 +884,7 @@ off the path or the Java tree is unbuilt.
 
 ## 20. A release
 
-**20.1** `release/publish.sh [version]` builds the eleven tools from the
+**20.1** `release/publish.sh [version]` builds the twelve tools from the
 Go tree for `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64`
 and `linux-arm64`, one zip a platform in `dist/release`, named
 `ymxr-tools-<platform>-v<version>.zip`, the Windows executables with
