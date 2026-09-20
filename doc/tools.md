@@ -535,26 +535,26 @@ images, the bound tunes, and the remainder. The summary line is
 ## 13. ymxr-prg
 
 **13.1** The input is an SNDH file of section 12; the output the program
-of BINARIES.md 4: the stub patched with the subtune count, the rate and
-the FLAG letters read from the tags, ROWS from `-rROWS`, 0 by default,
-and the core's offset. The program plays ROWS rows and stops, or plays on
-until SPACE or ESC for ROWS 0; lists the subtunes; selects one on LEFT,
-RIGHT, UP, DOWN or a typed number; and starts the next subtune where a
-subtune that plays once has ended.
+of BINARIES.md 4: the stub patched with the subtune count, the rate of
+the clock tag and the FLAG letters read from the tags, ROWS from
+`-rROWS`, 0 by default, and the core's offset. The program plays ROWS
+rows and stops, or plays on until SPACE or ESC for ROWS 0; lists the
+subtunes; selects one on LEFT, RIGHT, UP, DOWN or a typed number; and
+starts the next subtune where a subtune that plays once has ended.
 
-**13.2 Errors**, each exit 1: the lines of BINARIES.md 4's tag reader for
-a file outside the layout (`not an SNDH file: no SNDH at 12`, `the SNDH
-file's tags have no '##' subtune count`, `the SNDH file's tags have no TC
-rate`, `the SNDH file's FRMS tag at A stands before the '##' count that
-sizes it`, the same with `!#SN`, `the SNDH file's tag X at A is not one
-this reads`, `not an SNDH file: no HDNS ends its tags`, `the SNDH file
-has no core: no YMXS past its tags`, `the core begins at C, and the entry
-triple reaches R`, `the core begins at C and the file ends B bytes on,
-short of the core's descriptor, 36 bytes`); `rows N does not fit a long`
-for ROWS outside 0 to 4,294,967,295; and `the set claims Timer C and
-plays at H Hz: the stub then plays from the VBL, a 50 Hz clock, so this
-set needs a separate host` where the FLAG letters have `c` and the rate
-is other than 50.
+**13.2 Errors**, each exit 1: the lines of BINARIES.md 4's tag reader
+for a file outside the layout (`not an SNDH file: no SNDH at 12`, `the
+SNDH file's tags have no '##' subtune count`, `the SNDH file's tags have
+no TC or !V rate`, `the SNDH file's FRMS tag at A stands before the '##'
+count that sizes it`, the same with `!#SN`, `the SNDH file's tag X at A
+is not one this reads`, `not an SNDH file: no HDNS ends its tags`, `the
+SNDH file has no core: no YMXS past its tags`, `the core begins at C,
+and the entry triple reaches R`, `the core begins at C and the file ends
+B bytes on, short of the core's descriptor, 36 bytes`); `rows N does not
+fit a long` for ROWS outside 0 to 4,294,967,295; and `the set claims
+Timer C and plays at H Hz: the stub then plays from the VBL, a 50 Hz
+clock, so this set needs a separate host` where the FLAG letters have
+`c` and the rate is other than 50.
 
 **13.3 The report:** the heading `the SNDH file: B bytes, N subtune(s)
 at H Hz, FLAG <letters>`; the heading `the stub: B bytes, patched` with

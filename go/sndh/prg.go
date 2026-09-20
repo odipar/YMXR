@@ -21,7 +21,7 @@ import (
 //	8       2      the descriptor's version, 1
 //	10      2      the subtunes, patched here from the '##' tag
 //	12      2      flags, patched here
-//	14      2      the rate, rows a second, patched here from the TC tag
+//	14      2      the rate, rows a second, patched here from the clock tag
 //	16      4      the rows to play, patched here; 0 plays on until a key stops it
 //	20      4      the core's offset from the SNDH file's first byte, patched here
 
@@ -132,12 +132,12 @@ func CheckStub(stub []byte) error {
 
 // ReadTags walks the tag block from its first tag to HDNS. A zero byte
 // where a tag name would begin is a pad, one byte. '##' is four bytes, its
-// two digits the subtunes; TC and each text tag, TITL, COMM, CONV and
-// FLAG, run to their zero byte and one past; FRMS is 4 + 4 bytes a
-// subtune, and '!#SN' 4 + 2 bytes a subtune, then a name a subtune, each
-// to its zero byte and one past. The subtunes, the rate and the FLAG
-// letters come from those tags alone, so a title or a composer that reads
-// like a tag patches no field.
+// two digits the subtunes; the clock tag, 'TC' or '!V', and each text tag,
+// TITL, COMM, CONV and FLAG, run to their zero byte and one past; FRMS is
+// 4 + 4 bytes a subtune, and '!#SN' 4 + 2 bytes a subtune, then a name a
+// subtune, each to its zero byte and one past. The subtunes, the rate and
+// the FLAG letters come from those tags alone, so a title or a composer
+// that reads like a tag patches no field.
 func ReadTags(sndh []byte) (Tagged, error) {
 	if len(sndh) < tagsAt+4 || string(sndh[tagsAt:tagsAt+4]) != "SNDH" {
 		return Tagged{}, fmt.Errorf("not an SNDH file: no SNDH at %d", tagsAt)
@@ -166,7 +166,7 @@ func ReadTags(sndh []byte) (Tagged, error) {
 			}
 			subtunes = int(sndh[at+2]-'0')*10 + int(sndh[at+3]-'0')
 			at += 4
-		case strings.HasPrefix(name, "TC"):
+		case strings.HasPrefix(name, "TC") || strings.HasPrefix(name, "!V"):
 			to, err := zero(sndh, at+2)
 			if err != nil {
 				return Tagged{}, err
@@ -176,7 +176,8 @@ func ReadTags(sndh []byte) (Tagged, error) {
 				rate = rate*10 + int(sndh[i]-'0')
 			}
 			if rate == 0 {
-				return Tagged{}, fmt.Errorf("the SNDH file's tags have no TC rate")
+				return Tagged{}, fmt.Errorf("the SNDH file's tags have no TC or" +
+					" !V rate")
 			}
 			at = to + 1
 		case name == "FRMS":
@@ -217,7 +218,7 @@ func ReadTags(sndh []byte) (Tagged, error) {
 		return Tagged{}, fmt.Errorf("the SNDH file's tags have no '##' subtune count")
 	}
 	if rate < 0 {
-		return Tagged{}, fmt.Errorf("the SNDH file's tags have no TC rate")
+		return Tagged{}, fmt.Errorf("the SNDH file's tags have no TC or !V rate")
 	}
 	return Tagged{Subtunes: subtunes, Rate: rate, Flag: flag, End: at}, nil
 }

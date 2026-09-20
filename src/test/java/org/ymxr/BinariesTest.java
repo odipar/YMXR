@@ -175,13 +175,13 @@ final class BinariesTest {
 
     /**
      * The tag block walked from SNDH to HDNS as the tool writes it: the
-     * tags in order, each text tag's text, the '##' count, the TC rate,
-     * the FLAG letters after its '~', FRMS's longs, the names, and where
-     * the block ends, past HDNS. A zero byte where a tag would begin is a
-     * pad, and stands at an odd position.
+     * tags in order, each text tag's text, the '##' count, the clock tag
+     * and its rate, the FLAG letters after its '~', FRMS's longs, the
+     * names, and where the block ends, past HDNS. A zero byte where a tag
+     * would begin is a pad, and stands at an odd position.
      */
-    record Tags(List<String> order, Map<String, String> text, int subtunes, int rate,
-                String flag, int[] frames, List<String> names, int end) {
+    record Tags(List<String> order, Map<String, String> text, int subtunes, String clock,
+                int rate, String flag, int[] frames, List<String> names, int end) {
     }
 
     static Tags tags(byte[] sndh) {
@@ -189,6 +189,7 @@ final class BinariesTest {
         List<String> order = new ArrayList<>();
         Map<String, String> text = new HashMap<>();
         int subtunes = -1;
+        String clock = "";
         int rate = -1;
         String flag = "";
         int[] frames = new int[0];
@@ -212,8 +213,9 @@ final class BinariesTest {
                 at += 4;
                 assertEquals(0, sndh[at], "'##' ends in a zero byte");
                 at++;
-            } else if (name.startsWith("TC")) {
-                order.add("TC");
+            } else if (name.startsWith("TC") || name.startsWith("!V")) {
+                clock = name.substring(0, 2);
+                order.add(clock);
                 int to = at + 2;
                 while (sndh[to] != 0) {
                     to++;
@@ -261,7 +263,7 @@ final class BinariesTest {
                 at = to + 1;
             }
         }
-        return new Tags(order, text, subtunes, rate, flag, frames, names, at);
+        return new Tags(order, text, subtunes, clock, rate, flag, frames, names, at);
     }
 
     /** The file's parts past the tags: the core named, the subtune table,
@@ -332,6 +334,7 @@ final class BinariesTest {
         Tags tags = tags(sndh);
         assertEquals(List.of("TITL", "COMM", "CONV", "##", "TC", "FLAG", "FRMS", "!#SN", "HDNS"),
                 tags.order());
+        assertEquals("TC", tags.clock(), "neither tune claims Timer C");
         assertEquals("Two of the kit", tags.text().get("TITL"));
         assertEquals("Jochen Hippel", tags.text().get("COMM"));
         assertEquals(Sndh.CONVERTER, tags.text().get("CONV"));
@@ -369,12 +372,29 @@ final class BinariesTest {
                 new Sndh.Options("Four", null, null, false, false)));
         assertEquals("abcdy", tags.flag());
         assertEquals(60, tags.rate());
+        assertEquals(List.of("TITL", "CONV", "##", "!V", "FLAG", "FRMS", "HDNS"),
+                tags.order(), "the clock tag stands where TC would");
         // effects 0 to 3 run Timers A, D, B and C
         assertEquals("~ay", Sndh.flag(Sndh.claims(1)));
         assertEquals("~dy", Sndh.flag(Sndh.claims(2)));
         assertEquals("~by", Sndh.flag(Sndh.claims(4)));
         assertEquals("~cy", Sndh.flag(Sndh.claims(8)));
         assertEquals("~y", Sndh.flag(Sndh.claims(0)));
+    }
+
+    @Test
+    void theClockTagIsTheVblWhereTheSetClaimsTimerC() throws IOException {
+        Sndh.Options options = new Sndh.Options("Clock", null, null, false, false);
+        Tags free = tags(Sndh.of(List.of(tune("chambers")), options));
+        assertEquals("TC", free.clock(), "a set that leaves Timer C free plays from it");
+        assertEquals("y", free.flag());
+        Tags claimed = tags(Sndh.of(List.of(tune("four-timers")), options));
+        assertEquals("!V", claimed.clock(), "a host cannot call play from a claimed timer");
+        assertEquals("abcdy", claimed.flag());
+        assertEquals(60, claimed.rate(), "the clock tag carries the rate either way");
+        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50));
+        assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50), "Timers A, D and B");
+        assertEquals("!V50", Sndh.clock(Sndh.claims(8), 50), "effect 3 runs Timer C");
     }
 
     @Test
