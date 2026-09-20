@@ -86,6 +86,9 @@ final class Sndh {
      *  effects 0 to 3 run Timers A, D, B and C. */
     private static final int[] TIMER_OF_EFFECT = {0, 3, 1, 2};
 
+    /** Timer C's bit in a claims byte, the third of A to D. */
+    static final int TIMER_C = 1 << 2;
+
     /**
      * Which ticks the file's core reads a row with (BINARIES.md 2.1).
      * A tool writes {@code CHOSEN} unasked: it stands the core that reads
@@ -315,15 +318,22 @@ final class Sndh {
         return text.append('y').toString();
     }
 
+    /** The clock tag: 'TC' and the rate, Timer C, where the claims byte
+     *  leaves Timer C free, and '!V' and the rate, the VBL, where it has
+     *  Timer C. A host calls play from that clock (BINARIES.md 5.4). */
+    static String clock(int claimed, int rate) {
+        return ((claimed & TIMER_C) != 0 ? "!V" : "TC") + rate;
+    }
+
     /**
      * The tag block, 'SNDH' through 'HDNS': TITL, COMM where there is a
-     * composer, CONV, '##' and two digits, TC and the rate, FLAG, each
-     * text ended by a zero byte, a pad to an even length, FRMS with a long
-     * a subtune, '!#SN' where the caller names them with a word a subtune,
-     * the
-     * name's offset from the tag's first byte, then the names each ended
-     * by a zero byte, a pad to an even length, and HDNS. The '##' count
-     * stands before FRMS and the names, since a reader sizes both by it.
+     * composer, CONV, '##' and two digits, the clock tag and the rate,
+     * FLAG, each text ended by a zero byte, a pad to an even length, FRMS
+     * with a long a subtune, '!#SN' where the caller names them with a
+     * word a subtune, the name's offset from the tag's first byte, then
+     * the names each ended by a zero byte, a pad to an even length, and
+     * HDNS. The '##' count stands before FRMS and the names, since a
+     * reader sizes both by it.
      */
     static byte[] tags(Options options, int rate, int n, int[] frames, int claimed) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -335,7 +345,7 @@ final class Sndh {
         }
         tag(out, "CONV", CONVERTER);
         tag(out, String.format(Locale.ROOT, "##%02d", n), "");
-        tag(out, "TC" + rate, "");
+        tag(out, clock(claimed, rate), "");
         tag(out, "FLAG", flag(claimed));
         pad(out);
         text(out, "FRMS");

@@ -331,7 +331,8 @@ $20 to $7E, the others dropped.
 | `COMM`, the composer, a zero byte | where the composer is other than the empty text |
 | `CONV`, `YMXR (ym-to-ymxr)`, a zero byte | the converter |
 | `##`, two decimal digits, a zero byte | `N`, 01 to 99 |
-| `TC`, the rate in decimal, a zero byte | the rate of the set, in Hz |
+| `TC`, the rate in decimal, a zero byte | the rate of the set, in Hz, where the claims byte of the set leaves Timer C free |
+| `!V`, the rate in decimal, a zero byte | the rate of the set, in Hz, where the claims byte of the set has Timer C |
 | `FLAG`, `~`, letters, `y`, a zero byte | the letters `a` to `d` of the timers in the claims byte of the set, in that order |
 | a zero byte | where the bytes so far are odd |
 | `FRMS`, `N` longs | subtune 1 to `N`: `R` for a tune that plays once, 0 for one that repeats |
@@ -339,13 +340,16 @@ $20 to $7E, the others dropped.
 | a zero byte | where the bytes so far are odd |
 | `HDNS` | |
 
-The claims byte of the set is the claims bytes of its tunes ORed. The
-title and the composer are the tool's (tools.md); where the tool leaves
-the title to the file, of a multi file it is name 1, and `(untitled)`
-where name 1 is the empty text, and of a YMXS multi it is the first
-tune's title, and the composer the first tune's composer where that is
-other than blank. A tune file read alone has the empty name; its recorded
-name (SPEC.md 3.3) is outside what the tool reads.
+The claims byte of the set is the claims bytes of its tunes ORed. One of
+`TC` and `!V` stands in the block, the clock tag: it names the clock a
+host calls play from (5.4), Timer C where the set leaves that timer free
+and the VBL where the set claims it. The title and the composer are the
+tool's (tools.md); where the tool leaves the title to the file, of a
+multi file it is name 1, and `(untitled)` where name 1 is the empty
+text, and of a YMXS multi it is the first tune's title, and the composer
+the first tune's composer where that is other than blank. A tune file
+read alone has the empty name; its recorded name (SPEC.md 3.3) is
+outside what the tool reads.
 
 **3.3 Writing.** A tool with a core and `N` tune files, in order:
 
@@ -384,7 +388,7 @@ the SNDH file begins at the byte after the stub's last.
 | 8 | 2 | the descriptor's version, 1 |
 | 10 | 2 | the subtunes: patched from the `##` tag |
 | 12 | 2 | flags: patched; the word of 4.3 |
-| 14 | 2 | the rate, rows a second: patched from the `TC` tag |
+| 14 | 2 | the rate, rows a second: patched from the clock tag |
 | 16 | 4 | the rows to play: patched; 0 plays until a key stops it |
 | 20 | 4 | the core's offset from the SNDH file's first byte: patched |
 
@@ -401,7 +405,7 @@ a row count `rows` writes, in order:
 1. The PRG header, 28 bytes: the word $601A; a long, the stub's bytes
    plus F; five zero longs; a zero word.
 2. The stub, its fields at 10, 12, 14, 16 and 20 patched: `N` of the
-   `##` tag; the flags of 4.3; the rate of the `TC` tag; `rows`; the
+   `##` tag; the flags of 4.3; the rate of the clock tag; `rows`; the
    core's offset, H of 3.1.
 3. The SNDH file, byte for byte.
 4. One zero long, the relocation table.
@@ -414,11 +418,11 @@ table is empty since every address in the stub and the file is relative.
 1. Check the stub and `rows`, the table's first four conditions.
 2. Read `SNDH` at 12, then the tags from 16 to `HDNS`: a zero byte where
    a tag name would begin is a pad of one byte; `##` is 4 bytes, its two
-   digits `N`; `TC` runs to its zero byte, its leading decimal digits the
-   rate; `TITL`, `COMM`, `CONV` and `FLAG` run to their zero byte, of
-   `FLAG` the letters after `~` kept, or the whole text where `~` is
-   absent; `FRMS` is 4 + 4`N` bytes; `!#SN` is 4 + 2`N` bytes then `N`
-   texts each to its zero byte.
+   digits `N`; the clock tag, `TC` or `!V`, runs to its zero byte, its
+   leading decimal digits the rate; `TITL`, `COMM`, `CONV` and `FLAG`
+   run to their zero byte, of `FLAG` the letters after `~` kept, or the
+   whole text where `~` is absent; `FRMS` is 4 + 4`N` bytes; `!#SN` is
+   4 + 2`N` bytes then `N` texts each to its zero byte.
 3. Where the `FLAG` letters contain `c`, check the rate.
 4. C is where `YMXS` first stands from the byte after `HDNS`, less 12;
    R is 2 + the word at 2 where the word at 0 is $6000, else -1.
@@ -434,12 +438,12 @@ tags stand:
 | `rows` N is outside 0 to 4,294,967,295 | `rows N does not fit a long` |
 | bytes 12 to 15 of the file are other than `SNDH` | `not an SNDH file: no SNDH at 12` |
 | either of the two bytes after `##` is other than a digit | `the SNDH file's tags have no '##' subtune count` |
-| the `TC` text reads as 0 | `the SNDH file's tags have no TC rate` |
+| the clock tag's text reads as 0 | `the SNDH file's tags have no TC or !V rate` |
 | `FRMS` or `!#SN` at A precedes `##` | `the SNDH file's FRMS tag at A stands before the '##' count that sizes it`, or `!#SN` in place of `FRMS` |
 | tag X at A is other than the tags of 3.2 | `the SNDH file's tag X at A is not one this reads` |
 | a tag name or a zero byte is read past the file's end | `not an SNDH file: no HDNS ends its tags` |
 | the tags end and `##` is absent | `the SNDH file's tags have no '##' subtune count` |
-| the tags end and `TC` is absent | `the SNDH file's tags have no TC rate` |
+| the tags end and the clock tag is absent | `the SNDH file's tags have no TC or !V rate` |
 | the `FLAG` letters contain `c` and the rate H is other than 50 | `the set claims Timer C and plays at H Hz: the stub then plays from the VBL, a 50 Hz clock, so this set needs a separate host` |
 | `YMXS` is absent past `HDNS` | `the SNDH file has no core: no YMXS past its tags` |
 | C is before the byte after `HDNS`, or R is other than C | `the core begins at C, and the entry triple reaches R` |
@@ -579,16 +583,17 @@ written 0, and R7 written $FF. A timer outside the claims byte is left as
 it is by both.
 
 **5.4 An SNDH host.** It loads the file on an even address, calls init
-with `d0.w` the subtune, 1 to `N`, calls play at the rate of the `TC`
+with `d0.w` the subtune, 1 to `N`, calls play at the rate of the clock
 tag, and calls exit at the end; it reads the end of a tune that plays
-once in the state byte (2.4). The `TC` tag names Timer C as the clock an
-SNDH host under TOS calls play from: the program of 4 writes Timer C's
-vector with a separate handler, leaves the timer at the operating
-system's 200 Hz, adds the rate to an accumulator on each tick and plays a
-row for each 200 the accumulator reaches (4.7, 4.8), and restores the
-vector at the end (4.6 step 6). The `FLAG` letters list the timers the
-set claims: a host that ticks from a timer selects one outside them, and
-a set whose letters contain `c` plays from the VBL or another clock.
+once in the state byte (2.4). The clock tag names the clock an SNDH host
+under TOS calls play from: `TC` Timer C, and `!V` the VBL, written where
+the set claims Timer C (3.2). The `FLAG` letters list the timers the set
+claims, and a host that ticks from a timer selects one outside them.
+Under `TC` the program of 4 writes Timer C's vector with a separate
+handler, leaves the timer at the operating system's 200 Hz, adds the
+rate to an accumulator on each tick and plays a row for each 200 the
+accumulator reaches (4.7, 4.8), and restores the vector at the end (4.6
+step 6); under `!V` it plays from the VBL (4.3).
 
 **5.5 A player that reads a row through a displacement.** A tick reads
 its row through a signed word displacement from the instruction that

@@ -20,7 +20,7 @@ import org.ymxs.tool.Tool;
  *  8       2      the descriptor's version, 1
  *  10      2      the subtunes, patched here from the '##' tag
  *  12      2      flags, patched here
- *  14      2      the rate, rows a second, patched here from the TC tag
+ *  14      2      the rate, rows a second, patched here from the clock tag
  *  16      4      the rows to play, patched here; 0 plays on until a key stops it
  *  20      4      the core's offset from the SNDH file's first byte, patched here
  * </pre>
@@ -53,8 +53,9 @@ final class Prg {
      *  its SNDH, then the tags. */
     private static final int TAGS_AT = 12;
 
-    /** What the tag block passes the stub: the '##' count, the TC rate, the
-     *  FLAG letters after its '~', and where HDNS stands. */
+    /** What the tag block passes the stub: the '##' count, the clock
+     *  tag's rate, the FLAG letters after its '~', and where HDNS
+     *  stands. */
     record Tags(int subtunes, int rate, String flag, int end) {
     }
 
@@ -147,17 +148,18 @@ final class Prg {
     /**
      * The tag block walked from its first tag to HDNS, as {@link Sndh}
      * writes it. A zero byte where a tag name would begin is a pad, one
-     * byte. '##' is four bytes, its two digits the subtunes; TC and each
-     * text tag, TITL, COMM, CONV and FLAG, run to their zero byte and one
-     * past; FRMS is 4 + 4 bytes a subtune, and '!#SN' 4 + 2 bytes a
-     * subtune, then a name a subtune, each to its zero byte and one past.
-     * The subtunes, the rate and the FLAG letters come from those tags
-     * alone, so a title or a composer that reads like a tag patches no
-     * field.
+     * byte. '##' is four bytes, its two digits the subtunes; the clock
+     * tag, 'TC' or '!V', and each text tag, TITL, COMM, CONV and FLAG, run
+     * to their zero byte and one past; FRMS is 4 + 4 bytes a subtune, and
+     * '!#SN' 4 + 2 bytes a subtune, then a name a subtune, each to its
+     * zero byte and one past. The subtunes, the rate and the FLAG letters
+     * come from those tags alone, so a title or a composer that reads like
+     * a tag patches no field.
      *
      * @throws IllegalArgumentException where the file has no SNDH at 12,
      *     no HDNS ends its tags, a tag is not one {@link Sndh} writes,
-     *     FRMS or '!#SN' stands before '##', or '##' or TC is missing
+     *     FRMS or '!#SN' stands before '##', or '##' or the clock tag is
+     *     missing
      */
     static Tags tags(byte[] sndh) {
         if (sndh.length < TAGS_AT + 4 || !ascii(sndh, TAGS_AT, 4).equals("SNDH")) {
@@ -183,14 +185,15 @@ final class Prg {
                 }
                 subtunes = (sndh[at + 2] - '0') * 10 + sndh[at + 3] - '0';
                 at += 4;
-            } else if (name.startsWith("TC")) {
+            } else if (name.startsWith("TC") || name.startsWith("!V")) {
                 int to = zero(sndh, at + 2);
                 rate = 0;
                 for (int i = at + 2; i < to && digit(sndh[i]); i++) {
                     rate = rate * 10 + sndh[i] - '0';
                 }
                 if (rate == 0) {
-                    throw new IllegalArgumentException("the SNDH file's tags have no TC rate");
+                    throw new IllegalArgumentException("the SNDH file's tags have no TC or !V"
+                            + " rate");
                 }
                 at = to + 1;
             } else if (name.equals("FRMS")) {
@@ -218,7 +221,7 @@ final class Prg {
             throw new IllegalArgumentException("the SNDH file's tags have no '##' subtune count");
         }
         if (rate < 0) {
-            throw new IllegalArgumentException("the SNDH file's tags have no TC rate");
+            throw new IllegalArgumentException("the SNDH file's tags have no TC or !V rate");
         }
         return new Tags(subtunes, rate, flag, at);
     }
