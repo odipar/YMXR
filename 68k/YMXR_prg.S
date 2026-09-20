@@ -6,10 +6,10 @@
 ;   +4   'YMXT'
 ;   +8   the descriptor's version, 1
 ;   +10  the subtunes, a word
-;   +12  flags, a word: bit 0 is zero; bit 1 plays from
-;        the VBL, which the tool sets where the set claims Timer C; with
-;        it clear the program uses the VBL where the screen's rate is the
-;        tune's, and Timer C at the rate where it is not
+;   +12  flags, a word: bit 0 is zero; bit 1 plays from the VBL, which
+;        the tool sets where the SNDH file's clock tag names the VBL,
+;        where the set claims Timer C, or where the VBL is asked for;
+;        with it clear the program plays from Timer C at the rate
 ;   +14  the rate, a word, rows a second
 ;   +16  the rows to play, a long, 0 to play on until a key stops it
 ;   +20  the core's offset from the SNDH file's first byte, a long
@@ -534,8 +534,8 @@ ikbd:           btst    #1,$FFFFFC00.w
                 rts
 
 ; d0.w the subtune: the one playing stopped, this one started and its
-; clock armed, at level 7. The VBL where the tool asked for it, or where
-; the screen refreshes at the tune's rate; Timer C where it does not.
+; clock armed, at level 7. The VBL where the flags word names it, and
+; Timer C where it does not.
 start:
                 lea     playing(pc),a0
                 move.w  d0,(a0)
@@ -550,11 +550,8 @@ start:
                 clr.b   (a0)
                 move.l  rows(pc),rows_left-done(a0)
                 btst    #1,flags+1(pc)
-                bne.s   .vbl
-                bsr     screen_hz
-                cmp.w   rate(pc),d0
-                bne.s   .timer
-.vbl:           lea     vbl(pc),a0
+                beq.s   .timer
+                lea     vbl(pc),a0
                 move.l  a0,VBL.w
                 rts
 .timer:         lea     timer_c(pc),a0          ; Timer C at 200 Hz, and the
@@ -568,18 +565,6 @@ start:
                 bset    #5,$FFFFFA09.w
                 bset    #5,$FFFFFA15.w
                 rts
-
-; d0 the screen's rate: 71 in high resolution, else 50 or 60 by the sync
-; bit.
-screen_hz:
-                moveq   #71,d0
-                cmp.b   #2,$FFFF8260.w
-                beq.s   .known
-                moveq   #60,d0
-                btst    #1,$FFFF820A.w
-                beq.s   .known
-                moveq   #50,d0
-.known:         rts
 
 ; The VBL: one row a frame.
 vbl:

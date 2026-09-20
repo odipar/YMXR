@@ -392,9 +392,10 @@ final class BinariesTest {
         assertEquals("!V", claimed.clock(), "a host cannot call play from a claimed timer");
         assertEquals("abcdy", claimed.flag());
         assertEquals(60, claimed.rate(), "the clock tag carries the rate either way");
-        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50));
-        assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50), "Timers A, D and B");
-        assertEquals("!V50", Sndh.clock(Sndh.claims(8), 50), "effect 3 runs Timer C");
+        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, false));
+        assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50, false), "Timers A, D and B");
+        assertEquals("!V50", Sndh.clock(Sndh.claims(8), 50, false), "effect 3 runs Timer C");
+        assertEquals("!V50", Sndh.clock(Sndh.claims(0), 50, true), "the VBL asked for");
     }
 
     @Test
@@ -464,9 +465,9 @@ final class BinariesTest {
     }
 
     @Test
-    void theMonitorInTheCoreLeavesTheStubsFlagsAlone() throws IOException {
-        // The stub clears the screen every run, so the monitor no longer
-        // decides it and the flags read the same either way.
+    void theMonitorInTheCoreNamesTheVbl() throws IOException {
+        // The monitor paints one frame of calls, which reads against the
+        // raster only where the tick comes from the VBL.
         List<byte[]> files = List.of(tune("chambers"));
         byte[] plain = Sndh.of(files, new Sndh.Options("Plain", null, null, false, false));
         byte[] watched = Sndh.of(files, new Sndh.Options("Watched", null, null, true, false));
@@ -474,11 +475,12 @@ final class BinariesTest {
         // program counter (Sndh.Ticks)
         assertCombined(Binaries.core(false, false, true), plain, files, tags(plain));
         assertCombined(Binaries.core(true, false, true), watched, files, tags(watched));
+        assertEquals("TC", tags(plain).clock(), "a set that leaves Timer C free plays from it");
+        assertEquals("!V", tags(watched).clock(), "-perf names the VBL");
         assertEquals(0, Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
-                "a set with no Timer C sets no flag");
-        assertEquals(Tune.getWord(Prg.of(plain, 0), 28 + Prg.STUB_FLAGS_AT),
-                Tune.getWord(Prg.of(watched, 0), 28 + Prg.STUB_FLAGS_AT),
-                "the monitor core sets the same flags as the plain one");
+                "a file naming Timer C sets no flag");
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(Prg.of(watched, 0), 28 + Prg.STUB_FLAGS_AT),
+                "the program follows the clock the file names");
     }
 
     @Test
@@ -497,8 +499,9 @@ final class BinariesTest {
                     Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
                     "the file's core reads back the switches asked for");
             assertCombined(Binaries.core(monitor, lean, pcrel), sndh, files, tags(sndh));
-            assertEquals(0, Tune.getWord(Prg.of(sndh, 0), 28 + Prg.STUB_FLAGS_AT),
-                    "no switch sets a stub flag: the screen is cleared every run");
+            assertEquals(monitor ? Prg.FLAG_VBL : 0,
+                    Tune.getWord(Prg.of(sndh, 0), 28 + Prg.STUB_FLAGS_AT),
+                    "-perf alone of the three sets a stub flag, the VBL it names");
         }
     }
 
@@ -617,8 +620,10 @@ final class BinariesTest {
                 new Sndh.Options("Four", null, null, false, false));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Prg.of(sndh, 0));
-        assertEquals("the set claims Timer C and plays at 60 Hz: the stub then plays from the"
-                + " VBL, a 50 Hz clock, so this set needs a separate host", wrong.getMessage());
+        assertEquals("the file plays from the VBL at 60 Hz: the stub's VBL is a 50 Hz clock,"
+                + " so this set needs a separate host or the VBL asked for", wrong.getMessage());
+        // the VBL asked for is that separate host named
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(Prg.of(sndh, 0, true), 28 + Prg.STUB_FLAGS_AT));
     }
 
     @Test

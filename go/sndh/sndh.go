@@ -87,6 +87,13 @@ var timerOfEffect = [4]int{0, 3, 1, 2}
 // TimerC is Timer C's bit in a claims byte, the third of A to D.
 const TimerC = 1 << 2
 
+// ClockTimerC and ClockVBL are the clock tag's two names: Timer C, and
+// the VBL.
+const (
+	ClockTimerC = "TC"
+	ClockVBL    = "!V"
+)
+
 // Ticks names the ticks the file's core reads a row with (BINARIES.md
 // 2.1). A tool writes Chosen unasked: it stands the core that reads a row
 // through the program counter under a file whose tunes end within the
@@ -114,6 +121,7 @@ type Options struct {
 	Monitor  bool
 	Lean     bool
 	Ticks    Ticks
+	VBL      bool
 }
 
 // Of is the file, from the tune files as subtunes 1 up, around the core
@@ -314,12 +322,13 @@ func Flag(claimed int) string {
 
 // Clock is the clock tag: 'TC' and the rate, Timer C, where the claims
 // byte leaves Timer C free, and '!V' and the rate, the VBL, where it has
-// Timer C. A host calls play from that clock (BINARIES.md 5.4).
-func Clock(claimed, rate int) string {
-	if claimed&TimerC != 0 {
-		return fmt.Sprintf("!V%d", rate)
+// Timer C or the VBL is asked for. A host calls play from that
+// clock (BINARIES.md 5.4).
+func Clock(claimed, rate int, vbl bool) string {
+	if vbl || claimed&TimerC != 0 {
+		return ClockVBL + fmt.Sprintf("%d", rate)
 	}
-	return fmt.Sprintf("TC%d", rate)
+	return ClockTimerC + fmt.Sprintf("%d", rate)
 }
 
 // Tags is the tag block, 'SNDH' through 'HDNS': TITL, COMM where there is
@@ -329,7 +338,8 @@ func Clock(claimed, rate int) string {
 // subtune, the name's offset from the tag's first byte, then the names
 // each ended by a zero byte, a pad to an even length, and HDNS. The '##'
 // count stands before FRMS and the names, since a reader sizes both by
-// it.
+// it. The raster monitor paints one frame of calls (performance.md), so a
+// core with it in names the VBL as the clock.
 func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, error) {
 	var out bytes.Buffer
 	text(&out, "SNDH")
@@ -339,7 +349,7 @@ func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, erro
 	}
 	tag(&out, "CONV", Converter)
 	tag(&out, fmt.Sprintf("##%02d", n), "")
-	tag(&out, Clock(claimed, rate), "")
+	tag(&out, Clock(claimed, rate, options.VBL || options.Monitor), "")
 	tag(&out, "FLAG", Flag(claimed))
 	pad(&out)
 	text(&out, "FRMS")

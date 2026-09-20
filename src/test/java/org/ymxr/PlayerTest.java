@@ -197,7 +197,7 @@ final class PlayerTest {
         assertEquals(Prg.STUB_ROWS_AT, row(said, "the rows to play").getValue());
         assertEquals(Prg.STUB_CORE_AT, row(said, "the core's offset").getValue());
         Map<String, Integer> bits = flags(binaries, "4. The program stub", 2);
-        assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the set claims Timer C").getValue());
+        assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the clock tag is `!V`").getValue());
     }
 
     @Test

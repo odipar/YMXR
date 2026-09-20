@@ -135,8 +135,9 @@ Measure from the VBL, at the tune's rate. Where the program plays from Timer
 C, a call runs inside the tick handler the timer interrupted, since a handler
 drops the level once its write is made (SPEC.md 5), and the wait then keeps
 that handler open for as long as it runs: that timer's next ticks wait with
-it, and the tune's sound changes. At the screen's rate the program plays from
-the VBL and no call nests inside a tick.
+it, and the tune's sound changes. A file whose clock tag names the VBL, which
+`-perf` and `-vbl` write (BINARIES.md 3.2), plays from it, and every call then
+runs outside the tick handlers.
 
 ## Against YMX
 

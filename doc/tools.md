@@ -64,14 +64,14 @@ within the packing report (4.5).
 | `ym-to-ymxr` | a dump | a tune file (SPEC.md 3.3) | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ym-to-ymxs` | a dump | a structure of one tune | `-rRR`, `-r` |
 | `ymxs-to-ymxr` | a structure | a tune file, or a multi file (BINARIES.md 0) of several | `-kK`, `-mN`, `-copies[S]` |
-| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs` |
+| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
 | `ymxs-to-prg` | a structure | a TOS program (BINARIES.md 4) | the flags of `ymxs-to-sndh` and `-rROWS` |
 | `ymxr-check` | a dump, or the files named | one verdict a dump, on standard output | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
 | `ymxr-multi` | the tune files named | a multi file | `-nNAME` |
-| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs` |
-| `ymxr-prg` | an SNDH file | a TOS program | `-rROWS` |
+| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
+| `ymxr-prg` | an SNDH file | a TOS program | `-rROWS`, `-vbl` |
 
 **2.1** Each tool is written twice, under one name, in the two trees of
 section 19: in Java as the script `bin/<tool>`, one line running
@@ -317,13 +317,14 @@ the summary line is `ymxs-to-ymxr: N tunes in a multi file, B bytes`,
 and a multi of 100 tunes or more is the error of 11.2, exit 1.
 
 **7.5 `ymxs-to-sndh`.** The flags are those of 7.4 and `-tTITLE`,
-`-cCOMPOSER`, `-perf`, `-lean`. The output is the SNDH file of section 12
-around the tune files of 7.3, one subtune a tune in the multi's order,
-with: the title `-tTITLE`, or the first tune's title, `(untitled)` where
-blank; the composer `-cCOMPOSER`, or the first tune's where present after
-stripping; the subtune names the titles, `(untitled)` where blank, where
-the multi has more than one tune. The errors of 12.2 are exit 1. The
-report is that of 7.3 alone; the tool omits a summary line.
+`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`. The output is
+the SNDH file of section 12 around the tune files of 7.3, one subtune a
+tune in the multi's order, with: the title `-tTITLE`, or the first
+tune's title, `(untitled)` where blank; the composer `-cCOMPOSER`, or
+the first tune's where present after stripping; the subtune names the
+titles, `(untitled)` where blank, where the multi has more than one
+tune. The errors of 12.2 are exit 1. The report is that of 7.3 alone;
+the tool omits a summary line.
 
 **7.6 `ymxs-to-prg`.** The flags are those of 7.5 and `-rROWS`, ROWS the
 rows the program plays, 0 by default. The output is the program of
@@ -473,20 +474,24 @@ B bytes, and the file has F`, A its offset.
 
 **12.1** The input is a tune file, one subtune, or a multi file, its
 tunes the subtunes in order, each named by the name the multi file
-records. The output is the SNDH file of BINARIES.md 3 around the core the
-switches select: `-perf` the core with the raster monitor in; `-lean` the
-core whose ticks omit the interrupt-level drop and the end-of-interrupt
-write (performance.md); `-pcrel` the core whose ticks read a row through
-the program counter and `-abs` the core whose ticks read an absolute
-address (BINARIES.md 5.5); and two or three together the core that is
-those. Where neither `-pcrel` nor `-abs` is passed the tool reads the
-file's last bound tune against the core's first byte: within 32,767 bytes
-it writes the core that reads through the program counter, and further
-off the core that reads an address. The title is `-tTITLE`, else the
+records. The output is the SNDH file of BINARIES.md 3 around the core
+the switches select: `-perf` the core with the raster monitor in;
+`-lean` the core whose ticks omit the interrupt-level drop and the
+end-of-interrupt write (performance.md); `-pcrel` the core whose ticks
+read a row through the program counter and `-abs` the core whose ticks
+read an absolute address (BINARIES.md 5.5); and two or three together
+the core that is those. Where neither `-pcrel` nor `-abs` is passed the
+tool reads the file's last bound tune against the core's first byte:
+within 32,767 bytes it writes the core that reads through the program
+counter, and further off the core that reads an address. The clock tag
+names Timer C, or the VBL where `-vbl` or `-perf` is passed: the raster
+monitor paints one frame of calls, which reads against the raster where
+the tick comes from the VBL (BINARIES.md 3.2, performance.md). A set
+that claims Timer C names the VBL. The title is `-tTITLE`, else the
 first name, `(untitled)` where a tune file was read or the name is
-blank; the composer `-cCOMPOSER`, or
-absent. In the tags (BINARIES.md 3) each text is reduced to its
-characters $20 to $7E; the report of 12.4 prints the text as passed.
+blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md 3)
+each text is reduced to its characters $20 to $7E; the report of 12.4
+prints the text as passed.
 
 **12.2 Errors**, each exit 1:
 
@@ -517,18 +522,18 @@ the program counter`, `-abs, ticks that read a row through an absolute
 address` where that was passed, and `ticks that read a row through an
 absolute address: the tunes end past the 32767 bytes a displacement
 reaches` where the tool chose it (12.1), joined by `; `; the heading
-`the tags: TITL <title>`, then `, COMM <composer>` where present and `,
-!#SN with N name(s)` for several subtunes; a row a subtune, its name or
-`the tune`, `B bytes bound to B2, its table in image I`, B the tune
-file's bytes, B2 the bound tune's, I the number of its image from 1; the
-heading `the images: N image(s) of B bytes, DTX's reader once a set of
-tunes that share one` with a row an image, `image I`, `<shape>, N
-tune(s)`, the shape `DTX2 at unit K, a ring of A, values of W`, W the
-width of a value in bytes, then `, with copies` where packed so; the
-heading `the file: B bytes, the core C, the images I, the tunes T, the
-workspace and the rest W`, C, I, T and W the bytes of the core, the
-images, the bound tunes, and the remainder. The summary line is
-`ymxr-sndh: B bytes, N subtune(s)`.
+`the tags: TITL <title>`, then `, COMM <composer>` where present, `,
+<clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N name(s)` for
+several subtunes; a row a subtune, its name or `the tune`, `B bytes
+bound to B2, its table in image I`, B the tune file's bytes, B2 the
+bound tune's, I the number of its image from 1; the heading `the images:
+N image(s) of B bytes, DTX's reader once a set of tunes that share one`
+with a row an image, `image I`, `<shape>, N tune(s)`, the shape `DTX2 at
+unit K, a ring of A, values of W`, W the width of a value in bytes, then
+`, with copies` where packed so; the heading `the file: B bytes, the
+core C, the images I, the tunes T, the workspace and the rest W`, C, I,
+T and W the bytes of the core, the images, the bound tunes, and the
+remainder. The summary line is `ymxr-sndh: B bytes, N subtune(s)`.
 
 ---
 
@@ -537,10 +542,12 @@ images, the bound tunes, and the remainder. The summary line is
 **13.1** The input is an SNDH file of section 12; the output the program
 of BINARIES.md 4: the stub patched with the subtune count, the rate of
 the clock tag and the FLAG letters read from the tags, ROWS from
-`-rROWS`, 0 by default, and the core's offset. The program plays ROWS
-rows and stops, or plays on until SPACE or ESC for ROWS 0; lists the
-subtunes; selects one on LEFT, RIGHT, UP, DOWN or a typed number; and
-starts the next subtune where a subtune that plays once has ended.
+`-rROWS`, 0 by default, and the core's offset. The program plays from
+the clock the file's tag names, Timer C or the VBL, and from the VBL
+where `-vbl` is passed (BINARIES.md 4.3). It plays ROWS rows and stops,
+or plays on until SPACE or ESC for ROWS 0; lists the subtunes; selects
+one on LEFT, RIGHT, UP, DOWN or a typed number; and starts the next
+subtune where a subtune that plays once has ended.
 
 **13.2 Errors**, each exit 1: the lines of BINARIES.md 4's tag reader
 for a file outside the layout (`not an SNDH file: no SNDH at 12`, `the
@@ -551,19 +558,21 @@ is not one this reads`, `not an SNDH file: no HDNS ends its tags`, `the
 SNDH file has no core: no YMXS past its tags`, `the core begins at C,
 and the entry triple reaches R`, `the core begins at C and the file ends
 B bytes on, short of the core's descriptor, 36 bytes`); `rows N does not
-fit a long` for ROWS outside 0 to 4,294,967,295; and `the set claims
-Timer C and plays at H Hz: the stub then plays from the VBL, a 50 Hz
-clock, so this set needs a separate host` where the FLAG letters have
-`c` and the rate is other than 50.
+fit a long` for ROWS outside 0 to 4,294,967,295; and `the file plays
+from the VBL at H Hz: the stub's VBL is a 50 Hz clock, so this set needs
+a separate host or the VBL asked for` where the clock tag is `!V` or the
+FLAG letters have `c`, the rate is other than 50, and `-vbl` is left
+off.
 
 **13.3 The report:** the heading `the SNDH file: B bytes, N subtune(s)
 at H Hz, FLAG <letters>`; the heading `the stub: B bytes, patched` with
-the rows `the subtunes`, N; `the rows to play`, `0, until a key stops it`
-or ROWS; `it plays from`, `the VBL, the set claims Timer C` or `the VBL
-where the screen's rate is the tune's, and Timer C where it is not`; `the
-screen`, `cleared before the banner`; the heading `the program: B bytes`.
-The summary line is `ymxr-prg: B bytes, until a key stops it` or
-`ymxr-prg: B bytes, ROWS rows`.
+the rows `the subtunes`, N; `the rows to play`, `0, until a key stops
+it` or ROWS; `it plays from`, one of `Timer C, 200 ticks a second and
+the rate's share of them`, `the VBL, asked for`, `the VBL, the file's
+clock tag` and `the VBL, the set claims Timer C`; `the screen`, `cleared
+before the banner`; the heading `the program: B bytes`. The summary line
+is `ymxr-prg: B bytes, until a key stops it` or `ymxr-prg: B bytes, ROWS
+rows`.
 
 ---
 
@@ -628,26 +637,28 @@ AVI, `ym/avi.py` reads its sound out as that WAV and its last frame as a
 PNG of the same stem. The options `-kK`, `-mN`, `-rRR`, `-r`,
 `-copies[S]` reach `ym-to-ymxr`, and with a tune file among the names
 are the error `ym/play.sh: <name> is a tune file, and -k, -m and -r pack
-one`, exit 2; `-tTITLE` and `-cCOMPOSER`, `-perf` and `-lean` reach
-`ymxr-sndh`, the title the first name's stem by default; `-vN` stops the
-run after N frames; `-silent` reaches every tool; `-h` prints the head
-of the script, exit 0, and a call with zero names prints it, exit 2.
-Several tunes go through `ymxr-multi`, each named by its stem, and the
-program picks between them as 13.1 defines. The script writes `TUNE.SND`
-and `TUNE.PRG` under a
-temporary directory: `ym/play.sh: TUNE.SND and TUNE.PRG are under
-<dir>` on standard error. A second name to record to is the error
-`ym/play.sh: <a> and <b> both name a file to record to`, exit 2; an
-option outside these is `ym/play.sh does not read <option>`, exit 2.
+one`, exit 2; `-tTITLE` and `-cCOMPOSER`, `-perf`, `-lean` and `-vbl`
+reach `ymxr-sndh`, the title the first name's stem by default; `-vN`
+stops the run after N frames, and `-vbl` is read as the clock before it;
+`-silent` reaches every tool; `-h` prints the head of the script, exit
+0, and a call with zero names prints it, exit 2. Several tunes go
+through `ymxr-multi`, each named by its stem, and the program picks
+between them as 13.1 defines. The script writes `TUNE.SND` and
+`TUNE.PRG` under a temporary directory: `ym/play.sh: TUNE.SND and
+TUNE.PRG are under <dir>` on standard error. A second name to record to
+is the error `ym/play.sh: <a> and <b> both name a file to record to`,
+exit 2; an option outside these is `ym/play.sh does not read <option>`,
+exit 2.
 
 **16.2 `ym/play-ymxs.sh [options] [tune.ymxs] [out.wav]`** runs
-`ymxs-to-prg` on the file named, or on standard input otherwise, and
-the program under Hatari as 16.1 runs one; `-rROWS`, `-vN`, `-silent`,
-`-h` are the script's, and `-kK`, `-mN`, `-copies[S]`, `-tTITLE`,
-`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs` reach `ymxs-to-prg`. A
-name ending `.ymxs` or `.json` is the structure; a second is the error
-`<a> and <b> both name a structure; a multi's tunes are its subtunes`,
-exit 2.
+`ymxs-to-prg` on the file named, or on standard input otherwise, and the
+program under Hatari as 16.1 runs one; `-rROWS`, `-vN`, `-silent`, `-h`
+are the script's, and `-kK`, `-mN`, `-copies[S]`, `-tTITLE`,
+`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` reach
+`ymxs-to-prg`, and `-vbl` is read as the clock before `-vN`. A name
+ending `.ymxs` or `.json` is the structure; a second is the error `<a>
+and <b> both name a structure; a multi's tunes are its subtunes`, exit
+2.
 
 **16.3 `ym/hatari.sh WORK [VBLS] [out.wav]`** runs `TUNE.PRG` under
 `WORK` with `--tos $TOS --machine st --cpuclock 8 --cpu-exact on
@@ -690,7 +701,7 @@ converter:
 |---|---|
 | `-kK`, `-mN`, `-rRR`, `-r`, `-copies[S]` | `ym-to-ymxr` (4, 5) |
 | `-nNAME`, the i-th naming the i-th dump | `ymxr-multi` (11.1) |
-| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs` | `ymxr-sndh` (12) |
+| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` | `ymxr-sndh` (12) |
 | `-rowsN`, the rows the program plays | `ymxr-prg` as `-rN` (13.1) |
 | `-silent` | every tool (3.3) |
 

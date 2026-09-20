@@ -32,9 +32,14 @@
 #
 #   -tTITLE    the title, the first subtune's name by default
 #   -cCOMPOSER the composer
-#   -perf      the core with the raster monitor in
+#   -perf      the core with the raster monitor in, which names the VBL
+#              as the clock
 #   -lean      the core whose ticks neither drop the interrupt level nor
 #              write an end of interrupt
+#   -pcrel     the core whose ticks read a row through the program
+#              counter, -abs the one whose ticks read an address
+#   -vbl       the VBL as the clock the program plays from, Timer C
+#              without it
 #
 # The program's (tools.md 13):
 #
@@ -66,6 +71,8 @@ title=
 composer=
 perf=
 lean=
+ticks=
+vbl=
 rows=
 silent=
 help=
@@ -82,6 +89,8 @@ while [ "$left" -gt 0 ]; do
         -h|-help|--help) help=1 ;;
         -perf) perf=-perf ;;
         -lean) lean=-lean ;;
+        -pcrel|-abs) ticks=$arg ;;
+        -vbl) vbl=-vbl ;;
         -silent) silent=-silent ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
@@ -157,6 +166,6 @@ while IFS= read -r named; do
     set -- "$@" "$named"
 done < "$work/names"
 "$tools/ymxr-multi" "$@" $silent > "$work/SET.YMXR"
-"$tools/ymxr-sndh" $perf $lean $silent ${title:+"-t$title"} \
+"$tools/ymxr-sndh" $perf $lean $ticks $vbl $silent ${title:+"-t$title"} \
     ${composer:+"-c$composer"} < "$work/SET.YMXR" > "$work/SET.SND"
 exec "$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"

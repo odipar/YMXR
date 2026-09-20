@@ -40,12 +40,16 @@ const Unit = 2
 // PackingFlags is the packer's flags.
 var PackingFlags = []string{"-k", "-m", "-copies"}
 
-// Tags is the tags ymxs-to-sndh reads, and the two cores it selects
-// between.
-var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel", "-abs"}
+// Tags is the tags ymxs-to-sndh reads, the two cores it selects between,
+// and the clock asked for.
+var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl"}
 
 // Rows is the row count a program stops after.
 var Rows = []string{"-r"}
+
+// VBL is the clock ymxr-prg reads: the VBL over the clock the file
+// names.
+var VBL = []string{"-vbl"}
 
 // PackingOf is the packing the flags ask for.
 func PackingOf(t *tool.Tool, args []string) Packing {
@@ -205,6 +209,8 @@ func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":
 			options.Ticks = sndh.Absolute
+		case flag == "-vbl":
+			options.VBL = true
 		case strings.HasPrefix(flag, "-copies"):
 		case strings.HasPrefix(flag, "-t"):
 			title = flag[2:]

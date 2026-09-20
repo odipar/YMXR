@@ -112,12 +112,16 @@ final class Ymxs {
      *  {@link Tool#of} leaves them for the tool. */
     static final String[] PACKING = {"-k", "-m", "-copies"};
 
-    /** The tags {@code ymxs-to-sndh} reads, and the switches that select
-     *  the core among the eight (BINARIES.md 2.1). */
-    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel", "-abs"};
+    /** The tags {@code ymxs-to-sndh} reads, the switches that select the
+     *  core among the eight (BINARIES.md 2.1), and the clock asked for. */
+    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl"};
 
     /** The row count {@code ymxs-to-prg} reads. */
     static final String[] ROWS = {"-r"};
+
+    /** The clock {@code ymxr-prg} reads: the VBL over the clock the file
+     *  names. */
+    static final String[] VBL = {"-vbl"};
 
     /** Every argument checked against the flags the tool reads: a call
      *  that passes another, or a file name, is wrong (exit 2). */
