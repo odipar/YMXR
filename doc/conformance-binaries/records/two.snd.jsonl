@@ -1,0 +1,17 @@
+{"kind":"sndh","bytes":46424}
+{"part":"entry","to":[118,122,126]}
+{"part":"tag","name":"TITL","at":16,"text":"Two"}
+{"part":"tag","name":"COMM","at":24,"text":"Jochen Hippel"}
+{"part":"tag","name":"CONV","at":42,"text":"YMXR (ym-to-ymxr)"}
+{"part":"tag","name":"##","at":64,"subtunes":2}
+{"part":"tag","name":"TC","at":69,"rate":50}
+{"part":"tag","name":"FLAG","at":74,"text":"~y"}
+{"part":"tag","name":"FRMS","at":82,"frames":[0,4]}
+{"part":"tag","name":"!#SN","at":94,"names":["Circus","Once"]}
+{"part":"tag","name":"HDNS","at":114}
+{"part":"core","at":118,"version":1,"binds":6,"fixed":2120,"flags":4,"state":772,"subtunes":8962,"work":13990}
+{"part":"subtunes","at":8962,"tunes":[8972,8996]}
+{"part":"tune","number":1,"at":8972,"bytes":24,"version":3,"rate":50,"effects":0,"sources":0,"state":30312,"image":9022,"table":1928}
+{"part":"tune","number":2,"at":8996,"bytes":26,"version":3,"rate":50,"effects":0,"sources":0,"state":30312,"image":9022,"table":3748}
+{"part":"image","number":1,"at":9022}
+{"part":"workspace","at":13990,"bytes":32434}
