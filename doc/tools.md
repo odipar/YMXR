@@ -707,7 +707,10 @@ tool's exit code, standard output empty.
 ## 17. The rigs
 
 **17.1 `68k/test/emu/test_ymxr.py [mode] [tune ...]`** converts each dump
-named, or every dump under `ym/test`, binds it through `ymxr-bind` and
+named, or every dump under `ym/test`, and a dump the converter reads as
+another format (5.1) stands outside the run, named on a line and counted
+apart from the tunes that played wrong. The rig binds each tune
+through `ymxr-bind` and
 plays it row by row on an emulated 68000 (unicorn), against a model of
 SPEC.md 4 and 5 built from the tune's tables: every frame's chip writes
 in order, each timer's programming, each handler's place, and every

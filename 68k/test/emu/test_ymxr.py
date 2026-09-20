@@ -290,6 +290,13 @@ def spread(most):
     return every[::max(1, len(every) // most)][:most]
 
 
+class AnotherFormat(Exception):
+    """A dump the converter reads as another format: it reads a YM5! or a
+    YM6! dump, packed or plain (doc/tools.md 5.1), and the corpus has one
+    file of another in it. Such a file stands outside a run rather than
+    among the tunes that played wrong."""
+
+
 def convert(ym, work):
     """A tune file out of a YM dump, through the converter; a tune file
     named as it stands."""
@@ -298,6 +305,8 @@ def convert(ym, work):
     flags = os.environ.get("YMXR_FLAGS", "").split()
     r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
                        stdin=open(ym, "rb"), capture_output=True)
+    if r.returncode != 0 and "not a YM5!/YM6! file" in r.stderr.decode():
+        raise AnotherFormat(r.stderr.decode().strip().splitlines()[-1])
     assert r.returncode == 0, r.stderr.decode()
     # The tool reports on standard error, the last line being what it wrote.
     said = [line for line in r.stderr.decode().splitlines() if line.startswith("ym-to-ymxr: ")]
@@ -1965,7 +1974,10 @@ def patched_code_follows_the_subtune(defines, tunes):
     # the pairs below are the square of the set, and a run over the corpus
     # would otherwise convert every dump of it for a set of four.
     for ym in tunes[:SET_READS]:
-        file, _ = convert(ym, work)
+        try:
+            file, _ = convert(ym, work)
+        except AnotherFormat:
+            continue
         bound = bind(file, work)
         if bound is not None:
             bounds.append((os.path.basename(ym), bound))
@@ -2180,9 +2192,21 @@ def main():
     print("the player: %d bytes%s%s" % (len(code),
                                        ", the raster monitor in" if perf else "",
                                        ", the lean tick" if LEAN else ""))
-    if tunes:
+    # The checks below read one tune of the list, and a dump of another
+    # format is outside a run (convert): the first the converter reads
+    # stands for them, and the run reports the rest as it reaches them.
+    opens = tempfile.mkdtemp()
+    first = None
+    for one in tunes:
+        try:
+            convert(one, opens)
+        except AnotherFormat:
+            continue
+        first = one
+        break
+    if first is not None:
         print("the SNDH core: %d bytes, $60 kept and put back"
-              % core(defines, tunes[0]))
+              % core(defines, first))
         print("    %s" % patched_code_follows_the_subtune(defines, tunes))
         print("    %s" % unplaced(code, symbols))
         print("    %s" % voices(code, symbols))
@@ -2201,6 +2225,7 @@ def main():
     stale = []
     wrong = []
     measured = {}                       # the refill parts by tune, with -refill
+    another = []
     for ym in tunes:
         try:
             if real:
@@ -2311,6 +2336,9 @@ def main():
                 if refills_of["slope"]:
                     line += ", %3.0f an operation fitted" % refills_of["slope"]
             print(line)
+        except AnotherFormat as said:
+            another.append(os.path.basename(ym))
+            print("%-45s %s" % (os.path.basename(ym), said))
         except AssertionError as failed:
             # A tune that fails is named and the rest are read, so one run
             # says every tune that fails and not the first alone. One line
@@ -2326,10 +2354,13 @@ def main():
         stale += refills(measured, tunes, code, symbols, cycles_of,
                          not args and wide is None and not kit)
     assert not stale, "\n".join(sorted(set(stale)))
+    played = len(tunes) - len(another)
     if wrong:
         raise SystemExit("%d of %d tunes failed: %s"
-                         % (len(wrong), len(tunes), ", ".join(wrong)))
-    print("%d tunes play as the specification reads" % len(tunes))
+                         % (len(wrong), played, ", ".join(wrong)))
+    print("%d tunes play as the specification reads%s" % (
+        played, ", and %d of another format stands outside the run: %s"
+        % (len(another), ", ".join(another)) if another else ""))
 
 
 def with_movep(module):
