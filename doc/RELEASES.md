@@ -34,6 +34,58 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.11, 2026-09-21
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.11>, built from the commit
+tagged `v0.4.11`.
+
+A twelfth tool, and a program stub of 1,770 bytes whose descriptor is
+version 2; the eight cores are 0.4.10's bytes, no source of the player
+having moved.
+
+- **Timer C ticks at a multiple of the tune's rate.** The stub armed the
+  operating system's 200 Hz and counted the rate against it, so a 60 Hz
+  tune's rows landed 3, 3, 4 ticks apart, 15 or 20 ms where 16.67 was
+  wanted. A tool picks the timer now, the lowest multiple of the rate the
+  MFP counts exactly, and writes the prescaler, the count and the ticks
+  into three fields of the descriptor (BINARIES.md 4.10): a 50 Hz tune is
+  150 ticks a second and a row every third, a 60 Hz tune 240 and a row
+  every fourth, and a rate the MFP counts no multiple of under 400 falls
+  back to the 200 Hz clock, whose accumulator spreads the rows over the
+  second. Over
+  rates 1 to 400 the two fields multiply to 2,457,600 and the ticks are a
+  multiple of the rate.
+- **`-tc` names Timer C**, over the VBL `-perf` names, in `ymxr-sndh`,
+  `ymxs-to-sndh`, `ymxr-prg` and `ymxs-to-prg`, and in `bin/ymxr-set`,
+  `ym/play.sh` and `ym/play-ymxs.sh`. Both flags together are `-vbl and
+  -tc name two clocks`, exit 2, and a set that claims Timer C keeps the
+  VBL, `-tc` with such a set reported by name.
+- **`ymxr-layout` writes the record of a file**, the twelfth tool: a
+  multi file, a bound tune, an SNDH file or a program on standard input,
+  one line of JSON a part on standard output. BINARIES.md 6 defines that
+  record, of the tags and their values, the core's descriptor, the
+  subtune table, each bound tune with its sources, the images and the
+  workspace, and of a program the PRG header, the stub's descriptor and
+  where the SNDH file begins.
+- **The binaries kit reads BINARIES.md cold**, nine files of the four
+  kinds under `doc/conformance-binaries` with the record of each, 127
+  lines over the nine. Two implementers read the document and wrote a
+  reader from it: the first returned seven records of nine byte for byte
+  and the two that differed were right, the workspace inside a program
+  counting the relocation table in; the second returned all nine. The
+  two runs moved 23 places of the document, `##` being 4 bytes and a zero
+  byte in 4.5 step 2 among them.
+- **The rig reads the stub's two clocks**, `-stub`: one SNDH file, two
+  programs, one from Timer C and one from the VBL, and the writes the
+  frame procedure makes are one stream in one order under either, over
+  the same frames. `-hatari` names the VBL as the clock it cuts its
+  frames at, where the clock tag of 0.4.10 had left it reading Timer C
+  against a model of the VBL.
+
+Checks: `mvn -o clean test` green, 166 tests and no skip; the rig green
+under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, 10,
+10, 10, 14, 10 and 13 tunes.
+
 ### 0.4.10, 2026-09-20
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.10>, built from the commit
