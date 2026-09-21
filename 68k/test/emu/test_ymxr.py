@@ -24,7 +24,9 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -stub [tunes]      the program stub's two clocks under
                                        Hatari: one SNDH file played from
                                        Timer C and from the VBL, the rows
-                                       one stream either way
+                                       one stream either way, and the same
+                                       tune at 60 Hz, whose rows land on
+                                       the period the timer is armed at
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
                                        the monitor moves no chip write
@@ -1514,6 +1516,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+) .* pc=([0-9a-f]+)")
 MFPW = re.compile(r"mfp write \S+ ([0-9a-f]+)=0x([0-9a-f]+) video_cyc=(\d+) .* pc=([0-9a-f]+)")
 VBLA = re.compile(r"^VBL=(\d+) clock=(\d+)")
+CYCLE = re.compile(r"video_cyc=(\d+)")
+
+# The ST's CPU, cycles a second: the clock a trace counts in.
+CPU_CLOCK = 8021247.0
 ROM = 0xE00000
 
 
@@ -1660,8 +1666,8 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
 
 def under_hatari(work, name, vbls, trace_kinds="psg_write,video_vbl"):
     """One program under Hatari for that many VBLs: the chip writes in
-    order, each with the VBL it lands in and the address that wrote it,
-    and where the SNDH file loaded."""
+    order, each with the VBL it lands in, the cycle of the run it lands
+    at and the address that wrote it, and where the SNDH file loaded."""
     trace = os.path.join(work, name + ".trace")
     r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
@@ -1675,14 +1681,30 @@ def under_hatari(work, name, vbls, trace_kinds="psg_write,video_vbl"):
     at = int(said.group(1), 16)
     writes = []
     frame = 0
+    clock = 0
     for line in open(trace, errors="replace"):
-        if VBLA.match(line):
+        v = VBLA.match(line)
+        if v:
             frame += 1
+            clock = int(v.group(2))
             continue
         w = WRITE.search(line)
         if w and int(w.group(3), 16) < ROM:
+            # video_cyc counts the cycles into the frame, and the VBL
+            # line the cycle the frame opened at
+            cyc = CYCLE.search(line)
             writes.append((frame, int(w.group(1), 16), int(w.group(2), 16),
-                           int(w.group(3), 16)))
+                           int(w.group(3), 16),
+                           clock + (int(cyc.group(1)) if cyc else 0)))
+            continue
+        w = MFPW.search(line)
+        if w and int(w.group(4), 16) < ROM:
+            # an effect's step writes its timer before the row's chip
+            # writes, so a run traced with mfp_write reads where the
+            # frame procedure opened
+            writes.append((frame, 0xFF000000 | int(w.group(1), 16),
+                           int(w.group(2), 16), int(w.group(4), 16),
+                           clock + int(w.group(3))))
     return writes, at
 
 
@@ -1724,17 +1746,17 @@ def clocks(ym, code, symbols):
             "the core in the file is not the one assembled, its two patched longs aside"
         base = at + core
         frame = (base + symbols["ymxr_frame"], base + symbols["ymxr_reads"])
-        played[name] = [(f, reg, value, frame[0] <= pc < frame[1])
-                        for f, reg, value, pc in writes]
+        played[name] = [(f, reg, value, frame[0] <= pc < frame[1], cycle)
+                        for f, reg, value, pc, cycle in writes]
     timer, vbl = played["TIMERC.PRG"], played["VBL.PRG"]
-    rows = [[(reg, value) for _, reg, value, row in w if row] for w in (timer, vbl)]
+    rows = [[(reg, value) for _, reg, value, row, _ in w if row] for w in (timer, vbl)]
     assert rows[0] == rows[1], \
         "the two clocks played %d writes of a row and %d, or wrote different values" % (
             len(rows[0]), len(rows[1]))
     assert rows[0], "the frame procedure wrote no register"
     spans = []
     for w in (timer, vbl):
-        of = [f for f, _, _, row in w if row]
+        of = [f for f, _, _, row, _ in w if row]
         spans.append(of[-1] - of[0])
     # A row whose columns are unset leaves every register as it is, so
     # the span runs short of the rows played, and a tune ends its writes
@@ -1745,7 +1767,47 @@ def clocks(ym, code, symbols):
         "%d rows took %d frames from Timer C and %d from the VBL" % (
             STUB_CLOCKS, spans[0], spans[1])
     ticked = len(timer) - len(rows[0])
-    return len(rows[0]), ticked, spans[0], spans[1]
+    return len(rows[0]), ticked, spans[0], spans[1], evenness(ym, work, code, symbols)
+
+
+def evenness(ym, work, code, symbols):
+    """The timer the tool arms for a rate no multiple of the operating
+    system's 200 Hz clock, read on Hatari's MFP: the same tune at 60 Hz,
+    whose fields are the divisor 64 and the count 160, 240 ticks a second
+    (BINARIES.md 4.10). The stub's handler clears its in-service bit on
+    every tick, so the gaps between those writes are the timer's period;
+    a row runs at level 5 while it plays, which delays a tick and the
+    next one makes up, so the run's mean reads the arming. The
+    figure returned is the mean tick in milliseconds, 4.167 for 240 ticks
+    a second against 5.000 for the 200 the clock this replaced arms."""
+    file, report = convert(ym, work)
+    at = bytearray(file)
+    at[6], at[7] = 0, 60                # the frame rate, a word at 6
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-tSixty"]
+                       + ([] if PCREL else ["-abs"]), input=bytes(at), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
+                        "-r%d" % STUB_CLOCKS], input=r.stdout, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    prg = r.stdout
+    ticks = prg[28 + 28] << 8 | prg[28 + 29]
+    assert ticks == 240, "the tool armed %d ticks a second for 60 Hz" % ticks
+    sndh_at = 28
+    while prg[sndh_at + 12:sndh_at + 16] != b"SNDH":
+        sndh_at += 2
+    open(os.path.join(work, "SIXTY.PRG"), "wb").write(prg)
+    writes, loaded = under_hatari(work, "SIXTY.PRG", STUB_CLOCKS + 400,
+                                  "psg_write,mfp_write,video_vbl")
+    stub = (loaded - (sndh_at - 28), loaded)
+    # ISRB, whose bit 5 the stub's handler clears as it enters
+    of = [cycle for _, reg, _, pc, cycle in writes
+          if reg == 0xFFFFFA11 and stub[0] <= pc < stub[1]]
+    assert len(of) > 100, "the stub's handler wrote its in-service bit %d times" % len(of)
+    mean = (of[-1] - of[0]) / (len(of) - 1) / CPU_CLOCK * 1000
+    assert abs(mean - 1000.0 / ticks) <= 0.02, \
+        "the timer ticked every %.3f ms, and %d ticks a second is %.3f" % (
+            mean, ticks, 1000.0 / ticks)
+    return mean
 
 
 def hatari(ym, code, symbols, perf=False):
@@ -2329,12 +2391,13 @@ def main():
     for ym in tunes:
         try:
             if stub:
-                writes, ticked, timed, framed = clocks(ym, code, symbols)
+                writes, ticked, timed, framed, worst = clocks(ym, code, symbols)
                 line = ("%-45s %6d writes of a row, one stream from both clocks, over %d"
                         " frames from Timer C and %d from the VBL"
                         % (os.path.basename(ym), writes, timed, framed))
                 if ticked:
                     line += ", %d writes of a tick beside them" % ticked
+                line += ", the same tune at 60 Hz ticking every %.3f ms" % worst
                 print(line)
                 continue
             if real:
