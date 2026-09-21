@@ -23,20 +23,26 @@ import org.ymxs.tool.Tool;
  *  14      2      the rate, rows a second, patched here from the clock tag
  *  16      4      the rows to play, patched here; 0 plays on until a key stops it
  *  20      4      the core's offset from the SNDH file's first byte, patched here
+ *  24      2      the prescaler, TCDCR's nibble, patched here
+ *  26      2      the timer's count, 1 to 255 or 0 for 256, patched here
+ *  28      2      the timer's rate, the ticks a row is counted against
  * </pre>
  */
 final class Prg {
 
     static final byte[] STUB_MAGIC = {'Y', 'M', 'X', 'T'};
     static final int STUB_MAGIC_AT = 4;
-    static final int STUB_VERSION = 1;
+    static final int STUB_VERSION = 2;
     static final int STUB_VERSION_AT = 8;
     static final int STUB_SUBTUNES_AT = 10;
     static final int STUB_FLAGS_AT = 12;
     static final int STUB_RATE_AT = 14;
     static final int STUB_ROWS_AT = 16;
     static final int STUB_CORE_AT = 20;
-    static final int STUB_DESCRIPTOR = 24;
+    static final int STUB_PRESCALER_AT = 24;
+    static final int STUB_COUNT_AT = 26;
+    static final int STUB_TICKS_AT = 28;
+    static final int STUB_DESCRIPTOR = 30;
 
     /** Flag bit 1: play from the VBL. Set where the clock tag names the
      *  VBL, where the `FLAG` letters claim Timer C, since the stub then
@@ -46,6 +52,50 @@ final class Prg {
      *  where that equals the descriptor's rate and from Timer C where
      *  not. */
     static final int FLAG_VBL = 2;
+
+    /** The timer the stub arms for a rate (BINARIES.md 4.10): the
+     *  prescaler, TCDCR's nibble; the count, 1 to 256; and the ticks a
+     *  second the two make, which a row is counted against. */
+    record Timer(int prescaler, int count, int ticks) {
+    }
+
+    /** The MFP's clock, and the divisor each of the seven nibbles
+     *  selects (SPEC.md 1.9.2). */
+    static final int MFP_CLOCK = 2457600;
+    private static final int[] DIVISOR = {0, 4, 10, 16, 50, 64, 100, 200};
+
+    /** The ticks a second the timer is armed at, at most: twice the
+     *  operating system's clock. */
+    private static final int MOST_TICKS = 400;
+
+    /** The operating system's clock, which the stub arms where the MFP
+     *  counts no multiple of the rate: 2,457,600 / 64 / 192. */
+    static final Timer OS_CLOCK = new Timer(5, 192, 200);
+
+    /**
+     * The timer for a rate: the lowest multiple of the rate the MFP
+     * counts exactly, so a row lands every few ticks and the count
+     * returns to zero, and the operating system's clock where it counts
+     * none. A
+     * tune at 50 Hz is 150 ticks a second and a row every third, one at
+     * 60 Hz is 240 and a row every fourth.
+     */
+    static Timer timer(int rate) {
+        for (int k = 1; rate > 0 && k * rate <= MOST_TICKS; k++) {
+            int ticks = k * rate;
+            if (MFP_CLOCK % ticks != 0) {
+                continue;
+            }
+            int of = MFP_CLOCK / ticks;
+            for (int nibble = 1; nibble <= 7; nibble++) {
+                int count = of / DIVISOR[nibble];
+                if (count * DIVISOR[nibble] == of && count >= 1 && count <= 256) {
+                    return new Timer(nibble, count, ticks);
+                }
+            }
+        }
+        return OS_CLOCK;
+    }
 
     /** The PRG header's bytes, and its magic. */
     static final int HEADER = 28;
@@ -74,36 +124,43 @@ final class Prg {
      *     other than 50
      */
     static byte[] of(byte[] sndh, long rows) {
-        return of(sndh, rows, false);
+        return of(sndh, rows, Sndh.Asked.CHOSEN);
     }
 
     /**
-     * The same, the VBL asked for or the file's clock read.
+     * The same, a clock asked for or the file's clock read.
      *
-     * @param vbl the program plays from the VBL over the file's clock tag
-     *     and its claims, at the file's rate
+     * @param asked the clock the program plays from over the file's
+     *     clock tag and its claims, at the file's rate
      */
-    static byte[] of(byte[] sndh, long rows, boolean vbl) {
-        return of(Binaries.stub(), sndh, rows, vbl);
+    static byte[] of(byte[] sndh, long rows, Sndh.Asked asked) {
+        return of(Binaries.stub(), sndh, rows, asked);
     }
 
     /** The same, from the stub named. */
     static byte[] of(byte[] stub, byte[] sndh, long rows) {
-        return of(stub, sndh, rows, false);
+        return of(stub, sndh, rows, Sndh.Asked.CHOSEN);
     }
 
-    /** The same, from the stub named, the VBL asked for or read. */
-    static byte[] of(byte[] stub, byte[] sndh, long rows, boolean vbl) {
+    /** The same, from the stub named, a clock asked for or read. */
+    static byte[] of(byte[] stub, byte[] sndh, long rows, Sndh.Asked asked) {
         checkStub(stub);
         if (rows < 0 || rows > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("rows " + rows + " does not fit a long");
         }
         Tags tags = tags(sndh);
         // The file leaves the stub the VBL where its clock tag names the
-        // VBL and where its set claims Timer C; the VBL asked for stands
+        // VBL and where its set claims Timer C; a clock asked for stands
         // over either (BINARIES.md 4.3).
-        boolean named = tags.clock().equals(Sndh.VBL_CLOCK) || tags.flag().indexOf('c') >= 0;
-        if (named && !vbl && tags.rate() != 50) {
+        boolean claimed = tags.flag().indexOf('c') >= 0;
+        boolean named = tags.clock().equals(Sndh.VBL_CLOCK) || claimed;
+        if (claimed && asked == Sndh.Asked.TIMER_C) {
+            throw new IllegalArgumentException("the set claims Timer C and the clock asked"
+                    + " for is Timer C: the player's handler has that timer");
+        }
+        boolean vbl = asked == Sndh.Asked.VBL
+                || (asked == Sndh.Asked.CHOSEN && named);
+        if (named && asked == Sndh.Asked.CHOSEN && tags.rate() != 50) {
             throw new IllegalArgumentException("the file plays from the VBL at " + tags.rate()
                     + " Hz: the stub's VBL is a 50 Hz clock, so this set needs a separate host"
                     + " or the VBL asked for");
@@ -114,17 +171,22 @@ final class Prg {
         Tune.putLong(prg, 2, stub.length + sndh.length);
         System.arraycopy(stub, 0, prg, HEADER, stub.length);
         Tune.putWord(prg, HEADER + STUB_SUBTUNES_AT, tags.subtunes());
-        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, named || vbl ? FLAG_VBL : 0);
+        Tune.putWord(prg, HEADER + STUB_FLAGS_AT, vbl ? FLAG_VBL : 0);
         Tune.putWord(prg, HEADER + STUB_RATE_AT, tags.rate());
         Tune.putLong(prg, HEADER + STUB_ROWS_AT, (int) rows);
         Tune.putLong(prg, HEADER + STUB_CORE_AT, core);
+        Timer timer = timer(tags.rate());
+        Tune.putWord(prg, HEADER + STUB_PRESCALER_AT, timer.prescaler());
+        Tune.putWord(prg, HEADER + STUB_COUNT_AT, timer.count() & 0xFF);
+        Tune.putWord(prg, HEADER + STUB_TICKS_AT, timer.ticks());
         System.arraycopy(sndh, 0, prg, HEADER + stub.length, sndh.length);
         return prg;
     }
 
     /** What the program was made of: the file under it, the stub's bytes,
      *  and what the stub was patched with. */
-    private static void made(Report report, byte[] sndh, byte[] prg, long rows, boolean vbl) {
+    private static void made(Report report, byte[] sndh, byte[] prg, long rows,
+                             Sndh.Asked asked) {
         if (!report.says()) {
             return;
         }
@@ -137,18 +199,21 @@ final class Prg {
         report.row("the subtunes", String.valueOf(tags.subtunes()));
         report.row("the rows to play", rows == 0 ? "0, until a key stops it"
                 : String.valueOf(rows));
-        report.row("it plays from", from(tags, flags, vbl));
+        report.row("it plays from", from(tags, flags, asked));
         report.row("the screen", "cleared before the banner");
         report.say("the program: " + prg.length + " bytes");
     }
 
     /** The clock the program plays from, and what named it: the caller,
      *  the file's clock tag, or its claims. */
-    private static String from(Tags tags, int flags, boolean vbl) {
+    private static String from(Tags tags, int flags, Sndh.Asked asked) {
         if ((flags & FLAG_VBL) == 0) {
-            return "Timer C, 200 ticks a second and the rate's share of them";
+            Timer timer = timer(tags.rate());
+            String at = "Timer C, " + timer.ticks() + " ticks a second and a row every "
+                    + timer.ticks() / tags.rate();
+            return asked == Sndh.Asked.TIMER_C ? at + ", asked for" : at;
         }
-        if (vbl) {
+        if (asked == Sndh.Asked.VBL) {
             return "the VBL, asked for";
         }
         return tags.clock().equals(Sndh.VBL_CLOCK) ? "the VBL, the file's clock tag"
@@ -347,18 +412,18 @@ final class Prg {
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymxr-prg", flags, Ymxs.ROWS);
-        Ymxs.only(tool, flags, Ymxs.ROWS, Ymxs.VBL);
+        Ymxs.only(tool, flags, Ymxs.ROWS, Ymxs.CLOCKS);
         long rows = Ymxs.rows(tool, flags, 0);
-        boolean vbl = flags.contains("-vbl");
+        Sndh.Asked asked = Ymxs.asked(tool, flags);
         Report report = new Report(tool.reports());
         byte[] sndh = tool.bytes();
         byte[] prg;
         try {
-            prg = of(sndh, rows, vbl);
+            prg = of(sndh, rows, asked);
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
-        made(report, sndh, prg, rows, vbl);
+        made(report, sndh, prg, rows, asked);
         tool.report(prg.length + " bytes, "
                 + (rows == 0 ? "until a key stops it" : rows + " rows"));
         Out.write(tool, prg);

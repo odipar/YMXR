@@ -42,8 +42,8 @@
 #   -perf      the core with the raster monitor in, so the run paints
 #              what each call costs on the screen the program clears
 #              (performance.md, Measure)
-#   -vbl       the VBL as the clock the program plays from, Timer C
-#              without it; -perf names the VBL too
+#   -vbl       the VBL as the clock the program plays from, and -tc
+#              Timer C, which -perf would otherwise name the VBL over
 #   -lean      the core whose ticks neither drop the interrupt level nor
 #              write an end of interrupt, 32 cycles cheaper on a
 #              tick that writes a row and 16 on one that ends a source,
@@ -114,7 +114,7 @@ composer=
 help=
 perf=
 lean=
-vbl=
+clock=
 silent=
 vbls=
 # The flags read off, and the names left in the positional parameters:
@@ -129,7 +129,7 @@ while [ "$left" -gt 0 ]; do
         -h|-help|--help) help=1 ;;
         -perf) perf=-perf ;;
         -lean) lean=-lean ;;
-        -vbl) vbl=-vbl ;;
+        -vbl|-tc) clock=$arg ;;
         -silent) silent=-silent ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
@@ -246,7 +246,7 @@ if [ "$tunes" -gt 1 ]; then
 else
     cp "$1" "$work/TUNE.YMXR"
 fi
-"$here/bin/ymxr-sndh" $perf $lean $vbl $silent "-t${title:-$stem}" \
+"$here/bin/ymxr-sndh" $perf $lean $clock $silent "-t${title:-$stem}" \
     ${composer:+"-c$composer"} < "$work/TUNE.YMXR" > "$work/TUNE.SND"
 "$here/bin/ymxr-prg" $silent < "$work/TUNE.SND" > "$work/TUNE.PRG"
 "$here/ym/hatari.sh" "$work" "$vbls" "$out"

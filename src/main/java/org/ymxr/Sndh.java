@@ -105,24 +105,28 @@ final class Sndh {
      */
     enum Ticks { CHOSEN, PCREL, ABSOLUTE }
 
+    /** The clock the caller asks the tag block to name: the one the set
+     *  and the core select, the VBL, or Timer C (tools.md 12.1). */
+    enum Asked { CHOSEN, VBL, TIMER_C }
+
     /** The tag block's text: the title, the composer where there is one,
      *  and a name a subtune where the caller names them; and the core the
      *  file uses, which {@code monitor} and {@code lean} select a switch
      *  of and {@code ticks} the third. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor, boolean lean, Ticks ticks, boolean vbl) {
+            boolean monitor, boolean lean, Ticks ticks, Asked asked) {
 
         /** The two switches the tag block reads, the third chosen, and the
          *  clock tag left to the set. */
         Options(String title, @Nullable String composer, @Nullable List<String> names,
                 boolean monitor, boolean lean) {
-            this(title, composer, names, monitor, lean, Ticks.CHOSEN, false);
+            this(title, composer, names, monitor, lean, Ticks.CHOSEN, Asked.CHOSEN);
         }
 
         /** The same, with the ticks named. */
         Options(String title, @Nullable String composer, @Nullable List<String> names,
                 boolean monitor, boolean lean, Ticks ticks) {
-            this(title, composer, names, monitor, lean, ticks, false);
+            this(title, composer, names, monitor, lean, ticks, Asked.CHOSEN);
         }
     }
 
@@ -317,6 +321,15 @@ final class Sndh {
         return claimed;
     }
 
+    /** The clock the tag block names: the one asked for, and the VBL
+     *  where the raster monitor is in and the caller leaves the clock to
+     *  the tool, since the monitor paints one frame of calls and reads
+     *  against the raster where the tick comes from the VBL. */
+    static Asked asked(Options options) {
+        return options.asked() == Asked.CHOSEN && options.monitor()
+                ? Asked.VBL : options.asked();
+    }
+
     /** The FLAG tag's text: '~', a letter for each timer claimed, a to d,
      *  and y for the YM2149. */
     static String flag(int claimed) {
@@ -329,12 +342,23 @@ final class Sndh {
         return text.append('y').toString();
     }
 
-    /** The clock tag: 'TC' and the rate, Timer C, where the claims byte
-     *  leaves Timer C free, and '!V' and the rate, the VBL, where it has
-     *  Timer C or the VBL is asked for. A host calls play from that
-     *  clock (BINARIES.md 5.4). */
-    static String clock(int claimed, int rate, boolean vbl) {
-        return (vbl || (claimed & TIMER_C) != 0 ? VBL_CLOCK : TIMER_C_CLOCK) + rate;
+    /** The clock tag: '!V' and the rate, the VBL, where the claims byte
+     *  has Timer C, since the player's handler then has that timer, or
+     *  where the VBL is asked for; 'TC' and the rate, Timer C,
+     *  otherwise. A host calls play from that clock (BINARIES.md 5.4).
+     *
+     *  @throws IllegalArgumentException where Timer C is asked for and
+     *      the claims byte has it
+     */
+    static String clock(int claimed, int rate, Asked asked) {
+        if ((claimed & TIMER_C) != 0) {
+            if (asked == Asked.TIMER_C) {
+                throw new IllegalArgumentException("the set claims Timer C and the clock"
+                        + " asked for is Timer C: the player's handler has that timer");
+            }
+            return VBL_CLOCK + rate;
+        }
+        return (asked == Asked.VBL ? VBL_CLOCK : TIMER_C_CLOCK) + rate;
     }
 
     /**
@@ -359,7 +383,7 @@ final class Sndh {
         }
         tag(out, "CONV", CONVERTER);
         tag(out, String.format(Locale.ROOT, "##%02d", n), "");
-        tag(out, clock(claimed, rate, options.vbl() || options.monitor()), "");
+        tag(out, clock(claimed, rate, asked(options)), "");
         tag(out, "FLAG", flag(claimed));
         pad(out);
         text(out, "FRMS");
@@ -519,7 +543,7 @@ final class Sndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
-        boolean vbl = false;
+        Asked asked = Ymxs.asked(tool, flags);
         Ticks ticks = Ticks.CHOSEN;
         for (String flag : flags) {
             if (flag.equals("-perf")) {
@@ -530,11 +554,12 @@ final class Sndh {
                 ticks = Ticks.PCREL;
             } else if (flag.equals("-abs")) {
                 ticks = Ticks.ABSOLUTE;
-            } else if (flag.equals("-vbl")) {
-                vbl = true;
             } else if (flag.startsWith("-copies")) {
                 throw tool.usage("not a flag of the tool: " + flag
                         + "; a tune file is packed already");
+            } else if (flag.equals("-vbl") || flag.equals("-tc")) {
+                // the clock asked for, read by Ymxs.asked above
+                continue;
             } else if (flag.startsWith("-t")) {
                 title = flag.substring(2);
             } else if (flag.startsWith("-c")) {
@@ -562,7 +587,7 @@ final class Sndh {
             title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
         Options options = new Options(title, composer,
-                tunes.size() > 1 ? names : null, monitor, lean, ticks, vbl);
+                tunes.size() > 1 ? names : null, monitor, lean, ticks, asked);
         byte[] sndh;
         try {
             sndh = of(tunes, options);

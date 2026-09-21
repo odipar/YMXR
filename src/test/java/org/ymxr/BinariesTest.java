@@ -145,7 +145,7 @@ final class BinariesTest {
         int to = reaches(stub, 0);
         assertTrue(to >= Prg.STUB_DESCRIPTOR && to < stub.length, "the stub's bra.w reaches " + to);
         assertArrayEquals(Prg.STUB_MAGIC, Arrays.copyOfRange(stub, 4, 8));
-        assertEquals(1, Tune.getWord(stub, 8));
+        assertEquals(Prg.STUB_VERSION, Tune.getWord(stub, 8));
     }
 
     /**
@@ -392,10 +392,66 @@ final class BinariesTest {
         assertEquals("!V", claimed.clock(), "a host cannot call play from a claimed timer");
         assertEquals("abcdy", claimed.flag());
         assertEquals(60, claimed.rate(), "the clock tag carries the rate either way");
-        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, false));
-        assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50, false), "Timers A, D and B");
-        assertEquals("!V50", Sndh.clock(Sndh.claims(8), 50, false), "effect 3 runs Timer C");
-        assertEquals("!V50", Sndh.clock(Sndh.claims(0), 50, true), "the VBL asked for");
+        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, Sndh.Asked.CHOSEN));
+        assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50, Sndh.Asked.CHOSEN),
+                "Timers A, D and B");
+        assertEquals("!V50", Sndh.clock(Sndh.claims(8), 50, Sndh.Asked.CHOSEN),
+                "effect 3 runs Timer C");
+        assertEquals("!V50", Sndh.clock(Sndh.claims(0), 50, Sndh.Asked.VBL),
+                "the VBL asked for");
+        assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, Sndh.Asked.TIMER_C),
+                "Timer C asked for");
+        IllegalArgumentException both = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.clock(Sndh.claims(8), 50, Sndh.Asked.TIMER_C));
+        assertEquals("the set claims Timer C and the clock asked for is Timer C: the"
+                + " player's handler has that timer", both.getMessage());
+    }
+
+    @Test
+    void theTimerIsTheLowestMultipleOfTheRateTheMfpCounts() {
+        // 2,457,600 / 64 / 256 is 150, a row every third tick at 50 Hz,
+        // and / 64 / 160 is 240, a row every fourth at 60
+        assertEquals(new Prg.Timer(5, 256, 150), Prg.timer(50));
+        assertEquals(new Prg.Timer(5, 160, 240), Prg.timer(60));
+        assertEquals(new Prg.Timer(5, 192, 200), Prg.timer(200), "a row a tick");
+        assertEquals(new Prg.Timer(5, 256, 150), Prg.timer(25), "a row every sixth");
+        // 7 and 11 divide no multiple of the MFP's clock under 400
+        assertEquals(Prg.OS_CLOCK, Prg.timer(77));
+        for (int rate = 1; rate <= 400; rate++) {
+            Prg.Timer timer = Prg.timer(rate);
+            assertTrue(timer.count() >= 1 && timer.count() <= 256, rate + ": " + timer);
+            assertTrue(timer.prescaler() >= 1 && timer.prescaler() <= 7, rate + ": " + timer);
+            int divisor = Prg.MFP_CLOCK / (timer.count() * timer.ticks());
+            assertEquals(Prg.MFP_CLOCK, divisor * timer.count() * timer.ticks(),
+                    rate + ": the two fields make " + timer.ticks() + " ticks");
+            assertTrue(List.of(4, 10, 16, 50, 64, 100, 200).contains(divisor),
+                    rate + ": the divisor is " + divisor);
+            assertTrue(timer.ticks() % rate == 0 || timer.equals(Prg.OS_CLOCK),
+                    rate + ": " + timer.ticks() + " ticks is no multiple of the rate");
+        }
+    }
+
+    @Test
+    void theProgramCarriesTheTimerItsRateAsksFor() throws IOException {
+        byte[] sndh = Sndh.of(List.of(tune("plays-once")),
+                new Sndh.Options("Once", null, null, false, false));
+        byte[] prg = Prg.of(sndh, 0);
+        assertEquals(5, Tune.getWord(prg, 28 + Prg.STUB_PRESCALER_AT), "the divisor 64");
+        assertEquals(0, Tune.getWord(prg, 28 + Prg.STUB_COUNT_AT), "256, as the MFP reads it");
+        assertEquals(150, Tune.getWord(prg, 28 + Prg.STUB_TICKS_AT), "a row every third");
+        assertEquals(50, Tune.getWord(prg, 28 + Prg.STUB_RATE_AT));
+    }
+
+    @Test
+    void theMonitorsVblIsAskedAwayByTimerC() throws IOException {
+        List<byte[]> files = List.of(tune("chambers"));
+        Sndh.Options watched = new Sndh.Options("Watched", null, null, true, false);
+        assertEquals("!V", tags(Sndh.of(files, watched)).clock(), "-perf names the VBL");
+        Sndh.Options asked = new Sndh.Options("Watched", null, null, true, false,
+                Sndh.Ticks.CHOSEN, Sndh.Asked.TIMER_C);
+        assertEquals("TC", tags(Sndh.of(files, asked)).clock(), "-tc names Timer C over it");
+        assertEquals(0, Tune.getWord(Prg.of(Sndh.of(files, asked), 0), 28 + Prg.STUB_FLAGS_AT),
+                "and the program plays from Timer C");
     }
 
     @Test
@@ -623,7 +679,12 @@ final class BinariesTest {
         assertEquals("the file plays from the VBL at 60 Hz: the stub's VBL is a 50 Hz clock,"
                 + " so this set needs a separate host or the VBL asked for", wrong.getMessage());
         // the VBL asked for is that separate host named
-        assertEquals(Prg.FLAG_VBL, Tune.getWord(Prg.of(sndh, 0, true), 28 + Prg.STUB_FLAGS_AT));
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(Prg.of(sndh, 0, Sndh.Asked.VBL),
+                28 + Prg.STUB_FLAGS_AT));
+        IllegalArgumentException timer = assertThrows(IllegalArgumentException.class,
+                () -> Prg.of(sndh, 0, Sndh.Asked.TIMER_C));
+        assertEquals("the set claims Timer C and the clock asked for is Timer C: the"
+                + " player's handler has that timer", timer.getMessage());
     }
 
     @Test

@@ -28,16 +28,65 @@ import (
 var stubMagic = []byte{'Y', 'M', 'X', 'T'}
 
 const (
-	stubMagicAt    = 4
-	stubVersion    = 1
-	stubVersionAt  = 8
-	stubSubtunesAt = 10
-	StubFlagsAt    = 12
-	stubRateAt     = 14
-	stubRowsAt     = 16
-	stubCoreAt     = 20
-	stubLength     = 24
+	stubMagicAt     = 4
+	stubVersion     = 2
+	stubVersionAt   = 8
+	stubSubtunesAt  = 10
+	StubFlagsAt     = 12
+	stubRateAt      = 14
+	stubRowsAt      = 16
+	stubCoreAt      = 20
+	stubPrescalerAt = 24
+	stubCountAt     = 26
+	stubTicksAt     = 28
+	stubLength      = 30
 )
+
+// Timer is the timer the stub arms for a rate (BINARIES.md 4.10): the
+// prescaler, TCDCR's nibble; the count, 1 to 255 or 0 for 256; and the
+// ticks a second the two make, which a row is counted against.
+type Timer struct {
+	Prescaler int
+	Count     int
+	Ticks     int
+}
+
+// MfpClock is the MFP's clock, and divisors are the seven the nibbles
+// select (SPEC.md 1.9.2).
+const MfpClock = 2457600
+
+var divisors = [8]int{0, 4, 10, 16, 50, 64, 100, 200}
+
+// mostTicks is the ticks a second the timer is armed at, at most: twice
+// the operating system's clock.
+const mostTicks = 400
+
+// OSClock is the operating system's clock, which the stub arms where the
+// MFP counts no multiple of the rate: 2,457,600 / 64 / 192.
+var OSClock = Timer{Prescaler: 5, Count: 192, Ticks: 200}
+
+// TimerFor is the timer for a rate: the lowest multiple of the rate the
+// MFP counts exactly, so a row lands every few ticks and the count
+// returns to zero, and the operating system's clock where it counts
+// none. A tune at
+// 50 Hz is 150 ticks a second and a row every third, one at 60 Hz is 240
+// and a row every fourth.
+func TimerFor(rate int) Timer {
+	for k := 1; rate > 0 && k*rate <= mostTicks; k++ {
+		ticks := k * rate
+		if MfpClock%ticks != 0 {
+			continue
+		}
+		of := MfpClock / ticks
+		for nibble := 1; nibble <= 7; nibble++ {
+			count := of / divisors[nibble]
+			if count*divisors[nibble] == of && count >= 1 && count <= 256 {
+				return Timer{Prescaler: nibble, Count: count, Ticks: ticks}
+			}
+		}
+	}
+	return OSClock
+}
 
 // FlagVBL is flag bit 1: play from the VBL. Set where the clock tag names
 // the VBL, where the FLAG letters claim Timer C, since the stub then has
@@ -67,18 +116,18 @@ type Tagged struct {
 }
 
 // Program is the program around an SNDH file, playing that many rows, or
-// playing on where rows is 0, from the clock the file names. vbl plays
-// from the VBL over that clock, at the file's rate.
-func Program(sndh []byte, rows int64, vbl bool) ([]byte, error) {
+// playing on where rows is 0, from the clock the file names. A clock
+// asked for stands over that one, at the file's rate.
+func Program(sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	stub, err := binaries.Read(binaries.Stub)
 	if err != nil {
 		return nil, err
 	}
-	return ProgramWith(stub, sndh, rows, vbl)
+	return ProgramWith(stub, sndh, rows, asked)
 }
 
 // ProgramWith is the same, from the stub named.
-func ProgramWith(stub, sndh []byte, rows int64, vbl bool) ([]byte, error) {
+func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	if err := CheckStub(stub); err != nil {
 		return nil, err
 	}
@@ -90,10 +139,16 @@ func ProgramWith(stub, sndh []byte, rows int64, vbl bool) ([]byte, error) {
 		return nil, err
 	}
 	// The file leaves the stub the VBL where its clock tag names the VBL
-	// and where its set claims Timer C; the VBL asked for stands over
+	// and where its set claims Timer C; a clock asked for stands over
 	// either (BINARIES.md 4.3).
-	named := tags.Clock == ClockVBL || strings.ContainsRune(tags.Flag, 'c')
-	if named && !vbl && tags.Rate != 50 {
+	claimed := strings.ContainsRune(tags.Flag, 'c')
+	named := tags.Clock == ClockVBL || claimed
+	if claimed && asked == AskedTimerC {
+		return nil, fmt.Errorf("the set claims Timer C and the clock asked for is Timer" +
+			" C: the player's handler has that timer")
+	}
+	vbl := asked == AskedVBL || (asked == AskedChosen && named)
+	if named && asked == AskedChosen && tags.Rate != 50 {
 		return nil, fmt.Errorf("the file plays from the VBL at %d Hz: the stub's VBL is"+
 			" a 50 Hz clock, so this set needs a separate host or the VBL asked for",
 			tags.Rate)
@@ -108,13 +163,17 @@ func ProgramWith(stub, sndh []byte, rows int64, vbl bool) ([]byte, error) {
 	copy(prg[Header:], stub)
 	ymxr.PutWord(prg, Header+stubSubtunesAt, tags.Subtunes)
 	flags := 0
-	if named || vbl {
+	if vbl {
 		flags |= FlagVBL
 	}
 	ymxr.PutWord(prg, Header+StubFlagsAt, flags)
 	ymxr.PutWord(prg, Header+stubRateAt, tags.Rate)
 	ymxr.PutLong(prg, Header+stubRowsAt, int(rows))
 	ymxr.PutLong(prg, Header+stubCoreAt, core)
+	timer := TimerFor(tags.Rate)
+	ymxr.PutWord(prg, Header+stubPrescalerAt, timer.Prescaler)
+	ymxr.PutWord(prg, Header+stubCountAt, timer.Count&0xFF)
+	ymxr.PutWord(prg, Header+stubTicksAt, timer.Ticks)
 	copy(prg[Header+len(stub):], sndh)
 	return prg, nil
 }
