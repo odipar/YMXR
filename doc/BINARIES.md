@@ -733,8 +733,10 @@ of 0.4 or 4.5, report that line alone and stop.
   "flags":G,"rate":H,"rows":R,"core":C}`, the fields at 8, 10, 12, 14,
   16 and 20 counted from 28 (4.2), S the stub's bytes, the SNDH file's
   first byte less 28, and C the core's offset plus the SNDH file's first
-  byte. V is the field as the file has it: a program of a release before
-  the fields at 24, 26 and 28 reads 1.
+  byte. V is the field as the file has it, and
+  `"prescaler":P,"count":K,"ticks":T`, the fields at 24, 26 and 28, end
+  the line where V is 2 or above; a program of a release before those
+  fields reads 1 and ends its line at `core`.
 - `{"part":"sndh","at":A}`, A the SNDH file's first byte: the lowest
   even offset, 28 or above, where bytes A + 12 to A + 15 are `SNDH`.
 - the lines 6.4 defines for the SNDH file at A, the first line of 6.1

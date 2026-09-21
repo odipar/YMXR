@@ -1,8 +1,8 @@
 # The conformance kit of the binaries
 
-**1.** The kit is nine files under `files/`, of the four kinds
+**1.** The kit is ten files under `files/`, of the four kinds
 [BINARIES.md](../BINARIES.md) defines, and the record of each under
-`records/`: 127 lines over the nine. The kit tests one document,
+`records/`: 149 lines over the ten. The kit tests one document,
 BINARIES.md: an implementer who has read it alone writes a reader (2),
 and a record equal to the reference byte for byte shows that the
 document defines the layouts.
@@ -31,12 +31,14 @@ reads neither the tune format nor DTX.
 | `MANIFEST.txt` | `# sha256  bytes  file`, then a line each for every file and every record |
 | `SOURCES.md` | a row a file: its name, the tool call that wrote it, its input, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
 
-The nine are written from three tunes of the other kit
+The ten are written from three tunes of the other kit
 (`../conformance/tunes`), `circus`, `plays-once` and `four-timers`, by
 the calls `SOURCES.md` records, with the binaries of release 0.4.10
-under them. The music in those tunes is its composers', and the
-repository's LICENSE covers the code alone: a copy of the kit has the
-files in it for the exercise alone.
+under nine of them and 0.4.11's under `armed.prg`, whose stub is of the
+later descriptor version: the kit has a program of each. The music in
+those tunes is its composers', and the repository's LICENSE covers the
+code alone: a copy of the kit has the files in it for the exercise
+alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of these

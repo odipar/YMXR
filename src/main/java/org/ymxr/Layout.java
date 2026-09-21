@@ -121,14 +121,22 @@ final class Layout {
             at += 2;
         }
         out.append("{\"part\":\"prg\",\"text\":").append(Tune.getLong(file, 2)).append("}\n");
+        int version = word(file, 28 + 8);
         out.append("{\"part\":\"stub\",\"at\":28,\"bytes\":").append(at - 28)
-                .append(",\"version\":").append(word(file, 28 + 8))
+                .append(",\"version\":").append(version)
                 .append(",\"subtunes\":").append(word(file, 28 + 10))
                 .append(",\"flags\":").append(word(file, 28 + 12))
                 .append(",\"rate\":").append(word(file, 28 + 14))
                 .append(",\"rows\":").append(Tune.getLong(file, 28 + 16))
-                .append(",\"core\":").append(at + Tune.getLong(file, 28 + 20))
-                .append("}\n");
+                .append(",\"core\":").append(at + Tune.getLong(file, 28 + 20));
+        if (version >= 2) {
+            // the timer the stub arms (4.10), which a program of an
+            // earlier version has no field for
+            out.append(",\"prescaler\":").append(word(file, 28 + Prg.STUB_PRESCALER_AT))
+                    .append(",\"count\":").append(word(file, 28 + Prg.STUB_COUNT_AT))
+                    .append(",\"ticks\":").append(word(file, 28 + Prg.STUB_TICKS_AT));
+        }
+        out.append("}\n");
         out.append("{\"part\":\"sndh\",\"at\":").append(at).append("}\n");
         sndh(out, file, at, 28 + Tune.getLong(file, 2));
     }

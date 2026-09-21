@@ -25,7 +25,7 @@ and a line feed ending each line. In Python that is
 `json.dumps(part, separators=(",", ":"))` over dicts filled in that
 order, `sort_keys` left at its default.
 
-**3. The files.** Nine, of the four kinds. Each was written by the tools
+**3. The files.** Ten, of the four kinds. Each was written by the tools
 of the repository from the tunes of the other kit.
 
 | file | what it is | lines to produce |
@@ -39,6 +39,7 @@ of the repository from the tunes of the other kit.
 | `abs.snd` | one subtune behind the core whose ticks read an address | 14 |
 | `two.prg` | a program around `two.snd`, 2,000 rows | 20 |
 | `timers.prg` | a program around `timers.snd`, the VBL asked for | 22 |
+| `armed.prg` | the same, its stub of the later descriptor version | 22 |
 
 **4. The rules.**
 
