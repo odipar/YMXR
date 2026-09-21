@@ -132,6 +132,16 @@ final class PlayerTest {
         throw new AssertionError("no row opens \"" + opens + "\", of " + table.keySet());
     }
 
+    /** The version a layout table of that section reads: the figure after
+     *  "the descriptor's version," in its row. */
+    private static int version(String binaries, String section) {
+        int at = binaries.indexOf("## " + section);
+        assertTrue(at >= 0, "BINARIES.md has no section " + section);
+        Matcher said = Pattern.compile("the descriptor's version, (\\d+)").matcher(binaries);
+        assertTrue(said.find(at), section + " has no version row");
+        return Integer.parseInt(said.group(1));
+    }
+
     /**
      * The bound tune's layout as BINARIES.md 1 defines it, against the
      * player's equates and the binder's constants. A host reads a bound
@@ -171,6 +181,8 @@ final class PlayerTest {
         assertEquals(Sndh.CORE_READS_AT, row(said, "the highest bound tune version").getValue());
         assertEquals(Sndh.CORE_FIXED_AT, row(said, "`YMXR_FIXED`").getValue());
         assertEquals(Sndh.CORE_FLAGS_AT, row(said, "flags").getValue());
+        assertEquals(Sndh.CORE_VERSION, version(binaries, "2. The SNDH core"),
+                "2.2 reads the version the tool writes");
         assertEquals(Sndh.CORE_STATE_AT, row(said, "where the core's state byte").getValue());
         assertEquals(Sndh.CORE_TABLE_AT, row(said, "the subtune table").getValue());
         assertEquals(Sndh.CORE_WORK_AT, row(said, "the workspace").getValue());
@@ -199,6 +211,8 @@ final class PlayerTest {
         assertEquals(Prg.STUB_PRESCALER_AT, row(said, "the prescaler").getValue());
         assertEquals(Prg.STUB_COUNT_AT, row(said, "the timer's count").getValue());
         assertEquals(Prg.STUB_TICKS_AT, row(said, "the timer's rate").getValue());
+        assertEquals(Prg.STUB_VERSION, version(binaries, "4. The program stub"),
+                "4.2 reads the version the tool writes");
         Map<String, Integer> bits = flags(binaries, "4. The program stub", 2);
         assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the clock tag is `!V`").getValue());
     }

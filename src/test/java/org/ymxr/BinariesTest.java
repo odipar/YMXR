@@ -15,6 +15,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -405,6 +407,41 @@ final class BinariesTest {
                 () -> Sndh.clock(Sndh.claims(8), 50, Sndh.Asked.TIMER_C));
         assertEquals("the set claims Timer C and the clock asked for is Timer C: the"
                 + " player's handler has that timer", both.getMessage());
+    }
+
+    /**
+     * The version a document reports is the version a tool writes: the
+     * stub's descriptor (BINARIES.md 4.5) and the core's (2.10), each
+     * driven with a binary of another version and read against the row
+     * of its table. 0.4.11 took the stub to version 2 in 4.2 and left
+     * 4.5 reading 1, which a reader of the kit found and this reads.
+     */
+    @Test
+    void theVersionsTheDocumentsReportAreTheOnesWritten() throws IOException {
+        String binaries = Files.readString(Path.of("doc", "BINARIES.md"));
+        byte[] files = tune("plays-once");
+        byte[] stub = Binaries.stub().clone();
+        Tune.putWord(stub, Prg.STUB_VERSION_AT, 9);
+        byte[] sndh = Sndh.of(List.of(files), new Sndh.Options("Once", null, null, false, false));
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Prg.of(stub, sndh, 0));
+        assertEquals(reported(binaries, "the stub's descriptor is version").replace("V", "9"),
+                wrong.getMessage());
+        byte[] core = Binaries.core(false, false, true).clone();
+        Tune.putWord(core, 16, 9);
+        IllegalArgumentException old = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(core, List.of(files),
+                        new Sndh.Options("Once", null, null, false, false)));
+        assertEquals(reported(binaries, "the core's descriptor is version").replace("V", "9"),
+                old.getMessage());
+    }
+
+    /** The line a table of the document reports, opening with those
+     *  words: the one code span of a row that begins so. */
+    private static String reported(String document, String opens) {
+        Matcher said = Pattern.compile("`(" + Pattern.quote(opens) + "[^`]*)`").matcher(document);
+        assertTrue(said.find(), "the document reports no line opening \"" + opens + "\"");
+        return said.group(1);
     }
 
     @Test
