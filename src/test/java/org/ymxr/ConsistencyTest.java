@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.TreeSet;
 import java.util.function.ToLongFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.ymxr.doc.Documents;
 import org.junit.jupiter.api.Test;
 
@@ -978,6 +980,91 @@ final class ConsistencyTest {
      * documents outside the list cite SPEC.md by the same brackets, which
      * the Conventions allow and this leaves alone.
      */
+    /**
+     * Every line a table of BINARIES.md or tools.md reports reads the
+     * same in the two trees: a message reworded in one tree and the
+     * document, or in the document alone, fails here. The letters a
+     * table writes for a figure, V or N or B or i, and the figures a tool
+     * builds a line from stand outside the comparison, and this reads the
+     * words around them.
+     *
+     * <p>The check that a figure reads the same is
+     * {@code BinariesTest.theVersionsTheDocumentsReportAreTheOnesWritten}:
+     * 0.4.11 took the stub's descriptor to version 2 in BINARIES.md 4.2
+     * and left 4.5 reading 1, which a reader of the kit found.
+     */
+    @Test
+    void everyLineATableReportsReadsTheSameInBothTrees() throws IOException {
+        String java = tree(Path.of("src/main/java/org/ymxr"), ".java");
+        String go = tree(Path.of("go"), ".go");
+        List<String> read = new ArrayList<>();
+        for (Path at : List.of(Path.of("doc/BINARIES.md"), Path.of("doc/tools.md"))) {
+            for (String said : reported(read(at))) {
+                List<String> parts = new ArrayList<>();
+                for (String part : said.split("\\b[A-Zi]\\b|[0-9][0-9,]*")) {
+                    String one = part.strip();
+                    if (one.length() >= 12) {
+                        parts.add(one);
+                    }
+                }
+                if (parts.isEmpty()) {
+                    continue;
+                }
+                // the longest run of words between the figures: a name
+                // the tool writes into a line, a tag's or a tool's,
+                // stands between two such runs and moves with the file
+                String part = parts.stream().max(Comparator.comparingInt(String::length))
+                        .orElseThrow();
+                if (!java.contains(part)) {
+                    // a line of the shared tool or of a script, which
+                    // stands outside these two trees
+                    continue;
+                }
+                read.add(said);
+                assertTrue(go.contains(part),
+                        at + " reports \"" + said + "\" and the Go tree lacks \""
+                        + part + "\"");
+            }
+        }
+        assertTrue(read.size() >= 30, "the tables report " + read.size() + " lines of the tools");
+    }
+
+    /** The lines the tables of a document report: the last cell of a row,
+     *  each code span in it of three words or more that opens in lower
+     *  case. */
+    private static List<String> reported(String document) {
+        List<String> out = new ArrayList<>();
+        Matcher row = Pattern.compile("^\\|(.*)\\|\\s*$", Pattern.MULTILINE)
+                .matcher(document);
+        while (row.find()) {
+            String[] cells = row.group(1).split("\\|");
+            if (cells.length < 2) {
+                continue;
+            }
+            Matcher said = Pattern.compile("`([^`]+)`").matcher(cells[cells.length - 1]);
+            while (said.find()) {
+                String one = said.group(1);
+                if (one.split("\\s+").length >= 3 && Character.isLowerCase(one.charAt(0))) {
+                    out.add(one);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Every source of a tree, read as one text. */
+    private static String tree(Path at, String ending) throws IOException {
+        StringBuilder out = new StringBuilder();
+        try (Stream<Path> found = Files.walk(at)) {
+            for (Path one : found.filter(p -> p.toString().endsWith(ending)).toList()) {
+                out.append(Files.readString(one)).append('\n');
+            }
+        }
+        // a line a tool builds from two strings reads as one here
+        return out.toString().replaceAll("\"\\s*\\+\\s*\"", "")
+                .replaceAll("\"\\s*\\+\\n?\\s*\"", "");
+    }
+
     @Test
     void everyCitationLandsOnAClause() throws IOException {
         List<String> wrong = new ArrayList<>();
