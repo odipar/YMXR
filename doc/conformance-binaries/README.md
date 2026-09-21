@@ -52,7 +52,8 @@ files, of the tune format, of DTX and of ST4.
 4. The implementer produces `layout.py`, `READ.md` and `NOTES.md` as
    `TASK.md` defines.
 5. For each file `X`, run `python3 layout.py files/X` and compare its
-   output byte for byte with `records/X.jsonl`.
+   output byte for byte with `records/X.jsonl`, which
+   `bin/ymxr-layout -silent < files/X` writes (tools.md 9.5).
 
 **5. What passes.** All three:
 
@@ -96,3 +97,32 @@ lowest offset, the image of a bound tune of a set, a text above $7E, and
 in 4.5 step 2 that `##` is 4 bytes and a zero byte, which 3.2 writes and
 that step read as four. The signed fields of 0.2 and the unsigned index
 of 1.2 are marked in their tables.
+
+**6.2 The second run**, the same day, against the kit with the thirteen
+places of 6.1 written into it and a fresh implementer. Every record
+byte for byte, all nine, and `READ.md` named documents alone.
+`NOTES.md` had 10 entries with 4 marked *decides output*, so the run
+failed rule 3 again; the four are readings the document settles once two
+clauses are read together, and each was settled in one place.
+
+- 6.1 sent a reader of an SNDH file to the conditions of 4.5, five of
+  which read the stub, the caller's `rows` or the caller's clock rather
+  than the file. Reporting the clock row would have replaced the records
+  of `timers.snd` and `timers.prg` with one error line. 4.5 says which
+  conditions a reader reports now.
+- 6.4 gave a subtune's `at` as `its offset from the subtune table`,
+  which reads as the offset the table has or as the file offset it
+  names. It reads `the offset subtune i has in the subtune table, plus
+  H` now.
+- 6.4 put the `~` in a tag's text and named 4.5 step 2, which keeps the
+  letters after it, so the two clauses read as one instruction to drop
+  it.
+- 6.5's `its first line left out` named either 6.1's kind line or 6.4's
+  `entry` line. It names 6.1's now.
+
+Six entries marked *leaves output as it is* carried six sentences: what
+T counts in 3.1, the unsigned fields of 1.2 and 2.5, the `!#SN` names
+read from the byte after the offset words, a file that meets none of the
+four kinds, the line of a file outside the rules standing alone, and
+the scan for the SNDH file inside a program stepping by 2
+from 28.

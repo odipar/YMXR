@@ -2,18 +2,50 @@ package org.ymxr;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.TreeSet;
+import org.ymxs.tool.Tool;
 
 /**
  * The record of BINARIES.md 6: a file this repository writes read back
  * and reported part by part, one line of JSON a part. The reader here
  * reads the file alone, as an implementer of the document does, so a
  * record that differs from the reference is the document read two ways.
+ *
+ * <p>{@code ymxr-layout} (tools.md 9.5) writes it.
  */
 final class Layout {
 
     private Layout() {
+    }
+
+    /** The tool: a file on standard input, its record on standard
+     *  output. */
+    public static void main(String[] args) {
+        List<String> flags = new ArrayList<>(Arrays.asList(args));
+        Tool tool = Tool.of("ymxr-layout", flags);
+        byte[] file = tool.bytes();
+        Report report = new Report(tool.reports());
+        String record;
+        try {
+            record = of(file);
+        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException wrong) {
+            throw tool.wrong(Tool.WRONG, wrong instanceof IllegalArgumentException
+                    ? String.valueOf(wrong.getMessage())
+                    : "the record runs past the file's " + file.length + " bytes");
+        }
+        List<String> lines = record.lines().toList();
+        report.say("the file: " + file.length + " bytes, kind " + kind(file));
+        for (String part : List.of("tag", "tune", "source", "image")) {
+            long of = lines.stream().filter(line -> line.contains("\"part\":\"" + part + "\""))
+                    .count();
+            if (of > 0) {
+                report.row("the " + part + (of == 1 ? "" : "s"), String.valueOf(of));
+            }
+        }
+        tool.report(lines.size() + (lines.size() == 1 ? " line" : " lines"));
+        Out.write(tool, record.getBytes(StandardCharsets.US_ASCII));
     }
 
     /** The record of the file: 6.1's first line, then the lines of 6.2
@@ -40,13 +72,14 @@ final class Layout {
         if (ascii(file, 0, 4).equals("YMXB")) {
             return "bound";
         }
-        if (word(file, 0) == 0x601A) {
+        if (file.length >= 2 && word(file, 0) == Prg.PRG_MAGIC) {
             return "program";
         }
         if (ascii(file, 12, 4).equals("SNDH")) {
             return "sndh";
         }
-        throw new IllegalArgumentException("not a file BINARIES.md defines");
+        throw new IllegalArgumentException("not a file BINARIES.md defines: no YMXM, YMXB,"
+                + " $601A or SNDH");
     }
 
     /** 6.2: the header, then a line a tune. */
