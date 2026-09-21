@@ -155,3 +155,27 @@ layout they report, and one clause of 4.5 left behind by a release.
 
 Eight entries marked *leaves output as it is* read as the document
 defines them.
+
+**6.4 The fourth run**, 2026-09-21, against the kit at ten files, the
+tenth a program of the later descriptor version, and the three places of
+6.3 written into the document. Every record byte for byte, all ten, and
+`READ.md` documents alone. `NOTES.md` had 11 entries with 3 marked
+*decides output*, each a clause of 6.4 that reads two ways, and each
+reads one way now.
+
+- `to` reports three targets of a `bra.w`, and 6.1's rule covers an
+  offset: a reader of a program that left the SNDH file's first byte off
+  reported 118, 122 and 126 where the reference reads 1,906, 1,910 and
+  1,914. The clause names the base now.
+- The image lines read as one an offset or one a subtune naming it; the
+  kit's two files of two subtunes share an image, so the two readings
+  differ by a line. The clause reads one line a distinct offset.
+- The text of `FLAG` was raised by the second, the third and this run:
+  6.4 put the `~` in the text and cited 4.5 step 2, which keeps the
+  letters after it, so the two read as one instruction. 4.5's reading is
+  marked the tool's, outside the record.
+
+Two figures the run checked against the document and reported: the
+prescaler, the count and the ticks of `armed.prg` are 4.10's for 60 Hz,
+2,457,600 / 240 = 10,240 = 64 x 160, and every workspace of 32,434 bytes
+is 2.6's align(2120 + 30312) + 2.
