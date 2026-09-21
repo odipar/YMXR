@@ -441,8 +441,8 @@ tags stand:
 
 | condition | reported as |
 |---|---|
-| the stub is under 24 bytes, or its bytes 4 to 7 are other than `YMXT` | `not a program stub: no YMXT at 4` |
-| the stub's field at 8 is V, other than 1 | `the stub's descriptor is version V, and this writes 1` |
+| the stub is under 30 bytes, or its bytes 4 to 7 are other than `YMXT` | `not a program stub: no YMXT at 4` |
+| the stub's field at 8 is V, other than 2 | `the stub's descriptor is version V, and this writes 2` |
 | the stub's length B is odd | `the stub is B bytes, odd: the SNDH file after it would load on an odd address` |
 | `rows` N is outside 0 to 4,294,967,295 | `rows N does not fit a long` |
 | bytes 12 to 15 of the file are other than `SNDH` | `not an SNDH file: no SNDH at 12` |
@@ -458,10 +458,12 @@ tags stand:
 | C is before the byte after `HDNS`, or R is other than C | `the core begins at C, and the entry triple reaches R` |
 | C plus 36 is past the file, B bytes remaining from C | `the core begins at C and the file ends B bytes on, short of the core's descriptor, 36 bytes` |
 
-A reader of 6.1 reports a condition of this table that reads the file's
-bytes. The condition that reads the caller's clock is the tool's alone,
-and a reader of a file whose clock tag is `!V` at a rate other than 50
-reports the record of 6.4.
+A reader of 6.1 reports a condition of this table that reads the SNDH
+file. The four that read the stub a tool is handed and its `rows`
+argument are the tool's, and so is the one that reads the caller's
+clock: a reader of a program whose stub is of an earlier version reports
+the record of 6.5, and one of a file whose clock tag is `!V` at a rate
+other than 50 the record of 6.4.
 
 **4.6 The program**, as the stub runs it under TOS. Scan codes are the
 IKBD's; `N` is the field at 10, `rate` the field at 14, `rows` the field
@@ -677,9 +679,10 @@ of 0.4 or 4.5, report that line alone and stop.
 
 - `{"part":"header","version":V,"rate":H,"effects":E,"sources":S,
   "state":B,"image":I,"table":C}`, the fields at 4, 6, 8, 9, 12, 16 and
-  20, I the field at 16 plus the tune's first byte, which is the tune's
-  first byte for a bound tune of a set (1.4), and C the field at 20 as
-  the file has it, an offset from the image's first byte.
+  20, I the field at 16 plus the tune's first byte, which 3.1 patches
+  for a subtune of an SNDH file, so that I is the image's offset there,
+  and C the field at 20 as the file has it, an offset from the image's
+  first byte.
 - a line a source, 1 to `S`, in index order: `{"part":"source",
   "number":i,"at":A}`, A the index entry plus the tune's first byte.
 - `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0,
@@ -714,11 +717,10 @@ of 0.4 or 4.5, report that line alone and stop.
 - a line a subtune, 1 to `N`, in order: `{"part":"tune","number":i,
   "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
   "state":D,"image":I,"table":C}`, A the offset subtune i has in the
-  subtune table, plus H,
-  the fields of 1.2 read at A as 6.3 reads them, and B the bytes to the
-  next subtune, or, for the last, to the image at the lowest offset;
-  then a line a source of that subtune, as 6.3 defines them, each `at`
-  the index entry plus A.
+  subtune table, plus H, the fields of 1.2 read at A as 6.3 reads them,
+  its image line left out, and B the bytes to the next subtune, or, for
+  the last, to the image at the lowest offset; then a line a source of
+  that subtune, as 6.3 defines them, each `at` the index entry plus A.
 - a line an image: `{"part":"image","number":i,"at":I}`, each offset the
   subtunes name once, in increasing order of offset, i counting from 1.
 - `{"part":"workspace","at":W,"bytes":B}`, B the bytes from W to the end
@@ -730,8 +732,9 @@ of 0.4 or 4.5, report that line alone and stop.
 - `{"part":"stub","at":28,"bytes":S,"version":V,"subtunes":N,
   "flags":G,"rate":H,"rows":R,"core":C}`, the fields at 8, 10, 12, 14,
   16 and 20 counted from 28 (4.2), S the stub's bytes, the SNDH file's
-  first byte less 28, and C the core's offset plus the SNDH file's
-  first byte.
+  first byte less 28, and C the core's offset plus the SNDH file's first
+  byte. V is the field as the file has it: a program of a release before
+  the fields at 24, 26 and 28 reads 1.
 - `{"part":"sndh","at":A}`, A the SNDH file's first byte: the lowest
   even offset, 28 or above, where bytes A + 12 to A + 15 are `SNDH`.
 - the lines 6.4 defines for the SNDH file at A, the first line of 6.1

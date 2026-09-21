@@ -126,3 +126,30 @@ read from the byte after the offset words, a file that meets none of the
 four kinds, the line of a file outside the rules standing alone, and
 the scan for the SNDH file inside a program stepping by 2
 from 28.
+
+**6.3 The third run**, 2026-09-21, against the document release 0.4.11
+ships, the ten places of 6.2 written into it and a fresh implementer.
+Every record byte for byte again, all nine, and `READ.md` documents
+alone. `NOTES.md` had 11 entries with 3 marked *decides output*, so the
+run failed rule 3; the three are two clauses of 6 pulling against the
+layout they report, and one clause of 4.5 left behind by a release.
+
+- 4.2 reads the stub's descriptor version 2, with the fields at 24, 26
+  and 28 the timer is armed from, where 4.5 reported an error for a
+  field at 8 other than 1 and a stub under 24 bytes. The kit's two
+  programs are 0.4.10's, their stubs 24 bytes reading 1, so a reader
+  that followed 4.5 as it stood reported an error line for what 4.2
+  defines. The row reads
+  30 bytes and version 2 now, those four conditions are the tool's
+  alone, and 6.5 reads V as the file has it: a program of an earlier
+  release reads 1. That was the one defect of the run.
+- 6.3 read `I` as the tune's first byte for a bound tune of a set, which
+  1.4 writes the field 0 for, where 3.1 patches that field in an SNDH
+  file and every subtune of the kit has it patched.
+- 6.3's image line stands where the field at 16 is above 0, which every
+  subtune of a written file meets, so a reader that applied 6.3 whole
+  inside 6.4 wrote an image line a subtune beside the images. 6.4 leaves
+  that line out now.
+
+Eight entries marked *leaves output as it is* read as the document
+defines them.
