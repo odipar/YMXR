@@ -88,11 +88,20 @@ func layoutProgram(out *bytes.Buffer, file []byte) {
 		at += 2
 	}
 	fmt.Fprintf(out, "{\"part\":\"prg\",\"text\":%d}\n", ymxr.GetLong(file, 2))
+	version := ymxr.GetWord(file, 28+8)
 	fmt.Fprintf(out, "{\"part\":\"stub\",\"at\":28,\"bytes\":%d,\"version\":%d,"+
-		"\"subtunes\":%d,\"flags\":%d,\"rate\":%d,\"rows\":%d,\"core\":%d}\n",
-		at-28, ymxr.GetWord(file, 28+8), ymxr.GetWord(file, 28+10),
+		"\"subtunes\":%d,\"flags\":%d,\"rate\":%d,\"rows\":%d,\"core\":%d",
+		at-28, version, ymxr.GetWord(file, 28+10),
 		ymxr.GetWord(file, 28+12), ymxr.GetWord(file, 28+14),
 		ymxr.GetLong(file, 28+16), at+ymxr.GetLong(file, 28+20))
+	if version >= 2 {
+		// the timer the stub arms (4.10), which a program of an earlier
+		// version has no field for
+		fmt.Fprintf(out, ",\"prescaler\":%d,\"count\":%d,\"ticks\":%d",
+			ymxr.GetWord(file, 28+stubPrescalerAt), ymxr.GetWord(file, 28+stubCountAt),
+			ymxr.GetWord(file, 28+stubTicksAt))
+	}
+	out.WriteString("}\n")
 	fmt.Fprintf(out, "{\"part\":\"sndh\",\"at\":%d}\n", at)
 	layoutSndh(out, file, at, 28+ymxr.GetLong(file, 2))
 }

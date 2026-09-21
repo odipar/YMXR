@@ -693,13 +693,15 @@ of 0.4 or 4.5, report that line alone and stop.
 **6.4 An SNDH file** (3.1), after the first line:
 
 - `{"part":"entry","to":[a,b,c]}`, entry i at 4i and its target
-  4i + 2 + the word at 4i + 2, read signed.
+  4i + 2 + the word at 4i + 2, read signed, an offset like every other
+  the record reports and counted from the file's first byte.
 - a line a tag, in the order they stand, from 16 to `HDNS` (3.2), a
   zero byte where a tag name would begin skipped, A its first byte:
   `{"part":"tag","name":"TITL","at":A,"text":"T"}` for `TITL`, `COMM`,
   `CONV` and `FLAG`, T the bytes after the four of the name to its zero
-  byte; of `FLAG` the `~` stands in T, where 4.5 step 2 keeps the
-  letters after it; `{"part":"tag","name":"##","at":A,"subtunes":N}`, N
+  byte; of `FLAG` that is the whole text 3.2 writes, its `~` and its
+  `y` among it, and the letters 4.5 step 2 keeps are the tool's reading,
+  outside the record; `{"part":"tag","name":"##","at":A,"subtunes":N}`, N
   its two digits; `{"part":"tag","name":"TC","at":A,"rate":H}`, or `!V`
   in place of `TC`, H the leading decimal digits after the two of the
   name;
@@ -721,8 +723,9 @@ of 0.4 or 4.5, report that line alone and stop.
   its image line left out, and B the bytes to the next subtune, or, for
   the last, to the image at the lowest offset; then a line a source of
   that subtune, as 6.3 defines them, each `at` the index entry plus A.
-- a line an image: `{"part":"image","number":i,"at":I}`, each offset the
-  subtunes name once, in increasing order of offset, i counting from 1.
+- a line an image: `{"part":"image","number":i,"at":I}`, one line for
+  each distinct offset the subtunes name, in increasing order of offset,
+  i counting from 1.
 - `{"part":"workspace","at":W,"bytes":B}`, B the bytes from W to the end
   of the SNDH file, which the workspace stands last in (3.1).
 
@@ -733,8 +736,10 @@ of 0.4 or 4.5, report that line alone and stop.
   "flags":G,"rate":H,"rows":R,"core":C}`, the fields at 8, 10, 12, 14,
   16 and 20 counted from 28 (4.2), S the stub's bytes, the SNDH file's
   first byte less 28, and C the core's offset plus the SNDH file's first
-  byte. V is the field as the file has it: a program of a release before
-  the fields at 24, 26 and 28 reads 1.
+  byte. V is the field as the file has it, and
+  `"prescaler":P,"count":K,"ticks":T`, the fields at 24, 26 and 28, end
+  the line where V is 2 or above; a program of a release before those
+  fields reads 1 and ends its line at `core`.
 - `{"part":"sndh","at":A}`, A the SNDH file's first byte: the lowest
   even offset, 28 or above, where bytes A + 12 to A + 15 are `SNDH`.
 - the lines 6.4 defines for the SNDH file at A, the first line of 6.1

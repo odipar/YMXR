@@ -1,8 +1,8 @@
 # The conformance kit of the binaries
 
-**1.** The kit is nine files under `files/`, of the four kinds
+**1.** The kit is ten files under `files/`, of the four kinds
 [BINARIES.md](../BINARIES.md) defines, and the record of each under
-`records/`: 127 lines over the nine. The kit tests one document,
+`records/`: 149 lines over the ten. The kit tests one document,
 BINARIES.md: an implementer who has read it alone writes a reader (2),
 and a record equal to the reference byte for byte shows that the
 document defines the layouts.
@@ -31,12 +31,14 @@ reads neither the tune format nor DTX.
 | `MANIFEST.txt` | `# sha256  bytes  file`, then a line each for every file and every record |
 | `SOURCES.md` | a row a file: its name, the tool call that wrote it, its input, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
 
-The nine are written from three tunes of the other kit
+The ten are written from three tunes of the other kit
 (`../conformance/tunes`), `circus`, `plays-once` and `four-timers`, by
 the calls `SOURCES.md` records, with the binaries of release 0.4.10
-under them. The music in those tunes is its composers', and the
-repository's LICENSE covers the code alone: a copy of the kit has the
-files in it for the exercise alone.
+under nine of them and 0.4.11's under `armed.prg`, whose stub is of the
+later descriptor version: the kit has a program of each. The music in
+those tunes is its composers', and the repository's LICENSE covers the
+code alone: a copy of the kit has the files in it for the exercise
+alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of these
@@ -153,3 +155,27 @@ layout they report, and one clause of 4.5 left behind by a release.
 
 Eight entries marked *leaves output as it is* read as the document
 defines them.
+
+**6.4 The fourth run**, 2026-09-21, against the kit at ten files, the
+tenth a program of the later descriptor version, and the three places of
+6.3 written into the document. Every record byte for byte, all ten, and
+`READ.md` documents alone. `NOTES.md` had 11 entries with 3 marked
+*decides output*, each a clause of 6.4 that reads two ways, and each
+reads one way now.
+
+- `to` reports three targets of a `bra.w`, and 6.1's rule covers an
+  offset: a reader of a program that left the SNDH file's first byte off
+  reported 118, 122 and 126 where the reference reads 1,906, 1,910 and
+  1,914. The clause names the base now.
+- The image lines read as one an offset or one a subtune naming it; the
+  kit's two files of two subtunes share an image, so the two readings
+  differ by a line. The clause reads one line a distinct offset.
+- The text of `FLAG` was raised by the second, the third and this run:
+  6.4 put the `~` in the text and cited 4.5 step 2, which keeps the
+  letters after it, so the two read as one instruction. 4.5's reading is
+  marked the tool's, outside the record.
+
+Two figures the run checked against the document and reported: the
+prescaler, the count and the ticks of `armed.prg` are 4.10's for 60 Hz,
+2,457,600 / 240 = 10,240 = 64 x 160, and every workspace of 32,434 bytes
+is 2.6's align(2120 + 30312) + 2.
