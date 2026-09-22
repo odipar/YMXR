@@ -6,7 +6,7 @@ implementations (19), releases (20), and environment (21).
 
 Terms follow [SPEC.md](SPEC.md) and [BINARIES.md](BINARIES.md). A
 *structure* is a YMXS multi as JSON ([ymxs.md](ymxs.md)); a *dump* is
-YM5! or YM6!, bare or in an LHA archive.
+YM3!, YM3b, YM5! or YM6!, bare or in an LHA archive.
 
 **Conventions.** A clause is cited by number, 8.3. In a quoted line a
 capital letter is a decimal figure defined beside the line or in the
@@ -347,8 +347,8 @@ converted at them and the conversion replayed against the dump (8.3).
 **8.2 The verdict** of a dump is written on standard output: `<name>:
 replays to its dump`, or `<name>:` and one line of 8.3 under it, each
 two spaces in; `<name>` is `standard input` or the file's name. A file
-that is other than a dump after unpacking is `<name>: not a YM5!/YM6!
-dump`.
+that is other than a dump after unpacking is `<name>: not a
+YM3!/YM3b/YM5!/YM6! dump`.
 
 **8.3 The check** converts the dump as `ym-to-ymxr` does, reads the tune
 file back, and steps a model of SPEC.md 4 through one pass and one loop
@@ -884,7 +884,7 @@ off the path or the Java tree is unbuilt.
 | `ymxr-check` on a named file that is absent | the verdict `unreadable: <message>`, counted as a dump, exit 1 | the error `<stat message>`, exit 2, before any verdict |
 | `ymxr-check` on a named file that is present and fails to read | `unreadable: <message>` | `unreadable: <file name>` |
 | `ymxr-check` with a flag the converter rejects | the verdict `the converter refuses it: not a flag of the tool: X` (8.4) | the verdict `not a flag of the tool: X` |
-| `ymxr-check` on an LHA archive that fails to unpack | `the archive does not unpack: <message>`, counted as a dump | `not a YM5!/YM6! dump`, uncounted |
+| `ymxr-check` on an LHA archive that fails to unpack | `the archive does not unpack: <message>`, counted as a dump | `not a YM3!/YM3b/YM5!/YM6! dump`, uncounted |
 | `ymxr-check` on several files | read in parallel | read in order |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |
 

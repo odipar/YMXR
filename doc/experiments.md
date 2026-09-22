@@ -3,10 +3,12 @@
 One experiment: the corpus through the specification, what it packs to,
 and what a frame costs.
 
-The corpus is the 544 YM files YMX 0.8.3 was tested against, 543 of which
-read: `capture.ym` is a YM3 dump, which the converter reads as another
-format and names, and the rig's runs stand it outside a run rather than
-among the tunes that played wrong (tools.md 17.1). `YM_CORPUS` names the
+The corpus is the 544 YM files YMX 0.8.3 was tested against, all 544 of
+which read and play as the specification reads, measured by the rig over
+every one of them at 200 frames each. `capture.ym` is a YM3 dump, which
+the converter read as another format until 0.4.13 read the format
+(ymxs.md); the figures below were measured over the 543 that read before
+it. `YM_CORPUS` names the
 directory here. `ym/convert.py` runs everything below and reads the
 figures back; the percentages are sums and ratios of its rows. The DTX2
 files are written by DTX 0.4.0's `dtx-write`, built from that repository's

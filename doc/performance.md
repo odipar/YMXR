@@ -139,6 +139,31 @@ it, and the tune's sound changes. A file whose clock tag names the VBL, which
 `-perf` and `-vbl` write (BINARIES.md 3.2), plays from it, and every call then
 runs outside the tick handlers.
 
+## The program's clock
+
+The tick a program plays from costs the CPU what its handler runs, and
+the stub arms Timer C at the lowest multiple of the tune's rate the MFP
+counts exactly (BINARIES.md 4.10). Measured on Hatari's cycle-exact CPU,
+the profiler reading the instructions of the handler alone: a tick that
+plays no row costs 147 cycles, the interrupt's entry and the `rte`
+among them, and one that plays a row costs 283 before the play call it
+makes.
+
+A 50 Hz tune ticks 150 times a second with a row every third, so the
+clock costs 100 x 147 + 50 x 283 = 28,850 cycles a second, 0.36 per cent
+of the 8,021,247 the CPU runs. The 200 Hz clock the stub armed before
+0.4.11 cost 150 x 147 + 50 x 283 = 36,200, 0.45 per cent: the change
+leaves 50 ticks a second unrun, 7,350 cycles.
+
+A 60 Hz tune ticks 240 times with a row every fourth, 180 x 147 +
+60 x 283 = 43,440 cycles a second, 0.54 per cent, against the 200 Hz
+clock's 140 x 147 + 60 x 283 = 37,560, 0.47 per cent. The even spacing
+of a 60 Hz tune's rows (4.10) costs 5,880 cycles a second, and a rate
+the MFP counts no multiple of under 400 keeps the 200 Hz clock.
+
+The VBL costs the handler of 4.8 once a frame, 50 ticks a second at the
+screen's rate, and the row lands where the frame procedure runs.
+
 ## Against YMX
 
 YMX 0.10.1 measured its player the same way, painting the background red

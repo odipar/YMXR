@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -337,6 +338,23 @@ final class ParityTest {
                         file + "'s record is the kit's");
             }
         }
+    }
+
+    /** A YM3 dump, which has no header: the two trees read the same
+     *  fourteen vectors out of it. */
+    @Test
+    void aYm3DumpConvertsTheSameInBothTrees() throws Exception {
+        byte[] data = new byte[4 + 14 * 40];
+        System.arraycopy("YM3!".getBytes(StandardCharsets.US_ASCII), 0, data, 0, 4);
+        for (int r = 0; r < 14; r++) {
+            for (int frame = 0; frame < 40; frame++) {
+                data[4 + r * 40 + frame] = (byte) ((r * 7 + frame * 3) & 0x0F);
+            }
+        }
+        byte[] tune = both("ym-to-ymxr", data, "-silent");
+        assertTrue(tune.length > 0, "a YM3 dump converts");
+        both("ym-to-ymxs", data, "-silent");
+        both("ymxr-check", data, "-silent");
     }
 
     @Test

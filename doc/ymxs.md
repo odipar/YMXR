@@ -18,11 +18,14 @@ A tracker can emit YMXS JSON for conversion to YMXR.
 
 ## The two stages
 
-**Reading.** `Ym` converts a YM5!/YM6! dump into register rows, effects,
-sources and a repeat row. Import rules cover
-drums preempting square waves, drum duration from source rows and rate,
-effect volume registers, and repeat rows that restore registers and
-restart effects running through the wrap.
+**Reading.** `Ym` converts a YM3!, YM3b, YM5! or YM6! dump into register
+rows, effects, sources and a repeat row. Import rules cover drums preempting
+square waves, drum duration from source rows and rate, effect volume
+registers, and repeat rows that restore registers and restart effects
+running through the wrap. A YM3 dump is fourteen vectors of one register
+each and no header: the rate is 50 Hz, the clock 2,000,000, and R14 and R15
+are zero, so it runs no effect; YM3b names the frame it repeats to in a long
+after the vectors.
 
 **Encoding.** `Schema` converts the structure into the columns of SPEC.md
 1: set bits, bits marking zero values in full-byte columns, effect
