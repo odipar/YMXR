@@ -34,6 +34,42 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.13, 2026-09-22
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.13>, built from the commit
+tagged `v0.4.13`.
+
+The nine 68000 binaries are 0.4.11's bytes: no source under `68k/` has
+moved since. What moves is the record `ymxr-layout` writes and the
+clauses two more rounds of readers marked.
+
+- **One key, one meaning.** `state` was the state byte's offset on the
+  core line and the state block's bytes on a tune line, and `subtunes`
+  was the subtune table's offset on the core line and the count of the
+  `##` tag. A tune line reads `stateblock`, the core line
+  `subtunetable` and the tag line `count`, so `ymxr-layout` writes
+  different keys than 0.4.12 for those three values.
+- **6.5 lists the offsets.** 6.1 reads every `at` and every other offset
+  of the record from the file's first byte and 6.5 counts them from the
+  program's first byte, and neither said which values those are. The
+  clause names them: the entry line's `to`, every `at`, the core line's
+  `state`, `subtunetable` and `work`, the subtunes line's `tunes` and a
+  tune line's `image`.
+- **The letters are carried over.** The core line reports `U` and `W`
+  with `H` among them, and the subtunes line and the workspace line said
+  `at` in those letters alone; each tag's length stood in 4.5 step 2
+  unnamed, which fixes the `at` of `!#SN` and `HDNS`; and the `##` count
+  and a clock tag's rate read as digits against 6.1's integers.
+- **Four readers read the document cold**, runs 6 and 7 of the binaries
+  kit, two implementers at a time. Every record came back byte for byte
+  from each, forty-four against forty-four, and one reader of run 6
+  marked every note *leaves output as it is*, the first of the nine to
+  do so. Over the seven runs the document moved in 26 places.
+
+Checks: `mvn -o clean test` green, 168 tests and no skip; the rig green
+under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, 10,
+10, 10, 14, 10 and 13 tunes.
+
 ### 0.4.12, 2026-09-22
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.12>, built from the commit
