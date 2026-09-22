@@ -34,6 +34,51 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.12, 2026-09-22
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.12>, built from the commit
+tagged `v0.4.12`.
+
+The nine 68000 binaries are 0.4.11's bytes: no source under `68k/` moved.
+What moves is `ymxr-layout`, the record it writes, and the checks the
+documents are read under.
+
+- **A record reads the timer a program is armed with.** BINARIES.md 6.5
+  reported the stub's descriptor as far as the core's offset, which was
+  the whole descriptor until 0.4.11 put the prescaler, the count and the
+  ticks behind it. The stub line ends with those three where the version
+  is 2 or above, and a program of an earlier release ends at `core`.
+- **A text above $7E escapes the same in both trees.** The Java tool
+  replaced a byte outside UTF-8 with U+FFFD and then wrote the record in
+  US-ASCII, which put a `?` where the Go tool wrote `\ufffd`. 6.1
+  defines the escape and the replacement character, and the Java tool
+  escapes every character above $7E.
+- **Five readers read BINARIES.md cold**, runs 3 to 5 of the binaries
+  kit, the fifth two implementers at once. Every record came back byte
+  for byte from each, and twenty places of the document moved for what
+  they marked: 4.5 reported the stub's version as 1 where 4.2 reads 2,
+  the entry line read `entry i at 4i` where an ordinal counts from 1, an
+  image line read as one an offset or one a subtune, and the text of
+  `FLAG` read two ways under a citation of 4.5.
+- **The lines a table reports are read against both trees**, 52 of them:
+  the longest run of words between the figures a tool writes into a line
+  must stand in the Java tree and the Go tree. The versions the
+  documents report are driven through the tools rather than read, which
+  is the check 4.5 lacked.
+- **The rig reads the timer on Hatari's MFP.** `-stub` reads its tunes
+  at 50 Hz, which divides 200, so the arming 0.4.11 changed made no
+  difference to it; it reads the same tune at 60 Hz now, the period
+  between the in-service bits the stub's handler clears, 4.164 to
+  4.166 ms against the 4.167 of 240 ticks a second.
+
+The kit under `doc/conformance-binaries` is eleven files and 153 record
+lines, with a program of each descriptor version and a multi file whose
+names stand above $7E.
+
+Checks: `mvn -o clean test` green, 168 tests and no skip; the rig green
+under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, 10,
+10, 10, 14, 10 and 13 tunes.
+
 ### 0.4.11, 2026-09-21
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.11>, built from the commit
