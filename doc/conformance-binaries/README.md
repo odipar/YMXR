@@ -1,8 +1,8 @@
 # The conformance kit of the binaries
 
-**1.** The kit is ten files under `files/`, of the four kinds
+**1.** The kit is eleven files under `files/`, of the four kinds
 [BINARIES.md](../BINARIES.md) defines, and the record of each under
-`records/`: 149 lines over the ten. The kit tests one document,
+`records/`: 153 lines over the eleven. The kit tests one document,
 BINARIES.md: an implementer who has read it alone writes a reader (2),
 and a record equal to the reference byte for byte shows that the
 document defines the layouts.
@@ -31,14 +31,15 @@ reads neither the tune format nor DTX.
 | `MANIFEST.txt` | `# sha256  bytes  file`, then a line each for every file and every record |
 | `SOURCES.md` | a row a file: its name, the tool call that wrote it, its input, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
 
-The ten are written from three tunes of the other kit
+The eleven are written from three tunes of the other kit
 (`../conformance/tunes`), `circus`, `plays-once` and `four-timers`, by
 the calls `SOURCES.md` records, with the binaries of release 0.4.10
 under nine of them and 0.4.11's under `armed.prg`, whose stub is of the
-later descriptor version: the kit has a program of each. The music in
-those tunes is its composers', and the repository's LICENSE covers the
-code alone: a copy of the kit has the files in it for the exercise
-alone.
+later descriptor version, and `named.ymxr`, whose names stand above $7E:
+the kit has a program of each descriptor version and a text the record
+escapes. The music in those tunes is its composers', and the
+repository's LICENSE covers the code alone: a copy of the kit has the
+files in it for the exercise alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of these
@@ -179,3 +180,31 @@ Two figures the run checked against the document and reported: the
 prescaler, the count and the ticks of `armed.prg` are 4.10's for 60 Hz,
 2,457,600 / 240 = 10,240 = 64 x 160, and every workspace of 32,434 bytes
 is 2.6's align(2120 + 30312) + 2.
+
+**6.5 The fifth run**, 2026-09-22, two implementers at once against the
+kit at ten files, each in a separate directory (4 rule 3). Every
+record byte for byte from both, twenty against twenty, and `READ.md`
+documents alone. The first wrote 9 notes with 2 marked *decides output*
+and the second 12 with 1, and the two lists overlap in three places.
+Two readers buy that overlap: a clause both stop at is the document's,
+and one only one stops at is a reading.
+
+- Both stopped at the entry line, and both marked it *decides output*:
+  6.4 read `entry i at 4i` where the Conventions count an ordinal from
+  1, which puts the three at 4, 8 and 12, the third word inside the tag
+  block. The clause names 0, 4 and 8 now.
+- Both stopped at a text outside UTF-8, and this tree wrote two answers:
+  the Java tool replaced the bytes with U+FFFD and then wrote the record
+  in US-ASCII, which put a `?` where the Go tool wrote `\ufffd`. 6.1
+  defines the escape and the replacement character now, the Java tool
+  escapes every character above $7E, and `named.ymxr` has two names
+  above $7E in it, so that a reader is read against them.
+- Both stopped at the longs of `FRMS`, marked *leaves output as it is*
+  by each: they are unsigned, as the clause reads now.
+- One stopped at what a tag line's `at` counts from inside a program,
+  marked *decides output*: 6.4 cites 4.5, whose offsets count from the
+  SNDH file, and 6.5 counts from the program's first byte. 6.5 says
+  which governs.
+
+The other fourteen notes are readings the document settles, and the two
+readers stop at different ones.

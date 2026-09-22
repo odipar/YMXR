@@ -46,7 +46,7 @@ final class BinariesConformanceTest {
     @Test
     void everyFileOfTheKitRecordsAsTheReferenceReads() throws IOException {
         List<String> names = named();
-        assertEquals(10, names.size(), "the kit is ten files");
+        assertEquals(11, names.size(), "the kit is eleven files");
         for (String name : names) {
             String record = Layout.of(Files.readAllBytes(FILES.resolve(name)));
             assertEquals(Files.readString(RECORDS.resolve(name + ".jsonl")), record,

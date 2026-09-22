@@ -657,7 +657,9 @@ decimal, the keys of each object in the order this section lists them,
 and a line feed, byte 10, ending every line. An `at` is an offset from
 the file's first byte, and so is every other offset the record reports
 but for `table`, which 6.3 defines. A text of the record is UTF-8 read
-out, each character above $7E escaped as JSON escapes it.
+out, each character above $7E escaped `\uXXXX`, its code point in four
+hexadecimal digits, lower case; a byte sequence outside UTF-8 reads as
+U+FFFD, the replacement character, and escapes as `\ufffd`.
 
 The first line is `{"kind":"K","bytes":F}`, F the file's bytes and K the
 first kind of the four the file meets, read in this order: `multi` where
@@ -692,9 +694,11 @@ of 0.4 or 4.5, report that line alone and stop.
 
 **6.4 An SNDH file** (3.1), after the first line:
 
-- `{"part":"entry","to":[a,b,c]}`, entry i at 4i and its target
-  4i + 2 + the word at 4i + 2, read signed, an offset like every other
-  the record reports and counted from the file's first byte.
+- `{"part":"entry","to":[a,b,c]}`, the three `bra.w` of 3.1 at 0, 4
+  and 8 from the SNDH file's first byte, and a, b and c their targets:
+  for the one at E, E + 2 + the word at E + 2, read signed, an offset
+  like every other the record reports and counted from the file's first
+  byte.
 - a line a tag, in the order they stand, from 16 to `HDNS` (3.2), a
   zero byte where a tag name would begin skipped, A its first byte:
   `{"part":"tag","name":"TITL","at":A,"text":"T"}` for `TITL`, `COMM`,
@@ -705,7 +709,8 @@ of 0.4 or 4.5, report that line alone and stop.
   its two digits; `{"part":"tag","name":"TC","at":A,"rate":H}`, or `!V`
   in place of `TC`, H the leading decimal digits after the two of the
   name;
-  `{"part":"tag","name":"FRMS","at":A,"frames":[...]}`, the `N` longs;
+  `{"part":"tag","name":"FRMS","at":A,"frames":[...]}`, the `N` longs,
+  unsigned;
   `{"part":"tag","name":"!#SN","at":A,"names":[...]}`, the `N` names in
   subtune order, each read to its zero byte from the byte after the
   offset words (4.5 step 2); and
@@ -743,6 +748,8 @@ of 0.4 or 4.5, report that line alone and stop.
 - `{"part":"sndh","at":A}`, A the SNDH file's first byte: the lowest
   even offset, 28 or above, where bytes A + 12 to A + 15 are `SNDH`.
 - the lines 6.4 defines for the SNDH file at A, the first line of 6.1
-  left out, every offset counted from the program's first byte. The SNDH
+  left out, every offset counted from the program's first byte, the
+  `at` of a tag line among them, where 4.5 counts from the SNDH file's
+  first byte. The SNDH
   file ends at 28 plus the long at 2, the relocation table standing
   after it (4.4), and the workspace's `bytes` counts to that end.

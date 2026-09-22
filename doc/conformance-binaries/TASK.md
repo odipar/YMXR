@@ -25,12 +25,13 @@ and a line feed ending each line. In Python that is
 `json.dumps(part, separators=(",", ":"))` over dicts filled in that
 order, `sort_keys` left at its default.
 
-**3. The files.** Ten, of the four kinds. Each was written by the tools
+**3. The files.** Eleven, of the four kinds. Each was written by the tools
 of the repository from the tunes of the other kit.
 
 | file | what it is | lines to produce |
 |---|---|---:|
 | `set.ymxr` | a multi file of two tunes, named | 4 |
+| `named.ymxr` | the same, its names above $7E | 4 |
 | `one.ymxb` | a bound tune written alone | 3 |
 | `one.snd` | an SNDH file of one subtune that plays once | 14 |
 | `two.snd` | two subtunes, a composer and their names | 17 |
