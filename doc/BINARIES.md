@@ -700,28 +700,30 @@ of 0.4 or 4.5, report that line alone and stop.
   for the one at E, E + 2 + the word at E + 2, read signed, an offset
   like every other the record reports and counted from the file's first
   byte.
-- a line a tag, in the order they stand, from 16 to `HDNS` (3.2), a
-  zero byte where a tag name would begin skipped, A its first byte:
+- a line a tag, in the order they stand, from 16 to `HDNS` (3.2), each
+  tag as long as 4.5 step 2 reads it, a zero byte where a tag name would
+  begin skipped, A its first byte:
   `{"part":"tag","name":"TITL","at":A,"text":"T"}` for `TITL`, `COMM`,
   `CONV` and `FLAG`, T the bytes after the four of the name to its zero
-  byte; of `FLAG` that is the whole text 3.2 writes, its `~` and its
-  `y` among it, and the letters 4.5 step 2 keeps are the tool's reading,
+  byte; of `FLAG` that is the whole text 3.2 writes, its `~` and its `y`
+  among it, and the letters 4.5 step 2 keeps are the tool's reading,
   outside the record; `{"part":"tag","name":"##","at":A,"count":N}`, N
-  its two digits; `{"part":"tag","name":"TC","at":A,"rate":H}`, or `!V`
-  in place of `TC`, H the leading decimal digits after the two of the
-  name;
-  `{"part":"tag","name":"FRMS","at":A,"frames":[...]}`, the `N` longs,
-  unsigned;
+  the number its two digits spell;
+  `{"part":"tag","name":"TC","at":A,"rate":H}`, or `!V` in place of
+  `TC`, H the number the leading decimal digits after the two of the
+  name spell; `{"part":"tag","name":"FRMS","at":A,"frames":[...]}`, the
+  `N` longs, unsigned;
   `{"part":"tag","name":"!#SN","at":A,"names":[...]}`, the `N` names in
   subtune order, each read to its zero byte from the byte after the
-  offset words (4.5 step 2); and
-  `{"part":"tag","name":"HDNS","at":A}`, last.
+  offset words (4.5 step 2); and `{"part":"tag","name":"HDNS","at":A}`,
+  last.
 - `{"part":"core","at":H,"version":V,"binds":R,"fixed":F,"flags":G,
   "state":S,"subtunetable":U,"work":W}`, H the core's first byte,
   even(12 + T) of 3.1 with T the tag block's bytes, the fields at 16,
   18, 20, 22, 24, 28 and 32 (2.2), S, U and W each plus H.
-- `{"part":"subtunes","at":U,"tunes":[...]}`, the word `N` at U and the
-  `N` longs after it, each plus H (2.5).
+- `{"part":"subtunes","at":U,"tunes":[...]}`, U as the core line
+  reports it, H among it; the word `N` at U and the `N` longs after it,
+  each plus H (2.5).
 - a line a subtune, 1 to `N`, in order: `{"part":"tune","number":i,
   "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
   "stateblock":D,"image":I,"table":C}`, A the offset subtune i has in the
@@ -732,8 +734,9 @@ of 0.4 or 4.5, report that line alone and stop.
 - a line an image: `{"part":"image","number":i,"at":I}`, one line for
   each distinct offset the subtunes name, in increasing order of offset,
   i counting from 1.
-- `{"part":"workspace","at":W,"bytes":B}`, B the bytes from W to the end
-  of the SNDH file, which the workspace stands last in (3.1).
+- `{"part":"workspace","at":W,"bytes":B}`, W as the core line reports
+  it, H among it, and B the bytes from W to the end of the SNDH file,
+  which the workspace stands last in (3.1).
 
 **6.5 A program** (4.4), after the first line:
 
