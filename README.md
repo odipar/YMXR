@@ -1,4 +1,4 @@
-# YMXR
+# YMXR - a chiptune format and player for the Atari ST
 
 ## Read this first
 
@@ -17,22 +17,69 @@ Arnaud Carré's, and SNDH is the Atari ST scene's shared music container.
 
 ## What YMXR is
 
-YMXR is a chiptune format and 68000 player for the Atari ST. It encodes
-YMXS tune data in DTX tables.
+YMXR plays chiptunes on the Atari ST. It converts a YM dump, the registers
+of the sound chip recorded one frame at a time, into a tune file, and a
+tune file into an SNDH file or a TOS program that plays on an Atari ST or
+under an emulator. The player is 68000 code: it writes the YM2149 sound
+chip once a frame, and runs effects on the timers of the MC68901 (MFP) at
+rates above the frame rate.
 
-[YMX](https://github.com/odipar/YMX) is the family this repository
-belongs to: a design document defining how YMXS, YMXR, DTX and ST4 fit
-together. YMX was a format and a player until 0.10.1, and YMXR replaces
-both. Each repository defines a layer:
+The format encodes a YMXS tune as DTX tables, and defines how each column
+reaches the YM2149 or the MFP.
 
-- **[DTX](https://github.com/odipar/DTX)** defines table layout, packing
-  and 68000 readers. Values have a fixed width; tables repeat from a
-  selected row or play once.
-- **[YMXS](https://github.com/odipar/YMXS)** defines tune data and playback:
-  register rows, effects, sources and rates. Every conversion here passes
-  through this structure, which a tracker can emit as JSON.
-- **YMXR** encodes the structure as DTX tables and defines how each column
-  reaches the YM2149 sound chip or MC68901 (MFP) timers.
+## Getting started
+
+The twelve tools come as executables for Windows, macOS and Linux, on x64
+and arm64, from the [releases](https://github.com/odipar/YMXR/releases):
+one zip a platform. This makes a program that plays a dump:
+
+```bash
+ym-to-ymxs < tune.ym | ymxs-to-prg > TUNE.PRG
+```
+
+`TUNE.PRG` is a TOS program: it runs on an Atari ST, or under Hatari, an
+Atari ST emulator, and plays until SPACE or ESC. In a checkout the same
+tools are under [`bin/`](bin), and [`ym/play.sh`](ym/play.sh) converts a
+dump and plays it under Hatari in one call; [`ym/test/`](ym/test) has ten
+dumps to try it on.
+
+## Converting and playing
+
+```bash
+bin/ym-to-ymxr < tune.ym > tune.ymxr
+bin/ymxr-sndh -t"The title" < tune.ymxr > tune.sndh
+bin/ymxr-prg < tune.sndh > TUNE.PRG
+
+bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG
+bin/ymxr-multi one.ymxr two.ymxr | bin/ymxr-sndh | bin/ymxr-prg > SET.PRG
+bin/ymxr-set one.ym two.ym > SET.PRG
+bin/ymxr-trace -r4 < tune.ymxr
+ym/play.sh tune.ym
+```
+
+A tune file contains tables. An SNDH file adds DTX's reader and the
+player; a TOS program plays that SNDH file on a bare machine.
+[`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
+the Go tools ([tools.md](doc/tools.md) 16.6), and
+[`ym/play.sh`](ym/play.sh) runs the conversion and Hatari.
+
+`ymxr-check` compares a converted tune with its dump. `ymxr-trace`
+prints the frame record used by the conformance kit. Tools write output
+to standard output and reports to standard error; `-silent` omits the
+report and summary but preserves output and notes ([tools.md](doc/tools.md) 3.3).
+
+## Words used here
+
+| word | definition |
+|---|---|
+| YM dump | a YM5 or YM6 file: the registers of the YM2149, recorded one frame at a time |
+| tune file | the values fixed for a tune, its name, its DTX2 table and one DTX1 table a source, in one file |
+| SNDH file | tunes with DTX's reader and the player added, in SNDH, the Atari ST scene's shared music container |
+| TOS program | an SNDH file behind a program stub, which runs on an Atari ST |
+| player | the program that reads the tune's table one row a frame, writes the columns that row sets to the YM2149 and the MFP, and at each tick of a timer writes one row of its source |
+| frame | one call of the player, at the tune's rate |
+| tick | one interrupt of a timer, at the rate of an effect |
+| conformance kit | the tune files under `doc/conformance/tunes`, each with its table unpacked beside it, that an independent reader is written against |
 
 ## Reading and playback
 
@@ -93,31 +140,6 @@ and 7, then the [conformance kit](doc/conformance). Read SPEC.md with
 | [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 18), and [`ym/test`](ym/test), ten dumps the tests run on |
 | [`release/`](release) | the scripts that build and list a release |
 
-## Converting and playing
-
-```bash
-bin/ym-to-ymxr < tune.ym > tune.ymxr
-bin/ymxr-sndh -t"The title" < tune.ymxr > tune.sndh
-bin/ymxr-prg < tune.sndh > TUNE.PRG
-
-bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG
-bin/ymxr-multi one.ymxr two.ymxr | bin/ymxr-sndh | bin/ymxr-prg > SET.PRG
-bin/ymxr-set one.ym two.ym > SET.PRG
-bin/ymxr-trace -r4 < tune.ymxr
-ym/play.sh tune.ym
-```
-
-A tune file contains tables. An SNDH file adds DTX's reader and the
-player; a TOS program plays that SNDH file on a bare machine.
-[`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
-the Go tools ([tools.md](doc/tools.md) 16.6), and
-[`ym/play.sh`](ym/play.sh) runs the conversion and Hatari.
-
-`ymxr-check` compares a converted tune with its dump. `ymxr-trace`
-prints the frame record used by the conformance kit. Tools write output
-to standard output and reports to standard error; `-silent` omits the
-report and summary but preserves output and notes ([tools.md](doc/tools.md) 3.3).
-
 ## Building and testing
 
 Java 23, Maven and rmac, with DTX and YMXS installed in the local Maven
@@ -129,3 +151,13 @@ repository by `mvn install` in each checkout. The Go tree builds with
 |---|---|
 | `mvn test` | document consistency and style; dump conversion and replay; conformance files byte for byte; assembled cores, stub, SNDH and PRG layouts; Java/Go parity |
 | [`68k/test/emu/test_ymxr.py`](68k/test/emu/test_ymxr.py) | emulated 68000 frames, timer programming and ticks against the specification model; corpus and build flags in [tools.md](doc/tools.md) 17 |
+
+## Related repositories
+
+[YMXS](https://github.com/odipar/YMXS) defines the tune a YMXR tune file
+encodes, and how it plays. [DTX](https://github.com/odipar/DTX) is the
+table format: `R` rows and `C` columns, every value `W` bytes, in one of
+three variants. [YMX](https://github.com/odipar/YMX) is the family this
+repository belongs to: a design document defining how YMXS, YMXR, DTX and
+ST4 fit together. YMX was a format and a player until 0.10.1, and YMXR
+replaces both.
