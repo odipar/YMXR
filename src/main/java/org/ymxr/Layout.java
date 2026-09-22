@@ -288,9 +288,22 @@ final class Layout {
     }
 
     /** JSON text: the quotes, a backslash before a quote and a
-     *  backslash, and the bytes as they read. */
+     *  backslash, and every character above $7E escaped, so the record
+     *  reads US-ASCII (6.1). A byte sequence outside UTF-8 reads as
+     *  U+FFFD, the replacement character, and escapes as $FFFD. */
     private static String text(String said) {
-        return '"' + said.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
+        StringBuilder out = new StringBuilder("\"");
+        for (int i = 0; i < said.length(); i++) {
+            char c = said.charAt(i);
+            if (c == '"' || c == '\\') {
+                out.append('\\').append(c);
+            } else if (c > 0x7E) {
+                out.append(String.format("\\u%04x", (int) c));
+            } else {
+                out.append(c);
+            }
+        }
+        return out.append('"').toString();
     }
 
     private static String ascii(byte[] file, int at, int bytes) {
