@@ -25,7 +25,7 @@ import (
 )
 
 // result is one line of the tool's report on a file: no dump where the
-// file is not a YM5!/YM6! dump, and otherwise an empty list, or the
+// file is not a YM3!/YM3b/YM5!/YM6! dump, and otherwise an empty list, or the
 // faults.
 type result struct {
 	file  string
@@ -122,7 +122,7 @@ func says(one result) {
 	name := filepath.Base(one.file)
 	switch {
 	case !one.dump:
-		fmt.Println(name + ": not a YM5!/YM6! dump")
+		fmt.Println(name + ": not a YM3!/YM3b/YM5!/YM6! dump")
 	case len(one.wrong) == 0:
 		fmt.Println(name + ": replays to its dump")
 	default:

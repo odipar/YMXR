@@ -194,7 +194,7 @@ final class Check {
     }
 
     /** What one line of the tool reports of a file: no dump where the file is
-     *  not a YM5!/YM6! dump, and otherwise an empty list, or the faults. */
+     *  not a YM3!/YM3b/YM5!/YM6! dump, and otherwise an empty list, or the faults. */
     record Result(Path file, boolean dump, List<String> wrong) {
     }
 
@@ -314,7 +314,7 @@ final class Check {
     private static void said(Result result) {
         String name = result.file().getFileName().toString();
         if (!result.dump()) {
-            System.out.println(name + ": not a YM5!/YM6! dump");
+            System.out.println(name + ": not a YM3!/YM3b/YM5!/YM6! dump");
         } else if (result.wrong().isEmpty()) {
             System.out.println(name + ": replays to its dump");
         } else {

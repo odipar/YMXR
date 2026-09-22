@@ -42,6 +42,67 @@ final class ConversionTest {
         assertTrue(wrong.isEmpty(), () -> path + ":\n" + String.join("\n", wrong));
     }
 
+    /** A YM3 dump built here: the four bytes of the format, then
+     *  fourteen vectors of one register each. */
+    private static byte[] ym3(String format, int frames, int loop) {
+        byte[] data = new byte[4 + 14 * frames + (format.equals("YM3b") ? 4 : 0)];
+        System.arraycopy(format.getBytes(java.nio.charset.StandardCharsets.US_ASCII), 0,
+                data, 0, 4);
+        for (int r = 0; r < 14; r++) {
+            for (int frame = 0; frame < frames; frame++) {
+                // a value that reads back as itself: four bits fit the
+                // volume registers and the byte fits the rest
+                data[4 + r * frames + frame] = (byte) ((r + frame) & 0x0F);
+            }
+        }
+        if (format.equals("YM3b")) {
+            Tune.putLong(data, data.length - 4, loop);
+        }
+        return data;
+    }
+
+    @Test
+    void aYm3DumpIsFourteenVectorsAndNoHeader() {
+        YmDump.Song song = YmDump.read(ym3("YM3!", 8, 0));
+        assertEquals("YM3!", song.format());
+        assertEquals(8, song.frames());
+        assertEquals(50, song.playerHz(), "a YM3 dump leaves the rate unsaid");
+        assertEquals(2000000L, song.masterClock());
+        assertEquals(0, song.loopFrame());
+        assertEquals(0, song.drums().length, "and runs no digidrum");
+        for (int r = 0; r < 14; r++) {
+            for (int frame = 0; frame < 8; frame++) {
+                assertEquals((r + frame) & 0x0F, song.registers()[r][frame] & 0xFF,
+                        "R" + r + " of frame " + frame);
+            }
+        }
+        for (int r = 14; r < 16; r++) {
+            for (int frame = 0; frame < 8; frame++) {
+                assertEquals(0, song.registers()[r][frame], "R" + r + " stands outside YM3");
+            }
+        }
+    }
+
+    @Test
+    void aYm3bDumpNamesTheFrameItRepeatsTo() {
+        YmDump.Song song = YmDump.read(ym3("YM3b", 8, 3));
+        assertEquals("YM3b", song.format());
+        assertEquals(8, song.frames(), "the long after the vectors is no frame");
+        assertEquals(3, song.loopFrame());
+    }
+
+    @Test
+    void aYm3DumpOfAPartialFrameIsReported() {
+        byte[] data = java.util.Arrays.copyOf(ym3("YM3!", 8, 0), 4 + 14 * 8 - 3);
+        YmDump.FormatException wrong = assertThrows(YmDump.FormatException.class,
+                () -> YmDump.read(data));
+        assertEquals("YM3! holds 109 bytes of frames, and a frame is 14 bytes",
+                wrong.getMessage());
+        YmDump.FormatException loop = assertThrows(YmDump.FormatException.class,
+                () -> YmDump.read(ym3("YM3b", 8, 8)));
+        assertEquals("YM3b repeats to frame 8, and the dump has 8", loop.getMessage());
+    }
+
     @Test
     void anOddRowCountIsPaddedToTheUnit() throws IOException {
         // Thirty-one frames of a dump that repeats, cut to a tune that plays

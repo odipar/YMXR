@@ -63,14 +63,25 @@ public final class YmDump {
         this.data = data;
     }
 
-    /** Whether {@code data}, unpacked, opens as a YM5! or YM6! dump. */
+    /** Whether {@code data}, unpacked, opens as a dump this reads: YM3!,
+     *  YM3b, YM5! or YM6!. */
     static boolean isDump(byte[] data) {
         if (data.length < 4) {
             return false;
         }
         String format = new String(data, 0, 4, java.nio.charset.StandardCharsets.ISO_8859_1);
-        return format.equals("YM5!") || format.equals("YM6!");
+        return format.equals("YM5!") || format.equals("YM6!")
+                || format.equals("YM3!") || format.equals("YM3b");
     }
+
+    /** The registers a YM3 dump has, R0 to R13: R14 and R15, the I/O
+     *  ports YM5 runs its effects through, stand outside the format. */
+    private static final int YM3_REGISTERS = 14;
+
+    /** What a YM3 dump leaves unsaid: the rate its player ran at, and the
+     *  chip's clock. */
+    private static final int YM3_HZ = 50;
+    private static final long YM3_CLOCK = 2000000L;
 
     public static Song read(byte[] data) {
         if (Lha.isArchive(data)) {
@@ -86,9 +97,12 @@ public final class YmDump {
 
     private Song run() {
         String format = ascii(4);
+        if (format.equals("YM3!") || format.equals("YM3b")) {
+            return ym3(format);
+        }
         if (!format.equals("YM6!") && !format.equals("YM5!")) {
-            throw new FormatException("not a YM5!/YM6! file (starts with \"" + format
-                    + "\"); YM2/YM3/YM4 and packed .ym files are not supported");
+            throw new FormatException("not a YM3!/YM3b/YM5!/YM6! file (starts with \"" + format
+                    + "\"); YM2 and YM4 are not supported");
         }
         String check = ascii(8);
         if (!check.equals("LeOnArD!")) {
@@ -136,6 +150,42 @@ public final class YmDump {
         }
         return new Song(format, count, playerHz, masterClock, loopFrame, interleaved,
                 attributes, drums, name, author, comment, registers);
+    }
+
+    /**
+     * A YM3 dump: the four bytes of the format, then fourteen vectors of
+     * one register each, R0 to R13, and under YM3b a long after them, the
+     * frame the dump repeats to. The format has no header: the frames are
+     * the vectors' length, the rate is 50 Hz, the clock 2,000,000,
+     * and R14 and R15, which YM5 uses for the effects, are zero, so a YM3
+     * dump runs no effect.
+     */
+    private Song ym3(String format) {
+        int trailing = format.equals("YM3b") ? 4 : 0;
+        int rest = data.length - at - trailing;
+        if (rest <= 0 || rest % YM3_REGISTERS != 0) {
+            throw new FormatException(format + " holds " + Math.max(rest, 0) + " bytes of"
+                    + " frames, and a frame is " + YM3_REGISTERS + " bytes");
+        }
+        int frames = rest / YM3_REGISTERS;
+        byte[][] registers = new byte[Song.YM_REGISTERS][];
+        for (int r = 0; r < Song.YM_REGISTERS; r++) {
+            registers[r] = new byte[frames];
+            if (r < YM3_REGISTERS) {
+                System.arraycopy(data, at, registers[r], 0, frames);
+                at += frames;
+            }
+        }
+        long loopFrame = 0;
+        if (trailing > 0) {
+            loopFrame = u32();
+            if (loopFrame < 0 || loopFrame >= frames) {
+                throw new FormatException("YM3b repeats to frame " + loopFrame
+                        + ", and the dump has " + frames);
+            }
+        }
+        return new Song(format, frames, YM3_HZ, YM3_CLOCK, loopFrame, true, 1,
+                new byte[0][], "", "", "", registers);
     }
 
     private byte[][] readInterleaved(int frames) {

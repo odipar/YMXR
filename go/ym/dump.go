@@ -23,6 +23,15 @@ import (
 // being the I/O ports.
 const Registers = 16
 
+// ym3Registers is the register count a YM3 dump has, R0 to R13: R14 and
+// R15, the I/O ports YM5 runs its effects through, stand outside the
+// format. ym3Hz and ym3Clock stand for what a YM3 dump leaves unsaid.
+const (
+	ym3Registers = 14
+	ym3Hz        = 50
+	ym3Clock     = 2000000
+)
+
 // Drums4Bit is attribute bit 2: drum samples are 4-bit values, one a byte.
 const Drums4Bit = 4
 
@@ -66,13 +75,14 @@ type dump struct {
 	at   int
 }
 
-// IsDump is whether the data, unpacked, opens as a YM5! or YM6! dump.
+// IsDump is whether the data, unpacked, opens as a dump this reads: YM3!,
+// YM3b, YM5! or YM6!.
 func IsDump(data []byte) bool {
 	if len(data) < 4 {
 		return false
 	}
 	format := string(data[:4])
-	return format == "YM5!" || format == "YM6!"
+	return format == "YM5!" || format == "YM6!" || format == "YM3!" || format == "YM3b"
 }
 
 // Read is the song in the data.
@@ -93,9 +103,12 @@ func (d *dump) run() (Song, error) {
 	if err != nil {
 		return Song{}, err
 	}
+	if format == "YM3!" || format == "YM3b" {
+		return d.ym3(format)
+	}
 	if format != "YM6!" && format != "YM5!" {
-		return Song{}, wrong("not a YM5!/YM6! file (starts with %q); YM2/YM3/YM4 and"+
-			" packed .ym files are not supported", format)
+		return Song{}, wrong("not a YM3!/YM3b/YM5!/YM6! file (starts with %q); YM2 and"+
+			" YM4 are not supported", format)
 	}
 	check, err := d.ascii(8)
 	if err != nil {
@@ -188,6 +201,48 @@ func (d *dump) run() (Song, error) {
 		MasterClock: masterClock, LoopFrame: loopFrame, Interleaved: interleaved,
 		Attributes: attributes, Drums: drums, Name: name, Author: author,
 		Comment: comment, Values: values}, nil
+}
+
+// ym3 reads a YM3 dump: the four bytes of the format, then fourteen
+// vectors of one register each, R0 to R13, and under YM3b a long after
+// them, the frame the dump repeats to. The format has no header: the
+// frames are the vectors' length, the rate is 50 Hz, the clock
+// 2,000,000, and R14 and R15, which YM5 uses for the effects, are zero,
+// so a YM3 dump runs no effect.
+func (d *dump) ym3(format string) (Song, error) {
+	trailing := 0
+	if format == "YM3b" {
+		trailing = 4
+	}
+	rest := len(d.data) - d.at - trailing
+	if rest <= 0 || rest%ym3Registers != 0 {
+		return Song{}, wrong("%s holds %d bytes of frames, and a frame is %d bytes",
+			format, max(rest, 0), ym3Registers)
+	}
+	frames := rest / ym3Registers
+	values := make([][]byte, Registers)
+	for r := 0; r < Registers; r++ {
+		values[r] = make([]byte, frames)
+		if r < ym3Registers {
+			copy(values[r], d.data[d.at:])
+			d.at += frames
+		}
+	}
+	loopFrame := int64(0)
+	if trailing > 0 {
+		one, err := d.u32()
+		if err != nil {
+			return Song{}, err
+		}
+		loopFrame = one
+		if loopFrame < 0 || loopFrame >= int64(frames) {
+			return Song{}, wrong("YM3b repeats to frame %d, and the dump has %d",
+				loopFrame, frames)
+		}
+	}
+	return Song{Format: format, Frames: frames, PlayerHz: ym3Hz, MasterClock: ym3Clock,
+		LoopFrame: loopFrame, Interleaved: true, Attributes: 1, Drums: [][]byte{},
+		Values: values}, nil
 }
 
 func (d *dump) interleaved(frames int) ([][]byte, error) {
