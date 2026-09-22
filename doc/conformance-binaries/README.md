@@ -208,3 +208,28 @@ and one only one stops at is a reading.
 
 The other fourteen notes are readings the document settles, and the two
 readers stop at different ones.
+
+**6.6 The sixth run**, 2026-09-22, two implementers at once against the
+kit at eleven files. Every record byte for byte from both, twenty-two
+against twenty-two, and `READ.md` documents alone. The first wrote 13
+notes and marked every one *leaves output as it is*, the first reader of
+the six to meet rule 3 of 5; the second wrote 14 with 1 marked *decides
+output*, and that one names what the document left open.
+
+- 6.1 reads every `at` and every other offset the record reports from
+  the file's first byte, and 6.5 counts them from the program's first
+  byte, and neither said which values those are. The second reader
+  enumerated them and the enumeration decided 16 of the 20 lines of
+  `two.prg`. 6.5 lists them now: the entry line's `to`, every `at`, the
+  core line's `state`, `subtunetable` and `work`, the subtunes line's
+  `tunes` and a tune line's `image`.
+- One key had two meanings twice over, which both readers stopped at:
+  `state` was the state byte's offset on the core line and the state
+  block's bytes on a tune line, and `subtunes` was the subtune table's
+  offset on the core line and the count of the `##` tag. The tune line
+  reads `stateblock` now, the core line `subtunetable`, and the tag line
+  `count`, so one key means one thing. The eleven records carry the new
+  keys.
+
+The other twenty-five notes are readings the document settles, and the
+two readers stop at different ones.
