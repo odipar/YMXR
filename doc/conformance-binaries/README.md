@@ -233,3 +233,26 @@ output*, and that one names what the document left open.
 
 The other twenty-five notes are readings the document settles, and the
 two readers stop at different ones.
+
+**6.7 The seventh run**, 2026-09-22, two implementers at once. Every
+record byte for byte from both, twenty-two against twenty-two, and
+`READ.md` documents alone. The first wrote 11 notes with 2 marked
+*decides output* and the second 16 with 2, and the four are one kind:
+a letter or a length the clause left the reader to carry over.
+
+- The core line reports `U` and `W` with H among them, and the subtunes
+  line and the workspace line wrote `at` as those letters without
+  saying so, so a reader could read the raw fields: `one.snd` would then
+  report the subtune table at 8,844 and the workspace at 12,024 for
+  32,510 bytes. Both lines say `as the core line reports it` now.
+- 6.4 listed what each tag line reports and left each tag's length to
+  4.5 step 2 without naming it, which fixes the `at` of `!#SN` and
+  `HDNS` and with them the core's first byte. The clause reads `each tag
+  as long as 4.5 step 2 reads it`.
+- The `##` count and a clock tag's rate read as digits against 6.1's
+  integers in decimal, so a reader could report `"count":"01"`. Each is
+  the number its digits spell now.
+
+Twenty-three entries marked *leaves output as it is* between the two.
+Over the seven runs the document moved in 26 places, and the record of
+every file came back byte for byte from every one of the nine readers.
