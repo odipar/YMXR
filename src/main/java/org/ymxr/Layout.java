@@ -162,7 +162,7 @@ final class Layout {
                 .append(",\"fixed\":").append(word(file, core + 20))
                 .append(",\"flags\":").append(word(file, core + 22))
                 .append(",\"state\":").append(core + word(file, core + 24))
-                .append(",\"subtunes\":").append(table)
+                .append(",\"subtunetable\":").append(table)
                 .append(",\"work\":").append(work)
                 .append("}\n");
         int n = word(file, table);
@@ -216,7 +216,7 @@ final class Layout {
             if (name.startsWith("##")) {
                 subtunes = Integer.parseInt(name.substring(2));
                 out.append("{\"part\":\"tag\",\"name\":\"##\",\"at\":").append(at)
-                        .append(",\"subtunes\":").append(subtunes).append("}\n");
+                        .append(",\"count\":").append(subtunes).append("}\n");
                 at += 5;
             } else if (name.startsWith(Sndh.TIMER_C_CLOCK) || name.startsWith(Sndh.VBL_CLOCK)) {
                 int to = zero(file, at + 2);
@@ -273,7 +273,7 @@ final class Layout {
                 + ",\"rate\":" + word(file, at + 6)
                 + ",\"effects\":" + (file[at + 8] & 0xFF)
                 + ",\"sources\":" + (file[at + 9] & 0xFF)
-                + ",\"state\":" + Tune.getLong(file, at + 12)
+                + ",\"stateblock\":" + Tune.getLong(file, at + 12)
                 + ",\"image\":" + (at + Tune.getLong(file, at + 16))
                 + ",\"table\":" + Tune.getLong(file, at + 20);
     }

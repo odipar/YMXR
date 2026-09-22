@@ -2,13 +2,13 @@
 {"part":"entry","to":[80,84,88]}
 {"part":"tag","name":"TITL","at":16,"text":"Absolute"}
 {"part":"tag","name":"CONV","at":29,"text":"YMXR (ym-to-ymxr)"}
-{"part":"tag","name":"##","at":51,"subtunes":1}
+{"part":"tag","name":"##","at":51,"count":1}
 {"part":"tag","name":"TC","at":56,"rate":50}
 {"part":"tag","name":"FLAG","at":61,"text":"~y"}
 {"part":"tag","name":"FRMS","at":68,"frames":[4]}
 {"part":"tag","name":"HDNS","at":76}
-{"part":"core","at":80,"version":1,"binds":6,"fixed":2120,"flags":0,"state":734,"subtunes":8568,"work":11748}
+{"part":"core","at":80,"version":1,"binds":6,"fixed":2120,"flags":0,"state":734,"subtunetable":8568,"work":11748}
 {"part":"subtunes","at":8568,"tunes":[8574]}
-{"part":"tune","number":1,"at":8574,"bytes":26,"version":3,"rate":50,"effects":0,"sources":0,"state":30312,"image":8600,"table":1928}
+{"part":"tune","number":1,"at":8574,"bytes":26,"version":3,"rate":50,"effects":0,"sources":0,"stateblock":30312,"image":8600,"table":1928}
 {"part":"image","number":1,"at":8600}
 {"part":"workspace","at":11748,"bytes":32434}

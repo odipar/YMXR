@@ -5,14 +5,14 @@
 {"part":"entry","to":[1880,1884,1888]}
 {"part":"tag","name":"TITL","at":1814,"text":"Timers"}
 {"part":"tag","name":"CONV","at":1825,"text":"YMXR (ym-to-ymxr)"}
-{"part":"tag","name":"##","at":1847,"subtunes":1}
+{"part":"tag","name":"##","at":1847,"count":1}
 {"part":"tag","name":"!V","at":1852,"rate":60}
 {"part":"tag","name":"FLAG","at":1857,"text":"~abcdy"}
 {"part":"tag","name":"FRMS","at":1868,"frames":[0]}
 {"part":"tag","name":"HDNS","at":1876}
-{"part":"core","at":1880,"version":1,"binds":6,"fixed":2120,"flags":4,"state":2534,"subtunes":10724,"work":14704}
+{"part":"core","at":1880,"version":1,"binds":6,"fixed":2120,"flags":4,"state":2534,"subtunetable":10724,"work":14704}
 {"part":"subtunes","at":10724,"tunes":[10730]}
-{"part":"tune","number":1,"at":10730,"bytes":186,"version":3,"rate":60,"effects":15,"sources":5,"state":30312,"image":10916,"table":1928}
+{"part":"tune","number":1,"at":10730,"bytes":186,"version":3,"rate":60,"effects":15,"sources":5,"stateblock":30312,"image":10916,"table":1928}
 {"part":"source","number":1,"at":10774}
 {"part":"source","number":2,"at":10794}
 {"part":"source","number":3,"at":10850}

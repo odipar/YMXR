@@ -124,7 +124,7 @@ func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 	table := core + ymxr.GetLong(file, core+28)
 	work := core + ymxr.GetLong(file, core+32)
 	fmt.Fprintf(out, "{\"part\":\"core\",\"at\":%d,\"version\":%d,\"binds\":%d,"+
-		"\"fixed\":%d,\"flags\":%d,\"state\":%d,\"subtunes\":%d,\"work\":%d}\n",
+		"\"fixed\":%d,\"flags\":%d,\"state\":%d,\"subtunetable\":%d,\"work\":%d}\n",
 		core, ymxr.GetWord(file, core+16), ymxr.GetWord(file, core+18),
 		ymxr.GetWord(file, core+20), ymxr.GetWord(file, core+22),
 		core+ymxr.GetWord(file, core+24), table, work)
@@ -182,7 +182,7 @@ func layoutTags(out *bytes.Buffer, file []byte, from int) int {
 		case name[:2] == "##":
 			subtunes, _ = strconv.Atoi(name[2:])
 			fmt.Fprintf(out, "{\"part\":\"tag\",\"name\":\"##\",\"at\":%d,"+
-				"\"subtunes\":%d}\n", at, subtunes)
+				"\"count\":%d}\n", at, subtunes)
 			at += 5
 		case name[:2] == ClockTimerC || name[:2] == ClockVBL:
 			to := zeroFrom(file, at+2)
@@ -240,7 +240,7 @@ func layoutSources(out *bytes.Buffer, file []byte, at int) {
 // `at`, its image resolved against the file.
 func boundFields(file []byte, at int) string {
 	return fmt.Sprintf(",\"version\":%d,\"rate\":%d,\"effects\":%d,\"sources\":%d,"+
-		"\"state\":%d,\"image\":%d,\"table\":%d",
+		"\"stateblock\":%d,\"image\":%d,\"table\":%d",
 		ymxr.GetWord(file, at+4), ymxr.GetWord(file, at+6), file[at+8], file[at+9],
 		ymxr.GetLong(file, at+12), at+ymxr.GetLong(file, at+16),
 		ymxr.GetLong(file, at+20))

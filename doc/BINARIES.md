@@ -680,7 +680,8 @@ of 0.4 or 4.5, report that line alone and stop.
 **6.3 A bound tune** (1.2), after the first line:
 
 - `{"part":"header","version":V,"rate":H,"effects":E,"sources":S,
-  "state":B,"image":I,"table":C}`, the fields at 4, 6, 8, 9, 12, 16 and
+  "stateblock":B,"image":I,"table":C}`, the fields at 4, 6, 8, 9, 12, 16
+  and
   20, I the field at 16 plus the tune's first byte, which 3.1 patches
   for a subtune of an SNDH file, so that I is the image's offset there,
   and C the field at 20 as the file has it, an offset from the image's
@@ -705,7 +706,7 @@ of 0.4 or 4.5, report that line alone and stop.
   `CONV` and `FLAG`, T the bytes after the four of the name to its zero
   byte; of `FLAG` that is the whole text 3.2 writes, its `~` and its
   `y` among it, and the letters 4.5 step 2 keeps are the tool's reading,
-  outside the record; `{"part":"tag","name":"##","at":A,"subtunes":N}`, N
+  outside the record; `{"part":"tag","name":"##","at":A,"count":N}`, N
   its two digits; `{"part":"tag","name":"TC","at":A,"rate":H}`, or `!V`
   in place of `TC`, H the leading decimal digits after the two of the
   name;
@@ -716,14 +717,14 @@ of 0.4 or 4.5, report that line alone and stop.
   offset words (4.5 step 2); and
   `{"part":"tag","name":"HDNS","at":A}`, last.
 - `{"part":"core","at":H,"version":V,"binds":R,"fixed":F,"flags":G,
-  "state":S,"subtunes":T,"work":W}`, H the core's first byte,
-  even(12 + T) of 3.1, the fields at 16, 18, 20, 22, 24, 28 and 32
-  (2.2), S, T and W each plus H.
-- `{"part":"subtunes","at":T,"tunes":[...]}`, the word `N` at T and the
+  "state":S,"subtunetable":U,"work":W}`, H the core's first byte,
+  even(12 + T) of 3.1 with T the tag block's bytes, the fields at 16,
+  18, 20, 22, 24, 28 and 32 (2.2), S, U and W each plus H.
+- `{"part":"subtunes","at":U,"tunes":[...]}`, the word `N` at U and the
   `N` longs after it, each plus H (2.5).
 - a line a subtune, 1 to `N`, in order: `{"part":"tune","number":i,
   "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
-  "state":D,"image":I,"table":C}`, A the offset subtune i has in the
+  "stateblock":D,"image":I,"table":C}`, A the offset subtune i has in the
   subtune table, plus H, the fields of 1.2 read at A as 6.3 reads them,
   its image line left out, and B the bytes to the next subtune, or, for
   the last, to the image at the lowest offset; then a line a source of
@@ -748,8 +749,10 @@ of 0.4 or 4.5, report that line alone and stop.
 - `{"part":"sndh","at":A}`, A the SNDH file's first byte: the lowest
   even offset, 28 or above, where bytes A + 12 to A + 15 are `SNDH`.
 - the lines 6.4 defines for the SNDH file at A, the first line of 6.1
-  left out, every offset counted from the program's first byte, the
-  `at` of a tag line among them, where 4.5 counts from the SNDH file's
-  first byte. The SNDH
+  left out, and these counted from the program's first byte: the entry
+  line's `to`, every `at`, the core line's `state`, `subtunetable` and
+  `work`, the subtunes line's `tunes` and a tune line's `image`. Every
+  other value of those lines stands as the SNDH file has it, and the
+  offsets of 4.5 count from that file's first byte. The SNDH
   file ends at 28 plus the long at 2, the relocation table standing
   after it (4.4), and the workspace's `bytes` counts to that end.
