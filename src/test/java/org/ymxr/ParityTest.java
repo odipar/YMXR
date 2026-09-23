@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -336,6 +337,44 @@ final class ParityTest {
                 assertArrayEquals(Files.readAllBytes(Path.of("doc", "conformance-binaries",
                         "records", file.getFileName() + ".jsonl")), record,
                         file + "'s record is the kit's");
+            }
+        }
+    }
+
+    /**
+     * A file of the kit cut short, in both trees: cut one byte into each
+     * part its record lists, and of the program inside its stub, before
+     * any SNDH. Each cut records the same in both, the whole record or
+     * the line of tools.md 9.7 where the record reads past the end.
+     */
+    @Test
+    void aFileCutShortReadsTheSameInBothTrees() throws Exception {
+        Path kit = Path.of("doc", "conformance-binaries");
+        Pattern at = Pattern.compile("\"at\":(\\d+)");
+        for (String name : List.of("two.snd", "two.prg")) {
+            byte[] file = Files.readAllBytes(kit.resolve("files").resolve(name));
+            TreeSet<Integer> cuts = new TreeSet<>();
+            for (String line : Files.readAllLines(kit.resolve("records")
+                    .resolve(name + ".jsonl"))) {
+                Matcher part = at.matcher(line);
+                if (part.find()) {
+                    cuts.add(Integer.parseInt(part.group(1)) + 1);
+                }
+            }
+            if (name.endsWith(".prg")) {
+                cuts.add(1000);
+            }
+            for (int cut : cuts) {
+                byte[] in = Arrays.copyOf(file, cut);
+                Ran java = ran(Path.of("bin"), "ymxr-layout", in);
+                Ran go = ran(built(), "ymxr-layout", in);
+                String where = name + " cut at " + cut;
+                assertTrue(java.exit() == 0 || java.said().contains(
+                        "the record runs past the file's " + cut + " bytes"),
+                        where + ": " + java.said());
+                assertEquals(java.exit(), go.exit(), where + " exits the same: " + go.said());
+                assertArrayEquals(java.out(), go.out(), where + " writes the same bytes");
+                assertEquals(java.said(), go.said(), where + " reports the same");
             }
         }
     }

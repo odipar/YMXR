@@ -117,7 +117,9 @@ final class Layout {
      *  the relocation table standing after it. */
     private static void program(StringBuilder out, byte[] file) {
         int at = 28;
-        while (!ascii(file, at + 12, 4).equals("SNDH")) {
+        // the first SNDH on an even offset; a file cut before it ends the
+        // search at its end, and the tags below read past it (tools.md 9.7)
+        while (at + 16 <= file.length && !ascii(file, at + 12, 4).equals("SNDH")) {
             at += 2;
         }
         out.append("{\"part\":\"prg\",\"text\":").append(Tune.getLong(file, 2)).append("}\n");

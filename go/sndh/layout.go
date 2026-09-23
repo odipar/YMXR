@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/odipar/ymxr/go/ymxr"
 )
@@ -14,8 +16,20 @@ import (
 // read back and reported part by part, one line of JSON a part. The
 // reader here reads the file alone, as an implementer of the document
 // does, so a record that differs from the reference is the document read
-// two ways.
-func Layout(file []byte) (string, error) {
+// two ways. A read past the file's end is the error of tools.md 9.7,
+// where the Java tree catches the same read.
+func Layout(file []byte) (record string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			wrong, ok := r.(runtime.Error)
+			if !ok || !(strings.Contains(wrong.Error(), "index out of range") ||
+				strings.Contains(wrong.Error(), "slice bounds out of range")) {
+				panic(r)
+			}
+			record, err = "", fmt.Errorf("the record runs past the file's %d bytes",
+				len(file))
+		}
+	}()
 	kind, err := kindOf(file)
 	if err != nil {
 		return "", err
@@ -84,7 +98,9 @@ func layoutBound(out *bytes.Buffer, file []byte) {
 // at 2, the relocation table standing after it.
 func layoutProgram(out *bytes.Buffer, file []byte) {
 	at := 28
-	for ascii(file, at+12, 4) != "SNDH" {
+	// the first SNDH on an even offset; a file cut before it ends the
+	// search at its end, and the tags below read past it (tools.md 9.7)
+	for at+16 <= len(file) && ascii(file, at+12, 4) != "SNDH" {
 		at += 2
 	}
 	fmt.Fprintf(out, "{\"part\":\"prg\",\"text\":%d}\n", ymxr.GetLong(file, 2))
