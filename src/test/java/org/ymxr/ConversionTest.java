@@ -96,7 +96,7 @@ final class ConversionTest {
         byte[] data = java.util.Arrays.copyOf(ym3("YM3!", 8, 0), 4 + 14 * 8 - 3);
         YmDump.FormatException wrong = assertThrows(YmDump.FormatException.class,
                 () -> YmDump.read(data));
-        assertEquals("YM3! holds 109 bytes of frames, and a frame is 14 bytes",
+        assertEquals("YM3! has 109 bytes of frames, and a frame is 14 bytes",
                 wrong.getMessage());
         YmDump.FormatException loop = assertThrows(YmDump.FormatException.class,
                 () -> YmDump.read(ym3("YM3b", 8, 8)));

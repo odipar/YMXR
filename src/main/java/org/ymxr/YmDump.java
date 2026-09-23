@@ -164,7 +164,7 @@ public final class YmDump {
         int trailing = format.equals("YM3b") ? 4 : 0;
         int rest = data.length - at - trailing;
         if (rest <= 0 || rest % YM3_REGISTERS != 0) {
-            throw new FormatException(format + " holds " + Math.max(rest, 0) + " bytes of"
+            throw new FormatException(format + " has " + Math.max(rest, 0) + " bytes of"
                     + " frames, and a frame is " + YM3_REGISTERS + " bytes");
         }
         int frames = rest / YM3_REGISTERS;

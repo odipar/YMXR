@@ -301,10 +301,10 @@ def spread(most):
 
 
 class AnotherFormat(Exception):
-    """A dump the converter reads as another format: it reads a YM5! or a
-    YM6! dump, packed or plain (doc/tools.md 5.1), and the corpus has one
-    file of another in it. Such a file stands outside a run rather than
-    among the tunes that played wrong."""
+    """A dump the converter reads as another format: it reads a YM3!, a
+    YM3b, a YM5! or a YM6! dump, packed or plain (doc/tools.md 5.1), and a
+    corpus may have a file of another in it. Such a file stands outside a
+    run rather than among the tunes that played wrong."""
 
 
 def convert(ym, work):
@@ -315,7 +315,7 @@ def convert(ym, work):
     flags = os.environ.get("YMXR_FLAGS", "").split()
     r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
                        stdin=open(ym, "rb"), capture_output=True)
-    if r.returncode != 0 and "not a YM5!/YM6! file" in r.stderr.decode():
+    if r.returncode != 0 and "not a YM3!/YM3b/YM5!/YM6! file" in r.stderr.decode():
         raise AnotherFormat(r.stderr.decode().strip().splitlines()[-1])
     assert r.returncode == 0, r.stderr.decode()
     # The tool reports on standard error, the last line being what it wrote.
@@ -1542,7 +1542,13 @@ def decoder_of(file, bound, tune, dtx):
     """
     image, labels = dtx.package(file[long_at(file, 12):])
     at = FILE + tune.image_at
-    assert image == bound[tune.image_at:tune.image_at + len(image)], \
+    # The packager reads the tune file's tail, so its image has the
+    # sources' tables in it where the binder packs each as a separate
+    # table: the binder's image region is the packager's image as far as
+    # the file runs, and the decoder stands at its head either way.
+    have = bound[tune.image_at:]
+    over = min(len(image), len(have))
+    assert image[:over] == have[:over], \
         "the packager's image is not the image the binder wrote"
     return ((at + labels["ST4_resume"], at + labels["ST4_init"]),
             (at + labels["new_offset"], at + labels["begin_literals"]))
@@ -1613,8 +1619,8 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
     """performance.md read against the refill parts a run measured, one
     tune a key (check).
 
-    The document's figures are of the ten fixtures, so the claims over the
-    set are read back on a run of the set: `whole` says this is one.
+    The document's figures are of the eleven fixtures, so the claims over
+    the set are read back on a run of the set: `whole` says this is one.
     """
     said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
     stale = []
@@ -1636,12 +1642,15 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
         reads(r"The advance spends ([\d,]+) cycles a refill outside the"
               r" decoder,.*?; ([\d,]+) where a column fits the ring",
               floors[-1], floors[0])
-        reads(r"(\w+) of the ten tunes fit", WORDS.get(fits, fits))
-        idle = {one["idle"] for one in parts.values()}
+        reads(r"(\w+) of the eleven tunes fit", WORDS.get(fits, fits))
+        idle = {stem: one["idle"] for stem, one in parts.items()}
+        odd = idle.pop("capture", None)
+        rest = sorted(set(idle.values()))
         at_one = refill(tunes[0], code, symbols, dtx, "-k1")["idle"]
         reads(r"A refill that parses no new operation adds ([\d,]+) inside the"
-              r" decoder on every tune, and ([\d,]+) at unit 1",
-              idle.pop() if len(idle) == 1 else sorted(idle), at_one)
+              r" decoder on ten of the eleven tunes, ([\d,]+) on capture,"
+              r" and ([\d,]+) at unit 1",
+              rest[0] if len(rest) == 1 else rest, odd, at_one)
         slopes = sorted((one["slope"], stem) for stem, one in parts.items()
                         if one["slope"])
         reads(r"about ([\d,]+) to ([\d,]+) an operation to parse",
@@ -2441,7 +2450,7 @@ def main():
                 counted = (frames, average, max(cost), int(sum(adv) / len(adv)), adv[where[0]])
                 # A play call's figures a tune are the player as it is
                 # assembled. A start of -abs does less arithmetic and its
-                # ticks cost more, which moves three of the ten tunes, and
+                # ticks cost more, which moves three of the eleven tunes, and
                 # the table of tick paths under that build's heading is
                 # what those ticks read against.
                 if PCREL and said != counted:
