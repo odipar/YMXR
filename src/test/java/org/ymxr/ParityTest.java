@@ -329,8 +329,8 @@ final class ParityTest {
         // The three tools whose input is YMXS's JSON form stood outside
         // this check: an empty text parsed to an absent format in that
         // tree's Java reader and to a text that is not JSON in its Go one,
-        // and odipar/YMXS#58 reports the second in both. This build reads
-        // YMXS 0.4.4, where the second stands, so the three read one here now.
+        // and odipar/YMXS#58 reports the second in both. YMXS reads the
+        // second from its 0.4.4 on, so the three read one here now.
         for (String tool : EVERY_TOOL) {
             Ran java = ran(Path.of("bin"), tool, new byte[0], "-silent");
             Ran go = ran(built(), tool, new byte[0], "-silent");
