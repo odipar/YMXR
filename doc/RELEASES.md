@@ -34,6 +34,41 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.16, 2026-09-23
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.16>, built from the commit
+tagged `v0.4.16`.
+
+The nine 68000 binaries are 0.4.11's bytes: every file under `68k/` that
+an assembler reads stands as 0.4.15 has it, and so does every file the
+twelve tools write. One line a tool reports is reworded.
+
+- **A YM3 dump is one of the rig's fixtures.** `capture.ym`, the corpus's
+  one `YM3!` dump, was read by the converter's tests alone: a dump built
+  in a test covers the format, and no run played a recorded YM3 tune
+  through the converter, the binder and the player. It is the eleventh
+  dump under `ym/test`, 921 rows at 50 Hz and no effect, so every
+  ordinary run reads it. performance.md gains a row in each table, 1,844
+  frames at 1,414 cycles a call on average and 3,422 at most, 1,657 and
+  3,660 at unit 1; six of the eleven pack at unit 1 before SPEC.md 6 rule
+  6, and seven fit the ring.
+- **The rig's image check read seven fixtures wrong.** `-refill` compares
+  DTX's packager's image against the image the binder wrote, for the
+  labels that place ST4's decoder. The packager reads the tune file's
+  tail, so its image has the sources' tables in it, where the binder
+  packs each as a separate table: the comparison failed on every fixture
+  with sources, and the mode reported four tunes in place of ten. It now
+  compares the bytes the file has, which the labels need, and the ten
+  fixtures then read back every figure performance.md has in it.
+- **A dump of another format stopped a run.** 0.4.14 reworded the
+  converter's line to `not a YM3!/YM3b/YM5!/YM6! file`, and the rig
+  matched the line before it, so a corpus file of another format ended a
+  run with an assertion in place of standing outside it.
+- **A struck verb in an error line.** The YM3 length error read `YM3!
+  holds 109 bytes of frames`; it reads `has` in both trees. The style
+  check reads documents and comments, so a line a tool prints stands
+  outside it.
+
 ### 0.4.15, 2026-09-23
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.15>, built from the commit
