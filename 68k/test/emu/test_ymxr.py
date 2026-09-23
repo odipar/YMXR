@@ -1647,10 +1647,11 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
         odd = idle.pop("capture", None)
         rest = sorted(set(idle.values()))
         at_one = refill(tunes[0], code, symbols, dtx, "-k1")["idle"]
-        reads(r"A refill that parses no new operation adds ([\d,]+) inside the"
-              r" decoder on ten of the eleven tunes, ([\d,]+) on capture,"
-              r" and ([\d,]+) at unit 1",
-              rest[0] if len(rest) == 1 else rest, odd, at_one)
+        reads(r"the cost most of its refills read: ([\d,]+) cycles inside the"
+              r" decoder on ten of the eleven,.*?and ([\d,]+) on capture,.*?"
+              r"The ([\d,]+) between them.*?A refill at unit 1 is ([\d,]+)\.",
+              rest[0] if len(rest) == 1 else rest, odd,
+              odd - rest[0] if len(rest) == 1 else "", at_one)
         slopes = sorted((one["slope"], stem) for stem, one in parts.items()
                         if one["slope"])
         reads(r"about ([\d,]+) to ([\d,]+) an operation to parse",
