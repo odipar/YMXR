@@ -63,8 +63,8 @@ clock costs.
   cost 43,440 against 37,560, the price of its rows landing evenly.
 
 Checks: `mvn -o clean test` green, 172 tests and no skip; the rig green
-under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, and
-over the whole corpus.
+under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, 10,
+10, 10, 14, 10 and 13 tunes, and over the whole corpus, 544 of 544.
 
 ### 0.4.13, 2026-09-22
 
