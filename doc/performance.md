@@ -48,9 +48,15 @@ The advance spends 450 cycles a refill outside the decoder, loading and
 storing the decoder's eight registers, moving its mark and stepping to
 the next; 412 where a column fits the ring, since the mark the advance
 moves is a replayed loop and ST4 replays a loop only past the reach of a
-back reference (DTX, abi.md 4). Seven of the eleven tunes fit. A refill
-that parses no new operation adds 334 inside the decoder on ten of the
-eleven tunes, 378 on capture, and 576 at unit 1.
+back reference (DTX, abi.md 4). Seven of the eleven tunes fit.
+
+A refill that parses no new operation copies inside a match the ring
+already has, and the figure of a tune is the cost most of its refills
+read: 334 cycles inside the decoder on ten of the eleven, where the
+match's source stands after the ring's start, and 378 on capture, where
+the source crosses that start. The 44 between them is the decoder adding
+the ring's size to the source and cutting the segment at the crossing
+(ST4's `source_wrapped`). A refill at unit 1 is 576.
 
 The 200 to 270 is a least-squares fit of the decoder's cycles against the
 operations parsed, over every refill of a tune: 199 on Turrican 2 - world
