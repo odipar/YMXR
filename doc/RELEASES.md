@@ -34,6 +34,42 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.17, 2026-09-23
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.17>, built from the commit
+tagged `v0.4.17`.
+
+Every file a tool is built from stands as 0.4.16 has it, so the twelve
+executables are that release's bytes and the nine 68000 binaries are
+0.4.11's. What moves is the script a caller runs the suite through, and one
+paragraph of performance.md.
+
+- **The suite runs the same way here and on a runner.** A test that skips
+  is a check that did not run. The workflow has failed on a nonzero skip
+  count for some time, and a local `mvn test` did not: a bare run here
+  reports 178 tests with 1 skipped, since `RigCallsTest` reads a table
+  back through DTX's packer, where the workflow runs 178 with none.
+  `bin/suite` (tools.md 19.6) requires go on the path, python3 with
+  unicorn in it, rmac on the path or at `RMAC`, and DTX's packer on the
+  path or at `DTX_WRITE`, exit 2 where one is absent and the release
+  `pom.xml` requires named in the message; it reads `gofmt -l go` beside
+  them, runs `mvn test`, and ends with 1 where the skip count is above 0.
+  The workflow runs that script, so the two cannot drift. YMXS published
+  0.4.6 from such a local run, and its workflow found a test reading a
+  reworded error line after the release was out.
+- **The refill that costs 378 is the one whose source crosses the ring.**
+  0.4.16 recorded a figure with no cause behind it. A 334 refill and a 378
+  one run the same code but for a branch at `budget_fits`: the branch
+  reaches `copy`, and a fall-through runs eight instructions ending at
+  `source_wrapped`, 46 cycles against the branch's 2, which is the 44
+  between them. A match's source is the destination less the offset, and
+  where it lands before the ring's start ST4 adds the ring's size back and
+  cuts the segment at the crossing. The figure a tune reads is the cost
+  most of its refills read, a mode rather than a property: `capture`
+  crosses in 900 of the 1,700 refills of it that parse no operation, and
+  `Chambers of Shaolin` in 71 of 914, where three other fixtures never
+  cross. The rig reads the 44 back as the difference of the two figures.
+
 ### 0.4.16, 2026-09-23
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.16>, built from the commit
