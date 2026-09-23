@@ -1,0 +1,69 @@
+#!/bin/sh
+# The Java suite as .github/workflows/test.yml runs it, on this machine.
+# A test that skips is a check that did not run, so this requires what the
+# skipping tests need, runs the suite, and reads the skip count back: a
+# count above 0 ends this with exit 1 and the lines that report it.
+# doc/tools.md 19.
+#
+#   bin/suite [maven argument ...]
+set -e
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+
+# ParityTest runs the two trees against one another, and skips where go is
+# absent.
+if ! command -v go >/dev/null 2>&1; then
+    echo "suite: ParityTest runs the two trees, and go is not on the path" >&2
+    exit 2
+fi
+
+# RigCallsTest plays the built tunes on the 68000 player under emulation:
+# python3 with unicorn in it, rmac to assemble the cores, and DTX's
+# packer to read a table back. RMAC and DTX_WRITE name the last two where
+# they stand outside the path.
+if ! python3 -c "import unicorn" >/dev/null 2>&1; then
+    echo "suite: RigCallsTest plays the player under unicorn: pip install unicorn" >&2
+    exit 2
+fi
+if ! command -v "${RMAC:-rmac}" >/dev/null 2>&1; then
+    echo "suite: the cores are assembled by ${RMAC:-rmac}, which is not on the"\
+         "path; RMAC names another" >&2
+    exit 2
+fi
+dtx=$(sed -n '/<artifactId>dtx<\/artifactId>/,/<\/version>/s|.*<version>\(.*\)</version>.*|\1|p' \
+    pom.xml | head -1)
+if ! command -v "${DTX_WRITE:-dtx-write}" >/dev/null 2>&1; then
+    echo "suite: RigCallsTest reads a table back through ${DTX_WRITE:-dtx-write},"\
+         "which is not on the path; DTX_WRITE names it, and pom.xml requires"\
+         "DTX $dtx, whose packer builds from v$dtx of that repository" >&2
+    exit 2
+fi
+
+# ParityTest reads the Go tree against the Java one in what the tools
+# write and leaves its shape alone, so a file the formatter would rewrite
+# drifts unread.
+said=$(gofmt -l go)
+if [ -n "$said" ]; then
+    echo "suite: gofmt would rewrite $said" >&2
+    exit 2
+fi
+
+log=target/suite.log
+status=target/suite.status
+mkdir -p target
+( set +e; mvn -B --no-transfer-progress "$@" test 2>&1; echo $? > "$status" ) | tee "$log"
+[ "$(cat "$status")" = 0 ] || exit "$(cat "$status")"
+
+count=$(grep -oE 'Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+$' \
+    "$log" | tail -1)
+if [ -z "$count" ]; then
+    echo "suite: the run reported no count of tests" >&2
+    exit 1
+fi
+skipped=${count##*: }
+if [ "$skipped" != 0 ]; then
+    echo "suite: $skipped skipped, and a whole run reads 0" >&2
+    grep -E 'Skipped: [1-9]' "$log" >&2
+    exit 1
+fi
+echo "suite: $(echo "$count" | sed -n 's/^Tests run: \([0-9]*\).*/\1/p') tests, 0 skipped"
