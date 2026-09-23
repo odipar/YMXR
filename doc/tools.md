@@ -774,11 +774,11 @@ run continues.
 
 | mode | reads |
 |---|---|
-| absent | the dumps named, or the ten under `ym/test` |
+| absent | the dumps named, or the eleven under `ym/test` |
 | `-corpus[N]` | N tunes spread over the corpus, `YM_CORPUS`: of its F files by name, every (F divided by N)-th, the first N of those; 40 with N absent |
 | `-framesN` | each tune for N frames at most |
 | `-cycles` | the play call, DTX's advance and the tick handlers counted with DTX's cycle counter under `DTX_REPO/68k/test/emu`, against performance.md's figures |
-| `-refill` | `-cycles` and the advance's parts off one pass: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the ten fixtures reads the claims over the set; a run of other tunes reads each tune alone |
+| `-refill` | `-cycles` and the advance's parts off one pass: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the eleven fixtures reads the claims over the set; a run of other tunes reads each tune alone |
 | `-hatari` | each tune, at 50 Hz alone, through `ymxr-sndh -vbl` and `ymxr-prg` with 2,000 rows, run under Hatari, the trace of every chip write cut into frames at the VBL and read against the model; `-vbl` names the VBL as the clock the program plays from (BINARIES.md 4.3), which the frames are cut at; a run that names no tune plays the conformance kit's `voices` after the fixtures, since no dump converts to a target of several registers |
 | `-stub` | each tune, at 50 Hz alone, through `ymxr-sndh` and then `ymxr-prg` twice, 600 rows each: one program playing from Timer C, which the file's clock tag names, and one from the VBL, which `-vbl` names. Both run under Hatari, and the writes the frame procedure makes are one stream in one order under either clock, over the same frames but for the phase of the first row and the last. A tick's writes are counted apart: an effect's handler writes the chip from its timer, which the two clocks interleave among the rows differently. Then the same tune at 60 Hz, a rate no multiple of the operating system's clock: the tool arms 240 ticks a second (BINARIES.md 4.10), and the gaps between the in-service bit the stub's handler clears read that period on Hatari's MFP, 4.167 ms, against the 5 ms of the 200 Hz clock |
 | `-perf` | the player assembled with the raster monitor, against the model |

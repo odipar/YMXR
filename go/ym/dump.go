@@ -216,7 +216,7 @@ func (d *dump) ym3(format string) (Song, error) {
 	}
 	rest := len(d.data) - d.at - trailing
 	if rest <= 0 || rest%ym3Registers != 0 {
-		return Song{}, wrong("%s holds %d bytes of frames, and a frame is %d bytes",
+		return Song{}, wrong("%s has %d bytes of frames, and a frame is %d bytes",
 			format, max(rest, 0), ym3Registers)
 	}
 	frames := rest / ym3Registers

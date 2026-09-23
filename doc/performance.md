@@ -1,6 +1,6 @@
 # performance
 
-What a play call costs, in cycles, measured on the ten tunes under
+What a play call costs, in cycles, measured on the eleven tunes under
 `ym/test` by the rig's cycle counter (tools.md 17): 68000 cycles,
 with no wait state, over every frame of a tune played through its wrap
 once. A tick handler's cost is its instructions, from its vector to its
@@ -24,8 +24,9 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Synergy Credits | 10756 | 2030 | 5094 | 938 | 2932 |
 | Turrican - world 4-3 | 3680 | 1606 | 4532 | 884 | 3826 |
 | Turrican 2 - world completed 1 | 182 | 1606 | 4060 | 932 | 3436 |
+| capture | 1844 | 1414 | 3422 | 826 | 2822 |
 
-Five of the ten packed at unit 1 before SPEC.md 6, rule 6, since an odd
+Six of the eleven packed at unit 1 before SPEC.md 6, rule 6, since an odd
 row count or repeat row does not divide by 2, and a refill of theirs was
 thirty units of a byte. The call on each, at unit 1 and padded to unit 2:
 
@@ -36,6 +37,7 @@ thirty units of a byte. The call on each, at unit 1 and padded to unit 2:
 | DBA 5 | 2009 | 1754 | 4986 | 3606 |
 | Synergy Credits | 2294 | 2030 | 5778 | 5094 |
 | Turrican 2 - world completed 1 | 1896 | 1606 | 5382 | 4060 |
+| capture | 1657 | 1414 | 3660 | 3422 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so
 a refill is fifteen units of two bytes and one comes every row (tools.md
@@ -46,9 +48,9 @@ The advance spends 450 cycles a refill outside the decoder, loading and
 storing the decoder's eight registers, moving its mark and stepping to
 the next; 412 where a column fits the ring, since the mark the advance
 moves is a replayed loop and ST4 replays a loop only past the reach of a
-back reference (DTX, abi.md 4). Six of the ten tunes fit. A refill that
-parses no new operation adds 334 inside the decoder on every tune, and
-576 at unit 1.
+back reference (DTX, abi.md 4). Seven of the eleven tunes fit. A refill
+that parses no new operation adds 334 inside the decoder on ten of the
+eleven tunes, 378 on capture, and 576 at unit 1.
 
 The 200 to 270 is a least-squares fit of the decoder's cycles against the
 operations parsed, over every refill of a tune: 199 on Turrican 2 - world
