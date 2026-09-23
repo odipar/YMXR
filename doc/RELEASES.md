@@ -34,6 +34,38 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.14, 2026-09-23
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.14>, built from the commit
+tagged `v0.4.14`.
+
+The nine 68000 binaries are 0.4.11's bytes. The tools read a format they
+could not read before, and performance.md records what the program's
+clock costs.
+
+- **A YM3 dump reads.** `YM3!` and `YM3b` are fourteen vectors of one
+  register each and no header at all: the rate is 50 Hz, the clock
+  2,000,000, and R14 and R15, which YM5 runs its effects through, are
+  zero, so a YM3 dump runs no effect; `YM3b` names the frame it repeats
+  to in a long after the vectors. A byte count that is no whole frame
+  and a loop frame past the end are two lines of this reader, and the
+  format
+  gate `ymxr-check` reads opens on them too.
+- **The corpus is 544 of 544.** The rig played every file of the corpus
+  at 200 frames and each one plays as the specification reads, where
+  `capture.ym`, the corpus's one YM3 dump, stood outside a run before.
+- **What the program's clock costs.** Read off Hatari's profiler over
+  the handler's instructions: a tick that plays no row is 147 cycles,
+  the interrupt's entry and the `rte` among them, and one that plays a
+  row 283 before the play call it makes. A 50 Hz tune's 150 ticks a
+  second cost 28,850 cycles, 0.36 per cent of the CPU, against the
+  36,200 of the 200 Hz clock before 0.4.11; a 60 Hz tune's 240 ticks
+  cost 43,440 against 37,560, the price of its rows landing evenly.
+
+Checks: `mvn -o clean test` green, 172 tests and no skip; the rig green
+under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, and
+over the whole corpus.
+
 ### 0.4.13, 2026-09-22
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.13>, built from the commit
