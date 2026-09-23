@@ -798,8 +798,10 @@ leaves the work directory, and `HATARI` and `TOS` name the emulator and a
 TOS image as 16.3 reads them; a missing one is exit 2, a key that lands on
 another subtune exit 1.
 
-`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs the two
-built tunes at `-frames24` on every build.
+`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs the two built
+tunes at `-frames24` on every build, and `-refill` over `Turrican 2 - world
+completed 1` whole, which reads the tune's row of performance.md and a
+refill of a tune with a source.
 
 ---
 
@@ -888,15 +890,16 @@ off the path or the Java tree is unbuilt.
 | `ymxr-check` on several files | read in parallel | read in order |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |
 
-**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the suite
-of 19.2 on the caller's machine. A skipped test is a check that did not
-run, so the script requires go on the path, python3 with unicorn in it,
-rmac on the path or at `RMAC`, and DTX's packer on the path or at
-`DTX_WRITE`, exit 2 where one of them is absent; it reads `gofmt -l go`
-beside them and ends with 2 where a file would be rewritten. After the run
-it reads the count of skipped tests, exit 1 and the lines that report it
-where the count is above 0. `pom.xml` requires one release of DTX, and the
-message names it: another release of that packer is another set of bytes.
+**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the suite of
+19.2 on the caller's machine. A skipped test is a check that did not run, so
+the script requires go on the path, python3 with unicorn in it, rmac on the
+path or at `RMAC`, DTX's packer on the path or at `DTX_WRITE`, and a built
+DTX checkout at `DTX_REPO`, exit 2 where one of them is absent; it reads
+`gofmt -l go` beside them and ends with 2 where a file would be rewritten.
+After the run it reads the count of skipped tests, exit 1 and the lines that
+report it where the count is above 0. `pom.xml` requires one release of DTX,
+and the message names it: another release of that packer is another set of
+bytes.
 
 ---
 
@@ -948,7 +951,7 @@ the module at. The published release has the six zips and the
 | `YM_CORPUS` | the corpus directory | `test_ymxr.py -corpus`, `ym/convert.py`, `ym/measure.py` |
 | `RMAC` | the assembler, `rmac` by default | `test_ymxr.py` |
 | `DTX_WRITE` | DTX's `dtx-write`, `dtx-write` by default | `test_ymxr.py`, `ym/convert.py` |
-| `DTX_REPO` | the DTX checkout, `../DTX` by default | `test_ymxr.py -cycles` |
+| `DTX_REPO` | the DTX checkout, `../DTX` by default | `test_ymxr.py -cycles`, `RigCallsTest`, `bin/suite` |
 | `DTX_RING`, `DTX_COPIES`, `JOBS` | 18.1 | `ym/convert.py` |
 | `HATARI`, `TOS` | the emulator, `hatari`, and a TOS image, `~/hatari-2.6.1_macos/tos-2.06.rom` | `ym/hatari.sh`, `ym/cost.sh`, `test_ymxr.py` |
 | `VBLS` | the frames a run plays | `ym/cost.sh` |

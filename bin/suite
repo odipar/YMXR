@@ -39,6 +39,17 @@ if ! command -v "${DTX_WRITE:-dtx-write}" >/dev/null 2>&1; then
     exit 2
 fi
 
+# RigCallsTest also counts a whole tune on DTX's cycle counter, the rig of
+# the DTX checkout at DTX_REPO, whose built classes package the image.
+repo=${DTX_REPO:-../DTX}
+if [ ! -f "$repo/68k/test/emu/test_dtx.py" ] \
+        || [ ! -f "$repo/target/classes/org/dtx/Packager.class" ]; then
+    echo "suite: RigCallsTest counts a tune on the DTX rig at $repo, which is"\
+         "absent or unbuilt; DTX_REPO names a checkout of DTX $dtx, built with"\
+         "mvn install" >&2
+    exit 2
+fi
+
 # ParityTest reads the Go tree against the Java one in what the tools
 # write and leaves its shape alone, so a file the formatter would rewrite
 # drifts unread.
