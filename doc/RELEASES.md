@@ -9,7 +9,7 @@ below it.
 `release/manifest.sh` the manifest in it:
 
 - one zip a platform, over six: Windows, macOS and Linux, each on x64 and
-  arm64. A zip contains the eleven tools as executables, and each
+  arm64. A zip contains the twelve tools as executables, and each
   executable contains the nine 68000 binaries of BINARIES.md and DTX's
   twenty-two images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed
@@ -33,6 +33,44 @@ A player pins a version of this format: a tune file is 3, 4, 5 or 6
 and a release's number names the tools rather than either.
 
 ## Published
+
+### 0.4.15, 2026-09-23
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.15>, built from the commit
+tagged `v0.4.15`.
+
+The nine 68000 binaries are 0.4.11's bytes: a comment in `YMXR_prg.S` is
+the one line under `68k/` that has moved. An SNDH file records how long
+each subtune plays, and a file cut short records the same in both trees.
+
+- **The SNDH file records each subtune's seconds.** The tag block ends
+  with `TIME` before `HDNS`: a word a subtune, the frames of a tune that
+  plays once divided by the rate of the set, rounded up and at most
+  65,535, and 0 for one that repeats, as `FRMS` records it (BINARIES.md
+  3.2). In SNDH, 0 in either tag marks a tune that loops without end, and
+  rounding up keeps a tune under a second at 1. `ymxr-prg` and
+  `ymxr-layout` read the tag, and `ymxr-layout` records it as `seconds`
+  (BINARIES.md 6.4).
+- **A rate of 0 is an error.** A tune file whose rate word is 0 made
+  `ymxr-sndh` write an SNDH file naming `TC0`; it now reports `subtune 1
+  plays at 0 Hz: an SNDH file records a rate of 1 Hz or more`, exit 1
+  (tools.md 12.2).
+- **A file cut short records the same in both trees.** The Go tree's
+  `ymxr-layout` panicked, exit 2, where the Java tree reports `the record
+  runs past the file's B bytes`, exit 1 (tools.md 9.7), and a program cut
+  inside its stub ran the search for its SNDH file past the end in both
+  trees. Every cut of the eleven files of the binaries kit, 377,463 cuts,
+  records the same in both.
+- **What an earlier release reads.** `ymxr-prg` and `ymxr-layout` of
+  0.4.14 and earlier report `the SNDH file's tag TIME at A is not one this
+  reads` on a file this release writes. An SNDH file or a program is 4 +
+  2`N` bytes longer, `N` its subtunes.
+
+Checks: `mvn -o clean test` green, 177 tests and no skip; the rig green
+under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, 10, 10,
+10, 14, 10 and 13 tunes. The corpus run was left out: it reads the
+converter, the binder and the player, and none of them has moved since
+0.4.14, when it read 544 of 544.
 
 ### 0.4.14, 2026-09-23
 
