@@ -33,6 +33,9 @@ import (
 // MaxSubtunes is the most the '##' tag's two digits number.
 const MaxSubtunes = ymxr.MaxSubtunes
 
+// MaxSeconds is the most seconds a TIME word reaches.
+const MaxSeconds = 65535
+
 // The core's descriptor.
 var coreMagic = []byte{'Y', 'M', 'X', 'S'}
 
@@ -172,6 +175,11 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		}
 		if i == 0 {
 			rate = tune.FrameRate
+			// TIME divides the frames by the rate
+			if rate == 0 {
+				return nil, errors.New("subtune 1 plays at 0" +
+					" Hz: an SNDH file records a rate of 1 Hz or more")
+			}
 		} else if tune.FrameRate != rate {
 			return nil, fmt.Errorf("subtune %d plays at %d Hz and subtune 1 at %d: an"+
 				" SNDH file records one rate", i+1, tune.FrameRate, rate)
@@ -365,10 +373,11 @@ func AskedOf(options Options) Asked {
 // each text ended by a zero byte, a pad to an even length, FRMS with a
 // long a subtune, '!#SN' where the caller names them with a word a
 // subtune, the name's offset from the tag's first byte, then the names
-// each ended by a zero byte, a pad to an even length, and HDNS. The '##'
-// count stands before FRMS and the names, since a reader sizes both by
-// it. The raster monitor paints one frame of calls (performance.md), so a
-// core with it in names the VBL as the clock.
+// each ended by a zero byte, a pad to an even length, TIME with a word a
+// subtune, and HDNS. The '##' count stands before FRMS, the names and
+// TIME, since a reader sizes each by it. The raster monitor paints one
+// frame of calls (performance.md), so a core with it in names the VBL as
+// the clock.
 func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, error) {
 	var out bytes.Buffer
 	text(&out, "SNDH")
@@ -402,8 +411,24 @@ func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, erro
 		}
 	}
 	pad(&out)
+	text(&out, "TIME")
+	for _, f := range frames {
+		s := seconds(f, rate)
+		out.Write([]byte{byte(s >> 8), byte(s)})
+	}
 	text(&out, "HDNS")
 	return out.Bytes(), nil
+}
+
+// seconds is the seconds that many frames last at rate frames a second,
+// rounded up and at most MaxSeconds: 0 frames, a tune that repeats, is 0
+// seconds, and a tune that plays once for under a second is 1.
+func seconds(frames, rate int) int {
+	s := (int64(frames) + int64(rate) - 1) / int64(rate)
+	if s > MaxSeconds {
+		return MaxSeconds
+	}
+	return int(s)
 }
 
 // Combine is the file: the entry triple, the tag block padded even, the

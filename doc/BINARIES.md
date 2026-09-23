@@ -339,6 +339,7 @@ $20 to $7E, the others dropped.
 | `FRMS`, `N` longs | subtune 1 to `N`: `R` for a tune that plays once, 0 for one that repeats |
 | `!#SN`, `N` words, `N` names each with a zero byte | where `N` is above 1: word i is the offset of name i from the tag's first byte, word 1 being 4 + 2`N`; the names of the set: the multi file's (0.3), or of a YMXS multi its tunes' titles, `(untitled)` for a blank one |
 | a zero byte | where the bytes so far are odd |
+| `TIME`, `N` words | subtune 1 to `N`: for a tune that plays once, `R` divided by the rate of the set and rounded up, or 65,535 where that is more; 0 for one that repeats |
 | `HDNS` | |
 
 The claims byte of the set is the claims bytes of its tunes ORed. One of
@@ -357,7 +358,7 @@ tool reads.
 2. Report the first condition met of the table's first three rows.
 3. For subtune i from 1 to `N`: read tune file i as SPEC.md 3.3 defines,
    an error reported as `subtune i: ` and that reader's line; then
-   report the table's fourth condition where it is met.
+   report the table's fourth or fifth condition where it is met.
 4. Bind the set (1.4).
 5. Write the tag block (3.2), its clock tag `!V` where the claims byte of
    the set has Timer C, whose handler is then the player's, or where the
@@ -372,6 +373,7 @@ tool reads.
 | zero tune files | `no tune files: an SNDH file has one subtune at least` |
 | N tune files, N above 99 | an error naming N and the 99 subtunes the two digits of `##` number |
 | N names for M tune files, N other than M | `N names for M subtunes` |
+| subtune 1 is at 0 Hz | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | subtune i, i above 1, is at H Hz and subtune 1 at R, H other than R | `subtune i plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
 | H - 2 is above 32,767, the tag block being B bytes | `the tag block is B bytes, and a bra.w reaches 32767` |
 
@@ -430,7 +432,8 @@ table is empty since every address in the stub and the file is relative.
    its zero byte, its leading decimal digits the rate; `TITL`, `COMM`,
    `CONV` and `FLAG` run to their zero byte, of `FLAG` the letters after
    `~` kept, or the whole text where `~` is absent; `FRMS` is 4 + 4`N`
-   bytes; `!#SN` is 4 + 2`N` bytes then `N` texts each to its zero byte.
+   bytes; `TIME` is 4 + 2`N` bytes; `!#SN` is 4 + 2`N` bytes then `N`
+   texts each to its zero byte.
 3. Where the clock tag is `!V` or the `FLAG` letters contain `c`, check
    the rate.
 4. C is where `YMXS` first stands from the byte after `HDNS`, less 12;
@@ -448,7 +451,7 @@ tags stand:
 | bytes 12 to 15 of the file are other than `SNDH` | `not an SNDH file: no SNDH at 12` |
 | either of the two bytes after `##` is other than a digit | `the SNDH file's tags have no '##' subtune count` |
 | the clock tag's text reads as 0 | `the SNDH file's tags have no TC or !V rate` |
-| `FRMS` or `!#SN` at A precedes `##` | `the SNDH file's FRMS tag at A stands before the '##' count that sizes it`, or `!#SN` in place of `FRMS` |
+| `FRMS`, `TIME` or `!#SN` at A precedes `##` | `the SNDH file's FRMS tag at A stands before the '##' count that sizes it`, or `TIME` or `!#SN` in place of `FRMS` |
 | tag X at A is other than the tags of 3.2 | `the SNDH file's tag X at A is not one this reads` |
 | a tag name or a zero byte is read past the file's end | `not an SNDH file: no HDNS ends its tags` |
 | the tags end and `##` is absent | `the SNDH file's tags have no '##' subtune count` |
@@ -715,8 +718,9 @@ of 0.4 or 4.5, report that line alone and stop.
   `N` longs, unsigned;
   `{"part":"tag","name":"!#SN","at":A,"names":[...]}`, the `N` names in
   subtune order, each read to its zero byte from the byte after the
-  offset words (4.5 step 2); and `{"part":"tag","name":"HDNS","at":A}`,
-  last.
+  offset words (4.5 step 2);
+  `{"part":"tag","name":"TIME","at":A,"seconds":[...]}`, the `N` words,
+  unsigned; and `{"part":"tag","name":"HDNS","at":A}`, last.
 - `{"part":"core","at":H,"version":V,"binds":R,"fixed":F,"flags":G,
   "state":S,"subtunetable":U,"work":W}`, H the core's first byte,
   even(12 + T) of 3.1 with T the tag block's bytes, the fields at 16,

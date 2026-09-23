@@ -179,11 +179,13 @@ final class BinariesTest {
      * The tag block walked from SNDH to HDNS as the tool writes it: the
      * tags in order, each text tag's text, the '##' count, the clock tag
      * and its rate, the FLAG letters after its '~', FRMS's longs, the
-     * names, and where the block ends, past HDNS. A zero byte where a tag
-     * would begin is a pad, and stands at an odd position.
+     * names, TIME's words, and where the block ends, past HDNS. A zero
+     * byte where a tag would begin is a pad, and stands at an odd
+     * position.
      */
     record Tags(List<String> order, Map<String, String> text, int subtunes, String clock,
-                int rate, String flag, int[] frames, List<String> names, int end) {
+                int rate, String flag, int[] frames, List<String> names, int[] seconds,
+                int end) {
     }
 
     static Tags tags(byte[] sndh) {
@@ -196,6 +198,7 @@ final class BinariesTest {
         String flag = "";
         int[] frames = new int[0];
         List<String> names = new ArrayList<>();
+        int[] seconds = new int[0];
         int at = 16;
         while (true) {
             if (sndh[at] == 0) {
@@ -233,6 +236,15 @@ final class BinariesTest {
                     frames[i] = Tune.getLong(sndh, at + 4 * i);
                 }
                 at += 4 * subtunes;
+            } else if (name.equals("TIME")) {
+                order.add(name);
+                assertTrue(subtunes >= 0, "'##' stands before TIME");
+                at += 4;
+                seconds = new int[subtunes];
+                for (int i = 0; i < subtunes; i++) {
+                    seconds[i] = Tune.getWord(sndh, at + 2 * i);
+                }
+                at += 2 * subtunes;
             } else if (name.equals("!#SN")) {
                 order.add(name);
                 assertTrue(subtunes >= 0, "'##' stands before !#SN");
@@ -265,7 +277,7 @@ final class BinariesTest {
                 at = to + 1;
             }
         }
-        return new Tags(order, text, subtunes, clock, rate, flag, frames, names, at);
+        return new Tags(order, text, subtunes, clock, rate, flag, frames, names, seconds, at);
     }
 
     /** The file's parts past the tags: the core named, the subtune table,
@@ -334,8 +346,8 @@ final class BinariesTest {
         byte[] sndh = Sndh.of(files, new Sndh.Options("Two of the kit", "Jochen Hippel",
                 List.of("Chambers", "Circus"), false, false));
         Tags tags = tags(sndh);
-        assertEquals(List.of("TITL", "COMM", "CONV", "##", "TC", "FLAG", "FRMS", "!#SN", "HDNS"),
-                tags.order());
+        assertEquals(List.of("TITL", "COMM", "CONV", "##", "TC", "FLAG", "FRMS", "!#SN", "TIME",
+                "HDNS"), tags.order());
         assertEquals("TC", tags.clock(), "neither tune claims Timer C");
         assertEquals("Two of the kit", tags.text().get("TITL"));
         assertEquals("Jochen Hippel", tags.text().get("COMM"));
@@ -344,6 +356,7 @@ final class BinariesTest {
         assertEquals(50, tags.rate());
         assertEquals("y", tags.flag(), "neither tune runs an effect");
         assertArrayEquals(new int[] {0, 0}, tags.frames(), "both tunes repeat");
+        assertArrayEquals(new int[] {0, 0}, tags.seconds(), "both tunes repeat");
         assertEquals(List.of("Chambers", "Circus"), tags.names());
         assertCombined(Binaries.core(false, false, true), sndh, files, tags);
     }
@@ -353,7 +366,8 @@ final class BinariesTest {
         List<byte[]> files = List.of(tune("plays-once"));
         byte[] sndh = Sndh.of(files, new Sndh.Options("Once", null, null, false, false));
         Tags tags = tags(sndh);
-        assertEquals(List.of("TITL", "CONV", "##", "TC", "FLAG", "FRMS", "HDNS"), tags.order());
+        assertEquals(List.of("TITL", "CONV", "##", "TC", "FLAG", "FRMS", "TIME", "HDNS"),
+                tags.order());
         assertEquals(1, tags.subtunes());
         assertCombined(Binaries.core(false, false, true), sndh, files, tags);
     }
@@ -369,12 +383,46 @@ final class BinariesTest {
     }
 
     @Test
+    void theTimeTagIsTheSecondsOfATuneThatPlaysOnceRoundedUp() throws IOException {
+        byte[] file = tune("plays-once");
+        assertEquals(50, TuneFile.read(file).frameRate());
+        Tags tags = tags(Sndh.of(List.of(file), new Sndh.Options("Once", null, null, false, false)));
+        assertArrayEquals(new int[] {1}, tags.seconds(),
+                "4 frames at 50 Hz last under a second, and 0 marks a tune that repeats");
+    }
+
+    @Test
+    void theSecondsAreRoundedUpAndAtMostAWord() {
+        assertEquals(0, Sndh.seconds(0, 50), "a tune that repeats");
+        assertEquals(1, Sndh.seconds(1, 50));
+        assertEquals(1, Sndh.seconds(50, 50));
+        assertEquals(2, Sndh.seconds(51, 50));
+        assertEquals(225, Sndh.seconds(225 * 50, 50), "3:45 at 50 Hz");
+        assertEquals(1, Sndh.seconds(65535, 65535));
+        assertEquals(65535, Sndh.seconds(65535 * 50, 50));
+        assertEquals(65535, Sndh.seconds(65535 * 50 + 1, 50), "65,536 seconds, past a word");
+        assertEquals(65535, Sndh.seconds(Integer.MAX_VALUE, 1));
+        assertEquals(32769, Sndh.seconds(Integer.MAX_VALUE, 65535));
+    }
+
+    @Test
+    void aRateOfZeroIsRejected() throws IOException {
+        byte[] file = tune("plays-once");
+        file[Tune.FRAME_RATE_AT] = 0;
+        file[Tune.FRAME_RATE_AT + 1] = 0;
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(List.of(file), new Sndh.Options("Zero", null, null, false, false)));
+        assertEquals("subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more",
+                wrong.getMessage());
+    }
+
+    @Test
     void theFlagTagListsTheTimersTheSetClaims() throws IOException {
         Tags tags = tags(Sndh.of(List.of(tune("four-timers"), tune("four-timers")),
                 new Sndh.Options("Four", null, null, false, false)));
         assertEquals("abcdy", tags.flag());
         assertEquals(60, tags.rate());
-        assertEquals(List.of("TITL", "CONV", "##", "!V", "FLAG", "FRMS", "HDNS"),
+        assertEquals(List.of("TITL", "CONV", "##", "!V", "FLAG", "FRMS", "TIME", "HDNS"),
                 tags.order(), "the clock tag stands where TC would");
         // effects 0 to 3 run Timers A, D, B and C
         assertEquals("~ay", Sndh.flag(Sndh.claims(1)));

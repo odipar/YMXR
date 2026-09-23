@@ -169,6 +169,34 @@ final class ParityTest {
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-perf"), "-silent", "-tc");
     }
 
+    /**
+     * The TIME tag of a tune that plays once, in both trees. Every dump
+     * under ym/test repeats, so the cases above write 0 alone: the kit's
+     * set has a subtune that repeats and one of 4 frames at 50 Hz, rounded
+     * up to 1, and a dump read with -r plays once.
+     */
+    @Test
+    void theTimeTagIsTheSameInBothTrees() throws Exception {
+        byte[] set = Files.readAllBytes(Path.of("doc", "conformance-binaries", "files",
+                "set.ymxr"));
+        byte[] sndh = both("ymxr-sndh", set, "-silent");
+        String record = new String(both("ymxr-layout", sndh), StandardCharsets.UTF_8);
+        assertTrue(record.contains("\"name\":\"TIME\"") && record.contains("\"seconds\":[0,1]"),
+                record);
+        both("ymxr-prg", sndh, "-silent");
+        byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym"));
+        byte[] once = both("ym-to-ymxr", dump, "-silent", "-r");
+        both("ymxr-layout", both("ymxr-sndh", once, "-silent"));
+        byte[] zero = once.clone();
+        zero[Tune.FRAME_RATE_AT] = 0;
+        zero[Tune.FRAME_RATE_AT + 1] = 0;
+        Ran java = ran(Path.of("bin"), "ymxr-sndh", zero, "-silent");
+        Ran go = ran(built(), "ymxr-sndh", zero, "-silent");
+        assertEquals(1, java.exit(), "a rate of 0 is an error: " + java.said());
+        assertEquals(java.exit(), go.exit(), "ymxr-sndh exits the same: " + go.said());
+        assertEquals(java.said(), go.said(), "ymxr-sndh reports the same");
+    }
+
     @Test
     void aSetOfSubtunesIsTheSameInBothTrees() throws Exception {
         List<Path> dumps = dumps();

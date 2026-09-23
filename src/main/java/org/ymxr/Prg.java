@@ -248,16 +248,16 @@ final class Prg {
      * writes it. A zero byte where a tag name would begin is a pad, one
      * byte. '##' is four bytes, its two digits the subtunes; the clock
      * tag, 'TC' or '!V', and each text tag, TITL, COMM, CONV and FLAG, run
-     * to their zero byte and one past; FRMS is 4 + 4 bytes a subtune, and
-     * '!#SN' 4 + 2 bytes a subtune, then a name a subtune, each to its
-     * zero byte and one past. The subtunes, the rate and the FLAG letters
-     * come from those tags alone, so a title or a composer that reads like
-     * a tag patches no field.
+     * to their zero byte and one past; FRMS is 4 + 4 bytes a subtune,
+     * TIME 4 + 2 bytes a subtune, and '!#SN' 4 + 2 bytes a subtune, then a
+     * name a subtune, each to its zero byte and one past. The subtunes, the
+     * rate and the FLAG letters come from those tags alone, so a title or a
+     * composer that reads like a tag patches no field.
      *
      * @throws IllegalArgumentException where the file has no SNDH at 12,
      *     no HDNS ends its tags, a tag is not one {@link Sndh} writes,
-     *     FRMS or '!#SN' stands before '##', or '##' or the clock tag is
-     *     missing
+     *     FRMS, TIME or '!#SN' stands before '##', or '##' or the clock tag
+     *     is missing
      */
     static Tags tags(byte[] sndh) {
         if (sndh.length < TAGS_AT + 4 || !ascii(sndh, TAGS_AT, 4).equals("SNDH")) {
@@ -298,6 +298,8 @@ final class Prg {
                 at = to + 1;
             } else if (name.equals("FRMS")) {
                 at += 4 + 4 * sized(subtunes, name, at);
+            } else if (name.equals("TIME")) {
+                at += 4 + 2 * sized(subtunes, name, at);
             } else if (name.equals("!#SN")) {
                 int names = sized(subtunes, name, at);
                 at += 4 + 2 * names;
