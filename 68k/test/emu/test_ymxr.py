@@ -30,6 +30,10 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
                                        the monitor moves no chip write
+       test_ymxr.py -lean [tunes]      the player built with YMXR_NEST=0 and
+                                       YMXR_AEOI=1, whose ticks omit the
+                                       interrupt-level drop, against the
+                                       same model
        test_ymxr.py -kit [tunes]       the conformance kit's tune files, the
                                        player's frames against the reader's
                                        entries a frame at a time
@@ -2531,7 +2535,7 @@ def main():
             print("%-45s FAILED: %s" % (os.path.basename(ym), said[:120]))
     if measured:
         # The advance's parts of the same pass, and the sentences of
-        # performance.md that read them back: a run over the ten fixtures
+        # performance.md that read them back: a run over the eleven fixtures
         # reads every figure of The play call the table does not carry.
         stale += refills(measured, tunes, code, symbols, cycles_of,
                          not args and wide is None and not kit)
