@@ -339,8 +339,9 @@ play:
 ; a0 the SNDH file's '!#SN' tag, or 0 where the file has none. d0 is
 ; clobbered. The tag
 ; block runs from 'SNDH' at offset 12 to 'HDNS' (BINARIES.md 3), and
-; every tag this reads is at an even address, since the block pads
-; before FRMS and the names follow it.
+; every tag this reads is at an even address: the block pads before
+; FRMS, the names follow it, and it pads again before TIME, 4 + 2 bytes
+; a subtune, which 'HDNS' follows.
 names:
                 lea     sndh(pc),a0
                 lea     12(a0),a0

@@ -200,10 +200,10 @@ func CheckStub(stub []byte) error {
 // where a tag name would begin is a pad, one byte. '##' is four bytes, its
 // two digits the subtunes; the clock tag, 'TC' or '!V', and each text tag,
 // TITL, COMM, CONV and FLAG, run to their zero byte and one past; FRMS is
-// 4 + 4 bytes a subtune, and '!#SN' 4 + 2 bytes a subtune, then a name a
-// subtune, each to its zero byte and one past. The subtunes, the rate and
-// the FLAG letters come from those tags alone, so a title or a composer
-// that reads like a tag patches no field.
+// 4 + 4 bytes a subtune, TIME 4 + 2 bytes a subtune, and '!#SN' 4 + 2
+// bytes a subtune, then a name a subtune, each to its zero byte and one
+// past. The subtunes, the rate and the FLAG letters come from those tags
+// alone, so a title or a composer that reads like a tag patches no field.
 func ReadTags(sndh []byte) (Tagged, error) {
 	if len(sndh) < tagsAt+4 || string(sndh[tagsAt:tagsAt+4]) != "SNDH" {
 		return Tagged{}, fmt.Errorf("not an SNDH file: no SNDH at %d", tagsAt)
@@ -254,6 +254,12 @@ func ReadTags(sndh []byte) (Tagged, error) {
 				return Tagged{}, err
 			}
 			at += 4 + 4*n
+		case name == "TIME":
+			n, err := sized(subtunes, name, at)
+			if err != nil {
+				return Tagged{}, err
+			}
+			at += 4 + 2*n
 		case name == "!#SN":
 			names, err := sized(subtunes, name, at)
 			if err != nil {

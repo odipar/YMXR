@@ -39,6 +39,9 @@ final class Sndh {
     /** The most the '##' tag's two digits reach. */
     static final int MAX_SUBTUNES = 99;
 
+    /** The most seconds a TIME word reaches. */
+    static final int MAX_SECONDS = 65535;
+
     static final byte[] CORE_MAGIC = {'Y', 'M', 'X', 'S'};
     static final int CORE_MAGIC_AT = 12;
     static final int CORE_VERSION = 1;
@@ -183,6 +186,11 @@ final class Sndh {
             }
             if (i == 0) {
                 rate = tune.frameRate();
+                // TIME divides the frames by the rate
+                if (rate == 0) {
+                    throw new IllegalArgumentException("subtune 1 plays at 0"
+                            + " Hz: an SNDH file records a rate of 1 Hz or more");
+                }
             } else if (tune.frameRate() != rate) {
                 throw new IllegalArgumentException("subtune " + (i + 1) + " plays at "
                         + tune.frameRate() + " Hz and subtune 1 at " + rate + ": an SNDH file"
@@ -367,11 +375,11 @@ final class Sndh {
      * FLAG, each text ended by a zero byte, a pad to an even length, FRMS
      * with a long a subtune, '!#SN' where the caller names them with a
      * word a subtune, the name's offset from the tag's first byte, then
-     * the names each ended by a zero byte, a pad to an even length, and
-     * HDNS. The '##' count stands before FRMS and the names, since a
-     * reader sizes both by it. The raster monitor paints one frame of
-     * calls (performance.md), so a core with it in names the VBL as the
-     * clock.
+     * the names each ended by a zero byte, a pad to an even length, TIME
+     * with a word a subtune, and HDNS. The '##' count stands before FRMS,
+     * the names and TIME, since a reader sizes each by it. The raster
+     * monitor paints one frame of calls (performance.md), so a core with
+     * it in names the VBL as the clock.
      */
     static byte[] tags(Options options, int rate, int n, int[] frames, int claimed) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -408,8 +416,24 @@ final class Sndh {
             }
         }
         pad(out);
+        text(out, "TIME");
+        for (int f : frames) {
+            int s = seconds(f, rate);
+            out.write(s >>> 8);
+            out.write(s);
+        }
         text(out, "HDNS");
         return out.toByteArray();
+    }
+
+    /**
+     * The seconds {@code frames} frames last at {@code rate} frames a
+     * second, rounded up and at most {@link #MAX_SECONDS}: 0 frames, a
+     * tune that repeats, is 0 seconds, and a tune that plays once for
+     * under a second is 1.
+     */
+    static int seconds(int frames, int rate) {
+        return (int) Math.min(((long) frames + rate - 1) / rate, MAX_SECONDS);
     }
 
     /**

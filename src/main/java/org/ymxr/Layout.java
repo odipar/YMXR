@@ -233,6 +233,14 @@ final class Layout {
                 }
                 out.append("]}\n");
                 at += 4 + 4 * subtunes;
+            } else if (name.equals("TIME")) {
+                out.append("{\"part\":\"tag\",\"name\":\"TIME\",\"at\":").append(at)
+                        .append(",\"seconds\":[");
+                for (int i = 0; i < subtunes; i++) {
+                    out.append(i == 0 ? "" : ",").append(Tune.getWord(file, at + 4 + 2 * i));
+                }
+                out.append("]}\n");
+                at += 4 + 2 * subtunes;
             } else if (name.equals("!#SN")) {
                 out.append("{\"part\":\"tag\",\"name\":\"!#SN\",\"at\":").append(at)
                         .append(",\"names\":[");

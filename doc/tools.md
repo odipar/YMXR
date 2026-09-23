@@ -525,6 +525,7 @@ prints the text as passed.
 | zero tune files | `no tune files: an SNDH file has one subtune at least` |
 | more than 99 | `N tune files: the '##' tag's two digits hold at most 99 subtunes` |
 | subtune N fails to read | `subtune N: <message>` |
+| subtune 1 has a rate of 0 | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | subtune N has a rate other than subtune 1's | `subtune N plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
 | Timer C is asked for and the claims byte of the set has it | `the set claims Timer C and the clock asked for is Timer C: the player's handler has that timer` |
@@ -579,18 +580,18 @@ starts the next subtune where a subtune that plays once has ended.
 for a file outside the layout (`not an SNDH file: no SNDH at 12`, `the
 SNDH file's tags have no '##' subtune count`, `the SNDH file's tags have
 no TC or !V rate`, `the SNDH file's FRMS tag at A stands before the '##'
-count that sizes it`, the same with `!#SN`, `the SNDH file's tag X at A
-is not one this reads`, `not an SNDH file: no HDNS ends its tags`, `the
-SNDH file has no core: no YMXS past its tags`, `the core begins at C,
-and the entry triple reaches R`, `the core begins at C and the file ends
-B bytes on, short of the core's descriptor, 36 bytes`); `rows N does not
-fit a long` for ROWS outside 0 to 4,294,967,295; and `the file plays
-from the VBL at H Hz: the stub's VBL is a 50 Hz clock, so this set needs
-a separate host or the VBL asked for` where the clock tag is `!V` or the
-FLAG letters have `c`, the rate is other than 50, and the clock is left
-to the file; and `the set claims Timer C and the clock asked for is
-Timer C: the player's handler has that timer` where `-tc` is passed and
-the FLAG letters have `c`.
+count that sizes it`, the same with `TIME` and with `!#SN`, `the SNDH
+file's tag X at A is not one this reads`, `not an SNDH file: no HDNS
+ends its tags`, `the SNDH file has no core: no YMXS past its tags`, `the
+core begins at C, and the entry triple reaches R`, `the core begins at C
+and the file ends B bytes on, short of the core's descriptor, 36
+bytes`); `rows N does not fit a long` for ROWS outside 0 to
+4,294,967,295; and `the file plays from the VBL at H Hz: the stub's VBL
+is a 50 Hz clock, so this set needs a separate host or the VBL asked
+for` where the clock tag is `!V` or the FLAG letters have `c`, the rate
+is other than 50, and the clock is left to the file; and `the set claims
+Timer C and the clock asked for is Timer C: the player's handler has
+that timer` where `-tc` is passed and the FLAG letters have `c`.
 
 **13.3 The report:** the heading `the SNDH file: B bytes, N subtune(s)
 at H Hz, FLAG <letters>`; the heading `the stub: B bytes, patched` with

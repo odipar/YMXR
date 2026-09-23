@@ -204,6 +204,17 @@ func layoutTags(out *bytes.Buffer, file []byte, from int) int {
 			}
 			out.WriteString("]}\n")
 			at += 4 + 4*subtunes
+		case name == "TIME":
+			fmt.Fprintf(out, "{\"part\":\"tag\",\"name\":\"TIME\",\"at\":%d,"+
+				"\"seconds\":[", at)
+			for i := 0; i < subtunes; i++ {
+				if i > 0 {
+					out.WriteString(",")
+				}
+				fmt.Fprintf(out, "%d", ymxr.GetWord(file, at+4+2*i))
+			}
+			out.WriteString("]}\n")
+			at += 4 + 2*subtunes
 		case name == "!#SN":
 			fmt.Fprintf(out, "{\"part\":\"tag\",\"name\":\"!#SN\",\"at\":%d,"+
 				"\"names\":[", at)
