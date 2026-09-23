@@ -33,6 +33,13 @@ import org.junit.jupiter.api.Test;
  * the row it repeats to comes round. The whole run reaches those, and it is
  * the run to make before a release.
  *
+ * <p>The rig's other modes ran by hand alone, and one of them read seven
+ * fixtures of ten wrong until a hand run found it: {@code -refill} read
+ * the packager's image against the binder's whole, where the packager's has
+ * the sources' tables in it and the binder packs each as a separate table,
+ * so every tune with a source failed. So this also runs {@code -refill}
+ * over one tune with a source, whole, against performance.md.
+ *
  * <p>Skipped where the tools the rig runs are absent, which the build is
  * not made to install.
  */
@@ -127,8 +134,9 @@ final class RigCallsTest {
                 + ", which no tool reads");
     }
 
-    @Test
-    void theRigPlaysTheBuiltTunesAgainstTheModel() throws Exception {
+    /** What the rig runs: python3 with unicorn, rmac, DTX's dtx-write and
+     *  the tools this repository builds. */
+    private static void theRigRuns() {
         Assumptions.assumeTrue(runs("python3", "--version"), "no python3");
         Assumptions.assumeTrue(runs("python3", "-c", "import unicorn"),
                 "no unicorn for python3");
@@ -137,14 +145,61 @@ final class RigCallsTest {
                 "no dtx-write: DTX_WRITE names it");
         Assumptions.assumeTrue(Files.exists(Path.of("target/classes/org/ymxr/Tune.class")),
                 "the tools are not built");
-        List<String> argv = new ArrayList<>(List.of("python3", RIG.toString(), FRAMES));
-        argv.addAll(TUNES);
-        Process ran = new ProcessBuilder(argv).redirectErrorStream(true).start();
+    }
+
+    /** The rig run with {@code argv} after its name, and what it printed. */
+    private static String rigWith(List<String> argv) throws Exception {
+        List<String> all = new ArrayList<>(List.of("python3", RIG.toString()));
+        all.addAll(argv);
+        Process ran = new ProcessBuilder(all).redirectErrorStream(true).start();
         String said = new String(ran.getInputStream().readAllBytes(),
                 StandardCharsets.UTF_8);
-        assertTrue(ran.waitFor() == 0
+        return ran.waitFor() + "\n" + said;
+    }
+
+    @Test
+    void theRigPlaysTheBuiltTunesAgainstTheModel() throws Exception {
+        theRigRuns();
+        List<String> argv = new ArrayList<>(List.of(FRAMES));
+        argv.addAll(TUNES);
+        String said = rigWith(argv);
+        assertTrue(said.startsWith("0\n")
                         && said.contains("2 tunes play as the specification reads"),
                 () -> RIG + " does not play the built tunes:\n" + said);
+    }
+
+    /** The tune a counted run reads: 182 frames, so the whole tune plays in
+     *  seconds, and a source on Timer D, so the bound image has the table of
+     *  a source beside the tune's. performance.md has its row. */
+    private static final String COUNTED = "ym/test/Turrican 2 - world completed 1.ym";
+
+    /** The DTX checkout whose rig the counted modes run on: its cycle
+     *  counter, and the packager its classes build. */
+    private static Path dtxRepo() {
+        String named = System.getenv("DTX_REPO");
+        return Path.of(named == null || named.isEmpty() ? "../DTX" : named);
+    }
+
+    /**
+     * The rig's {@code -refill} over one tune, whole: the play call, DTX's
+     * advance and the parts of a refill counted, and the tune's row of
+     * performance.md read against the count. A run that reads the image of
+     * the binder wrong fails here in seconds.
+     */
+    @Test
+    void theRigCountsAWholeTuneAgainstTheDocument() throws Exception {
+        theRigRuns();
+        Path rig = dtxRepo().resolve("68k/test/emu/test_dtx.py");
+        Assumptions.assumeTrue(Files.isRegularFile(rig),
+                "no DTX rig at " + rig + ": DTX_REPO names the checkout");
+        Path packager = dtxRepo().resolve("target/classes/org/dtx/Packager.class");
+        Assumptions.assumeTrue(Files.isRegularFile(packager),
+                "DTX's classes are not built at " + packager);
+        String said = rigWith(List.of("-refill", COUNTED));
+        assertTrue(said.startsWith("0\n")
+                        && said.contains("1 tunes play as the specification reads")
+                        && said.contains("cycles outside the decoder"),
+                () -> RIG + " -refill does not count " + COUNTED + ":\n" + said);
     }
 
     /** A tool the environment names, or the plain name. */
