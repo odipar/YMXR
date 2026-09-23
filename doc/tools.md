@@ -798,10 +798,13 @@ leaves the work directory, and `HATARI` and `TOS` name the emulator and a
 TOS image as 16.3 reads them; a missing one is exit 2, a key that lands on
 another subtune exit 1.
 
-`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs the two built
-tunes at `-frames24` on every build, and `-refill` over `Turrican 2 - world
-completed 1` whole, which reads the tune's row of performance.md and a
-refill of a tune with a source.
+`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs three things
+on every build: the two built tunes at `-frames24` on each of the eight
+cores of 12.1, `-abs`, `-lean` and `-perf` alone and together and the plain
+core; the conformance kit at `-frames24` under `-kit`; and `-refill` over
+`Turrican 2 - world completed 1` whole, which reads the tune's row of
+performance.md and a refill of a tune with a source. `-hatari` and `-stub`
+need Hatari and a TOS image, and run by hand.
 
 ---
 

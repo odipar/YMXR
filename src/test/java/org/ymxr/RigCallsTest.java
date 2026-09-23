@@ -10,8 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
 
 /**
  * The calls {@code 68k/test/emu/test_ymxr.py} makes, and a short run of it.
@@ -39,6 +42,15 @@ import org.junit.jupiter.api.Test;
  * the sources' tables in it and the binder packs each as a separate table,
  * so every tune with a source failed. So this also runs {@code -refill}
  * over one tune with a source, whole, against performance.md.
+ *
+ * <p>The same capped run plays on each of the eight cores a release ships,
+ * the three switches {@code -abs}, {@code -lean} and {@code -perf} alone and
+ * together, since {@code BinariesTest} reads a core's bytes and leaves what
+ * the core does to the rig. The kit's tunes play too, capped: their
+ * versions 4 to 6 have the targets of several registers and the counted
+ * sources, which no dump converts to. The modes under Hatari,
+ * {@code -hatari} and {@code -stub}, need an emulator and a TOS image, and
+ * run by hand.
  *
  * <p>Skipped where the tools the rig runs are absent, which the build is
  * not made to install.
@@ -157,15 +169,41 @@ final class RigCallsTest {
         return ran.waitFor() + "\n" + said;
     }
 
+    /** The eight cores a release ships, as the rig's switches select them:
+     *  the plain core, and {@code -abs}, {@code -lean} and {@code -perf}
+     *  alone and together. */
+    private static final List<List<String>> CORES = List.of(
+            List.of(), List.of("-abs"), List.of("-lean"), List.of("-perf"),
+            List.of("-perf", "-lean"), List.of("-perf", "-abs"),
+            List.of("-lean", "-abs"), List.of("-perf", "-lean", "-abs"));
+
+    @TestFactory
+    Stream<DynamicTest> theRigPlaysTheBuiltTunesOnEveryCore() {
+        return CORES.stream().map(core -> DynamicTest.dynamicTest(
+                core.isEmpty() ? "the plain core" : String.join(" ", core), () -> {
+                    theRigRuns();
+                    List<String> argv = new ArrayList<>(core);
+                    argv.add(FRAMES);
+                    argv.addAll(TUNES);
+                    String said = rigWith(argv);
+                    assertTrue(said.startsWith("0\n")
+                                    && said.contains("2 tunes play as the specification reads"),
+                            () -> RIG + " " + String.join(" ", core)
+                                    + " does not play the built tunes:\n" + said);
+                }));
+    }
+
+    /** The conformance kit's tunes, capped: the player's frames against
+     *  the reader's entries, and the tune of another version rejected by
+     *  the binder and the reader. */
     @Test
-    void theRigPlaysTheBuiltTunesAgainstTheModel() throws Exception {
+    void theRigPlaysTheKitAgainstTheReader() throws Exception {
         theRigRuns();
-        List<String> argv = new ArrayList<>(List.of(FRAMES));
-        argv.addAll(TUNES);
-        String said = rigWith(argv);
+        String said = rigWith(List.of("-kit", FRAMES));
         assertTrue(said.startsWith("0\n")
-                        && said.contains("2 tunes play as the specification reads"),
-                () -> RIG + " does not play the built tunes:\n" + said);
+                        && said.contains("tunes play as the specification reads")
+                        && said.contains("the binder and the reader reject it"),
+                () -> RIG + " -kit does not play the kit:\n" + said);
     }
 
     /** The tune a counted run reads: 182 frames, so the whole tune plays in
