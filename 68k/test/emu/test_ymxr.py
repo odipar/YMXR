@@ -1924,12 +1924,14 @@ def clock():
                   r" its `rte` among them, and one that plays a row runs (\d+) of the"
                   r" handler and (\d+) of the routine around the play call", said)
     assert m, "performance.md has no figures of the program's clock"
+    runs = "at 50 Hz %d ticks, %d rows, %d and %d cycles; at 60 Hz %d, %d, %d and %d" % (
+        t5, r5, c5, w5, t6, r6, c6, w6)
     for what, reads, counted in (("a tick without a row", m.group(1), plain),
                                  ("a tick with a row", m.group(2), row),
                                  ("the routine around the play call", m.group(3), around)):
         assert abs(int(reads) - counted) < 1, \
-            "performance.md reads %s cycles for %s, and the profiler counts %.2f" % (
-                reads, what, counted)
+            "performance.md reads %s cycles for %s, and the profiler counts %.2f (%s)" % (
+                reads, what, counted, runs)
     return ("the program's clock over %d ticks at 50 Hz and %d at 60 Hz: a tick without a"
             " row %.2f cycles of the handler, with a row %.2f and %.2f around the play"
             " call, as performance.md reads" % (t5, t6, plain, row, around))
