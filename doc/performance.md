@@ -119,25 +119,23 @@ switch off, the default, the player is byte for byte the player without
 it.
 
 `ym/cost.sh` builds a program with that core, runs it under Hatari tracing
-the writes to the background, and `ym/cost.py` reads every call's span
-back: the red mark to the yellow one is the call's work, less each tick
-band inside it, and the yellow to the write that puts the desktop's colour
-back is the bar. What the method leaves out: the ticks' counts are
-estimates, each within a twentieth of what A tick measures below, which
-PlayerTest checks; what a tick costs beyond its handler, the 44 cycles of
-the interrupt's entry and the 20 of its `rte`, falls where the tick landed,
-inside the call's work where it landed there and left out where it did not;
-a tick that lands inside the bar is counted in the next call's; and the
-wait moves the call's writes in time, which is why the monitor is a build
-for reading a run rather than one to play a tune with.
+the writes to the background, and `ym/cost.py` reads every call's span back:
+the red mark to the yellow one is the call's work, less each tick band
+inside it, and the yellow to the write that puts the desktop's colour back
+is the bar. What the method leaves out: the ticks' counts are estimates,
+each a path's cycles rounded to a turn of ten and so within 4 cycles of what
+A tick measures below; what a tick costs beyond its handler, the 44 cycles
+of the interrupt's entry and the 20 of its `rte`, falls where the tick
+landed, inside the call's work where it landed there and left out where it
+did not; a tick that lands inside the bar is counted in the next call's; and
+the wait moves the call's writes in time, which is why the monitor is a
+build for reading a run rather than one to play a tune with.
 
 A call writes the row the call before it read, and reads the next once its
 writes are made (68k/YMXR.S), so a row's refill stands behind that row's
-writes rather than in front of them. Measured on DBA 2 over 3,000
-frames, the first register write of a frame stands 1,125 cycles after
-the VBL and the energy at the frame rate is 6.38 per cent of the whole,
-against YMX's 6.56. YMX writes its fourteen registers before it decodes
-for the same reason.
+writes rather than in front of them. Measured on DBA 2 over 3,000 frames,
+the call's first register write stands at least 752 cycles after the VBL.
+YMX writes its fourteen registers before it decodes for the same reason.
 
 Measure from the VBL, at the tune's rate. Where the program plays from Timer
 C, a call runs inside the tick handler the timer interrupted, since a handler
@@ -181,65 +179,66 @@ screen's rate, and the row lands where the frame procedure runs.
 
 YMX 0.10.1 measured its player the same way, painting the background red
 while a call runs and reading the palette writes back from a cycle-exact
-Hatari. So the two players were read by one method, on the same dumps,
-each over a `VBLS=2300` run: 2,019 calls of YMX and 2,020 of YMXR. YMX is
-a design document now, so its row is that release's, in that repository's
-history, and YMXR's is this release's, `ym/cost.sh` over the two tunes.
+Hatari. So the two players were read by one method, on the same dumps, each
+over a `VBLS=2300` run: 2,019 calls of YMX and 2,020 of YMXR. YMX is a
+design document now, and its rows stand in this document alone, measured on
+the player of its 0.10.1 release; YMXR's are this release's, `ym/cost.sh`
+over the two tunes, which `test_ymxr.py -cost` measures again.
 
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
-| Synergy Credits | YMXR | 1990 | 3464 | 4296 |
+| Synergy Credits | YMXR | 1991 | 3464 | 4296 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
-| Turrican - world 4-3 | YMXR | 1651 | 2936 | 4692 |
+| Turrican - world 4-3 | YMXR | 1653 | 2944 | 4692 |
 
 These figures and the rig's are not one sample: the rig counts every frame
 of the tune in 68000 cycles with no wait state, and these are the first
 2,020 calls on a machine that stalls the processor while the shifter
-fetches. Synergy Credits' costliest frame is its 5,346th, past the end of
+fetches. Synergy Credits' costliest frame is its 5,347th, past the end of
 this run.
 
-YMXR costs an eighth less on average on Turrican - world 4-3 and a
-seventh less on Synergy Credits, and at their worst 10 per cent more on
-Turrican - world 4-3 and 9 per cent less on Synergy Credits, and the
-figures have two causes. The frame procedure here tests the fourteen
-register columns and writes the ones they admit, reads the effects'
-columns and enters and leaves the call, where YMX writes its fourteen
-registers unconditionally, one `movep` each, and its whole call with no
-decode in it is 908, the writes included. Fourteen tests and a few writes
-cost what fourteen writes cost, which YMX's measurement found and its
-design follows; the schema adds the effects' columns and the entry. So
-YMXR's frame procedure costs less on the rows that set few columns, 721
-on average on that tune, the rig's call there less its advance, against
-YMX's 908, and the average lands under.
+YMXR costs an eighth less on average on Turrican - world 4-3 and a seventh
+less on Synergy Credits, and at their worst 10 per cent more on Turrican -
+world 4-3 and 9 per cent less on Synergy Credits, and the figures have two
+causes. The frame procedure here tests the fourteen register columns and
+writes the ones they admit, reads the effects' columns and enters and leaves
+the call, where YMX writes its fourteen registers unconditionally, one
+`movep` each, and its whole call with no decode in it is 908, the writes
+included. Fourteen tests and a few writes cost what fourteen writes cost,
+which YMX's measurement found and its design follows; the schema adds the
+effects' columns and the entry. So YMXR's frame procedure costs less on the
+rows that set few columns, 722 on average on that tune, the rig's call there
+less its advance, against YMX's 908, and the average lands under.
 
 The refill is the second cause. YMXR refills fifteen units every row; YMX
-serves a round-robin of twenty-four slots, twenty-one of them a live
-stream, so its group is twenty-four bytes, twelve units at the same unit
-2, and it refills on twenty-one rows in twenty-four: the three slots
-without a stream refill no column and cost 1,012 cycles a call over 252
-of the 2,019 calls, against 2,023 on the 1,767 calls that refill. YMX's
-refill is the smaller of the two, twelve units against fifteen, which is
-why its worst call is the lower. A refill parses at most one operation a
-unit, so its unit count bounds the parse, and that count follows the
-streams the schedule serves: thirty columns here against twenty-one live
-streams there. The worst frame of each player parses one operation for
-every unit, fifteen of fifteen here and twelve of twelve there, so each
-worst frame is that bound. On Synergy Credits the run ends before YMXR's
-costliest frame, so its 4,296 at most is not that frame, which the rig
-counts at 5,094. Both players pad this tune to unit 2, YMX by duplicating
-a frame and YMXR by a row that sets no column (SPEC.md 6, rule 6); before
-that rule the tune packed at unit 1, the refill was thirty units, and a
-run of the same length reads 5,168 at most.
+serves a round-robin of twenty-four slots, twenty-one of them a live stream,
+so its group is twenty-four bytes, twelve units at the same unit 2, and it
+refills on twenty-one rows in twenty-four: the three slots without a stream
+refill no column and cost 1,012 cycles a call over 252 of the 2,019 calls on
+Turrican - world 4-3, against 2,023 on the 1,767 calls that refill. YMX's
+refill is the smaller of the two, twelve units against fifteen, which is why
+its worst call is the lower. A refill parses at most one operation a unit,
+so its unit count bounds the parse, and that count follows the streams the
+schedule serves: thirty columns here against twenty-one live streams there.
+The worst frame of each player parses one operation for every unit, fifteen
+of fifteen here and twelve of twelve there, so each worst frame is that
+bound. On Synergy Credits the run ends before YMXR's costliest frame, so its
+4,296 at most is not that frame, which the rig counts at 5,094. Both players
+pad this tune to unit 2, YMX by duplicating a frame and YMXR by a row that
+sets no column (SPEC.md 6, rule 6); before that rule the tune packed at unit
+1, the refill was thirty units, and a run of the same length reads 5,168 at
+most.
 
 The one thing YMX does here that this player does not is write its register
-columns unconditionally, dense, with the effects behind one bit. Measured
-against the player as it stands that saves 70 to 80 a frame on a tune
-running one effect, zero on Synergy Credits, and costs about 70 a frame on
-a tune that runs no effect, for rewriting 1.1 to 1.7 and redefining five
-bits against R6.2. YMX's finding that a test costs what a write costs
-applies to a 30-cycle test and not to the 22 of a test that forms the
-select only where it writes.
+columns unconditionally, dense, with the effects behind one bit. Counted by
+the rig against the player as it stands, each register written as the player
+writes a set column, in 36 cycles, and the effects' steps behind a test of
+22, that costs 31 to 173 cycles a frame on eight of the eleven fixtures and
+saves 4 to 36 on the other three, for rewriting 1.1 to 1.7 and redefining
+five bits against R6.2. YMX's finding that a test costs what a write costs
+applies to a 30-cycle test and not to the 22 of a test that forms the select
+only where it writes.
 
 ---
 

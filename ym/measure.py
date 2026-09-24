@@ -1,3 +1,19 @@
+#!/usr/bin/env python3
+"""How a dump's registers move from frame to frame, over the corpus.
+
+Reads every dump under YM_CORPUS, a YM3!, YM3b, YM5! or YM6! file, packed
+or plain, and prints over its frame steps: each voice's coarse tone byte
+moving while its fine byte stays, its level moving, and its envelope bit
+moving alone; the envelope shape's writes, and those that write the shape
+standing; the tunes whose envelope period and whose noise period stay
+throughout; the frames of envelope period 0, and those with a voice on the
+envelope; the shape column's changes under three encodings of the period
+bytes' bits; and each voice's fine tone byte moving to 0. doc/tools.md
+18.7 has the list; ym/convert.py reads the corpus through this file's
+reader, payload and regs.
+
+    ym/measure.py
+"""
 import os, struct, subprocess, sys, tempfile, shutil
 
 CORPUS = os.environ.get("YM_CORPUS",

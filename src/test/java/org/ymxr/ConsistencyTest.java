@@ -692,6 +692,202 @@ final class ConsistencyTest {
                 "the two sentences read the fixed part differently");
     }
 
+    /** The words the section against YMX spells a count with. */
+    private static final Map<String, Integer> COUNT = Map.of(
+            "three", 3, "twelve", 12, "fifteen", 15, "twenty-one", 21,
+            "twenty-four", 24, "thirty", 30);
+
+    /** A ratio spelled as a part: an eighth less is one part in eight. */
+    private static final Map<String, Integer> PART = Map.of(
+            "a half", 2, "a third", 3, "a quarter", 4, "a fifth", 5, "a sixth", 6,
+            "a seventh", 7, "an eighth", 8, "a ninth", 9, "a tenth", 10);
+
+    private static long part(String said) {
+        String words = said.replaceAll("\\s+", " ");
+        return Objects.requireNonNull(PART.get(words), () -> "no part spelled " + words);
+    }
+
+    private static int count(String word) {
+        return Objects.requireNonNull(COUNT.get(word), () -> "no count spelled " + word);
+    }
+
+    /** The table against YMX by tune and player: the call on average, at
+     *  the 99th call in a hundred and at most. */
+    private static Map<String, long[]> againstYmx(String section) {
+        Map<String, long[]> rows = new LinkedHashMap<>();
+        Matcher m = Pattern.compile("^\\| ([^|]+?) \\| (YMX 0\\.10\\.1|YMXR) \\| (\\d+)"
+                + " \\| (\\d+) \\| (\\d+) \\|$", Pattern.MULTILINE).matcher(section);
+        while (m.find()) {
+            rows.put(m.group(1) + ", " + m.group(2), new long[] {Long.parseLong(m.group(3)),
+                Long.parseLong(m.group(4)), Long.parseLong(m.group(5))});
+        }
+        return rows;
+    }
+
+    /**
+     * The section against YMX read against its table, the play-call table
+     * and ym/cost.sh. YMX's rows stand in this document alone, measured once
+     * on that player, so its figures are read against each other:
+     * the refill's two kinds of call make its calls and its average. The
+     * sentences read 721 where the play-call table makes 722 and placed a
+     * frame counted from 0 as the 5,346th.
+     */
+    @Test
+    void theComparisonWithYmxReadsItsTables() throws IOException {
+        String perf = read(PERF);
+        String section = perf.substring(perf.indexOf("## Against YMX"), perf.indexOf("## A tick"));
+        Map<String, long[]> t = againstYmx(section);
+        assertEquals(4, t.size(), () -> "the table against YMX read as " + t.keySet());
+        long[] sy = Objects.requireNonNull(t.get("Synergy Credits, YMX 0.10.1"), "no YMX row, Synergy");
+        long[] sr = Objects.requireNonNull(t.get("Synergy Credits, YMXR"), "no YMXR row, Synergy");
+        long[] ty = Objects.requireNonNull(t.get("Turrican - world 4-3, YMX 0.10.1"),
+                "no YMX row, Turrican");
+        long[] tr = Objects.requireNonNull(t.get("Turrican - world 4-3, YMXR"),
+                "no YMXR row, Turrican");
+        Matcher ratio = wrapped("YMXR costs (an? \\w+) less on average on Turrican - world 4-3"
+                + " and (an? \\w+) less on Synergy Credits, and at their worst (\\d+) per cent"
+                + " more on Turrican - world 4-3 and (\\d+) per cent less on Synergy Credits")
+                .matcher(section);
+        assertTrue(ratio.find(), "performance.md has no ratio against YMX");
+        assertEquals(Math.round(ty[0] / (double) (ty[0] - tr[0])), part(ratio.group(1)),
+                ratio.group(1));
+        assertEquals(Math.round(sy[0] / (double) (sy[0] - sr[0])), part(ratio.group(2)),
+                ratio.group(2));
+        assertEquals(Math.round(100.0 * (tr[2] - ty[2]) / ty[2]), Long.parseLong(ratio.group(3)),
+                "the worst call more on Turrican - world 4-3");
+        assertEquals(Math.round(100.0 * (sy[2] - sr[2]) / sy[2]), Long.parseLong(ratio.group(4)),
+                "the worst call less on Synergy Credits");
+
+        Map<String, long[]> calls = playCalls(perf);
+        long[] turrican = Objects.requireNonNull(calls.get("Turrican - world 4-3"),
+                "performance.md's table names no Turrican - world 4-3");
+        long[] synergy = Objects.requireNonNull(calls.get("Synergy Credits"),
+                "performance.md's table names no Synergy Credits");
+        Matcher frame = wrapped("columns, (\\d+) on average on that tune, the rig's call there"
+                + " less its advance, against YMX's (\\d+)").matcher(section);
+        assertTrue(frame.find(), "performance.md has no frame procedure against YMX's");
+        assertEquals(turrican[0] - turrican[2], Long.parseLong(frame.group(1)),
+                "the frame procedure on Turrican - world 4-3");
+        Matcher whole = wrapped("its whole call with no decode in it is (\\d+)").matcher(section);
+        assertTrue(whole.find(), "performance.md has no call of YMX without a decode");
+        assertEquals(whole.group(1), frame.group(2), "YMX's call without a decode, read twice");
+        Matcher most = wrapped("so its ([\\d,]+) at most is not that frame, which the rig counts"
+                + " at ([\\d,]+)").matcher(section);
+        assertTrue(most.find(), "performance.md has no costliest frame past the run");
+        assertEquals(sr[2], number(most.group(1)), "Synergy Credits' call at most in the run");
+        assertEquals(synergy[1], number(most.group(2)), "Synergy Credits' costliest frame");
+
+        Matcher run = wrapped("each over a `VBLS=(\\d+)` run: ([\\d,]+) calls of YMX and"
+                + " ([\\d,]+) of YMXR").matcher(section);
+        assertTrue(run.find(), "performance.md names no run of the two players");
+        Matcher script = wrapped("performance.md's figures are a VBLS=(\\d+) run, which plays"
+                + " ([\\d,]+) calls").matcher(read(Path.of("ym/cost.sh")));
+        assertTrue(script.find(), "ym/cost.sh names no run of performance.md's");
+        assertEquals(run.group(1), script.group(1), "the run's VBLs in the two files");
+        assertEquals(run.group(3), script.group(2), "YMXR's calls in the two files");
+        Matcher split = wrapped("cost ([\\d,]+) cycles a call over (\\d+) of the ([\\d,]+) calls"
+                + " on Turrican - world 4-3, against ([\\d,]+) on the ([\\d,]+) calls that refill")
+                .matcher(section);
+        assertTrue(split.find(), "performance.md has no split of YMX's calls");
+        long idle = number(split.group(2));
+        long busy = number(split.group(5));
+        assertEquals(number(split.group(3)), idle + busy, "YMX's calls, the two kinds together");
+        assertEquals(number(run.group(2)), idle + busy, "YMX's calls in the run and in the split");
+        assertEquals(ty[0], Math.round((number(split.group(1)) * idle
+                + number(split.group(4)) * busy) / (double) (idle + busy)),
+                "YMX's two kinds of call average to its row on Turrican - world 4-3");
+
+        Matcher ours = wrapped("YMXR refills (\\S+) units every row; YMX serves a round-robin of"
+                + " (\\S+) slots, (\\S+) of them a live stream, so its group is (\\S+) bytes,"
+                + " (\\S+) units at the same unit 2, and it refills on (\\S+) rows in (\\S+):"
+                + " the (\\S+) slots without a stream").matcher(section);
+        assertTrue(ours.find(), "performance.md has no refill of the two players");
+        int units = count(ours.group(1));
+        int slots = count(ours.group(2));
+        int live = count(ours.group(3));
+        assertEquals(Columns.C / 2, units, "YMXR's units at unit 2");
+        assertEquals(slots, count(ours.group(4)), "YMX's group, a byte a slot");
+        assertEquals(slots / 2, count(ours.group(5)), "YMX's units at unit 2");
+        assertEquals(live, count(ours.group(6)), "the rows YMX refills on");
+        assertEquals(slots, count(ours.group(7)), "the rows YMX refills over");
+        assertEquals(slots - live, count(ours.group(8)), "YMX's slots without a stream");
+        Matcher against = wrapped("(\\S+) units against (\\S+), which is why").matcher(section);
+        assertTrue(against.find(), "performance.md has no refills set against each other");
+        assertEquals(slots / 2, count(against.group(1)), "YMX's refill");
+        assertEquals(units, count(against.group(2)), "YMXR's refill");
+        Matcher columns = wrapped("(\\S+) columns here against (\\S+) live streams there")
+                .matcher(section);
+        assertTrue(columns.find(), "performance.md has no columns against streams");
+        assertEquals(Columns.C, count(columns.group(1)), "YMXR's columns");
+        assertEquals(live, count(columns.group(2)), "YMX's live streams");
+        Matcher worst = wrapped("(\\S+) of (\\S+) here and (\\S+) of (\\S+) there").matcher(section);
+        assertTrue(worst.find(), "performance.md has no worst frame's parse");
+        assertEquals(List.of(units, units, slots / 2, slots / 2), List.of(count(worst.group(1)),
+                count(worst.group(2)), count(worst.group(3)), count(worst.group(4))),
+                "the worst frames parse an operation a unit");
+        Matcher one = wrapped("the refill was (\\S+) units").matcher(section);
+        assertTrue(one.find(), "performance.md has no refill at unit 1");
+        assertEquals(Columns.C, count(one.group(1)), "YMXR's units at unit 1");
+    }
+
+    /**
+     * The raster monitor's paragraph against what it names: a scanline
+     * against ym/cost.py's, the entry and the rte against the section on
+     * the program's clock and the rig's ENTRY, the count's turn against the
+     * player's COUNT macro, and the count's error against A tick's table.
+     * The paragraph read each count as within a twentieth, and a tick of
+     * one row, 64 cycles, counts as 60.
+     */
+    @Test
+    void theRasterMonitorReadsTheFiguresItNames() throws IOException {
+        String perf = read(PERF);
+        String section = perf.substring(perf.indexOf("## The raster monitor"),
+                perf.indexOf("## The program's clock"));
+        Matcher line = wrapped("one scanline to (\\d+) cycles").matcher(section);
+        assertTrue(line.find(), "performance.md has no scanline");
+        Matcher tool = Pattern.compile("^LINE = (\\d+)", Pattern.MULTILINE)
+                .matcher(read(Path.of("ym/cost.py")));
+        assertTrue(tool.find(), "ym/cost.py has no scanline");
+        assertEquals(tool.group(1), line.group(1), "the scanline in ym/cost.py");
+        Matcher tick = wrapped("the (\\d+) cycles of the interrupt's entry and the (\\d+) of its"
+                + " `rte`").matcher(section);
+        assertTrue(tick.find(), "performance.md has no entry and rte");
+        Matcher clock = wrapped("the (\\d+) cycles of the interrupt's entry come on top")
+                .matcher(perf);
+        assertTrue(clock.find(), "the program's clock has no entry");
+        assertEquals(clock.group(1), tick.group(1), "the entry in the two sections");
+        Matcher rig = Pattern.compile("^ENTRY = (\\d+)", Pattern.MULTILINE)
+                .matcher(read(Path.of("68k/test/emu/test_ymxr.py")));
+        assertTrue(rig.find(), "the rig has no ENTRY");
+        assertEquals(Long.parseLong(rig.group(1)),
+                Long.parseLong(tick.group(1)) + Long.parseLong(tick.group(2)),
+                "the rig's entry and rte together");
+        Matcher turn = wrapped("in turns of (\\w+) cycles").matcher(section);
+        assertTrue(turn.find(), "performance.md has no turn of the count");
+        Matcher macro = Pattern.compile("add\\.w\\s+#\\(\\\\cycles\\+\\\\drop\\+PERF_END\\+(\\d+)\\)"
+                + "/(\\d+),\\(a0\\)").matcher(read(Path.of("68k/YMXR.S")));
+        assertTrue(macro.find(), "the player's COUNT macro has no turn");
+        int ten = Integer.parseInt(macro.group(2));
+        assertEquals("ten", turn.group(1), "the turn the player counts in");
+        assertEquals(10, ten, "the turn the player counts in");
+        assertEquals(ten / 2, Integer.parseInt(macro.group(1)), "the count rounds to the nearest turn");
+        Matcher within = wrapped("rounded to a turn of (\\w+) and so within (\\d+) cycles of what"
+                + " A tick measures below").matcher(section);
+        assertTrue(within.find(), "performance.md has no bound on a tick's count");
+        String ticks = perf.substring(perf.indexOf("## A tick"));
+        Matcher row = Pattern.compile("^\\| ((?:a|the) [^|]+?) \\| (\\d+) \\| (\\d+) \\|$",
+                Pattern.MULTILINE).matcher(ticks.substring(0, ticks.indexOf("\n## ", 5)));
+        long off = 0;
+        int read = 0;
+        while (row.find()) {
+            long cost = Long.parseLong(row.group(2));
+            off = Math.max(off, Math.abs((cost + ten / 2) / ten * ten - cost));
+            read++;
+        }
+        assertEquals(5, read, "A tick's table of five paths");
+        assertEquals(off, Long.parseLong(within.group(2)), "the most a tick's count is off");
+    }
+
     /**
      * Every glossary row names the document that explains its term, and
      * and no check opened that document. requirements.md R0.7 allows no second

@@ -30,6 +30,11 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -clock             the stub's Timer C handler under
                                        Hatari's profiler, one tune at 50 Hz
                                        and at 60 Hz, against performance.md
+       test_ymxr.py -cost              the raster monitor's runs under
+                                       Hatari, as ym/cost.sh makes them:
+                                       the two tunes against YMX, one at
+                                       unit 1, and DBA 2's first write,
+                                       against performance.md
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
                                        the monitor moves no chip write
@@ -1237,7 +1242,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init took a bound tune of version %d" % (BOUND_VERSIONS[-1] + 1)
-        return 0, 0, [], {}, 0, (0, 0, 0, []), 0, None
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0), 0, None
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
@@ -1248,9 +1253,16 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         # so it runs from the field at 16 to the end: the cycles the
         # counter reads there are the reader's, since the tables below it
         # are data.
+        # The frame procedure's steps 1 to 3, the effects, stand from
+        # ymxr_frame to ymxr_regs, and steps 4 to 8, the register columns,
+        # from there to ymxr_played: the two parts a dense frame procedure
+        # would replace (dense).
         cycles.attach(m, (FILE + tune.image_at, FILE + len(bound)),
                       *(decoder_of(file, bound, tune, cycles.module)
-                        if parts else ()))
+                        if parts else ()),
+                      regions=None if perf else {
+                          "effects": (CODE + symbols["ymxr_frame"], CODE + symbols["ymxr_regs"]),
+                          "registers": (CODE + symbols["ymxr_regs"], CODE + symbols["ymxr_played"])})
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
@@ -1302,9 +1314,13 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         entries = entries[1:]
     cost = []
     refills_of = []
+    # each frame's cycles in the effects' steps and in the register
+    # columns', and whether its row sets a column of any effect
+    steps = []
     for f in range(frames):
         if cycles:
             cycles._settle(None)
+        spent_before = dict(cycles.spent) if cycles else {}
         before = cycles.cycles if cycles else 0
         image_before = cycles.image if cycles else 0
         decoder_before = cycles.decoder if cycles else 0
@@ -1345,6 +1361,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                 "frame %d: the yellow mark falls on chip write %d of %d, not after the last" % (
                     f, yellow, len(m.psg))
         want = model.frame()
+        if cycles and cycles.regions:
+            steps.append((cycles.spent["effects"] - spent_before["effects"],
+                          cycles.spent["registers"] - spent_before["registers"],
+                          any(model.fx[i]["touched"] for i in range(4))))
         assert masked(m.psg) == masked(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
             assert entries[f] == entry(model, want), "frame %d: the reader reports %s, the player %s" % (
@@ -1516,7 +1536,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
             assert timers.mode[i] == 0 or i == 3, "stop left effect %d's timer running" % i
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "stop moved Timer C's nibble"
     return (frames, ticks, cost, tick_cost, tick_cycles,
-            (costliest[0], tune.R, tune.RR, advance), boundaries,
+            (costliest[0], tune.R, tune.RR, advance, steps, tune.effects), boundaries,
             parts_of(refills_of) if refills_of else None)
 
 
@@ -1535,6 +1555,37 @@ ROM = 0xE00000
 WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
          7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
          12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
+
+
+def dense_read(savings, costs):
+    """performance.md's dense register columns against the rig: the write
+    and the test the section names, the old test, and what the columns
+    cost or save a frame over the eleven fixtures, a cost the least to the
+    most on the tunes they cost and a saving the least to the most on the
+    rest, each figure rounded to a cycle."""
+    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
+    stale = []
+    m = re.search(r"each register written as the player writes a set column, in (\d+) cycles,"
+                  r" and the effects' steps behind a test of (\d+), that costs (\d+) to (\d+)"
+                  r" cycles a frame on (\w+) of the (\w+) fixtures and saves (\d+) to (\d+) on"
+                  r" the other (\w+),", said)
+    if not m:
+        return ["performance.md has no count of dense register columns"]
+    rounded = [int(round(saved)) for saved, _ in savings.values()]
+    cost = sorted(-r for r in rounded if r < 0)
+    save = sorted(r for r in rounded if r >= 0)
+    counted = (str(costs["write"]), str(costs["skip"]), str(cost[0]), str(cost[-1]),
+               WORDS[len(cost)], WORDS[len(rounded)], str(save[0]), str(save[-1]),
+               WORDS[len(save)]) if cost and save else None
+    if m.groups() != counted:
+        stale.append("performance.md reads dense register columns as %s, and the rig counts %s"
+                     % (m.groups(), counted))
+    t = re.search(r"applies to a (\d+)-cycle test and not to the (\d+) of a test that forms the"
+                  r" select only where it writes", said)
+    if not t or (int(t.group(1)), int(t.group(2))) != (costs["then"], costs["skip"]):
+        stale.append("performance.md reads the two tests as %s, and the rig counts %d and %d"
+                     % (t and t.groups(), costs["then"], costs["skip"]))
+    return stale
 
 
 def decoder_of(file, bound, tune, dtx):
@@ -1948,6 +1999,141 @@ def clock():
     return ("the program's clock over %d ticks at 50 Hz and %d at 60 Hz: %.2f cycles a tick"
             " and %.2f, %.2f around the play call, a tick without a row %.2f, as"
             " performance.md reads" % (t5, t6, fifty, sixty, around, plain))
+
+
+# performance.md's two tunes against YMX, and the tune of the raster
+# monitor's paragraph on where a row's writes land.
+COST_TUNES = ("Synergy Credits", "Turrican - world 4-3")
+FIRST_TUNE = "DBA 2"
+
+
+def cost_program(file, work, name, flags):
+    """A tune file in COST.PRG, as ym/cost.sh builds it: bin/ymxr-sndh with
+    the flags named, then bin/ymxr-prg."""
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-t" + name] + flags,
+                       input=file, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    sndh = r.stdout
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent"],
+                       input=sndh, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    open(os.path.join(work, "COST.PRG"), "wb").write(r.stdout)
+    return sndh
+
+
+def cost_run(work, vbls, kinds):
+    """COST.PRG under Hatari for `vbls` VBLs, as ym/cost.sh runs it: what
+    the program printed, and the trace of `kinds`."""
+    r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+                        "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                        "--sound", "off", "--conout", "2", "--fast-forward", "on",
+                        "--disable-video", "1", "--run-vbls", str(vbls),
+                        "--log-level", "fatal", "--trace", kinds,
+                        "--trace-file", "trace.txt", "COST.PRG"],
+                       cwd=work, stdin=subprocess.DEVNULL, capture_output=True, timeout=900)
+    return r.stdout.decode(errors="replace"), os.path.join(work, "trace.txt")
+
+
+def calls(ym, vbls, unit=None):
+    """The play calls of a raster monitor run (ym/cost.py): the calls
+    counted, on average, at the 99th in a hundred and at most."""
+    sys.path.insert(0, os.path.join(ROOT, "ym"))
+    import cost as raster
+    work = tempfile.mkdtemp(prefix="ymxr68")
+    flags = ["-k%d" % unit] if unit else []
+    r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
+                       stdin=open(ym, "rb"), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    cost_program(r.stdout, work, os.path.basename(ym)[:-3], ["-perf"])
+    _, trace = cost_run(work, vbls, "video_color")
+    work_cycles, _, _ = raster.spans(raster.read(trace))
+    assert work_cycles, "the run of %s has no call" % os.path.basename(ym)
+    work_cycles.sort()
+    n = len(work_cycles)
+    return n, int(sum(work_cycles) / n), work_cycles[int(n * 0.99)], work_cycles[-1]
+
+
+def first_writes(ym, frames):
+    """The cycles from the VBL to the frame procedure's first chip write,
+    in each of the first `frames` frames whose call writes: the plain core,
+    played from the VBL, its writes told from the ticks' by the player's
+    labels."""
+    code, symbols = assemble("YMXR_sndh.S")
+    work = tempfile.mkdtemp(prefix="ymxr68")
+    file, _ = convert(ym, work)
+    sndh = cost_program(file, work, os.path.basename(ym)[:-3], ["-vbl"])
+    said, trace = cost_run(work, frames + 700, "psg_write,video_vbl")
+    at = re.search(r"YMXR at \$([0-9A-F]{8})", said)
+    assert at, "the program printed no address"
+    base = int(at.group(1), 16) + sndh.find(b"YMXS") - 12
+    low, high = base + symbols["ymxr_frame"], base + symbols["ymxr_reads"]
+    vbl = re.compile(r"^VBL \d+ video_cyc=(\d+)")
+    write = re.compile(r"ym write data reg=0x[0-9a-f]+ val=0x[0-9a-f]+ video_cyc=(\d+) .*pc=([0-9a-f]+)")
+    out, since, seen = [], None, True
+    for line in open(trace, errors="replace"):
+        v = vbl.match(line)
+        if v:
+            since, seen = int(v.group(1)), False
+            continue
+        w = write.search(line)
+        if w and not seen and since is not None and low <= int(w.group(2), 16) < high:
+            out.append(int(w.group(1)) - since)
+            seen = True
+    assert len(out) >= frames, "the run reads %d frames of %s's calls, not %d" % (
+        len(out), os.path.basename(ym), frames)
+    return out[:frames]
+
+
+def monitor_runs():
+    """performance.md's figures of a raster monitor run against Hatari
+    (-cost): the two tunes of the section against YMX, each over the run
+    the section names, their calls counted, on average, at the 99th in a
+    hundred and at most against the table's YMXR rows; Synergy Credits
+    packed at unit 1 over a run of the same length against its figure at
+    most; and on DBA 2, the least cycles from the VBL to the frame
+    procedure's first chip write, against the raster monitor's paragraph."""
+    text = open(os.path.join(ROOT, "doc", "performance.md")).read()
+    said = " ".join(text.split())
+    run = re.search(r"each over a `VBLS=(\d+)` run: ([\d,]+) calls of YMX and ([\d,]+) of YMXR", said)
+    assert run, "performance.md names no run of YMXR's calls"
+    vbls, counted = int(run.group(1)), int(run.group(3).replace(",", ""))
+    first = re.search(r"these are the first ([\d,]+) calls", said)
+    assert first and int(first.group(1).replace(",", "")) == counted, \
+        "performance.md counts YMXR's calls two ways"
+    stale, read = [], []
+    for tune in COST_TUNES:
+        row = re.search(r"^\| %s \| YMXR \| (\d+) \| (\d+) \| (\d+) \|$" % re.escape(tune), text, re.M)
+        assert row, "performance.md's table has no YMXR row for " + tune
+        n, average, near, most = calls(os.path.join(ROOT, "ym", "test", tune + ".ym"), vbls)
+        if n != counted:
+            stale.append("the run of %s plays %d calls, and performance.md reads %d" % (tune, n, counted))
+        if (average, near, most) != tuple(int(x) for x in row.groups()):
+            stale.append("performance.md reads %s for %s, and the run measures %s" % (
+                "/".join(row.groups()), tune, "/".join(str(x) for x in (average, near, most))))
+        read.append("%s %d/%d/%d over %d calls" % (tune, average, near, most, n))
+    unit = re.search(r"packed at unit 1, the refill was thirty units, and a run of the same length"
+                     r" reads ([\d,]+) at most", said)
+    assert unit, "performance.md has no run of Synergy Credits at unit 1"
+    _, _, _, most = calls(os.path.join(ROOT, "ym", "test", "Synergy Credits.ym"), vbls, unit=1)
+    if most != int(unit.group(1).replace(",", "")):
+        stale.append("performance.md reads %s at most for Synergy Credits at unit 1, and the run"
+                     " measures %d" % (unit.group(1), most))
+    read.append("Synergy Credits at unit 1 %d at most" % most)
+    lands = re.search(r"Measured on %s over ([\d,]+) frames, the call's first register write"
+                      r" stands at least ([\d,]+) cycles after the VBL" % FIRST_TUNE, said)
+    assert lands, "performance.md has no first write on " + FIRST_TUNE
+    frames = int(lands.group(1).replace(",", ""))
+    got = first_writes(os.path.join(ROOT, "ym", "test", FIRST_TUNE + ".ym"), frames)
+    # The least moves by the phase the VBL lands at against the instruction
+    # it interrupts: a title one byte longer moved it 2 cycles. It reads
+    # within one of the shifter's bus slots, 4 cycles.
+    if abs(min(got) - int(lands.group(2).replace(",", ""))) > 4:
+        stale.append("performance.md reads %s cycles to %s's first write at least, and the run"
+                     " measures %d" % (lands.group(2), FIRST_TUNE, min(got)))
+    read.append("%s's first write at least %d cycles after the VBL over %d frames, %.0f on average"
+                % (FIRST_TUNE, min(got), frames, sum(got) / float(frames)))
+    assert not stale, "\n".join(stale)
+    return "the raster monitor's runs as performance.md reads them: " + "; ".join(read)
 
 
 def hatari(ym, code, symbols, perf=False):
@@ -2410,6 +2596,9 @@ def main():
     if "-clock" in sys.argv:
         print(clock())
         return
+    if "-cost" in sys.argv:
+        print(monitor_runs())
+        return
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     count = "-cycles" in sys.argv
     parts = "-refill" in sys.argv
@@ -2527,6 +2716,8 @@ def main():
         import test_dtx
         with_movep(test_dtx)
         cycles_of = test_dtx
+    costs = dense(cycles_of, code, symbols) if cycles_of and not perf else None
+    savings = {}                        # dense columns' saving by tune, and its effects
     stale = []
     wrong = []
     measured = {}                       # the refill parts by tune, with -refill
@@ -2571,6 +2762,11 @@ def main():
                 # here counts: 44 and 20 from the manual, the 64 that
                 # separates performance.md's 96 from its 160.
                 ticked = int(round((tick_cycles + ENTRY * ticks) / float(frames)))
+                if costs and where[4]:
+                    savings[os.path.basename(ym)[:-3].replace("  ", " ")] = (
+                        saving(where[4], where[5], costs), bin(where[5]).count("1"))
+                    line += "; dense columns %+4.0f a frame" % savings[
+                        os.path.basename(ym)[:-3].replace("  ", " ")][0]
                 if ticks:
                     line += "; the ticks %5d cycles a frame, %5d with the call" % (
                         ticked, average + ticked)
@@ -2600,6 +2796,14 @@ def main():
                 # of this tune is a square, whose tick costs the same under
                 # both builds, so the three figures stand under -abs too.
                 if stem == "Synergy Credits" and not LEAN and PCREL:
+                    # the costliest frame, counted from the first as 1,
+                    # which the section against YMX places past its run
+                    perf_said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
+                    nth = re.search(r"Synergy Credits' costliest frame is its ([\d,]+)(?:st|nd|rd|th)",
+                                    perf_said)
+                    if not nth or int(nth.group(1).replace(",", "")) != where[0] + 1:
+                        stale.append("performance.md places Synergy Credits' costliest frame at %s,"
+                                     " and the rig counts frame %d" % (nth and nth.group(1), where[0] + 1))
                     plan = " ".join(open(os.path.join(ROOT, "doc", "plan.md")).read().split())
                     closing = re.search(
                         r"Synergy Credits reads ([\d,]+) cycles a call against the"
@@ -2662,6 +2866,10 @@ def main():
             wrong.append(os.path.basename(ym))
             said = str(failed).strip().split("\n")[0]
             print("%-45s FAILED: %s" % (os.path.basename(ym), said[:120]))
+    if savings and not args and wide is None and not kit and PCREL and not LEAN:
+        # a run over the eleven fixtures reads the section against YMX's
+        # dense columns as the rig counts them
+        stale += dense_read(savings, costs)
     if measured:
         # The advance's parts of the same pass, and the sentences of
         # performance.md that read them back: a run over the eleven fixtures
@@ -2676,6 +2884,73 @@ def main():
     print("%d tunes play as the specification reads%s" % (
         played, ", and %d of another format stands outside the run: %s"
         % (len(another), ", ".join(another)) if another else ""))
+
+
+def assemble_text(text):
+    """The bytes rmac assembles a few lines of 68000 to, at 0."""
+    work = tempfile.mkdtemp()
+    source, out = os.path.join(work, "part.S"), os.path.join(work, "part.bin")
+    open(source, "w").write(text)
+    r = subprocess.run([RMAC, "-m68000", "-fr", "-o", out, source], capture_output=True)
+    assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
+    return open(out, "rb").read()
+
+
+def counted(module, code, jumps):
+    """The cycles of code's instructions in order, as the rig counts the
+    player's: a short branch among them jumping where `jumps` is true."""
+    at, total = 0, 0
+    while at < len(code):
+        words = struct.unpack(">5H", (code[at:at + 10] + bytes(10))[:10])
+        op = words[0]
+        after = None
+        if op >> 12 == 6 and op & 0xFF:
+            after = at + 2 + ((op & 0xFF) ^ 0x80) - 0x80 if jumps else at + 2
+        cycles, size = module.cycles_of(words, 0, None, at, after, None)
+        total += cycles
+        at += 2 * size
+    return total
+
+
+def dense(module, code, symbols):
+    """What register columns written unconditionally would cost this
+    player, counted as the rig counts it (performance.md, Against YMX):
+    a register's write in the form the player writes a set column in,
+    the select and the column into d0 and one movep, fourteen of them;
+    the effects behind one bit, tested as the player tests a column's set
+    bit, the test at WRITE _6's site, its branch jumping over the effects'
+    steps on a row whose effect columns are all clear; and the test the
+    player had when it formed the select before it, one move ahead of the
+    same two instructions."""
+    one = assemble_text("        move.w  #$0600,d0\n        move.b  $7FFF(a1),d0\n"
+                        "        movep.w d0,(a2)\n")
+    block = assemble_text("".join("        move.w  #$%02X00,d0\n        move.b  $7FFF(a1),d0\n"
+                                  "        movep.w d0,(a2)\n" % r for r in range(14)))
+    test = code[symbols["c_6"]:symbols["c_6"] + 6]
+    assert struct.unpack(">H", test[4:6])[0] >> 8 == 0x6A, "WRITE _6 is not a read and a bpl.s"
+    select = assemble_text("        move.w  #$0600,d1\n")
+    return {"write": counted(module, one, False), "block": counted(module, block, False),
+            "skip": counted(module, test, True), "run": counted(module, test, False),
+            "then": counted(module, select, False) + counted(module, test, True)}
+
+
+def saving(steps, effects, costs):
+    """The cycles a frame dense register columns would save this tune on
+    average, a cost where negative. Where the tune's effect bits are all
+    clear, both procedures jump over the effects' steps; otherwise the
+    dense one tests the bit and runs the steps on the rows that set an
+    effect column."""
+    saved = 0
+    for effect_cycles, register_cycles, touched in steps:
+        now = effect_cycles + register_cycles
+        if not effects:
+            then = costs["block"] + effect_cycles
+        elif touched:
+            then = costs["block"] + costs["run"] + effect_cycles
+        else:
+            then = costs["block"] + costs["skip"]
+        saved += now - then
+    return saved / float(len(steps))
 
 
 def with_movep(module):
@@ -2706,12 +2981,17 @@ class CyclesOn:
         self.range = (0, 0)
         self.inner = (0, 0)
         self.hits = {}
+        # named address ranges of the player, and the cycles spent in each
+        self.regions = {}
+        self.spent = {}
 
-    def attach(self, m, image=(0, 0), decoder=(0, 0), heads=()):
+    def attach(self, m, image=(0, 0), decoder=(0, 0), heads=(), regions=None):
         self.counter = self.module.Cycles(m)
         self.range = image
         self.inner = decoder
         self.hits = {at: 0 for at in heads}
+        self.regions = dict(regions or {})
+        self.spent = {name: 0 for name in self.regions}
         inner = self.counter._settle
         counter = self.counter
         rig = self
@@ -2726,6 +3006,9 @@ class CyclesOn:
                 rig.image += counter.cycles - before
                 if rig.inner[0] <= pending[0] < rig.inner[1]:
                     rig.decoder += counter.cycles - before
+            for name, (low, high) in rig.regions.items():
+                if low <= pending[0] < high:
+                    rig.spent[name] += counter.cycles - before
             if pending[0] in rig.hits:
                 rig.hits[pending[0]] += 1
         self.counter._settle = settle

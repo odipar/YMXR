@@ -777,11 +777,12 @@ run continues.
 | absent | the dumps named, or the eleven under `ym/test` |
 | `-corpus[N]` | N tunes spread over the corpus, `YM_CORPUS`: of its F files by name, every (F divided by N)-th, the first N of those; 40 with N absent |
 | `-framesN` | each tune for N frames at most |
-| `-cycles` | the play call, DTX's advance and the tick handlers counted with DTX's cycle counter under `DTX_REPO/68k/test/emu`, against performance.md's figures |
+| `-cycles` | the play call, DTX's advance and the tick handlers counted with DTX's cycle counter under `DTX_REPO/68k/test/emu`, against performance.md's figures; the frame procedure's effect steps and register steps counted apart, frame by frame, against dense register columns: fourteen writes of a set column's form, and the effects' steps behind the test of a column's set bit on the rows whose effect columns are all clear. A run of the eleven fixtures reads what the columns cost and save a frame, the write, the test and the test the player had before, against the section on YMX |
 | `-refill` | `-cycles` and the advance's parts off one pass: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the eleven fixtures reads the claims over the set; a run of other tunes reads each tune alone |
 | `-hatari` | each tune, at 50 Hz alone, through `ymxr-sndh -vbl` and `ymxr-prg` with 2,000 rows, run under Hatari, the trace of every chip write cut into frames at the VBL and read against the model; `-vbl` names the VBL as the clock the program plays from (BINARIES.md 4.3), which the frames are cut at; a run that names no tune plays the conformance kit's `voices` after the fixtures, since no dump converts to a target of several registers |
 | `-stub` | each tune, at 50 Hz alone, through `ymxr-sndh` and then `ymxr-prg` twice, 600 rows each: one program playing from Timer C, which the file's clock tag names, and one from the VBL, which `-vbl` names. Both run under Hatari, and the writes the frame procedure makes are one stream in one order under either clock, over the same frames but for the phase of the first row and the last. A tick's writes are counted apart: an effect's handler writes the chip from its timer, which the two clocks interleave among the rows differently. Then the same tune at 60 Hz, a rate no multiple of the operating system's clock: the tool arms 240 ticks a second (BINARIES.md 4.10), and the gaps between the in-service bit the stub's handler clears read that period on Hatari's MFP, 4.167 ms, against the 5 ms of the 200 Hz clock |
 | `-clock` | the stub's Timer C handler under Hatari's profiler: `Circus Attractions 2` in a program at 50 Hz and at 60 Hz, a row every third tick and every fourth, 1,000 VBLs each; each run measures the handler's cycles a tick and the routine around the play call's a row, which performance.md's section on the program's clock reads within a cycle, and the two runs together solve for a tick without a row, which it reads as one of two figures |
+| `-cost` | the raster monitor's runs of performance.md, as `ym/cost.sh` makes them: `Synergy Credits` and `Turrican - world 4-3` on the monitor's core over the VBLs the section against YMX names, the calls counted, on average, at the 99th in a hundred and at most against the table's YMXR rows, and `Synergy Credits` packed at unit 1 over the same run against its figure at most; then `DBA 2` on the plain core, played from the VBL, the least cycles from the VBL to the frame procedure's first chip write over the frames the raster monitor's paragraph names, which that paragraph reads within one of the shifter's bus slots, 4 cycles: the least moves with the phase the VBL lands at |
 | `-perf` | the player assembled with the raster monitor, against the model |
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
@@ -806,19 +807,19 @@ core; the conformance kit at `-frames24` under `-kit`; and `-refill` over
 `Turrican 2 - world completed 1` whole, which reads the tune's row of
 performance.md and a refill of a tune with a source. The workflow runs
 `-refill` over the eleven fixtures whole as a step after the suite, which
-reads the sentences over the set. The workflow then runs `-stub`, `-hatari`
-and `-clock` under Hatari 2.6.1, built from its tag, and the PAL image of
-EmuTOS 1.4, which boots the ST at the 50 Hz the two modes require; a caller
-runs them under TOS 2.06, which `TOS` names.
+reads the sentences over the set. The workflow then runs `-stub`, `-hatari`,
+`-clock` and `-cost` under Hatari 2.6.1, built from its tag, and the PAL
+image of EmuTOS 1.4, which boots the ST at the 50 Hz the two modes require;
+a caller runs them under TOS 2.06, which `TOS` names.
 
 ---
 
 ## 18. The measurements
 
 **18.1 `ym/convert.py corpus|envelope|frame`** converts the corpus and
-prints the figures of experiments.md; `ym/measure.py` prints those of
-SPEC.md 1.2 and 1.7. `JOBS` is the tunes converted at once, `DTX_WRITE`
-DTX's writer, `DTX_RING` the ring, and `DTX_COPIES` the copies flag.
+prints the figures of experiments.md. `JOBS` is the tunes converted at
+once, `DTX_WRITE` DTX's writer, `DTX_RING` the ring, and `DTX_COPIES` the
+copies flag.
 
 **18.2 `ym/cost.py trace.txt`** reads a Hatari trace of the background
 colour's writes, `--trace video_color`, from a program on a `-perf`
@@ -844,6 +845,18 @@ by rows alone. `python3 ym/whole-byte.py | bin/ymxs-to-prg -r4800 >
 dist/whole/TUNE.PRG` makes a program of it, and experiments.md reads what
 the sections come to.
 
+**18.7 `ym/measure.py`** reads every dump of the corpus under `YM_CORPUS`
+and prints, over its frame steps, how the registers move: each voice's
+coarse tone byte moving while its fine byte stays, its level moving, and its
+envelope bit moving alone; the envelope shape's writes, and those that write
+the shape standing; the tunes whose envelope period and whose noise period
+stay throughout; the frames of envelope period 0, and those among them with
+a voice on the envelope; the shape column's changes, alone, with the bits
+beside the period bytes, and with a set bit for each period byte; and each
+voice's fine tone byte moving to 0. SPEC.md 1.2 to 1.7 define the columns
+these movements are encoded in, and `ym/convert.py` reads the corpus through
+this script's reader.
+
 ---
 
 ## 19. The two trees
@@ -868,9 +881,9 @@ checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
 so that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
 whole, which reads performance.md's sentences over the set, and then
-`-stub`, `-hatari` and `-clock` under Hatari and EmuTOS (17). No push starts
-it: a caller starts it from the Actions tab or by `gh workflow run
-test.yml`.
+`-stub`, `-hatari`, `-clock` and `-cost` under Hatari and EmuTOS (17). No
+push starts it: a caller starts it from the Actions tab or by `gh workflow
+run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images
