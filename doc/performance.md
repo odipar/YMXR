@@ -152,29 +152,27 @@ runs outside the tick handlers.
 The tick a program plays from costs the CPU what its handler runs, and
 the stub arms Timer C at the lowest multiple of the tune's rate the MFP
 counts exactly (BINARIES.md 4.10). Read by Hatari's profiler on its
-cycle-exact CPU, over a 50 Hz tune and the same tune at 60 Hz, a few
-thousand ticks each: a tick that plays no row runs 149 cycles of the
-handler on average, its `rte` among them, and one that plays a row runs
-278 of the handler and 416 of the routine around the play call, which
-saves every register before the call and restores them after, the call
-apart. The branch that picks the path costs 12 cycles where it branches
-and 8 where it falls through, and the `rte` varies, so the two figures
-of the handler are averages over each path. The profiler reads
-instructions, and the 44 cycles of the interrupt's entry come on top:
-193 a tick without a row and 738 with one. `test_ymxr.py -clock` reads
-the three figures back.
+cycle-exact CPU over a few thousand ticks of a tune at each rate: at 50
+Hz, where a row lands every third tick, the handler runs 192 cycles a
+tick on average, its `rte` among them, and at 60 Hz, a row every fourth,
+181. The routine around the play call, which saves every register before
+the call and restores them after, runs 416 cycles a row, the call apart.
+The profiler reads instructions, and the 44 cycles of the interrupt's
+entry come on top of each tick. `test_ymxr.py -clock` reads the three
+figures back.
 
-A 50 Hz tune ticks 150 times a second with a row every third, so the
-clock costs 100 x 193 + 50 x 738 = 56,200 cycles a second, 0.70 per cent
-of the 8,021,247 the CPU runs. The 200 Hz clock the stub armed before
-0.4.11 cost 150 x 193 + 50 x 738 = 65,850, 0.82 per cent: the change
-leaves 50 ticks a second unrun, 9,650 cycles.
+A 50 Hz tune ticks 150 times a second, so the clock costs 150 x 236 +
+50 x 416 = 56,200 cycles a second, 0.70 per cent of the 8,021,247 the
+CPU runs. A 60 Hz tune ticks 240 times, 240 x 225 + 60 x 416 = 78,960
+cycles a second, 0.98 per cent.
 
-A 60 Hz tune ticks 240 times with a row every fourth, 180 x 193 +
-60 x 738 = 79,020 cycles a second, 0.99 per cent, against the 200 Hz
-clock's 140 x 193 + 60 x 738 = 71,300, 0.89 per cent. The even spacing
-of a 60 Hz tune's rows (4.10) costs 7,720 cycles a second, and a rate
-the MFP counts no multiple of under 400 keeps the 200 Hz clock.
+The two averages put a tick without a row at 148 or 149 cycles of the
+handler, by the operating system under the program, whose code the `rte`
+returns into. The 200 Hz clock the stub armed before 0.4.11 ran 50 such
+ticks a second more for a 50 Hz tune, about 9,600 cycles with their
+entries, and 40 fewer for a 60 Hz tune than the 240 of the even spacing
+(4.10), about 7,700 cycles; a rate the MFP counts no multiple of under
+400 keeps the 200 Hz clock.
 
 The VBL costs the handler of 4.8 once a frame, 50 ticks a second at the
 screen's rate, and the row lands where the frame procedure runs.

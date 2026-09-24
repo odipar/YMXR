@@ -1913,36 +1913,41 @@ def clock_profile(rate, symbols):
 
 def clock():
     """performance.md's figures of the program's clock against Hatari's
-    profiler (-clock). The same tune at 50 Hz and at 60 Hz lands a row
-    every third tick and every fourth; the handler's cycles over a run are
-    a tick without a row times the ticks without one, and a tick with a
-    row times the rows, so the two runs give the two figures, and the
-    routine around the play call runs once a row. A figure reads within
-    a cycle of the section's: the rte varies with what it returns into,
-    and so with the operating system under the program."""
+    profiler (-clock): the same tune at 50 Hz and at 60 Hz, a row every
+    third tick and every fourth. Each run measures the handler's cycles
+    a tick on average and the routine around the play call's a row, and
+    those read within a cycle of the section's. The two runs together
+    solve for a tick without a row, which the section reads as one of two
+    figures: the rte runs longer on some returns, by the code it returns
+    into, and so by the operating system under the program."""
     code, symbols = assemble("YMXR_prg.S")
     got = {rate: clock_profile(rate, symbols) for rate in (50, 60)}
     (t5, r5, c5, w5), (t6, r6, c6, w6) = got[50], got[60]
+    fifty, sixty = c5 / float(t5), c6 / float(t6)
+    around = (w5 + w6) / float(r5 + r6)
     across = (t5 - r5) * r6 - (t6 - r6) * r5
     plain = (c5 * r6 - c6 * r5) / float(across)
-    row = ((t5 - r5) * c6 - (t6 - r6) * c5) / float(across)
-    around = (w5 + w6) / float(r5 + r6)
-    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
-    m = re.search(r"a tick that plays no row runs (\d+) cycles of the handler on average,"
-                  r" its `rte` among them, and one that plays a row runs (\d+) of the"
-                  r" handler and (\d+) of the routine around the play call", said)
-    assert m, "performance.md has no figures of the program's clock"
     runs = "at 50 Hz %d ticks, %d rows, %d and %d cycles; at 60 Hz %d, %d, %d and %d" % (
         t5, r5, c5, w5, t6, r6, c6, w6)
-    for what, reads, counted in (("a tick without a row", m.group(1), plain),
-                                 ("a tick with a row", m.group(2), row),
+    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
+    m = re.search(r"the handler runs (\d+) cycles a tick on average, its `rte` among them,"
+                  r" and at 60 Hz, a row every fourth, (\d+)\. The routine around the play"
+                  r" call, .*? runs (\d+) cycles a row", said)
+    assert m, "performance.md has no figures of the program's clock"
+    for what, reads, counted in (("a tick at 50 Hz", m.group(1), fifty),
+                                 ("a tick at 60 Hz", m.group(2), sixty),
                                  ("the routine around the play call", m.group(3), around)):
         assert abs(int(reads) - counted) < 1, \
             "performance.md reads %s cycles for %s, and the profiler counts %.2f (%s)" % (
                 reads, what, counted, runs)
-    return ("the program's clock over %d ticks at 50 Hz and %d at 60 Hz: a tick without a"
-            " row %.2f cycles of the handler, with a row %.2f and %.2f around the play"
-            " call, as performance.md reads" % (t5, t6, plain, row, around))
+    n = re.search(r"a tick without a row at (\d+) or (\d+) cycles of the handler", said)
+    assert n, "performance.md has no tick without a row"
+    assert int(round(plain)) in (int(n.group(1)), int(n.group(2))), \
+        "performance.md reads %s or %s cycles for a tick without a row, and the two runs" \
+        " give %.2f (%s)" % (n.group(1), n.group(2), plain, runs)
+    return ("the program's clock over %d ticks at 50 Hz and %d at 60 Hz: %.2f cycles a tick"
+            " and %.2f, %.2f around the play call, a tick without a row %.2f, as"
+            " performance.md reads" % (t5, t6, fifty, sixty, around, plain))
 
 
 def hatari(ym, code, symbols, perf=False):
