@@ -1876,18 +1876,20 @@ def clock_profile(rate, symbols):
     instructions, and those of the routine around the play call. The
     profile lists from an address, so a first run reads where the
     program loads; the debugger is entered once, at a VBL past the boot,
-    and lists the profile from each routine. A listing ends at a page,
-    and Hatari's page is shorter on some hosts, so each routine is
-    listed from its first instruction and read to its last: the rts of
-    the routine and the rte of the handler."""
+    and lists the profile. A listing ends at a page, which is a few lines
+    on some hosts, so a listing starts every 16 bytes across the two
+    routines, eight instructions at most, and each routine is read to
+    its last instruction: the rts of the routine and the rte of the
+    handler."""
     work = tempfile.mkdtemp(prefix="ymxr68")
     sndh_at = clock_program(work, rate)
     said = re.search(r"YMXR at \$([0-9A-F]{8})", clock_run(work, 400))
     assert said, "the program printed no address"
     stub = int(said.group(1), 16) - (sndh_at - 28)
     lists = os.path.join(work, "lists.txt")
-    open(lists, "w").write("profile addresses $%x\nprofile addresses $%x\ncont\n"
-                           % (stub + symbols["tick"], stub + symbols["timer_c"]))
+    open(lists, "w").write("".join(
+        "profile addresses $%x\n" % (stub + at)
+        for at in range(symbols["tick"], symbols["clear"], 16)) + "cont\n")
     script = os.path.join(work, "profile.txt")
     open(script, "w").write("profile on\nb VBL > %d :once :quiet :file %s\n"
                             % (CLOCK_VBLS - 20, lists))
