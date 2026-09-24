@@ -803,8 +803,10 @@ on every build: the two built tunes at `-frames24` on each of the eight
 cores of 12.1, `-abs`, `-lean` and `-perf` alone and together and the plain
 core; the conformance kit at `-frames24` under `-kit`; and `-refill` over
 `Turrican 2 - world completed 1` whole, which reads the tune's row of
-performance.md and a refill of a tune with a source. `-hatari` and `-stub`
-need Hatari and a TOS image, and run by hand.
+performance.md and a refill of a tune with a source. The workflow runs
+`-refill` over the eleven fixtures whole as a step after the suite, which
+reads the sentences over the set. `-hatari` and `-stub` need Hatari and a
+TOS image, and run by hand.
 
 ---
 
@@ -848,8 +850,8 @@ the sections come to.
 the reference, and in Go under `go/`, module `github.com/odipar/ymxr/go`,
 a version of it a tag of that directory, `go/v0.1.0` beside `v0.1.0`.
 
-**19.2 A Java tool** is the script `bin/<tool>`, one line running
-`bin/run` with the class of 2.1 and the arguments. `bin/run` builds where
+**19.2 A Java tool** is the script `bin/<tool>`, one line running `bin/run`
+with the class of 2.1 and the arguments. `bin/run` builds where
 `target/classes/.built` or `target/classpath` is absent, a core of
 BINARIES.md is absent from `target/classes/org/ymxr/68k`, or a file under
 `src/main/java`, `pom.xml` or a `68k/*.S` source is newer than `.built`:
@@ -857,13 +859,15 @@ BINARIES.md is absent from `target/classes/org/ymxr/68k`, or a file under
 closed, under the lock `target/.building`, a directory one process creates
 and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has held <lock> for three
-minutes` and exits with 2. Then it runs the class with `java -ea`. The
-build needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX
-`0.11.11` and YMXS `0.4.7` in the local Maven repository, `mvn install` in
-each checkout. `.github/workflows/test.yml` does that on a GitHub runner
-and then runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's
-`dtx-write` on it so that no check skips. No push starts it: a caller
-starts it from the Actions tab or by `gh workflow run test.yml`.
+minutes` and exits with 2. Then it runs the class with `java -ea`. The build
+needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.11.11`
+and YMXS `0.4.7` in the local Maven repository, `mvn install` in each
+checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
+runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
+so that no check skips, and then `test_ymxr.py -refill` over the eleven
+fixtures whole, which reads performance.md's sentences over the set (17). No
+push starts it: a caller starts it from the Actions tab or by `gh workflow
+run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images
