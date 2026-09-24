@@ -27,6 +27,9 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        one stream either way, and the same
                                        tune at 60 Hz, whose rows land on
                                        the period the timer is armed at
+       test_ymxr.py -clock             the stub's Timer C handler under
+                                       Hatari's profiler, one tune at 50 Hz
+                                       and at 60 Hz, against performance.md
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
                                        the monitor moves no chip write
@@ -1824,6 +1827,114 @@ def evenness(ym, work, code, symbols):
     return mean
 
 
+# The tune the program's clock is read on, and the VBLs a run of it lasts:
+# past the operating system's boot, a few thousand ticks.
+CLOCK_TUNE = os.path.join(ROOT, "ym", "test", "Circus Attractions  2.ym")
+CLOCK_VBLS = 1000
+PROFILED = re.compile(r"^([0-9a-f]{8}) .*?\s[\d.]+% \((\d+), (\d+), ", re.M)
+
+
+def clock_program(work, rate):
+    """The clock's tune at `rate` in CLOCK.PRG, and where the SNDH file
+    stands in the program file: the stub is its text, and the SNDH file
+    follows the stub."""
+    file, report = convert(CLOCK_TUNE, work)
+    at = bytearray(file)
+    at[6], at[7] = 0, rate              # the frame rate, a word at 6
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-tClock"],
+                       input=bytes(at), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent"],
+                       input=r.stdout, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    prg = r.stdout
+    sndh_at = 28
+    while prg[sndh_at + 12:sndh_at + 16] != b"SNDH":
+        sndh_at += 2
+    open(os.path.join(work, "CLOCK.PRG"), "wb").write(prg)
+    return sndh_at
+
+
+def clock_run(work, vbls, script=None):
+    """What a run of CLOCK.PRG writes to the console: the program's lines,
+    and the debugger's where a script of its commands is named. Its
+    input is empty, so the debugger reads the script alone."""
+    out = os.path.join(work, "out.txt")
+    subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+                    "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                    "--sound", "off", "--conout", "2", "--fast-forward", "on",
+                    "--disable-video", "1", "--run-vbls", str(vbls),
+                    "--log-level", "fatal"] + (["--parse", script] if script else [])
+                   + ["CLOCK.PRG"], cwd=work, stdin=subprocess.DEVNULL,
+                   stdout=open(out, "wb"), stderr=subprocess.STDOUT, timeout=600)
+    return open(out, errors="replace").read()
+
+
+def clock_profile(rate, symbols):
+    """The stub's Timer C handler over one run at `rate`, read by Hatari's
+    profiler: the ticks, the rows among them, the cycles of the handler's
+    instructions, and those of the routine around the play call. The
+    profile lists from an address, so a first run reads where the
+    program loads; the debugger is entered once, at a VBL past the boot,
+    and lists the profile from the routine on."""
+    work = tempfile.mkdtemp(prefix="ymxr68")
+    sndh_at = clock_program(work, rate)
+    said = re.search(r"YMXR at \$([0-9A-F]{8})", clock_run(work, 400))
+    assert said, "the program printed no address"
+    stub = int(said.group(1), 16) - (sndh_at - 28)
+    lists = os.path.join(work, "lists.txt")
+    open(lists, "w").write("profile addresses $%x\ncont\n" % (stub + symbols["tick"]))
+    script = os.path.join(work, "profile.txt")
+    open(script, "w").write("profile on\nb VBL > %d :once :quiet :file %s\n"
+                            % (CLOCK_VBLS - 20, lists))
+    runs, cycles = {}, {}
+    for m in PROFILED.finditer(clock_run(work, CLOCK_VBLS, script)):
+        runs[int(m.group(1), 16)] = int(m.group(2))
+        cycles[int(m.group(1), 16)] = int(m.group(3))
+
+    def spent(first, last):
+        return sum(c for at, c in cycles.items()
+                   if stub + symbols[first] <= at < stub + symbols[last])
+
+    ticks = runs.get(stub + symbols["timer_c"], 0)
+    rows = runs.get(stub + symbols["tick"], 0)
+    assert ticks > 1000 and rows > 200, \
+        "the profile at %d Hz read %d ticks and %d rows" % (rate, ticks, rows)
+    return ticks, rows, spent("timer_c", "clear"), spent("tick", "timer_c")
+
+
+def clock():
+    """performance.md's figures of the program's clock against Hatari's
+    profiler (-clock). The same tune at 50 Hz and at 60 Hz lands a row
+    every third tick and every fourth; the handler's cycles over a run are
+    a tick without a row times the ticks without one, and a tick with a
+    row times the rows, so the two runs give the two figures, and the
+    routine around the play call runs once a row. A figure reads within
+    a cycle of the section's: the rte varies with what it returns into,
+    and so with the operating system under the program."""
+    code, symbols = assemble("YMXR_prg.S")
+    got = {rate: clock_profile(rate, symbols) for rate in (50, 60)}
+    (t5, r5, c5, w5), (t6, r6, c6, w6) = got[50], got[60]
+    across = (t5 - r5) * r6 - (t6 - r6) * r5
+    plain = (c5 * r6 - c6 * r5) / float(across)
+    row = ((t5 - r5) * c6 - (t6 - r6) * c5) / float(across)
+    around = (w5 + w6) / float(r5 + r6)
+    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
+    m = re.search(r"a tick that plays no row runs (\d+) cycles of the handler on average,"
+                  r" its `rte` among them, and one that plays a row runs (\d+) of the"
+                  r" handler and (\d+) of the routine around the play call", said)
+    assert m, "performance.md has no figures of the program's clock"
+    for what, reads, counted in (("a tick without a row", m.group(1), plain),
+                                 ("a tick with a row", m.group(2), row),
+                                 ("the routine around the play call", m.group(3), around)):
+        assert abs(int(reads) - counted) < 1, \
+            "performance.md reads %s cycles for %s, and the profiler counts %.2f" % (
+                reads, what, counted)
+    return ("the program's clock over %d ticks at 50 Hz and %d at 60 Hz: a tick without a"
+            " row %.2f cycles of the handler, with a row %.2f and %.2f around the play"
+            " call, as performance.md reads" % (t5, t6, plain, row, around))
+
+
 def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
     trace records, checked against the model, and the ticks counted. code
@@ -2281,6 +2392,9 @@ def core(defines, ym):
 
 
 def main():
+    if "-clock" in sys.argv:
+        print(clock())
+        return
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     count = "-cycles" in sys.argv
     parts = "-refill" in sys.argv

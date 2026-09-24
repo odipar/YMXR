@@ -507,6 +507,52 @@ final class ConsistencyTest {
     }
 
     /**
+     * The program's clock in performance.md against itself: the three
+     * figures Hatari's profiler reads, the 44 cycles of the interrupt's
+     * entry on top of them, and every sum, percentage and difference of
+     * the section read against those. {@code test_ymxr.py -clock} reads
+     * the three figures against Hatari; this reads what the section
+     * builds on them.
+     */
+    @Test
+    void theClockCostsAreTheSumsTheSectionReports() throws IOException {
+        String perf = read(PERF);
+        String section = perf.substring(perf.indexOf("## The program's clock"),
+                perf.indexOf("## Against YMX"));
+        Matcher three = wrapped("runs (\\d+) cycles of the handler on average, its `rte` among"
+                + " them, and one that plays a row runs (\\d+) of the handler and (\\d+) of"
+                + " the routine").matcher(section);
+        assertTrue(three.find(), "performance.md has no figures of the program's clock");
+        Matcher entry = wrapped("the (\\d+) cycles of the interrupt's entry come on top:"
+                + " (\\d+) a tick without a row and (\\d+) with one").matcher(section);
+        assertTrue(entry.find(), "performance.md adds no entry to the clock's ticks");
+        long without = number(three.group(1)) + number(entry.group(1));
+        long with = number(three.group(2)) + number(three.group(3)) + number(entry.group(1));
+        assertEquals(without, number(entry.group(2)), "a tick without a row");
+        assertEquals(with, number(entry.group(3)), "a tick with a row");
+        Matcher sum = wrapped("(\\d+) x (\\d+) \\+ (\\d+) x (\\d+) = ([\\d,]+)"
+                + "(?: cycles a second)?, (\\d+\\.\\d+) per cent").matcher(section);
+        List<Long> totals = new ArrayList<>();
+        while (sum.find()) {
+            String said = sum.group();
+            assertEquals(without, number(sum.group(2)), said);
+            assertEquals(with, number(sum.group(4)), said);
+            long total = number(sum.group(1)) * without + number(sum.group(3)) * with;
+            assertEquals(total, number(sum.group(5)), said);
+            double percent = Math.round(total * 10000.0 / 8021247) / 100.0;
+            assertEquals(percent, Double.parseDouble(sum.group(6)), said);
+            totals.add(total);
+        }
+        assertEquals(4, totals.size(), "the section's four clocks: " + totals);
+        Matcher unrun = wrapped("unrun, ([\\d,]+) cycles").matcher(section);
+        assertTrue(unrun.find(), "performance.md has no saving of the 50 Hz clock");
+        assertEquals(totals.get(1) - totals.get(0), number(unrun.group(1)), unrun.group());
+        Matcher spacing = wrapped("costs ([\\d,]+) cycles a second, and a rate").matcher(section);
+        assertTrue(spacing.find(), "performance.md has no cost of the even spacing");
+        assertEquals(totals.get(2) - totals.get(3), number(spacing.group(1)), spacing.group());
+    }
+
+    /**
      * plan.md's two opening ranges against performance.md's table. plan.md
      * records that every figure in it is against those, and no check read
      * the one document against the other: both ranges sat three commits
