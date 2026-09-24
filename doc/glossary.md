@@ -18,7 +18,7 @@ and this repository reads that table.
 | column | One field of a row, `W` bytes wide: one byte in a tune's table. | requirements.md R1.1 |
 | conformance kit | The tune files under `doc/conformance/tunes`, each with its table unpacked beside it and, in `MANIFEST.txt`, the size and the digest of the tune file, of the unpacked table and of the record a reader produces; a reader is tested against it. | README.md |
 | control column | Column 14 + 4i + 2 of effect i: bit 7 the set bit, bit 6 the timer's reset, bit 5 the place's reset, bit 4 the count column's 0 as a value, bits 2 to 0 the select. | SPEC.md 1.9 |
-| corpus | The 544 YM files YMX 0.8.3 was tested against, 543 of which read; the figures of experiments.md and performance.md are measured over it. | experiments.md |
+| corpus | The 544 YM files YMX 0.8.3 was tested against, all of which read from 0.4.13 on; the figures of experiments.md and performance.md are measured over it. | experiments.md |
 | count column | Column 14 + 4i + 3 of effect i: the timer count, the byte written to the timer's data register; 0 where the row leaves it unset, and bit 4 of the control column marks 0 as a value. | SPEC.md 1.9 |
 | DAC | The YM2149's ladder of output levels, close to logarithmic: 16 for a volume register, 32 for the envelope. | terminology.md, 1. The sound chip |
 | digidrum | A sample run on a voice's volume register: a source of many rows that plays once, at the rate of the recording. | terminology.md, 5. Effects |

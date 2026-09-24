@@ -814,11 +814,10 @@ runs them under TOS 2.06, which `TOS` names.
 
 ## 18. The measurements
 
-**18.1 `ym/convert.py corpus|pairs|envelope|frame`** converts the corpus
-and prints the figures of experiments.md;
-`ym/measure.py` prints those of SPEC.md 1.2 and 1.7. `JOBS` is the tunes
-converted at once, `DTX_WRITE` DTX's writer, `DTX_RING` the ring,
-and `DTX_COPIES` the copies flag.
+**18.1 `ym/convert.py corpus|envelope|frame`** converts the corpus and
+prints the figures of experiments.md; `ym/measure.py` prints those of
+SPEC.md 1.2 and 1.7. `JOBS` is the tunes converted at once, `DTX_WRITE`
+DTX's writer, `DTX_RING` the ring, and `DTX_COPIES` the copies flag.
 
 **18.2 `ym/cost.py trace.txt`** reads a Hatari trace of the background
 colour's writes, `--trace video_color`, from a program on a `-perf`

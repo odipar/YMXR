@@ -14,7 +14,19 @@ def payload(path, tmp):
     return open(os.path.join(tmp, files[0]), "rb").read()
 
 def regs(d):
-    """(nframes, get(reg, frame)) for a YM5!/YM6! dump, or None."""
+    """(nframes, get(reg, frame)) for a YM3!/YM3b/YM5!/YM6! dump, or None.
+
+    A YM3 dump is fourteen vectors of one register each after the four
+    bytes of the format, and under YM3b a long after them, the frame it
+    repeats to (the converter's reading, ymxs.md): R14 and R15, where a
+    YM5 dump files its effects' counts, read 0."""
+    if d[:4] in (b"YM3!", b"YM3b"):
+        rest = len(d) - 4 - (4 if d[:4] == b"YM3b" else 0)
+        if rest <= 0 or rest % 14:
+            return None
+        nf = rest // 14
+        block = d[4:4 + 14 * nf]
+        return nf, lambda r, f: block[r * nf + f] if r < 14 else 0
     if d[:4] not in (b"YM5!", b"YM6!") or d[4:12] != b"LeOnArD!":
         return None
     nf   = struct.unpack(">I", d[12:16])[0]

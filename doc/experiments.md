@@ -5,25 +5,26 @@ and what a frame costs.
 
 The corpus is the 544 YM files YMX 0.8.3 was tested against, all 544 of
 which read and play as the specification reads, measured by the rig over
-every one of them at 200 frames each. `capture.ym` is a YM3 dump, which
-the converter read as another format until 0.4.13 read the format
-(ymxs.md); the figures below were measured over the 543 that read before
-it. `YM_CORPUS` names the
-directory here. `ym/convert.py` runs everything below and reads the
-figures back; the percentages are sums and ratios of its rows. The DTX2
-files are written by DTX 0.4.0's `dtx-write`, built from that repository's
-`go/cmd/dtx-write`, from the columns as text, at the ring it defaults to,
-960 bytes: a streaming player decodes into a ring, and 960 bytes a stream
-is the ring in every `.ymx` file below.
+every one of them at 200 frames each. `capture.ym` is a YM3 dump, which the
+converter reads from 0.4.13 on (ymxs.md), and the figures below are measured
+over all 544, but for a section that names the release it was measured
+under. `YM_CORPUS` names the directory here, and its four directories named
+like a dump stand outside the corpus. `ym/convert.py corpus`, `envelope` and
+`frame` print the figures over the whole corpus below, and the percentages
+are sums and ratios of their rows. The DTX2 files are written by DTX 0.4.0's
+`dtx-write`, built from that repository's `go/cmd/dtx-write`, from the
+columns as text, at the ring it defaults to, 960 bytes: a streaming player
+decodes into a ring, and 960 bytes a stream is the ring in every `.ymx` file
+below.
 
 ---
 
 ## Everything fits
 
-Every readable tune converts whole: 411 YM5! files and 132 YM6!, whose
-effect slots encode differently. The fourteen sound registers cross one a
-column, and the two effect slots land in two of the schema's four
-effects.
+Every tune converts whole: 411 YM5! files, 132 YM6!, whose effect slots
+encode differently, and one YM3!, whose frames end at R13. The fourteen
+sound registers cross one a column, and the two effect slots land in two of
+the schema's four effects.
 
 Two ceilings the schema sets, against what the corpus requires of them. A
 source number is seven bits, so 127 sources, and the most any tune requires
@@ -49,27 +50,26 @@ each data set on a long.
 
 | | bytes | a frame | against raw |
 |---|---|---|---|
-| raw rows, 543 tunes, 3,789,212 frames | 113,676,360 | 30.00 | |
-| DTX2 files at `k` = 1 | 2,600,640 | 0.69 | 43.7x |
-| DTX2 files at `k` = 2 | 3,078,520 | 0.81 | 36.9x |
-| DTX2 files at `k` = 4 | 4,190,340 | 1.11 | 27.1x |
+| raw rows, 544 tunes, 3,790,133 frames | 113,703,990 | 30.00 | |
+| DTX2 files at `k` = 1 | 2,602,692 | 0.69 | 43.7x |
+| DTX2 files at `k` = 2 | 3,080,776 | 0.81 | 36.9x |
+| DTX2 files at `k` = 4 | 4,193,040 | 1.11 | 27.1x |
 
-`k` = 1 packs smallest, and it is the unit every `R` divides by (DTX,
-R5.6). At `k` = 2, 148 of the 543 tunes need one frame added to divide; at
-`k` = 4, 250 tunes need 508 frames between them, and the packing is worse
-besides. The converter packs at `k` = 2 (tools.md): `k` = 1 costs the
-play call about a seventh more on average (performance.md). A tune whose
-row count or repeat row is odd is padded until it packs at `k` = 2
-(SPEC.md 6, rule 6): rows that set no column at the repeat row, then a
-loop of fewer than 64 rows written again or rows that set no column at
-the end ("Where a padded tune's added frame lands" below); before that
-rule it packed at `k` = 1 instead.
+`k` = 1 packs smallest, and it is the unit every `R` divides by (DTX, R5.6).
+At `k` = 2, 149 of the 544 tunes need one frame added to divide; at `k` = 4,
+251 tunes need 511 frames between them, and the packing is worse besides.
+The converter packs at `k` = 2 (tools.md): `k` = 1 costs the play call about
+a seventh more on average (performance.md). A tune whose row count or repeat
+row is odd is padded until it packs at `k` = 2 (SPEC.md 6, rule 6): rows
+that set no column at the repeat row, then a loop of fewer than 64 rows
+written again or rows that set no column at the end ("Where a padded tune's
+added frame lands" below); before that rule it packed at `k` = 1 instead.
 
 At `k` = 1, the three tone periods, fine and coarse together, are 21.9%,
 18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen effect
 columns are 15.7%, and the envelope shape 1.4%. No corpus tune runs more
 than two effects at once, so columns 22 to 29 are zero throughout and pack
-to 20,284 bytes each: the floor a column costs, mostly the 28-byte ST4
+to 20,320 bytes each: the floor a column costs, mostly the 28-byte ST4
 header its data set opens with, one a tune.
 
 The gain over YMX, on the 42 tunes it ships with both files and their
@@ -191,13 +191,13 @@ is seven times that.
 ## The envelope period's reserved 0
 
 The period's two bytes fill their columns, so 0 marks the row that does not
-set one, and bits 6 and 5 of the shape keep a zero byte reachable (SPEC
-1.1, 1.7). The other way to keep it is a set bit for each byte, placed in
-the shape column, which then moves whenever a byte moves between set and
-unset (1.7). Packed both ways at the same ring and at `k` = 1, the three
-envelope columns cost 123,646 bytes as SPEC.md has them, and 131,622 under
-set bits in the shape column. The reservation saves 7,976 bytes, 0.3% of
-the 2,600,640 the corpus packs to at that unit.
+set one, and bits 6 and 5 of the shape keep a zero byte reachable (SPEC 1.1,
+1.7). The other way to keep it is a set bit for each byte, placed in the
+shape column, which then moves whenever a byte moves between set and unset
+(1.7). Packed both ways at the same ring and at `k` = 1, the three envelope
+columns cost 123,822 bytes as SPEC.md has them, and 131,814 under set bits
+in the shape column. The reservation saves 7,992 bytes, 0.3% of the
+2,602,692 the corpus packs to at that unit.
 
 The saving is smaller than the 27,362 of an earlier measurement. That one
 set the period as one column of two bytes against a plain column of four
@@ -255,15 +255,17 @@ image is no part of the trade, and the tables alone are.
 
 Rule 6 pads a loop of odd length by one frame a pass. Of the 543 dumps of
 the corpus, converted under 0.3.11, 161 are padded, and in 137 that frame
-lands inside the loop: thirteen loops are one row, an ending that
-sustains, which a row that sets no column leaves as it was; 121 are 95
-rows or more, where one frame is under one per cent of a pass; and three
-are short and move every row. Masterblazer 7 slides all three tones over
-7 rows, A Prehistoric Tale 6 runs a vibrato on voice B over 9, and
-Crapman game over an arpeggio over 17, which one frame a pass slows by
-14, 11 and 6 per cent. Played side by side under Hatari, each of the
-three with the frame and written again, neither version was heard as
-wrong: the difference is measured, not heard.
+lands inside the loop: thirteen loops are one row, an ending that sustains,
+which a row that sets no column leaves as it was; 121 are 95 rows or more,
+where one frame is under one per cent of a pass; and three are short and
+move every row. Masterblazer 7 slides all three tones over 7 rows, A
+Prehistoric Tale 6 runs a vibrato on voice B over 9, and Crapman game over
+an arpeggio over 17, which one frame a pass slows by 14, 11 and 6 per cent.
+Played side by side under Hatari, each of the three with the frame and
+written again, neither version was heard as wrong: the difference is
+measured, not heard. `capture.ym`, which reads from 0.4.13 on, is one more:
+its 921 rows repeat to row 0, so the frame lands inside a loop of 95 rows or
+more.
 
 A loop of fewer than 64 rows is written again all the same (SPEC.md 6,
 rule 6), since it keeps the period the dump had for a few bytes: the

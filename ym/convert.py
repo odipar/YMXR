@@ -42,13 +42,14 @@ COPIES = os.environ.get("DTX_COPIES", "")
 JOBS = int(os.environ.get("JOBS", str(os.cpu_count() or 1)))
 
 def load(path, tmp):
-    """(nf, get, ym6) for one corpus file, or None."""
+    """(nf, get, format) for one corpus file, or None: the format is the
+    dump's first four bytes."""
     d = M.payload(path, tmp)
     got = M.regs(d) if d else None
     if not got:
         return None
     nf, g = got
-    return nf, g, d[:4] == b"YM6!"
+    return nf, g, d[:4].decode("latin-1")
 
 def effect_slots(r, ym6):
     """The two YM effect slots of one frame: (kind, target, data, select,
@@ -249,8 +250,9 @@ def one(args):
         got = load(path, tmp)
         if not got:
             return None
-        nf, g, ym6 = got
-        out = {"name": os.path.basename(path), "nf": nf, "ym6": ym6}
+        nf, g, format = got
+        ym6 = format == "YM6!"
+        out = {"name": os.path.basename(path), "nf": nf, "format": format}
         if mode == "corpus":
             cols, out["sources"], out["kinds"] = rows(nf, g, ym6)
             out["files"] = {}
@@ -277,8 +279,11 @@ def each(paths, mode):
                 yield got
 
 def corpus():
+    """The corpus's dumps. A dump is a file: the corpus has directories
+    named like one, and 7z extracts a dump out of one of them."""
     return [os.path.join(M.CORPUS, f) for f in sorted(os.listdir(M.CORPUS))
-            if f.lower().endswith(".ym")]
+            if f.lower().endswith(".ym")
+            and os.path.isfile(os.path.join(M.CORPUS, f))]
 
 def table(rows, frames, raw=None):
     """A packing table's rows: label, bytes, a frame, and the ratio against
@@ -300,10 +305,10 @@ def main():
         # which kinds a tune's effects name, a tune counted once a kind
         kinds = {k: 0 for k in (1, 2, 3, 4)}
         named = 0
-        ym5 = ym6 = 0
+        formats = collections.Counter()
         for got in each(corpus(), "corpus"):
             n += 1; frames += got["nf"]
-            ym6 += got["ym6"]; ym5 += not got["ym6"]
+            formats[got["format"][:3]] += 1
             sources.append(got["sources"])
             named += bool(got["kinds"])
             for k in got["kinds"]:
@@ -316,7 +321,8 @@ def main():
                     for c in range(C):
                         per[c] += spans[c]
         raw = C * frames
-        print(f"{n} tunes, {ym5} YM5! and {ym6} YM6!, {frames:,} frames,"
+        print(f"{n} tunes, {formats['YM3']} YM3!/YM3b, {formats['YM5']} YM5!"
+              f" and {formats['YM6']} YM6!, {frames:,} frames,"
               f" ring {RING}, {C} columns of one byte")
         print(f"  raw rows                           {raw:>12,}"
               f"   {C:5.2f}")
