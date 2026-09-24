@@ -277,8 +277,11 @@ def each(paths, mode):
                 yield got
 
 def corpus():
+    """The corpus's dumps. A dump is a file: the corpus has directories
+    named like one, and 7z extracts a dump out of one of them."""
     return [os.path.join(M.CORPUS, f) for f in sorted(os.listdir(M.CORPUS))
-            if f.lower().endswith(".ym")]
+            if f.lower().endswith(".ym")
+            and os.path.isfile(os.path.join(M.CORPUS, f))]
 
 def table(rows, frames, raw=None):
     """A packing table's rows: label, bytes, a frame, and the ratio against
