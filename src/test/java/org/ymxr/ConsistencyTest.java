@@ -507,6 +507,63 @@ final class ConsistencyTest {
     }
 
     /**
+     * The program's clock in performance.md against itself: the handler's
+     * cycles a tick at 50 Hz and at 60 Hz, the routine around the play call,
+     * and the 44 cycles of the interrupt's entry, and the section's sums,
+     * percentages and rounded savings read against those.
+     * {@code test_ymxr.py -clock} reads the three figures against Hatari;
+     * this reads what the section builds on them.
+     */
+    @Test
+    void theClockCostsAreTheSumsTheSectionReports() throws IOException {
+        String perf = read(PERF);
+        String section = perf.substring(perf.indexOf("## The program's clock"),
+                perf.indexOf("## Against YMX"));
+        Matcher ticks = wrapped("the handler runs (\\d+) cycles a tick on average, its `rte`"
+                + " among them, and at 60 Hz, a row every fourth, (\\d+)\\.").matcher(section);
+        assertTrue(ticks.find(), "performance.md has no ticks of the program's clock");
+        Matcher around = wrapped("runs (\\d+) cycles a row, the call apart").matcher(section);
+        assertTrue(around.find(), "performance.md has no routine around the play call");
+        Matcher entry = wrapped("the (\\d+) cycles of the interrupt's entry come on top")
+                .matcher(section);
+        assertTrue(entry.find(), "performance.md adds no entry to the clock's ticks");
+        long enter = number(entry.group(1));
+        long row = number(around.group(1));
+        long[] tick = {number(ticks.group(1)) + enter, number(ticks.group(2)) + enter};
+        long[] per = {150, 240};
+        long[] rows = {50, 60};
+        Matcher sum = wrapped("(\\d+) x (\\d+) \\+ (\\d+) x (\\d+) = ([\\d,]+)"
+                + " cycles a second, (\\d+\\.\\d+) per cent").matcher(section);
+        int read = 0;
+        while (sum.find()) {
+            String said = sum.group();
+            assertTrue(read < 2, "the section has more sums than its two rates: " + said);
+            assertEquals(per[read], number(sum.group(1)), said);
+            assertEquals(tick[read], number(sum.group(2)), said);
+            assertEquals(rows[read], number(sum.group(3)), said);
+            assertEquals(row, number(sum.group(4)), said);
+            long total = per[read] * tick[read] + rows[read] * row;
+            assertEquals(total, number(sum.group(5)), said);
+            assertEquals(Math.round(total * 10000.0 / 8021247) / 100.0,
+                    Double.parseDouble(sum.group(6)), said);
+            read++;
+        }
+        assertEquals(2, read, "the section's sums of its two rates");
+        Matcher plain = wrapped("a tick without a row at (\\d+) or (\\d+) cycles of the"
+                + " handler").matcher(section);
+        assertTrue(plain.find(), "performance.md has no tick without a row");
+        double mid = (number(plain.group(1)) + number(plain.group(2))) / 2.0 + enter;
+        Matcher saved = wrapped("ran 50 such ticks a second more for a 50 Hz tune, about"
+                + " ([\\d,]+) cycles").matcher(section);
+        assertTrue(saved.find(), "performance.md has no saving of the 50 Hz clock");
+        assertEquals(Math.round(50 * mid / 100.0) * 100, number(saved.group(1)), saved.group());
+        Matcher spacing = wrapped("\\(4\\.10\\), about ([\\d,]+) cycles").matcher(section);
+        assertTrue(spacing.find(), "performance.md has no cost of the even spacing");
+        assertEquals(Math.round(40 * mid / 100.0) * 100, number(spacing.group(1)),
+                spacing.group());
+    }
+
+    /**
      * plan.md's two opening ranges against performance.md's table. plan.md
      * records that every figure in it is against those, and no check read
      * the one document against the other: both ranges sat three commits

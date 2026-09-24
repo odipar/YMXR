@@ -781,6 +781,7 @@ run continues.
 | `-refill` | `-cycles` and the advance's parts off one pass: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the eleven fixtures reads the claims over the set; a run of other tunes reads each tune alone |
 | `-hatari` | each tune, at 50 Hz alone, through `ymxr-sndh -vbl` and `ymxr-prg` with 2,000 rows, run under Hatari, the trace of every chip write cut into frames at the VBL and read against the model; `-vbl` names the VBL as the clock the program plays from (BINARIES.md 4.3), which the frames are cut at; a run that names no tune plays the conformance kit's `voices` after the fixtures, since no dump converts to a target of several registers |
 | `-stub` | each tune, at 50 Hz alone, through `ymxr-sndh` and then `ymxr-prg` twice, 600 rows each: one program playing from Timer C, which the file's clock tag names, and one from the VBL, which `-vbl` names. Both run under Hatari, and the writes the frame procedure makes are one stream in one order under either clock, over the same frames but for the phase of the first row and the last. A tick's writes are counted apart: an effect's handler writes the chip from its timer, which the two clocks interleave among the rows differently. Then the same tune at 60 Hz, a rate no multiple of the operating system's clock: the tool arms 240 ticks a second (BINARIES.md 4.10), and the gaps between the in-service bit the stub's handler clears read that period on Hatari's MFP, 4.167 ms, against the 5 ms of the 200 Hz clock |
+| `-clock` | the stub's Timer C handler under Hatari's profiler: `Circus Attractions 2` in a program at 50 Hz and at 60 Hz, a row every third tick and every fourth, 1,000 VBLs each; each run measures the handler's cycles a tick and the routine around the play call's a row, which performance.md's section on the program's clock reads within a cycle, and the two runs together solve for a tick without a row, which it reads as one of two figures |
 | `-perf` | the player assembled with the raster monitor, against the model |
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
@@ -805,8 +806,8 @@ core; the conformance kit at `-frames24` under `-kit`; and `-refill` over
 `Turrican 2 - world completed 1` whole, which reads the tune's row of
 performance.md and a refill of a tune with a source. The workflow runs
 `-refill` over the eleven fixtures whole as a step after the suite, which
-reads the sentences over the set. The workflow then runs `-stub` and
-`-hatari` under Hatari 2.6.1, built from its tag, and the PAL image of
+reads the sentences over the set. The workflow then runs `-stub`, `-hatari`
+and `-clock` under Hatari 2.6.1, built from its tag, and the PAL image of
 EmuTOS 1.4, which boots the ST at the 50 Hz the two modes require; a caller
 runs them under TOS 2.06, which `TOS` names.
 
@@ -866,9 +867,10 @@ and YMXS `0.4.7` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
 so that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
-whole, which reads performance.md's sentences over the set, and then `-stub`
-and `-hatari` under Hatari and EmuTOS (17). No push starts it: a caller
-starts it from the Actions tab or by `gh workflow run test.yml`.
+whole, which reads performance.md's sentences over the set, and then
+`-stub`, `-hatari` and `-clock` under Hatari and EmuTOS (17). No push starts
+it: a caller starts it from the Actions tab or by `gh workflow run
+test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images

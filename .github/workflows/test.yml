@@ -110,3 +110,4 @@ jobs:
         run: |
           python3 68k/test/emu/test_ymxr.py -stub
           python3 68k/test/emu/test_ymxr.py -hatari
+          python3 68k/test/emu/test_ymxr.py -clock
