@@ -1831,7 +1831,7 @@ def evenness(ym, work, code, symbols):
 # past the operating system's boot, a few thousand ticks.
 CLOCK_TUNE = os.path.join(ROOT, "ym", "test", "Circus Attractions  2.ym")
 CLOCK_VBLS = 1000
-PROFILED = re.compile(r"^([0-9a-f]{8}) .*?\s[\d.]+% \((\d+), (\d+), ", re.M)
+PROFILED = re.compile(r"^([0-9a-f]{8}) (.*?)\s[\d.]+% \((\d+), (\d+), ", re.M)
 
 
 def clock_program(work, rate):
@@ -1876,31 +1876,37 @@ def clock_profile(rate, symbols):
     instructions, and those of the routine around the play call. The
     profile lists from an address, so a first run reads where the
     program loads; the debugger is entered once, at a VBL past the boot,
-    and lists the profile from the routine on."""
+    and lists the profile from each routine. A listing ends at a page,
+    and Hatari's page is shorter on some hosts, so each routine is
+    listed from its first instruction and read to its last: the rts of
+    the routine and the rte of the handler."""
     work = tempfile.mkdtemp(prefix="ymxr68")
     sndh_at = clock_program(work, rate)
     said = re.search(r"YMXR at \$([0-9A-F]{8})", clock_run(work, 400))
     assert said, "the program printed no address"
     stub = int(said.group(1), 16) - (sndh_at - 28)
     lists = os.path.join(work, "lists.txt")
-    open(lists, "w").write("profile addresses $%x\ncont\n" % (stub + symbols["tick"]))
+    open(lists, "w").write("profile addresses $%x\nprofile addresses $%x\ncont\n"
+                           % (stub + symbols["tick"], stub + symbols["timer_c"]))
     script = os.path.join(work, "profile.txt")
     open(script, "w").write("profile on\nb VBL > %d :once :quiet :file %s\n"
                             % (CLOCK_VBLS - 20, lists))
-    runs, cycles = {}, {}
+    runs, cycles, said = {}, {}, {}
     for m in PROFILED.finditer(clock_run(work, CLOCK_VBLS, script)):
-        runs[int(m.group(1), 16)] = int(m.group(2))
-        cycles[int(m.group(1), 16)] = int(m.group(3))
+        at = int(m.group(1), 16)
+        said[at], runs[at], cycles[at] = m.group(2), int(m.group(3)), int(m.group(4))
 
-    def spent(first, last):
-        return sum(c for at, c in cycles.items()
-                   if stub + symbols[first] <= at < stub + symbols[last])
+    def spent(first, last, ends):
+        inside = [at for at in cycles if stub + symbols[first] <= at < stub + symbols[last]]
+        assert any(re.search(r"\b%s\b" % ends, said[at]) for at in inside), \
+            "the profile of %s at %d Hz stops before its %s" % (first, rate, ends)
+        return sum(cycles[at] for at in inside)
 
     ticks = runs.get(stub + symbols["timer_c"], 0)
     rows = runs.get(stub + symbols["tick"], 0)
     assert ticks > 1000 and rows > 200, \
         "the profile at %d Hz read %d ticks and %d rows" % (rate, ticks, rows)
-    return ticks, rows, spent("timer_c", "clear"), spent("tick", "timer_c")
+    return ticks, rows, spent("timer_c", "clear", "rte"), spent("tick", "timer_c", "rts")
 
 
 def clock():
