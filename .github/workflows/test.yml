@@ -73,3 +73,40 @@ jobs:
       # of them, a few minutes the suite leaves to this step.
       - name: performance.md over the whole set
         run: python3 68k/test/emu/test_ymxr.py -refill
+      # -stub and -hatari play the tunes on a real MFP, under Hatari. Its
+      # version is pinned, built from its tag and kept between runs: the rig
+      # reads Hatari's trace, whose lines 2.4.1, the version Ubuntu carries,
+      # writes another way. TOS 2.06, the image a caller runs them under,
+      # is Atari's; EmuTOS is free, and its PAL image boots the ST at the
+      # 50 Hz the two modes require.
+      - uses: actions/cache@v4
+        with:
+          path: /opt/hatari
+          key: hatari-2.6.1-${{ runner.os }}
+      - name: Hatari 2.6.1 and EmuTOS 1.4
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libsdl2-2.0-0
+          if [ ! -x /opt/hatari/bin/hatari ]; then
+              sudo apt-get install -y -q cmake libsdl2-dev zlib1g-dev
+              git clone -q --depth 1 --branch v2.6.1 https://github.com/hatari/hatari /tmp/hatari
+              cmake -S /tmp/hatari -B /tmp/hatari/build -DCMAKE_BUILD_TYPE=Release > /dev/null
+              cmake --build /tmp/hatari/build -j4 --target hatari > /dev/null
+              sudo mkdir -p /opt/hatari/bin
+              sudo cp /tmp/hatari/build/src/hatari /opt/hatari/bin/
+          fi
+          /opt/hatari/bin/hatari --version | head -2
+          echo "HATARI=/opt/hatari/bin/hatari" >> "$GITHUB_ENV"
+          curl -fsSL -o /tmp/emutos.zip \
+            https://downloads.sourceforge.net/project/emutos/emutos/1.4/emutos-192k-1.4.zip
+          echo "59abac06a2d29b0864c5a7cfb2af65f022c337aed34188e174a9a08cc737e4bc  /tmp/emutos.zip" \
+            | sha256sum -c
+          unzip -o -q /tmp/emutos.zip -d /tmp/emutos
+          echo "TOS=/tmp/emutos/emutos-192k-1.4/etos192uk.img" >> "$GITHUB_ENV"
+      - name: the tunes on Hatari's MFP
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          python3 68k/test/emu/test_ymxr.py -stub
+          python3 68k/test/emu/test_ymxr.py -hatari

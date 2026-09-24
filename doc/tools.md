@@ -805,8 +805,10 @@ core; the conformance kit at `-frames24` under `-kit`; and `-refill` over
 `Turrican 2 - world completed 1` whole, which reads the tune's row of
 performance.md and a refill of a tune with a source. The workflow runs
 `-refill` over the eleven fixtures whole as a step after the suite, which
-reads the sentences over the set. `-hatari` and `-stub` need Hatari and a
-TOS image, and run by hand.
+reads the sentences over the set. The workflow then runs `-stub` and
+`-hatari` under Hatari 2.6.1, built from its tag, and the PAL image of
+EmuTOS 1.4, which boots the ST at the 50 Hz the two modes require; a caller
+runs them under TOS 2.06, which `TOS` names.
 
 ---
 
@@ -864,10 +866,10 @@ needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.11.11`
 and YMXS `0.4.7` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
-so that no check skips, and then `test_ymxr.py -refill` over the eleven
-fixtures whole, which reads performance.md's sentences over the set (17). No
-push starts it: a caller starts it from the Actions tab or by `gh workflow
-run test.yml`.
+so that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
+whole, which reads performance.md's sentences over the set, and then `-stub`
+and `-hatari` under Hatari and EmuTOS (17). No push starts it: a caller
+starts it from the Actions tab or by `gh workflow run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images
