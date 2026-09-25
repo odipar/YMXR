@@ -183,7 +183,12 @@ Hatari. So the two players were read by one method, on the same dumps, each
 over a `VBLS=2300` run: 2,019 calls of YMX and 2,020 of YMXR. YMX is a
 design document now, and its rows stand in this document alone, measured on
 the player of its 0.10.1 release; YMXR's are this release's, `ym/cost.sh`
-over the two tunes, which `test_ymxr.py -cost` measures again.
+over the two tunes under TOS 2.06. `test_ymxr.py -cost` measures them again
+over the first 2,020 calls, under the operating system `TOS` names: a tick's
+entry and `rte` fall inside a call or outside it by where the tick lands,
+and where it lands moves with the operating system and the build of Hatari,
+so an average there reads within 2 cycles of the table and a single call
+within 64.
 
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|

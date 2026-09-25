@@ -2007,6 +2007,7 @@ COST_TUNES = ("Synergy Credits", "Turrican - world 4-3")
 FIRST_TUNE = "DBA 2"
 
 
+
 def cost_program(file, work, name, flags):
     """A tune file in COST.PRG, as ym/cost.sh builds it: bin/ymxr-sndh with
     the flags named, then bin/ymxr-prg."""
@@ -2034,9 +2035,12 @@ def cost_run(work, vbls, kinds):
     return r.stdout.decode(errors="replace"), os.path.join(work, "trace.txt")
 
 
-def calls(ym, vbls, unit=None):
-    """The play calls of a raster monitor run (ym/cost.py): the calls
-    counted, on average, at the 99th in a hundred and at most."""
+def calls(ym, vbls, first, unit=None):
+    """The first `first` play calls of a raster monitor run (ym/cost.py):
+    the calls the run made, and those first calls on average, at the 99th
+    in a hundred and at most. An operating system that boots sooner starts
+    the tune sooner and fits more calls into the run, so the figures are
+    of the first calls and not of the run."""
     sys.path.insert(0, os.path.join(ROOT, "ym"))
     import cost as raster
     work = tempfile.mkdtemp(prefix="ymxr68")
@@ -2047,10 +2051,11 @@ def calls(ym, vbls, unit=None):
     cost_program(r.stdout, work, os.path.basename(ym)[:-3], ["-perf"])
     _, trace = cost_run(work, vbls, "video_color")
     work_cycles, _, _ = raster.spans(raster.read(trace))
-    assert work_cycles, "the run of %s has no call" % os.path.basename(ym)
-    work_cycles.sort()
-    n = len(work_cycles)
-    return n, int(sum(work_cycles) / n), work_cycles[int(n * 0.99)], work_cycles[-1]
+    made = len(work_cycles)
+    assert made >= first, "the run of %s makes %d calls, not %d" % (
+        os.path.basename(ym), made, first)
+    work_cycles = sorted(work_cycles[:first])
+    return made, int(sum(work_cycles) / first), work_cycles[int(first * 0.99)], work_cycles[-1]
 
 
 def first_writes(ym, frames):
@@ -2087,11 +2092,14 @@ def first_writes(ym, frames):
 def monitor_runs():
     """performance.md's figures of a raster monitor run against Hatari
     (-cost): the two tunes of the section against YMX, each over the run
-    the section names, their calls counted, on average, at the 99th in a
-    hundred and at most against the table's YMXR rows; Synergy Credits
-    packed at unit 1 over a run of the same length against its figure at
-    most; and on DBA 2, the least cycles from the VBL to the frame
-    procedure's first chip write, against the raster monitor's paragraph."""
+    the section names, their first calls, as many as the section counts,
+    on average, at the 99th in a hundred and at most against the table's
+    YMXR rows; Synergy Credits packed at unit 1 over a run of the same
+    length against its figure at most; and on DBA 2, the least cycles from
+    the VBL to the frame procedure's first chip write, against the raster
+    monitor's paragraph. A run reads the table within the bounds the
+    section names, since a tick's entry and rte fall inside a call or
+    outside it by where the tick lands."""
     text = open(os.path.join(ROOT, "doc", "performance.md")).read()
     said = " ".join(text.split())
     run = re.search(r"each over a `VBLS=(\d+)` run: ([\d,]+) calls of YMX and ([\d,]+) of YMXR", said)
@@ -2100,22 +2108,33 @@ def monitor_runs():
     first = re.search(r"these are the first ([\d,]+) calls", said)
     assert first and int(first.group(1).replace(",", "")) == counted, \
         "performance.md counts YMXR's calls two ways"
+    # How near a run under another operating system, or another build of
+    # Hatari, reads the table, measured under TOS 2.06: a single call within
+    # a tick's entry and rte, which fall inside a call or outside it by
+    # where the tick lands, and an average within the figure the section
+    # names.
+    near_by = re.search(r"an average there reads within (\d+) cycles of the table and a single"
+                        r" call within (\d+)", said)
+    assert near_by, "performance.md names no bound on a run of another machine"
+    average_within, call_within = int(near_by.group(1)), int(near_by.group(2))
+    assert call_within == ENTRY, "performance.md bounds a call by %d, and a tick's entry and" \
+        " rte are %d" % (call_within, ENTRY)
     stale, read = [], []
     for tune in COST_TUNES:
         row = re.search(r"^\| %s \| YMXR \| (\d+) \| (\d+) \| (\d+) \|$" % re.escape(tune), text, re.M)
         assert row, "performance.md's table has no YMXR row for " + tune
-        n, average, near, most = calls(os.path.join(ROOT, "ym", "test", tune + ".ym"), vbls)
-        if n != counted:
-            stale.append("the run of %s plays %d calls, and performance.md reads %d" % (tune, n, counted))
-        if (average, near, most) != tuple(int(x) for x in row.groups()):
+        made, average, near, most = calls(os.path.join(ROOT, "ym", "test", tune + ".ym"), vbls, counted)
+        said_row = tuple(int(x) for x in row.groups())
+        if not (abs(average - said_row[0]) <= average_within and abs(near - said_row[1]) <= call_within
+                and abs(most - said_row[2]) <= call_within):
             stale.append("performance.md reads %s for %s, and the run measures %s" % (
                 "/".join(row.groups()), tune, "/".join(str(x) for x in (average, near, most))))
-        read.append("%s %d/%d/%d over %d calls" % (tune, average, near, most, n))
+        read.append("%s %d/%d/%d over the first %d of %d calls" % (tune, average, near, most, counted, made))
     unit = re.search(r"packed at unit 1, the refill was thirty units, and a run of the same length"
                      r" reads ([\d,]+) at most", said)
     assert unit, "performance.md has no run of Synergy Credits at unit 1"
-    _, _, _, most = calls(os.path.join(ROOT, "ym", "test", "Synergy Credits.ym"), vbls, unit=1)
-    if most != int(unit.group(1).replace(",", "")):
+    _, _, _, most = calls(os.path.join(ROOT, "ym", "test", "Synergy Credits.ym"), vbls, counted, unit=1)
+    if abs(most - int(unit.group(1).replace(",", ""))) > call_within:
         stale.append("performance.md reads %s at most for Synergy Credits at unit 1, and the run"
                      " measures %d" % (unit.group(1), most))
     read.append("Synergy Credits at unit 1 %d at most" % most)
