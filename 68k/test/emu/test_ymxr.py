@@ -1364,7 +1364,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         if cycles and cycles.regions:
             steps.append((cycles.spent["effects"] - spent_before["effects"],
                           cycles.spent["registers"] - spent_before["registers"],
-                          any(model.fx[i]["touched"] for i in range(4))))
+                          any(model.fx[i]["touched"] for i in range(4)), model.playing))
         assert masked(m.psg) == masked(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
             assert entries[f] == entry(model, want), "frame %d: the reader reports %s, the player %s" % (
@@ -2841,6 +2841,7 @@ def main():
     costs = dense(cycles_of, code, symbols) if cycles_of and not perf else None
     savings = {}                        # dense columns' saving by tune, and its effects
     general = {}                        # every tick's cost the fixtures counted, by kind
+    walker = None                       # the register steps walked, once a count runs
     stale = []
     wrong = []
     measured = {}                       # the refill parts by tune, with -refill
@@ -2887,6 +2888,15 @@ def main():
                 # here counts: 44 and 20 from the manual, the 64 that
                 # separates performance.md's 96 from its 160.
                 ticked = int(round((tick_cycles + ENTRY * ticks) / float(frames)))
+                if costs and where[4] and PCREL and not LEAN:
+                    # the walk of the frame procedure, frame by frame, is the rig's count
+                    walker = walker or FrameWalk(cycles_of, code, symbols)
+                    for f, (_, counted, _, row) in enumerate(where[4]):
+                        if walker.registers(row) != counted:
+                            stale.append("%s frame %d: the walk of the register steps reads %d,"
+                                         " and the rig counts %d" % (os.path.basename(ym), f,
+                                                                     walker.registers(row), counted))
+                            break
                 if costs and where[4]:
                     savings[os.path.basename(ym)[:-3].replace("  ", " ")] = (
                         saving(where[4], where[5], costs), bin(where[5]).count("1"))
@@ -2995,6 +3005,9 @@ def main():
         # a run over the eleven fixtures reads the section on a counted
         # tick of two columns against the kit's tunes of that shape
         stale += counted_read(code, symbols, cycles_of, general)
+    if costs and not args and wide is None and not kit and PCREL and not LEAN:
+        # plan.md's shares, gates and parts over the eleven fixtures
+        stale += plan_read(walker or FrameWalk(cycles_of, code, symbols), tunes, measured)
     if savings and not args and wide is None and not kit and PCREL and not LEAN:
         # a run over the eleven fixtures reads the section against YMX's
         # dense columns as the rig counts them
@@ -3063,6 +3076,274 @@ def dense(module, code, symbols):
             "then": counted(module, select, False) + counted(module, test, True)}
 
 
+class FrameWalk:
+    """The frame procedure's register steps, 4 to 8, walked for a row
+    through the player's instructions and counted with DTX's table as
+    the rig counts the player: each macro's branches go as its tests read
+    the row's bytes. A run over the fixtures reads the walk against the
+    rig's count of every frame, so the walk of a row the player never
+    plays, a gate's path, counts what the player would."""
+
+    def __init__(self, module, code, symbols):
+        self.module, self.code, self.at = module, code, symbols
+
+    def walk(self, start, stop, decide, code=None):
+        """The cycles from start to stop, the n-th conditional branch jumping
+        where decide(n) is true and bra always."""
+        code = self.code if code is None else code
+        at, total, n = start, 0, 0
+        while at != stop:
+            words = struct.unpack(">5H", (code[at:at + 10] + bytes(10))[:10])
+            op = words[0]
+            after = None
+            if op >> 12 == 6:
+                disp = op & 0xFF
+                size = 2 if disp else 4
+                target = at + 2 + ((disp ^ 0x80) - 0x80 if disp else (words[1] ^ 0x8000) - 0x8000)
+                jump = True if op >> 8 & 0xF == 0 else decide(n)
+                if op >> 8 & 0xF:
+                    n += 1
+                after = target if jump else at + size
+            cycles, size = self.module.cycles_of(words, 0, None, at, after, None)
+            total += cycles
+            at = after if after is not None else at + 2 * size
+            assert 0 <= at <= len(code) and total < 5000, "the walk left the code at %x" % at
+        return total
+
+    def tones(self, r):
+        """Step 4: the three pairs, TONE fine,coarse."""
+        total = 0
+        for fine, coarse, stop in ((0, 1, "c_3"), (2, 3, "c_5"), (4, 5, "c_6")):
+            f, c = r[fine], r[coarse]
+            if f != 0:
+                went = [True, not c & 0x80]
+            elif c == 0:
+                went = [False, True]
+            else:
+                went = [False, False, not c & 0x40, not c & 0x80]
+            total += self.walk(self.at["c_%d" % coarse], self.at[stop], lambda n, w=went: w[n])
+        return total
+
+    def volumes(self, r):
+        """Step 6's three columns on the path the row runs: WRITE after a
+        column 13 other than 0, RWRITE in the copy after one of 0."""
+        kind = "r" if r[13] == 0 else "c"
+        return sum(self.walk(self.at["%s_%d" % (kind, v)], self.at["%s_%d" % (kind, stop)],
+                             lambda n, v=v: not r[v] & 0x80)
+                   for v, stop in ((8, 9), (9, 10), (10, 7)))
+
+    def registers(self, r):
+        """Steps 4 to 8 of the row, ymxr_regs to ymxr_played."""
+        at = self.at
+        total = self.tones(r) + self.walk(at["c_6"], at["c_13"], lambda n: not r[6] & 0x80)
+        if r[13] == 0:
+            total += self.walk(at["c_13"], at["q_11"], lambda n: True)
+            total += self.walk(at["q_11"], at["q_12"], lambda n: r[11] == 0)
+            total += self.walk(at["q_12"], at["r_8"], lambda n: r[12] == 0)
+            total += self.volumes(r)
+            return total + self.walk(at["r_7"], at["ymxr_played"], lambda n: not r[7] & 0x80)
+        total += self.walk(at["c_13"], at["c_11"], lambda n: False)
+        for column, bit, stop in ((11, 6, "c_12"), (12, 5, "c_8")):
+            went = [True] if r[column] else [False, not r[13] >> bit & 1]
+            total += self.walk(at["c_%d" % column], at[stop], lambda n, w=went: w[n])
+        total += self.volumes(r)
+        return total + self.walk(at["c_7"], at["ymxr_played"],
+                                 lambda n: not r[7] & 0x80 if n == 0 else not r[13] & 0x80)
+
+    def snippet(self, text, decide):
+        part = assemble_text(text)
+        return self.walk(0, len(part), decide, part)
+
+
+# The rows plan.md's shares and gates are measured over, a tune.
+PLAN_ROWS = 40000
+
+
+def plan_figures(walker, tunes):
+    """plan.md's figures of the frame procedure, off the rows of `tunes`,
+    PLAN_ROWS of each played through its loop: a tune's share of rows that
+    set no tone, no volume and no envelope column, its register columns a
+    row, and what three gates would cost or save it a frame, each a mean
+    over the rows. A gate is a bit a row sets where it sets a column of a
+    group, tested before the group: 20 cycles where it skips and 18 where it
+    does not, as walked. The volume gate in column 13 moves a row that sets
+    a volume where column 13 was 0 from the copy of steps 6 and 7 to the
+    longer path; in column 6, and the tone gate, each read their bit on
+    every row, a move of 12."""
+    gate = "        btst    #4,d2\n        beq.s   over\n        nop\nover:\n"
+    skip = walker.snippet(gate, lambda n: True)
+    part = assemble_text(gate)
+    run = walker.walk(0, len(part) - 2, lambda n: False, part)
+    read = walker.snippet("        move.b  $7FFF(a1),d3\n", lambda n: False)
+    unset = [0] * 30
+    figures = {"skip": skip, "run": run, "read": read,
+               "column": walker.walk(walker.at["c_6"], walker.at["c_13"], lambda n: True),
+               "pair": walker.tones(unset) // 3, "volumes": walker.volumes([0] * 13 + [1] + [0] * 16),
+               "tones": walker.tones(unset), "tunes": {}}
+    for ym in tunes:
+        work = tempfile.mkdtemp(prefix="ymxr68")
+        file, _ = convert(ym, work)
+        tune = Tune(bind(file, work), work)
+        model = Model(tune)
+        none = {"tone": 0, "volume": 0, "envelope": 0}
+        columns = 0
+        net = {"13": 0, "6": 0, "tone": 0}
+        for n in range(PLAN_ROWS):
+            model.begin()
+            r = model.playing
+            wrote = {register for register, _ in model.writes()}
+            columns += len(wrote)
+            tone = bool(wrote & {0, 1, 2, 3, 4, 5})
+            volume = bool(wrote & {8, 9, 10})
+            none["tone"] += not tone
+            none["volume"] += not volume
+            none["envelope"] += not wrote & {11, 12, 13}
+            if volume:
+                moved = 0
+                if r[13] == 0:
+                    gated = list(r)
+                    gated[13] = 0x10            # bit 4, the gate: the longer path
+                    moved = walker.registers(gated) - walker.registers(r)
+                net["13"] += run + moved
+                net["6"] += read + run
+            else:
+                net["13"] += skip - walker.volumes(r)
+                net["6"] += read + skip - walker.volumes(r)
+            net["tone"] += read + (run if tone else skip - walker.tones(r))
+        stem = os.path.basename(ym)[:-3].replace("  ", " ")
+        figures["tunes"][stem] = {
+            "no " + k: 100.0 * v / PLAN_ROWS for k, v in none.items()}
+        figures["tunes"][stem].update({"columns": columns / float(PLAN_ROWS),
+                                       "net 13": net["13"] / float(PLAN_ROWS),
+                                       "net 6": net["6"] / float(PLAN_ROWS),
+                                       "net tone": net["tone"] / float(PLAN_ROWS)})
+    return figures
+
+
+def sample_tick(walker):
+    """A row tick of the general handler, instruction by instruction, on the
+    path that writes a row and steps the place: the two chip writes, the
+    marker's test, the level dropped, the step and the end of interrupt,
+    and the read and the step an address register would replace."""
+    code, at = walker.code, walker.at["ymxr_tick0"]
+    parts = []
+    while struct.unpack(">H", code[at:at + 2])[0] != 0x4E73:          # rte
+        words = struct.unpack(">5H", (code[at:at + 10] + bytes(10))[:10])
+        after = at + 2 if words[0] >> 12 == 6 else None
+        cycles, size = walker.module.cycles_of(words, 0, None, at, after, None)
+        parts.append((words[0], cycles))
+        at += 2 * size
+    kinds = {"writes": 0, "test": 0, "level": 0, "step": 0, "end": 0}
+    writes = 0
+    for op, cycles in parts:
+        if op >> 12 == 6:
+            kinds["test"] += cycles
+        elif op == 0x46FC:
+            kinds["level"] += cycles
+        elif op >> 12 == 5:
+            kinds["step"] += cycles
+            step = cycles
+        elif op >> 12 == 1 and writes < 2:
+            kinds["writes"] += cycles
+            writes += 1
+            read = cycles
+        else:
+            kinds["end"] += cycles
+    kinds["whole"] = sum(c for _, c in parts)
+    kinds["through"] = read + step
+    kinds["register"] = walker.snippet("        move.b  (a0)+,$FFFF8802.w\n", lambda n: False)
+    return kinds
+
+
+# A share spelled as a part: a sixth is one in six.
+PARTS = {2: "a half", 3: "a third", 4: "a quarter", 5: "a fifth", 6: "a sixth",
+         7: "a seventh", 8: "an eighth", 9: "a ninth", 10: "a tenth"}
+
+
+def plan_read(walker, tunes, parts):
+    """plan.md against the rig: the groups a row leaves unset and the
+    columns it sets, the costs of a column, a pair and the volume group,
+    the three gates, the sample tick's parts, and, where the run counted a
+    refill's parts, the operations of Turrican 2 - world completed 1's."""
+    text = open(os.path.join(ROOT, "doc", "plan.md")).read()
+    said = " ".join(text.split())
+    fig = plan_figures(walker, tunes)
+    tune = fig["tunes"]
+    stale = []
+
+    def read(pattern, counted, what):
+        m = re.search(pattern, said)
+        got = m and tuple(g.replace(",", "") if re.fullmatch(r"[\d,]+", g) else g
+                          for g in m.groups())
+        want = tuple(str(x) for x in counted)
+        if got != want:
+            stale.append("plan.md reads %s as %s, and the rig counts %s" % (what, got, want))
+
+    for name, v in tune.items():
+        read(r"\| %s \| (\d+)%% \| (\d+)%% \| (\d+)%% \| (\d+\.\d) \|" % re.escape(name),
+             ("%.0f" % v["no tone"], "%.0f" % v["no volume"], "%.0f" % v["no envelope"],
+              "%.1f" % v["columns"]), "the groups %s leaves unset" % name)
+    columns = sorted(v["columns"] for v in tune.values())
+    median = columns[len(columns) // 2]
+    read(r"a row sets (\d+\.\d) to (\d+\.\d) of the fourteen register columns, (\d+\.\d) on the"
+         r" median tune", ("%.1f" % columns[0], "%.1f" % columns[-1], "%.1f" % median),
+         "the columns a row sets")
+    read(r"unset on 40 per cent of the rows or more on (\w+) of the (\w+) and the envelope group"
+         r" on 62 per cent or more on (\w+);",
+         (WORDS[sum(1 for v in tune.values() if round(v["no volume"]) >= 40)], WORDS[len(tune)],
+          WORDS[sum(1 for v in tune.values() if round(v["no envelope"]) >= 62)]),
+         "the tunes whose groups go unset")
+    read(r"A column the row leaves unset costs (\d+) cycles and a tone pair (\d+)",
+         (fig["column"], fig["pair"]), "an unset column and pair")
+    read(r"What is left to gate is the volume group's three columns, (\d+) cycles",
+         (fig["volumes"],), "the volume group")
+    read(r"counts a gate that skips at (\d+) cycles and one that does not at (\d+)",
+         (fig["skip"], fig["run"]), "a gate")
+    for name, v in tune.items():
+        net = int(round(v["net 13"]))
+        read(r"\| %s \| (\d+)%% \| \**([-+]?\d+)\** \|" % re.escape(name),
+             ("%.0f" % v["no volume"], ("+%d" % net) if net > 0 else "%d" % net),
+             "the gate in column 13 on " + name)
+    means = {k: sum(v[k] for v in tune.values()) / len(tune) for k in ("net 13", "net 6", "net tone")}
+    costs = {k: [n for n, v in tune.items() if round(v[k]) > 0] for k in means}
+    read(r"\| the mean of the (\w+) \| \| (-?\d+) \|", (WORDS[len(tune)], int(round(means["net 13"]))),
+         "the gate in column 13's mean")
+    read(r"it saves (\d+) cycles a frame on the mean of the (\w+) fixtures, and it costs (\w+) of"
+         r" them", (-int(round(means["net 13"])), WORDS[len(tune)], WORDS[len(costs["net 13"])]),
+         "the gate in column 13")
+    six = costs["net 6"]
+    read(r"costs a read of (\d+) on every row and leaves column 13 alone, reads (-?\d+) as the mean,"
+         r" the better of the two, and costs (\w+) tunes: (.+?)\. Column 13 pays",
+         (fig["read"], int(round(means["net 6"])), WORDS[len(six)],
+          ", ".join(six[:-1]) + " and " + six[-1]), "the gate in column 6")
+    if means["net 6"] >= means["net 13"]:
+        stale.append("plan.md reads column 6 as the better gate, and the rig counts column 13's"
+                     " mean lower")
+    idle = [v["no tone"] for v in tune.values()]
+    share = sum(idle) / len(idle) / 100.0
+    read(r"reads \+(\d+): its six columns are idle on (\d+) to (\d+) per cent of rows, and the"
+         r" (\d+) it saves on (an? \w+) of them does not pay the (\d+) it costs on the rest",
+         (int(round(means["net tone"])), "%.0f" % min(idle), "%.0f" % max(idle),
+          fig["tones"] - fig["skip"] - fig["read"], PARTS[int(round(1 / share))],
+          fig["read"] + fig["run"]), "the tone gate")
+    read(r"(\d+) cycles a frame, the better gate, is a version of the tune file, .*? and (\w+)"
+         r" tunes that read slower", (-int(round(means["net 6"])), WORDS[len(six)]),
+         "the better gate")
+    tick = sample_tick(walker)
+    read(r"Of the (\d+) its instructions cost, (\d+) are the chip writes, (\d+) the step, (\d+) the"
+         r" end of interrupt, (\d+) the level dropped and (\d+) the marker test",
+         (tick["whole"], tick["writes"], tick["step"], tick["end"], tick["level"], tick["test"]),
+         "the parts of a sample's tick")
+    read(r"`move\.b \(a0\)\+,YM_SELECT\+2\.w`, is (\d+) against the (\d+) the read through the"
+         r" program counter and its step cost", (tick["register"], tick["through"]),
+         "the read and the step")
+    if parts and "Turrican 2 - world completed 1" in parts:
+        read(r"a refill of Turrican 2 - world completed 1 parses (\w+) operations, the bound at"
+             r" unit 2", (WORDS[parts["Turrican 2 - world completed 1"]["operations"]],),
+             "Turrican 2 - world completed 1's heaviest refill")
+    return stale
+
+
 def saving(steps, effects, costs):
     """The cycles a frame dense register columns would save this tune on
     average, a cost where negative. Where the tune's effect bits are all
@@ -3070,7 +3351,7 @@ def saving(steps, effects, costs):
     dense one tests the bit and runs the steps on the rows that set an
     effect column."""
     saved = 0
-    for effect_cycles, register_cycles, touched in steps:
+    for effect_cycles, register_cycles, touched, _ in steps:
         now = effect_cycles + register_cycles
         if not effects:
             then = costs["block"] + effect_cycles
