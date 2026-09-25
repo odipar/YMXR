@@ -1552,7 +1552,9 @@ ymxr_frame:
                 EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,ymxr_two1,ymxr_three1,$110
                 EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,ymxr_two2,ymxr_three2,$120
                 EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,ymxr_two3,ymxr_three3,$114
-; 4: the tone periods.
+; 4: the tone periods. Steps 4 to 8 stand between this label and
+; ymxr_played, where the rig counts what the register columns cost.
+ymxr_regs:
                 TONE    _0,_1,$0000,$0100
                 TONE    _2,_3,$0200,$0300
                 TONE    _4,_5,$0400,$0500
