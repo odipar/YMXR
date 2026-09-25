@@ -1487,6 +1487,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                     kind = "square"
                 elif model.onerow(i):
                     kind = "one"
+                elif model.counted(i):
+                    # a counted handler, of one column or of several
+                    kind = ("counted wide " if model.wide(i) else "counted ") + then
+                elif model.wide(i):
+                    kind = "wide " + then
                 if bin(tune.effects).count("1") == 1:
                     kind += " alone"        # init took the level's drop out
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
@@ -1585,6 +1590,104 @@ def dense_read(savings, costs):
     if not t or (int(t.group(1)), int(t.group(2))) != (costs["then"], costs["skip"]):
         stale.append("performance.md reads the two tests as %s, and the rig counts %d and %d"
                      % (t and t.groups(), costs["then"], costs["skip"]))
+    return stale
+
+
+# The kit's tunes the section on a counted tick of two columns reads: a
+# marked and a counted source on setEnvelope, and a counted source of one
+# column on each target whose register reads a whole byte.
+ENVELOPE_TUNES = ("envelope.ymxr", "envelope-counted.ymxr")
+COUNTED_TUNE = "counted.ymxr"
+# The table's rows, each the path its tick runs.
+COUNTED_ROWS = {"a row written, the places stepped": "on",
+                "the end, the places to row `RR`": "loop",
+                "the end, the timer stopped": "stop"}
+
+
+def counted_read(code, symbols, cycles_of, general):
+    """performance.md's section on a counted tick of two columns against the
+    rig, for the build assembled: its table's two columns of that build, the
+    marked and the counted ticks of the kit's two envelope tunes; a counted
+    tick of one column on the kit's counted tune against the general tick
+    the fixtures measured (general, by kind); the differences the section
+    draws; the handlers' sizes and the player's; and the envelope tune's
+    last two periods, the marker added to the last."""
+    text = open(os.path.join(ROOT, "doc", "performance.md")).read()
+    section = text[text.index("## A counted tick of two columns"):
+                   text.index("## A tick through an absolute address")]
+    said = " ".join(section.split())
+    stale = []
+    kit = os.path.join(ROOT, "doc", "conformance", "tunes")
+    got = {name: check(os.path.join(kit, name), code, symbols, CyclesOn(cycles_of))[3]
+           for name in ENVELOPE_TUNES + (COUNTED_TUNE,)}
+
+    def one(name, kind):
+        costs = got[name].get(kind, set())
+        if len(costs) != 1:
+            stale.append("%s ticks %s at %s, not one figure" % (name, kind, sorted(costs)))
+            return None
+        return next(iter(costs))
+
+    column = 0 if PCREL else 2
+    ticked = {}
+    for row, then in COUNTED_ROWS.items():
+        m = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$" % re.escape(row), section, re.M)
+        if not m:
+            stale.append("performance.md's counted ticks have no row for " + row)
+            continue
+        counted = (one(ENVELOPE_TUNES[0], "wide %s alone" % then),
+                   one(ENVELOPE_TUNES[1], "counted wide %s alone" % then))
+        ticked[then] = counted
+        read = (int(m.group(column + 1)), int(m.group(column + 2)))
+        if read != counted:
+            stale.append("performance.md reads the ticks %s as %s, and the rig counts %s"
+                         % (row, read, counted))
+    d = re.search(r"So (\d+) cycles a tick that writes a row, as the counted handler of one"
+                  r" column costs against the general one, and (\d+) on the path that loops", said)
+    one_column = one(COUNTED_TUNE, "counted on")
+    general_on = general.get("on", set())
+    if not d or len(general_on) != 1 or "on" not in ticked or "loop" not in ticked:
+        stale.append("performance.md has no difference of a counted tick the rig reads")
+    else:
+        row_more, loop_more = int(d.group(1)), int(d.group(2))
+        if ticked["on"][1] - ticked["on"][0] != row_more or \
+                one_column - next(iter(general_on)) != row_more:
+            stale.append("performance.md reads %d cycles more a counted tick that writes a row,"
+                         " and the rig counts %d on two columns and %d on one"
+                         % (row_more, ticked["on"][1] - ticked["on"][0],
+                            one_column - next(iter(general_on))))
+        if ticked["loop"][1] - ticked["loop"][0] != loop_more:
+            stale.append("performance.md reads %d cycles more on the loop, and the rig counts %d"
+                         % (loop_more, ticked["loop"][1] - ticked["loop"][0]))
+    wide_size = symbols["ymxr_env1"] - symbols["ymxr_env0"]
+    marked_size = symbols["ymxr_two1"] - symbols["ymxr_two0"]
+    shapes = 4 * (symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]) + 4 * wide_size
+    if PCREL:
+        sizes = re.search(r"(\d+) bytes an instance against (\d+)", said)
+        player = re.search(r"The player is ([\d,]+) bytes, ([\d,]+) of them the counted shapes'"
+                           r" eight instances", said)
+    else:
+        sizes = re.search(r"instances of (\d+) bytes against the marked shape's (\d+)", said)
+        player = re.search(r"where a tick reads an absolute address, ([\d,]+) bytes and ([\d,]+),", said)
+    if not sizes or (int(sizes.group(1)), int(sizes.group(2))) != (wide_size, marked_size):
+        stale.append("performance.md reads the handlers' instances as %s, and the player"
+                     " assembles %d and %d" % (sizes and sizes.groups(), wide_size, marked_size))
+    if not player or tuple(int(x.replace(",", "")) for x in player.groups()) != (len(code), shapes):
+        stale.append("performance.md reads the player as %s, and it assembles to %d bytes, %d"
+                     " of them the counted shapes" % (player and player.groups(), len(code), shapes))
+    marker = re.search(r"a period ([\d,]+) more than the row's, which the kit's `envelope` tune"
+                       r" does on its first source's last two rows, ([\d,]+) and then ([\d,]+),"
+                       r" its ([\d,]+) with the marker", said)
+    work = tempfile.mkdtemp(prefix="ymxr68")
+    with open(os.path.join(kit, ENVELOPE_TUNES[0]), "rb") as f:
+        tune = Tune(bind(f.read(), work), work)
+    at, R, RR, columns = tune.sources[1]
+    periods = [columns[0][r] | columns[1][r] << 8 for r in range(R)]
+    # the marker is bit 7 of R12, the high byte: 1 << 15 of the period
+    counted = (1 << 15, periods[-2], periods[-1], periods[-1] - (1 << 15))
+    if not marker or tuple(int(x.replace(",", "")) for x in marker.groups()) != counted:
+        stale.append("performance.md reads the envelope tune's marker as %s, and the tune has %s"
+                     % (marker and marker.groups(), counted))
     return stale
 
 
@@ -2737,6 +2840,7 @@ def main():
         cycles_of = test_dtx
     costs = dense(cycles_of, code, symbols) if cycles_of and not perf else None
     savings = {}                        # dense columns' saving by tune, and its effects
+    general = {}                        # every tick's cost the fixtures counted, by kind
     stale = []
     wrong = []
     measured = {}                       # the refill parts by tune, with -refill
@@ -2760,6 +2864,8 @@ def main():
             frames, ticks, cost, tick_cost, tick_cycles, where, boundaries, refills_of = \
                 check(ym, code, symbols, cycles_of and CyclesOn(cycles_of),
                       kit, perf, parts)
+            for kind, spent in tick_cost.items():
+                general.setdefault(kind, set()).update(spent)
             line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
             if boundaries:
                 line += ", a tick at %d boundaries of the frame" % boundaries
@@ -2885,6 +2991,10 @@ def main():
             wrong.append(os.path.basename(ym))
             said = str(failed).strip().split("\n")[0]
             print("%-45s FAILED: %s" % (os.path.basename(ym), said[:120]))
+    if costs and not args and wide is None and not kit and not LEAN:
+        # a run over the eleven fixtures reads the section on a counted
+        # tick of two columns against the kit's tunes of that shape
+        stale += counted_read(code, symbols, cycles_of, general)
     if savings and not args and wide is None and not kit and PCREL and not LEAN:
         # a run over the eleven fixtures reads the section against YMX's
         # dense columns as the rig counts them

@@ -365,30 +365,33 @@ bytes where it was 8, so YMXR_FIXED is 2,120 bytes against 56.
 `setEnvelope` writes R11 and R12, and both read every bit of their byte,
 so a source on that target is counted: its rows are whole bytes and a
 tick counts them (SPEC.md 2.1.3). The wide handler runs that source with
-a word counter where the marked one tests bit 7, 138 bytes an instance
-against 122, and four instances of it stand beside the two marked shapes.
+a word counter where the marked one tests bit 7, 128 bytes an instance
+against 112, and four instances of it stand beside the two marked shapes.
 
 Both tunes of the kit that sweep the envelope period run one effect, so
 their ticks drop no level and the figures below are the second column's
-of the lean table:
+of the lean table. The last two columns are the player whose ticks read a
+row through an absolute address (A tick through an absolute address):
 
-| tick | marked | counted |
-|---|---|---|
-| a row written, the places stepped | 176 | 196 |
-| the end, the places to row `RR` | 206 | 246 |
-| the end, the timer stopped | 172 | 192 |
+| tick | marked | counted | marked, absolute | counted, absolute |
+|---|---|---|---|---|
+| a row written, the places stepped | 152 | 172 | 176 | 196 |
+| the end, the places to row `RR` | 178 | 218 | 206 | 246 |
+| the end, the timer stopped | 160 | 180 | 172 | 192 |
 
 So 20 cycles a tick that writes a row, as the counted handler of one
 column costs against the general one, and 40 on the path that loops,
 where the reload of the counter stands too. What that buys is the half of
 the envelope period a marked source cannot reach and the row it would
 spoil: the tick that reads the last row of a marked source on this target
-writes the marker's bit into R12 with the value, a period 32,768 above
-the rows before it, which the kit's `envelope` tune does at 800 and
-33,696.
+writes the marker's bit into R12 with the value, a period 32,768 more than
+the row's, which the kit's `envelope` tune does on its first source's last
+two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,160 bytes against 7,298 before the counted shape of one
-column, and 7,804 against 6,934 where a tick reads an absolute address.
+The player is 8,160 bytes, 896 of them the counted shapes' eight
+instances, four of one column and four of two; where a tick reads an
+absolute address, 7,804 bytes and 952, instances of 138 bytes against the
+marked shape's 122.
 
 ## A tick through an absolute address
 

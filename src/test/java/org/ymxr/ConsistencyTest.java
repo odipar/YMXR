@@ -889,6 +889,49 @@ final class ConsistencyTest {
     }
 
     /**
+     * The section on a counted tick of two columns against its table and
+     * the marker's arithmetic: the rig reads each build's two columns
+     * against its count, a run a build, and this reads the differences the
+     * section draws against both builds at once. The section's table had
+     * the absolute build's figures under the plain build's name.
+     */
+    @Test
+    void theCountedTickReadsItsTable() throws IOException {
+        String perf = read(PERF);
+        String section = perf.substring(perf.indexOf("## A counted tick of two columns"),
+                perf.indexOf("## A tick through an absolute address"));
+        Matcher row = Pattern.compile("^\\| (a row written, the places stepped|the end, the places"
+                + " to row `RR`|the end, the timer stopped) \\| (\\d+) \\| (\\d+) \\| (\\d+)"
+                + " \\| (\\d+) \\|$", Pattern.MULTILINE).matcher(section);
+        Map<String, long[]> rows = new LinkedHashMap<>();
+        while (row.find()) {
+            rows.put(row.group(1), new long[] {Long.parseLong(row.group(2)),
+                Long.parseLong(row.group(3)), Long.parseLong(row.group(4)),
+                Long.parseLong(row.group(5))});
+        }
+        assertEquals(3, rows.size(), () -> "the counted ticks' table read as " + rows.keySet());
+        Matcher more = wrapped("So (\\d+) cycles a tick that writes a row, as the counted handler"
+                + " of one column costs against the general one, and (\\d+) on the path that"
+                + " loops").matcher(section);
+        assertTrue(more.find(), "performance.md has no difference of a counted tick");
+        long[] written = Objects.requireNonNull(rows.get("a row written, the places stepped"));
+        long[] loops = Objects.requireNonNull(rows.get("the end, the places to row `RR`"));
+        for (int build = 0; build < 4; build += 2) {
+            assertEquals(Long.parseLong(more.group(1)), written[build + 1] - written[build],
+                    "a counted tick that writes a row, columns " + (build + 1) + " and " + (build + 2));
+            assertEquals(Long.parseLong(more.group(2)), loops[build + 1] - loops[build],
+                    "a counted tick on the loop, columns " + (build + 1) + " and " + (build + 2));
+        }
+        Matcher marker = wrapped("a period ([\\d,]+) more than the row's, which the kit's"
+                + " `envelope` tune does on its first source's last two rows, ([\\d,]+) and then"
+                + " ([\\d,]+), its ([\\d,]+) with the marker").matcher(section);
+        assertTrue(marker.find(), "performance.md has no marker of the envelope tune");
+        assertEquals(1L << 15, number(marker.group(1)), "bit 7 of R12, the period's high byte");
+        assertEquals(number(marker.group(3)) - number(marker.group(1)), number(marker.group(4)),
+                "the last row's period less the marker");
+    }
+
+    /**
      * Every glossary row names the document that explains its term, and
      * and no check opened that document. requirements.md R0.7 allows no second
      * word for a thing that has one, so the document explaining a term

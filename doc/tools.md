@@ -777,7 +777,7 @@ run continues.
 | absent | the dumps named, or the eleven under `ym/test` |
 | `-corpus[N]` | N tunes spread over the corpus, `YM_CORPUS`: of its F files by name, every (F divided by N)-th, the first N of those; 40 with N absent |
 | `-framesN` | each tune for N frames at most |
-| `-cycles` | the play call, DTX's advance and the tick handlers counted with DTX's cycle counter under `DTX_REPO/68k/test/emu`, against performance.md's figures; the frame procedure's effect steps and register steps counted apart, frame by frame, against dense register columns: fourteen writes of a set column's form, and the effects' steps behind the test of a column's set bit on the rows whose effect columns are all clear. A run of the eleven fixtures reads what the columns cost and save a frame, the write, the test and the test the player had before, against the section on YMX |
+| `-cycles` | the play call, DTX's advance and the tick handlers counted with DTX's cycle counter under `DTX_REPO/68k/test/emu`, against performance.md's figures; the frame procedure's effect steps and register steps counted apart, frame by frame, against dense register columns: fourteen writes of a set column's form, and the effects' steps behind the test of a column's set bit on the rows whose effect columns are all clear. A run of the eleven fixtures reads what the columns cost and save a frame, the write, the test and the test the player had before, against the section on YMX; and it plays the kit's `envelope`, `envelope-counted` and `counted` tunes, counting the marked and the counted ticks, against the section on a counted tick of two columns, the columns of the build assembled, with the handlers' sizes and the player's. `-cycles -abs` reads the absolute build's tables the same way |
 | `-refill` | `-cycles` and the advance's parts off one pass: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the eleven fixtures reads the claims over the set; a run of other tunes reads each tune alone |
 | `-hatari` | each tune, at 50 Hz alone, through `ymxr-sndh -vbl` and `ymxr-prg` with 2,000 rows, run under Hatari, the trace of every chip write cut into frames at the VBL and read against the model; `-vbl` names the VBL as the clock the program plays from (BINARIES.md 4.3), which the frames are cut at; a run that names no tune plays the conformance kit's `voices` after the fixtures, since no dump converts to a target of several registers |
 | `-stub` | each tune, at 50 Hz alone, through `ymxr-sndh` and then `ymxr-prg` twice, 600 rows each: one program playing from Timer C, which the file's clock tag names, and one from the VBL, which `-vbl` names. Both run under Hatari, and the writes the frame procedure makes are one stream in one order under either clock, over the same frames but for the phase of the first row and the last. A tick's writes are counted apart: an effect's handler writes the chip from its timer, which the two clocks interleave among the rows differently. Then the same tune at 60 Hz, a rate no multiple of the operating system's clock: the tool arms 240 ticks a second (BINARIES.md 4.10), and the gaps between the in-service bit the stub's handler clears read that period on Hatari's MFP, 4.167 ms, against the 5 ms of the 200 Hz clock |
@@ -807,7 +807,8 @@ core; the conformance kit at `-frames24` under `-kit`; and `-refill` over
 `Turrican 2 - world completed 1` whole, which reads the tune's row of
 performance.md and a refill of a tune with a source. The workflow runs
 `-refill` over the eleven fixtures whole as a step after the suite, which
-reads the sentences over the set. The workflow then runs `-stub`, `-hatari`,
+reads the sentences over the set, and `-cycles -abs` over them, which reads
+the absolute build's tables. The workflow then runs `-stub`, `-hatari`,
 `-clock` and `-cost` under Hatari 2.6.1, built from its tag, and the PAL
 image of EmuTOS 1.4, which boots the ST at the 50 Hz the two modes require;
 a caller runs them under TOS 2.06, which `TOS` names.
@@ -880,7 +881,8 @@ and YMXS `0.4.7` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
 so that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
-whole, which reads performance.md's sentences over the set, and then
+whole, which reads performance.md's sentences over the set, `-cycles -abs`
+over the fixtures, which reads the absolute build's tables, and then
 `-stub`, `-hatari`, `-clock` and `-cost` under Hatari and EmuTOS (17). No
 push starts it: a caller starts it from the Actions tab or by `gh workflow
 run test.yml`.
