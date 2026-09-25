@@ -43,6 +43,7 @@ final class ConsistencyTest {
     private static final Path EXP = Path.of("doc/experiments.md");
     private static final Path PERF = Path.of("doc/performance.md");
     private static final Path PLAN = Path.of("doc/plan.md");
+    private static final Path WRITING = Path.of("doc/writing.md");
 
     /** Every document of the repository, which every check here reads. */
     private static final List<Path> DOCUMENTS = documents();
@@ -929,6 +930,87 @@ final class ConsistencyTest {
         assertEquals(1L << 15, number(marker.group(1)), "bit 7 of R12, the period's high byte");
         assertEquals(number(marker.group(3)) - number(marker.group(1)), number(marker.group(4)),
                 "the last row's period less the marker");
+    }
+
+    /** A count spelled out, one to twenty. */
+    private static final List<String> SPELLED = List.of("zero", "one", "two", "three", "four",
+            "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+            "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty");
+
+    private static int spelled(String word) {
+        int at = SPELLED.indexOf(word);
+        assertTrue(at >= 0, () -> "no count spelled " + word);
+        return at;
+    }
+
+    /**
+     * writing.md, the guide for a writer, against the reader, the packer
+     * and the conformance kit: the versions a reader reads and the one a
+     * writer writes for each shape of tune, the ring the packer clamps to,
+     * and the kit's files, their versions and their lines in MANIFEST.txt.
+     * The guide stood at version 3 while the format reached 6: it read a
+     * version other than $0003 as rejected, a source as one column, and
+     * eleven tune files where the kit had fifteen.
+     */
+    @Test
+    void theWritersGuideReadsTheFormatAndTheKit() throws IOException {
+        String guide = read(WRITING);
+        Matcher reads = wrapped("a version other than (\\d) to (\\d)").matcher(guide);
+        assertTrue(reads.find(), "writing.md names no versions a reader reads");
+        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(1)), "the first version read");
+        assertEquals(Tune.VERSION_WIDE_COUNTED, Integer.parseInt(reads.group(2)),
+                "the last version read");
+        Matcher lowest = wrapped("\\(SPEC\\.md 3\\.3\\.5\\): (\\d) where every source is one"
+                + " column and every target 0 to 13, (\\d) with a source of several columns or a"
+                + " target of 14 upward, (\\d) with a counted source of one column, and (\\d) with"
+                + " a counted source of several columns").matcher(guide);
+        assertTrue(lowest.find(), "writing.md names no version a writer writes");
+        assertEquals(List.of(Tune.VERSION, Tune.VERSION_COLUMNS, Tune.VERSION_COUNTED,
+                Tune.VERSION_WIDE_COUNTED), List.of(Integer.parseInt(lowest.group(1)),
+                Integer.parseInt(lowest.group(2)), Integer.parseInt(lowest.group(3)),
+                Integer.parseInt(lowest.group(4))), "the version of each shape");
+
+        Matcher ring = wrapped("the bytes a column unpacks through: a multiple of (\\w+), at"
+                + " least (\\d+) and at most ([\\d,]+)").matcher(guide);
+        assertTrue(ring.find(), "writing.md has no ring");
+        assertEquals(Columns.C, count(ring.group(1)), "the ring's multiple, the period");
+        assertEquals(Tune.ringOf(0), Integer.parseInt(ring.group(2)), "the least ring");
+        assertEquals(Tune.ringOf(Integer.MAX_VALUE / 2), number(ring.group(3)), "the most ring");
+
+        Path kit = Path.of("doc/conformance/tunes");
+        List<Path> files;
+        try (Stream<Path> at = Files.list(kit)) {
+            files = at.filter(one -> one.toString().endsWith(".ymxr")).sorted().toList();
+        }
+        Matcher tunes = wrapped("`doc/conformance/tunes/` has (\\w+) tune files: (\\w+) a reader"
+                + " reads, of versions (\\d) to (\\d), and `wrong-version\\.ymxr`, version"
+                + " `\\$([0-9A-F]{4})`").matcher(guide);
+        assertTrue(tunes.find(), "writing.md has no count of the kit's tune files");
+        assertEquals(files.size(), spelled(tunes.group(1)), "the kit's tune files");
+        TreeSet<Integer> versions = new TreeSet<>();
+        int read = 0;
+        for (Path one : files) {
+            byte[] file = Files.readAllBytes(one);
+            int version = (file[4] & 0xFF) << 8 | file[5] & 0xFF;
+            if (one.getFileName().toString().equals("wrong-version.ymxr")) {
+                assertEquals(Integer.parseInt(tunes.group(5), 16), version,
+                        "wrong-version.ymxr's version");
+                assertTrue(version > Tune.VERSION_WIDE_COUNTED, "wrong-version.ymxr is one a"
+                        + " reader reads");
+            } else {
+                versions.add(version);
+                read++;
+            }
+        }
+        assertEquals(read, spelled(tunes.group(2)), "the kit's tune files a reader reads");
+        assertEquals(List.of(Integer.parseInt(tunes.group(3)), Integer.parseInt(tunes.group(4))),
+                List.of(versions.first(), versions.last()),
+                "the versions of the kit's tune files");
+        String manifest = read(Path.of("doc/conformance/MANIFEST.txt"));
+        for (Path one : files) {
+            assertTrue(manifest.contains(" tunes/" + one.getFileName() + "\n"),
+                    () -> "MANIFEST.txt names no " + one.getFileName());
+        }
     }
 
     /**
