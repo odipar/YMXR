@@ -1013,6 +1013,176 @@ final class ConsistencyTest {
         }
     }
 
+    /** A ratio spelled as a part, to a fifteenth. */
+    private static final List<String> PARTS = List.of("", "a whole", "a half", "a third",
+            "a quarter", "a fifth", "a sixth", "a seventh", "an eighth", "a ninth", "a tenth",
+            "an eleventh", "a twelfth", "a thirteenth", "a fourteenth", "a fifteenth");
+
+    /** The part a fall from one figure to another nears: a fall of an eighth is 1 in 8. */
+    private static String fall(long from, long to) {
+        return PARTS.get((int) Math.round(from / (double) (from - to)));
+    }
+
+    /**
+     * plan.md against requirements.md and performance.md: the budget, the
+     * heaviest refill and its shares, the tunes that packed at unit 1 and
+     * what padding them saved, the costliest frame against the budget, an
+     * operation's cost, the square's tick, the window, and the arithmetic of
+     * the thirty-first column. The rig reads the shares and gates the rows
+     * give; this reads what the other documents give. The document read ten
+     * tunes where the fixtures are eleven and five that packed at unit 1
+     * where performance.md counts six.
+     */
+    @Test
+    void thePlanReadsTheBudgetAndTheTables() throws IOException {
+        String plan = read(PLAN);
+        String perf = read(PERF);
+        Matcher budget = wrapped("A play call costs at most ([\\d,]+) cycles").matcher(read(REQ));
+        assertTrue(budget.find(), "requirements.md has no budget in R4.5");
+        long most = number(budget.group(1));
+        Matcher names = Pattern.compile("(?:R4\\.5 budgets ([\\d,]+) a frame|R4\\.5's ([\\d,]+)-cycle"
+                + " budget|the budget's ([\\d,]+))").matcher(plan.replaceAll("\\s+", " "));
+        int named = 0;
+        while (names.find()) {
+            String said = names.group(1) != null ? names.group(1)
+                    : names.group(2) != null ? names.group(2) : names.group(3);
+            assertEquals(most, number(said), "plan.md's budget: " + names.group());
+            named++;
+        }
+        assertTrue(named >= 3, "plan.md names R4.5's budget " + named + " times");
+
+        Map<String, long[]> calls = playCalls(perf);
+        long heaviest = 0;
+        long costliest = 0;
+        String worst = "";
+        for (Map.Entry<String, long[]> one : calls.entrySet()) {
+            heaviest = Math.max(heaviest, one.getValue()[3]);
+            if (one.getValue()[1] > costliest) {
+                costliest = one.getValue()[1];
+                worst = one.getKey();
+            }
+        }
+        Matcher refill = wrapped("The heaviest refill of the (\\w+) tunes costs ([\\d,]+) cycles at"
+                + " unit 2, (\\d+) per cent of R4\\.5's [\\d,]+-cycle budget, against ([\\d,]+) at"
+                + " unit 1 and (\\d+) per cent").matcher(plan);
+        assertTrue(refill.find(), "plan.md has no heaviest refill");
+        assertEquals(calls.size(), spelled(refill.group(1)), "the tunes the table measures");
+        assertEquals(heaviest, number(refill.group(2)), "the heaviest refill the table reads");
+        assertEquals(Math.round(100.0 * heaviest / most), Long.parseLong(refill.group(3)),
+                "the heaviest refill's share of the budget");
+        assertEquals(Math.round(100.0 * number(refill.group(4)) / most),
+                Long.parseLong(refill.group(5)), "the share at unit 1");
+
+        int table = perf.indexOf("| tune | on average at unit 1 |");
+        assertTrue(table >= 0, "performance.md has no table at unit 1");
+        Matcher units = Pattern.compile("^\\| ([^|]+?) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\|$",
+                Pattern.MULTILINE).matcher(perf.substring(table, perf.indexOf("\n\n", table)));
+        Map<String, long[]> byTune = new LinkedHashMap<>();
+        while (units.find()) {
+            byTune.put(units.group(1), new long[] {Long.parseLong(units.group(2)),
+                Long.parseLong(units.group(3)), Long.parseLong(units.group(4)),
+                Long.parseLong(units.group(5))});
+        }
+        Matcher before = wrapped("(\\w+) of the (\\w+) tunes packed at unit 1 before it; measured again"
+                + " at unit 2, their calls fell by (an? \\w+) to (an? \\w+) on average and by (an? \\w+)"
+                + " to more than a quarter in the costliest frame, Synergy Credits' from ([\\d,]+) to"
+                + " ([\\d,]+)").matcher(plan);
+        assertTrue(before.find(), "plan.md has no tunes that packed at unit 1");
+        assertEquals(byTune.size(), spelled(before.group(1).toLowerCase()), "the tunes padded");
+        assertEquals(calls.size(), spelled(before.group(2)), "the tunes measured");
+        Comparator<long[]> onAverage = Comparator.comparingDouble(row -> (row[0] - row[1]) / (double) row[0]);
+        Comparator<long[]> atMost = Comparator.comparingDouble(row -> (row[2] - row[3]) / (double) row[2]);
+        long[] leastAverage = byTune.values().stream().min(onAverage).orElseThrow();
+        long[] mostAverage = byTune.values().stream().max(onAverage).orElseThrow();
+        long[] leastFrame = byTune.values().stream().min(atMost).orElseThrow();
+        long[] mostFrame = byTune.values().stream().max(atMost).orElseThrow();
+        assertEquals(fall(leastAverage[0], leastAverage[1]), before.group(3).replaceAll("\\s+", " "),
+                "the least fall on average");
+        assertEquals(fall(mostAverage[0], mostAverage[1]), before.group(4).replaceAll("\\s+", " "),
+                "the greatest fall on average");
+        assertEquals(fall(leastFrame[2], leastFrame[3]), before.group(5).replaceAll("\\s+", " "),
+                "the least fall in the costliest frame");
+        assertTrue((mostFrame[2] - mostFrame[3]) / (double) mostFrame[2] > 0.25,
+                "the greatest fall in the costliest frame is a quarter or less");
+        long[] synergy = Objects.requireNonNull(byTune.get("Synergy Credits"),
+                "the unit-1 table has no Synergy Credits");
+        assertEquals(synergy[2], number(before.group(6)), "Synergy Credits at unit 1");
+        assertEquals(synergy[3], number(before.group(7)), "Synergy Credits at unit 2");
+        Matcher under = wrapped("The costliest frame of any tune is now that one, ([\\d,]+) cycles"
+                + " under the budget").matcher(plan);
+        assertTrue(under.find(), "plan.md has no costliest frame against the budget");
+        assertEquals("Synergy Credits", worst, "the tune of the costliest frame");
+        assertEquals(most - costliest, number(under.group(1)), "the costliest frame under the budget");
+
+        Matcher parse = wrapped("about (\\d+) to (\\d+) an operation to parse").matcher(perf);
+        assertTrue(parse.find(), "performance.md has no operation's cost");
+        Matcher each = Pattern.compile("(\\d+) to (\\d+) cycles each|operations at (\\d+) to (\\d+)")
+                .matcher(plan.replaceAll("\\s+", " "));
+        int costs = 0;
+        while (each.find()) {
+            String low = each.group(1) != null ? each.group(1) : each.group(3);
+            String high = each.group(2) != null ? each.group(2) : each.group(4);
+            assertEquals(parse.group(1) + " to " + parse.group(2), low + " to " + high,
+                    "an operation's cost: " + each.group());
+            costs++;
+        }
+        assertEquals(3, costs, "plan.md names an operation's cost three times");
+
+        Matcher square = wrapped("A square's tick is in place: (\\d+) cycles of instructions against"
+                + " (\\d+) and (\\d+), and (\\d+) with the 68000's entry and the `rte` against (\\d+)"
+                + " and (\\d+)").matcher(plan);
+        assertTrue(square.find(), "plan.md has no square's tick");
+        String ticks = perf.substring(perf.indexOf("## A tick"));
+        long[] paths = new long[3];
+        String[] rows = {"a square's two rows, no place stepped", "a row written, the place stepped",
+            "the marker, the place to row `RR`"};
+        for (int i = 0; i < 3; i++) {
+            Matcher row = Pattern.compile("^\\| " + Pattern.quote(rows[i]) + " \\| (\\d+) \\|",
+                    Pattern.MULTILINE).matcher(ticks);
+            assertTrue(row.find(), "performance.md's tick table has no " + rows[i]);
+            paths[i] = Long.parseLong(row.group(1));
+            assertEquals(paths[i], Long.parseLong(square.group(i + 1)), rows[i]);
+        }
+        Matcher rig = Pattern.compile("^ENTRY = (\\d+)", Pattern.MULTILINE)
+                .matcher(read(Path.of("68k/test/emu/test_ymxr.py")));
+        assertTrue(rig.find(), "the rig has no ENTRY");
+        long entry = Long.parseLong(rig.group(1));
+        for (int i = 0; i < 3; i++) {
+            assertEquals(paths[i] + entry, Long.parseLong(square.group(i + 4)),
+                    rows[i] + " with the entry and the rte");
+        }
+        Matcher drum = wrapped("its tick is the row path every time, (\\d+) cycles").matcher(plan);
+        assertTrue(drum.find(), "plan.md has no digidrum's tick");
+        assertEquals(paths[1] + entry, Long.parseLong(drum.group(1)), "a digidrum's tick");
+        Matcher order = Pattern.compile("^\\| a separate tick for a square \\| \\d+ a tick \\| (\\d+)"
+                + " against (\\d+) and (\\d+) \\|$", Pattern.MULTILINE).matcher(plan);
+        assertTrue(order.find(), "plan.md's order has no square");
+        for (int i = 0; i < 3; i++) {
+            assertEquals(paths[i], Long.parseLong(order.group(i + 1)), "the order's " + rows[i]);
+        }
+
+        Matcher window = wrapped("The window is (\\d+) units at unit 1 and (\\d+) at unit 2")
+                .matcher(plan);
+        assertTrue(window.find(), "plan.md has no window");
+        assertEquals(Columns.C, Integer.parseInt(window.group(1)), "the window at unit 1");
+        assertEquals(Columns.C / 2, Integer.parseInt(window.group(2)), "the window at unit 2");
+        Matcher wider = wrapped("The ring is (\\d+) bytes and (\\d+) does not divide by 31, so the"
+                + " period goes from (\\d+) to (\\d+): a refill grows (\\w+) unit at unit 2 and"
+                + " (\\w+) at unit 1").matcher(plan);
+        assertTrue(wider.find(), "plan.md has no thirty-first column's ring");
+        assertEquals(Tune.RING, Integer.parseInt(wider.group(1)), "the ring");
+        assertEquals(Tune.RING, Integer.parseInt(wider.group(2)), "the ring, again");
+        assertTrue(Tune.RING % 31 != 0, "the ring divides by 31");
+        int period = 31;
+        while (Tune.RING % period != 0) {
+            period++;
+        }
+        assertEquals(Columns.C, Integer.parseInt(wider.group(3)), "the period today");
+        assertEquals(period, Integer.parseInt(wider.group(4)), "the period of 31 columns");
+        assertEquals((period - Columns.C) / 2, spelled(wider.group(5)), "a refill's growth at unit 2");
+        assertEquals(period - Columns.C, spelled(wider.group(6)), "a refill's growth at unit 1");
+    }
+
     /**
      * Every glossary row names the document that explains its term, and
      * and no check opened that document. requirements.md R0.7 allows no second
