@@ -73,6 +73,12 @@ jobs:
       # of them, a few minutes the suite leaves to this step.
       - name: performance.md over the whole set
         run: python3 68k/test/emu/test_ymxr.py -refill
+      # The player whose ticks read a row through an absolute address has
+      # separate tables in performance.md: its ticks, and its columns of the
+      # counted ticks of two columns. A run of -cycles -abs over the
+      # fixtures reads them back.
+      - name: performance.md's absolute build over the whole set
+        run: python3 68k/test/emu/test_ymxr.py -cycles -abs
       # -stub and -hatari play the tunes on a real MFP, under Hatari. Its
       # version is pinned, built from its tag and kept between runs: the rig
       # reads Hatari's trace, whose lines 2.4.1, the version Ubuntu carries,
