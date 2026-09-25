@@ -52,9 +52,11 @@ leaves the rows between unset.
 ## 4. The effects
 
 **4.1** Four columns an effect: the target, the source, the timer's
-control and its count (SPEC.md 1.8, 1.9). A row starts an effect by
-setting the source column to the source's number, 1 to 127, and stops it
-by setting the column to `$80`: the set bit with source 0 under it. A
+control and its count (SPEC.md 1.8, 1.9). The target column names a
+target of SPEC.md 2.1: a register, 0 to 13, or from version 4 a target
+of two or three registers, 14 to 24. A row starts an effect by setting
+the source column to the source's number, 1 to 127, and stops it by
+setting the column to `$80`: the set bit with source 0 under it. A
 source column of 0 is unset (SPEC.md 1.1).
 
 **4.2** The control column has the prescaler select in bits 2 to 0, the
@@ -78,17 +80,34 @@ encodes; YMXS, SPEC.md 6 defines those in the structure.
 
 ## 5. The sources
 
-**5.1** A source is a DTX1 table of `R` rows and one column of one-byte
-values (SPEC.md 3.1): `C` is 1 and `W` is 1 at this version, and a reader
-rejects a source of another shape. `RR` is the row it repeats to; where
-`RR` equals `R` the source plays once.
+**5.1** A source is a DTX1 table of `R` rows, a column for each register
+its target writes, and a byte a value (SPEC.md 2.2, 3.1.3): `C` is 1, 2
+or 3, the registers its target writes, and `W` is 1. `RR` is the row it
+repeats to; where `RR` equals `R` the source plays once.
 
-**5.2** Set bit 7, the marker, on the last row and clear it on every
-other row (SPEC.md 3.2). The target register must ignore that bit:
-`setR1`, `setR3`, `setR5`, `setR6`, `setR8` to `setR10` or `setR13`.
-Other targets are left to a later version (SPEC.md 2.1, R6.2).
+**5.2** A source ends on its marker or on its count. A marked source
+sets bit 7, the marker, in the column SPEC.md 2.1 names for its target
+on the last row, and clears it on every other row (SPEC.md 3.2); that
+column writes a register that reads seven bits or fewer, and on a target
+of one register the target is `setR1`, `setR3`, `setR5`, `setR6`,
+`setR8` to `setR10` or `setR13`. A target of one register that reads
+every bit of its byte, `setR0`, `setR2`, `setR4`, `setR7`, `setR11` or
+`setR12`, runs a counted source: every bit of a row is a value, bit 31
+of its index entry is 1, and a tick counts `R` rows (SPEC.md 3.1.6). A
+counted source on `setR7` sets bits 7 and 6 of every row, the directions
+of the two ports (SPEC.md 6, rule 2(f)). A source of two columns on
+`setEnvelope` is counted as well, and a file of version 4 or 5 writes it
+marked in its place, bit 7 of R12's column the marker (SPEC.md 2.1.3,
+2.1.4). Targets 25 upward are left to a later version (SPEC.md 2.1,
+R6.2).
 
-**5.3** The format leaves the kind of a source to its shape (SPEC.md
+**5.3** A writer writes the lowest version the tune reads under (SPEC.md
+3.3.5): 3 where every source is one column and every target 0 to 13, 4
+with a source of several columns or a target of 14 upward, 5 with a
+counted source of one column, and 6 with a counted source of several
+columns. An older player then reads every tune two versions encode.
+
+**5.4** The format leaves the kind of a source to its shape (SPEC.md
 2.2); the sound follows from the shape:
 
 | the source | the sound |
@@ -97,7 +116,7 @@ Other targets are left to a later version (SPEC.md 2.1, R6.2).
 | two rows repeating to row 0 | a volume moving between a level and 0 at the timer's rate: a SID voice |
 | many rows played once | a recording through a volume register: a digidrum |
 
-**5.4** The values belong to the source: two SID voices at two levels are
+**5.5** The values belong to the source: two SID voices at two levels are
 two sources, and the effect column names one of them.
 
 ---
@@ -121,14 +140,12 @@ thirty rings and a fixed part; a smaller ring packs to more bytes
 
 ## 7. What a reader rejects
 
-| the file | clause |
-|---|---|
-| shorter than 16 bytes, or other than `YMXR` at offset 0 | SPEC.md 3.3 |
-| a version other than `$0003` | SPEC.md 3.3, R6.1 |
-| a source whose `C` or `W` is other than 1 | SPEC.md 3.1 |
-| a table or a source whose offsets lie outside the file | SPEC.md 3.3; the Go reader, where the Java reader leaves this unchecked (tools.md 19.5) |
-
-A reader reports a rejected file (SPEC.md 7) and produces zero entries.
+A reader rejects a file with a condition of SPEC.md 3.3.4, reports the
+first (SPEC.md 7) and produces zero entries. Among them: a version other
+than 3 to 6, a source other than one, two or three columns of one byte,
+and a source the file's version is below: a source of several columns in
+version 3, a counted source below version 5, and a counted source of
+several columns below version 6.
 
 ---
 
@@ -148,10 +165,10 @@ frame against a model of SPEC.md 4 and 5 built from the tune's tables,
 and names the frame and the register that differ; `-hatari` plays it on
 a real MFP (tools.md 17.1).
 
-**8.3** `doc/conformance/tunes/` has eleven tune files: ten a reader
-reads, and `wrong-version.ymxr`, version `$0004`, which a reader rejects
-(7); `MANIFEST.txt` names the record of each by its sha256 and size, the
-rejected one's empty.
+**8.3** `doc/conformance/tunes/` has fifteen tune files: fourteen a
+reader reads, of versions 3 to 6, and `wrong-version.ymxr`, version
+`$0007`, which a reader rejects (7); `MANIFEST.txt` names the record of
+each by its sha256 and size, the rejected one's empty.
 
 ---
 
