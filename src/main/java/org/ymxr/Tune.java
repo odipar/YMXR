@@ -61,8 +61,8 @@ final class Tune {
     static final int COUNTED = 0x80000000;
 
     /** The version a tune of these sources is written at: the lowest it
-     *  reads under, so a tune two versions encode is one file and the
-     *  older player reads it (SPEC.md 3.3.5). */
+     *  reads under, so a player of an older version reads every tune that
+     *  version encodes (SPEC.md 3.3.5). */
     static int version(List<Sources.Source> sources) {
         for (Sources.Source source : sources) {
             if (source.counted() && source.width() > 1) {

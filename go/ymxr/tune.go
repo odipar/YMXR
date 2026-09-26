@@ -57,8 +57,8 @@ const VersionWideCounted = 0x0006
 const Counted = 1 << 31
 
 // VersionOf is the version a tune of these sources is written at: the
-// lowest it reads under, so a tune two versions encode is one file and
-// the older player reads it (SPEC.md 3.3.5).
+// lowest it reads under, so a player of an older version reads every tune
+// that version encodes (SPEC.md 3.3.5).
 func VersionOf(sources []Source) int {
 	for _, one := range sources {
 		if one.Counted && one.Width() > 1 {

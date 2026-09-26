@@ -1,7 +1,8 @@
 # The YMXR format
 
-Version 3 encodes YMXS tune data (YMXS, SPEC.md 1) as DTX tables for
-playback on the Atari ST's YM2149 and MC68901. This document defines
+YMXR encodes YMXS tune data (YMXS, SPEC.md 1) as DTX tables for
+playback on the Atari ST's YM2149 and MC68901, in a tune file of version
+3 to 6 (3.3.5). This document defines
 columns (1), target, source and timer maps (2), file layout (3), frames
 (4), ticks (5), writer rules and checks (6), reader output (7), and later
 versions (8).
@@ -178,7 +179,7 @@ column unset, and the row that stops the effect may set it (rule 1).
 (YMXS, SPEC.md 2.4, 8.8). A player writes both as 1 on every write of R7
 a row makes (4.4 step 5), the directions of an Atari ST; a reader reports
 bits 5 to 0 (7.3). A tick of a counted source on `setR7` writes the row
-whole (5.1), so the two bits stand in the source, where a writer sets
+whole (5.1), so the two bits are in the source, where a writer sets
 them (rule 2(f)).
 
 ### 1.5 Noise period
@@ -324,9 +325,9 @@ it reads, where a source on `setR0` has no bit to spare for the marker.
 A tick writes the columns in column order and the marker's column last
 (5.1), so a player reads the marker off the last byte it wrote. The order
 of the writes is the player's (YMXS, SPEC.md 3.1.1), with two of them
-fixed there: a tone and a voice name their coarse nibble for the marker,
-so the fine byte stands before it, and a buzzer names its shape, so the
-envelope period stands before it.
+fixed there: a tone and a voice use their coarse nibble for the marker,
+so the fine byte comes before it, and a buzzer uses its shape, so the
+envelope period comes before it.
 
 **2.1.2** A target of one register runs a source of one column, and one
 of several a source of that many columns (3.1.3; YMXS, SPEC.md 3.2.1).
@@ -367,7 +368,7 @@ one byte a value, repeating to RR or playing once (3.1). A source has as
 many columns as the target of every effect that starts it reads (2.1.2).
 
 **2.2.2** A source is numbered by its index entry, 1 to 127 (3.1), and a
-source column names one by that number (1.8.3). A tick advances a source
+source column selects one by that number (1.8.3). A tick advances a source
 one row (5.1); a frame advances the tune's table one row (4.2).
 
 ### 2.3 The timers
@@ -455,13 +456,13 @@ plays once: the tick that reads row R - 1 stops the timer (5.1).
 **3.1.5** A writer numbers the sources in first-start order (YMXS,
 SPEC.md 1.9).
 
-**3.1.6** A counted source is one whose rows carry no marker: each of the
+**3.1.6** A counted source is one whose rows have no marker: each of the
 eight bits of a row is a value, where the marker of 3.2.1 requires bit 7.
 Bit 31 of its index entry is 1, and a tick reads R rows from the row it
 starts at (5.1). Bit 31 of the index entry of every other source is 0.
 
-A writer writes a source counted where the column the marker would stand
-in writes a register that reads every bit of its byte: a source of one
+A writer writes a source counted where the marker's column would write
+a register that reads every bit of its byte: a source of one
 column on a target of 2.1.2, and a source of two columns on `setEnvelope`
 (2.1.3). A file with a counted source of one column is version 5, and one
 with a counted source of several columns version 6 (3.3.5).
@@ -561,7 +562,7 @@ are, since a player of 3 or 4 would read bit 31 of that source's index
 entry as part of an offset; and one with a counted source of several
 columns is version 6, which a player of 5 would read as a counted source
 of one column. A writer writes the lowest of the four a tune reads under,
-so a tune two of them encode is one file and the older player reads it. A
+so a player of an older version reads every tune that version encodes. A
 player of this version reads 3, 4, 5 and 6.
 
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
@@ -754,12 +755,12 @@ names its registers and the column of the source each is written from
    interrupt: clear the timer's in-service bit (2.3.2).
 
 **5.1.1** A player runs the MFP in the mode the host leaves it, bit 3 of
-`$FFFA17` at 1, and performs step 5. A player that clears bit 3 at 4.1,
-automatic end of interrupt, omits step 5, keeps the interrupt level
+`$FFFA17` at 1, and performs step 6. A player that clears bit 3 at 4.1,
+automatic end of interrupt, omits step 6, keeps the interrupt level
 through every tick, and writes the register back at 4.7 (BINARIES.md 2,
 the flags word).
 
-**5.1.2** A player performing step 5 may lower the interrupt level to 5
+**5.1.2** A player performing step 6 may lower the interrupt level to 5
 after step 2, so that a tick of a timer of higher priority nests in this
 one; a tick of the same timer or of a lower one is served after it.
 
@@ -969,13 +970,18 @@ down, 256 where C is 0 (1.9.1), the arithmetic exact (YMXS, SPEC.md
 ### 6.5 Errors of a writer
 
 A writer reports a structure outside what this version encodes as one
-line, in place of a tune file: N a count, NAME a source's name, V a value
-and R a row number.
+line, in place of a tune file: NAME a source's name, TARGET a target's
+name, and each capital letter a decimal figure defined in its row.
 
 | condition | reported as |
 |---|---|
 | the structure has N sources, above 127 (2.2.2) | `the tune runs N sources, and a source column numbers 127` |
-| source NAME has the value V, above 127, in row R (3.2.1) | `the source NAME has the value V in row R, and bit 7 of a source's row is the marker` |
+| row N sets a count C outside 0 to 255 (1.9.1) | `row N: a count of C, and the count column reaches 0 to 255` |
+| row N performs an operation other than a start, a retune and a stop | `row N: an effect this version does not read` |
+| source NAME runs on TARGET, a target past 24 (2.1) | `the source NAME runs on TARGET, a target this version leaves to a later one (SPEC.md section 8)` |
+| source NAME runs on two targets whose markers are columns A and B, A other than B (rule 2(d)) | `the source NAME runs on targets that mark column A and column B, and a source has one marker column (SPEC.md rule 2(d))` |
+| a marked source NAME has the value V, above 127, in row R of column C, its marker's column (3.2.1) | `the source NAME has the value V in row R of column C, and bit 7 of the marker's column is the marker` |
+| source NAME has the value V, above 255, in row R of column C (3.2.1) | `the source NAME has the value V in row R of column C, and a column is one byte` |
 | the rate is H, outside 1 to 65,535, the word at 6 (3.3) | `a frame rate of H, and the frame rate is a word, 1 to 65535` |
 
 ---
@@ -1097,8 +1103,8 @@ and the length `MANIFEST.txt` lists.
 ## 8. What a later version defines
 
 A player of this version is unconstrained in each item below. A number
-missing from the list is a clause a version has defined, and the numbers
-of the rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
+missing from the list is a clause a version has defined, and the rest
+keep their numbers: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 
 **8.2** Targets 25 to 127 (2.1).
 
