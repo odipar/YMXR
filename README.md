@@ -3,45 +3,43 @@
 ## Read this first
 
 **AI wrote most of YMXR.** Claude (Anthropic's Claude Code) wrote the two
-tool trees, the 68000 player and the two files combined around it, the
-tests, the emulation rig and most of what is written here, under Robbert
-van Dalen's direction: he requested, read and merged every change.
-[LICENSE](LICENSE) is the terms, and its attribution records who did what.
-Whether to use software written that way is the reader's decision, and
-this section is here so that the decision is informed.
+tool trees, the 68000 player and the two files around it, the tests, the
+emulation rig and most of these documents. Robbert van Dalen directed the
+work: he requested, read and merged every change. [LICENSE](LICENSE) sets
+the terms, and its attribution records who did what. This section informs
+the reader's decision to use software written this way.
 
-The pieces it is built on are older than it. DTX defines the table and the
-68000 readers a tool binds a tune with, and the ST4 compressor beneath DTX
-derives from Einar Saukas's ZX1. The YM5 and YM6 register-dump formats are
-Arnaud Carré's, and SNDH is the Atari ST scene's shared music container.
+YMXR builds on older work. DTX defines the table and the 68000 readers a
+tool binds a tune with, and the ST4 compressor beneath DTX derives from
+Einar Saukas's ZX1. Arnaud Carré defined the YM5 and YM6 register-dump
+formats, and SNDH is the Atari ST scene's shared music container.
 
 ## What YMXR is
 
-YMXR plays chiptunes on the Atari ST. It converts a YM dump, the registers
-of the sound chip recorded one frame at a time, into a tune file, and a
-tune file into an SNDH file or a TOS program that plays on an Atari ST or
-under an emulator. The player is 68000 code: it writes the YM2149 sound
-chip once a frame, and runs effects on the timers of the MC68901 (MFP) at
-rates above the frame rate.
+YMXR plays chiptunes on the Atari ST. It converts a YM dump, the sound
+chip's registers recorded one frame at a time, into a tune file, and a
+tune file into an SNDH file or a TOS program for an Atari ST or an
+emulator. The 68000 player writes the YM2149 once a frame and runs effects
+on the timers of the MC68901 (MFP) at rates above the frame rate.
 
-The format encodes a YMXS tune as DTX tables, and defines how each column
+The format encodes a YMXS tune as DTX tables and defines how each column
 reaches the YM2149 or the MFP.
 
 ## Getting started
 
-The twelve tools come as executables for Windows, macOS and Linux, on x64
-and arm64, from the [releases](https://github.com/odipar/YMXR/releases):
-one zip a platform. This makes a program that plays a dump:
+The [releases](https://github.com/odipar/YMXR/releases) ship the twelve
+tools as executables for Windows, macOS and Linux, on x64 and arm64, one
+zip a platform. This call makes a program that plays a dump:
 
 ```bash
 ym-to-ymxs < tune.ym | ymxs-to-prg > TUNE.PRG
 ```
 
-`TUNE.PRG` is a TOS program: it runs on an Atari ST, or under Hatari, an
-Atari ST emulator, and plays until SPACE or ESC. In a checkout the same
-tools are under [`bin/`](bin), and [`ym/play.sh`](ym/play.sh) converts a
-dump and plays it under Hatari in one call; [`ym/test/`](ym/test) has ten
-dumps to try it on.
+`TUNE.PRG` runs on an Atari ST or under Hatari, an Atari ST emulator, and
+plays until SPACE or ESC. A checkout has the same tools under
+[`bin/`](bin); [`ym/play.sh`](ym/play.sh) converts a dump and plays it
+under Hatari in one call, and [`ym/test/`](ym/test) has eleven dumps to
+try.
 
 ## Converting and playing
 
@@ -57,16 +55,16 @@ bin/ymxr-trace -r4 < tune.ymxr
 ym/play.sh tune.ym
 ```
 
-A tune file contains tables. An SNDH file adds DTX's reader and the
-player; a TOS program plays that SNDH file on a bare machine.
+A tune file has tables alone. An SNDH file adds DTX's reader and the
+player, and a TOS program plays the SNDH file on a bare machine.
 [`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
-the Go tools ([tools.md](doc/tools.md) 16.6), and
-[`ym/play.sh`](ym/play.sh) runs the conversion and Hatari.
+the Go tools ([tools.md](doc/tools.md) 16.6).
 
-`ymxr-check` compares a converted tune with its dump. `ymxr-trace`
-prints the frame record used by the conformance kit. Tools write output
-to standard output and reports to standard error; `-silent` omits the
-report and summary but preserves output and notes ([tools.md](doc/tools.md) 3.3).
+`ymxr-check` compares a converted tune with its dump, and `ymxr-trace`
+prints the frame record the conformance kit uses. A tool writes its
+output to standard output and its report to standard error; `-silent`
+drops the report and the summary and keeps the output and the notes
+([tools.md](doc/tools.md) 3.3).
 
 ## Words used here
 
@@ -83,9 +81,9 @@ report and summary but preserves output and notes ([tools.md](doc/tools.md) 3.3)
 
 ## Reading and playback
 
-The host calls the player at the tune's frame rate. Each frame applies
-an unpacked tune row: effect columns first, then register columns. MFP
-interrupts run the tick procedure at each effect's rate.
+The host calls the player at the tune's frame rate. A frame applies an
+unpacked row of the tune: the effect columns, then the register columns.
+The MFP's interrupts run the tick at each effect's rate.
 
 ```mermaid
 flowchart TD
@@ -98,18 +96,18 @@ flowchart TD
     tick --> ym
 ```
 
-A tick writes a source byte through its target. It advances the *place*,
-or, at the marker on the last row, repeats the source or stops its timer.
-[SPEC.md](doc/SPEC.md) sections 4 and 5 define the order and interrupt
-boundaries. A YMXR reader records frames instead of writing to the chips;
-its record excludes ticks (section 7).
+A tick writes a source byte through its target and advances the
+*place*; at the marker on the last row it repeats the source or stops its
+timer. [SPEC.md](doc/SPEC.md) sections 4 and 5 define the order and where
+a tick may fall. A YMXR reader records the frames instead of writing the
+chips, and its record leaves the ticks out (section 7).
 
 ## The documents
 
-For a player, begin with [requirements.md](doc/requirements.md),
-[SPEC.md](doc/SPEC.md) sections 1 to 5 and
-[BINARIES.md](doc/BINARIES.md). For a reader, use SPEC.md sections 1 to 3
-and 7, then the [conformance kit](doc/conformance). Read SPEC.md with
+To write a player, start with [requirements.md](doc/requirements.md),
+[SPEC.md](doc/SPEC.md) sections 1 to 5 and [BINARIES.md](doc/BINARIES.md);
+to write a reader, SPEC.md sections 1 to 3 and 7, then the
+[conformance kit](doc/conformance). Read SPEC.md beside
 [YMXS's specification](https://github.com/odipar/YMXS/blob/main/doc/SPEC.md).
 
 | document | contents |
@@ -137,15 +135,15 @@ and 7, then the [conformance kit](doc/conformance). Read SPEC.md with
 | [`bin/`](bin) | the twelve as scripts, each writing standard output; ten read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1), and `ymxr-set` runs the calls of a whole set (16.6) |
 | [`68k/YMXR.S`](68k/YMXR.S) | the player; `YMXR_PERF` builds the raster monitor in |
 | [`68k/YMXR_sndh.S`](68k/YMXR_sndh.S), [`68k/YMXR_prg.S`](68k/YMXR_prg.S) | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool |
-| [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 18), and [`ym/test`](ym/test), ten dumps the tests run on |
+| [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 18), and [`ym/test`](ym/test), eleven dumps the tests run on |
 | [`release/`](release) | the scripts that build and list a release |
 
 ## Building and testing
 
-Java 23, Maven and rmac, with DTX and YMXS installed in the local Maven
-repository by `mvn install` in each checkout. The Go tree builds with
-`go build ./cmd/...` under [`go/`](go) and fetches its modules
-([tools.md](doc/tools.md) 19).
+The Java tree needs Java 23, Maven and rmac, with DTX and YMXS installed
+in the local Maven repository by `mvn install` in each checkout. The Go
+tree builds with `go build ./cmd/...` under [`go/`](go) and fetches its
+modules ([tools.md](doc/tools.md) 19).
 
 | what runs | what it reads |
 |---|---|
@@ -157,7 +155,45 @@ repository by `mvn install` in each checkout. The Go tree builds with
 [YMXS](https://github.com/odipar/YMXS) defines the tune a YMXR tune file
 encodes, and how it plays. [DTX](https://github.com/odipar/DTX) is the
 table format: `R` rows and `C` columns, every value `W` bytes, in one of
-three variants. [YMX](https://github.com/odipar/YMX) is the family this
-repository belongs to: a design document defining how YMXS, YMXR, DTX and
-ST4 fit together. YMX was a format and a player until 0.10.1, and YMXR
+three variants. [YMX](https://github.com/odipar/YMX), the family this
+repository belongs to, is a design document of how YMXS, YMXR, DTX and ST4
+fit together. It was a format and a player until 0.10.1, and YMXR
 replaces both.
+
+## License
+
+Anyone may implement the format. [SPEC.md](doc/SPEC.md) and
+[BINARIES.md](doc/BINARIES.md) define it, and an independent writer,
+player or reader owes only the acknowledgement of condition 2 of
+[LICENSE](LICENSE): documentation that indicates the use of YMXR. The
+player, the tools and the tests under `68k/`, `src/`, `go/`, `bin/`, `ym/`
+and `release/`, and the executables and 68000 binaries of a release, are
+free to use in any program, for any platform, commercial releases
+included, on the same condition. Where a program ships a DTX image, its
+documentation also indicates the use of ZX1 through ST4 through DTX. The
+licence excludes the published music in the tunes under `ym/test` and in
+the two conformance kits. LICENSE has the full terms and the notices that
+cover the LHA depacker.
+
+## Attribution
+
+YMXR, its specification, its player, its tools and its tests are © 2026
+Robbert van Dalen, written by Claude (Anthropic's Claude Code) under
+Robbert van Dalen's direction.
+
+[DTX](https://github.com/odipar/DTX), © 2026 Robbert van Dalen, is the
+table format a tune is laid out in, and a release ships its 68000 images.
+Each image has a decoder of [ST4](https://github.com/odipar/ST4), © 2026
+Robbert van Dalen, which packs a DTX2 column. The ST4 compressor derives
+from the [ZX1](https://github.com/einar-saukas/ZX1) format and algorithm
+by Einar Saukas (© 2021), with thanks to introspec/spke; the BSD 3-Clause
+License that covers it is in the licence files of ST4 and DTX.
+
+Arnaud Carré (Leonard/Oxygene) defined the YM5 and YM6 register-dump
+formats that `ym-to-ymxr` reads. The LHA depacker in `Lha.java` and
+`go/ym/dump.go` is a port of the LZH code of the ST-Sound library by
+Arnaud Carré, based on LZH code by Haruhiko Okumura (1991) and Kerwin F.
+Medina (1996).
+
+SNDH, the music container of the Atari ST scene, is the file structure
+`ymxr-sndh` and `ymxs-to-sndh` write ([BINARIES.md](doc/BINARIES.md) 3).
