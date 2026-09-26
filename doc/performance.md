@@ -26,9 +26,9 @@ refilled a row out of its ST4 data set, a period's bytes of it at once.
 | Turrican 2 - world completed 1 | 182 | 1606 | 4060 | 932 | 3436 |
 | capture | 1844 | 1414 | 3422 | 826 | 2822 |
 
-Six of the eleven packed at unit 1 before SPEC.md 6, rule 6, since an odd
-row count or repeat row does not divide by 2, and a refill of theirs was
-thirty units of a byte. The call on each, at unit 1 and padded to unit 2:
+Six of the eleven packed at unit 1 before SPEC.md 6, rule 6, since each
+had an odd row count or repeat row, and a refill of theirs was thirty units
+of a byte. The call on each, at unit 1 and padded to unit 2:
 
 | tune | on average at unit 1 | at unit 2 | at most at unit 1 | at unit 2 |
 |---|---|---|---|---|
@@ -41,7 +41,7 @@ thirty units of a byte. The call on each, at unit 1 and padded to unit 2:
 
 A table packs at unit 2 and a period of thirty rows, the column count, so
 a refill is fifteen units of two bytes and one comes every row (tools.md
-4). What those units cost follows how the column packed: a run of long
+4). The cost of those units depends on how the column packed: a run of long
 matches costs 12 cycles a unit to copy, and a short operation, a length
 and an offset read bit by bit, about 200 to 270 an operation to parse.
 The advance spends 450 cycles a refill outside the decoder, loading and
@@ -54,7 +54,7 @@ A refill that parses no new operation copies inside a match the ring
 already has, and the figure of a tune is the cost most of its refills
 read: 334 cycles inside the decoder on ten of the eleven, where the
 match's source stands after the ring's start, and 378 on capture, where
-the source crosses that start. The 44 between them is the decoder adding
+the source crosses that start. The 44 between them goes to adding
 the ring's size to the source and cutting the segment at the crossing
 (ST4's `source_wrapped`). A refill at unit 1 is 576.
 
@@ -72,51 +72,50 @@ Unit 1 packs the corpus to 0.69 bytes a frame against 0.81
 (experiments.md) and costs more to decode: on Turrican - world 4-3 the
 advance reads 1,132 on average and 4,298 at most against 884 and 3,826,
 and the play call 1,852 and 4,952 against 1,606 and 4,532. `-k1` packs at
-it.
+unit 1.
 
-The frame procedure is the rest, from 510 to 1,092 cycles on average:
-the fourteen register columns' tests and the writes they admit, the
-effects' columns and the call's entry and exit. An effect the tune
-does not run is jumped over, two nops standing at its columns' head
-where the tune runs it; an effect it runs tests its three set-bit
-columns in one pass and reads its count alone where none is set; a tone
-period and the envelope period branch on a zero byte before the bit
-beside it; a column's select is formed only where the column is set;
-and the frame stands inline in the call.
+The frame procedure is the rest, from 510 to 1,092 cycles on average: the
+fourteen register columns' tests and the writes they admit, the effects'
+columns and the call's entry and exit. The call jumps over an effect the
+tune leaves unused, and two nops replace the jump at the head of its columns
+where the tune runs it; an effect it runs tests its three set-bit columns in
+one pass and reads its count alone where none is set; a tone period and the
+envelope period branch on a zero byte before the bit beside it; a column's
+select is formed only where the column is set; and the frame procedure is
+inline in the call.
 
 The costliest frame of a tune is its heaviest refill, or a frame
 within a few hundred cycles of it: the column and the period whose fifteen
 units packed as the most operations. A table that repeats puts each
 column's decoder back to what it was at the loop's first row at that
 column's next refill, one column a row over the period after the pass's
-end, so no row pays for more than one decoder's copy.
+end, so each row pays for one decoder's copy at most.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it:
 the averages by more than two thirds of it, and the costliest frame of
 every tune by 1,562 cycles or more, Synergy Credits' 5,094 the nearest.
-The ticks of a frame stand beside the call and are counted in A tick below.
+The ticks of a frame come on top of the call, and A tick below counts them.
 
 ## The raster monitor
 
-The figures above are the rig's, counted instruction by instruction
-under an emulated 68000. A second measure runs on a cycle-exact machine,
-and the player is built with it: `rmac -dYMXR_PERF=1` puts the raster
-monitor in (`68k/YMXR.S`), and `bin/ymxr-sndh -perf` puts that core in
-an SNDH file. The call paints the background red while its work runs,
-one scanline to 512 cycles, and each tick handler paints a separate colour
-where the beam stands: effect 0 green, effect 1 blue, effect 2 magenta,
-effect 3 cyan, four colours distinct from the call's red and the bar's
-yellow, so a reader separates every band. A tick's band is a few
-hundred cycles wide, so each handler also adds a count of what its
-instructions cost, in turns of ten cycles, and the next call burns the
-total off as a yellow bar after its work, the register writes among them:
-no chip write moves for the bar, and the bar shows what the handlers cost
-the frame. The call waits for the display to start before it paints, since
-the VBL fires far above the screen and an unsynced bar lands in the top
-border, out of sight; the wait stands before the red mark, so it is outside
-the figures, and it is bounded, so a call from anywhere runs on. With the
-switch off, the default, the player is byte for byte the player without
-it.
+The figures above are the rig's, counted instruction by instruction under an
+emulated 68000. A second measure runs on a cycle-exact machine, and the
+player is built with it: `rmac -dYMXR_PERF=1` puts the raster monitor in
+(`68k/YMXR.S`), and `bin/ymxr-sndh -perf` puts that core in an SNDH file.
+The call paints the background red while its work runs, one scanline to 512
+cycles, and each tick handler paints a separate colour where the beam
+stands: effect 0 green, effect 1 blue, effect 2 magenta, effect 3 cyan, four
+colours distinct from the call's red and the bar's yellow, so a reader
+separates every band. A tick's band is a few hundred cycles wide, so each
+handler also adds a count of what its instructions cost, in turns of ten
+cycles, and the next call burns the total off as a yellow bar after its
+work, the register writes among them: the bar leaves every chip write where
+it was and shows what the handlers cost the frame. The call waits for the
+display to start before it paints, since the VBL fires far above the screen
+and an unsynced bar lands in the top border, out of sight; the wait stands
+before the red mark, so it is outside the figures, and it is bounded, so a
+call from anywhere runs on. With the switch off, the default, the player is
+byte for byte the player without it.
 
 `ym/cost.sh` builds a program with that core, runs it under Hatari tracing
 the writes to the background, and `ym/cost.py` reads every call's span back:
@@ -132,8 +131,8 @@ the wait moves the call's writes in time, which is why the monitor is a
 build for reading a run rather than one to play a tune with.
 
 A call writes the row the call before it read, and reads the next once its
-writes are made (68k/YMXR.S), so a row's refill stands behind that row's
-writes rather than in front of them. Measured on DBA 2 over 3,000 frames,
+writes are made (68k/YMXR.S), so a row's refill comes after that row's
+writes. Measured on DBA 2 over 3,000 frames,
 the call's first register write stands at least 752 cycles after the VBL.
 YMX writes its fourteen registers before it decodes for the same reason.
 
@@ -172,8 +171,8 @@ entries, and 40 fewer for a 60 Hz tune than the 240 of the even spacing
 (4.10), about 7,700 cycles; a rate the MFP counts no multiple of under
 400 keeps the 200 Hz clock.
 
-The VBL costs the handler of 4.8 once a frame, 50 ticks a second at the
-screen's rate, and the row lands where the frame procedure runs.
+The VBL costs the handler of BINARIES.md 4.8 once a frame, 50 ticks a second
+at the screen's rate, and the row lands where the frame procedure runs.
 
 ## Against YMX
 
@@ -181,7 +180,7 @@ YMX 0.10.1 measured its player the same way, painting the background red
 while a call runs and reading the palette writes back from a cycle-exact
 Hatari. So the two players were read by one method, on the same dumps, each
 over a `VBLS=2300` run: 2,019 calls of YMX and 2,020 of YMXR. YMX is a
-design document now, and its rows stand in this document alone, measured on
+design document now, and its rows are in this document alone, measured on
 the player of its 0.10.1 release; YMXR's are this release's, `ym/cost.sh`
 over the two tunes under TOS 2.06. `test_ymxr.py -cost` measures them again
 over the first 2,020 calls, under the operating system `TOS` names: a tick's
@@ -197,7 +196,7 @@ within 64.
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
 | Turrican - world 4-3 | YMXR | 1653 | 2944 | 4692 |
 
-These figures and the rig's are not one sample: the rig counts every frame
+These figures and the rig's are two samples: the rig counts every frame
 of the tune in 68000 cycles with no wait state, and these are the first
 2,020 calls on a machine that stalls the processor while the shifter
 fetches. Synergy Credits' costliest frame is its 5,347th, past the end of
@@ -214,7 +213,7 @@ included. Fourteen tests and a few writes cost what fourteen writes cost,
 which YMX's measurement found and its design follows; the schema adds the
 effects' columns and the entry. So YMXR's frame procedure costs less on the
 rows that set few columns, 722 on average on that tune, the rig's call there
-less its advance, against YMX's 908, and the average lands under.
+less its advance, against YMX's 908, and its average is the lower.
 
 The refill is the second cause. YMXR refills fifteen units every row; YMX
 serves a round-robin of twenty-four slots, twenty-one of them a live stream,
@@ -230,13 +229,13 @@ The worst frame of each player parses one operation for every unit, fifteen
 of fifteen here and twelve of twelve there, so each worst frame is that
 bound. On Synergy Credits the run ends before YMXR's costliest frame, so its
 4,296 at most is not that frame, which the rig counts at 5,094. Both players
-pad this tune to unit 2, YMX by duplicating a frame and YMXR by a row that
-sets no column (SPEC.md 6, rule 6); before that rule the tune packed at unit
+pad this tune to unit 2, YMX by duplicating a frame and YMXR by an unset
+row (SPEC.md 6, rule 6); before that rule the tune packed at unit
 1, the refill was thirty units, and a run of the same length reads 5,168 at
 most.
 
-The one thing YMX does here that this player does not is write its register
-columns unconditionally, dense, with the effects behind one bit. Counted by
+YMX alone writes its register columns unconditionally, dense, with the
+effects behind one bit. Counted by
 the rig against the player as it stands, each register written as the player
 writes a set column, in 36 cycles, and the effects' steps behind a test of
 22, that costs 31 to 173 cycles a frame on eight of the eleven fixtures and
@@ -262,8 +261,8 @@ only where it writes.
 | a square's two rows, one effect | 80 |
 | a source of one row, one effect | 56 |
 
-A tick reads its row through the program counter, which the player does
-unasked; the section below reads what an absolute address costs instead.
+A tick reads its row through the program counter by default; the section
+below measures an absolute address instead.
 With the interrupt's entry and its `rte`, a tick is 160 cycles: 12% of an
 8 MHz 68000 at a digidrum's 6,000 ticks a second, and 51% at 25,600.
 
@@ -315,8 +314,8 @@ shortens the next. `ym/writes.py` reads two traces back this way.
 A tune that runs one effect has no second timer to nest inside a tick, so
 init writes two nops where that effect's handlers drop the interrupt level:
 8 cycles a tick, the drop costing 16 and the nops 8. Only a path that
-writes a row's value drops it and the marker's two never did, so the two
-marker rows of the second five stand at what the first five's do. A tune
+writes a row's value drops the level, so the two marker rows of the second
+five equal those of the first five. A tune
 running two or more effects keeps the drop, since a faster timer waits
 behind a slower one without it.
 
@@ -336,8 +335,7 @@ buzzer, so 445 cycles a frame come off it against a play call of 1,493.
 83 tunes of it naming any source (experiments.md), so what the handler
 saves is measured on this tune and the conformance kit alone. The target
 belongs to the effect on all three handlers, patched at a start out of the
-effect's record, so a source's shape selects the handler and the register
-it drives does not.
+effect's record, so the handler follows the source's shape alone.
 
 A start separates three shapes off one cell, which would cost every start
 16 cycles. Init already walks every source to resolve it, so it reads there
@@ -381,9 +379,10 @@ row through an absolute address (A tick through an absolute address):
 
 So 20 cycles a tick that writes a row, as the counted handler of one
 column costs against the general one, and 40 on the path that loops,
-where the reload of the counter stands too. What that buys is the half of
-the envelope period a marked source cannot reach and the row it would
-spoil: the tick that reads the last row of a marked source on this target
+where the reload of the counter stands too. The counted handler reaches
+the half of the envelope period above a marked source's range, and plays
+the last row as written: the tick that reads the last row of a marked
+source on this target
 writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
@@ -403,8 +402,8 @@ cycles where a displacement costs 16; the step that moves the place is an
 `addq.l` on a long address, 28 against the 20 an `addq.w` on a
 displacement costs; and the loop's test and its reload move the same way,
 20 against 16 and 36 against 28. A square's handler and a one-row
-source's write a value the start patched into them, so both cost what
-they cost:
+source's write a value the start patched into them, so both cost the same
+in either build:
 
 | tick | cycles |
 |---|---|
@@ -479,5 +478,7 @@ minute part where a square's edge crosses a sample and rejoin after it,
 at one loudness - 4,572 against 4,558 over the minute - and one set of
 partials. `ym/writes.py` reads the two traces back.
 
-The rig reads every figure here back with `-cycles`, and `-hatari` plays
-the same tunes on a cycle-exact machine, where the MFP fires the ticks.
+The rig reads these figures back: `-cycles` and `-cycles -abs` its counts,
+`-clock` the program's clock and `-cost` the comparison with YMX under
+Hatari; `-hatari` plays the same tunes on a cycle-exact machine, where the
+MFP fires the ticks.
