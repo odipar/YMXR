@@ -2,9 +2,9 @@
 
 The terms of the two chips and of the format, one word for each thing
 (requirements.md R0.6 to R0.9). [glossary.md](glossary.md) lists every
-term with the section that defines it. The range of a register, what a
-volume bit selects and what a write to R13 does are YMXS, SPEC.md 2,
-cited here and defined there.
+term with the section that defines it. YMXS, SPEC.md 2 defines the range
+of a register, what a volume bit selects and what a write to R13 does,
+and this document cites it.
 
 **Conventions.** A clause is cited by number, 2.3. A bold term is defined
 in the clause that bolds it. A range includes both ends. `Note:` begins
@@ -134,10 +134,10 @@ written (SPEC.md 1.9).
 **2.5 Claim and release.** A player **claims** a timer at init, for each
 effect the effects used byte marks: it stops the timer, writes its
 vector, clears its pending bit, and sets its enable bit and its mask bit.
-It **releases** it at stop, the reverse: the timer stopped, its enable
-bit and its mask bit cleared, its pending bit cleared. A timer outside
-the tune's is left as it is. Note: YMXS, SPEC.md 8.5 leaves what
-a claim comprises to a later version; this format fixes it.
+It **releases** it at stop, the reverse: it stops the timer and clears
+its enable bit, its mask bit and its pending bit. A player leaves a timer
+outside the tune's as it is. Note: YMXS, SPEC.md 8.5 leaves what a claim
+comprises to a later version; this format fixes it.
 
 ---
 
@@ -150,8 +150,8 @@ are its **metadata**; the layout of the rows is one of DTX's variants
 (R1.2).
 
 **3.2 A row.** A **row** is one step of a table: `C` values, one a
-**column**, each `W` bytes. A table has values alone; the meaning of a
-column is the format's (R2.1). An **unset row** is a row of the tune's
+**column**, each `W` bytes. A table has values alone, and the format
+defines what a column means (R2.1). An **unset row** is a row of the tune's
 table that leaves every column unset: a frame that reads it leaves every
 register as it is and every timer running (SPEC.md 6, rule 6).
 
@@ -181,17 +181,17 @@ of a tune that plays once, a call leaves every register as it is and
 reports -1 (SPEC.md 4).
 
 **4.2 A tick.** The clock of a timer is its interrupt (2.2). Its table is
-a source, its procedure a target, which writes one register (SPEC.md 5),
-and one advance and call is a **tick**. Note: YMXS, SPEC.md 8.6 leaves
-where a tick falls in a frame, and what a tick of a timer with no source
-connected performs, to a later version; this format fixes both (SPEC.md
-4.2.1, 5.2.1).
+a source, its procedure a target, which writes one, two or three registers
+(SPEC.md 2.1, 5), and one advance and call is a **tick**. Note: YMXS,
+SPEC.md 8.6 leaves where a tick falls in a frame, and what a tick of a
+timer with no source connected performs, to a later version; this format
+fixes both (SPEC.md 4.2.1, 5.2.1).
 
 **4.3 Row and frame.** A document about storing or packing values uses
 row (3.2); a document about playing uses frame (4.1).
 
 **4.4 What each writes.** A frame writes the registers its row sets; a
-tick writes the register of its target. Under rule 1 of SPEC.md 6 a row
+tick writes the registers of its target. Under rule 1 of SPEC.md 6 a row
 leaves a register an effect runs on unset, R13 excepted.
 
 ---
@@ -223,7 +223,7 @@ at 13 when the timer stops.
 is the pitch and the row is the shape.
 
 **5.5 The kinds.** The tools report a source as a square, a drum or a
-buzzer (tools.md), the kinds of 5.2 to 5.4; a sinus SID, a fourth kind of
-the dumps, is dropped with a note (tools.md). The format encodes a source
-as a table (SPEC.md 2.2), and the kind is outside the format: a player
-reads the table alone.
+buzzer (tools.md), the kinds of 5.2 to 5.4, and the converter drops a
+sinus SID, a fourth kind of the dumps, with a note (tools.md). The format
+encodes a source as a table (SPEC.md 2.2), and the kind is outside the
+format: a player reads the table alone.
