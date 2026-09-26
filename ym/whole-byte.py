@@ -32,7 +32,7 @@ The note a sweep drives stands at a period of 256 to 511, a coarse byte
 of 1, so a fine byte over its whole range moves the pitch by an octave:
 at a lower note the coarse byte would swamp the sweep.
 
-experiments.md reads what the five sections come to.
+experiments.md reads what the six sections come to.
 """
 import json
 
