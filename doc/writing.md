@@ -52,7 +52,7 @@ leaves the rows between unset.
 ## 4. The effects
 
 **4.1** Four columns an effect: the target, the source, the timer's
-control and its count (SPEC.md 1.8, 1.9). The target column names a
+control and its count (SPEC.md 1.8, 1.9). The target column selects a
 target of SPEC.md 2.1: a register, 0 to 13, or from version 4 a target
 of two or three registers, 14 to 24. A row starts an effect by setting
 the source column to the source's number, 1 to 127, and stops it by
@@ -63,18 +63,19 @@ source column of 0 is unset (SPEC.md 1.1).
 timer's reset in bit 6, the place's reset in bit 5, and in bit 4 the
 mark that a count column of 0 is the value 256 (SPEC.md 1.9).
 
-**4.3** SPEC.md 2.3 assigns Timers A, D, B and C to effects 0 to 3; a
-writer selects an effect, and its timer is that of the assignment. A
-tune running one effect sets columns 14 to 17 and leaves 18 to 29 unset
-for its whole length.
+**4.3** SPEC.md 2.3 assigns Timers A, D, B and C to effects 0 to 3, so
+a writer selects a timer by selecting an effect. A tune running one
+effect sets columns 14 to 17 and leaves 18 to 29 unset for its whole
+length.
 
 **4.4 SPEC.md 6 binds the writer.** Its rules fix which columns a row
-leaves unset while an effect runs, which effects a row may name, and
-which bits a row that starts a source sets with it. A player assumes the
-rules and writes each set column as the row has it (YMXS, SPEC.md 6.1);
-a file that breaks one plays, and a check of the structure reports the
-breach as a warning (tools.md 7.2). Each rule names the YMXS rule it
-encodes; YMXS, SPEC.md 6 defines those in the structure.
+leaves unset while an effect runs, which effects and numbers a row sets,
+and which bits a row that starts a source sets with it. A player assumes
+the rules and writes each set column as the row has it (SPEC.md 6.1), so
+a file that breaks one plays as its columns read. Rules 1, 3 and 4
+encode rules of YMXS, SPEC.md 6, and a converter reports a breach of a
+YMXS rule in the structure as a warning (tools.md 7.2); rules 2, 5 and 6
+are this format's.
 
 ---
 
@@ -86,29 +87,30 @@ or 3, the registers its target writes, and `W` is 1. `RR` is the row it
 repeats to; where `RR` equals `R` the source plays once.
 
 **5.2** A source ends on its marker or on its count. A marked source
-sets bit 7, the marker, in the column SPEC.md 2.1 names for its target
-on the last row, and clears it on every other row (SPEC.md 3.2); that
-column writes a register that reads seven bits or fewer, and on a target
-of one register the target is `setR1`, `setR3`, `setR5`, `setR6`,
-`setR8` to `setR10` or `setR13`. A target of one register that reads
-every bit of its byte, `setR0`, `setR2`, `setR4`, `setR7`, `setR11` or
-`setR12`, runs a counted source: every bit of a row is a value, bit 31
-of its index entry is 1, and a tick counts `R` rows (SPEC.md 3.1.6). A
-counted source on `setR7` sets bits 7 and 6 of every row, the directions
-of the two ports (SPEC.md 6, rule 2(f)). A source of two columns on
-`setEnvelope` is counted as well, and a file of version 4 or 5 writes it
-marked in its place, bit 7 of R12's column the marker (SPEC.md 2.1.3,
-2.1.4). Targets 25 upward are left to a later version (SPEC.md 2.1,
-R6.2).
+sets bit 7, the marker, on its last row and clears it on every other row
+(SPEC.md 3.2), in the column SPEC.md 2.1 assigns its target: a column of
+a register that reads seven bits or fewer. A target of one register
+that runs a marked source is `setR1`, `setR3`, `setR5`, `setR6`, `setR8`
+to `setR10` or `setR13`.
 
-**5.3** A writer writes the lowest version the tune reads under (SPEC.md
+**5.3** A target of one register that reads eight bits, `setR0`,
+`setR2`, `setR4`, `setR7`, `setR11` or `setR12`, runs a counted source:
+every bit of a row is a value, bit 31 of its index entry is 1, and a
+tick counts `R` rows (SPEC.md 3.1.6). A counted source on `setR7` sets
+bits 7 and 6 of every row, the directions of the two ports (SPEC.md 6,
+rule 2(f)). A source of two columns on `setEnvelope` is counted as well;
+a file of version 4 or 5 has the marked form in its place, the marker in
+bit 7 of R12's column (SPEC.md 2.1.3, 2.1.4). Targets 25 upward are left
+to a later version (SPEC.md 2.1, R6.2).
+
+**5.4** A writer writes the lowest version the tune reads under (SPEC.md
 3.3.5): 3 where every source is one column and every target 0 to 13, 4
 with a source of several columns or a target of 14 upward, 5 with a
 counted source of one column, and 6 with a counted source of several
-columns. An older player then reads every tune two versions encode.
+columns, so a player of an older version reads every tune that version
+encodes.
 
-**5.4** The format leaves the kind of a source to its shape (SPEC.md
-2.2); the sound follows from the shape:
+**5.5** The shape of a source sets its sound (SPEC.md 2.2):
 
 | the source | the sound |
 |---|---|
@@ -116,8 +118,8 @@ columns. An older player then reads every tune two versions encode.
 | two rows repeating to row 0 | a volume moving between a level and 0 at the timer's rate: a SID voice |
 | many rows played once | a recording through a volume register: a digidrum |
 
-**5.5** The values belong to the source: two SID voices at two levels are
-two sources, and the effect column names one of them.
+**5.6** The values belong to the source: two SID voices at two levels are
+two sources, and the source column selects one of them.
 
 ---
 
@@ -143,8 +145,8 @@ thirty rings and a fixed part; a smaller ring packs to more bytes
 A reader rejects a file with a condition of SPEC.md 3.3.4, reports the
 first (SPEC.md 7) and produces zero entries. Among them: a version other
 than 3 to 6, a source other than one, two or three columns of one byte,
-and a source the file's version is below: a source of several columns in
-version 3, a counted source below version 5, and a counted source of
+and a source newer than the file's version: a source of several columns
+in version 3, a counted source below version 5, and a counted source of
 several columns below version 6.
 
 ---
@@ -162,13 +164,13 @@ ym/play.sh tune.ymxr                  # under Hatari, with its sound on
 
 **8.2** The third plays the file on an emulated 68000 and checks every
 frame against a model of SPEC.md 4 and 5 built from the tune's tables,
-and names the frame and the register that differ; `-hatari` plays it on
+and reports the frame and the register that differ; `-hatari` plays it on
 a real MFP (tools.md 17.1).
 
 **8.3** `doc/conformance/tunes/` has fifteen tune files: fourteen a
 reader reads, of versions 3 to 6, and `wrong-version.ymxr`, version
-`$0007`, which a reader rejects (7); `MANIFEST.txt` names the record of
-each by its sha256 and size, the rejected one's empty.
+`$0007`, which a reader rejects (7); `MANIFEST.txt` lists the sha256 and
+the size of the record of each, the rejected one's empty.
 
 ---
 
@@ -179,7 +181,7 @@ each by its sha256 and size, the rejected one's empty.
 3. SPEC.md 2, the targets, the sources and the timers.
 4. SPEC.md 3, the bytes of the tune file.
 5. SPEC.md 6, the rules that bind a writer.
-6. SPEC.md 4 and 5, what a player does with all of it.
+6. SPEC.md 4 and 5, how a player plays a tune.
 
 [glossary.md](glossary.md) lists every term this uses, and
 [terminology.md](terminology.md) describes the machine the terms name.
