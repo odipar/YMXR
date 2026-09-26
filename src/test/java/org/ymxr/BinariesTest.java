@@ -22,8 +22,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * The five binaries as the build assembled them, and what the tools make
- * of them: each of the four cores' descriptors and the stub's as
+ * The nine binaries as the build assembled them, and what the tools make
+ * of them: each of the eight cores' descriptors and the stub's as
  * BINARIES.md defines them, an SNDH file from the kit's tunes read back
  * tag by tag and part by part, and a program around it.
  */

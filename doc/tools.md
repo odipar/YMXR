@@ -11,8 +11,7 @@ YM3!, YM3b, YM5! or YM6!, bare or in an LHA archive.
 **Conventions.** A clause is cited by number, 8.3. In a quoted line a
 capital letter is a decimal figure defined beside the line or in the
 clause, and `<x>` a text the clause names; a format is that of C's
-`printf`.
-`Note:` begins an informative sentence.
+`printf`. `Note:` begins an informative sentence.
 
 ---
 
@@ -88,6 +87,7 @@ command directory `go/cmd/<tool>`.
 | `ymxs-to-prg` | `org.ymxr.YmxsToPrg` |
 | `ymxr-check` | `org.ymxr.Check` |
 | `ymxr-trace` | `org.ymxr.Trace` |
+| `ymxr-layout` | `org.ymxr.Layout` |
 | `ymxr-bind` | `org.ymxr.Bind` |
 | `ymxr-multi` | `org.ymxr.Multi` |
 | `ymxr-sndh` | `org.ymxr.Sndh` |
@@ -105,11 +105,10 @@ other than `-` names a file (9, 12).
 
 **3.2 A wrong call** writes one line and exits with 2. A tool reads a
 flag outside its flags before standard input, `ymxr-check` excepted
-(8.4), and `ym-to-ymxr`, `ymxr-check`, `ymxr-trace`,
-`ymxr-prg` and `ymxs-to-prg` the numbers of their flags before it,
-standard input then unread;
-`ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg` read the numbers of
-`-kK`, `-mN` and `-copies[S]` after reading and checking the structure
+(8.4), and `ym-to-ymxr`, `ymxr-check`, `ymxr-trace`, `ymxr-prg` and
+`ymxs-to-prg` the numbers of their flags before it, standard input then
+unread; `ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg` read the numbers
+of `-kK`, `-mN` and `-copies[S]` after reading and checking the structure
 (7.1), so an error of the structure is reported first, exit 1. X is the
 argument.
 
@@ -221,10 +220,9 @@ named by the dump's song name (4.6).
 writes one that repeats to row RR; RR above the dump's frame count F is
 the error `the repeat row RR is past the dump's F frames`, exit 1, RR
 equal to F a tune that plays once, and RR below 0 is read as both flags
-absent. With both flags absent the tune
-repeats to the dump's loop frame; where that is at or above F the tune
-plays once and the tool notes `the dump's loop frame L is past its last
-frame: the tune plays once`.
+absent. With both flags absent the tune repeats to the dump's loop frame;
+where that is at or above F the tune plays once and the tool notes `the
+dump's loop frame L is past its last frame: the tune plays once`.
 
 **5.3 The report**, in order:
 
@@ -297,7 +295,10 @@ row where it arises:
 | the tune starts more than 127 sources | `the tune runs N sources, and a source column numbers 127` |
 | row N has a count outside 0 to 255 | `row N: a count of C, and the count column reaches 0 to 255` |
 | row N performs an operation outside `Start`, `Retune` and `Stop` | `row N: an effect this version does not read` |
-| a source has a value outside 0 to 127 | `the source NAME has the value V in row R, and bit 7 of a source's row is the marker` |
+| a source runs on a target past 24 | `the source <source> runs on <target>, a target this version leaves to a later one (SPEC.md section 8)` |
+| a source runs on two targets whose markers are in different columns | `the source <source> runs on targets that mark column A and column B, and a source has one marker column (SPEC.md rule 2(d))` |
+| a marked source has a value past 127 in its marker's column | `the source <source> has the value V in row R of column C, and bit 7 of the marker's column is the marker` |
+| a source has a value past 255 | `the source <source> has the value V in row R of column C, and a column is one byte` |
 
 **7.2 The warnings.** After the check and before the report, each
 finding of YMXS's check of the writing rules (YMXS, SPEC.md 6.3) is a
@@ -382,7 +383,7 @@ reckons.
 
 **8.4 A file that fails to read** is a verdict of one line: `unreadable:
 <message>`, `the archive does not unpack: <message>`, or `the converter
-rejects it: <message>` for a dump the converter rejects. A flag
+refuses it: <message>` for a dump the converter rejects. A flag
 outside the converter's is that verdict with the message `not a flag of
 the tool: X`, exit 1, in place of the wrong call of 3.2 (19.5).
 
@@ -433,7 +434,7 @@ reads a file, so `-silent` is its one flag.
 
 **9.6 The report** is the heading `the file: B bytes, kind K`, K one of
 `multi`, `bound`, `sndh` and `program`, and a row for each part the
-record has more than none of: `the tag(s)`, `the tune(s)`, `the
+record has one or more of: `the tag(s)`, `the tune(s)`, `the
 source(s)` and `the image(s)`, each the lines of that part. The summary
 line is `ymxr-layout: N line(s)`.
 
@@ -482,13 +483,13 @@ most`, exit 1.
 **11.3 The summary lines** are `ymxr-multi: <name>: B bytes` for each
 tune, then `ymxr-multi: N tune(s), B bytes`.
 
-**11.4 Reading a multi file.** A file of 8 bytes or more beginning
-`YMXM` is read as a multi file (BINARIES.md 0), and a tool that reads one
-rejects, with the line, exit 1: a version word other than 3, `version V
-is not 3`; a count outside 1 to 99, `N tunes, and a multi file has 1 to
-99`; an index past the file's end, `the entries of N tunes stand past
-the file's B bytes`; an entry outside the file, `tune N stands at A for
-B bytes, and the file has F`, A its offset.
+**11.4 Reading a multi file.** A file of 8 bytes or more beginning `YMXM` is
+read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
+with the line, exit 1: a version word other than 3 to 6, `version V is not
+3, 4, 5 or 6`; a count outside 1 to 99, `N tunes, and a multi file has 1 to
+99`; an index past the file's end, `the entries of N tunes stand past the
+file's B bytes`; an entry outside the file, `tune N stands at A for B bytes,
+and the file has F`, A its offset.
 
 ---
 
@@ -534,11 +535,11 @@ prints the text as passed.
 
 **12.3 The core's descriptor** (BINARIES.md 2) is checked before the
 combine: `not an SNDH core: no YMXS at 12`; `the core's descriptor is
-version V, and this writes 1`; `the core reads bound tunes of version V,
-and this binds at 3`; `the core's flags at 22 read F, and the raster
-monitor asked for needs bit 0 set`; `... the lean tick asked for needs
-bit 1 set`, or `... the row read through the program counter asked for
-needs bit 2 set`.
+version V, and this writes 1`; `the core reads bound tunes to version V, and
+this binds at W`, W the version the tune binds at; `the core's flags at 22
+read F, and the raster monitor asked for needs bit 0 set`; `... the lean
+tick asked for needs bit 1 set`, or `... the row read through the program
+counter asked for needs bit 2 set`.
 
 **12.4 The report:** the heading `the core: <file>, B bytes` with the
 row `the switches`, of `-perf, the raster monitor in` and `-lean, ticks
@@ -631,7 +632,7 @@ its first three longs are `bra.w` to the calls, and the SNDH core
 
 | offset | call | in | out |
 |---|---|---|---|
-| 0 | `YMXR_init` | `a0` the bound tune (BINARIES.md 1), on an even address; `a1` the workspace, on a long | `d0` 0, or -1 for a bound tune of another magic or version, or whose image's variant byte is other than 2 |
+| 0 | `YMXR_init` | `a0` the bound tune (BINARIES.md 1), on an even address; `a1` the workspace, on a long | `d0` 0, or -1 for a bound tune of another magic or version, whose image's variant byte is other than 2, or with a source past the handlers' reach (BINARIES.md 1.5) |
 | 4 | `YMXR_play` | `a0` the workspace | `d0` 0, or -1 where the tune has played its last row and plays once; that call leaves every register as it is |
 | 8 | `YMXR_stop` | `a0` the workspace | - |
 
@@ -707,7 +708,7 @@ the background colour, and `ym/cost.py` on the trace, one line a tune. An
 option outside the two is `ym/cost.sh does not read <option>`, exit 2.
 
 **16.5 `Binaries DIR... [-aRMAC] [-sSOURCES]`**, class
-`org.ymxr.Binaries`, assembles the four cores and the stub with `rmac
+`org.ymxr.Binaries`, assembles the eight cores and the stub with `rmac
 -m68000 -fr -i68k <defines> -o` into each directory named, one line each
 `%-24s %5d bytes`; the assembler is `rmac` on the path or `-aRMAC`, the
 sources `68k` or `-sSOURCES`. A failure is `binaries: no <file>
@@ -751,9 +752,9 @@ tool's exit code, standard output empty.
 **17.1 `68k/test/emu/test_ymxr.py [mode] [tune ...]`** converts each dump
 named, or every dump under `ym/test`, and a dump the converter reads as
 another format (5.1) stands outside the run, named on a line and counted
-apart from the tunes that played wrong. The rig binds each tune
-through `ymxr-bind` and
-plays it row by row on an emulated 68000 (unicorn), against a model of
+apart from the tunes that played wrong. The rig binds each tune through
+`ymxr-bind` and plays it row by row on an emulated 68000 (unicorn),
+against a model of
 SPEC.md 4 and 5 built from the tune's tables: every frame's chip writes
 in order, each timer's programming, each handler's place, and every
 tick's write. The rig fires each tick at the time the model computes, in
@@ -763,7 +764,7 @@ to R0 and stops the timer (SPEC.md 5.2.1), and a tick inside a frame,
 which the rig stops at the head of each effect's step and after the last
 of them (SPEC.md 4.2.1). The frame it stops in is one whose row moves
 what the effect's tick writes, so the reading before that effect's step
-and the reading after it differ, and the run says how many of the
+and the reading after it differ, and the run reports how many of the
 boundaries a tick was fired at. A name ending `.ymxr` is played as it
 stands, and a run writes one such tune itself: a start that moves no
 place with no start on that timer before it, which no conversion of a
@@ -792,13 +793,12 @@ program of twelve subtunes, each writing the number it is to R0, starts
 Hatari with a command fifo and a trace of the chip writes, and presses the
 keys of BINARIES.md 4.6 step 4 through the fifo: RIGHT and DOWN step on,
 LEFT and UP step back, both wrap, two digits typed inside the pause reach
-subtune 12, and a digit no second can grow starts at once. The trace says
-which subtune plays, so each check reads what the chip was written rather
-than what a sleep hoped for. Hatari ends the run itself at a VBL count,
-with no dialog to answer, and a run that outlives it is killed. `--keep`
-leaves the work directory, and `HATARI` and `TOS` name the emulator and a
-TOS image as 16.3 reads them; a missing one is exit 2, a key that lands on
-another subtune exit 1.
+subtune 12, and a digit no second can grow starts at once. The trace records
+which subtune plays, and each check reads the chip's writes. Hatari ends the
+run itself at a VBL count, with no dialog to answer, and a run that outlives
+it is killed. `--keep` leaves the work directory, and `HATARI` and `TOS`
+name the emulator and a TOS image as 16.3 reads them; a missing one is exit
+2, a key that lands on another subtune exit 1.
 
 `YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs three things
 on every build: the two built tunes at `-frames24` on each of the eight
@@ -939,7 +939,7 @@ and `linux-arm64`, one zip a platform in `dist/release`, named
 `OUT` replaces `dist`. A platform outside the six is `publish: <target>
 is not a platform this builds`, exit 1. The nine binaries it requires
 under `go/binaries/data` are the ones `go/binaries/binaries.go` names,
-so one list cannot drift from the other: a missing one is `publish:
+so the two lists agree: a missing one is `publish:
 <path> is not built: run mvn process-classes` and a Go file naming none
 is `publish: go/binaries/binaries.go names no binary`, exit 1 either
 way. After the zips the script runs `manifest.sh` (20.2); then, where
