@@ -18,7 +18,7 @@
 # and ParityTest checks the two against one another, byte for byte; a
 # release is built from one tree.
 #
-# A Go executable runs as it stands: a Java tool runs through bin/run,
+# A Go executable runs as it is: a Java tool runs through bin/run,
 # which finds the classpath first, and these run with no wrapper.
 set -e
 cd "$(dirname "$0")/.."

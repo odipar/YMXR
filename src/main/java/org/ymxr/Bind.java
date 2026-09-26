@@ -57,7 +57,7 @@ final class Bind {
         }
         int state = Tune.getLong(bound, Bound.STATE_AT);
         int image = Tune.getLong(bound, Bound.IMAGE_AT);
-        // The image stands before the DTX1 source tables, so where there
+        // The image is before the DTX1 source tables, so where there
         // is a source the first one's offset ends the image, and where
         // there is none the file does.
         int sources = TuneFile.read(tune).sources().size();

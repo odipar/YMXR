@@ -28,10 +28,10 @@ final class Sources {
 
     /** One source: a column a value of the row (SPEC.md 2.2.1), each
      *  column the R values of that column in row order, and the row it
-     *  repeats to, `R` where it plays once. The marker stands in bit 7 of
+     *  repeats to, `R` where it plays once. The marker is in bit 7 of
      *  the last row of the column the target names (SPEC.md 3.2.1), other
      *  than on a source whose column fills its byte, where every row is a
-     *  whole byte and the end stands in the count a player keeps. */
+     *  whole byte and the end is in the count a player keeps. */
     record Source(int kind, int data, byte[][] columns, int repeat, boolean counted) {
 
         /** A source the marker ends. */
@@ -67,7 +67,7 @@ final class Sources {
     }
 
     /** The song's digidrums as 4-bit levels: the high nibble of an 8-bit
-     *  sample, or the byte as it stands where the file has 4-bit values. */
+     *  sample, or the byte as it is where the file has 4-bit values. */
     Sources(YmDump.Song song) {
         boolean fourBit = (song.attributes() & YmDump.Song.A_DRUM4BITS) != 0;
         byte[][] source = song.drums();

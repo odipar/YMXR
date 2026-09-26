@@ -15,11 +15,11 @@ import java.util.stream.Stream;
  * The 68000 binaries the tools combine with bound tunes
  * (doc/BINARIES.md): the SNDH core, which {@link Sndh} puts under an SNDH
  * file's entries, and the program stub, which {@link Prg} puts in front
- * of an SNDH file. Three switches of the player's stand in the core, the
+ * of an SNDH file. Three switches of the player's are in the core, the
  * raster monitor, the lean tick and the row read through an absolute
  * address, and each of their eight settings is a separate core, so a file
  * that requests two uses the core that is both. A tick reads its row
- * through the program counter where {@code YMXR_PCREL} stands at 1, its
+ * through the program counter where {@code YMXR_PCREL} is at 1, its
  * value unasked (doc/performance.md).
  * The build assembles each once from its source under {@code 68k} and
  * writes it into the classes, the one step rmac is needed for; a tool

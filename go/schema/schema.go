@@ -248,7 +248,7 @@ func effectOf(timer ymxs.Timer) (int, error) {
 	return 0, fmt.Errorf("no effect runs on Timer %s", timer)
 }
 
-// markers is the column of each source's row the marker stands in, off the
+// markers is the column of each source's row the marker is in, off the
 // targets the tune starts that source on (SPEC.md 2.1, 3.2.1).
 //
 // The error names a target this version does not encode, or two targets of
@@ -257,7 +257,7 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) ([]int, []int, error) {
 	marker := make([]int, len(sources))
 	target := make([]int, len(sources))
 	// unstarted: no row starts the source, so no target names a column and
-	// the marker stands in column 0, as every version before this one
+	// the marker is in column 0, as every version before this one
 	// wrote every source.
 	for i := range marker {
 		marker[i] = unstarted
@@ -306,7 +306,7 @@ func sourceTables(sources []ymxs.Source, marker, target []int) ([]ymxr.Source, e
 		values := ymxs.SourceRows(source).Rows
 		counted := marker[n] == -1
 		// A tick of a counted source on setR7 writes the row whole, so the
-		// two port directions stand in the source rather than in the
+		// two port directions are in the source rather than in the
 		// player (SPEC.md rule 2(f)).
 		ports := 0
 		if counted && target[n] == ymxr.MixerTarget {

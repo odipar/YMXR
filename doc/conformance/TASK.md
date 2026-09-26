@@ -45,7 +45,7 @@ byte a column, the rows adjoining.
 Read the table from it. The frame rate, the effects used, the source
 index and the sources' tables are in the tune file as `SPEC.md` 3 lays
 it out. The DTX2 table in the tune file packs the same rows in a form
-another format defines; the rows file stands in for it.
+another format defines; the rows file replaces it.
 
 **4. The tunes.** Each is a `.ymxr` beside its `.rows`; the tunes differ
 in what they reach. Every tune names the targets `SPEC.md` 2.1 assigns,

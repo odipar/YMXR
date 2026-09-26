@@ -55,7 +55,7 @@ final class Bound {
     static final int INDEX_AT = 24;
 
     /** The image's format block, and where the state block's bytes and the
-     *  first table stand in it (DTX, abi.md 1). */
+     *  first table are in it (DTX, abi.md 1). */
     static final int FORMAT_AT = 16;
     static final int FORMAT_STATE_AT = 4;
     static final int FORMAT_TABLE_AT = 8;
@@ -66,16 +66,16 @@ final class Bound {
     /**
      * A set of tunes bound together: the images their tables were packaged
      * into, and a bound tune for each, in the order named. A bound tune
-     * here has no image in it, and its {@code IMAGE_AT} stands at
+     * here has no image in it, and its {@code IMAGE_AT} is at
      * 0 for the caller that lays them out to patch (SPEC.md's files are
      * laid out by {@link Sndh}).
      *
      * <p>The tunes are grouped by what an image fixes once (DTX abi.md 1),
      * so tunes that agree on those share one image and the reader's code
-     * stands once for the group.
+     * appears once for the group.
      *
-     * @param image which image each tune's table stands in
-     * @param table where each tune's table stands in it
+     * @param image which image each tune's table is in
+     * @param table where each tune's table is in it
      */
     record Set(List<byte[]> images, List<String> shapes, List<byte[]> tunes,
             int[] image, int[] table) {
@@ -144,7 +144,7 @@ final class Bound {
     /** The bound tune of a tune file: the header with the magic and the
      *  version replaced and the state block's bytes and the image's place
      *  put in, the index recomputed, then the image, then the file's DTX1
-     *  tables as they stand. */
+     *  tables as they are. */
     static byte[] of(byte[] tuneFile) {
         byte[] image = Packager.image(TuneFile.read(tuneFile).dtx2());
         return build(tuneFile, image,
@@ -154,7 +154,7 @@ final class Bound {
 
     /**
      * The bound tune: the header, the state block's bytes, the table's
-     * place in the image it stands in, the source index, then the image
+     * place in the image it is in, the source index, then the image
      * where the tune has one and the file's DTX1 tables.
      *
      * @param image the image to carry, or null where the tunes share one
@@ -173,7 +173,7 @@ final class Bound {
             tables[i] = Arrays.copyOfRange(tuneFile, at, to);
         }
         // The DTX1 tables first and the image after them, so that a
-        // source's rows stand beside the header however long the image is:
+        // source's rows are beside the header however long the image is:
         // a player whose ticks read a row through a displacement reaches
         // 32,767 bytes (68k/YMXR.S, YMXR_PCREL).
         int here = Tune.align(INDEX_AT + 4 * count);
@@ -192,12 +192,12 @@ final class Bound {
         Tune.putWord(bound, 4, Tune.getWord(tuneFile, 4));
         Tune.putLong(bound, STATE_AT, state);
         Tune.putLong(bound, IMAGE_AT, imageAt);
-        // Where this tune's table stands in the image it is packaged into. An
+        // Where this tune's table is in the image it is packaged into. An
         // image of one names it in its format block; one of several
         // names the first, so a tune past the first records a separate offset.
         Tune.putLong(bound, TABLE_AT, table);
-        // A counted source's mark stands in the index a player reads, so
-        // bit 31 stands in the binding beside the offset (SPEC.md 3.1).
+        // A counted source's mark is in the index a player reads, so
+        // bit 31 is in the binding beside the offset (SPEC.md 3.1).
         for (int i = 0; i < count; i++) {
             Tune.putLong(bound, INDEX_AT + 4 * i,
                     sourceAt[i] | (tune.counted().get(i) ? Tune.COUNTED : 0));

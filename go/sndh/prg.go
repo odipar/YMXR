@@ -117,7 +117,7 @@ type Tagged struct {
 
 // Program is the program around an SNDH file, playing that many rows, or
 // playing on where rows is 0, from the clock the file names. A clock
-// asked for stands over that one, at the file's rate.
+// asked for is over that one, at the file's rate.
 func Program(sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	stub, err := binaries.Read(binaries.Stub)
 	if err != nil {
@@ -139,7 +139,7 @@ func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
 		return nil, err
 	}
 	// The file leaves the stub the VBL where its clock tag names the VBL
-	// and where its set claims Timer C; a clock asked for stands over
+	// and where its set claims Timer C; a clock asked for is over
 	// either (BINARIES.md 4.3).
 	claimed := strings.ContainsRune(tags.Flag, 'c')
 	named := tags.Clock == ClockVBL || claimed
@@ -298,7 +298,7 @@ func ReadTags(sndh []byte) (Tagged, error) {
 		End: at}, nil
 }
 
-// zero is where the next zero byte from there stands.
+// zero is where the next zero byte from there is.
 func zero(sndh []byte, from int) (int, error) {
 	for at := from; at < len(sndh); at++ {
 		if sndh[at] == 0 {
@@ -308,7 +308,7 @@ func zero(sndh []byte, from int) (int, error) {
 	return 0, noEnd()
 }
 
-// sized is the subtunes a tag sized by '##' runs over: '##' stands before
+// sized is the subtunes a tag sized by '##' runs over: '##' is before
 // it.
 func sized(subtunes int, name string, at int) (int, error) {
 	if subtunes < 0 {
@@ -324,7 +324,7 @@ func noEnd() error {
 
 // Core is where the core begins: its YMXS, past the tags, less the magic's
 // offset. The entry triple's first bra.w reaches the core's first byte, or
-// the file is not one this wrote, and the core's descriptor stands whole
+// the file is not one this wrote, and the core's descriptor is whole
 // in the file, since this reads its flags.
 func Core(sndh []byte, from int) (int, error) {
 	at := find(sndh, string(coreMagic), from, len(sndh))
@@ -351,7 +351,7 @@ func digit(b byte) bool {
 	return b >= '0' && b <= '9'
 }
 
-// find is where a text first stands in [from, end), or -1.
+// find is where a text first is in [from, end), or -1.
 func find(said []byte, text string, from, end int) int {
 	wanted := []byte(text)
 	for at := from; at+len(wanted) <= end; at++ {

@@ -7,8 +7,8 @@
 # Each dump is converted to a tune file, the tune files go into one multi
 # file, an SNDH file is made around it and the program stub is put in
 # front of that: the four calls README.md, Converting and playing, lists,
-# run for you. The subtunes stand in the order named, each under the
-# dump's song name, or under the i-th -nNAME where one stands
+# run for you. The subtunes are in the order named, each under the
+# dump's song name, or under the i-th -nNAME where one is
 # (tools.md 11.1).
 #
 # The tools are the Go tree's (tools.md 19.3), built with `go build` into

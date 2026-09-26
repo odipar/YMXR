@@ -1,6 +1,6 @@
 # RELEASES
 
-What a release contains stands here, and each one published is listed
+This file defines what a release contains, and each one published is listed
 below it.
 
 ## What a release contains
@@ -16,7 +16,7 @@ below it.
 - `MANIFEST.txt`: every zip's size and sha256, what it contains, and the
   source commit the release was built from
 
-The version names every file. It is read out of `pom.xml`, or stands as
+The version names every file. It is read out of `pom.xml`, or is
 the script's one argument.
 
 The nine binaries are assembled from `68k/` by rmac on the machine that
@@ -39,7 +39,7 @@ and a release's number names the tools rather than either.
 <https://github.com/odipar/YMXR/releases/tag/v0.4.17>, built from the commit
 tagged `v0.4.17`.
 
-Every file a tool is built from stands as 0.4.16 has it, so the twelve
+Every file a tool is built from matches 0.4.16, so the twelve
 executables are that release's bytes and the nine 68000 binaries are
 0.4.11's. What moves is the script a caller runs the suite through, and one
 paragraph of performance.md.
@@ -76,7 +76,7 @@ paragraph of performance.md.
 tagged `v0.4.16`.
 
 The nine 68000 binaries are 0.4.11's bytes: every file under `68k/` that
-an assembler reads stands as 0.4.15 has it, and so does every file the
+an assembler reads matches 0.4.15, and so does every file the
 twelve tools write. One line a tool reports is reworded.
 
 - **A YM3 dump is one of the rig's fixtures.** `capture.ym`, the corpus's
@@ -99,10 +99,10 @@ twelve tools write. One line a tool reports is reworded.
 - **A dump of another format stopped a run.** 0.4.14 reworded the
   converter's line to `not a YM3!/YM3b/YM5!/YM6! file`, and the rig
   matched the line before it, so a corpus file of another format ended a
-  run with an assertion in place of standing outside it.
+  run with an assertion in place of staying outside it.
 - **A struck verb in an error line.** The YM3 length error read `YM3!
   holds 109 bytes of frames`; it reads `has` in both trees. The style
-  check reads documents and comments, so a line a tool prints stands
+  check reads documents and comments, so a line a tool prints is
   outside it.
 
 ### 0.4.15, 2026-09-23
@@ -162,7 +162,7 @@ clock costs.
   gate `ymxr-check` reads opens on them too.
 - **The corpus is 544 of 544.** The rig played every file of the corpus
   at 200 frames and each one plays as the specification reads, where
-  `capture.ym`, the corpus's one YM3 dump, stood outside a run before.
+  `capture.ym`, the corpus's one YM3 dump, was outside a run before.
 - **What the program's clock costs.** Read off Hatari's profiler over
   the handler's instructions: a tick that plays no row is 147 cycles,
   the interrupt's entry and the `rte` among them, and one that plays a
@@ -198,7 +198,7 @@ clauses two more rounds of readers marked.
   tune line's `image`.
 - **The letters are carried over.** The core line reports `U` and `W`
   with `H` among them, and the subtunes line and the workspace line said
-  `at` in those letters alone; each tag's length stood in 4.5 step 2
+  `at` in those letters alone; each tag's length was in 4.5 step 2
   unnamed, which fixes the `at` of `!#SN` and `HDNS`; and the `##` count
   and a clock tag's rate read as digits against 6.1's integers.
 - **Four readers read the document cold**, runs 6 and 7 of the binaries
@@ -239,7 +239,7 @@ documents are read under.
   `FLAG` read two ways under a citation of 4.5.
 - **The lines a table reports are read against both trees**, 52 of them:
   the longest run of words between the figures a tool writes into a line
-  must stand in the Java tree and the Go tree. The versions the
+  must be in the Java tree and the Go tree. The versions the
   documents report are driven through the tools rather than read, which
   is the check 4.5 lacked.
 - **The rig reads the timer on Hatari's MFP.** `-stub` reads its tunes
@@ -250,7 +250,7 @@ documents are read under.
 
 The kit under `doc/conformance-binaries` is eleven files and 153 record
 lines, with a program of each descriptor version and a multi file whose
-names stand above $7E.
+names are above $7E.
 
 Checks: `mvn -o clean test` green, 168 tests and no skip; the rig green
 under its default, `-abs`, `-lean`, `-kit`, `-stub` and `-hatari`, 10,
@@ -380,7 +380,7 @@ documents the tools are read against.
   conformance/README.md records the four runs.
 - **Every shape a tick has is read on a real MFP.** The rig told a chip
   write from the handler that wrote it by five shapes of seven, so the
-  two counted shapes stood outside the comparison since the counted
+  two counted shapes were outside the comparison since the counted
   handler arrived: `counted.ymxr` now plays 70,239 ticks on Hatari's MFP
   against the model, and `envelope-counted.ymxr` 9,722.
 - **A run over the corpus plays 542 of 543 tunes** as the specification
@@ -403,12 +403,12 @@ The player reads a row through the program counter unasked. The eight
 cores move their bytes, four of them change name, and a fifth reader of
 the specification moved seven of its clauses.
 
-- **`YMXR_PCREL` stands at 1.** A player assembled by hand reads each row
+- **`YMXR_PCREL` is at 1.** A player assembled by hand reads each row
   through a signed word displacement from the instruction that reads it,
   where it read an absolute address: 96 cycles a tick that writes a row
   against 108, 114 on the loop against 130 and 124 on the stop against
   132, and 160 with the interrupt's entry and its `rte`. Every row of
-  every source stands within 32,767 bytes of the handlers, and a host
+  every source is within 32,767 bytes of the handlers, and a host
   that places a tune further off assembles the player with
   `-dYMXR_PCREL=0` (68k/YMXR.S; BINARIES.md 5.5). The player is 8,160
   bytes against 7,804.
@@ -417,9 +417,9 @@ the specification moved seven of its clauses.
   where `-pcrel` named the other four before, and the four the tools
   choose keep the plain names, so a flags word of 4 to 7 is the ordinary
   case (BINARIES.md 2.1). A tool passed neither switch reads the
-  displacement core and stands the absolute one under a file whose tunes
+  displacement core and puts the absolute one under a file whose tunes
   end past the reach, as it did.
-- **performance.md is the player as it stands**, and an absolute address
+- **performance.md is the player as it is**, and an absolute address
   has a section with the figures it costs. Three of the ten fixture tunes
   read a cycle or two more a call, where a start turns a row's address
   into a displacement, and what a square's tick and a one-row source's
@@ -429,7 +429,7 @@ the specification moved seven of its clauses.
   records of the kit byte for byte. Seven places moved for what it marked
   as deciding output: the Conventions' offset counts bytes and one on a
   long is a multiple of 4; 3.1.2 has the offset of row n of column i, so
-  the stride stands without DTX's SPEC.md; 1.1.2's table records which
+  the stride is without DTX's SPEC.md; 1.1.2's table records which
   marking bits a player reads on every row; 1.9.1 reads the count as 0 to
   255; 7.3 defines the effects of `e` once and names its four numbers as
   the kept values; 7.4 says where the line of an error of the file goes;
@@ -438,7 +438,7 @@ the specification moved seven of its clauses.
 - **The envelope's whole range, heard.** `ym/whole-byte.py` gains a sixth
   section, a counted source of two columns on `setEnvelope` whose 512
   rows step the period from 64 to 65,535 over eight seconds and then
-  stand: under Hatari the player writes 52 periods above 32,767, the half
+  are: under Hatari the player writes 52 periods above 32,767, the half
   a marked source leaves unreachable, and the last is one cycle in 8.39
   seconds (experiments.md).
 
@@ -461,7 +461,7 @@ not reach.
   `envelope` tune jumps from 800 to 33,696 there. Such a source is
   counted now: its rows are whole bytes, a tick counts them, and it
   reaches 0 to 65,535, an envelope cycle of 8.39 seconds where it reached
-  4.19 (SPEC.md 2.1.3, 3.1.6). The marked form stands for the files that
+  4.19 (SPEC.md 2.1.3, 3.1.6). The marked form remains for the files that
   have it, which 2.1.4 defines.
 - **Version 6**, since a player of 5 would read a counted source of
   several columns as a counted source of one (3.3.5). It runs through the
@@ -517,13 +517,13 @@ tagged `v0.4.5`.
 
 A source whose column fills its byte, and a tick that reads its row
 through the program counter. Version 5 of the tune file encodes the
-first; the second is a build of the player, and the tools stand it under
+first; the second is a build of the player, and the tools put it under
 a file unasked, so an SNDH file written by this release ticks 12 cycles
 cheaper on every row it writes.
 
 - **A source on a register that reads every bit of its byte.** `setR0`,
   `setR2`, `setR4`, `setR7`, `setR11` and `setR12` were left to a later
-  version: the marker stands in bit 7 of a row and those registers read
+  version: the marker is in bit 7 of a row and those registers read
   that bit.
   A source on one of them is counted instead - bit 31 of its index entry
   marks it, every byte of a row is a value, and a tick reads R rows -
@@ -545,10 +545,10 @@ cheaper on every row it writes.
   last bound tune against the core's first byte: within the 32,767 bytes
   a displacement reaches they write the core that reads through the
   program counter, and further off the one that reads an address.
-  `-pcrel` requires it and `-abs` stands the other core under the tunes.
+  `-pcrel` requires it and `-abs` puts the other core under the tunes.
   The cores are eight, one a setting of the three switches.
-- **Two layouts moved** so the rows stand beside the player: a bound
-  tune's DTX1 tables now stand before its image, and an SNDH file's
+- **Two layouts moved** so the rows are beside the player: a bound
+  tune's DTX1 tables now are before its image, and an SNDH file's
   subtunes before the images. Both are offsets the player follows rather
   than a fixed order, so no format moved.
 
@@ -559,13 +559,13 @@ tagged `v0.4.4`.
 
 `setEnvelope` is a target this version encodes, and the targets of several
 registers are heard as one form. The player is the size 0.4.3 has: the row
-for target 20 stood in `ymxr_wide` as zeros and this release fills it, so
-a version 3 tune plays as it did and performance.md stands as it was.
+for target 20 was in `ymxr_wide` as zeros and this release fills it, so
+a version 3 tune plays as it did and performance.md is as it was.
 
 - **The envelope period is a target this version encodes.** Target 20,
   `setEnvelope`, was the one target of 14 to 24 left out: both its
   registers read eight bits, so no column of its rows had a bit to spare
-  for the marker. The marker stands in bit 7 of R12's column now, the
+  for the marker. The marker is in bit 7 of R12's column now, the
   envelope period's high byte, which leaves a source on this target a
   period of 0 to 32,767. The envelope frequency is 2,000,000 / (256 x
   envelope period), so 32,767 is one cycle in 4.19 seconds and 65,535 one
@@ -618,7 +618,7 @@ a version 3 tune plays as it did and performance.md stands as it was.
 <https://github.com/odipar/YMXR/releases/tag/v0.4.3>, built from the commit
 tagged `v0.4.3`.
 
-The document checks are one package. Every file a tool is built from stands
+The document checks are one package. Every file a tool is built from is
 as 0.4.2 has it - `go/`, `68k/`, `bin/` and every document - so the player
 is that release's, the eleven tools are its executables, and the ten dumps
 under `ym/test` convert to the tune files it wrote.
@@ -643,7 +643,7 @@ under `ym/test` convert to the tune files it wrote.
 tagged `v0.4.2`.
 
 The style check, and the LHA decoder read from YMXS rather than copied.
-Every file under `68k/` stands as v0.4.1 has it, so the player is that
+Every file under `68k/` matches v0.4.1, so the player is that
 release's, and the ten dumps under `ym/test` convert to the tune files a
 build of the tag before writes, measured.
 
@@ -655,9 +655,9 @@ build of the tag before writes, measured.
   four repositories of the family run the same 370 lines. The cleft, struck
   in AGENTS.md since it was written and encoded in no list, found 30 of the
   50 lines reworded.
-- **A code span is quoted material.** The check read what stands between
+- **A code span is quoted material.** The check read what is between
   backticks as prose, so tools.md reported a hit on two of the messages the
-  tools write, which it quotes. That line stands in every copy now.
+  tools write, which it quotes. That line is in every copy now.
 - **`Lha.java` goes.** It was 351 lines of code identical to YMXS's but for
   the class modifier, carried because the two calls it needs were
   package-private there, beside a Go tree that already imported the module
@@ -671,8 +671,8 @@ build of the tag before writes, measured.
 tagged `v0.4.1`.
 
 What a tick of a target of several registers writes, and the rig reading
-one on a real MFP. Every file under `68k/` but the rig stands as v0.4.0 has
-it, so the player is that release's, and the thirty files the ten dumps
+one on a real MFP. Every file under `68k/` but the rig matches v0.4.0,
+so the player is that release's, and the thirty files the ten dumps
 under `ym/test` convert to - the tune file, the structure and the program
 of each - are byte for byte 0.4.0's, measured against a build of its tag.
 
@@ -684,7 +684,7 @@ of each - are byte for byte 0.4.0's, measured against a build of its tag.
   columns, values wider than a byte, and RR above R.
 - **5.1 was the hole that made**: its steps wrote the register of the
   target, and a target of several has no one register. A tick writes a
-  column at a time in column order, the column the marker stands in last,
+  column at a time in column order, the column the marker is in last,
   so the marker is the last byte written and a player reads it there. 1.8.2,
   1.8.3 and 4.3 step 3 read the registers of the kept target.
 - **The order is the player's**, which YMXS 0.4.1 defines: 3.1.1's table
@@ -694,7 +694,7 @@ of each - are byte for byte 0.4.0's, measured against a build of its tag.
   names its shape. The tools read YMXS 0.4.1.
 - **The rig reads a tick of several registers on a real MFP.** Its trace
   path placed a chip write by the handler whose range its PC fell in, and
-  the two handlers of several registers stood in none of them, so their
+  the two handlers of several registers were in none of them, so their
   writes were a tick of no effect: a run reported effect 0 ticking 0 times
   where the rates said 20,483. A tick of C registers is C writes of the
   trace besides, and the loop read one write a tick. A run that names no
@@ -715,7 +715,7 @@ so the tune file of each of the ten dumps under `ym/test` is byte for byte
 reads it. The structure of each differs in its version word alone, which
 YMXS 0.4.0 writes as 4. The SNDH file of each is 3,260 bytes longer: 2,212
 of core, 4,736 bytes going to 6,948, and 1,048 of workspace. The program
-stub stands at 1,794 bytes.
+stub is at 1,794 bytes.
 
 - **Targets 14 to 24** (SPEC.md 2.1): `setToneA/B/C` writes R0 R1, R2 R3,
   R4 R5; `setVoiceA/B/C` those and the voice's volume; `setBuzzer` R11 R12
@@ -723,7 +723,7 @@ stub stands at 1,794 bytes.
   runs a voice's period and its volume on one timer where it needed two.
   `setEnvelope` writes two registers of eight bits, so a source for it has
   no bit to spare for the marker and this version encodes none (2.1.3).
-- **The marker stands in the column the target names** (3.2.1), whose
+- **The marker is in the column the target names** (3.2.1), whose
   register reads seven bits or fewer: the coarse nibble of a tone or a
   voice, the envelope shape of a buzzer, the noise period of a noise. So a
   source runs on R0, which no source of version 3 could.
@@ -734,7 +734,7 @@ stub stands at 1,794 bytes.
   binds at.
 - **A tune of version 3 costs the player what it cost before.** Two
   handlers an effect beside the three it had, and three branches that
-  stand elsewhere in a tune with a source of several columns, each a byte
+  are elsewhere in a tune with a source of several columns, each a byte
   init writes. `-cycles` reads every figure of performance.md back
   unchanged. A tick of two registers is 244 cycles with the interrupt's
   entry and its rte and one of three is 328, against 176 for one. The
@@ -754,7 +754,7 @@ stub stands at 1,794 bytes.
 tagged `v0.3.27`.
 
 What a reader reports of a file written wrong. Every file under `68k/`
-stands as v0.3.26 has it, so the player is that release's and the forty
+matches v0.3.26, so the player is that release's and the forty
 files the ten dumps under `ym/test` convert to are byte for byte 0.3.26's,
 measured against a build of its tag.
 
@@ -772,7 +772,7 @@ measured against a build of its tag.
   besides, which neither read before: a DTX1 table or a table of 29 columns
   was read as a tune.
 - Section 8 says what a missing number means, since the numbers of the
-  rest stand: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
+  rest are: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 
 ### 0.3.26, 2026-09-17
 
@@ -850,7 +850,7 @@ dump are byte for byte that release's, measured against a build of its tag.
 tagged `v0.3.24`.
 
 A rig that presses the program's keys. Every file under `src/main`, `go/`
-and `68k/` stands as v0.3.23 has it, so the tools and the player are that
+and `68k/` matches v0.3.23, so the tools and the player are that
 release's and the forty files the ten dumps under `ym/test` convert to are
 byte for byte 0.3.23's.
 
@@ -939,8 +939,8 @@ YMXS 0.3.5 in the pom and in `go.mod`, a script that writes a set of dumps
 as one program, and the documents read back against the tree.
 
 **No byte of this release differs from 0.3.19's.** YMXS 0.3.5 is 0.3.4's
-code, and every file under `src/main`, `go/` and `68k/` stands as v0.3.19
-has it: the forty files the ten dumps under `ym/test` convert to, a tune
+code, and every file under `src/main`, `go/` and `68k/` matches
+v0.3.19: the forty files the ten dumps under `ym/test` convert to, a tune
 file, a structure, an SNDH file and a program each, are byte for byte
 0.3.19's.
 
@@ -956,7 +956,7 @@ file, a structure, an SNDH file and a program each, are byte for byte
 - **Two checks read a pointer and a figure back.** Every clause one document
   cites in another is one that document defines, and the releases the
   documents name are the ones the two trees require. Both failed on the text
-  as it stood: tools.md cited ymxs.md 1, 3, 3.4, 3.6 and 5 of a numbering
+  as it was: tools.md cited ymxs.md 1, 3, 3.4, 3.6 and 5 of a numbering
   that document never had, and tools.md 19.2 and 19.3 and requirements.md R1
   named DTX 0.10.1 and YMXS 0.3.2 while the build required 0.11.5 and 0.3.4.
 - **experiments.md carried its crossover section twice**, the older copy
@@ -1038,7 +1038,7 @@ byte 0.3.15's. The format is unchanged.
   per cent fewer bytes, and of three seconds 1.3 per cent.
 - A column packed without a search is the bytes it was, which is why every
   file of the ten dumps reads the same.
-- `github.com/odipar/st4/go` stands at v0.1.3 in `go.mod`, which is DTX's
+- `github.com/odipar/st4/go` is at v0.1.3 in `go.mod`, which is DTX's
   requirement reaching this module through it.
 
 ### 0.3.15, 2026-09-16
@@ -1055,7 +1055,7 @@ format is unchanged.
 - ST4's literal channel reads its least in one step where it read a
   min-tree in a logarithm, so a search of a packed column fits a fifth more
   steps in a second at a small ring.
-- `github.com/odipar/st4/go` stands at v0.1.2 in `go.mod`, which is DTX's
+- `github.com/odipar/st4/go` is at v0.1.2 in `go.mod`, which is DTX's
   requirement reaching this module through it.
 
 ### 0.3.14, 2026-09-15
@@ -1075,7 +1075,7 @@ The format is unchanged.
   copies costs a fifth of the memory it did, and the Java tools pack a
   48 KB file at `-Xmx1g` where they needed 12 GB.
 - **YMXS 0.3.4** is its documents alone, so a tune file reads as it did.
-- `github.com/odipar/st4/go` stands in `go.mod` as an indirect requirement
+- `github.com/odipar/st4/go` is in `go.mod` as an indirect requirement
   now, which is DTX's dependency reaching this module through it.
 
 ### 0.3.13, 2026-09-15
@@ -1303,7 +1303,7 @@ and a dump converts to the file 0.3.6 wrote, byte for byte.
 
 - **A structure with two sources under one name reads here.** YMXS 0.3.1
   made them an error of the form and 0.3.2 took the rule off: an effect
-  names its source by the number of the table it stands in, so a name
+  names its source by the number of the table it is in, so a name
   tells one from another in no form. A tune the tools of 0.3.6 rejected
   converts here.
 - DTX 0.10.1 is the table format: its module is fetched by its import
@@ -1402,7 +1402,7 @@ bytes, the tune file is version 3 and the bound tune is version 3, and
 `ym-to-ymxr` writes the file 0.3.3 wrote, byte for byte.
 
 **The tune data structure is YMXS 0.3.1**, which puts the warnings of its
-SPEC.md 6 where its errors already stood. `Ymxs.read` and `flags.Read`
+SPEC.md 6 where its errors already were. `Ymxs.read` and `flags.Read`
 call them, which is the one place each tree reads a structure, so
 `ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg` name a fault a writer left
 in rather than converting in silence. `-silent` does not quiet a warning:
@@ -1447,7 +1447,7 @@ wrote, byte for byte.
   runs exception 24 rather than the timer's handler. The SNDH core keeps
   the host's vector at `$60` and puts an `rte` there at init, beside the
   four timer vectors it already keeps, and exit puts the host's back. The
-  tick that acknowledge stood for is the one the write cancelled, so
+  tick that acknowledge belonged to is the one the write cancelled, so
   returning is the whole handler. Raising the interrupt level around the
   write is no substitute: an acknowledge the 68000 has begun runs to its
   end at any level, and the MFP sets a pending bit whether the 68000 masks
@@ -1460,7 +1460,7 @@ wrote, byte for byte.
   once played once and the desktop came back, and a set of subtunes ended
   with the first one that ran out. SPACE and ESC end the program now, and
   the rows patched in where a caller names a count. A tune that plays
-  its last row goes quiet and the keys stand, so another subtune is one
+  its last row goes quiet and the keys are, so another subtune is one
   keypress away.
 - The banner named SPACE alone, where ESC has stopped the program since
   the stub was written. It names both. The rows field of the stub's
@@ -1600,14 +1600,14 @@ and is `rows`, and the key `rows` was the columns a register and is
 
 - A structure of version 1 is read by no tool here, and one this writes is
   read by no release before this. The tune file, the SNDH file and the
-  program are untouched: their formats stand at the versions 0.1.0 set,
+  program are untouched: their formats are at the versions 0.1.0 set,
   and a `.ymxr` from 0.1.2 plays here.
 - No file in this repository names those keys. Every conversion reads and
   writes the structure through the library, so the move is the dependency
   and what the library writes.
 
 The five 68000 binaries are the same bytes as 0.1.0's, and the format
-versions stand: the tune file's is 2 and the bound tune's is 2.
+versions are: the tune file's is 2 and the bound tune's is 2.
 
 ### 0.1.2, 2026-09-11
 
@@ -1648,18 +1648,18 @@ A released executable reads a `.ymx` with no other program installed.
   it printed, so a released executable stopped with `cannot run ymx-dump`
   unless `YMX_DUMP` named a built copy of that tool. The two decode the
   file with YMX's reader now, `github.com/odipar/ymx/go`, which an
-  executable contains: all thirteen run as they stand.
+  executable contains: all thirteen run as they are.
 - The Java tools go on running `ymx-dump`, which `YMX_DUMP` names, since
   YMX publishes no Java artifact for the reader. `ParityTest` reads the
   four files under `ymx/test` through both trees, so the two routes write
   one tune file, one JSON and one report.
 - `release/publish.sh` runs the host's executables with an empty
   environment and puts a `.ymx` through them beside the dump, so a release
-  that reads one only where `ymx-dump` stands beside it is caught before it
+  that reads one only where `ymx-dump` is beside it is caught before it
   is published.
 
 The 68000 sources are unchanged since 0.1.0, so the five binaries an
-executable contains are the same bytes and the format versions stand:
+executable contains are the same bytes and the format versions are:
 this release changes the tools only.
 
 ### 0.1.0, 2026-09-11

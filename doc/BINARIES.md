@@ -113,7 +113,7 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | 10 | 2 | bytes 10 and 11 of the tune file, copied; the player skips them |
 | 12 | 4 | the state block's bytes, unsigned: the format block's field at +4 of the image the table is in |
 | 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
-| 20 | 4 | where this tune's table stands, from the image's first byte, unsigned: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
+| 20 | 4 | where this tune's table is, from the image's first byte, unsigned: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
 | 24 | 4`S` | the source index: for source 1 to `S`, a long, unsigned, where its DTX1 table begins |
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
@@ -128,7 +128,7 @@ the format block of the image the packager makes of the tune's DTX2 table
 alone; the field at 20 is that format block's field at +8; DTX1 table 1
 is at align(24 + 4`S`) and each next at align(the end of the one before);
 the index is those offsets; the field at 16 is align(the last table's
-end), where the image stands.
+end), where the image is.
 
 **1.4 A set.** A set shares images. The *shape* of a DTX2 table is its
 variant, its unit `k`, its ring `N`, its width `W` and its copies flag
@@ -342,7 +342,7 @@ $20 to $7E, the others dropped.
 | `HDNS` | |
 
 The claims byte of the set is the claims bytes of its tunes ORed. One of
-`TC` and `!V` stands in the block, the clock tag: it names the clock a
+`TC` and `!V` is in the block, the clock tag: it names the clock a
 host calls play from (5.4). The title and the composer are the tool's
 (tools.md); where the tool leaves the title to the file, of a multi file
 it is name 1, and `(untitled)` where name 1 is the empty text, and of a
@@ -435,11 +435,11 @@ table is empty since every address in the stub and the file is relative.
    texts each to its zero byte.
 3. Where the clock tag is `!V` or the `FLAG` letters contain `c`, check
    the rate.
-4. C is where `YMXS` first stands from the byte after `HDNS`, less 12;
+4. C is where `YMXS` first is from the byte after `HDNS`, less 12;
    R is 2 + the word at 2 where the word at 0 is $6000, else -1.
 
 The tool reports the first condition met, those of a tag in the order the
-tags stand:
+tags are:
 
 | condition | reported as |
 |---|---|
@@ -635,7 +635,7 @@ the vector at the end (4.6 step 6); under `!V` it plays from the VBL
 its row through a signed word displacement from the instruction that
 reads it, 12 cycles less a tick that writes a row than an absolute
 address costs ([performance.md](performance.md)). Every row of every
-source stands within 32,767 bytes of the player's handlers: init measures
+source is within 32,767 bytes of the player's handlers: init measures
 each source against them and reports -1 for one further off (1.5 step 5).
 The layouts of 1.3 and 3.1 put a tune's DTX1 tables beside its header and
 a set's subtunes beside the core, so a host that loads one file and
@@ -692,7 +692,7 @@ of 0.4 or 4.5, report that line alone and stop.
 - `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0,
   B the file's bytes less I: the image of a bound tune written alone
   (1.3). A bound tune of a set has that field written 0 (1.4), and the
-  line stands in the record of the SNDH file instead (6.4).
+  line is in the record of the SNDH file instead (6.4).
 
 **6.4 An SNDH file** (3.1), after the first line:
 
@@ -701,7 +701,7 @@ of 0.4 or 4.5, report that line alone and stop.
   for the one at E, E + 2 + the word at E + 2, read signed, an offset
   like every other the record reports and counted from the file's first
   byte.
-- a line a tag, in the order they stand, from 16 to `HDNS` (3.2), each
+- a line a tag, in the order they are, from 16 to `HDNS` (3.2), each
   tag as long as 4.5 step 2 reads it, a zero byte where a tag name would
   begin skipped, A its first byte:
   `{"part":"tag","name":"TITL","at":A,"text":"T"}` for `TITL`, `COMM`,

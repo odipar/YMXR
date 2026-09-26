@@ -66,7 +66,7 @@ final class Sndh {
     /** The core's flag bit 2: a tick reads its row through a displacement
      *  from the instruction that reads it (the player's YMXR_PCREL=1,
      *  doc/performance.md), which reaches 32,767 bytes, so the file's
-     *  tunes stand within that of the core (BINARIES.md 5.5). */
+     *  tunes are within that of the core (BINARIES.md 5.5). */
     static final int CORE_PCREL = 4;
 
     /** What a displacement reaches, the bytes from the core's first byte
@@ -98,11 +98,11 @@ final class Sndh {
 
     /**
      * Which ticks the file's core reads a row with (BINARIES.md 2.1).
-     * A tool writes {@code CHOSEN} unasked: it stands the core that reads
+     * A tool writes {@code CHOSEN} unasked: it puts the core that reads
      * a row through the program counter under a file whose tunes end
      * within the reach (5.5), and the one that reads an absolute address
      * under a file whose tunes end further off. {@code PCREL} reports
-     * such a file rather than standing the other core under it, and
+     * such a file rather than putting the other core under it, and
      * {@code ABSOLUTE} writes the core that reads an address at any
      * length of file.
      */
@@ -201,7 +201,7 @@ final class Sndh {
             claimed |= claims(tune.effects());
         }
         // The tunes are bound as a set, so those that agree on what an
-        // image fixes once share one and the reader's code stands once for
+        // image fixes once share one and the reader's code appears once for
         // them (DTX abi.md 1, doc/BINARIES.md 2).
         Bound.Set set = Bound.of(tuneFiles);
         int state = 0;
@@ -209,7 +209,7 @@ final class Sndh {
             state = Math.max(state, Tune.getLong(b, Bound.STATE_AT));
         }
         byte[] tags = tags(options, rate, n, frames, claimed);
-        // Which core stands under the tunes: the one the caller named, or
+        // Which core is under the tunes: the one the caller named, or
         // the one the switches select, which reads a row through the
         // program counter unless the file's tunes end past the reach
         // (BINARIES.md 5.5).
@@ -232,7 +232,7 @@ final class Sndh {
         if (pcrel) {
             // A tick of this core reads its row through a displacement
             // from the instruction that reads it, which reaches
-            // PCREL_REACH bytes, so every row of every subtune stands
+            // PCREL_REACH bytes, so every row of every subtune is
             // within that of the handlers (BINARIES.md 5.5).
             int last = tunesEnd(core, set, tags);
             if (last > PCREL_REACH) {
@@ -246,7 +246,7 @@ final class Sndh {
     }
 
     /** Where the last bound tune of a file on this core ends, counted from
-     *  the core's first byte (BINARIES.md 3.1): the handlers stand inside
+     *  the core's first byte (BINARIES.md 3.1): the handlers are inside
      *  the core, so a displacement is read against this, and the bytes of
      *  the core are the margin it spends. */
     static int tunesEnd(byte[] core, Bound.Set set, byte[] tags) {
@@ -376,7 +376,7 @@ final class Sndh {
      * with a long a subtune, '!#SN' where the caller names them with a
      * word a subtune, the name's offset from the tag's first byte, then
      * the names each ended by a zero byte, a pad to an even length, TIME
-     * with a word a subtune, and HDNS. The '##' count stands before FRMS,
+     * with a word a subtune, and HDNS. The '##' count is before FRMS,
      * the names and TIME, since a reader sizes each by it. The raster
      * monitor paints one frame of calls (performance.md), so a core with
      * it in names the VBL as the clock.
@@ -450,7 +450,7 @@ final class Sndh {
 
     /**
      * The same, of a set whose tunes share their images: the bound tunes
-     * stand behind the subtune table, the images behind them, and every
+     * are behind the subtune table, the images behind them, and every
      * bound tune's {@code IMAGE_AT} is patched to reach the one with its
      * table in it, from its first byte. A tune whose set has no image is
      * packaged with one, as a bound tune written by itself does.
@@ -466,7 +466,7 @@ final class Sndh {
         int tableAt = even(core.length);
         int at = tableAt + 2 + 4 * n;
         // The bound tunes first, each on an even address (5.1), so that a
-        // tune's sources stand beside the core: a player whose ticks read a
+        // tune's sources are beside the core: a player whose ticks read a
         // row through a displacement reaches 32,767 bytes (68k/YMXR.S,
         // YMXR_PCREL), and an image between the two would be in the way.
         int[] offsets = new int[n];
@@ -474,7 +474,7 @@ final class Sndh {
             offsets[i] = at;
             at = even(at + tunes.get(i).length);
         }
-        // Then the images, each on a long: the reader's code stands once a
+        // Then the images, each on a long: the reader's code appears once a
         // set of tunes that agree on what an image fixes once (DTX abi.md
         // 1), and every bound tune of that set reaches it.
         int[] imageAt = new int[set.images().size()];
@@ -504,7 +504,7 @@ final class Sndh {
             System.arraycopy(tunes.get(i), 0, file, header + offsets[i], tunes.get(i).length);
             if (imageAt.length > 0) {
                 // The bound tune reaches its image from its first byte,
-                // and the images stand after it.
+                // and the images are after it.
                 Tune.putLong(file, header + offsets[i] + Bound.IMAGE_AT,
                         imageAt[set.image()[i]] - offsets[i]);
             }

@@ -11,7 +11,7 @@ frame boundary passes a player that writes the right values at the wrong
 times; this reads the times.
 
 For every volume register the trace writes, it reports the writes, the
-edges among them, the median half and how many halves stand far from the
+edges among them, the median half and how many halves are far from the
 median. A player that breaks a square's phase reads high there: the row
 that started a square used to write 0 to the voice between two ticks, and
 DBA 5 came out at 2.4 per cent against the reference player's 0.2
@@ -32,7 +32,7 @@ FRAME = 160256                  # a 50 Hz frame in 8 MHz cycles
 
 
 def writes(path):
-    """Every write a program made to R8, R9 and R10: the cycle it stood
+    """Every write a program made to R8, R9 and R10: the cycle it was
     at, the register, the value, and the address it was written from."""
     out = []
     frame = -1

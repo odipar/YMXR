@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Every bound tune of a set begins on an even address (BINARIES.md
  * 5.1), which {@code Sndh.combine} evened for every subtune after the
- * first; the first stood at the byte after the last image, odd where that
+ * first; the first was at the byte after the last image, odd where that
  * image's length is odd.
  */
 final class WriterTest {
@@ -59,7 +59,7 @@ final class WriterTest {
     void everySubtuneOfASetBeginsOnAnEvenAddress() {
         // The set as the binder makes it, with its image replaced by one of
         // an odd length, so that the byte after the last image is odd:
-        // where subtune 1 stood before this fault was fixed.
+        // where subtune 1 was before this fault was fixed.
         Bound.Set bound = Bound.of(List.of(at(50).file(), at(60).file()));
         assertEquals(1, bound.images().size(), "the two tunes share one image");
         Bound.Set odd = new Bound.Set(List.of(new byte[15]), bound.shapes(),

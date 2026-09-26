@@ -24,7 +24,7 @@
 ; rows played from the VBL or Timer C, and the state put back once SPACE
 ; or ESC has stopped the program, or the rows patched in have played. A
 ; tune that plays its last row stops no program: it goes quiet and the
-; keys stand. 1 to 9 pick a subtune, and the banner offers the keys the
+; keys are. 1 to 9 pick a subtune, and the banner offers the keys the
 ; set has, on a separate line since the screen is forty columns. Timer C's
 ; count is written back as the 192 of the system's 200 Hz, since the
 ; register reads as the live count and writes as the reload. The SNDH
@@ -77,7 +77,7 @@ LIST_WIDE       equ     96
 ; The rows the list of subtunes may use: the screen is twenty-five rows
 ; in every resolution, and the banner, the header, the line that says
 ; what plays and one row spare account for the rest. A set of more than
-; this stands in two columns or more, so no part of it scrolls away.
+; this is in two columns or more, so no part of it scrolls away.
 LIST_ROWS       equ     18
 
 ; The columns the line that says which subtune plays leaves a name: the
@@ -127,7 +127,7 @@ main:           move.w  #Getrez,-(sp)           ; forty columns in low
 ; The set: its number and the name the SNDH file's '!#SN' tag names it by
 ; (BINARIES.md 3), a subtune an entry. A set of one has no list, since the
 ; banner names the tune already. A column has LIST_ROWS entries at most,
-; so a longer set stands in as many columns as it needs and every entry
+; so a longer set is in as many columns as it needs and every entry
 ; is on the screen; a column is the screen's width divided by their
 ; number, and the entries run down one column before the next.
                 move.w  subtunes(pc),d0
@@ -359,9 +359,9 @@ names:
 ; give. d0 and d1 are clobbered.
 ;
 ; A file that names its subtunes has the '!#SN' tag, and each name's
-; offset stands in the word table after it, counted from the tag's first
+; offset is in the word table after it, counted from the tag's first
 ; byte. A file of one subtune has no such tag, and its title is the name:
-; 'TITL' opens the block and its text follows, so the two stand at a
+; 'TITL' opens the block and its text follows, so the two are at a
 ; fixed place (BINARIES.md 3).
 name_of:
                 move.w  d0,d1
@@ -437,7 +437,7 @@ entry:
                 move.l  a0,d1
                 bne.s   .named
                 lea     unnamed(pc),a0
-; six columns stand before the name and one space after it, so a name
+; six columns are before the name and one space after it, so a name
 ; reaches the width less seven, which dbra counts from one under that. A
 ; cell is then a character short of its column, and a row of full cells a
 ; character short of the screen, where a row the width of the screen
@@ -462,7 +462,7 @@ entry:
 
 ; The line that says which subtune plays, written over the line before
 ; it: a carriage return opens it and no new line closes it, so the next
-; one stands where this one did. Called under Supexec with the player's
+; one is where this one was. Called under Supexec with the player's
 ; interrupts on, which write the chip and the MFP and no more.
 saying:
                 movem.l d0-d3/a0-a2,-(sp)

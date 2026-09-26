@@ -20,7 +20,7 @@ fi
 # RigCallsTest plays the built tunes on the 68000 player under emulation:
 # python3 with unicorn in it, rmac to assemble the cores, and DTX's
 # packer to read a table back. RMAC and DTX_WRITE name the last two where
-# they stand outside the path.
+# they are outside the path.
 if ! python3 -c "import unicorn" >/dev/null 2>&1; then
     echo "suite: RigCallsTest plays the player under unicorn: pip install unicorn" >&2
     exit 2

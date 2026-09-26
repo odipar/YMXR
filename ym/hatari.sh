@@ -1,11 +1,11 @@
 #!/bin/sh
 # TUNE.PRG under Hatari, with its sound on. ym/play.sh and
 # ym/play-ymxs.sh both run a program this way, so the emulator's flags and
-# the recording stand here once. doc/tools.md, Play.
+# the recording are here once. doc/tools.md, Play.
 #
 #   ym/hatari.sh WORK [VBLS] [out.wav]
 #
-# WORK is the directory TUNE.PRG stands in. VBLS stops the run after that
+# WORK is the directory TUNE.PRG is in. VBLS stops the run after that
 # many frames, and empty plays on. A third name records the run instead of
 # playing it: Hatari writes an AVI, video and sound, which ym/avi.py reads
 # back as a WAV, with the run's last frame beside it as a PNG of the same

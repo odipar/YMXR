@@ -107,7 +107,7 @@ final class Prg {
 
     /** What the tag block passes the stub: the '##' count, the clock tag
      *  and its rate, the FLAG letters after its '~', and where HDNS
-     *  stands. */
+     *  is. */
     record Tags(int subtunes, String clock, int rate, String flag, int end) {
     }
 
@@ -150,7 +150,7 @@ final class Prg {
         }
         Tags tags = tags(sndh);
         // The file leaves the stub the VBL where its clock tag names the
-        // VBL and where its set claims Timer C; a clock asked for stands
+        // VBL and where its set claims Timer C; a clock asked for is
         // over either (BINARIES.md 4.3).
         boolean claimed = tags.flag().indexOf('c') >= 0;
         boolean named = tags.clock().equals(Sndh.VBL_CLOCK) || claimed;
@@ -256,7 +256,7 @@ final class Prg {
      *
      * @throws IllegalArgumentException where the file has no SNDH at 12,
      *     no HDNS ends its tags, a tag is not one {@link Sndh} writes,
-     *     FRMS, TIME or '!#SN' stands before '##', or '##' or the clock tag
+     *     FRMS, TIME or '!#SN' is before '##', or '##' or the clock tag
      *     is missing
      */
     static Tags tags(byte[] sndh) {
@@ -336,7 +336,7 @@ final class Prg {
         return ascii(sndh, at, 4);
     }
 
-    /** Where the next zero byte from {@code from} stands. */
+    /** Where the next zero byte from {@code from} is. */
     private static int zero(byte[] sndh, int from) {
         for (int at = from; at < sndh.length; at++) {
             if (sndh[at] == 0) {
@@ -346,7 +346,7 @@ final class Prg {
         throw noEnd();
     }
 
-    /** The subtunes a tag sized by '##' runs over: '##' stands before it. */
+    /** The subtunes a tag sized by '##' runs over: '##' is before it. */
     private static int sized(int subtunes, String name, int at) {
         if (subtunes < 0) {
             throw new IllegalArgumentException("the SNDH file's " + name + " tag at " + at
@@ -363,7 +363,7 @@ final class Prg {
      * Where the core begins: its YMXS, past the tags, less the magic's
      * offset. The entry triple's first bra.w reaches the core's first
      * byte, or the file is not one {@link Sndh} wrote, and the core's
-     * descriptor stands whole in the file, since this reads its flags.
+     * descriptor is whole in the file, since this reads its flags.
      */
     static int core(byte[] sndh, int from) {
         int at = find(sndh, new String(Sndh.CORE_MAGIC, StandardCharsets.ISO_8859_1), from,
@@ -395,7 +395,7 @@ final class Prg {
         return new String(bytes, at, length, StandardCharsets.ISO_8859_1);
     }
 
-    /** Where a text first stands in {@code [from, end)}, or -1. */
+    /** Where a text first is in {@code [from, end)}, or -1. */
     static int find(byte[] bytes, String text, int from, int end) {
         byte[] wanted = text.getBytes(StandardCharsets.ISO_8859_1);
         for (int at = from; at + wanted.length <= end; at++) {

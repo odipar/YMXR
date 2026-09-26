@@ -27,7 +27,7 @@ import (
 //	10      2      zero
 //	12      4      the state block's bytes the image's reader needs
 //	16      4      where the image begins, signed
-//	20      4      where this tune's table stands, from the image's first byte
+//	20      4      where this tune's table is, from the image's first byte
 //	24      4S     the source index: where source 1 to S's DTX1 table begins
 //	        ..     the DTX1 tables, each on a long
 //	        ..     the image, on a long
@@ -37,7 +37,7 @@ import (
 // BoundMagic is the four bytes a bound tune opens with.
 var BoundMagic = []byte{'Y', 'M', 'X', 'B'}
 
-// Where a bound tune's fields stand.
+// Where a bound tune's fields are.
 const (
 	// BoundVersion is the version of a bound tune whose sources are one
 	// column (SPEC.md 3.3.5).
@@ -61,7 +61,7 @@ const (
 )
 
 // The image's format block, and where the state block's bytes and the
-// first table stand in it (DTX, abi.md 1).
+// first table are in it (DTX, abi.md 1).
 const (
 	FormatAt      = 16
 	FormatStateAt = 4
@@ -70,19 +70,19 @@ const (
 
 // Set is a set of tunes bound together: the images their tables were
 // packaged into, and a bound tune for each, in the order named. A bound
-// tune here has no image in it, and its ImageAt stands at 0 for
+// tune here has no image in it, and its ImageAt is at 0 for
 // the caller that lays them out to patch.
 //
 // The tunes are grouped by what an image fixes once (DTX abi.md 1), so
-// tunes that agree on those share one image and the reader's code stands
+// tunes that agree on those share one image and the reader's code is
 // once for the group.
 type Set struct {
 	Images []([]byte)
 	Shapes []string
 	Tunes  [][]byte
 
-	// Image is which image each tune's table stands in, and Table where it
-	// stands in that image.
+	// Image is which image each tune's table is in, and Table where it
+	// is in that image.
 	Image []int
 	Table []int
 }
@@ -173,7 +173,7 @@ func shape(dtx2 []byte) (string, error) {
 // Bound is the bound tune of a tune file: the header with the magic and
 // the version replaced and the state block's bytes and the image's place
 // put in, the index recomputed, then the image, then the file's DTX1
-// tables as they stand.
+// tables as they are.
 func Bound(tuneFile []byte) ([]byte, error) {
 	read, err := ymxr.Read(tuneFile)
 	if err != nil {
@@ -188,7 +188,7 @@ func Bound(tuneFile []byte) ([]byte, error) {
 }
 
 // build is the bound tune: the header, the state block's bytes, the
-// table's place in the image it stands in, the source index, then the
+// table's place in the image it is in, the source index, then the
 // image where the tune has one and the file's DTX1 tables. A nil image is
 // a tune of a set, whose ImageAt the caller patches.
 func build(tuneFile, image []byte, table, state int) ([]byte, error) {
@@ -207,7 +207,7 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 		tables[i] = tuneFile[at:to]
 	}
 	// The DTX1 tables first and the image after them, so that a source's
-	// rows stand beside the header however long the image is: a player
+	// rows are beside the header however long the image is: a player
 	// whose ticks read a row through a displacement reaches 32,767 bytes
 	// (68k/YMXR.S, YMXR_PCREL).
 	here := ymxr.Align(BoundIndexAt + 4*count)
@@ -227,13 +227,13 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	ymxr.PutWord(bound, 4, ymxr.GetWord(tuneFile, 4))
 	ymxr.PutLong(bound, StateAt, state)
 	ymxr.PutLong(bound, ImageAt, imageAt)
-	// Where this tune's table stands in the image it is packaged into. An
+	// Where this tune's table is in the image it is packaged into. An
 	// image of one names it in its format block; one of several names the
 	// first, so a tune past the first records a separate offset.
 	ymxr.PutLong(bound, BoundTableAt, table)
 	for i := 0; i < count; i++ {
-		// A counted source's mark stands in the index a player reads, so
-		// bit 31 stands in the binding beside the offset (SPEC.md 3.1).
+		// A counted source's mark is in the index a player reads, so
+		// bit 31 is in the binding beside the offset (SPEC.md 3.1).
 		entry := sourceAt[i]
 		if read.Counted[i] {
 			entry |= ymxr.Counted

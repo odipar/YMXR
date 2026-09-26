@@ -25,7 +25,7 @@ import (
 	"time"
 )
 
-// name is how wide a name stands in a reported row.
+// name is how wide a name is in a reported row.
 const name = 22
 
 // apart is how long a run stays quiet about its progress.
@@ -39,7 +39,7 @@ type Report struct {
 	to    io.Writer
 
 	// The tenth of a run the last progress line gave, and the clock it
-	// stood at.
+	// was at.
 	tenth int
 	last  time.Time
 
@@ -102,7 +102,7 @@ func (r *Report) Row(named, what string) {
 }
 
 // Progress says how far through a run of that many steps this is. A line
-// is said where the tenth of the run it stands in has moved and a second
+// is said where the tenth of the run it is in has moved and a second
 // has passed since the last.
 func (r *Report) Progress(what string, done, of int) {
 	r.mutex.Lock()
@@ -120,7 +120,7 @@ func (r *Report) Progress(what string, done, of int) {
 	r.said(fmt.Sprintf("  %s %d of %d (%d%%)", what, done, of, done*100/of))
 }
 
-// Note records a warning, which stands whether the report is on or off.
+// Note records a warning, which is written whether the report is on or off.
 func (r *Report) Note(text string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

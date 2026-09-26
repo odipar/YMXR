@@ -78,7 +78,7 @@ func VersionOf(sources []Source) int {
 	return Version
 }
 
-// Where each header field stands.
+// Where each header field is.
 const (
 	FrameRateAt = 6
 
@@ -99,7 +99,7 @@ const (
 // Ring is the ring a column unpacks through, dtx-write's default.
 const Ring = 960
 
-// MaxRing is the widest ring the player reads: column 29's value stands 29
+// MaxRing is the widest ring the player reads: column 29's value is 29
 // rings past column 0's, and the player reaches it through a 16-bit
 // displacement.
 const MaxRing = 32767 / (C - 1)

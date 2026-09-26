@@ -31,7 +31,7 @@ final class PlayerTest {
     private static final Path BINARIES = Path.of("doc/BINARIES.md");
 
     /** Every {@code NAME equ VALUE} in the player, decimal or hex, as it
-     *  is assembled: {@code YMXR_PCREL} stands at 1 unless a host defines
+     *  is assembled: {@code YMXR_PCREL} is at 1 unless a host defines
      *  it, so the else branch of a block that tests it is left out
      *  (68k/YMXR.S). */
     static Map<String, Integer> equates() throws IOException {
@@ -159,7 +159,7 @@ final class PlayerTest {
         assertEquals(e.get("TF_SOURCES"), row(said, "`S`, the source count").getValue());
         assertEquals(Bound.STATE_AT, row(said, "the state block's bytes").getValue());
         assertEquals(Bound.IMAGE_AT, row(said, "where the image begins").getValue());
-        assertEquals(Bound.TABLE_AT, row(said, "where this tune's table stands").getValue());
+        assertEquals(Bound.TABLE_AT, row(said, "where this tune's table is").getValue());
         assertEquals(Bound.INDEX_AT, row(said, "the source index").getValue());
         Matcher version = Pattern.compile("\\$([0-9A-Fa-f]+)")
                 .matcher(row(said, "the version").getKey());
@@ -285,7 +285,7 @@ final class PlayerTest {
 
     @Test
     void theTuneFileIsLaidOutAsTheSpecificationDefines() {
-        // SPEC.md 3.3: the version, where the DTX2 table's offset stands
+        // SPEC.md 3.3: the version, where the DTX2 table's offset is
         // and where the source index begins
         assertEquals(0x0003, Tune.VERSION);
         assertEquals(12, Tune.TABLE_AT);
@@ -311,7 +311,7 @@ final class PlayerTest {
         // the state block's bytes are the image's format block's
         assertEquals(Tune.getLong(bound, imageAt + Bound.FORMAT_AT + Bound.FORMAT_STATE_AT),
                 Tune.getLong(bound, Bound.STATE_AT));
-        // the DTX1 tables stand between the index and the image, each on a
+        // the DTX1 tables are between the index and the image, each on a
         // long, as the file has them
         assertEquals(Tune.align(Bound.INDEX_AT + 4 * count),
                 Tune.getLong(bound, Bound.INDEX_AT), "source 1 follows the index");

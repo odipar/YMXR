@@ -68,9 +68,9 @@ files, of the tune format, of DTX and of ST4.
    An entry marked *decides output* is a sentence the document lacks, a
    guess that matches the reference included.
 
-**6. The runs.** The log stands here, one entry a run.
+**6. The runs.** The log is here, one entry a run.
 
-**6.1 The first run**, 2026-09-20, against the kit as it stands. The
+**6.1 The first run**, 2026-09-20, against the kit as it is. The
 implementer wrote a `layout.py` of 291 lines and produced the line count
 of every one of the nine files; seven records came back byte for byte
 and two differed in one value. `READ.md` named documents alone, and
@@ -79,7 +79,7 @@ failed rule 3 of 5.
 
 - 6.4's workspace read `B the file's bytes less W`, which inside a
   program is the program's bytes: the relocation table of 4.4 step 4
-  stands after the SNDH file, so the reference this repository wrote
+  is after the SNDH file, so the reference this repository wrote
   counted those 4 bytes into the workspace and the implementer's 32,434
   was right against 2.6's `align(2120 + 30312) + 2`. The clause reads
   `the bytes from W to the end of the SNDH file` now, 6.5 says where
@@ -89,7 +89,7 @@ failed rule 3 of 5.
   byte, `the fields of 1.2 among them`, where `table` is an offset from
   the image's first byte (1.2) and 6.3 converted the field at 16 alone.
   The implementer read the silence the way this tree writes it, so the
-  output stands; 6.1 excepts `table` now and 6.3 defines it.
+  output is; 6.1 excepts `table` now and 6.3 defines it.
 
 Eleven entries marked *leaves output as it is* carried eleven sentences
 into the document: where the core's first byte is (6.4), the `~` of the
@@ -126,7 +126,7 @@ clauses are read together, and each was settled in one place.
 Six entries marked *leaves output as it is* carried six sentences: what
 T counts in 3.1, the unsigned fields of 1.2 and 2.5, the `!#SN` names
 read from the byte after the offset words, a file that meets none of the
-four kinds, the line of a file outside the rules standing alone, and
+four kinds, the line of a file outside the rules alone, and
 the scan for the SNDH file inside a program stepping by 2
 from 28.
 
@@ -141,7 +141,7 @@ layout they report, and one clause of 4.5 left behind by a release.
   and 28 the timer is armed from, where 4.5 reported an error for a
   field at 8 other than 1 and a stub under 24 bytes. The kit's two
   programs are 0.4.10's, their stubs 24 bytes reading 1, so a reader
-  that followed 4.5 as it stood reported an error line for what 4.2
+  that followed 4.5 as it was reported an error line for what 4.2
   defines. The row reads
   30 bytes and version 2 now, those four conditions are the tool's
   alone, and 6.5 reads V as the file has it: a program of an earlier
@@ -149,7 +149,7 @@ layout they report, and one clause of 4.5 left behind by a release.
 - 6.3 read `I` as the tune's first byte for a bound tune of a set, which
   1.4 writes the field 0 for, where 3.1 patches that field in an SNDH
   file and every subtune of the kit has it patched.
-- 6.3's image line stands where the field at 16 is above 0, which every
+- 6.3's image line is where the field at 16 is above 0, which every
   subtune of a written file meets, so a reader that applied 6.3 whole
   inside 6.4 wrote an image line a subtune beside the images. 6.4 leaves
   that line out now.

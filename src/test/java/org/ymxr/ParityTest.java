@@ -295,7 +295,7 @@ final class ParityTest {
     }
 
     /** Every tool of the twelve (tools.md 2), for a check that runs them
-     *  all. `ymxr-check` stood outside this list while the comment over it
+     *  all. `ymxr-check` was left out of this list while the comment over it
      *  read eleven. */
     private static final List<String> EVERY_TOOL = List.of("ym-to-ymxs",
             "ym-to-ymxr", "ymxs-to-ymxr", "ymxs-to-sndh", "ymxs-to-prg",
@@ -305,7 +305,7 @@ final class ParityTest {
     /**
      * The tools this runs against the tools tools.md 2 lists. The list
      * here named ten while the comment over it read eleven, and the tool
-     * left out, {@code ymxr-check}, stood outside the two checks below.
+     * left out, {@code ymxr-check}, was left out of the two checks below.
      */
     @Test
     void everyToolTheDocumentListsIsRunHere() throws Exception {
@@ -326,7 +326,7 @@ final class ParityTest {
 
     @Test
     void anEmptyInputIsOneFaultInBothTrees() throws Exception {
-        // The three tools whose input is YMXS's JSON form stood outside
+        // The three tools whose input is YMXS's JSON form were left out of
         // this check: an empty text parsed to an absent format in that
         // tree's Java reader and to a text that is not JSON in its Go one,
         // and odipar/YMXS#58 reports the second in both. YMXS reads the
@@ -463,7 +463,7 @@ final class ParityTest {
     }
 
     /**
-     * A tune file whose table stands outside it, and one whose table is
+     * A tune file whose table is outside it, and one whose table is
      * another variant, read in both trees. SPEC.md 3.3.4 has a line for
      * each; the Java tree took the bytes through the offset before any
      * check, so a file written wrong ended in the exception the copy threw
@@ -489,7 +489,7 @@ final class ParityTest {
     }
 
     /**
-     * {@code bin/ymxr-set} against the calls it stands for. The script
+     * {@code bin/ymxr-set} against the calls it replaces. The script
      * converts each dump, puts the tune files in one multi file, makes an
      * SNDH file around them and writes the program of the stub in front
      * of that, running the Go tools it builds (tools.md 16.6). The same

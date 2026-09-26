@@ -13,7 +13,7 @@ import java.util.List;
  * R6 bits 7-5 and its count R14; slot 2's are R3, R8 and R15. A code's
  * bits 7-6 select the kind, 00 SID, 01 DigiDrum, 11 Sync-Buzzer, and its
  * bits 5-4 the voice plus one, so 00 leaves the slot idle. The parameter
- * stands in that voice's volume register: a SID's maximum volume, a
+ * is in that voice's volume register: a SID's maximum volume, a
  * drum's sample number, a buzzer's envelope shape.
  */
 final class BuiltTunes {
@@ -234,7 +234,7 @@ final class BuiltTunes {
      * The four kinds of target that write several registers (SPEC.md
      * 2.1), one an effect, so the kit has a tune of version 4: a voice on
      * Timer A, a noise on Timer D, a buzzer on Timer B and a tone on Timer
-     * C. The marker stands in a different column under each kind - the
+     * C. The marker is in a different column under each kind - the
      * coarse nibble of a voice and a tone, the noise period of a noise,
      * the envelope shape of a buzzer - so a reader that reads the marker
      * in column 0 alone reports the wrong rows for three of the four.
@@ -243,7 +243,7 @@ final class BuiltTunes {
      * row 0, one repeating to a row above it, one that plays once and
      * stops its timer at its marker, and a start over a running source of
      * the same row count on the same kept target, which leaves the place
-     * where it stands (rule 3(a)).
+     * where it is (rule 3(a)).
      */
     static Tune.Written voices() {
         int frames = 96;
@@ -286,7 +286,7 @@ final class BuiltTunes {
         c[e1 + 3][repeat] = (byte) 200;
         // effect 2, Timer B: setBuzzer, three registers, the marker in the
         // envelope shape; the source plays once, so a tick stops the timer
-        // at its last row, and R13 stands outside rule 1 (1(c))
+        // at its last row, and R13 is outside rule 1 (1(c))
         c[e2][2] = (byte) (0x80 | 21);
         c[e2 + 1][2] = (byte) (0x80 | 3);
         c[e2 + 2][2] = (byte) (start | 7);
@@ -301,7 +301,7 @@ final class BuiltTunes {
         c[13][70] = (byte) 0x80;
         // effect 3, Timer C: setToneB, two registers, the marker in the
         // coarse nibble; the second start has the row count of the first on
-        // the kept target and leaves bit 5 at 0, so the place stands where
+        // the kept target and leaves bit 5 at 0, so the place is where
         // the ticks left it (rule 3(a))
         c[e3][4] = (byte) (0x80 | 15);
         c[e3 + 1][4] = (byte) (0x80 | 4);
@@ -313,7 +313,7 @@ final class BuiltTunes {
         c[e3 + 2][repeat] = (byte) (start | 4);
         c[e3 + 3][repeat] = (byte) 150;
         // A source of C columns: column i is the value register i of its
-        // target reads, and the marker stands in bit 7 of the column the
+        // target reads, and the marker is in bit 7 of the column the
         // target names (SPEC.md 2.1, 3.2.1).
         byte[][] voice = {{0, (byte) 0x80, 0, (byte) 0x40, 0, (byte) 0xC0},
                           {1, 1, 2, 2, 3, (byte) (0x80 | 3)},
@@ -339,7 +339,7 @@ final class BuiltTunes {
 
     /**
      * `setEnvelope` (SPEC.md 2.1.3), the one target whose marked register
-     * reads eight bits: the column the marker stands in is the envelope
+     * reads eight bits: the column the marker is in is the envelope
      * period's high byte, a value of 0 to 127, and the column beside it
      * the low byte, a whole byte. A reader that reads the marker's column
      * as a whole byte reports periods 32,768 too high from its last row.
@@ -394,7 +394,7 @@ final class BuiltTunes {
      * 2.1.2), each running a counted source, so the kit has a tune of
      * version 5: `setR0` and `setR4` on Timer A, `setR7` on Timer D,
      * `setR11` on Timer B, and `setR12` and `setR2` on Timer C. Rows with
-     * bit 7 set stand in every one of the six sources, where a source the
+     * bit 7 set are in every one of the six sources, where a source the
      * marker ends reads that bit as its end (3.2.1), and bit 31 of each of
      * their index entries is 1, where bits 30 to 0 are the offset
      * (3.1.1).

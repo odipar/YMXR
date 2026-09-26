@@ -96,7 +96,7 @@ the run: six clauses of SPEC.md were reworded for them.
   42 of `four-timers` is the one row of the kit under both.
 
 The seventh entry read 7.3's mask of a register's width as
-underspecified, where the clause defines it; that clause stands.
+underspecified, where the clause defines it; that clause is.
 
 **5.2 The second run**, the same day, against the kit with the six
 clauses of 5.1 written into it and a fresh implementer. Every record byte
@@ -125,8 +125,8 @@ Three clauses changed for it.
 **5.3 The third run**, the same day, against the kit with the clauses of
 5.1 and 5.2 in it and a third implementer. Every record byte for byte
 again, and `NOTES.md` 17 entries with 8 marked *decides output*. Every
-clause either earlier run wrote was read as it stands. Two changed for
-it, both of them places where a second reading stands in the document
+clause either earlier run wrote was read as it is. Two changed for
+it, both of them places where a second reading is in the document
 itself.
 
 - 7.2 fixed the rows of a source by row and left the order inside a row
@@ -136,19 +136,19 @@ itself.
   7.2 names column order and says which of the two it is.
 - 7.4 read that the record of a file with an error of 3.3.4 is empty,
   while 3.3.4 has a reader report a line for that error, and where the
-  line stands was left open. It stands outside the record.
+  line appears was left open. It is outside the record.
 
 The third entry that changed bytes was whether a row setting a column to
 the value the register keeps is reported, which 1.1.1 allows and 7.3
 reports through 4.4; the reading that passes is the one the clauses have,
-and they stand.
+and they remain.
 
 **5.4 The fourth run**, the same day, against the kit at 14 tunes, with
 `counted` in it and a fourth implementer. Every record byte for byte,
 `wrong-version` included; `READ.md` named documents alone; and `NOTES.md`
 had 10 entries with 1 marked *decides output*, so the run failed rule 3
 on that one. Version 5, bit 31 of an index entry and the layout that puts
-a tune's DTX1 tables before its image were read as they stand, and the
+a tune's DTX1 tables before its image were read as they are, and the
 reader reached the counted source of each of the six targets. Two clauses
 changed:
 
@@ -170,7 +170,7 @@ byte, `wrong-version` included; `READ.md` named documents alone; and
 `NOTES.md` had 20 entries with 7 marked *decides output*, so the run
 failed rule 3 on those. Version 6, the counted source of several columns,
 and rule 2(f)'s bits 7 and 6 on a counted source of `setR7` were read as
-they stand. Seven places changed:
+they are. Seven places changed:
 
 - The Conventions read "an offset counts from the first byte of the file,
   and an offset *on a long* divides by 4", where "divides by 4" reads as
@@ -194,7 +194,7 @@ they stand. Seven places changed:
   count columns of six tunes are above 127.
 - 7.3 defined the effects of `e` twice, as "the effects the row sets a
   column of" and as those whose target, source or control column is set
-  or whose count column is other than 0. The second stands alone now.
+  or whose count column is other than 0. The second is alone now.
 - 7.3's four numbers read as the row's four columns, each being the kept
   value: 3,574 starts leave the target column unset and 1,685 starts in
   `synergy.ymxr` leave the control column unset. The clause defines the
@@ -214,7 +214,7 @@ clauses of 5.5 in it and a sixth implementer. Every record byte for byte,
 `wrong-version` included, with the line of 3.3.4 on a separate stream;
 `READ.md` named documents alone; and `NOTES.md` had 17 entries with 7
 marked *decides output*, so the run failed rule 3 on those. The seven
-stand where a rule is spread over clauses rather than where a clause is
+lie where a rule is spread over clauses rather than where a clause is
 wrong: five of the seven cite section 7, and the reader read every one of
 them as the kit has it. Seven places changed:
 
@@ -237,9 +237,9 @@ them as the kit has it. Seven places changed:
   of the kit differ between the two. `rows` is one list of C times R
   integers now.
 - 3.1.2's offset of row n of column i reads align(R), which 3.1.3 defined
-  a clause later. The definition stands beside the offset now and 3.1.3
+  a clause later. The definition is beside the offset now and 3.1.3
   cites it.
-- 7.2 left what a reader does with a source whose bit 7 stands before its
+- 7.2 left what a reader does with a source whose bit 7 is before its
   last row, which a reader following 3.2.2 cuts at the first marker:
   source 2 of `four-timers` reads 2 values in place of 40. 7.2 reads
   every row of the table.
@@ -282,7 +282,7 @@ since 5.1, and four more places changed:
   reader that follows the table alone reads a select off an unset
   column: `four-timers` has `$07` there on twelve rows, and 8,322
   entries of eight tunes change. The clause names the condition where
-  the table stands.
+  the table is.
 - 7.2's `repeat` ended "RR equal to R included (3.1.4), where the record
   of the structure writes `null` for a source that plays once", which
   reads as a condition on the same key. The structure's record is a Note
@@ -291,10 +291,10 @@ since 5.1, and four more places changed:
   read both as `false` where the row leaves that column unset. The
   clause reads the condition first.
 
-Two of the run's readings stand. 3.1.2 sets the size of a source's rows
+Two of the run's readings remain. 3.1.2 sets the size of a source's rows
 at (C - 1) times align(R) + R, which reads as a stride of R until the
 offset of row n of column i in the same cell settles it, and that offset
-stands. 3.3.4 requires the first condition present to be reported where
+remains. 3.3.4 requires the first condition present to be reported where
 three of its eleven read the DTX2 table, which `TASK.md` 3 replaces with
 the rows file: the conditions are a reader's with the table in front of
 it, and none of the three is present in a tune of the kit.
@@ -345,10 +345,10 @@ and `NOTES.md` had 21 entries with 8 marked *decides output*, each with
 the lines the other reading moves - 10,966 for bit 7 of a column that
 fills its byte, 4,150 for the effects `e` names, 1,741 for a marking bit
 on an unset column, and 2 to 8 for the other five. Every one of the eight
-is a clause the documents settle, and the reader read each as it stands;
+is a clause the documents settle, and the reader read each as it is;
 none of the three clauses 5.8 sent back was read wrong.
 
-Five places changed, all where a rule stands away from the clause that
+Five places changed, all where a rule is away from the clause that
 needs it:
 
 - 7.4 read that a reader "writes the record to a stream writes 0 bytes to
@@ -382,7 +382,7 @@ needs it:
 | `retune` | a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7 |
 | `fine-zero` | a tone fine byte moving to 0 on each voice, with the coarse set bit set and with it clear; an odd row count, so a row of unset columns is appended at the end and the table packs at unit 2 |
 | `four-timers` | all four effects on Timers A, D, B and C at 60 Hz, and rows section 4 allows beyond those a conversion of a dump produces: a count or a select alone, bit 5 alone, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, its source with bit 7 set in nine rows before its last, outside SPEC.md 3.2 and reported as the table has it (SPEC.md 7), R13 set beside a buzzer, a source repeating to its row 2, values under a clear set bit, and a repeat row that sets R8, R9 and R10 while starting effects on those three registers, outside rule 1(a) and reported by SPEC.md 6.4 |
-| `voices` | version 4 (SPEC.md 3.3.5): the four kinds of target that write several registers, one an effect at 50 Hz, and the marker in a different column under each - the coarse nibble of a voice on Timer A and of a tone on Timer C, the noise period on Timer D, the envelope shape of a buzzer on Timer B; a source of several columns repeating to row 0, one repeating to a row above it, one that plays once and stops its timer at its marker, and a start over a running source of the same row count that leaves the place where it stands |
+| `voices` | version 4 (SPEC.md 3.3.5): the four kinds of target that write several registers, one an effect at 50 Hz, and the marker in a different column under each - the coarse nibble of a voice on Timer A and of a tone on Timer C, the noise period on Timer D, the envelope shape of a buzzer on Timer B; a source of several columns repeating to row 0, one repeating to a row above it, one that plays once and stops its timer at its marker, and a start over a running source of the same row count that leaves the place where it is |
 | `envelope` | version 4 (SPEC.md 3.3.5): `setEnvelope`, the one target whose marked register reads eight bits, so the marker's column is the envelope period's high byte, 0 to 127, and the column beside it a whole byte; a source of two columns repeating to a row above 0, one that plays once and stops its timer at its marker with 127 in a row of its marked column, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `counted` | version 5 (SPEC.md 3.3.5): a counted source on each of the six targets whose register reads every bit of its byte - `setR0` and `setR4` on Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and `setR2` on Timer C - each with rows whose bit 7 is set, where a source the marker ends reads that bit as its end; an index entry whose bit 31 is 1 and whose bits 30 to 0 are the offset (SPEC.md 3.1.1); a square on R8 in the same file, which the marker ends, so a player reads the end of a source from its index entry rather than from the version word; a counted source of one row, one that plays once and stops its timer at its count, one repeating to a row above 0; a target set while an effect runs and read at the next start; a row that sets R12 as it stops the effect running on it |
 | `envelope-counted` | version 6 (SPEC.md 3.3.5): a counted source of two columns on `setEnvelope`, whose two registers read every bit of their byte, so its rows are whole bytes and a tick counts them; the high byte runs past 127, where a marked source of that target stops, and reaches 255, an envelope period of 65,323; one source repeating to a row above 0 and one that plays once and stops its timer at its count, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
