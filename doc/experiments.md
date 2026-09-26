@@ -1,21 +1,20 @@
 # experiments
 
-One experiment: the corpus through the specification, what it packs to,
-and what a frame costs.
+The corpus through the specification: what it packs to and what a frame
+costs, then what the square's start, the targets of several registers and
+the counted sources sound like.
 
-The corpus is the 544 YM files YMX 0.8.3 was tested against, all 544 of
-which read and play as the specification reads, measured by the rig over
-every one of them at 200 frames each. `capture.ym` is a YM3 dump, which the
-converter reads from 0.4.13 on (ymxs.md), and the figures below are measured
-over all 544, but for a section that names the release it was measured
-under. `YM_CORPUS` names the directory here, and its four directories named
-like a dump stand outside the corpus. `ym/convert.py corpus`, `envelope` and
-`frame` print the figures over the whole corpus below, and the percentages
-are sums and ratios of their rows. The DTX2 files are written by DTX 0.4.0's
-`dtx-write`, built from that repository's `go/cmd/dtx-write`, from the
-columns as text, at the ring it defaults to, 960 bytes: a streaming player
-decodes into a ring, and 960 bytes a stream is the ring in every `.ymx` file
-below.
+The corpus is the 544 YM files YMX 0.8.3 was tested against, and the rig
+plays every one as the specification reads, 200 frames each. `capture.ym`
+is a YM3 dump, which the converter reads from 0.4.13 on (ymxs.md). The
+figures below cover all 544, except where a section names the release it
+was measured under. `YM_CORPUS` is the corpus directory; its four
+subdirectories named like a dump are outside the corpus. `ym/convert.py
+corpus`, `envelope` and `frame` print the figures over the whole corpus
+below, and the percentages are sums and ratios of their rows. DTX 0.4.0's
+`dtx-write`, built from that repository's `go/cmd/dtx-write`, writes the
+DTX2 files from the columns as text at its default ring, 960 bytes, the
+ring of every `.ymx` file below.
 
 ---
 
@@ -23,20 +22,20 @@ below.
 
 Every tune converts whole: 411 YM5! files, 132 YM6!, whose effect slots
 encode differently, and one YM3!, whose frames end at R13. The fourteen
-sound registers cross one a column, and the two effect slots land in two of
+sound registers map one to a column, and the two effect slots map to two of
 the schema's four effects.
 
 Two ceilings the schema sets, against what the corpus requires of them. A
 source number is seven bits, so 127 sources, and the most any tune requires
 is 16. A source is at most 32,768 rows, and the longest the corpus plays is
-a digidrum of a few thousand. A row that does not set a value zero-fills it
-(R3.6).
+a digidrum of a few thousand. The converter writes a value a row leaves
+unset as 0 (R3.6).
 
-83 tunes name any source: 14 a square wave and 69 a digidrum, and none
-a sinus SID or a sync buzzer. Their shapes are two rows repeating to row 0
-and many rows played once (SPEC.md 1.9), so the third shape the format
-defines, one row repeating, is named by no file here.
-`ym/convert.py` counts them, a tune once a kind.
+83 tunes name any source: 14 a square wave and 69 a digidrum, and none a
+sinus SID or a sync buzzer. Their shapes are two rows repeating to row 0
+and many rows played once, so the corpus leaves the third shape of
+writing.md 5.5, one row repeating, unused. `ym/convert.py` counts them, a
+tune once a kind.
 
 ---
 
@@ -60,22 +59,22 @@ At `k` = 2, 149 of the 544 tunes need one frame added to divide; at `k` = 4,
 251 tunes need 511 frames between them, and the packing is worse besides.
 The converter packs at `k` = 2 (tools.md): `k` = 1 costs the play call about
 a seventh more on average (performance.md). A tune whose row count or repeat
-row is odd is padded until it packs at `k` = 2 (SPEC.md 6, rule 6): rows
-that set no column at the repeat row, then a loop of fewer than 64 rows
-written again or rows that set no column at the end ("Where a padded tune's
-added frame lands" below); before that rule it packed at `k` = 1 instead.
+row is odd is padded until it packs at `k` = 2 (SPEC.md 6, rule 6): unset
+rows at the repeat row, then a loop of fewer than 64 rows written again or
+unset rows at the end ("Where a padded tune's added frame lands" below);
+before that rule it packed at `k` = 1 instead.
 
 At `k` = 1, the three tone periods, fine and coarse together, are 21.9%,
 18.0% and 19.3% of the packed bytes, 59.2% between them. The sixteen effect
-columns are 15.7%, and the envelope shape 1.4%. No corpus tune runs more
-than two effects at once, so columns 22 to 29 are zero throughout and pack
-to 20,320 bytes each: the floor a column costs, mostly the 28-byte ST4
-header its data set opens with, one a tune.
+columns are 15.7%, and the envelope shape 1.4%. Every corpus tune runs two
+effects at most, so columns 22 to 29 are zero throughout and pack to 20,320
+bytes each: the least a column costs, mostly the 28-byte ST4 header of its
+data set, one a tune.
 
 The gain over YMX, on the 42 tunes it ships with both files and their
 391,193 frames. The `.ymx` files are YMX 0.10.1's, format 0.9, every one
-packed at a 960-byte ring and none with copies from its literal stream, so
-the two sides pack alike. Eight of them start over at a frame other than
+packed at a 960-byte ring without copies from its literal stream, so the
+two sides pack alike. Eight of them start over at a frame other than
 the first, where a DTX2 file here does not repeat.
 
 | | bytes | a frame | of YMX |
@@ -94,10 +93,10 @@ file against a `.ymx` would.
 
 ## Copies from the literal stream
 
-DTX2 packs a match beyond the ring as a copy from the column's separate
-literal stream where the packer is run with `-copies` (tools.md), and the
-format block records which way the table was packed, so the binder selects
-the reader for it. It is off by default.
+With `-copies` (tools.md), the packer writes a match beyond the ring as a
+copy from the column's literal stream; the format block records the
+choice, and the binder selects the reader for it. The flag is off by
+default.
 
 Copies save more as the ring shrinks, since a smaller ring puts more
 matches beyond it. DBA 5 at `k` = 1, the tune file's bytes, against the
@@ -147,7 +146,7 @@ against 6,072 at 120. The bytes a tune adds are 13,889 at the defaults and
 18,135 at the small ring, 4,246 more a tune. The two meet at 25,200 over
 4,246, near six tunes, where the table turns negative.
 
-Where they meet follows the length of the tunes: the ring sets the
+The crossing depends on the length of the tunes: the ring sets the
 workspace and the rows set the file, so a set of short tunes adds less a
 tune and crosses later than these three, which are long. `-m120 -copies`
 is for a program of one tune or a few, and the defaults are for a set.
@@ -158,10 +157,10 @@ is for a program of one tune or a few, and the defaults are for a set.
 
 R4.5 budgets the worst frame at what 13 scanlines cover. `ym/convert.py
 frame` counts, for every frame of every tune, the columns a row sets and
-the register writes the frame procedure of section 4 makes for them: one
+the register writes the frame procedure of SPEC.md 4 makes for them: one
 a column for the fourteen registers, and for an effect one for a stop,
 three for a start or a timer's reset, and one each for a count or a
-select written to a running timer (SPEC 1.9).
+select written to a running timer (SPEC.md 1.9).
 
 | | columns set, of 30 | YM writes | MFP writes |
 |---|---|---|---|
@@ -176,27 +175,25 @@ sound registers, and a start adds the three writes a
 timer's reset costs.
 
 One PAL frame is 160,256 cycles and one scanline 512, so R4.5's 13
-scanlines are 6,656. Two byte writes reach a YM register, and at a
-generous 32 cycles for the pair the worst frame's 18 writes are about 580
-cycles, with another 370 to test thirty columns: near 950 cycles, under
-two scanlines.
+scanlines are 6,656. Two byte writes reach a YM register, and at 32
+cycles for the pair, an upper figure, the worst frame's 18 writes are
+about 580 cycles, with another 370 to test thirty columns: near 950
+cycles, under two scanlines, and R4.5's budget is seven times that.
 
-That is the frame procedure alone and not the whole frame. What reading a
-row out of the table costs belongs to DTX, measured there for its reader
-and not for a table of this shape, so it is not counted here. R4.5's budget
-is seven times that.
+That estimate covers the frame procedure alone. performance.md measures
+the whole call on the rig, DTX's advance with it.
 
 ---
 
 ## The envelope period's reserved 0
 
-The period's two bytes fill their columns, so 0 marks the row that does not
-set one, and bits 6 and 5 of the shape keep a zero byte reachable (SPEC 1.1,
-1.7). The other way to keep it is a set bit for each byte, placed in the
-shape column, which then moves whenever a byte moves between set and unset
-(1.7). Packed both ways at the same ring and at `k` = 1, the three envelope
-columns cost 123,822 bytes as SPEC.md has them, and 131,814 under set bits
-in the shape column. The reservation saves 7,992 bytes, 0.3% of the
+The period's two bytes fill their columns, so 0 marks a row that leaves one
+unset, and bits 6 and 5 of the shape column mark a 0 as a value (SPEC.md
+1.1, 1.7). The other way is a set bit for each byte, placed in the shape
+column, which then changes whenever a byte moves between set and unset
+(SPEC.md 1.7). Packed both ways at the same ring and at `k` = 1, the three
+envelope columns cost 123,822 bytes as SPEC.md has them, and 131,814 under
+set bits in the shape column. The reservation saves 7,992 bytes, 0.3% of the
 2,602,692 the corpus packs to at that unit.
 
 The saving is smaller than the 27,362 of an earlier measurement. That one
@@ -224,7 +221,7 @@ Twenty tunes off the corpus, every ninth, converted both ways:
 | every dump at `-k1` | 1 | 136,668 |
 
 14,148 bytes, 9.4 per cent. The image the set stops paying for is 1,492 of
-that and the tables are the rest, since unit 1 packs smaller: twenty eight
+that and the tables are the rest, since unit 1 packs smaller: twenty-eight
 tunes the defaults pack at unit 2, spread across the corpus, read 14.4 per
 cent smaller at unit 1, 133,340 bytes against 155,748. One of them, Union
 Demo - Megadist 2, packs 43.6 per cent smaller and another, Masterblazer 6,
@@ -249,23 +246,22 @@ So the trade is a tenth of the file for a fifth of the call, and the frame
 the budget binds moves toward it. The image is 1,492 bytes of the 14,148,
 so what a set gains from one unit is mostly what any tune gains from it,
 and `-k1` stays a flag rather than the default for a set. Under rule 6 the
-image is no part of the trade, and the tables alone are.
+trade is the tables alone.
 
 ## Where a padded tune's added frame lands
 
 Rule 6 pads a loop of odd length by one frame a pass. Of the 543 dumps of
 the corpus, converted under 0.3.11, 161 are padded, and in 137 that frame
 lands inside the loop: thirteen loops are one row, an ending that sustains,
-which a row that sets no column leaves as it was; 121 are 95 rows or more,
-where one frame is under one per cent of a pass; and three are short and
-move every row. Masterblazer 7 slides all three tones over 7 rows, A
-Prehistoric Tale 6 runs a vibrato on voice B over 9, and Crapman game over
-an arpeggio over 17, which one frame a pass slows by 14, 11 and 6 per cent.
-Played side by side under Hatari, each of the three with the frame and
-written again, neither version was heard as wrong: the difference is
-measured, not heard. `capture.ym`, which reads from 0.4.13 on, is one more:
-its 921 rows repeat to row 0, so the frame lands inside a loop of 95 rows or
-more.
+which an unset row leaves as it was; 121 are 95 rows or more, where one
+frame is under one per cent of a pass; and three are short and move every
+row. Masterblazer 7 slides all three tones over 7 rows, A Prehistoric Tale 6
+runs a vibrato on voice B over 9, and Crapman game over an arpeggio over 17,
+which one frame a pass slows by 14, 11 and 6 per cent. Played side by side
+under Hatari, each of the three with the frame and written again, both
+versions sounded right: the difference shows in the measurement alone.
+`capture.ym`, which reads from 0.4.13 on, is one more: its 921 rows repeat
+to row 0, so the frame lands inside a loop of 95 rows or more.
 
 A loop of fewer than 64 rows is written again all the same (SPEC.md 6,
 rule 6), since it keeps the period the dump had for a few bytes: the
@@ -295,10 +291,10 @@ under Hatari on *Chipping for Ca$h* writes R0 to R10 every frame and leaves
 the volume register the square runs on unwritten for all 218 frames it
 runs; on the row the square starts it leaves the level as it is too, and
 the first tick writes the wave's first value. Its timer's count and control
-are rewritten every frame with the timer running, and no row stops it. Its
-release clears the mask and not the control register, so the count runs on
-and the tick after the next note falls a whole period after the tick before
-the gap.
+are rewritten every frame with the timer running, and every row leaves it
+running. Its release clears the mask and leaves the control register as it
+is, so the count runs on and the tick after the next note falls a whole
+period after the tick before the gap.
 
 This format adopted the first model and applied it to every row that
 starts a source. In this schema the values written belong to the source
@@ -307,8 +303,7 @@ lead of DBA 5 starts one on 957 of its first 1,575 rows and Synergy
 Credits on 3,396 of 5,377. Every one of those rows wrote 0 to the voice
 between two ticks and moved the place to the source's loud row, so the
 half those two ticks bound was cut in two and the one after it began
-early. Read off the
-voice's edges over 1,575 frames of DBA 5:
+early. Read off the voice's edges over 1,575 frames of DBA 5:
 
 | the row that starts a square | edges | halves short | halves long | off |
 |---|---|---|---|---|
@@ -317,20 +312,21 @@ voice's edges over 1,575 frames of DBA 5:
 | leaves the place and the level as they are | 16,625 | 5 | 29 | 0.2% |
 | the reference player | 16,625 | 4 | 28 | 0.2% |
 
-The middle row stood before the write of 0 was added: a start whose place
-moved to the loud row while the voice was loud wrote that level again, so
-no edge fell between the two ticks and the half ran to twice its length.
+The middle row is the player before the write of 0 was added: a start
+whose place moved to the loud row while the voice was loud wrote that level
+again, so the two ticks fell on one level and the half ran to twice its
+length.
 Adding the write of 0 turned 313 long halves into 351 short ones and left
 every other figure as it was. Both follow from one reading: a row that
 starts a source read as a row that starts a wave.
 
 The third row is the rule now. A row that starts a square where this effect
-last ran one on the same target leaves bit 5 clear and sets no volume
-column, so the voice is left as it is between the two ticks either side of
-it and they fall a whole period apart (1.3, 1.9, section 6 rule 3). The
+last ran one on the same target leaves bit 5 clear and the volume column
+unset, so the voice is left as it is between the two ticks either side of
+it and they fall a whole period apart (SPEC.md 1.3, 1.9, 6 rule 3). The
 level the second writes belongs to the new source.
 
-### The place needs no code
+### The place across a stop
 
 The player was changed for this and then changed back. A row that stops an
 effect writes select 0 and drops the latched tick, and leaves the handler's
@@ -346,22 +342,22 @@ of writing select 0, the tick that runs a source out does the same, and a
 start after a gap programs the timer only where the prescaler moved. It
 costs 64 bytes of player and the effect step's enable write, 2,502 cycles a
 call on Synergy Credits against the 2,469 of the player then, and 2,457
-through the raster monitor against its 2,421. It buys the timer's phase
+through the raster monitor against its 2,421. It keeps the timer's phase
 over a gap in which the voice is silent. Measured against it on the drum
 preempt tune, which stops and starts a square on one voice 191 times, the
 two produce 2,873 and 2,874 edges, and the one whose timer counts on shows
 three short halves where the other's are whole: its first half after a gap
 runs for what the counter had left of a period, where a timer started again
-counts a whole one. It costs less and breaks fewer halves, so the timer is
-stopped and bit 5 alone moves the place.
+counts a whole one. A stopped timer costs less and breaks fewer halves,
+so a stop stops the timer and bit 5 alone moves the place.
 
-### Four rules this left behind
+### Four rules from the defect
 
 1. **A rule written into the specification, the converter, the player and
    the rig's model agrees with every check that reads it.** Every rig here
    runs the player against a model built from the tune's tables, so it
-   proves the player writes what the table encodes. It cannot see that the
-   table encodes the wrong thing. The conformance kit pins what the
+   proves the player writes what the table encodes. A table that encodes
+   the wrong thing passes it. The conformance kit pins what the
    converter writes, so it pinned the defect as the reference too, and
    `synergy.ymxr` shrank by 244 bytes when the defect was removed. A rule
    about sound needs a check that reads sound.
@@ -397,36 +393,36 @@ subtune each, 1,536 rows at 50 Hz: two timers under version 3, one
 `setVoiceA`, and one `setToneA` with the fine byte beside the coarse
 nibble. Under Hatari the three sound the same.
 
-The records agree as far as they reach. Each has 3,072 frames (SPEC.md 7),
-and 3,024 of them are equal byte for byte across the three. The 48 that
-differ are the 48 that start a timer, and in each the difference is R0
-alone: under version 3 the frame writes the tone's fine byte at a section's
-first row, and under a target of several registers the first tick of the
-effect starting there writes it. At select 4 and count 96, the rate these
-subtunes run their effects at, a tick is every 1.95 ms.
+Each record has 3,072 frames (SPEC.md 7), and 3,024 of them are equal byte
+for byte across the three. The 48 that differ are the 48 that start a timer,
+and in each the difference is R0 alone: under version 3 the frame writes the
+tone's fine byte at a section's first row, and under a target of several
+registers the first tick of the effect starting there writes it. At select 4
+and count 96, the rate these subtunes run their effects at, a tick is every
+1.95 ms.
 
-A record leaves the ticks out (YMXS, SPEC.md 7.1), and the ticks are where
-the three forms differ most: one tick writing R0, R1 and R8 stands where
-two ticks on two timers wrote R1 and R8 and a frame wrote R0. That
-difference stands below the record, and the listening reaches it.
+A record leaves the ticks out (YMXS, SPEC.md 7.1), and the three forms
+differ most in the ticks: one tick writing R0, R1 and R8 replaces two ticks
+on two timers writing R1 and R8 and a frame writing R0. The record misses
+that difference, and the listening covers it.
 
-The three tune files stand beside the program: 3,356 bytes under version 3,
+The three tune files are beside the program: 3,356 bytes under version 3,
 3,108 for `setVoiceA` and 3,116 for `setToneA`, 24 sources against 48, and
-one timer claimed against two, which leaves a timer for the tune to use.
+one timer claimed against two, which leaves a timer free for the tune.
 `dist/` is outside the repository, as `YM_CORPUS` is.
 
 ---
 
 ## A timer on a whole byte, heard
 
-The marker stands in bit 7 of a row, so a source drove a register of seven
-bits or fewer until version 5: a volume, a coarse nibble, the envelope
-shape. A counted source has no marker and its rows are whole bytes
-(SPEC.md 3.1.6), which opens the six registers that read all eight, and
-version 6 counts such a source of several columns, so one timer drives
-the envelope period's two bytes together (SPEC.md 2.1.3). What that
-sounds like is a question for the ear, so `ym/whole-byte.py` writes a
-tune that spends it and `bin/ymxs-to-prg` makes a program of it:
+The marker is bit 7 of a row, so a source drove a register of seven bits or
+fewer until version 5: a volume, a coarse nibble, the envelope shape. A
+counted source ends on its count and its rows are whole bytes (SPEC.md
+3.1.6), so a source reaches the six registers that read all eight, and
+version 6 counts such a source of several columns, so one timer drives the
+envelope period's two bytes together (SPEC.md 2.1.3). What that sounds like
+is a question for the ear, so `ym/whole-byte.py` writes a tune that uses it
+and `bin/ymxs-to-prg` makes a program of it:
 
     python3 ym/whole-byte.py | bin/ymxs-to-prg -r4800 > dist/whole/TUNE.PRG
     ym/hatari.sh dist/whole
@@ -450,18 +446,17 @@ strongest bins to 12 kHz as a share of the magnitude to 12 kHz.
 A steady tone keeps its energy in a few bins and a swept one spreads it,
 so the figure falls as a section moves its register faster over a wider
 range: the envelope sweeping 1,953 Hz down to 30 five times a second
-spreads it furthest. The six sections stand at one loudness, 3,292 to
+spreads it furthest. The six sections have one loudness, 3,292 to
 4,317 rms, so the spread is the pitch moving rather than a section
 playing louder.
 
-The sixth section is the range version 6 adds. Its source is 512 rows of
-two columns on `setEnvelope`, stepping the period from 64 to 65,535 over
-eight seconds at 64 ticks a second, and it plays once, so the last row's
-period stands for the eight seconds after it. Under Hatari the player
-writes those 512 periods, 52 of them above 32,767 - the half a source
-that spends bit 7 on the marker leaves unreachable (SPEC.md 2.1.4) - and
-the last is one cycle in 8.39 seconds, heard as a swell over voice A's
-tone rather than as a pitch.
+The sixth section is the range version 6 adds. Its source is 512 rows of two
+columns on `setEnvelope`, stepping the period from 64 to 65,535 over eight
+seconds at 64 ticks a second, and it plays once, so the chip keeps the last
+row's period for the eight seconds after it. Under Hatari the player writes
+those 512 periods, 52 of them above 32,767 - above the range a marked source
+reaches before its last row (SPEC.md 2.1.4) - and the last is one cycle in
+8.39 seconds, heard as a swell over voice A's tone rather than as a pitch.
 
 The tune file is 2,804 bytes at version 6, with five counted sources of
 32, 16, 64, 2 and 512 rows, the last of two columns. The two rows of the
