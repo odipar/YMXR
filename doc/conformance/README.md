@@ -25,14 +25,14 @@ tests a reader; the rig (7) tests the player against the same record.
 | `MANIFEST.txt` | `# sha256  bytes  file`, then a line each for `tunes/X.ymxr`, `tunes/X.rows` and `X.jsonl` of every tune |
 | `SOURCES.md` | a row a tune: its name, the dump or builder it comes from, the dump's title and author, the converter's flags, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
 
-Nine tunes are converted from eight dumps under `ym/test`: six of
-published music, by Jochen Hippel, Mad Max and Scavenger as their
-headers record, one of them converted twice (`circus`, `plays-once`),
-and two built (`preempt`, `retune`); `four-timers`, `voices`, `envelope`
-and `counted` are built by code and `wrong-version` is `chambers` with
-the version word $0007. The music is its composers', and the
-repository's LICENSE covers the code alone: a copy of the kit has the
-tunes in it for the exercise alone.
+The converter makes nine tunes from eight dumps under `ym/test`: six of
+published music, by Jochen Hippel, Mad Max and Scavenger as their headers
+record, one of them converted twice (`circus`, `plays-once`), and two
+built (`preempt`, `retune`). Code builds `four-timers`, `voices`,
+`envelope`, `counted` and `envelope-counted`, and `wrong-version` is
+`chambers` with the version word $0007. The published music belongs to
+its composers, and the repository's LICENSE excludes it: a copy of the kit
+has the tunes for the exercise alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of the format,
@@ -395,10 +395,10 @@ full.
 
 1. `ConformanceTest` builds every tune from its `SOURCES.md` row under
    `mvn test` and requires the `.ymxr`, the `.rows` and `MANIFEST.txt`
-   byte for byte; a difference fails the test. A tune or rows file
-   absent from the kit is written; a `SOURCES.md` row or a
-   `MANIFEST.txt` that differs is written beside the kit as
-   `SOURCES.generated.md` or `MANIFEST.generated.txt`.
+   byte for byte; a difference fails the test. The test writes a tune or
+   rows file the kit lacks, and writes a `SOURCES.md` row or a
+   `MANIFEST.txt` that differs beside the kit as `SOURCES.generated.md`
+   or `MANIFEST.generated.txt`.
 2. The reference is the record of `bin/ymxr-trace` (SPEC.md 7).
 3. `68k/test/emu/test_ymxr.py -kit` plays every tune but `wrong-version`
    on the 68000 player and requires the player's frames, the rig's model

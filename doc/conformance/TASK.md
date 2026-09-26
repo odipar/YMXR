@@ -22,10 +22,9 @@ first line, the tune's fixed values, then one line of JSON a frame. A
 frame reporting -1 is one line, and the record ends with it. `<lines>`
 counts the lines, the first line among them, so the program reads at
 most `<lines>` - 1 frames, and fewer where the record ends first; it is
-not the F of `SPEC.md` 7.4, which counts frames alone. For a file
-whose version word is other than $0003, $0004, $0005 or $0006 (`SPEC.md`
-3.3.5), the
-record is empty and the program's output is empty.
+not the F of `SPEC.md` 7.4, which counts frames alone. For a file whose
+version word is other than $0003, $0004, $0005 or $0006 (`SPEC.md`
+3.3.5), the record is empty and the program's output is empty.
 
 The output is compared with the reference byte for byte: each line free
 of spaces, integers in decimal, names in the order `SPEC.md` 7 defines,
