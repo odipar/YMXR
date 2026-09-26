@@ -118,9 +118,9 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
 
-The tables stand before the image so that a source's rows stand beside
-the header however long the image is: a player whose ticks read a row
-through a displacement reaches 32,767 bytes (5.5).
+The tables come before the image so that a source's rows are within
+reach of the header at any length of image: a player whose ticks read a
+row through a displacement reaches 32,767 bytes (5.5).
 
 **1.3 A bound tune written alone.** A tool writes it from one tune file:
 bytes 6 to 11 are the tune file's; the field at 12 is the field at +4 of
@@ -210,20 +210,20 @@ core's first byte and are even.
 | bit | set where the core was assembled with | which the host then provides |
 |---|---|---|
 | 0 | the player's raster monitor (`YMXR_PERF=1`): play and each tick handler write the background colour register as performance.md defines | a screen on which those writes are read |
-| 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires `YMXR_NEST=0` with; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
-| 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` stands at 1, its value unasked: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte, which the tool that writes it reads (2.10, 5.5) |
+| 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires with `YMXR_NEST=0`; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
+| 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte, which the tool that writes it reads (2.10, 5.5) |
 
-**2.4 The state byte**, at the offset the field at 24 names: bit 0 is
+**2.4 The state byte**, at the offset in the field at 24: bit 0 is
 set from init's step 8 to exit's step 1, while a tune plays; bit 1 is set
 by play (2.9) once the player has reported -1 (SPEC.md 4); bits 7 to 2
 are 0. Note: play keeps every register, so the state byte is where an
 SNDH host reads the end of a tune that plays once.
 
-**2.5 The subtune table**, at the offset the field at 28 names: a word
+**2.5 The subtune table**, at the offset in the field at 28: a word
 `N`, then `N` longs, unsigned, subtune 1 to `N`, each the offset of its
 bound tune from the core's first byte (3.1).
 
-**2.6 The workspace**, at the offset the field at 32 names: the core's
+**2.6 The workspace**, at the offset in the field at 32: the core's
 address plus that offset, rounded up to a long (2.7 step 4), then
 `YMXR_FIXED` bytes for the player and the state block of the subtune's
 image. A tool writes align(the core's field at 20 + the largest state
@@ -314,10 +314,9 @@ the core's first byte, at H.
 | the images | from even(the end of the last bound tune), each on a long, from the core | the images of the set (1.4), in group order |
 | the workspace | W = even(the end of the last image), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
 
-The subtunes stand before the images so that a subtune's sources stand
-beside the core: a player whose ticks read a row through a displacement
-reaches 32,767 bytes (5.5), and an image between the two would be in the
-way.
+The subtunes come before the images so that a subtune's sources are
+within reach of the core: a player whose ticks read a row through a
+displacement reaches 32,767 bytes (5.5).
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
@@ -349,8 +348,8 @@ host calls play from (5.4). The title and the composer are the tool's
 it is name 1, and `(untitled)` where name 1 is the empty text, and of a
 YMXS multi it is the first tune's title, and the composer the first
 tune's composer where that is other than blank. A tune file read alone
-has the empty name; its recorded name (SPEC.md 3.3) is outside what the
-tool reads.
+has the empty name; the tool leaves its recorded name (SPEC.md 3.3)
+unread.
 
 **3.3 Writing.** A tool with a core and `N` tune files, in order:
 
@@ -626,11 +625,11 @@ under TOS calls play from: `TC` Timer C, and `!V` the VBL, written where
 the set claims Timer C or the VBL is asked for (3.2, 3.3 step 5). The
 `FLAG` letters list the timers the set claims, and a host that ticks
 from a timer selects one outside them. Under `TC` the program of 4
-writes Timer C's vector with a separate handler, leaves the timer at the
-operating system's 200 Hz, adds the rate to an accumulator on each tick
-and plays a row for each 200 the accumulator reaches (4.7, 4.8), and
-restores the vector at the end (4.6 step 6); under `!V` it plays from
-the VBL (4.3).
+writes Timer C's vector with a separate handler, arms the timer at the
+`ticks` of 4.10, adds the rate to an accumulator on each tick and plays
+a row for each `ticks` the accumulator reaches (4.7, 4.8), and restores
+the vector at the end (4.6 step 6); under `!V` it plays from the VBL
+(4.3).
 
 **5.5 A player that reads a row through a displacement.** A tick reads
 its row through a signed word displacement from the instruction that
@@ -684,11 +683,10 @@ of 0.4 or 4.5, report that line alone and stop.
 
 - `{"part":"header","version":V,"rate":H,"effects":E,"sources":S,
   "stateblock":B,"image":I,"table":C}`, the fields at 4, 6, 8, 9, 12, 16
-  and
-  20, I the field at 16 plus the tune's first byte, which 3.1 patches
-  for a subtune of an SNDH file, so that I is the image's offset there,
-  and C the field at 20 as the file has it, an offset from the image's
-  first byte.
+  and 20, I the field at 16 plus the tune's first byte, which 3.1
+  patches for a subtune of an SNDH file, so that I is the image's offset
+  there, and C the field at 20 as the file has it, an offset from the
+  image's first byte.
 - a line a source, 1 to `S`, in index order: `{"part":"source",
   "number":i,"at":A}`, A the index entry plus the tune's first byte.
 - `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0,
@@ -740,7 +738,7 @@ of 0.4 or 4.5, report that line alone and stop.
   i counting from 1.
 - `{"part":"workspace","at":W,"bytes":B}`, W as the core line reports
   it, H among it, and B the bytes from W to the end of the SNDH file,
-  which the workspace stands last in (3.1).
+  the workspace being last in it (3.1).
 
 **6.5 A program** (4.4), after the first line:
 
@@ -759,7 +757,7 @@ of 0.4 or 4.5, report that line alone and stop.
   left out, and these counted from the program's first byte: the entry
   line's `to`, every `at`, the core line's `state`, `subtunetable` and
   `work`, the subtunes line's `tunes` and a tune line's `image`. Every
-  other value of those lines stands as the SNDH file has it, and the
-  offsets of 4.5 count from that file's first byte. The SNDH
-  file ends at 28 plus the long at 2, the relocation table standing
-  after it (4.4), and the workspace's `bytes` counts to that end.
+  other value of those lines is as the SNDH file has it, and the offsets
+  of 4.5 count from that file's first byte. The SNDH file ends at 28 plus
+  the long at 2, the relocation table after it (4.4), and the
+  workspace's `bytes` counts to that end.
