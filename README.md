@@ -171,8 +171,9 @@ and `release/`, and the executables and 68000 binaries of a release, are
 free to use in any program, for any platform, commercial releases
 included, on the same condition. Where a program ships a DTX image, its
 documentation also indicates the use of ZX1 through ST4 through DTX. The
-licence excludes the music in the tunes under `ym/test`. LICENSE has the
-full terms and the notices that cover the LHA depacker.
+licence excludes the published music in the tunes under `ym/test` and in
+the two conformance kits. LICENSE has the full terms and the notices that
+cover the LHA depacker.
 
 ## Attribution
 

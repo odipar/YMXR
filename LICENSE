@@ -3,10 +3,11 @@ YMXR License
 
 YMXR is a chiptune format for the Atari ST: one encoding of the YMXS tune
 data structure in a DTX table, and a player of it. This repository contains
-the specification and the documents around it (doc/), the conformance kit
-(doc/conformance/), the 68000 player with the SNDH core and the program stub
-combined around it (68k/), the tools in Java (src/main/java/org/ymxr) and in
-Go (go/), and the rigs, the tests and the scripts.
+the specification and the documents around it (doc/), the two conformance
+kits (doc/conformance/ and doc/conformance-binaries/), the 68000 player with
+the SNDH core and the program stub combined around it (68k/), the tools in
+Java (src/main/java/org/ymxr) and in Go (go/), and the rigs, the tests and
+the scripts.
 
 The format may be implemented freely. doc/SPEC.md and doc/BINARIES.md are the
 contract, and an independent writer, player or reader owes only the
@@ -23,8 +24,9 @@ acknowledgement below.
    everything under 68k/, src/, go/, bin/, ym/ and release/, and the
    executables and the 68000 binaries a release carries.
 
-   The tunes under ym/test are test input; the music in them is
-   outside this licence.
+The tunes under ym/test and in the two conformance kits are test input.
+The published music in them belongs to its composers and is outside this
+licence.
 
 Attribution
 -----------
