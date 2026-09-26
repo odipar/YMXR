@@ -159,3 +159,40 @@ three variants. [YMX](https://github.com/odipar/YMX), the family this
 repository belongs to, is a design document of how YMXS, YMXR, DTX and ST4
 fit together. It was a format and a player until 0.10.1, and YMXR
 replaces both.
+
+## License
+
+Anyone may implement the format. [SPEC.md](doc/SPEC.md) and
+[BINARIES.md](doc/BINARIES.md) define it, and an independent writer,
+player or reader owes only the acknowledgement of condition 2 of
+[LICENSE](LICENSE): documentation that indicates the use of YMXR. The
+player, the tools and the tests under `68k/`, `src/`, `go/`, `bin/`, `ym/`
+and `release/`, and the executables and 68000 binaries of a release, are
+free to use in any program, for any platform, commercial releases
+included, on the same condition. Where a program ships a DTX image, its
+documentation also indicates the use of ZX1 through ST4 through DTX. The
+licence excludes the music in the tunes under `ym/test`. LICENSE has the
+full terms and the notices that cover the LHA depacker.
+
+## Attribution
+
+YMXR, its specification, its player, its tools and its tests are © 2026
+Robbert van Dalen, written by Claude (Anthropic's Claude Code) under
+Robbert van Dalen's direction.
+
+[DTX](https://github.com/odipar/DTX), © 2026 Robbert van Dalen, is the
+table format a tune is laid out in, and a release ships its 68000 images.
+Each image has a decoder of [ST4](https://github.com/odipar/ST4), © 2026
+Robbert van Dalen, which packs a DTX2 column. The ST4 compressor derives
+from the [ZX1](https://github.com/einar-saukas/ZX1) format and algorithm
+by Einar Saukas (© 2021), with thanks to introspec/spke; the BSD 3-Clause
+License that covers it is in the licence files of ST4 and DTX.
+
+Arnaud Carré (Leonard/Oxygene) defined the YM5 and YM6 register-dump
+formats that `ym-to-ymxr` reads. The LHA depacker in `Lha.java` and
+`go/ym/dump.go` is a port of the LZH code of the ST-Sound library by
+Arnaud Carré, based on LZH code by Haruhiko Okumura (1991) and Kerwin F.
+Medina (1996).
+
+SNDH, the music container of the Atari ST scene, is the file structure
+`ymxr-sndh` and `ymxs-to-sndh` write ([BINARIES.md](doc/BINARIES.md) 3).
