@@ -2,9 +2,9 @@
 
 The requirements of this repository and of the format. R0 binds the
 repository: its documents, its comments and its terms. R1 records what
-DTX defines. R2 to R6 are requirements of the format and bind a writer,
-a player and a reader of a tune (R2.4). A requirement is cited by number,
-R3.6; one that rests on DTX or YMXS cites the clause it rests on.
+DTX defines. R2 to R6 bind a writer, a player and a reader of a tune
+(R2.4). A document cites a requirement by number, R3.6, and a requirement
+that rests on DTX or YMXS cites the clause it rests on.
 
 ## R0. The house style and the terms
 
@@ -34,9 +34,9 @@ R3.6; one that rests on DTX or YMXS cites the clause it rests on.
   recomputed and every reference that can be followed: the figures, the
   citations, the links, the glossary's order and the one wrap width.
 - **R0.11** DTX is the table format, a separate repository: a table of
-  `R` rows and `C` columns, the meaning of a column left to the format
-  built on it. The table is data; DTX's reader defines its compile step
-  and its calling convention (DTX, abi.md).
+  `R` rows and `C` columns, whose columns the format built on it defines.
+  The table is data; DTX's reader defines its compile step and its
+  calling convention (DTX, abi.md).
 - **R0.12** YMXS is the tune data structure, a separate repository: rows
   of registers and effects, the sources those effects run, one rate a
   tune, what each register reaches on the two chips, and what a player
@@ -58,7 +58,7 @@ Go tree read. Note: they change in that repository.
   row. Those four are its metadata.
 - **R1.2** The layout of the table, row by row or column by column, and
   how a row is read from it, are defined in that repository.
-- **R1.3** The meaning of a column is left to the format built on DTX.
+- **R1.3** The format built on DTX defines what each column means.
 
 ## R2. What YMXR defines
 
@@ -81,7 +81,7 @@ Go tree read. Note: they change in that repository.
 - **R3.2** The schema is an abstraction over those effects rather than
   one tracker's arrangement of them: the ubiquitous language a tracker
   maps its terms onto.
-- **R3.3** Every choice is compiled into the data, at the cost of
+- **R3.3** A writer compiles every choice into the data, at the cost of
   columns, and a player reads a row and writes it.
 - **R3.4** At most 32 columns.
 - **R3.5** A column is one value of one byte: a table's values are one
@@ -148,8 +148,8 @@ tune requires beyond a row.
 
 ## R6. Version and extension
 
-- **R6.1** A tune records the version it was written for. Where it
-  records it, and what a player does with another version, are SPEC.md's.
+- **R6.1** A tune records the version it was written for. SPEC.md defines
+  where it records it and what a player does with another version.
 - **R6.2** A meaning is fixed once assigned: a column's, a bit's within
   its column, a value's within its field. A later version assigns what
   this one leaves unassigned and leaves every assigned meaning as it is.
