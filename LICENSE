@@ -68,7 +68,7 @@ Attribution
 Used by the build and the tests, not distributed
 ------------------------------------------------
 
-* rmac, the 68000 assembler, assembles the four cores and the stub.
+* rmac, the 68000 assembler, assembles the eight cores and the stub.
 * Hatari, with a TOS or EmuTOS image, runs the harness on an emulated
   machine.
 * The Unicorn engine (GPL-2.0) is loaded at run time by the emulator rig from

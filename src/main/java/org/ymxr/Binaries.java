@@ -186,7 +186,7 @@ final class Binaries {
     }
 
     /**
-     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the four cores and the
+     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the eight cores and the
      * stub assembled and written into each directory named, one line each
      * with its bytes. The assembler is {@code rmac} on the path unless
      * {@code -a} names another, and the sources are under {@code 68k}

@@ -12,10 +12,12 @@ lock=$root/target/.building
 
 # Whether a build is owed: no build yet, no classpath written, a core not
 # assembled, or a source newer than the last build. A tool is asked for any
-# of the four cores and for the stub, so all five are looked for.
+# of the eight cores and for the stub, so all nine are looked for.
 owed() {
     for core in YMXR_sndh.bin YMXR_sndh-perf.bin YMXR_sndh-lean.bin \
-                YMXR_sndh-perf-lean.bin YMXR_prg.bin; do
+                YMXR_sndh-perf-lean.bin YMXR_sndh-abs.bin \
+                YMXR_sndh-perf-abs.bin YMXR_sndh-lean-abs.bin \
+                YMXR_sndh-perf-lean-abs.bin YMXR_prg.bin; do
         [ -f "$classes/org/ymxr/68k/$core" ] || return 0
     done
     [ ! -f "$built" ] || [ ! -f "$path" ] \
