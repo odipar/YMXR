@@ -35,11 +35,11 @@ The eleven are written from three tunes of the other kit
 (`../conformance/tunes`), `circus`, `plays-once` and `four-timers`, by
 the calls `SOURCES.md` records, with the binaries of release 0.4.10
 under nine of them and 0.4.11's under `armed.prg`, whose stub is of the
-later descriptor version, and `named.ymxr`, whose names stand above $7E:
-the kit has a program of each descriptor version and a text the record
-escapes. The published music in those tunes belongs to its composers,
-and the repository's LICENSE excludes it: a copy of the kit has the files
-for the exercise alone.
+later descriptor version, and `named.ymxr`, whose names have characters
+above $7E: the kit has a program of each descriptor version and a text
+the record escapes. The published music in those tunes belongs to its
+composers, and the repository's LICENSE excludes it: a copy of the kit
+has the files for the exercise alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of these

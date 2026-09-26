@@ -8,4 +8,4 @@
 | `two.prg` | `bin/ymxr-prg -r2000` | `two.snd` | 48216 | ebdb8033446abb38 | a program of 2,000 rows: the PRG header, the stub's descriptor with bit 1 clear, and the SNDH file at the stub's end |
 | `timers.prg` | `bin/ymxr-prg -vbl` | `timers.snd` | 47132 | fd72d82d54186908 | a program playing from the VBL: bit 1 of the stub's flags word (4.3), and rows 0, which plays until a key stops it |
 | `armed.prg` | `bin/ymxr-prg -vbl` of release 0.4.11 | `timers.snd` | 47142 | f88fff3c0b29a616 | a stub of descriptor version 2: the prescaler, the count and the ticks of the timer 4.10 picks for 60 Hz, 5, 160 and 240, where `timers.prg` is 0.4.10's and ends its descriptor at the core's offset |
-| `named.ymxr` | `bin/ymxr-multi -nNaïve -nÜbung` | two tunes of the other kit | 2680 | 3497b6e7f5171392 | names whose characters stand above $7E, which the record escapes `\uXXXX` (6.1) |
+| `named.ymxr` | `bin/ymxr-multi -nNaïve -nÜbung` | two tunes of the other kit | 2680 | 3497b6e7f5171392 | names with characters above $7E, which the record escapes `\uXXXX` (6.1) |
