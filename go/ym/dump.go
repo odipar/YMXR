@@ -24,8 +24,8 @@ import (
 const Registers = 16
 
 // ym3Registers is the register count a YM3 dump has, R0 to R13: R14 and
-// R15, the I/O ports YM5 runs its effects through, stand outside the
-// format. ym3Hz and ym3Clock stand for what a YM3 dump leaves unsaid.
+// R15, the I/O ports YM5 runs its effects through, are outside the
+// format. ym3Hz and ym3Clock fill in what a YM3 dump leaves unsaid.
 const (
 	ym3Registers = 14
 	ym3Hz        = 50

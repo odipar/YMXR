@@ -345,7 +345,7 @@ final class ConversionTest {
         // no source runs on its timer, and starts another source at another
         // count on row 36, where the timer has run since. The count row 36
         // writes loads when the running count reaches zero (1.9), so the
-        // pitch moves and the phase stands; the row moves no place with it,
+        // pitch moves and the phase remains; the row moves no place with it,
         // so its two ticks fall a whole period apart.
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym"));
         Table table = TuneFile.read(YmToYmxr.convert(dump, List.of(), new Report())
@@ -426,7 +426,7 @@ final class ConversionTest {
      * A count of 0 is the 256 the MFP counts down, so the frames a source
      * that plays once runs for are reckoned from 256 (SPEC.md 1.9.1, 6.4;
      * YMXS, SPEC.md 6.4, which reads counted(C)). The reckoning read the
-     * column as it stands, so a drum started at a count of 0 ended a frame
+     * column as it is, so a drum started at a count of 0 ended a frame
      * after it began.
      */
     @Test

@@ -98,7 +98,7 @@ command directory `go/cmd/<tool>`.
 ## 3. An invocation
 
 **3.1 The arguments.** `-silent` is a flag of every tool and is removed
-from the arguments wherever it stands. Every other argument is a flag of
+from the arguments wherever it is. Every other argument is a flag of
 the tool, listed in section 2, or makes the call wrong (3.2); for
 `ymxr-multi` and `ymxr-check` an argument that begins with a character
 other than `-` names a file (9, 12).
@@ -751,7 +751,7 @@ tool's exit code, standard output empty.
 
 **17.1 `68k/test/emu/test_ymxr.py [mode] [tune ...]`** converts each dump
 named, or every dump under `ym/test`, and a dump the converter reads as
-another format (5.1) stands outside the run, named on a line and counted
+another format (5.1) is outside the run, named on a line and counted
 apart from the tunes that played wrong. The rig binds each tune through
 `ymxr-bind` and plays it row by row on an emulated 68000 (unicorn),
 against a model of
@@ -766,7 +766,7 @@ of them (SPEC.md 4.2.1). The frame it stops in is one whose row moves
 what the effect's tick writes, so the reading before that effect's step
 and the reading after it differ, and the run reports how many of the
 boundaries a tick was fired at. A name ending `.ymxr` is played as it
-stands, and a run writes one such tune itself: a start that moves no
+is, and a run writes one such tune itself: a start that moves no
 place with no start on that timer before it, which no conversion of a
 dump writes, to read the place against SPEC.md 4.1 step 4. A tune whose
 RR equals R is played one frame past its last row, where the call reports
@@ -850,7 +850,7 @@ the sections come to.
 and prints, over its frame steps, how the registers move: each voice's
 coarse tone byte moving while its fine byte stays, its level moving, and its
 envelope bit moving alone; the envelope shape's writes, and those that write
-the shape standing; the tunes whose envelope period and whose noise period
+the shape in effect; the tunes whose envelope period and whose noise period
 stay throughout; the frames of envelope period 0, and those among them with
 a voice on the envelope; the shape column's changes, alone, with the bits
 beside the period bytes, and with a set bit for each period byte; and each

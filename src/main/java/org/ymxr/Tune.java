@@ -102,7 +102,7 @@ final class Tune {
     /** The ring a column unpacks through, dtx-write's default. */
     static final int RING = 960;
 
-    /** The widest ring the player reads: column 29's value stands 29 rings
+    /** The widest ring the player reads: column 29's value is 29 rings
      *  past column 0's, and the player reaches it through a 16-bit
      *  displacement. */
     static final int MAX_RING = 32767 / (Columns.C - 1);

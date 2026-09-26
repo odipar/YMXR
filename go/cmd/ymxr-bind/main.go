@@ -61,7 +61,7 @@ func bound_(said *report.Report, tune, bound []byte) {
 	}
 	state := ymxr.GetLong(bound, sndh.StateAt)
 	image := ymxr.GetLong(bound, sndh.ImageAt)
-	// The image stands before the DTX1 source tables, so where there is a
+	// The image is before the DTX1 source tables, so where there is a
 	// source the first one's offset ends the image, and where there is
 	// none the file does.
 	sources := len(file.Sources)

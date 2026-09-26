@@ -112,7 +112,7 @@ final class Multi {
     /** The tune files and names {@code file} has in it.
      *
      * @throws IllegalArgumentException where it is not a multi file of
-     *     this version, or an entry stands outside it
+     *     this version, or an entry is outside it
      */
     static Read read(byte[] file) {
         if (!is(file)) {

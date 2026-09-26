@@ -87,7 +87,7 @@ final class ConformanceTest {
                     + " several columns repeating to row 0, one repeating to a row above it, one"
                     + " that plays once and stops its timer at its marker, and a start over a"
                     + " running source of the same row count that leaves the place where it"
-                    + " stands"),
+                    + " is"),
             Fixture.built("envelope", "`BuiltTunes.envelope`", BuiltTunes::envelope,
                     "version 4: `setEnvelope`, the one target whose marked register reads"
                     + " eight bits, so the marker's column is the envelope period's high"

@@ -727,7 +727,7 @@ final class ConsistencyTest {
 
     /**
      * The section against YMX read against its table, the play-call table
-     * and ym/cost.sh. YMX's rows stand in this document alone, measured once
+     * and ym/cost.sh. YMX's rows are in this document alone, measured once
      * on that player, so its figures are read against each other:
      * the refill's two kinds of call make its calls and its average. The
      * sentences read 721 where the play-call table makes 722 and placed a
@@ -948,7 +948,7 @@ final class ConsistencyTest {
      * and the conformance kit: the versions a reader reads and the one a
      * writer writes for each shape of tune, the ring the packer clamps to,
      * and the kit's files, their versions and their lines in MANIFEST.txt.
-     * The guide stood at version 3 while the format reached 6: it read a
+     * The guide read version 3 while the format reached 6: it read a
      * version other than $0003 as rejected, a source as one column, and
      * eleven tune files where the kit had fifteen.
      */
@@ -1404,7 +1404,7 @@ final class ConsistencyTest {
      * specification, and no check opened ymxs.md against them.
      *
      * <p>A citation qualified with YMXS or DTX names that repository's
-     * document, and the qualifier stands anywhere from the parenthesis it
+     * document, and the qualifier is anywhere from the parenthesis it
      * opens; a document this repository does not have is that repository's
      * too. RELEASES.md records what was true at each release, so a clause
      * renumbered after one leaves its entry as it was.
@@ -1471,7 +1471,7 @@ final class ConsistencyTest {
     /**
      * The releases of DTX and YMXS the documents name against the ones the
      * two trees require. tools.md 19.2 and 19.3 and requirements.md R1 read
-     * DTX 0.10.1 and YMXS 0.3.2 while the pom stood at 0.11.5 and 0.3.4,
+     * DTX 0.10.1 and YMXS 0.3.2 while the pom required 0.11.5 and 0.3.4,
      * five releases of one and two of the other later: the versions move
      * with every release of either repository and the prose moved with
      * none of them.
@@ -1504,7 +1504,7 @@ final class ConsistencyTest {
     }
 
     /** The clauses one document defines: `**N.N**` and `## N.N`, a section
-     *  number standing for itself and for the clauses under it. */
+     *  number marking itself and the clauses under it. */
     private static Set<String> clausesOf(String said) {
         Set<String> out = new HashSet<>();
         Matcher m = Pattern.compile("(?m)^(?:\\*\\*|#+ )R?(\\d+(?:\\.\\d+)*)").matcher(said);
@@ -1533,7 +1533,7 @@ final class ConsistencyTest {
      * same in the two trees: a message reworded in one tree and the
      * document, or in the document alone, fails here. The letters a
      * table writes for a figure, V or N or B or i, and the figures a tool
-     * builds a line from stand outside the comparison, and this reads the
+     * builds a line from are outside the comparison, and this reads the
      * words around them.
      *
      * <p>The check that a figure reads the same is
@@ -1560,12 +1560,12 @@ final class ConsistencyTest {
                 }
                 // the longest run of words between the figures: a name
                 // the tool writes into a line, a tag's or a tool's,
-                // stands between two such runs and moves with the file
+                // is between two such runs and moves with the file
                 String part = parts.stream().max(Comparator.comparingInt(String::length))
                         .orElseThrow();
                 if (!java.contains(part)) {
                     // a line of the shared tool or of a script, which
-                    // stands outside these two trees
+                    // is outside these two trees
                     continue;
                 }
                 read.add(said);

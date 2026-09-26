@@ -13,9 +13,9 @@ import org.dtx.Table;
  * ticks are not modelled: a running effect's source, target and rate read
  * what the rows gave, and its place is not followed.
  *
- * <p>What the last step wrote stands beside the state: {@code written}
+ * <p>What the last step wrote is beside the state: {@code written}
  * reports each register's value where the row wrote it and -1 where not,
- * and each effect reports whether the row touched it and which control bits
+ * and each effect reports whether the row set it and which control bits
  * the row set. A reader reports that (SPEC.md 7).
  */
 final class Replay {

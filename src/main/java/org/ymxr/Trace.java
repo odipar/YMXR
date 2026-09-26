@@ -10,7 +10,7 @@ import org.ymxs.tool.Tool;
 /**
  * What a reader reports of a tune (SPEC.md 7): one line a play call, the
  * call's result, the registers the frame writes and the effects the row
- * touched. The kit's references are the output of this tool, and the rig checks
+ * set. The kit's references are the output of this tool, and the rig checks
  * the 68000 player to it.
  */
 final class Trace {

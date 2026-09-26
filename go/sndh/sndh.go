@@ -63,7 +63,7 @@ const coreLean = 2
 // corePcrel is the core's flag bit 2: a tick reads its row through a
 // displacement from the instruction that reads it (the player's
 // YMXR_PCREL=1, doc/performance.md), which reaches 32,767 bytes, so the
-// file's tunes stand within that of the core (BINARIES.md 5.5).
+// file's tunes are within that of the core (BINARIES.md 5.5).
 const corePcrel = 4
 
 // pcrelReach is the bytes from the core's first byte a bound tune of a
@@ -98,10 +98,10 @@ const (
 )
 
 // Ticks names the ticks the file's core reads a row with (BINARIES.md
-// 2.1). A tool writes Chosen unasked: it stands the core that reads a row
+// 2.1). A tool writes Chosen unasked: it puts the core that reads a row
 // through the program counter under a file whose tunes end within the
 // reach (5.5), and the one that reads an absolute address under a file
-// whose tunes end further off. Pcrel reports such a file rather than standing the other
+// whose tunes end further off. Pcrel reports such a file rather than putting the other
 // core under it, and Absolute writes the core that reads an address at
 // any length of file.
 type Ticks int
@@ -190,7 +190,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		claimed |= Claims(tune.Effects)
 	}
 	// The tunes are bound as a set, so those that agree on what an image
-	// fixes once share one and the reader's code stands once for them
+	// fixes once share one and the reader's code appears once for them
 	// (DTX abi.md 1, doc/BINARIES.md 2).
 	set, err := Bind(tuneFiles)
 	if err != nil {
@@ -206,7 +206,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Which core stands under the tunes: the one the caller named, or the
+	// Which core is under the tunes: the one the caller named, or the
 	// one the switches select, which reads a row through the program
 	// counter unless the file's tunes end past the reach (BINARIES.md
 	// 5.5).
@@ -237,7 +237,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	if pcrel {
 		// A tick of this core reads its row through a displacement from
 		// the instruction that reads it, which reaches pcrelReach bytes,
-		// so every row of every subtune stands within that of the
+		// so every row of every subtune is within that of the
 		// handlers (BINARIES.md 5.5).
 		if last := TunesEnd(core, set, tags); last > pcrelReach {
 			return nil, fmt.Errorf("the tunes end %d bytes past the core's first byte,"+
@@ -251,7 +251,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 
 // TunesEnd is where the last bound tune of a file on this core ends,
 // counted from the core's first byte (BINARIES.md 3.1): the handlers
-// stand inside the core, so a displacement is read against this, and the
+// are inside the core, so a displacement is read against this, and the
 // bytes of the core are the margin it spends.
 func TunesEnd(core []byte, set Set, tags []byte) int {
 	at := even(len(core)) + 2 + 4*len(set.Tunes)
@@ -374,7 +374,7 @@ func AskedOf(options Options) Asked {
 // long a subtune, '!#SN' where the caller names them with a word a
 // subtune, the name's offset from the tag's first byte, then the names
 // each ended by a zero byte, a pad to an even length, TIME with a word a
-// subtune, and HDNS. The '##' count stands before FRMS, the names and
+// subtune, and HDNS. The '##' count is before FRMS, the names and
 // TIME, since a reader sizes each by it. The raster monitor paints one
 // frame of calls (performance.md), so a core with it in names the VBL as
 // the clock.
@@ -437,7 +437,7 @@ func seconds(frames, rate int) int {
 // a bra.w to the same entry of the core's triple, so all three
 // displacements are the header's bytes less 2.
 //
-// The bound tunes stand behind the subtune table, the images of the set
+// The bound tunes are behind the subtune table, the images of the set
 // behind them, and every bound tune's ImageAt is patched to reach the one
 // with its table in it, from its first byte.
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
@@ -451,7 +451,7 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	tableAt := even(len(core))
 	at := tableAt + 2 + 4*n
 	// The bound tunes first, each on an even address (5.1), so that a
-	// tune's sources stand beside the core: a player whose ticks read a
+	// tune's sources are beside the core: a player whose ticks read a
 	// row through a displacement reaches 32,767 bytes (68k/YMXR.S,
 	// YMXR_PCREL), and an image between the two would be in the way.
 	offsets := make([]int, n)
@@ -459,7 +459,7 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 		offsets[i] = at
 		at = even(at + len(tunes[i]))
 	}
-	// Then the images, each on a long: the reader's code stands once a
+	// Then the images, each on a long: the reader's code appears once a
 	// set of tunes that agree on what an image fixes once (DTX abi.md 1),
 	// and every bound tune of that set reaches it.
 	imageAt := make([]int, len(set.Images))
@@ -488,7 +488,7 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 		copy(file[header+offsets[i]:], tunes[i])
 		if len(imageAt) > 0 {
 			// The bound tune reaches its image from its first byte, and
-			// the images stand after it.
+			// the images are after it.
 			ymxr.PutLong(file, header+offsets[i]+ImageAt,
 				imageAt[set.Image[i]]-offsets[i])
 		}

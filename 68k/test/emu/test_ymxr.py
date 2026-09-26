@@ -131,7 +131,7 @@ PERF_BAR = 0x0770
 # returns to.
 CODE = 0x1000
 # A tick reads its row through a signed word displacement from the
-# handler, so the tune stands within 32,767 bytes of the code, as an SNDH
+# handler, so the tune is within 32,767 bytes of the code, as an SNDH
 # file and a program lay it out (doc/BINARIES.md 2 and 3).
 FILE = 0x5000 + 2
 # Where a tune is loaded under -abs, whose ticks read an absolute address
@@ -229,8 +229,8 @@ def equate(name, symbols=None):
 
 # A tick handler's operands: the register it selects, and the place it
 # reads; a square handler's, the register it selects and the row it
-# stands at; and a one-row source handler's, the same two. Every offset
-# is measured off its handler's labels, so they stand once the
+# is at; and a one-row source handler's, the same two. Every offset
+# is measured off its handler's labels, so they are fixed once the
 # player is assembled (main).
 # The player as it is assembled: a handler reads its row through a
 # displacement from the instruction that reads it, and the rig reads the
@@ -245,7 +245,7 @@ TW_SEL1 = TW_PTR1 = (0, 0)
 
 # The registers a target writes and the column of the row each writes,
 # in the order a tick writes them (SPEC.md 2.1): the column the marker
-# stands in comes last, so the move that writes it leaves the marker in N
+# is in comes last, so the move that writes it leaves the marker in N
 # and the handler tests it there (3.2.1).
 TARGETS = {n: [(n, 0)] for n in range(14)}
 TARGETS.update({14: [(0, 0), (1, 1)], 15: [(2, 0), (3, 1)], 16: [(4, 0), (5, 1)],
@@ -269,7 +269,7 @@ def assemble(source="YMXR.S", defines=()):
         parts = line.split()
         for i in range(0, len(parts) - 2, 3):
             # a label of the text section, or an equate, which rmac lists
-            # as an absolute: an offset a macro writes stands here alone,
+            # as an absolute: an offset a macro writes is here alone,
             # since the source has no line to read it off
             if parts[i + 2] in ("t", "a") and len(parts[i + 1]) == 16:
                 try:
@@ -287,7 +287,7 @@ CORPUS = os.environ.get("YM_CORPUS",
 CORPUS_TUNES = 40
 
 # The tunes the check of init's patching reads to build one set, and how
-# many of those it stands in the set: it inits every ordered pair, so the
+# many of those it is in the set: it inits every ordered pair, so the
 # second bounds the work, and the first bounds what a run converts for it.
 SET_READS = 24
 SET_TUNES = 10
@@ -315,13 +315,13 @@ def spread(most):
 class AnotherFormat(Exception):
     """A dump the converter reads as another format: it reads a YM3!, a
     YM3b, a YM5! or a YM6! dump, packed or plain (doc/tools.md 5.1), and a
-    corpus may have a file of another in it. Such a file stands outside a
+    corpus may have a file of another in it. Such a file is outside a
     run rather than among the tunes that played wrong."""
 
 
 def convert(ym, work):
     """A tune file out of a YM dump, through the converter; a tune file
-    named as it stands."""
+    named as it is."""
     if ym.endswith(".ymxr"):
         return open(ym, "rb").read(), ""
     flags = os.environ.get("YMXR_FLAGS", "").split()
@@ -357,7 +357,7 @@ def trace(file, work, calls):
 
 def entry(model, writes):
     """The reader's entry for a frame the model just stepped: the writes
-    the chip reads, and the effects the row touched."""
+    the chip reads, and the effects the row set."""
     w = {}
     for reg, value in masked(writes):
         # R7's two host bits belong to the host: the reader reports bits 5 to 0
@@ -392,7 +392,7 @@ class Tune:
         count = file[9]
         self.state = long_at(file, 12)
         self.image_at = long_at(file, 16)
-        # Where this tune's table stands in the image it is packaged
+        # Where this tune's table is in the image it is packaged
         # into: an image of one names it in its format block, and one
         # shared by several names the first, so a bound tune records a
         # separate offset
@@ -404,7 +404,7 @@ class Tune:
         entries = [long_at(file, 24 + 4 * i) for i in range(count)]
         index = [at & ~COUNTED for at in entries]
         self.counted = [False] + [bool(at & COUNTED) for at in entries]
-        # The image stands after the sources' tables and runs to the end of
+        # The image is after the sources' tables and runs to the end of
         # the bound tune (doc/BINARIES.md 1.2).
         image = file[self.image_at:]
         table_at = self.table_at
@@ -426,7 +426,7 @@ class Tune:
         assert len(self.rows) == self.R
         # a source: (the offset of its first row in the file, R, RR, a
         # column a value of the row). DTX1 lays a table out column by
-        # column and pads each column to a word, so column i stands a
+        # column and pads each column to a word, so column i is a
         # stride of (R + 1) & ~1 from the one before it (SPEC.md 3.1.3).
         self.sources = [None]
         for at in index:
@@ -580,7 +580,7 @@ class Model:
 
     def ticking(self, i):
         """The writes a tick of effect i would make, the place left where
-        it stands."""
+        it is."""
         fx = self.fx[i]
         if not fx["running"]:
             return None
@@ -631,7 +631,7 @@ class Model:
         return len(columns) == 1 and R == 1 and RR == 0
 
     def value(self, i):
-        """The row a handler with its place as an immediate stands at,
+        """The row a handler with its place as an immediate is at,
         which is its place. Both such handlers run a source of one
         column."""
         fx = self.fx[i]
@@ -650,13 +650,13 @@ class Model:
 
     def left(self, i):
         """The rows a counted handler has left: from the row its place
-        stands at to the end of the source (68k/YMXR.S, TICKC)."""
+        is at to the end of the source (68k/YMXR.S, TICKC)."""
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return R - fx["place"]
 
     def place_address(self, i):
-        """The address the running handler's place stands at: the row it
+        """The address the running handler's place is at: the row it
         reads in the column it writes first (68k/YMXR.S, TICKW)."""
         fx = self.fx[i]
         if fx["place"] is None or fx["source"] == 0:
@@ -731,7 +731,7 @@ class Machine:
                 self.mfp.append((address + lane, byte))
         elif PERF and PALETTE <= address < PALETTE + 2:
             # a mark of the raster monitor: the colour, and how many chip
-            # writes of the call stand before it
+            # writes of the call are before it
             self.palette.append((value & 0xFFFF, len(self.psg)))
         elif address < 0x1000 or CODE <= address < CODE + 0x10000:
             pass                        # a vector, or the player patching itself
@@ -740,7 +740,7 @@ class Machine:
 
     def call(self, name, a0=0, a1=0, d0=0, at=None):
         """One call through the jump table, back at the sentinel. The
-        core's three entries stand in another order than the player's
+        core's three entries are in another order than the player's
         (BINARIES.md 2), so each set has a name a slot.
 
         With at, the call stops at that address and resume runs it on:
@@ -794,7 +794,7 @@ class Machine:
 
     def fire(self, vector):
         """One tick through its vector, run to the handler's rte, on the
-        stack and the registers as they stand: the frame the handler
+        stack and the registers as they are: the frame the handler
         returns through is pushed below the stack pointer it finds, so a
         tick inside a stopped call leaves the call as it was."""
         mu = self.mu
@@ -873,7 +873,7 @@ class Timers:
         """The MFP writes of a call, in order.
 
         The main counter runs on through a stop: a control register of 0
-        leaves it where it stands and a select written back resumes from
+        leaves it where it is and a select written back resumes from
         there, so a select alone moves the prescaler and no more. The
         data register written while the control register is 0 loads the
         counter, and the select after that is the start this counts."""
@@ -991,7 +991,7 @@ def inside(code, symbols, bound, tune, workspace):
         if not left:
             break
         # the first boundary left whose effect this row moves: where the
-        # row leaves every one of them as it stands, the two readings at
+        # row leaves every one of them as it is, the two readings at
         # each boundary are one and the row plays as a frame of a run
         pick = next(((one, moves) for one in left
                      for moves in [model.moved(one[0])] if moves), None)
@@ -1158,7 +1158,7 @@ def outofreach(code, symbols):
     """A tune past the reach of a displacement: init reports -1
     (doc/BINARIES.md 5.5). Every other run loads its tune at FILE, which
     the handlers reach; this one is loaded far up the mapped region, so
-    the rows of its sources stand past the 32,767 bytes a signed word
+    the rows of its sources are past the 32,767 bytes a signed word
     reaches."""
     work = tempfile.mkdtemp()
     with open(os.path.join(ROOT, "doc", "conformance", "tunes",
@@ -1253,7 +1253,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         # so it runs from the field at 16 to the end: the cycles the
         # counter reads there are the reader's, since the tables below it
         # are data.
-        # The frame procedure's steps 1 to 3, the effects, stand from
+        # The frame procedure's steps 1 to 3, the effects, are from
         # ymxr_frame to ymxr_regs, and steps 4 to 8, the register columns,
         # from there to ymxr_played: the two parts a dense frame procedure
         # would replace (dense).
@@ -1279,7 +1279,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
             # leaves the place at a marker and the register at R0, so such
             # a tick writes $80 to R0 and stops the timer. Rule 4(c) keeps
             # a tune clear of one, and one here leaves the player as init
-            # left it: the place stands and the timer was stopped already.
+            # left it: the place remains and the timer was stopped already.
             m.interrupt(TIMER[i]["vector"])
             assert m.psg == [(0, 0x80)], \
                 "effect %d: a tick with no source connected wrote %s" % (i, m.psg)
@@ -1349,7 +1349,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         assert d0 == 0, "play gave %d at frame %d" % (d0, f)
         if perf:
             # the monitor marks the call's work and burns the timers' bar
-            # after it, so the two marks stand around every chip write
+            # after it, so the two marks are around every chip write
             colours = [colour for colour, _ in m.palette]
             assert colours[:1] == [PERF_FRAME] and PERF_BAR in colours, \
                 "frame %d: the monitor's marks are %s" % (f, [hex(x) for x in colours])
@@ -1375,7 +1375,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         for i in range(4):
             fx = model.fx[i]
             # A restart is due where the row sets bit 6, and where the timer
-            # stood stopped and the row writes it a select: a select
+            # was stopped and the row writes it a select: a select
             # runs an MFP timer, so a stopped one starts on it either way
             # (SPEC.md 1.9). A source that plays once stops its timer at
             # its last row, so a writer cannot always determine which
@@ -1556,7 +1556,7 @@ ROM = 0xE00000
 
 
 # The words performance.md spells a small count with, so the rig reads the
-# sentence back as it stands.
+# sentence back as it is.
 WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
          7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
          12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
@@ -1692,7 +1692,7 @@ def counted_read(code, symbols, cycles_of, general):
 
 
 def decoder_of(file, bound, tune, dtx):
-    """Where ST4's decoder stands in a bound tune's image, and the two
+    """Where ST4's decoder is in a bound tune's image, and the two
     parse heads inside it.
 
     The image is DTX's packager's output, and DTX's rig assembles the same
@@ -1706,7 +1706,7 @@ def decoder_of(file, bound, tune, dtx):
     # The packager reads the tune file's tail, so its image has the
     # sources' tables in it where the binder packs each as a separate
     # table: the binder's image region is the packager's image as far as
-    # the file runs, and the decoder stands at its head either way.
+    # the file runs, and the decoder is at its head either way.
     have = bound[tune.image_at:]
     over = min(len(image), len(have))
     assert image[:over] == have[:over], \
@@ -1990,7 +1990,7 @@ PROFILED = re.compile(r"^([0-9a-f]{8}) (.*?)\s[\d.]+% \((\d+), (\d+), ", re.M)
 
 def clock_program(work, rate):
     """The clock's tune at `rate` in CLOCK.PRG, and where the SNDH file
-    stands in the program file: the stub is its text, and the SNDH file
+    is in the program file: the stub is its text, and the SNDH file
     follows the stub."""
     file, report = convert(CLOCK_TUNE, work)
     at = bytearray(file)
@@ -2242,7 +2242,7 @@ def monitor_runs():
                      " measures %d" % (unit.group(1), most))
     read.append("Synergy Credits at unit 1 %d at most" % most)
     lands = re.search(r"Measured on %s over ([\d,]+) frames, the call's first register write"
-                      r" stands at least ([\d,]+) cycles after the VBL" % FIRST_TUNE, said)
+                      r" is at least ([\d,]+) cycles after the VBL" % FIRST_TUNE, said)
     assert lands, "performance.md has no first write on " + FIRST_TUNE
     frames = int(lands.group(1).replace(",", ""))
     got = first_writes(os.path.join(ROOT, "ym", "test", FIRST_TUNE + ".ym"), frames)
@@ -2316,7 +2316,7 @@ def hatari(ym, code, symbols, perf=False):
     handler = symbols["ymxr_tick1"] - symbols["ymxr_tick0"]
     ticks = [(base + symbols["ymxr_tick%d" % i], base + symbols["ymxr_tick%d" % i] + handler)
              for i in range(4)]
-    # a square's handler stands beside the four, one an effect, and a
+    # a square's handler is beside the four, one an effect, and a
     # one-row source's beside those
     square = symbols["ymxr_sq1"] - symbols["ymxr_sq0"]
     squares = [(base + symbols["ymxr_sq%d" % i], base + symbols["ymxr_sq%d" % i] + square)
@@ -2334,7 +2334,7 @@ def hatari(ym, code, symbols, perf=False):
                base + symbols["ymxr_three%d" % i] + three) for i in range(4)]
     # and the two counted shapes, of one column and of several (68k/YMXR.S,
     # TICKC and TICKW with a counter): a write of a shape this misses is a
-    # write of no effect, so its tick stands outside the count below and
+    # write of no effect, so its tick is outside the count below and
     # its registers outside the comparison with the model.
     cnt = symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]
     cnts = [(base + symbols["ymxr_cnt%d" % i], base + symbols["ymxr_cnt%d" % i] + cnt)
@@ -2444,7 +2444,7 @@ def hatari(ym, code, symbols, perf=False):
             if len(of) == 1:
                 return of[0]
             # the register Timers C and D share, written by both effects:
-            # the first write is effect 1's, and the writes after it stand
+            # the first write is effect 1's, and the writes after it are
             # for either, so they place no source
             return of[0] if of and not stepped[of[0]] else None
 
@@ -2593,9 +2593,9 @@ def patched_code_follows_the_subtune(defines, tunes):
         if len(bounds) == SET_TUNES:
             break
     # A tick reads its row through a signed word displacement, so a
-    # subtune whose rows stand past the reach is left
+    # subtune whose rows are past the reach is left
     # out: these are bound one by one, so each has an image in it, where
-    # a set's subtunes share one image and stand together
+    # a set's subtunes share one image and are together
     # (doc/BINARIES.md 2).
     left = 0
     if PCREL:
@@ -2671,7 +2671,7 @@ def core(defines, ym):
     A write of the player's that clears a pending or an enable bit between
     the MFP raising an interrupt and the 68000 acknowledging it leaves the
     MFP with no vector to place on the bus, and the 68000 runs exception 24
-    rather than the timer's handler. The tick that acknowledge stood for is
+    rather than the timer's handler. The tick that acknowledge belonged to is
     the one the write cancelled, so the handler returns."""
     code, symbols = assemble("YMXR_sndh.S", defines=defines)
     work = tempfile.mkdtemp()
@@ -2680,7 +2680,7 @@ def core(defines, ym):
     assert bound is not None, "the binder rejected " + os.path.basename(ym)
     # The core reads its subtune table and its workspace as offsets from
     # its first byte, which the tool patches (BINARIES.md 3). The table
-    # stands after the bound tune here, one entry, and the workspace at
+    # is after the bound tune here, one entry, and the workspace at
     # WORK.
     table = (FILE + len(bound) + 1) & ~1
     code = bytearray(code)
@@ -2692,7 +2692,7 @@ def core(defines, ym):
     host = 0x00ABCDE0
     m.mu.mem_write(SPURIOUS, struct.pack(">I", host))
     # The core keeps every register, so its entries report through the
-    # state byte rather than through d0: bit 0 stands while a tune plays.
+    # state byte rather than through d0: bit 0 is while a tune plays.
     m.call("core-init", d0=1)
     assert m.byte(CODE + symbols["sndh_state"]) & 1, \
         "the core's init rejected " + os.path.basename(ym)
@@ -2810,7 +2810,7 @@ def main():
                                        ", the lean tick" if LEAN else ""))
     # The checks below read one tune of the list, and a dump of another
     # format is outside a run (convert): the first the converter reads
-    # stands for them, and the run reports the rest as it reaches them.
+    # represents them, and the run reports the rest as it reaches them.
     opens = tempfile.mkdtemp()
     first = None
     for one in tunes:
@@ -2929,7 +2929,7 @@ def main():
                 # ticks drop the level and write an end of interrupt, so
                 # the lean core reads its ticks and not these. Every effect
                 # of this tune is a square, whose tick costs the same under
-                # both builds, so the three figures stand under -abs too.
+                # both builds, so the three figures are under -abs too.
                 if stem == "Synergy Credits" and not LEAN and PCREL:
                     # the costliest frame, counted from the first as 1,
                     # which the section against YMX places past its run

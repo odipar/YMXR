@@ -53,7 +53,7 @@ back reference (DTX, abi.md 4). Seven of the eleven tunes fit.
 A refill that parses no new operation copies inside a match the ring
 already has, and the figure of a tune is the cost most of its refills
 read: 334 cycles inside the decoder on ten of the eleven, where the
-match's source stands after the ring's start, and 378 on capture, where
+match's source is after the ring's start, and 378 on capture, where
 the source crosses that start. The 44 between them goes to adding
 the ring's size to the source and cutting the segment at the crossing
 (ST4's `source_wrapped`). A refill at unit 1 is 576.
@@ -104,7 +104,7 @@ player is built with it: `rmac -dYMXR_PERF=1` puts the raster monitor in
 (`68k/YMXR.S`), and `bin/ymxr-sndh -perf` puts that core in an SNDH file.
 The call paints the background red while its work runs, one scanline to 512
 cycles, and each tick handler paints a separate colour where the beam
-stands: effect 0 green, effect 1 blue, effect 2 magenta, effect 3 cyan, four
+is: effect 0 green, effect 1 blue, effect 2 magenta, effect 3 cyan, four
 colours distinct from the call's red and the bar's yellow, so a reader
 separates every band. A tick's band is a few hundred cycles wide, so each
 handler also adds a count of what its instructions cost, in turns of ten
@@ -112,7 +112,7 @@ cycles, and the next call burns the total off as a yellow bar after its
 work, the register writes among them: the bar leaves every chip write where
 it was and shows what the handlers cost the frame. The call waits for the
 display to start before it paints, since the VBL fires far above the screen
-and an unsynced bar lands in the top border, out of sight; the wait stands
+and an unsynced bar lands in the top border, out of sight; the wait is
 before the red mark, so it is outside the figures, and it is bounded, so a
 call from anywhere runs on. With the switch off, the default, the player is
 byte for byte the player without it.
@@ -133,7 +133,7 @@ build for reading a run rather than one to play a tune with.
 A call writes the row the call before it read, and reads the next once its
 writes are made (68k/YMXR.S), so a row's refill comes after that row's
 writes. Measured on DBA 2 over 3,000 frames,
-the call's first register write stands at least 752 cycles after the VBL.
+the call's first register write is at least 752 cycles after the VBL.
 YMX writes its fourteen registers before it decodes for the same reason.
 
 Measure from the VBL, at the tune's rate. Where the program plays from Timer
@@ -236,7 +236,7 @@ most.
 
 YMX alone writes its register columns unconditionally, dense, with the
 effects behind one bit. Counted by
-the rig against the player as it stands, each register written as the player
+the rig against the player as it is, each register written as the player
 writes a set column, in 36 cycles, and the effects' steps behind a test of
 22, that costs 31 to 173 cycles a frame on eight of the eleven fixtures and
 saves 4 to 36 on the other three, for rewriting 1.1 to 1.7 and redefining
@@ -281,7 +281,7 @@ faster timer may nest inside a slower one. A host that requires neither
 uses the core assembled with `YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md
 2.1), where a tick writes its two chip registers and returns:
 
-| tick | as it stands | lean |
+| tick | as it is | lean |
 |---|---|---|
 | a row written, the place stepped | 96 | 64 |
 | the marker, the place to row `RR` | 114 | 98 |
@@ -289,16 +289,16 @@ uses the core assembled with `YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md
 | a square's two rows, no place stepped | 88 | 56 |
 | a source of one row, no place stepped | 64 | 32 |
 
-The level is dropped on the three paths that write a row's value and the
-end of interrupt is written on all five, so those three lose 32 cycles and
-the two that end a source lose 16, and 24 where the tune runs one effect
-and the nops below already stand. A source ends once a pass and its rows
-are written many times, so 32 a tick bounds what comes off a frame: 941
-cycles on Synergy Credits, 595 on DBA 2, 485 on DBA 5 and 295 on Turrican -
-world 4-3. The two switches go together, since automatic end of interrupt
-leaves the in-service bit clear and the level a tick sets is then all that
-keeps a lower timer out, and the player claims the MFP's vector register at
-init and restores it at stop.
+The level is dropped on the three paths that write a row's value and the end
+of interrupt is written on all five, so those three lose 32 cycles and the
+two that end a source lose 16, and 24 where the tune runs one effect and the
+nops below are already in place. A source ends once a pass and its rows are
+written many times, so 32 a tick bounds what comes off a frame: 941 cycles
+on Synergy Credits, 595 on DBA 2, 485 on DBA 5 and 295 on Turrican - world
+4-3. The two switches go together, since automatic end of interrupt leaves
+the in-service bit clear and the level a tick sets is then all that keeps a
+lower timer out, and the player claims the MFP's vector register at init and
+restores it at stop.
 
 The four cores write one tune the same but for a square's edge. Traced under
 Hatari over 900 frames of Synergy Credits, counted from the frame the player
@@ -326,7 +326,7 @@ ticks no longer cost.
 
 A source of one row repeating runs a separate handler the same way
 (68k/YMXR.S, ONEROW). A source of one row is the marker alone (SPEC.md 3.2)
-and its place stands at row 0, so the handler encodes that row as an
+and its place is at row 0, so the handler encodes that row as an
 immediate, writes it, and moves no place: 56 cycles against the 114 the
 general handler's marker path costs, and 64 against 114 where the tune runs
 more than one effect. The kit's `retune` ticks 7.7 times a frame, a 383 Hz
@@ -354,7 +354,7 @@ it walked the tune's index and read the source's header: 48 cycles against
 100. That is 38 a frame on Synergy Credits, 22 on DBA 2 and 21 on DBA 5, and
 60 to 94 off their costliest frames. The source column's seven bits reach
 127, so the room is sized for 127 sources. A second table of the same
-room stands beside it, where a source of several columns has its loop cell
+room is beside it, where a source of several columns has its loop cell
 and the stride from one column to the next, and an effect's record is 16
 bytes where it was 8, so YMXR_FIXED is 2,120 bytes against 56.
 
@@ -364,7 +364,7 @@ bytes where it was 8, so YMXR_FIXED is 2,120 bytes against 56.
 so a source on that target is counted: its rows are whole bytes and a
 tick counts them (SPEC.md 2.1.3). The wide handler runs that source with
 a word counter where the marked one tests bit 7, 128 bytes an instance
-against 112, and four instances of it stand beside the two marked shapes.
+against 112, and four instances of it are beside the two marked shapes.
 
 Both tunes of the kit that sweep the envelope period run one effect, so
 their ticks drop no level and the figures below are the second column's
@@ -379,7 +379,7 @@ row through an absolute address (A tick through an absolute address):
 
 So 20 cycles a tick that writes a row, as the counted handler of one
 column costs against the general one, and 40 on the path that loops,
-where the reload of the counter stands too. The counted handler reaches
+where the counter is reloaded too. The counted handler reaches
 the half of the envelope period above a marked source's range, and plays
 the last row as written: the tick that reads the last row of a marked
 source on this target
@@ -422,7 +422,7 @@ The lean tick of the table above leaves the same two writes out of these
 paths, the level's drop on the three that write a row's value and the end
 of interrupt on all five:
 
-| tick | as it stands | lean |
+| tick | as it is | lean |
 |---|---|---|
 | a row written, the place stepped | 108 | 76 |
 | the marker, the place to row `RR` | 130 | 114 |
@@ -430,7 +430,7 @@ of interrupt on all five:
 | a square's two rows, no place stepped | 88 | 56 |
 | a source of one row, no place stepped | 64 | 32 |
 
-So the player as it stands saves 12 cycles a tick that writes a row and
+So the player as it is saves 12 cycles a tick that writes a row and
 steps its place, 16 on the loop and 8 on the stop: at a digidrum's 6,000
 ticks a second, 1,440 cycles a frame. A handler of two columns saves
 twice that a tick and one of three three times, since each column is a
@@ -446,16 +446,16 @@ average and 31.70 at most against 2.23 and 28.57. `ym/cost.py` reads the
 colour writes back.
 
 A start writes the place it patches behind level 7, so that a tick reads
-a handler once it is made, and in the player as it stands the arithmetic
-that turns a row's address into a displacement stands in that window as
+a handler once it is made, and in the player as it is the arithmetic
+that turns a row's address into a displacement is in that window as
 well: a dozen instructions this build leaves out, which a tick of a timer
 due inside it waits for.
 
-The displacement is a signed word, so every row of every source stands
+The displacement is a signed word, so every row of every source is
 within 32,767 bytes of the handlers. Init measures each source against
 them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
-before the images, so the rows of the tune a host loads stand beside the
+before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
 assembles this build, which is 7,804 bytes against 8,160. Two figures
 move against each other: a place is a word where it was a long, which

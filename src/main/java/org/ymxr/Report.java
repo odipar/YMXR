@@ -28,7 +28,7 @@ import java.util.Locale;
  */
 final class Report {
 
-    /** How wide a name stands in a reported row. */
+    /** How wide a name is in a reported row. */
     private static final int NAME = 22;
 
     /** How long a run stays quiet about its progress, in nanoseconds. */
@@ -42,7 +42,7 @@ final class Report {
     private final PrintStream to;
 
     /** The tenth of a run the last progress line gave, and the clock it
-     *  stood at. A run over many files counts them from several threads,
+     *  was at. A run over many files counts them from several threads,
      *  so progress claims this object's lock and both are read under it. */
     private int tenth = -1;
 
@@ -99,7 +99,7 @@ final class Report {
 
     /**
      * How far through a run of {@code of} steps this is. A line is said
-     * where the tenth of the run it stands in has moved and a second has
+     * where the tenth of the run it is in has moved and a second has
      * passed since the last, so a run that ends within a second says
      * no progress and one of minutes produces about ten such
      * lines.

@@ -229,7 +229,7 @@ final class YmxsTest {
     @Test
     void aCountedSourceOnTheMixerCarriesTheTwoPortDirections() {
         // A tick of a counted source writes the row whole, so the two
-        // port directions of R7 stand in the source: the structure's
+        // port directions of R7 are in the source: the structure's
         // value is the mixer's six bits and the writer sets bits 7 and 6
         // (SPEC.md rule 2(f), 1.4.2).
         org.ymxs.YMXS.Single gate = Tunes.repeating("gate", List.of(56, 57), 0);

@@ -15,7 +15,7 @@ import (
 // MultiMagic is the four bytes a multi file opens with.
 var MultiMagic = []byte{'Y', 'M', 'X', 'M'}
 
-// Where a multi file's header fields stand.
+// Where a multi file's header fields are.
 const (
 	MultiCountAt = 6
 	MultiIndexAt = 8

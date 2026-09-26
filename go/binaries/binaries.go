@@ -3,11 +3,11 @@
 // file's entries, and the program stub, which goes in front of an SNDH
 // file.
 //
-// Three switches of the player's stand in the core, the raster monitor,
+// Three switches of the player's are in the core, the raster monitor,
 // the lean tick and the row read through an absolute address, and each of
 // their eight settings is a separate core, so a file that requests two
 // uses the core that is both. A tick reads its row through the program
-// counter where YMXR_PCREL stands at 1, its value unasked
+// counter where YMXR_PCREL is at 1, its value unasked
 // (doc/performance.md).
 //
 // The files are build output. The Maven build writes them into data/,

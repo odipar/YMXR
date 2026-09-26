@@ -75,7 +75,7 @@ public final class YmDump {
     }
 
     /** The registers a YM3 dump has, R0 to R13: R14 and R15, the I/O
-     *  ports YM5 runs its effects through, stand outside the format. */
+     *  ports YM5 runs its effects through, are outside the format. */
     private static final int YM3_REGISTERS = 14;
 
     /** What a YM3 dump leaves unsaid: the rate its player ran at, and the

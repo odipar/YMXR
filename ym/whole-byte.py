@@ -5,7 +5,7 @@ and 6 encode (SPEC.md 3.1.6).
   python3 ym/whole-byte.py | bin/ymxs-to-prg -r4800 > dist/whole/TUNE.PRG
   ym/hatari.sh dist/whole
 
-The marker stands in bit 7 of a row, so until version 5 a source drove
+The marker is in bit 7 of a row, so until version 5 a source drove
 only a register that reads seven bits or fewer: a volume, a coarse
 nibble, the envelope shape. A counted source has no marker and its rows
 are whole bytes, which opens the six registers that read all eight -
@@ -28,7 +28,7 @@ voice B under all six:
   6. setEnvelope: both period bytes from one timer, 122 Hz down to one
      cycle in 8.39 seconds
 
-The note a sweep drives stands at a period of 256 to 511, a coarse byte
+The note a sweep drives is at a period of 256 to 511, a coarse byte
 of 1, so a fine byte over its whole range moves the pitch by an octave:
 at a lower note the coarse byte would swamp the sweep.
 
@@ -140,7 +140,7 @@ stop(5 * ROWS_A_SECTION - 1)
 #    a counted source of two columns on setEnvelope, whose 512 rows step
 #    the period from 64 to 65,535 at 64 ticks a second, ten octaves in
 #    eight seconds under voice A's tone. The source plays once, so the
-#    last row's period stands for the eight seconds after it: one cycle
+#    last row's period remains for the eight seconds after it: one cycle
 #    in 8.39 seconds, and the half above 32,767 is the half a marked
 #    source leaves unreachable (SPEC.md 2.1.3, 2.1.4).
 DESCENT_ROWS = 512

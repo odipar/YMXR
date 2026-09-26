@@ -180,7 +180,7 @@ final class BinariesTest {
      * tags in order, each text tag's text, the '##' count, the clock tag
      * and its rate, the FLAG letters after its '~', FRMS's longs, the
      * names, TIME's words, and where the block ends, past HDNS. A zero
-     * byte where a tag would begin is a pad, and stands at an odd
+     * byte where a tag would begin is a pad, and is at an odd
      * position.
      */
     record Tags(List<String> order, Map<String, String> text, int subtunes, String clock,
@@ -297,10 +297,10 @@ final class BinariesTest {
         assertArrayEquals(core, patched, "the core as assembled, its two offsets aside");
         assertEquals(Sndh.even(core.length), tableAt);
         assertEquals(files.size(), Tune.getWord(sndh, header + tableAt));
-        // The tunes stand between the subtune table and the images, so
-        // that a tune's sources stand beside the core (68k/YMXR.S,
+        // The tunes are between the subtune table and the images, so
+        // that a tune's sources are beside the core (68k/YMXR.S,
         // YMXR_PCREL); the tunes that agree on what an image fixes once
-        // share one image, so the reader's code stands once for them (DTX
+        // share one image, so the reader's code appears once for them (DTX
         // abi.md 1, BINARIES.md 2).
         Bound.Set set = Bound.of(files);
         int state = 0;
@@ -664,7 +664,7 @@ final class BinariesTest {
                 () -> Sndh.of(core, files, options));
         assertTrue(said(wrong).contains("past the core's first byte")
                 && said(wrong).contains(String.valueOf(Sndh.PCREL_REACH)), said(wrong));
-        // the same tunes on the core as it stands, whose tunes end within
+        // the same tunes on the core as it is, whose tunes end within
         // the reach
         assertTrue(Sndh.of(files, options).length > 0,
                 "the core as assembled takes the tunes it ends in reach of");
@@ -675,7 +675,7 @@ final class BinariesTest {
         // A source of 30,000 rows puts the file's one bound tune past the
         // reach by itself, so the core chosen for it reads a row through
         // an absolute address (Sndh.Ticks), and -pcrel reports such a file
-        // rather than standing that core under it.
+        // rather than putting that core under it.
         List<byte[]> files = List.of(longSource(30000));
         byte[] sndh = Sndh.of(files, new Sndh.Options("Long", null, null, false, false));
         int flags = Tune.getWord(sndh, Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT);

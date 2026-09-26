@@ -11,8 +11,8 @@
 ; and interrupt bits as it finds them, and the vector at $60; exit puts
 ; back that vector and the state of the timers the tune claimed. The
 ; player claims a timer only for an effect the tune runs, and the bound
-; tune's effects byte says which. A timer the tune does not run is never
-; touched, so what a host runs on it runs on through the tune. No data
+; tune's effects byte says which. A timer the tune does not run is left
+; alone, so what a host runs on it runs on through the tune. No data
 ; register is kept: it reads as the live count and writes as the reload,
 ; so a count written back sets a rate no one asked for, and a host that
 ; needs a timer's rate back writes the value it knows.
@@ -72,7 +72,7 @@ SAV_SIZE        equ     28
 ; control register (keep is the other timer's), and its enable and mask
 ; bits as they were kept. slot is its byte's place in the kept control
 ; bytes, and ier the enable register, IERA or IERB, with the kept byte at
-; kept: the mask register and its kept byte stand 12 and 2 on.
+; kept: the mask register and its kept byte are 12 and 2 on.
                 .macro  PUTBACK i,vector,ctrl,keep,slot,ier,bit,kept
                 btst    #\i,d2
                 beq.s   .no\~
@@ -160,7 +160,7 @@ sndh_init:
 ; handler below returns from it, since the tick it would have run is the
 ; one the write cancelled. Raising the interrupt level around the write
 ; is no substitute: an acknowledge the 68000 has begun runs to its end at
-; any level. The host's vector stands again at exit.
+; any level. The host's vector is back at exit.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 lea     sndh_saved(pc),a5
@@ -231,7 +231,7 @@ sndh_play:
                 rts
 
 ; Exception 24, for as long as a tune plays: the acknowledge found no
-; vector, and the tick it stood for is one the player already cancelled.
+; vector, and the tick it belonged to is one the player already cancelled.
 sndh_spurious:  rte
 
 sndh_state:     dc.b    0

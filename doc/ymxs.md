@@ -64,7 +64,7 @@ row or the source and exits 1.
 | more than 127 sources | the source column numbers 1 to 127 (1.8) |
 | a count past 255 | the count column is the timer's data register, a byte (1.9) |
 | a target past 24 | 25 to 127 are left to a later version (2.1, section 8) |
-| a source on two targets whose markers stand in different columns | a source has one marker column (SPEC.md 6, rule 2(d)) |
+| a source on two targets whose markers are in different columns | a source has one marker column (SPEC.md 6, rule 2(d)) |
 | a value past 127 in the marker's column of a marked source | bit 7 of that column is the marker (3.2) |
 | a value past 255 | a column of a source is one byte (3.1.3) |
 

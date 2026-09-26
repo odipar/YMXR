@@ -72,7 +72,7 @@ a group of register columns, 1 where the row sets any of them, skips the
 group on one test. Weighed when this document opened (#48), at
 62 cycles a frame over nine tunes, it was the largest step in it.
 
-Against the player as it stands it saves 6 cycles a frame on the mean of
+Against the player as it is it saves 6 cycles a frame on the mean of
 the eleven fixtures, and it costs six of them. Five steps of the order
 below removed part of that work first: a row with the envelope columns
 unset already skips step 8, and the four before that cut the entry, the

@@ -95,7 +95,7 @@ func layoutBound(out *bytes.Buffer, file []byte) {
 
 // layoutProgram is 6.5: the PRG header, the stub, where the SNDH file
 // begins, and that file's lines. The SNDH file ends at 28 plus the long
-// at 2, the relocation table standing after it.
+// at 2, the relocation table after it.
 func layoutProgram(out *bytes.Buffer, file []byte) {
 	at := 28
 	// the first SNDH on an even offset; a file cut before it ends the
@@ -181,7 +181,7 @@ func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 }
 
 // layoutTags is the tags of 3.2, a line each from 16 to HDNS, and where
-// HDNS stands.
+// HDNS is.
 func layoutTags(out *bytes.Buffer, file []byte, from int) int {
 	at := from + 16
 	subtunes := 0
@@ -273,7 +273,7 @@ func boundFields(file []byte, at int) string {
 		ymxr.GetLong(file, at+20))
 }
 
-// zeroFrom is where the next zero byte from `from` stands.
+// zeroFrom is where the next zero byte from `from` is.
 func zeroFrom(file []byte, from int) int {
 	at := from
 	for file[at] != 0 {

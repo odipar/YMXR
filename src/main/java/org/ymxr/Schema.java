@@ -221,18 +221,18 @@ final class Schema {
     }
 
     /** A source no row starts: no target names a column for its marker,
-     *  so the marker stands in column 0, as every version before this one
+     *  so the marker is in column 0, as every version before this one
      *  wrote every source. */
     private static final int UNSTARTED = Integer.MIN_VALUE;
 
-    /** The column of each source's row the marker stands in, off the
+    /** The column of each source's row the marker is in, off the
      *  targets the tune starts that source on (SPEC.md 2.1, 3.2.1).
      *
      * @throws IllegalArgumentException where a target this version does not
      *     encode starts a source, or where two targets of one source name
      *     different columns (rule 2(d))
      */
-    /** Where each source's marker stands and which target it runs on: the
+    /** Where each source's marker is and which target it runs on: the
      *  column bit 7 marks, -1 where the target's register fills its byte,
      *  and the target's number, which a counted source on `setR7` reads
      *  the port directions in for (rule 2(f)). */
@@ -244,7 +244,7 @@ final class Schema {
         int[] target = new int[sources.size()];
         Arrays.fill(marker, UNSTARTED);   // no row starts it, so no target
                                           // names a column and the marker
-                                          // stands in column 0, as every
+                                          // is in column 0, as every
                                           // version before this one wrote it
         Arrays.fill(target, UNSTARTED);
         for (Row row : rows) {
@@ -289,7 +289,7 @@ final class Schema {
             List<List<Integer>> values = Tunes.rows(source).rows();
             boolean counted = marker[n] == -1;
             // A tick of a counted source on `setR7` writes the row whole,
-            // so the two port directions stand in the source rather than
+            // so the two port directions are in the source rather than
             // in the player (SPEC.md rule 2(f)).
             int ports = counted && marks.target()[n] == Columns.MIXER_TARGET
                     ? Columns.PORTS : 0;

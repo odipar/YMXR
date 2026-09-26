@@ -46,7 +46,7 @@
 #              write an end of interrupt (performance.md, BINARIES.md)
 #   -pcrel     the core whose ticks read a row through the program
 #              counter, which the tool writes unasked where the file's
-#              tunes stand within the reach (BINARIES.md 5.5)
+#              tunes are within the reach (BINARIES.md 5.5)
 #   -abs       the core whose ticks read a row through an absolute
 #              address
 #
@@ -127,7 +127,7 @@ done
 if [ -n "$out" ]; then
     case $out in /*) ;; *) out=$(pwd)/$out ;; esac
 fi
-# The program is kept, and where it stands is said on stderr: a run is
+# The program is kept, and its place is reported on stderr: a run is
 # often the start of reading it, under a debugger or another host.
 work=$(mktemp -d)
 echo "ym/play-ymxs.sh: TUNE.PRG is under $work" >&2

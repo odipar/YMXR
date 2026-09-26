@@ -80,7 +80,7 @@ final class ReportTest {
         Caught c = caught(true);
         // A tenth of the run and a second of the clock both have to pass,
         // so the four steps below produce three lines and not four: the
-        // first stands at the report's start.
+        // first is at the report's start.
         for (int done = 1; done <= 4; done++) {
             Thread.sleep(1100);
             c.report().progress("read", done, 4);

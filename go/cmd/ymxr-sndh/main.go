@@ -191,7 +191,7 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 		len(file)-len(core)-images-bound))
 }
 
-// even is at rounded up to an even address, as the file's parts stand
+// even is at rounded up to an even address, as the file's parts are
 // (doc/BINARIES.md 3.1).
 func even(at int) int {
 	return (at + 1) &^ 1

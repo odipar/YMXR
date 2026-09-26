@@ -49,7 +49,7 @@ build/
 *.o
 
 # a tool run by hand at the root leaves its output there. The tunes under
-# doc/conformance/tunes are committed and stand outside this.
+# doc/conformance/tunes are committed and are outside this.
 /*.ymxr
 /*.sndh
 /*.prg

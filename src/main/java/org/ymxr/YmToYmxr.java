@@ -191,7 +191,7 @@ public final class YmToYmxr {
             throw tool.wrong(Tool.WRONG, String.valueOf(no.getMessage()));
         }
         tool.report(converted.said());
-        // A note is a warning and stands whether the report is on or off.
+        // A note is a warning and is written whether the report is on or off.
         // Where the report is on, a note it said where it happened is not
         // said twice, and the counted ones are reached only here.
         for (String note : report.unsaid()) {

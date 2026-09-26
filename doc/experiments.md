@@ -333,7 +333,7 @@ effect writes select 0 and drops the latched tick, and leaves the handler's
 place and the source's first row as they are; a start whose row leaves bit
 5 clear reads the place and counts that number into the new source's rows.
 So a square that stops and starts again resumes at the row it left off at
-while the player stands as it is, and the converter encodes it by keeping
+while the player is left as it is, and the converter encodes it by keeping
 the last kind and target each effect ran rather than the one it runs.
 
 The other half of maxYMiser's model, a timer that counts through the gap,

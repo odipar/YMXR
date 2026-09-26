@@ -1,6 +1,6 @@
 // Package trace is a reader's report of a tune (SPEC.md 7): one line a
 // play call, the call's result, the registers the frame writes and the
-// effects the row touched. The kit's references are the output of this,
+// effects the row set. The kit's references are the output of this,
 // and the rig checks the 68000 player to it.
 package trace
 
@@ -19,13 +19,13 @@ import (
 // ticks are not modelled: a running effect's source, target and rate are
 // what the rows gave, and its place is not followed.
 //
-// What the last step wrote stands beside the state: Written reports each
+// What the last step wrote is beside the state: Written reports each
 // register's value where the row wrote it and -1 where not, and each
-// effect reports whether the row touched it and which control bits the row
+// effect reports whether the row set it and which control bits the row
 // set.
 
 // Effect records one effect's run after a row: source 0 where it runs no
-// source. Touched says the row set one of its columns, Timer that the
+// source. Touched is true where the row set one of its columns, Timer that the
 // row's control column had bit 6 and Place bit 5.
 type Effect struct {
 	Target  int

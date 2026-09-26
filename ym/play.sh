@@ -196,7 +196,7 @@ if [ -n "$unit$ring$repeat$copies" ]; then
         set -- "$@" "$arg"
     done
 fi
-# The SNDH file and the program are kept, and where they stand is said
+# The SNDH file and the program are kept, and their place is reported
 # on stderr: a run is often the start of reading one of them, with
 # bin/ymxr-trace or a debugger or another host, and a path that has been
 # cleared prints no line.

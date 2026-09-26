@@ -127,7 +127,7 @@ and writes the column's register where the row sets the column (4.3,
 | 0 | 1 | sets the column to 0 |
 
 **1.1.4** A player reads a marking bit where 1.1.2's table has it, the
-set bit of the column it stands in 1 or 0: a row may set a fine column
+set bit of the column it is in 1 or 0: a row may set a fine column
 to 0 and leave the coarse column unset (1.2), or mark a period byte 0
 and leave R13 as it is (1.6). Where a row leaves a control column unset,
 a count column of 0 is unset (1.9). Every other bit of a column is part
@@ -317,7 +317,7 @@ under them (R3.2).
 
 **2.1.1** A tick writes a source's row to the registers of its target,
 column i of the row to register i, each byte whole, and the register
-reads the bits it has (4.4). The marker of 3.2 stands in bit 7 of the
+reads the bits it has (4.4). The marker of 3.2 is in bit 7 of the
 column above, whose register reads seven bits or fewer, and the other
 columns are whole bytes: a source on `setToneA` writes R0 the eight bits
 it reads, where a source on `setR0` has no bit to spare for the marker.
@@ -354,7 +354,7 @@ before the last write R12 0 to 127. The envelope frequency is 2,000,000
 cycle in 4.19 seconds and period 65,535 one in 8.39 seconds.
 
 **2.1.4** A file of version 4 or 5 writes a marked source on that target
-(3.3.5): bits 6 to 0 of R12's column are the value, the marker stands in
+(3.3.5): bits 6 to 0 of R12's column are the value, the marker is in
 bit 7, and the tick that reads the last row writes that bit into R12 with
 the value, a period 32,768 above the one the rows before it write. A
 player reads such a source as this clause defines it, and a writer of
@@ -443,7 +443,7 @@ source 0 is the stop (1.8.3).
 **3.1.3** A reader reads a source whose C is the columns of the target
 of every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1;
 another C or W is an error of the file (3.3.4). DTX1 lays a table out
-column by column, so column i of a source of C columns stands at 16 + i
+column by column, so column i of a source of C columns is at 16 + i
 times align(R) (3.1.2), which is the stride DTX1 lays its columns at
 (DTX, SPEC.md 2.2), and a tick reads its columns at that stride. Where R
 is odd, the byte between one column and the next is 0. A source of
@@ -471,7 +471,7 @@ with a counted source of several columns version 6 (3.3.5).
 
 **3.2.1** A row of a source is one byte a column, each fitting the
 register its column writes (R5.3; YMXS, SPEC.md 3.2.2). The marker
-stands in bit 7 of the column 2.1 names for the target, bits 6 to 0 of
+is in bit 7 of the column 2.1 names for the target, bits 6 to 0 of
 that byte the value; every other column is a whole byte. A writer writes
 the marker as 1 in the last row of the source and as 0 in every other
 row. Every byte of every row of a counted source is a whole value, and
@@ -535,7 +535,7 @@ to 1,110, 960 by default.
 conditions below and reports the first one present as its line, in the
 order of the table and, for a condition that reads a source number N, in
 ascending N: V the version, X a DTX variant, N a source number, A
-and B where a table stands, F the file's bytes, C a column count and W a
+and B where a table is, F the file's bytes, C a column count and W a
 width. The record of such a file is empty (7.4), and a reader that
 reports a condition reads no further field. A name offset other than 16 +
 4S is a field a reader follows (3.3.2).
@@ -1064,7 +1064,7 @@ once ends with its `{"result":-1}` entry. Where the host leaves F
 unnamed, F is R + (R - RR) for a tune that repeats, one pass and one
 loop, and R + 1 for one that plays once, R and RR the file's (3.3). The
 record of a file with an error of 3.3.4 is empty, 0 bytes, and the line
-a reader reports of that error stands outside the record: a reader
+a reader reports of that error is outside the record: a reader
 writes the record to one stream, which has the record alone on it, and
 reports that line on another. Two readers of one tune file over one F
 produce one record, byte for byte.

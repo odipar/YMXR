@@ -114,7 +114,7 @@ final class Layout {
 
     /** 6.5: the PRG header, the stub, where the SNDH file begins, and
      *  that file's lines. The SNDH file ends at 28 plus the long at 2,
-     *  the relocation table standing after it. */
+     *  the relocation table after it. */
     private static void program(StringBuilder out, byte[] file) {
         int at = 28;
         // the first SNDH on an even offset; a file cut before it ends the
@@ -200,7 +200,7 @@ final class Layout {
     }
 
     /** The tags of 3.2, a line each from 16 to HDNS, and where HDNS
-     *  stands. */
+     *  is. */
     private static int tags(StringBuilder out, byte[] file, int from) {
         int at = from + 16;
         int subtunes = 0;
@@ -288,7 +288,7 @@ final class Layout {
                 + ",\"table\":" + Tune.getLong(file, at + 20);
     }
 
-    /** Where the next zero byte from {@code from} stands. */
+    /** Where the next zero byte from {@code from} is. */
     private static int zero(byte[] file, int from) {
         int at = from;
         while (file[at] != 0) {
