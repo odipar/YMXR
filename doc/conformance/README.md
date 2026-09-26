@@ -30,9 +30,9 @@ published music, by Jochen Hippel, Mad Max and Scavenger as their headers
 record, one of them converted twice (`circus`, `plays-once`), and two
 built (`preempt`, `retune`). Code builds `four-timers`, `voices`,
 `envelope`, `counted` and `envelope-counted`, and `wrong-version` is
-`chambers` with the version word $0007. The music belongs to its
-composers, and the repository's LICENSE covers the code alone: a copy of
-the kit has the tunes for the exercise alone.
+`chambers` with the version word $0007. The published music belongs to
+its composers, and the repository's LICENSE excludes it: a copy of the kit
+has the tunes for the exercise alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of the format,
