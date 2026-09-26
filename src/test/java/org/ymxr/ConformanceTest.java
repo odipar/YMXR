@@ -67,18 +67,18 @@ final class ConformanceTest {
             Fixture.of("turrican", "Turrican - world 4-3.ym", "",
                     "three drums on Timer D, each ending by its marker; RR at 160, a loop longer than the ring replayed at its exact rows; R13 rewritten"),
             Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "",
-                    "a loop of one row, RR at 177, odd, so a row that sets no column goes in before it and the loop's row is written twice, and the table packs at unit 2; six drums before it, the last stopped by a row"),
+                    "a loop of one row, RR at 177, odd, so an unset row goes in before it and the loop's row is written twice, and the table packs at unit 2; six drums before it, the last stopped by a row"),
             Fixture.of("synergy", "Synergy Credits.ym", "",
-                    "nine SIDs on Timers A and D at once, six of them named by both; a square replacing a square on the target of its effect, its place unmoved; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so a row that sets no column goes in at the end and the table packs at unit 2"),
+                    "nine SIDs on Timers A and D at once, six of them named by both; a square replacing a square on the target of its effect, its place unmoved; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so an unset row goes in at the end and the table packs at unit 2"),
             Fixture.of("preempt", "Digidrum preempt, built.ym", "",
                     "a drum starting on the voice a SID runs on stops the SID first, and the SID starts again when the drum ends; R8 passed between them with its column unset"),
             Fixture.of("retune", "Retrigger retune, built.ym", "",
                     "a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7; stopped at the wrap alone"),
             Fixture.of("fine-zero", "Big - Samantha Fox Strip Poker 6.ym", "",
                     "a tone fine byte moving to 0: on voice A without the coarse set bit, on B and C with it;"
-                    + " 215 rows, odd, so a row that sets no column goes in at the end and the table packs at unit 2"),
+                    + " 215 rows, odd, so an unset row goes in at the end and the table packs at unit 2"),
             Fixture.built("four-timers", "`BuiltTunes.fourTimers`", BuiltTunes::fourTimers,
-                    "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows that no dump produces: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target that is not a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with no source running, values under a clear set bit, a fine byte and an envelope period byte that are not 0 with the bit beside them"),
+                    "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows and the dumps leave out: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with no source running, values under a clear set bit, a fine byte and an envelope period byte other than 0 with the bit beside them"),
             Fixture.built("voices", "`BuiltTunes.voices`", BuiltTunes::voices,
                     "version 4: the four kinds of target that write several registers, one an"
                     + " effect, and the marker in a different column under each - the coarse"
@@ -120,7 +120,7 @@ final class ConformanceTest {
                     + " column 13 while the period ticks"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
-                            + " produces no report of it", WRONG_VERSION)));
+                            + " produces an empty record of it", WRONG_VERSION)));
 
     /** chambers with another version in its header: what a reader reports
      *  no report of (R6.1). */
