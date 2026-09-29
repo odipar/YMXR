@@ -97,9 +97,10 @@ final class Ymxs {
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
-        report.row(title(tune), org.ymxs.Tunes.size(tune.table()) + " rows at " + made.rate()
-                + " Hz, " + made.sources().count() + " sources: "
-                + written.file().length + " bytes");
+        report.row(title(tune), Report.count(org.ymxs.Tunes.size(tune.table()), "row", "rows")
+                + " at " + made.rate() + " Hz, "
+                + Report.count(made.sources().count(), "source", "sources") + ": "
+                + Report.count(written.file().length, "byte", "bytes"));
         return written.file();
     }
 

@@ -181,8 +181,10 @@ func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
-	said.Row(Title(tune), fmt.Sprintf("%d rows at %d Hz, %d sources: %d bytes",
-		len(ymxs.Rows(tune)), made.Rate, made.Sources.Count(), len(written.File)))
+	said.Row(Title(tune), fmt.Sprintf("%s at %d Hz, %s: %s",
+		report.Count(len(ymxs.Rows(tune)), "row", "rows"), made.Rate,
+		report.Count(made.Sources.Count(), "source", "sources"),
+		report.Count(len(written.File), "byte", "bytes")))
 	return written.File
 }
 

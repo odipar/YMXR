@@ -73,6 +73,7 @@ func read(said *report.Report, song ym.Song) {
 		for _, drum := range song.Drums {
 			bytes += len(drum)
 		}
-		said.Row("digidrums", fmt.Sprintf("%d of %d bytes in all", len(song.Drums), bytes))
+		said.Row("digidrums", fmt.Sprintf("%d of %s in all", len(song.Drums),
+			report.Count(bytes, "byte", "bytes")))
 	}
 }

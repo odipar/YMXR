@@ -208,10 +208,10 @@ final class Multi {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
         for (int i = 0; i < tunes.size(); i++) {
-            tool.report(names.get(i) + ": " + tunes.get(i).length + " bytes");
+            tool.report(names.get(i) + ": " + Report.count(tunes.get(i).length, "byte", "bytes"));
         }
-        tool.report(tunes.size() + (tunes.size() == 1 ? " tune, " : " tunes, ")
-                + file.length + " bytes");
+        tool.report(Report.count(tunes.size(), "tune", "tunes") + ", "
+                + Report.count(file.length, "byte", "bytes"));
         Out.write(tool, file);
     }
 }

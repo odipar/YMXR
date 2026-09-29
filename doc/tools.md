@@ -54,6 +54,10 @@ the run or that line; `ymxr-check` writes them as `read` (8.5), and
 every tool that writes a tune file as `packing the columns`, N of 30,
 within the packing report (4.5).
 
+**1.9** A count in a summary line, the report or a note is followed by
+its noun, singular for a count of 1 and plural for any other: `1 row`,
+`0 rows`, `2 rows`. The templates below write the plural.
+
 ---
 
 ## 2. The twelve tools
@@ -180,16 +184,16 @@ K the unit, an *unset row* a row with every column unset:
 
 1. Where K is above 1, the tune repeats and RR fails to divide by K:
    insert K minus RR modulo K unset rows at RR, and move RR past
-   them. Note `padded: N unset row(s) at row RR, before the repeat row,
+   them. Note `padded: N unset rows at row RR, before the repeat row,
    so the table packs at unit K`, N the rows inserted, `row` for 1 and
    `rows` otherwise.
 2. Where K is above 1 and R fails to divide by K, L = R minus RR for a
    tune that repeats and 0 for one that plays once:
    - where L is 1 to 63: append the loop's rows again until R divides by
-     K. Note `padded: the loop's L row(s) written T`, T `twice` or `N
+     K. Note `padded: the loop's L rows written T`, T `twice` or `N
      times`, then `, so the table packs at unit K`;
    - otherwise: append K minus R modulo K unset rows. Note
-     `padded: N unset row(s) at row R, so the table packs at unit K`.
+     `padded: N unset rows at row R, so the table packs at unit K`.
 
 The period of the DTX2 table is 30 rows.
 
@@ -200,7 +204,7 @@ unit K through a ring of A`, B = 30 R; a row a column, named `R0` to
 `effect i timer count` for i 0 to 3, the value
 `%7d -> %6d bytes  (%5.1f%%)`, two spaces before the parenthesis, of the
 rows in, the bytes out and their ratio; the heading `the sources: N
-table(s) of R row(s), B bytes`; and the heading `packed X bytes into Y
+tables of R rows, B bytes`; and the heading `packed X bytes into Y
 (Z%), the file F bytes`, X = 30 R, Y the DTX2 table, F the tune file.
 
 **4.6 The name** of a tune file (SPEC.md 3.3) is the text the tool's
@@ -240,9 +244,9 @@ dump's loop frame L is past its last frame: the tune plays once`.
    `RR, the dump's loop frame`; `-copies`, `no, the default: a match beyond
    the ring is not packed`, `yes, the opening passes alone` or `yes, S
    seconds of search, which packs another parse a run`.
-3. The heading `the effects: E of 4 run, S source(s), at most 127`. Rows
+3. The heading `the effects: E of 4 run, S sources, at most 127`. Rows
    for each kind present: `square waves`, `digidrums`, `sinus SIDs`,
-   `buzzers`, the value `N, R row(s) in all`.
+   `buzzers`, the value `N, R rows in all`.
 4. The packing report (4.5).
 
 **5.4 The summary line** is `ym-to-ymxr: F frames at H Hz, S sources,
@@ -387,11 +391,11 @@ refuses it: <message>` for a dump the converter rejects. A flag
 outside the converter's is that verdict with the message `not a flag of
 the tool: X`, exit 1, in place of the wrong call of 3.2 (19.5).
 
-**8.5 Several files.** The report is the heading `N file(s) to read`,
+**8.5 Several files.** The report is the heading `N files to read`,
 then `, at <flags>` where flags were passed; the progress lines `read`
 (1.8); the verdicts in the order the arguments name the files, a
 directory's `.ym` files sorted by name within it; and on standard output
-after them `N dump(s), M wrong`, then `, K file(s) not a dump` where K is
+after them `N dumps, M wrong`, then `, K files not a dump` where K is
 above 0. The Java tree reads the files in parallel, the Go tree in
 order; the verdicts are in that order in both.
 
@@ -434,9 +438,9 @@ reads a file, so `-silent` is its one flag.
 
 **9.6 The report** is the heading `the file: B bytes, kind K`, K one of
 `multi`, `bound`, `sndh` and `program`, and a row for each part the
-record has one or more of: `the tag(s)`, `the tune(s)`, `the
-source(s)` and `the image(s)`, each the lines of that part. The summary
-line is `ymxr-layout: N line(s)`.
+record has one or more of: `the tags`, `the tunes`, `the sources` and
+`the images`, each the lines of that part and named in the singular
+where it counts one. The summary line is `ymxr-layout: N lines`.
 
 **9.7 Errors.** A file of no kind of 6.1 is `not a file BINARIES.md
 defines: no YMXM, YMXB, $601A or SNDH`, exit 1; a file whose record runs
@@ -481,7 +485,7 @@ a hundred tune files or more is `N tunes, and a multi file has 99 at
 most`, exit 1.
 
 **11.3 The summary lines** are `ymxr-multi: <name>: B bytes` for each
-tune, then `ymxr-multi: N tune(s), B bytes`.
+tune, then `ymxr-multi: N tunes, B bytes`.
 
 **11.4 Reading a multi file.** A file of 8 bytes or more beginning `YMXM` is
 read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
@@ -550,17 +554,17 @@ address` where that was passed, and `ticks that read a row through an
 absolute address: the tunes end past the 32767 bytes a displacement
 reaches` where the tool chose it (12.1), joined by `; `; the heading
 `the tags: TITL <title>`, then `, COMM <composer>` where present, `,
-<clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N name(s)` for
+<clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N names` for
 several subtunes; a row a subtune, its name or `the tune`, `B bytes
 bound to B2, its table in image I`, B the tune file's bytes, B2 the
 bound tune's, I the number of its image from 1; the heading `the images:
-N image(s) of B bytes, DTX's reader once a set of tunes that share one`
-with a row an image, `image I`, `<shape>, N tune(s)`, the shape `DTX2 at
+N images of B bytes, DTX's reader once a set of tunes that share one`
+with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX2 at
 unit K, a ring of A, values of W`, W the width of a value in bytes, then
 `, with copies` where packed so; the heading `the file: B bytes, the
 core C, the images I, the tunes T, the workspace and the rest W`, C, I,
 T and W the bytes of the core, the images, the bound tunes, and the
-remainder. The summary line is `ymxr-sndh: B bytes, N subtune(s)`.
+remainder. The summary line is `ymxr-sndh: B bytes, N subtunes`.
 
 ---
 
@@ -594,7 +598,7 @@ is other than 50, and the clock is left to the file; and `the set claims
 Timer C and the clock asked for is Timer C: the player's handler has
 that timer` where `-tc` is passed and the FLAG letters have `c`.
 
-**13.3 The report:** the heading `the SNDH file: B bytes, N subtune(s)
+**13.3 The report:** the heading `the SNDH file: B bytes, N subtunes
 at H Hz, FLAG <letters>`; the heading `the stub: B bytes, patched` with
 the rows `the subtunes`, N; `the rows to play`, `0, until a key stops
 it` or ROWS; `it plays from`, one of `Timer C, T ticks a second and a

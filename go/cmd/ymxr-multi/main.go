@@ -10,6 +10,7 @@ import (
 
 	"github.com/odipar/ymxs/go/tool"
 
+	"github.com/odipar/ymxr/go/report"
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
@@ -56,12 +57,9 @@ func main() {
 		t.Wrong(tool.Wrong, err.Error())
 	}
 	for i, tune := range tunes {
-		t.Report(fmt.Sprintf("%s: %d bytes", names[i], len(tune)))
+		t.Report(names[i] + ": " + report.Count(len(tune), "byte", "bytes"))
 	}
-	tuned := " tunes, "
-	if len(tunes) == 1 {
-		tuned = " tune, "
-	}
-	t.Report(fmt.Sprintf("%d%s%d bytes", len(tunes), tuned, len(file)))
+	t.Report(report.Count(len(tunes), "tune", "tunes") + ", " +
+		report.Count(len(file), "byte", "bytes"))
 	t.WriteBytes(file)
 }

@@ -44,8 +44,9 @@ public final class YmToYmxs {
         } catch (YmDump.FormatException | IllegalArgumentException | IllegalStateException no) {
             throw tool.wrong(Tool.WRONG, String.valueOf(no.getMessage()));
         }
-        tool.report(song.format() + " \"" + song.name().strip() + "\", " + song.frames()
-                + " rows at " + song.playerHz() + " Hz, " + sources.count() + " sources");
+        tool.report(song.format() + " \"" + song.name().strip() + "\", "
+                + Report.count(song.frames(), "row", "rows") + " at " + song.playerHz() + " Hz, "
+                + Report.count(sources.count(), "source", "sources"));
         for (String note : report.unsaid()) {
             System.err.println("  " + note);
         }

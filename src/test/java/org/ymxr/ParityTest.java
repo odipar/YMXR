@@ -253,6 +253,50 @@ final class ParityTest {
      * <p>The progress lines are spaced by the clock and come out at
      * different rows, and steady drops those from both.
      */
+    /**
+     * A count of 1 reads in the singular, the same in both trees (tools.md
+     * 1.9): a YM3! dump of one frame, packed at a unit of 1 so that its table
+     * is one row, through the converters and the tools that read its tune
+     * file, a set of that tune alone, and a check of that one dump.
+     */
+    @Test
+    void aCountOfOneIsSingularInBothTrees() throws Exception {
+        byte[] dump = new byte[4 + 14];
+        System.arraycopy("YM3!".getBytes(StandardCharsets.US_ASCII), 0, dump, 0, 4);
+        dump[4 + 7] = 0x3F;             // R7: every voice off
+        dump[4 + 13] = (byte) 0xFF;     // R13 left as it is
+        byte[] tune = both("ym-to-ymxr", dump, "-k1");
+        both("ym-to-ymxs", dump);
+        both("ymxr-bind", tune);
+        both("ymxr-trace", tune);
+        both("ymxr-sndh", tune);
+        byte[] set = multiOf(List.of(tune));
+        assertTrue(set.length > 0, "a set of one tune");
+        List<String> said = new ArrayList<>();
+        for (String[] call : new String[][] {{"ym-to-ymxr", "-k1"}, {"ym-to-ymxs"},
+                {"ymxr-bind"}, {"ymxr-sndh"}}) {
+            byte[] in = call[0].startsWith("ym-to") ? dump : tune;
+            said.add(ran(Path.of("bin"), call[0], in,
+                    Arrays.copyOfRange(call, 1, call.length)).said());
+        }
+        Path work = Files.createTempDirectory("ymxr-parity");
+        Path one = work.resolve("one.ym");
+        Files.write(one, dump);
+        Ran java = ran(Path.of("bin"), "ymxr-check", new byte[0], one.toString());
+        Ran go = ran(built(), "ymxr-check", new byte[0], one.toString());
+        assertEquals(java.exit(), go.exit(), "ymxr-check exits the same: " + go.said());
+        assertArrayEquals(java.out(), go.out(), "ymxr-check writes the same bytes");
+        assertEquals(steady(java.said()), steady(go.said()), "ymxr-check reports the same");
+        said.add(java.said() + new String(java.out(), StandardCharsets.UTF_8));
+        String all = String.join("\n", said);
+        for (String line : List.of("30 columns of 1 row, 30 bytes",
+                "ym-to-ymxr: 1 frame at 50 Hz, 0 sources", "ym-to-ymxs: YM3! \"\", 1 row at",
+                "1 row of 30 columns", "1 image of", "1 tune", "ymxr-sndh:", "1 subtune",
+                "1 file to read", "1 dump, 0 wrong")) {
+            assertTrue(all.contains(line), () -> "the reports read \"" + line + "\": " + all);
+        }
+    }
+
     @Test
     void theVerboseReportIsTheSameInBothTrees() throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym"));

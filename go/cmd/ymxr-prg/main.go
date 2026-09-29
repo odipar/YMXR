@@ -33,9 +33,9 @@ func main() {
 	made(said, file, prg, rows, asked)
 	rowed := "until a key stops it"
 	if rows != 0 {
-		rowed = fmt.Sprintf("%d rows", rows)
+		rowed = report.Count(rows, "row", "rows")
 	}
-	t.Report(fmt.Sprintf("%d bytes, %s", len(prg), rowed))
+	t.Report(report.Count(len(prg), "byte", "bytes") + ", " + rowed)
 	t.WriteBytes(prg)
 }
 
@@ -49,18 +49,15 @@ func made(said *report.Report, file, prg []byte, rows int64, asked sndh.Asked) {
 	if err != nil {
 		return
 	}
-	subtunes := " subtunes at "
-	if tags.Subtunes == 1 {
-		subtunes = " subtune at "
-	}
-	said.Say(fmt.Sprintf("the SNDH file: %d bytes, %d%s%d Hz, FLAG %s", len(file),
-		tags.Subtunes, subtunes, tags.Rate, tags.Flag))
+	said.Say(fmt.Sprintf("the SNDH file: %s, %s at %d Hz, FLAG %s",
+		report.Count(len(file), "byte", "bytes"), report.Count(tags.Subtunes, "subtune",
+			"subtunes"), tags.Rate, tags.Flag))
 	stub, err := binaries.Read(binaries.Stub)
 	if err != nil {
 		return
 	}
 	flags := ymxr.GetWord(prg, sndh.Header+sndh.StubFlagsAt)
-	said.Say(fmt.Sprintf("the stub: %d bytes, patched", len(stub)))
+	said.Say("the stub: " + report.Count(len(stub), "byte", "bytes") + ", patched")
 	said.Row("the subtunes", fmt.Sprintf("%d", tags.Subtunes))
 	if rows == 0 {
 		said.Row("the rows to play", "0, until a key stops it")
@@ -69,7 +66,7 @@ func made(said *report.Report, file, prg []byte, rows int64, asked sndh.Asked) {
 	}
 	said.Row("it plays from", from(tags, flags, asked))
 	said.Row("the screen", "cleared before the banner")
-	said.Say(fmt.Sprintf("the program: %d bytes", len(prg)))
+	said.Say("the program: " + report.Count(len(prg), "byte", "bytes"))
 }
 
 // from is the clock the program plays from, and what named it: the
@@ -77,8 +74,8 @@ func made(said *report.Report, file, prg []byte, rows int64, asked sndh.Asked) {
 func from(tags sndh.Tagged, flags int, asked sndh.Asked) string {
 	if flags&sndh.FlagVBL == 0 {
 		timer := sndh.TimerFor(tags.Rate)
-		at := fmt.Sprintf("Timer C, %d ticks a second and a row every %d",
-			timer.Ticks, timer.Ticks/tags.Rate)
+		at := fmt.Sprintf("Timer C, %s a second and a row every %d",
+			report.Count(timer.Ticks, "tick", "ticks"), timer.Ticks/tags.Rate)
 		if asked == sndh.AskedTimerC {
 			return at + ", asked for"
 		}

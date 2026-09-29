@@ -284,7 +284,7 @@ final class Check {
         } catch (IOException failed) {
             throw tool.wrong(Tool.FAILED, String.valueOf(failed.getMessage()));
         }
-        report.say(files.size() + (files.size() == 1 ? " file" : " files") + " to read"
+        report.say(Report.count(files.size(), "file", "files") + " to read"
                 + (flags.isEmpty() ? "" : ", at " + String.join(" ", flags)));
         AtomicInteger read = new AtomicInteger();
         List<Result> results = files.parallelStream()
@@ -303,8 +303,8 @@ final class Check {
             said(result);
         }
         int others = results.size() - dumps;
-        System.out.println(dumps + (dumps == 1 ? " dump, " : " dumps, ") + failed + " wrong"
-                + (others == 0 ? "" : ", " + others + (others == 1 ? " file" : " files")
+        System.out.println(Report.count(dumps, "dump", "dumps") + ", " + failed + " wrong"
+                + (others == 0 ? "" : ", " + Report.count(others, "file", "files")
                 + " not a dump"));
         System.out.flush();
         System.exit(failed == 0 ? Tool.DONE : Tool.WRONG);

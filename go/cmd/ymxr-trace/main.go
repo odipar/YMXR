@@ -29,9 +29,10 @@ func main() {
 	// (SPEC.md 6, R6.1), so the report reads the header under the same
 	// guard rather than failing where the record would not.
 	if file, err := ymxr.Read(tune); err == nil {
-		said.Say(fmt.Sprintf("the tune file: %d bytes", len(tune)))
-		said.Row("the table", fmt.Sprintf("%d rows of %d columns, repeating at row %d",
-			file.Table.Rows(), file.Table.Columns(), file.Table.Repeat()))
+		said.Say("the tune file: " + report.Count(len(tune), "byte", "bytes"))
+		said.Row("the table", fmt.Sprintf("%s of %s, repeating at row %d",
+			report.Count(file.Table.Rows(), "row", "rows"),
+			report.Count(file.Table.Columns(), "column", "columns"), file.Table.Repeat()))
 		said.Row("the frame rate", fmt.Sprintf("%d Hz", file.FrameRate))
 		said.Row("the sources", fmt.Sprintf("%d", len(file.Sources)))
 		if calls < 0 {
@@ -40,8 +41,8 @@ func main() {
 			said.Row("the rows to record", fmt.Sprintf("%d", calls))
 		}
 	} else {
-		said.Say(fmt.Sprintf("the tune file: %d bytes, which this reader does not read: %s",
-			len(tune), err.Error()))
+		said.Say(fmt.Sprintf("the tune file: %s, which this reader does not read: %s",
+			report.Count(len(tune), "byte", "bytes"), err.Error()))
 	}
 	rows := trace.Record(tune, calls)
 	if len(rows) == 0 {
@@ -49,6 +50,6 @@ func main() {
 		// a caller reading the exit is told so.
 		t.Wrong(tool.Wrong, "no record: this reader does not read the file")
 	}
-	t.Report(fmt.Sprintf("%d bytes of rows", len(rows)))
+	t.Report(report.Count(len(rows), "byte", "bytes") + " of rows")
 	t.WriteBytes(rows)
 }

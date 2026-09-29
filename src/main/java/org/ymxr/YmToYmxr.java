@@ -100,10 +100,11 @@ public final class YmToYmxr {
         found(report, sources, columns);
         Tune.Written written = Tune.write(columns, made.sources(), song.playerHz(), unit, ring,
                 copies ? new St4(true, seconds) : new St4(), report, song.name());
-        String said = song.frames() + " frames at " + song.playerHz() + " Hz, "
-                + sources.count() + " sources, effects " + Integer.toBinaryString(columns.effects)
-                + ", repeats at " + (repeat < song.frames() ? "row " + written.repeat() : "no row")
-                + ": " + written.file().length + " bytes";
+        String said = Report.count(song.frames(), "frame", "frames") + " at "
+                + song.playerHz() + " Hz, " + Report.count(sources.count(), "source", "sources")
+                + ", effects " + Integer.toBinaryString(columns.effects) + ", repeats at "
+                + (repeat < song.frames() ? "row " + written.repeat() : "no row") + ": "
+                + Report.count(written.file().length, "byte", "bytes");
         return new Converted(written, repeat, sources, said, padded.frames());
     }
 
@@ -123,7 +124,8 @@ public final class YmToYmxr {
             for (byte[] drum : song.drums()) {
                 bytes += drum.length;
             }
-            report.row("digidrums", song.digidrums() + " of " + bytes + " bytes in all");
+            report.row("digidrums", song.digidrums() + " of "
+                    + Report.count(bytes, "byte", "bytes") + " in all");
         }
     }
 
@@ -133,7 +135,7 @@ public final class YmToYmxr {
         report.say("the flags: " + (flags.isEmpty() ? "none, so the defaults below"
                 : String.join(" ", flags)));
         report.row("-k, the unit", unit + (unit == UNIT ? ", the default" : ", asked for"));
-        report.row("-m, the ring", ring + " bytes"
+        report.row("-m, the ring", Report.count(ring, "byte", "bytes")
                 + (ring == Tune.RING ? ", the default" : ", asked for"));
         report.row("-r, the repeat row", once ? "none, the tune plays once"
                 : repeat + (flags.stream().anyMatch(f -> f.startsWith("-r")) ? ", asked for"
@@ -155,12 +157,11 @@ public final class YmToYmxr {
             rows[source.kind()] += source.rows();
         }
         report.say("the effects: " + Integer.bitCount(columns.effects) + " of 4 run, "
-                + sources.count() + (sources.count() == 1 ? " source" : " sources")
-                + ", at most " + Sources.MOST);
+                + Report.count(sources.count(), "source", "sources") + ", at most " + Sources.MOST);
         for (int kind = 0; kind <= Effects.BUZZER; kind++) {
             if (kinds[kind] > 0) {
-                report.row(kindName(kind), kinds[kind] + ", " + rows[kind]
-                        + (rows[kind] == 1 ? " row in all" : " rows in all"));
+                report.row(kindName(kind), kinds[kind] + ", "
+                        + Report.count(rows[kind], "row", "rows") + " in all");
             }
         }
     }

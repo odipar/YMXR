@@ -119,16 +119,17 @@ final class Trace {
         // same guard rather than throwing where the record would not.
         try {
             TuneFile file = TuneFile.read(tune);
-            report.say("the tune file: " + tune.length + " bytes");
-            report.row("the table", file.table().rows() + " rows of " + file.table().columns()
-                    + " columns, repeating at row " + file.table().repeat());
+            report.say("the tune file: " + Report.count(tune.length, "byte", "bytes"));
+            report.row("the table", Report.count(file.table().rows(), "row", "rows") + " of "
+                    + Report.count(file.table().columns(), "column", "columns")
+                    + ", repeating at row " + file.table().repeat());
             report.row("the frame rate", file.frameRate() + " Hz");
             report.row("the sources", String.valueOf(file.sources().size()));
             report.row("the rows to record", calls < 0 ? "one pass and the loop once"
                     : String.valueOf(calls));
         } catch (IllegalArgumentException wrong) {
-            report.say("the tune file: " + tune.length
-                    + " bytes, which this reader does not read: " + wrong.getMessage());
+            report.say("the tune file: " + Report.count(tune.length, "byte", "bytes")
+                    + ", which this reader does not read: " + wrong.getMessage());
         }
         byte[] rows = record(tune, calls);
         if (rows.length == 0) {
@@ -136,7 +137,7 @@ final class Trace {
             // and a caller reading the exit is told so.
             throw tool.wrong(Tool.WRONG, "no record: this reader does not read the file");
         }
-        tool.report(rows.length + " bytes of rows");
+        tool.report(Report.count(rows.length, "byte", "bytes") + " of rows");
         Out.write(tool, rows);
     }
 }

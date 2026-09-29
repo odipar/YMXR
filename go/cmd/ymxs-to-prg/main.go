@@ -12,7 +12,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/odipar/ymxs/go/tool"
@@ -35,9 +34,9 @@ func main() {
 	}
 	rowed := "until a key stops it"
 	if rows != 0 {
-		rowed = fmt.Sprintf("%d rows", rows)
+		rowed = report.Count(rows, "row", "rows")
 	}
-	said.Row("the program", fmt.Sprintf("%d bytes, %s", len(prg), rowed))
+	said.Row("the program", report.Count(len(prg), "byte", "bytes")+", "+rowed)
 	t.WriteBytes(prg)
 	for _, note := range said.Unsaid() {
 		t.Note(note)

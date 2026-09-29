@@ -29,7 +29,7 @@ func main() {
 		t.Wrong(tool.Wrong, err.Error())
 	}
 	bound_(said, tune, bound)
-	t.Report(fmt.Sprintf("%d bytes", len(bound)))
+	t.Report(report.Count(len(bound), "byte", "bytes"))
 	t.WriteBytes(bound)
 }
 
@@ -42,9 +42,10 @@ func read(said *report.Report, tune []byte) {
 	if err != nil {
 		return
 	}
-	said.Say(fmt.Sprintf("the tune file: %d bytes", len(tune)))
-	said.Row("the table", fmt.Sprintf("%d rows of %d columns, repeating at row %d",
-		file.Table.Rows(), file.Table.Columns(), file.Table.Repeat()))
+	said.Say("the tune file: " + report.Count(len(tune), "byte", "bytes"))
+	said.Row("the table", fmt.Sprintf("%s of %s, repeating at row %d",
+		report.Count(file.Table.Rows(), "row", "rows"),
+		report.Count(file.Table.Columns(), "column", "columns"), file.Table.Repeat()))
 	said.Row("the frame rate", fmt.Sprintf("%d Hz", file.FrameRate))
 	said.Row("the sources", fmt.Sprintf("%d", len(file.Sources)))
 }
@@ -70,13 +71,14 @@ func bound_(said *report.Report, tune, bound []byte) {
 		ends = ymxr.GetLong(bound, sndh.BoundIndexAt)
 	}
 	said.Say("bound: DTX's reader for the table in place of the table")
-	said.Row("the reader's image", fmt.Sprintf("at %d, %d bytes", image, ends-image))
+	said.Row("the reader's image", fmt.Sprintf("at %d, %s", image,
+		report.Count(ends-image, "byte", "bytes")))
 	if sources > 0 {
-		said.Row("the source tables", fmt.Sprintf("%d of %d bytes", sources,
-			len(bound)-ends))
+		said.Row("the source tables", fmt.Sprintf("%d of %s", sources,
+			report.Count(len(bound)-ends, "byte", "bytes")))
 	}
-	said.Row("the state block", fmt.Sprintf("%d bytes, which the host finds the"+
-		" workspace for", state))
-	said.Row("in all", fmt.Sprintf("%d bytes, %d over the tune file", len(bound),
-		len(bound)-len(tune)))
+	said.Row("the state block", report.Count(state, "byte", "bytes")+
+		", which the host finds the workspace for")
+	said.Row("in all", fmt.Sprintf("%s, %d over the tune file",
+		report.Count(len(bound), "byte", "bytes"), len(bound)-len(tune)))
 }

@@ -72,6 +72,12 @@ final class Report {
         this.last = System.nanoTime();
     }
 
+    /** A count and its noun: {@code one} for a count of 1 and {@code many}
+     *  for any other (tools.md 1.9). */
+    static String count(long count, String one, String many) {
+        return count + " " + (count == 1 ? one : many);
+    }
+
     /** Whether anything printed here is read: a caller that builds a line
      *  at some cost asks first. */
     boolean says() {
@@ -135,22 +141,24 @@ final class Report {
     synchronized List<String> notes() {
         List<String> out = new ArrayList<>(notes);
         if (sinus > 0) {
-            out.add(sinus + " sinus SID frames dropped: the reference player runs"
-                    + " an empty handler for them");
+            out.add(count(sinus, "sinus SID frame", "sinus SID frames")
+                    + " dropped: the reference player runs an empty handler for them");
         }
         if (missingDrums > 0) {
-            out.add(missingDrums + " digidrum triggers dropped: the file has no"
-                    + " sample at that number");
+            out.add(count(missingDrums, "digidrum trigger", "digidrum triggers")
+                    + " dropped: the file has no sample at that number");
         }
         if (overflow > 0) {
-            out.add(overflow + " effect frames dropped: a tune names at most "
-                    + Sources.MOST + " sources");
+            out.add(count(overflow, "effect frame", "effect frames")
+                    + " dropped: a tune names at most " + count(Sources.MOST, "source", "sources"));
         }
         if (cutAtRepeat > 0) {
-            out.add(cutAtRepeat + " digidrums stopped at the row the tune repeats to");
+            out.add(count(cutAtRepeat, "digidrum", "digidrums")
+                    + " stopped at the row the tune repeats to");
         }
         if (preempted > 0) {
-            out.add(preempted + " frames on which a drum kept a SID from running on its voice");
+            out.add(count(preempted, "frame", "frames")
+                    + " on which a drum kept a SID from running on its voice");
         }
         return out;
     }

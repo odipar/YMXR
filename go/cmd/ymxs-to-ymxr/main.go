@@ -8,7 +8,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/odipar/ymxs/go/tool"
@@ -35,7 +34,8 @@ func main() {
 			t.Wrong(tool.Wrong, err.Error())
 		}
 		file = made
-		t.Report(fmt.Sprintf("%d tunes in a multi file, %d bytes", len(tunes), len(file)))
+		t.Report(report.Count(len(tunes), "tune", "tunes") + " in a multi file, " +
+			report.Count(len(file), "byte", "bytes"))
 	}
 	for _, note := range said.Unsaid() {
 		t.Note(note)

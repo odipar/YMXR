@@ -61,11 +61,7 @@ func main() {
 	if len(reads) > 0 {
 		at = ", at " + strings.Join(reads, " ")
 	}
-	file := " files"
-	if len(files) == 1 {
-		file = " file"
-	}
-	said.Say(fmt.Sprintf("%d%s to read%s", len(files), file, at))
+	said.Say(report.Count(len(files), "file", "files") + " to read" + at)
 	dumped := 0
 	failed := 0
 	for i, name := range files {
@@ -84,19 +80,11 @@ func main() {
 		says(one)
 	}
 	others := len(files) - dumped
-	dumps := " dumps, "
-	if dumped == 1 {
-		dumps = " dump, "
-	}
 	not := ""
 	if others > 0 {
-		file := " files"
-		if others == 1 {
-			file = " file"
-		}
-		not = fmt.Sprintf(", %d%s not a dump", others, file)
+		not = ", " + report.Count(others, "file", "files") + " not a dump"
 	}
-	fmt.Printf("%d%s%d wrong%s\n", dumped, dumps, failed, not)
+	fmt.Printf("%s, %d wrong%s\n", report.Count(dumped, "dump", "dumps"), failed, not)
 	if failed == 0 {
 		os.Exit(tool.Done)
 	}
