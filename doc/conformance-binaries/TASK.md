@@ -20,10 +20,11 @@ be read, that is an entry of `NOTES.md` (6).
 
 It prints the record `BINARIES.md` 6 defines, one line a part. The
 output is compared with the reference byte for byte: each line free of
-spaces, integers in decimal, the keys in the order section 6 defines,
-and a line feed ending each line. In Python that is
+spaces outside a text, integers in decimal, the keys in the order section
+6 defines, and a line feed ending each line. In Python that is
 `json.dumps(part, separators=(",", ":"))` over dicts filled in that
-order, `sort_keys` left at its default.
+order, `sort_keys` left at its default, with $7F escaped as `\u007f` as
+6.1 escapes each character above $7E.
 
 **3. The files.** Eleven, of the four kinds. Each was written by the tools
 of the repository from the tunes of the other kit.

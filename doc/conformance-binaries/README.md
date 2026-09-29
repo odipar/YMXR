@@ -256,3 +256,24 @@ a letter or a length the clause left the reader to carry over.
 Twenty-three entries marked *leaves output as it is* between the two.
 Over the seven runs the document moved in 26 places, and the record of
 every file came back byte for byte from every one of the nine readers.
+
+**6.8 The eighth run**, 2026-09-29, one implementer against the kit at
+eleven files. The reader was 357 lines. Every record byte for byte,
+eleven against eleven, and `READ.md` documents alone. `NOTES.md` had 25
+entries with 3 marked *decides output*, and each changed:
+
+- 0.4 read "past the file's F bytes" for the end of the entries and of a
+  tune file, which also reads as at or above F, and the last tune file of
+  `set.ymxr` and of `named.ymxr` ends at the file's last byte: 1416 +
+  1260 is 2676, and 1420 + 1260 is 2680. The conditions read "above F".
+- 6.1 set the order of the keys and left the order of the lines to the
+  order of the items. The lines follow the section of 6.2 to 6.5 for the
+  kind, in its order.
+- `TASK.md` read each line "free of spaces", where 6.1 keeps a space
+  inside a text, and `YMXR (ym-to-ymxr)` is in eight records. It reads
+  "outside a text" now, and names the escape of $7F, which 6.1 escapes
+  and `json.dumps` prints as it is.
+
+3.2 listed `TIME` in every tag block, where the SNDH files of this kit,
+written by 0.4.10 and 0.4.11, have none. `TIME` is in the block from
+release 0.4.15, and 3.2 reads so.
