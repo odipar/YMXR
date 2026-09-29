@@ -45,8 +45,10 @@ build/
 .ym_work/
 .prg_work/
 
-# an assembler run by hand leaves an object file beside the source
+# an assembler run by hand leaves an object file beside the source, and a
+# listing where one is asked for
 *.o
+*.prn
 
 # a tool run by hand at the root leaves its output there. The tunes under
 # doc/conformance/tunes are committed and are outside this.
