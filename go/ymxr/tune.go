@@ -399,7 +399,7 @@ func Read(file []byte) (File, error) {
 		end = GetLong(file, IndexAt) &^ Counted
 	}
 	if tableAt < 0 || end > len(file) || tableAt > end {
-		return File{}, fmt.Errorf("the table stands at %d to %d, and the file has %d"+
+		return File{}, fmt.Errorf("the table is at %d to %d, and the file has %d"+
 			" bytes", tableAt, end, len(file))
 	}
 	dtx2 := file[tableAt:end]
@@ -430,7 +430,7 @@ func Read(file []byte) (File, error) {
 			to = GetLong(file, IndexAt+4*(i+1)) &^ Counted
 		}
 		if at < 0 || to > len(file) || at > to {
-			return File{}, fmt.Errorf("source %d stands at %d to %d, and the file has"+
+			return File{}, fmt.Errorf("source %d is at %d to %d, and the file has"+
 				" %d bytes", i+1, at, to, len(file))
 		}
 		source, err := dtx.Read(file[at:to])

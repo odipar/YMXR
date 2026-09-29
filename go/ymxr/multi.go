@@ -113,7 +113,7 @@ func ReadMulti(file []byte) (MultiRead, error) {
 	}
 	name := MultiIndexAt + entry*count
 	if name > len(file) {
-		return MultiRead{}, fmt.Errorf("the entries of %d tunes stand past the file's"+
+		return MultiRead{}, fmt.Errorf("the entries of %d tunes end past the file's"+
 			" %d bytes", count, len(file))
 	}
 	out := MultiRead{}
@@ -121,7 +121,7 @@ func ReadMulti(file []byte) (MultiRead, error) {
 		at := GetLong(file, MultiIndexAt+entry*i)
 		bytes := GetLong(file, MultiIndexAt+entry*i+4)
 		if at < 0 || bytes < 0 || at+bytes > len(file) {
-			return MultiRead{}, fmt.Errorf("tune %d stands at %d for %d bytes, and the"+
+			return MultiRead{}, fmt.Errorf("tune %d is at %d for %d bytes, and the"+
 				" file has %d", i+1, at, bytes, len(file))
 		}
 		tune := make([]byte, bytes)

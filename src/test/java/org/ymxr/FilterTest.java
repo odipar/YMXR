@@ -115,7 +115,7 @@ final class FilterTest {
                 Ran fault = ran(tool, in);
                 assertEquals(1, fault.exit(), () -> tool + " on a wrong input exits 1: "
                         + fault.err());
-                assertEquals(0, fault.out().length, () -> tool + " writes no file");
+                assertEquals(0, fault.out().length, () -> tool + " leaves standard output empty");
             }
         }
     }
@@ -176,7 +176,7 @@ final class FilterTest {
                 ran("Bind", structure, "-r0"));
         for (Ran call : calls) {
             assertEquals(2, call.exit(), () -> "a wrong call exits 2: " + call.err());
-            assertEquals(0, call.out().length, "and writes no file");
+            assertEquals(0, call.out().length, "and leaves standard output empty");
         }
     }
 

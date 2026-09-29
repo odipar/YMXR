@@ -129,7 +129,7 @@ final class ConsistencyTest {
             int first = (Integer) r[0];
             int last = (Integer) r[1];
             if (first != next) {
-                gaps.add("column " + next + " is where " + first + " stands");
+                gaps.add("column " + next + " is where " + first + " is");
             }
             // columns 0 to 13 reach R0 to R13, one a register
             if (first <= 13 && !((String) r[2]).startsWith("R" + first + ",")) {

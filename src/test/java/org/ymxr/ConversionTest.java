@@ -78,7 +78,7 @@ final class ConversionTest {
         }
         for (int r = 14; r < 16; r++) {
             for (int frame = 0; frame < 8; frame++) {
-                assertEquals(0, song.registers()[r][frame], "R" + r + " stands outside YM3");
+                assertEquals(0, song.registers()[r][frame], "R" + r + " is outside YM3");
             }
         }
     }
@@ -264,7 +264,7 @@ final class ConversionTest {
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);
         byte[] far = file.clone();
         Tune.putLong(far, Tune.TABLE_AT, file.length + 8);
-        assertEquals("the table stands at " + (file.length + 8) + " to "
+        assertEquals("the table is at " + (file.length + 8) + " to "
                         + Tune.getLong(file, Tune.INDEX_AT) + ", and the file has "
                         + file.length + " bytes",
                 assertThrows(IllegalArgumentException.class,
@@ -280,7 +280,7 @@ final class ConversionTest {
         // alone: the reader reports the first condition in the order of
         // SPEC.md 3.3.4's table
         int before = Tune.getLong(file, Tune.INDEX_AT + 4 * (count - 2));
-        assertEquals("source " + (count - 1) + " stands at " + before + " to "
+        assertEquals("source " + (count - 1) + " is at " + before + " to "
                         + (file.length + 4) + ", and the file has " + file.length
                         + " bytes",
                 assertThrows(IllegalArgumentException.class,

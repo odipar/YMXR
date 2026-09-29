@@ -312,7 +312,7 @@ func zero(sndh []byte, from int) (int, error) {
 // it.
 func sized(subtunes int, name string, at int) (int, error) {
 	if subtunes < 0 {
-		return 0, fmt.Errorf("the SNDH file's %s tag at %d stands before the '##' count"+
+		return 0, fmt.Errorf("the SNDH file's %s tag at %d comes before the '##' count"+
 			" that sizes it", name, at)
 	}
 	return subtunes, nil

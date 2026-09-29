@@ -154,7 +154,7 @@ def main():
     print(f"tone coarse moved alone   A {pc(coarse_alone[0])}  B {pc(coarse_alone[1])}  C {pc(coarse_alone[2])}")
     print(f"volume level moved        A {pc(level_moved[0])}  B {pc(level_moved[1])}  C {pc(level_moved[2])}")
     print(f"follow bit moved alone    A {pc(follow_alone[0])}  B {pc(follow_alone[1])}  C {pc(follow_alone[2])}")
-    print(f"envelope shape writes     {env_writes:,}; of those already standing {env_restates:,}"
+    print(f"envelope shape writes     {env_writes:,}; of those repeating the shape already set {env_restates:,}"
           f" ({100.0 * env_restates / env_writes:.1f}%)")
     print(f"tunes with one envelope period throughout  {tunes_env_fixed} of {read}")
     print(f"tunes with one noise period throughout     {tunes_noise_fixed} of {read}")

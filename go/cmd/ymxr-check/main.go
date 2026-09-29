@@ -99,7 +99,7 @@ func of(data []byte, name string, reads []string) result {
 			return result{file: name, dump: false}
 		}
 		return result{file: name, dump: true,
-			wrong: []string{"the converter refuses it: " + err.Error()}}
+			wrong: []string{"the converter fails on it: " + err.Error()}}
 	}
 	return result{file: name, dump: true, wrong: check.Of(song, reads)}
 }

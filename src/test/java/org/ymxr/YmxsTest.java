@@ -121,9 +121,9 @@ final class YmxsTest {
         assertEquals(0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET | 1,
                 column[control][0] & 0xFF, "the start writes the control column");
         assertEquals(100, column[count][0] & 0xFF, "and the count");
-        assertEquals(0, column[control][1] & 0xFF, "an unmoved rate writes no control column");
+        assertEquals(0, column[control][1] & 0xFF, "an unmoved rate leaves the control column at 0");
         assertEquals(0, column[count][1] & 0xFF, "and no count");
-        assertEquals(0, column[control][2] & 0xFF, "a count that moved writes no control column");
+        assertEquals(0, column[control][2] & 0xFF, "a count that moved leaves the control column at 0");
         assertEquals(90, column[count][2] & 0xFF, "and the count");
         assertEquals(0x80 | 2, column[control][3] & 0xFF, "a select that moved writes it");
         assertEquals(0, column[count][3] & 0xFF, "and leaves the count unwritten");

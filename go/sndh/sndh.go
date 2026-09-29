@@ -159,7 +159,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		return nil, errors.New("no tune files: an SNDH file has one subtune at least")
 	}
 	if n > MaxSubtunes {
-		return nil, fmt.Errorf("%d tune files: the '##' tag's two digits hold at most %d"+
+		return nil, fmt.Errorf("%d tune files: the '##' tag's two digits count at most %d"+
 			" subtunes", n, MaxSubtunes)
 	}
 	if options.Names != nil && len(options.Names) != n {

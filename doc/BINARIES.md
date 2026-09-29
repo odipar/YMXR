@@ -78,8 +78,8 @@ name runs to its zero byte or the file's end.
 | the file is under 8 bytes, or bytes 0 to 3 are other than `YMXM` | `not a YMXM file` |
 | the version is V, other than 3, 4, 5 or 6 | `version V is not 3, 4, 5 or 6` |
 | `N` is outside 1 to 99 | `N tunes, and a multi file has 1 to 99` |
-| 8 + 8`N` is above F, the file's bytes | `the entries of N tunes stand past the file's F bytes` |
-| entry i has A or B below 0, or A + B above F | `tune i stands at A for B bytes, and the file has F` |
+| 8 + 8`N` is above F, the file's bytes | `the entries of N tunes end past the file's F bytes` |
+| entry i has A or B below 0, or A + B above F | `tune i is at A for B bytes, and the file has F` |
 
 **0.5 Writing.** A tool with tune files and names reports the first
 condition met of the table below; then reads each tune file as SPEC.md
@@ -452,7 +452,7 @@ tags are:
 | bytes 12 to 15 of the file are other than `SNDH` | `not an SNDH file: no SNDH at 12` |
 | either of the two bytes after `##` is other than a digit | `the SNDH file's tags have no '##' subtune count` |
 | the clock tag's text reads as 0 | `the SNDH file's tags have no TC or !V rate` |
-| `FRMS`, `TIME` or `!#SN` at A precedes `##` | `the SNDH file's FRMS tag at A stands before the '##' count that sizes it`, or `TIME` or `!#SN` in place of `FRMS` |
+| `FRMS`, `TIME` or `!#SN` at A precedes `##` | `the SNDH file's FRMS tag at A comes before the '##' count that sizes it`, or `TIME` or `!#SN` in place of `FRMS` |
 | tag X at A is other than the tags of 3.2 | `the SNDH file's tag X at A is not one this reads` |
 | a tag name or a zero byte is read past the file's end | `not an SNDH file: no HDNS ends its tags` |
 | the tags end and `##` is absent | `the SNDH file's tags have no '##' subtune count` |

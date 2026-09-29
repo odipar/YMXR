@@ -33,7 +33,7 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
         // short or written wrong is a line rather than an exception the
         // reader's caller sees.
         if (tableAt < 0 || end > file.length || tableAt > end) {
-            throw new IllegalArgumentException("the table stands at " + tableAt + " to "
+            throw new IllegalArgumentException("the table is at " + tableAt + " to "
                     + end + ", and the file has " + file.length + " bytes");
         }
         byte[] dtx2 = Arrays.copyOfRange(file, tableAt, end);
@@ -58,7 +58,7 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx2, Table tabl
                     ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1)) & ~Tune.COUNTED
                     : file.length;
             if (at < 0 || to > file.length || at > to) {
-                throw new IllegalArgumentException("source " + (i + 1) + " stands at " + at
+                throw new IllegalArgumentException("source " + (i + 1) + " is at " + at
                         + " to " + to + ", and the file has " + file.length + " bytes");
             }
             Table source = Dtx.read(Arrays.copyOfRange(file, at, to));
