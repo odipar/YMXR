@@ -109,9 +109,10 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 	}
 	return Converted{Written: written, Repeat: repeat, Sources: sources,
 		Effects: made.Columns.Effects,
-		Said: fmt.Sprintf("%d frames at %d Hz, %d sources, effects %b, repeats at %s:"+
-			" %d bytes", song.Frames, song.PlayerHz, sources.Count(),
-			made.Columns.Effects, repeats, len(written.File)), Frames: frames}, nil
+		Said: fmt.Sprintf("%s at %d Hz, %s, effects %b, repeats at %s: %s",
+			report.Count(song.Frames, "frame", "frames"), song.PlayerHz,
+			report.Count(sources.Count(), "source", "sources"), made.Columns.Effects, repeats,
+			report.Count(len(written.File), "byte", "bytes")), Frames: frames}, nil
 }
 
 // flagsRead says which flags the tool read and what each came to.
@@ -134,7 +135,7 @@ func flagsRead(said *report.Report, args []string, unit, ring, repeat int,
 	if ring == ymxr.Ring {
 		asked = ", the default"
 	}
-	said.Row("-m, the ring", fmt.Sprintf("%d bytes%s", ring, asked))
+	said.Row("-m, the ring", report.Count(ring, "byte", "bytes")+asked)
 	if once {
 		said.Row("-r, the repeat row", "none, the tune plays once")
 	} else {
@@ -172,19 +173,12 @@ func found(said *report.Report, sources *ymxr.Sources, effects int) {
 		kinds[source.Kind]++
 		rows[source.Kind] += source.Rows()
 	}
-	named := " sources"
-	if sources.Count() == 1 {
-		named = " source"
-	}
-	said.Say(fmt.Sprintf("the effects: %d of 4 run, %d%s, at most %d",
-		bits(effects), sources.Count(), named, ymxr.Most))
+	said.Say(fmt.Sprintf("the effects: %d of 4 run, %s, at most %d",
+		bits(effects), report.Count(sources.Count(), "source", "sources"), ymxr.Most))
 	for kind := 0; kind <= ymxr.Buzzer; kind++ {
 		if kinds[kind] > 0 {
-			row := " rows in all"
-			if rows[kind] == 1 {
-				row = " row in all"
-			}
-			said.Row(kindName(kind), fmt.Sprintf("%d, %d%s", kinds[kind], rows[kind], row))
+			said.Row(kindName(kind), fmt.Sprintf("%d, %s in all", kinds[kind],
+				report.Count(rows[kind], "row", "rows")))
 		}
 	}
 }

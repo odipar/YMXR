@@ -36,7 +36,8 @@ final class Layout {
                     : "the record runs past the file's " + file.length + " bytes");
         }
         List<String> lines = record.lines().toList();
-        report.say("the file: " + file.length + " bytes, kind " + kind(file));
+        report.say("the file: " + Report.count(file.length, "byte", "bytes") + ", kind "
+                + kind(file));
         for (String part : List.of("tag", "tune", "source", "image")) {
             long of = lines.stream().filter(line -> line.contains("\"part\":\"" + part + "\""))
                     .count();
@@ -44,7 +45,7 @@ final class Layout {
                 report.row("the " + part + (of == 1 ? "" : "s"), String.valueOf(of));
             }
         }
-        tool.report(lines.size() + (lines.size() == 1 ? " line" : " lines"));
+        tool.report(Report.count(lines.size(), "line", "lines"));
         Out.write(tool, record.getBytes(StandardCharsets.US_ASCII));
     }
 

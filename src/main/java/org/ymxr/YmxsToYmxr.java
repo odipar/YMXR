@@ -40,7 +40,8 @@ public final class YmxsToYmxr {
             } catch (IllegalArgumentException wrong) {
                 throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
             }
-            tool.report(tunes.size() + " tunes in a multi file, " + file.length + " bytes");
+            tool.report(Report.count(tunes.size(), "tune", "tunes") + " in a multi file, "
+                    + Report.count(file.length, "byte", "bytes"));
         }
         for (String note : report.unsaid()) {
             System.err.println("  " + note);

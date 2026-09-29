@@ -33,7 +33,7 @@ final class Bind {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
         bound(report, tune, bound);
-        tool.report(bound.length + " bytes");
+        tool.report(Report.count(bound.length, "byte", "bytes"));
         Out.write(tool, bound);
     }
 
@@ -43,9 +43,10 @@ final class Bind {
             return;
         }
         TuneFile file = TuneFile.read(tune);
-        report.say("the tune file: " + tune.length + " bytes");
-        report.row("the table", file.table().rows() + " rows of " + file.table().columns()
-                + " columns, repeating at row " + file.table().repeat());
+        report.say("the tune file: " + Report.count(tune.length, "byte", "bytes"));
+        report.row("the table", Report.count(file.table().rows(), "row", "rows") + " of "
+                + Report.count(file.table().columns(), "column", "columns")
+                + ", repeating at row " + file.table().repeat());
         report.row("the frame rate", file.frameRate() + " Hz");
         report.row("the sources", String.valueOf(file.sources().size()));
     }
@@ -63,12 +64,15 @@ final class Bind {
         int sources = TuneFile.read(tune).sources().size();
         int ends = sources > 0 ? Tune.getLong(bound, Bound.INDEX_AT) : bound.length;
         report.say("bound: DTX's reader for the table in place of the table");
-        report.row("the reader's image", "at " + image + ", " + (ends - image) + " bytes");
+        report.row("the reader's image", "at " + image + ", "
+                + Report.count(ends - image, "byte", "bytes"));
         if (sources > 0) {
-            report.row("the source tables", sources + " of " + (bound.length - ends) + " bytes");
+            report.row("the source tables", sources + " of "
+                    + Report.count(bound.length - ends, "byte", "bytes"));
         }
-        report.row("the state block", state + " bytes, which the host finds the workspace for");
-        report.row("in all", bound.length + " bytes, " + (bound.length - tune.length)
-                + " over the tune file");
+        report.row("the state block", Report.count(state, "byte", "bytes")
+                + ", which the host finds the workspace for");
+        report.row("in all", Report.count(bound.length, "byte", "bytes") + ", "
+                + (bound.length - tune.length) + " over the tune file");
     }
 }

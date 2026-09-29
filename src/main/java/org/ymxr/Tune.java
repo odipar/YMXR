@@ -164,8 +164,8 @@ final class Tune {
         }
         int at = ringOf(ring);
         if (at != ring) {
-            report.note("the ring is " + at + " bytes: a multiple of the period within the"
-                    + " player's reach");
+            report.note("the ring is " + Report.count(at, "byte", "bytes")
+                    + ": a multiple of the period within the player's reach");
         }
         Watched watched = new Watched(report, Columns.C, packer);
         byte[] table = table(columns.column, frames, repeat, unit, at, watched);
@@ -311,20 +311,22 @@ final class Tune {
         if (!report.says()) {
             return;
         }
-        report.say("the table: " + Columns.C + " columns of " + frames + " rows, "
-                + Columns.C * frames + " bytes, packed at unit " + unit + " through a ring of "
-                + ring);
+        report.say("the table: " + Report.count(Columns.C, "column", "columns") + " of "
+                + Report.count(frames, "row", "rows") + ", "
+                + Report.count((long) Columns.C * frames, "byte", "bytes") + ", packed at unit "
+                + unit + " through a ring of " + ring);
         for (int c = 0; c < Columns.C; c++) {
             int bytes = packer.bytes[c];
             report.row(name(c), String.format(Locale.ROOT, "%7d -> %6d bytes  (%5.1f%%)",
                     frames, bytes, 100.0 * bytes / frames));
         }
-        report.say("the sources: " + sources + (sources == 1 ? " table of " : " tables of ")
-                + sourceRows + (sourceRows == 1 ? " row, " : " rows, ") + sourceBytes + " bytes");
+        report.say("the sources: " + Report.count(sources, "table", "tables") + " of "
+                + Report.count(sourceRows, "row", "rows") + ", "
+                + Report.count(sourceBytes, "byte", "bytes"));
         int raw = Columns.C * frames;
-        report.say(String.format(Locale.ROOT,
-                "packed %d bytes into %d (%.1f%%), the file %d bytes",
-                raw, table, 100.0 * table / raw, file));
+        report.say(String.format(Locale.ROOT, "packed %s into %d (%.1f%%), the file %s",
+                Report.count(raw, "byte", "bytes"), table, 100.0 * table / raw,
+                Report.count(file, "byte", "bytes")));
     }
 
     /** What a column is, for a reported row: a register by its number, and

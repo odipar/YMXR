@@ -55,6 +55,15 @@ type Report struct {
 	Most int
 }
 
+// Count is a count and its noun: one for a count of 1 and many for any
+// other (tools.md 1.9).
+func Count[N ~int | ~int32 | ~int64](count N, one, many string) string {
+	if count == 1 {
+		return fmt.Sprintf("%d %s", count, one)
+	}
+	return fmt.Sprintf("%d %s", count, many)
+}
+
 // Quiet is a report that prints no line.
 func Quiet() *Report {
 	return Of(false)
@@ -151,24 +160,24 @@ func (r *Report) Notes() []string {
 func (r *Report) all() []string {
 	out := append([]string{}, r.notes...)
 	if r.Sinus > 0 {
-		out = append(out, fmt.Sprintf("%d sinus SID frames dropped: the reference"+
-			" player runs an empty handler for them", r.Sinus))
+		out = append(out, Count(r.Sinus, "sinus SID frame", "sinus SID frames")+
+			" dropped: the reference player runs an empty handler for them")
 	}
 	if r.MissingDrums > 0 {
-		out = append(out, fmt.Sprintf("%d digidrum triggers dropped: the file has"+
-			" no sample at that number", r.MissingDrums))
+		out = append(out, Count(r.MissingDrums, "digidrum trigger", "digidrum triggers")+
+			" dropped: the file has no sample at that number")
 	}
 	if r.Overflow > 0 {
-		out = append(out, fmt.Sprintf("%d effect frames dropped: a tune names at"+
-			" most %d sources", r.Overflow, r.Most))
+		out = append(out, Count(r.Overflow, "effect frame", "effect frames")+
+			" dropped: a tune names at most "+Count(r.Most, "source", "sources"))
 	}
 	if r.CutAtRepeat > 0 {
-		out = append(out, fmt.Sprintf("%d digidrums stopped at the row the tune"+
-			" repeats to", r.CutAtRepeat))
+		out = append(out, Count(r.CutAtRepeat, "digidrum", "digidrums")+
+			" stopped at the row the tune repeats to")
 	}
 	if r.Preempted > 0 {
-		out = append(out, fmt.Sprintf("%d frames on which a drum kept a SID from"+
-			" running on its voice", r.Preempted))
+		out = append(out, Count(r.Preempted, "frame", "frames")+
+			" on which a drum kept a SID from running on its voice")
 	}
 	return out
 }

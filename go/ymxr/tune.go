@@ -202,8 +202,8 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	}
 	at := RingOf(ring)
 	if at != ring {
-		said.Note(fmt.Sprintf("the ring is %d bytes: a multiple of the period within"+
-			" the player's reach", at))
+		said.Note("the ring is " + report.Count(at, "byte", "bytes") +
+			": a multiple of the period within the player's reach")
 	}
 	watched := &watched{said: said, bytes: make([]int, C), inner: packer}
 	table, err := packTable(columns.Column, frames, repeat, unit, at, watched)
@@ -312,25 +312,20 @@ func packed(said *report.Report, packer *watched, frames, table, sources,
 	if !said.Says() {
 		return
 	}
-	said.Say(fmt.Sprintf("the table: %d columns of %d rows, %d bytes, packed at unit %d"+
-		" through a ring of %d", C, frames, C*frames, unit, ring))
+	said.Say(fmt.Sprintf("the table: %s of %s, %s, packed at unit %d through a ring of %d",
+		report.Count(C, "column", "columns"), report.Count(frames, "row", "rows"),
+		report.Count(C*frames, "byte", "bytes"), unit, ring))
 	for c := 0; c < C; c++ {
 		bytes := packer.bytes[c]
 		said.Row(Name(c), fmt.Sprintf("%7d -> %6d bytes  (%5.1f%%)", frames, bytes,
 			100.0*float64(bytes)/float64(frames)))
 	}
-	rows, tables := " rows, ", " tables of "
-	if sourceRows == 1 {
-		rows = " row, "
-	}
-	if sources == 1 {
-		tables = " table of "
-	}
-	said.Say(fmt.Sprintf("the sources: %d%s%d%s%d bytes", sources, tables, sourceRows,
-		rows, sourceBytes))
+	said.Say(fmt.Sprintf("the sources: %s of %s, %s", report.Count(sources, "table", "tables"),
+		report.Count(sourceRows, "row", "rows"), report.Count(sourceBytes, "byte", "bytes")))
 	raw := C * frames
-	said.Say(fmt.Sprintf("packed %d bytes into %d (%.1f%%), the file %d bytes",
-		raw, table, 100.0*float64(table)/float64(raw), file))
+	said.Say(fmt.Sprintf("packed %s into %d (%.1f%%), the file %s",
+		report.Count(raw, "byte", "bytes"), table, 100.0*float64(table)/float64(raw),
+		report.Count(file, "byte", "bytes")))
 }
 
 // RingOf is the ring the table packs through: the multiple of C nearest

@@ -38,8 +38,9 @@ func main() {
 	repeat := Repeat(t, at, asked, song, said)
 	sources := ymxr.Drums(song.Drums, song.Attributes&ym.Drums4Bit != 0)
 	tune := ym.Of(song, sources, repeat, said)
-	t.Report(fmt.Sprintf("%s %q, %d rows at %d Hz, %d sources", song.Format,
-		strings.TrimSpace(song.Name), song.Frames, song.PlayerHz, sources.Count()))
+	t.Report(fmt.Sprintf("%s \"%s\", %s at %d Hz, %s", song.Format,
+		strings.TrimSpace(song.Name), report.Count(song.Frames, "row", "rows"), song.PlayerHz,
+		report.Count(sources.Count(), "source", "sources")))
 	for _, note := range said.Unsaid() {
 		t.Note(note)
 	}

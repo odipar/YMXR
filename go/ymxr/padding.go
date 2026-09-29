@@ -106,29 +106,21 @@ func unsetFrames(n int) []int {
 // noted is the note for rows that set no column, which the Java tree
 // writes word for word.
 func noted(added, at int, beforeRepeat bool, unit int) string {
-	rows := " unset row"
-	if added != 1 {
-		rows = " unset rows"
-	}
 	before := ""
 	if beforeRepeat {
 		before = ", before the repeat row"
 	}
-	return fmt.Sprintf("padded: %d%s at row %d%s, so the table packs at unit %d",
-		added, rows, at, before, unit)
+	return fmt.Sprintf("padded: %s at row %d%s, so the table packs at unit %d",
+		report.Count(added, "unset row", "unset rows"), at, before, unit)
 }
 
 // written is the note for a loop written again, which the Java tree
 // writes word for word.
 func written(loop, times, unit int) string {
-	rows := " row"
-	if loop != 1 {
-		rows = " rows"
-	}
 	how := "twice"
 	if times != 2 {
 		how = fmt.Sprintf("%d times", times)
 	}
-	return fmt.Sprintf("padded: the loop's %d%s written %s, so the table packs at unit %d",
-		loop, rows, how, unit)
+	return fmt.Sprintf("padded: the loop's %s written %s, so the table packs at unit %d",
+		report.Count(loop, "row", "rows"), how, unit)
 }

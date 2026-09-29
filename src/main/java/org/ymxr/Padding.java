@@ -102,7 +102,7 @@ final class Padding {
     /** The note for rows that set no column, which the Go tree writes
      *  word for word. */
     static String noted(int added, int at, boolean beforeRepeat, int unit) {
-        return "padded: " + added + (added == 1 ? " unset row" : " unset rows") + " at row "
+        return "padded: " + Report.count(added, "unset row", "unset rows") + " at row "
                 + at + (beforeRepeat ? ", before the repeat row" : "")
                 + ", so the table packs at unit " + unit;
     }
@@ -110,7 +110,7 @@ final class Padding {
     /** The note for a loop written again, which the Go tree writes word
      *  for word. */
     static String written(int loop, int times, int unit) {
-        return "padded: the loop's " + loop + (loop == 1 ? " row" : " rows") + " written "
+        return "padded: the loop's " + Report.count(loop, "row", "rows") + " written "
                 + (times == 2 ? "twice" : times + " times") + ", so the table packs at unit "
                 + unit;
     }

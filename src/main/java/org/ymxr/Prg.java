@@ -192,16 +192,17 @@ final class Prg {
         }
         Tags tags = tags(sndh);
         int flags = Tune.getWord(prg, HEADER + STUB_FLAGS_AT);
-        report.say("the SNDH file: " + sndh.length + " bytes, " + tags.subtunes()
-                + (tags.subtunes() == 1 ? " subtune at " : " subtunes at ") + tags.rate()
+        report.say("the SNDH file: " + Report.count(sndh.length, "byte", "bytes") + ", "
+                + Report.count(tags.subtunes(), "subtune", "subtunes") + " at " + tags.rate()
                 + " Hz, FLAG " + tags.flag());
-        report.say("the stub: " + Binaries.stub().length + " bytes, patched");
+        report.say("the stub: " + Report.count(Binaries.stub().length, "byte", "bytes")
+                + ", patched");
         report.row("the subtunes", String.valueOf(tags.subtunes()));
         report.row("the rows to play", rows == 0 ? "0, until a key stops it"
                 : String.valueOf(rows));
         report.row("it plays from", from(tags, flags, asked));
         report.row("the screen", "cleared before the banner");
-        report.say("the program: " + prg.length + " bytes");
+        report.say("the program: " + Report.count(prg.length, "byte", "bytes"));
     }
 
     /** The clock the program plays from, and what named it: the caller,
@@ -209,8 +210,8 @@ final class Prg {
     private static String from(Tags tags, int flags, Sndh.Asked asked) {
         if ((flags & FLAG_VBL) == 0) {
             Timer timer = timer(tags.rate());
-            String at = "Timer C, " + timer.ticks() + " ticks a second and a row every "
-                    + timer.ticks() / tags.rate();
+            String at = "Timer C, " + Report.count(timer.ticks(), "tick", "ticks")
+                    + " a second and a row every " + timer.ticks() / tags.rate();
             return asked == Sndh.Asked.TIMER_C ? at + ", asked for" : at;
         }
         if (asked == Sndh.Asked.VBL) {
@@ -426,8 +427,8 @@ final class Prg {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
         made(report, sndh, prg, rows, asked);
-        tool.report(prg.length + " bytes, "
-                + (rows == 0 ? "until a key stops it" : rows + " rows"));
+        tool.report(Report.count(prg.length, "byte", "bytes") + ", "
+                + (rows == 0 ? "until a key stops it" : Report.count(rows, "row", "rows")));
         Out.write(tool, prg);
     }
 

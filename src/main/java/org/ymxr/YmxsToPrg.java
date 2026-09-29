@@ -37,8 +37,8 @@ public final class YmxsToPrg {
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
-        report.row("the program", program.length + " bytes, "
-                + (rows == 0 ? "until a key stops it" : rows + " rows"));
+        report.row("the program", Report.count(program.length, "byte", "bytes") + ", "
+                + (rows == 0 ? "until a key stops it" : Report.count(rows, "row", "rows")));
         Out.write(tool, program);
         for (String note : report.unsaid()) {
             System.err.println("  " + note);

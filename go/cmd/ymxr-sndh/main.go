@@ -78,11 +78,8 @@ func main() {
 		t.Wrong(tool.Wrong, err.Error())
 	}
 	made(said, options, names, tunes, out)
-	subtunes := " subtunes"
-	if len(tunes) == 1 {
-		subtunes = " subtune"
-	}
-	t.Report(fmt.Sprintf("%d bytes, %d%s", len(out), len(tunes), subtunes))
+	t.Report(report.Count(len(out), "byte", "bytes") + ", " +
+		report.Count(len(tunes), "subtune", "subtunes"))
 	t.WriteBytes(out)
 }
 
@@ -102,8 +99,8 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if err != nil {
 		return
 	}
-	said.Say(fmt.Sprintf("the core: %s, %d bytes",
-		binaries.Named(monitor, lean, pcrel), len(core)))
+	said.Say(fmt.Sprintf("the core: %s, %s",
+		binaries.Named(monitor, lean, pcrel), report.Count(len(core), "byte", "bytes")))
 	var switches []string
 	if monitor {
 		switches = append(switches, "-perf, the raster monitor in")
@@ -132,11 +129,7 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	}
 	named := ""
 	if options.Names != nil {
-		name := " names"
-		if len(options.Names) == 1 {
-			name = " name"
-		}
-		named = fmt.Sprintf(", !#SN with %d%s", len(options.Names), name)
+		named = ", !#SN with " + report.Count(len(options.Names), "name", "names")
 	}
 	tags, err := sndh.ReadTags(file)
 	if err != nil {
@@ -159,15 +152,12 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 		if strings.TrimSpace(named) == "" {
 			named = "the tune"
 		}
-		said.Row(named, fmt.Sprintf("%d bytes bound to %d, its table in image %d",
-			len(tunes[i]), len(one), set.Image[i]+1))
+		said.Row(named, fmt.Sprintf("%s bound to %d, its table in image %d",
+			report.Count(len(tunes[i]), "byte", "bytes"), len(one), set.Image[i]+1))
 	}
-	image := " images of "
-	if len(set.Images) == 1 {
-		image = " image of "
-	}
-	said.Say(fmt.Sprintf("the images: %d%s%d bytes, DTX's reader once a set of tunes"+
-		" that share one", len(set.Images), image, images))
+	said.Say(fmt.Sprintf("the images: %s of %s, DTX's reader once a set of tunes that"+
+		" share one", report.Count(len(set.Images), "image", "images"),
+		report.Count(images, "byte", "bytes")))
 	// What an image fixes once splits a set into more than one,
 	// and only a flag moves the unit, -k on one dump and not another:
 	// a tune whose row count or repeat row is odd is padded to the unit
@@ -179,15 +169,12 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 				of++
 			}
 		}
-		tune := " tunes"
-		if of == 1 {
-			tune = " tune"
-		}
-		said.Row(fmt.Sprintf("image %d", i+1), fmt.Sprintf("%s, %d%s", set.Shapes[i],
-			of, tune))
+		said.Row(fmt.Sprintf("image %d", i+1), set.Shapes[i]+", "+report.Count(of, "tune",
+			"tunes"))
 	}
-	said.Say(fmt.Sprintf("the file: %d bytes, the core %d, the images %d, the tunes %d,"+
-		" the workspace and the rest %d", len(file), len(core), images, bound,
+	said.Say(fmt.Sprintf("the file: %s, the core %d, the images %d, the tunes %d,"+
+		" the workspace and the rest %d", report.Count(len(file), "byte", "bytes"), len(core),
+		images, bound,
 		len(file)-len(core)-images-bound))
 }
 

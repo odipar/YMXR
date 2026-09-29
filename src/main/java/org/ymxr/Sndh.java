@@ -619,8 +619,8 @@ final class Sndh {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
         made(report, options, names, tunes, sndh);
-        tool.report(sndh.length + " bytes, " + tunes.size()
-                + (tunes.size() == 1 ? " subtune" : " subtunes"));
+        tool.report(Report.count(sndh.length, "byte", "bytes") + ", "
+                + Report.count(tunes.size(), "subtune", "subtunes"));
         Out.write(tool, sndh);
     }
 
@@ -639,7 +639,7 @@ final class Sndh {
         boolean pcrel = (flags & CORE_PCREL) != 0;
         Binaries.Binary binary = Binaries.binary(monitor, lean, pcrel);
         int core = Binaries.core(monitor, lean, pcrel).length;
-        report.say("the core: " + binary.name() + ", " + core + " bytes");
+        report.say("the core: " + binary.name() + ", " + Report.count(core, "byte", "bytes"));
         List<String> switches = new ArrayList<>();
         if (monitor) {
             switches.add("-perf, the raster monitor in");
@@ -662,8 +662,8 @@ final class Sndh {
         report.say("the tags: TITL " + options.title()
                 + (options.composer() == null ? "" : ", COMM " + options.composer())
                 + ", " + tags.clock() + tags.rate() + ", FLAG ~" + tags.flag()
-                + (options.names() == null ? "" : ", !#SN with " + options.names().size()
-                + (options.names().size() == 1 ? " name" : " names")));
+                + (options.names() == null ? ""
+                : ", !#SN with " + Report.count(options.names().size(), "name", "names")));
         Bound.Set set = Bound.of(tunes);
         int bound = 0;
         int images = 0;
@@ -676,12 +676,12 @@ final class Sndh {
             // A subtune is called by the name the multi file records for
             // it; a tune file records none, and one tune is one subtune.
             report.row(names.get(i).isBlank() ? "the tune" : names.get(i),
-                    tunes.get(i).length + " bytes bound to " + b.length + ", its table in "
-                    + "image " + (set.image()[i] + 1));
+                    Report.count(tunes.get(i).length, "byte", "bytes") + " bound to " + b.length
+                    + ", its table in image " + (set.image()[i] + 1));
         }
-        report.say("the images: " + set.images().size()
-                + (set.images().size() == 1 ? " image of " : " images of ") + images
-                + " bytes, DTX's reader once a set of tunes that share one");
+        report.say("the images: " + Report.count(set.images().size(), "image", "images")
+                + " of " + Report.count(images, "byte", "bytes")
+                + ", DTX's reader once a set of tunes that share one");
         // What an image fixes once splits a set into more than one,
         // and only a flag moves the unit, -k on one dump and not another:
         // a tune whose row count or repeat row is odd is padded to the
@@ -692,9 +692,10 @@ final class Sndh {
                 of += which == i ? 1 : 0;
             }
             report.row("image " + (i + 1), set.shapes().get(i) + ", "
-                    + of + (of == 1 ? " tune" : " tunes"));
+                    + Report.count(of, "tune", "tunes"));
         }
-        report.say("the file: " + sndh.length + " bytes, the core " + core + ", the images "
+        report.say("the file: " + Report.count(sndh.length, "byte", "bytes") + ", the core "
+                + core + ", the images "
                 + images + ", the tunes " + bound + ", the workspace and the rest "
                 + (sndh.length - core - images - bound));
     }

@@ -32,7 +32,8 @@ func main() {
 	lines := strings.Count(record, "\n")
 	if said.Says() {
 		kind := record[strings.Index(record, ":\"")+2 : strings.Index(record, "\",\"bytes")]
-		said.Say(fmt.Sprintf("the file: %d bytes, kind %s", len(file), kind))
+		said.Say(fmt.Sprintf("the file: %s, kind %s", report.Count(len(file), "byte", "bytes"),
+			kind))
 		for _, part := range []string{"tag", "tune", "source", "image"} {
 			of := strings.Count(record, "\"part\":\""+part+"\"")
 			if of > 0 {
@@ -44,10 +45,6 @@ func main() {
 			}
 		}
 	}
-	line := " lines"
-	if lines == 1 {
-		line = " line"
-	}
-	t.Report(fmt.Sprintf("%d%s", lines, line))
+	t.Report(report.Count(lines, "line", "lines"))
 	t.WriteBytes([]byte(record))
 }
