@@ -368,6 +368,24 @@ needs it:
   that a reader reports the row it reads, and row 30 of `four-timers` is
   one.
 
+**5.10 The tenth run**, 2026-09-29, against the kit at 15 tunes with the
+clauses of 5.9 in it and a tenth implementer. The reader was 254 lines,
+and a second checker the implementer wrote from the tables of 1.1.2,
+1.1.3, 1.9.1 and 7.3 agreed with every entry. Every record byte for byte,
+`wrong-version` included; `READ.md` named documents alone; and `NOTES.md`
+had 15 entries, none marked *decides output*, so the run passes whole.
+
+Two places changed for entries that left output as it is:
+
+- 1.1.1 and the first sentence of 1.1.4 read a marking bit on every row,
+  the set bit of its column 1 or 0, where 1.1.2's table and 1.9.1 read
+  bit 4 of a control column where the row sets that column, as the
+  player and the reader do. 1.1.4 reads each bit as the table has it,
+  and 1.1.1 names the bits read on every row.
+- 3.1.3 read a source whose C differs from the registers of its target
+  as an error of the file, which 3.3.4's table lacks. The match is a rule
+  of the writer, rule 2(b), and 3.1.3 reads so.
+
 **6. What each tune reaches.**
 
 | tune | what it reaches |

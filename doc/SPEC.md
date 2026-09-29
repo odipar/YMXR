@@ -92,10 +92,10 @@ it (R6.2, section 8).
 (R3.6). Where it is 1 the row sets the column, and a player reads bits 6
 to 0 as the column's clause defines. Where it is 0 the row leaves the
 column unset, and a player leaves bits 6 to 0 unread, other than a bit
-1.1.2 assigns, which 1.1.4 reads; a writer may write any value to those
-bits, other than a bit 1.1.2 assigns and a bit this section leaves
-unassigned. A row may set a column to the value the register already
-has.
+1.1.2 has a player read on every row, which 1.1.4 reads; a writer may
+write any value to those bits, other than a bit 1.1.2 assigns and a bit
+this section leaves unassigned. A row may set a column to the value the
+register already has.
 
 **1.1.2** Nine columns fill their byte with their value: 0, 2, 4, 11, 12,
 17, 21, 25 and 29. Each reserves the value 0 for a row that leaves it
@@ -126,12 +126,14 @@ and writes the column's register where the row sets the column (4.3,
 | 0 | 0 | leaves the column unset |
 | 0 | 1 | sets the column to 0 |
 
-**1.1.4** A player reads a marking bit where 1.1.2's table has it, the
-set bit of the column it is in 1 or 0: a row may set a fine column
-to 0 and leave the coarse column unset (1.2), or mark a period byte 0
-and leave R13 as it is (1.6). Where a row leaves a control column unset,
-a count column of 0 is unset (1.9). Every other bit of a column is part
-of its value, read where the row sets the column.
+**1.1.4** A player reads a marking bit where 1.1.2's table has it and as
+its third column has: bit 6 of a coarse column and bits 6 and 5 of column
+13 on every row, the set bit of the column 1 or 0, so a row may set a fine
+column to 0 and leave the coarse column unset (1.2), or mark a period byte
+0 and leave R13 as it is (1.6); bit 4 of a control column where the row
+sets that column. Where a row leaves a control column unset, a count
+column of 0 is unset (1.9). Every other bit of a column is part of its
+value, read where the row sets the column.
 
 ### 1.2 Tone period
 
@@ -440,14 +442,14 @@ source 0 is the stop (1.8.3).
 | 15 | 1 | 0 |
 | 16 | (C - 1) times align(R) + R | the rows, a column at a time (3.1.3): row n of column i at 16 + i times align(R) + n, align(R) the row count rounded up to a multiple of 2; the last column is R bytes and the table ends; for C = 1 that is R bytes, row n at 16 + n |
 
-**3.1.3** A reader reads a source whose C is the columns of the target
-of every effect that starts it, 1, 2 or 3 (2.1), and whose W is 1;
-another C or W is an error of the file (3.3.4). DTX1 lays a table out
-column by column, so column i of a source of C columns is at 16 + i
-times align(R) (3.1.2), which is the stride DTX1 lays its columns at
-(DTX, SPEC.md 2.2), and a tick reads its columns at that stride. Where R
-is odd, the byte between one column and the next is 0. A source of
-values wider than a byte is left to a later version (section 8).
+**3.1.3** A reader reads a source whose C is 1, 2 or 3 (2.1) and whose W
+is 1; another C or W is an error of the file (3.3.4). A source runs on a
+target of its C registers, a rule of the writer (rule 2(b)). DTX1 lays a
+table out column by column, so column i of a source of C columns is at
+16 + i times align(R) (3.1.2), which is the stride DTX1 lays its columns
+at (DTX, SPEC.md 2.2), and a tick reads its columns at that stride.
+Where R is odd, the byte between one column and the next is 0. A source
+of values wider than a byte is left to a later version (section 8).
 
 **3.1.4** RR below R marks a source that repeats: the tick that reads row
 R - 1 places the next at row RR (5.1). RR equal to R marks a source that
@@ -942,8 +944,8 @@ count; it names source N, the source the writer produced from that kind and
 value, or 0 for a kind 3, a digidrum outside the recording, or a source
 past 127. A source produced from a digidrum plays once; its end row, for a
 start at row r of a source of J rows at the flag's select, divisor D, and
-count C, at H frames a second, is r + (J × D × counted(C) × H + 153,600
-+ 2,457,599) divided by 2,457,600, counted(C) the count the timer counts
+count C, at H frames a second, is r + (J × D × counted(C) × H + 153,600 +
+2,457,599) divided by 2,457,600, counted(C) the count the timer counts
 down, 256 where C is 0 (1.9.1), the arithmetic exact (YMXS, SPEC.md
 6.4).
 

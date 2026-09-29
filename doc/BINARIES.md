@@ -78,8 +78,8 @@ name runs to its zero byte or the file's end.
 | the file is under 8 bytes, or bytes 0 to 3 are other than `YMXM` | `not a YMXM file` |
 | the version is V, other than 3, 4, 5 or 6 | `version V is not 3, 4, 5 or 6` |
 | `N` is outside 1 to 99 | `N tunes, and a multi file has 1 to 99` |
-| 8 + 8`N` is past the file's F bytes | `the entries of N tunes stand past the file's F bytes` |
-| entry i has A or B below 0, or A + B past the file's F bytes | `tune i stands at A for B bytes, and the file has F` |
+| 8 + 8`N` is above F, the file's bytes | `the entries of N tunes stand past the file's F bytes` |
+| entry i has A or B below 0, or A + B above F | `tune i stands at A for B bytes, and the file has F` |
 
 **0.5 Writing.** A tool with tune files and names reports the first
 condition met of the table below; then reads each tune file as SPEC.md
@@ -322,7 +322,9 @@ A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
 
 **3.2 The tag block**, in this order; each text is cleaned to the bytes
-$20 to $7E, the others dropped.
+$20 to $7E, the others dropped. `TIME` is in the block from release
+0.4.15; an SNDH file of an earlier release ends its tags at `FRMS` or
+`!#SN` and then `HDNS`, and a reader reads either (6.3).
 
 | bytes | what they are |
 |---|---|
@@ -666,11 +668,12 @@ U+FFFD, the replacement character, and escapes as `\ufffd`.
 The first line is `{"kind":"K","bytes":F}`, F the file's bytes and K the
 first kind of the four the file meets, read in this order: `multi` where
 bytes 0 to 3 are `YMXM` (0.2), `bound` where they are `YMXB` (1.2),
-`program` where the word at 0 is $601A (4.4), and `sndh` where bytes 12
-to 15 are `SNDH` (3.1). The lines after it are 6.2 to 6.5, by kind.
-Where the file meets none of the four, report `not a file BINARIES.md
-defines: no YMXM, YMXB, $601A or SNDH` and stop; where it breaks a rule
-of 0.4 or 4.5, report that line alone and stop.
+`program` where the word at 0 is $601A (4.4), and `sndh` where bytes 12 to
+15 are `SNDH` (3.1). The lines after it are those of the section of 6.2 to
+6.5 for its kind, in the order that section lists them. Where the file
+meets none of the four, report `not a file BINARIES.md defines: no YMXM,
+YMXB, $601A or SNDH` and stop; where it breaks a rule of 0.4 or 4.5,
+report that line alone and stop.
 
 **6.2 A multi file** (0.2), after the first line:
 
