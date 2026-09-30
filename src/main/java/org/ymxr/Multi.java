@@ -132,7 +132,7 @@ final class Multi {
         int name = INDEX_AT + ENTRY * count;
         if (name > file.length) {
             throw new IllegalArgumentException("the entries of " + count
-                    + " tunes stand past the file's " + file.length + " bytes");
+                    + " tunes end past the file's " + file.length + " bytes");
         }
         List<byte[]> tunes = new ArrayList<>();
         List<String> names = new ArrayList<>();
@@ -140,7 +140,7 @@ final class Multi {
             int at = Tune.getLong(file, INDEX_AT + ENTRY * i);
             int bytes = Tune.getLong(file, INDEX_AT + ENTRY * i + 4);
             if (at < 0 || bytes < 0 || at + bytes > file.length) {
-                throw new IllegalArgumentException("tune " + (i + 1) + " stands at " + at
+                throw new IllegalArgumentException("tune " + (i + 1) + " is at " + at
                         + " for " + bytes + " bytes, and the file has " + file.length);
             }
             tunes.add(Arrays.copyOfRange(file, at, at + bytes));

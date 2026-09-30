@@ -285,7 +285,7 @@ final class ConformanceTest {
             }
         }
         assertTrue(most > 13, "no tune of the kit names a target above 13,"
-                + " so this check reads nothing");
+                + " so this check is empty");
         assertTrue(task.contains("0 to " + most), "TASK.md names targets up to"
                 + " another number than " + most + ", which the kit reaches");
     }

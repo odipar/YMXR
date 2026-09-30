@@ -25,7 +25,7 @@ import (
 // set.
 
 // Effect records one effect's run after a row: source 0 where it runs no
-// source. Touched is true where the row set one of its columns, Timer that the
+// source. Set is true where the row set one of its columns, Timer that the
 // row's control column had bit 6 and Place bit 5.
 type Effect struct {
 	Target  int
@@ -33,7 +33,7 @@ type Effect struct {
 	Select  int
 	Count   int
 	Started bool
-	Touched bool
+	Set     bool
 	Timer   bool
 	Place   bool
 }
@@ -113,9 +113,9 @@ func (m *Replay) Step() {
 			timer = r[t+2]&0x40 != 0
 			place = r[t+2]&0x20 != 0
 		}
-		touched := (r[t]|r[t+1]|r[t+2])&0x80 != 0 || r[t+3] != 0
+		set := (r[t]|r[t+1]|r[t+2])&0x80 != 0 || r[t+3] != 0
 		m.Effect[i] = Effect{Target: target, Source: source, Select: selects,
-			Count: count, Started: started, Touched: touched, Timer: timer, Place: place}
+			Count: count, Started: started, Set: set, Timer: timer, Place: place}
 	}
 	m.EnvelopeWritten = false
 	for i := range m.Written {

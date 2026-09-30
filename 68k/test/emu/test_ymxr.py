@@ -365,7 +365,7 @@ def entry(model, writes):
     e = {}
     for i in range(4):
         fx = model.fx[i]
-        if not fx["touched"]:
+        if not fx["set"]:
             continue
         one = {"target": fx["target"], "source": fx["source"]}
         one["select"] = fx["select"]
@@ -483,7 +483,7 @@ class Model:
         # a stopped timer on the select alone.
         fx["selected"] = False
         fx["reset_place"] = False
-        fx["touched"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
+        fx["set"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
         if r[t + 1] & 0x80:
             source = r[t + 1] & 0x7F
             fx["source"] = source
@@ -771,7 +771,7 @@ class Machine:
     def resume(self, name="play"):
         """The call stopped at an address, run on to the sentinel."""
         at, self.stopped = self.stopped, None
-        assert at is not None, "no call stands at an address"
+        assert at is not None, "no call is at an address"
         self._run(at, name)
         return self._returned(name)
 
@@ -1071,7 +1071,7 @@ def unplaced(code, symbols):
                    "placeReset": column(0, 0)}}]}
     at = built("unplaced", tune)[0]
     frames = check(at, code, symbols)[0]
-    return "a start that moves no place stands at row 0: %d frames" % frames
+    return "a start that moves no place is at row 0: %d frames" % frames
 
 
 def voices(code, symbols):
@@ -1364,7 +1364,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         if cycles and cycles.regions:
             steps.append((cycles.spent["effects"] - spent_before["effects"],
                           cycles.spent["registers"] - spent_before["registers"],
-                          any(model.fx[i]["touched"] for i in range(4)), model.playing))
+                          any(model.fx[i]["set"] for i in range(4)), model.playing))
         assert masked(m.psg) == masked(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
             assert entries[f] == entry(model, want), "frame %d: the reader reports %s, the player %s" % (
@@ -1435,7 +1435,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                 elif model.square(i):
                     at = CODE + symbols["ymxr_sq%d" % i]
                     assert m.byte(at + SQ_VAL) == model.value(i), \
-                        "frame %d: effect %d's square stands at %02x, not %02x" % (
+                        "frame %d: effect %d's square is at %02x, not %02x" % (
                             f, i, m.byte(at + SQ_VAL), model.value(i))
                     assert m.byte(at + SQ_SEL) == fx["using"], \
                         "frame %d: effect %d's square selects R%d, not R%d" % (
@@ -1515,7 +1515,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
             elif model.square(i):
                 at = CODE + symbols["ymxr_sq%d" % i]
                 assert m.byte(at + SQ_VAL) == model.value(i), \
-                    "frame %d: after a tick effect %d's square stands at %02x, not %02x" % (
+                    "frame %d: after a tick effect %d's square is at %02x, not %02x" % (
                         f, i, m.byte(at + SQ_VAL), model.value(i))
             elif model.onerow(i):
                 at = CODE + symbols["ymxr_one%d" % i]
@@ -3024,7 +3024,7 @@ def main():
         raise SystemExit("%d of %d tunes failed: %s"
                          % (len(wrong), played, ", ".join(wrong)))
     print("%d tunes play as the specification reads%s" % (
-        played, ", and %d of another format stands outside the run: %s"
+        played, ", and %d of another format is outside the run: %s"
         % (len(another), ", ".join(another)) if another else ""))
 
 

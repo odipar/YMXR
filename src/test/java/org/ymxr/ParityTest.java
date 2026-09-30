@@ -503,7 +503,7 @@ final class ParityTest {
         Ran go = ran(built(), "ymxs-to-ymxr", fast, "-silent");
         assertEquals(java.exit(), go.exit(), "both trees exit 1: " + go.said());
         assertEquals(steady(java.said()), steady(go.said()), "both write one line");
-        assertEquals(0, java.out().length, "a fault writes no bytes");
+        assertEquals(0, java.out().length, "a fault leaves standard output empty");
     }
 
     /**

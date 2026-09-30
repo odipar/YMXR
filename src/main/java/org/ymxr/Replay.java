@@ -21,10 +21,10 @@ import org.dtx.Table;
 final class Replay {
 
     /** What one effect runs after a row: source 0 where it runs no source.
-     *  {@code touched} marks the row that set one of its columns, {@code timer}
+     *  {@code set} marks the row that set one of its columns, {@code timer}
      *  that the row's control column had bit 6 and {@code place} bit 5. */
     record Effect(int target, int source, int select, int count, boolean started,
-                  boolean touched, boolean timer, boolean place) {
+                  boolean set, boolean timer, boolean place) {
         static final Effect NONE = new Effect(0, 0, 0, 0, false, false, false, false);
     }
 
@@ -89,8 +89,8 @@ final class Replay {
                 timer = (r[t + 2] & 0x40) != 0;
                 place = (r[t + 2] & 0x20) != 0;
             }
-            boolean touched = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0;
-            effect[i] = new Effect(target, source, select, count, started, touched, timer, place);
+            boolean set = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0;
+            effect[i] = new Effect(target, source, select, count, started, set, timer, place);
         }
         envelopeWritten = false;
         Arrays.fill(written, -1);

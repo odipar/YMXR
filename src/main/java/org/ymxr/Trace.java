@@ -69,7 +69,7 @@ final class Trace {
             first = true;
             for (int i = 0; i < 4; i++) {
                 Replay.Effect e = model.effect[i];
-                if (!e.touched()) {
+                if (!e.set()) {
                     continue;
                 }
                 line.append(first ? "" : ",").append('"').append(i).append("\":{\"target\":")

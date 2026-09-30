@@ -351,7 +351,7 @@ final class Prg {
     private static int sized(int subtunes, String name, int at) {
         if (subtunes < 0) {
             throw new IllegalArgumentException("the SNDH file's " + name + " tag at " + at
-                    + " stands before the '##' count that sizes it");
+                    + " comes before the '##' count that sizes it");
         }
         return subtunes;
     }

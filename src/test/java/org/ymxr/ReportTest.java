@@ -134,7 +134,7 @@ final class ReportTest {
         assertArrayEquals(said.written().file(), with.written().file(),
                 "a reporting conversion writes the file a silent one writes");
         assertEquals("", silent.said(), "the flag it names leaves the output empty");
-        assertFalse(saying.said().isEmpty(), "and without it the account stands");
+        assertFalse(saying.said().isEmpty(), "and without it the account is reported");
         assertFalse(new Report().says(), "the report a library caller passes is silent");
     }
 
@@ -239,8 +239,8 @@ final class ReportTest {
         assertEquals("", err[1].replace(before, "").replace(after, ""),
                 "a silent run prints its notes alone: " + err[1]);
         assertTrue(err[0].contains("note: padded: 1 unset row at row 177"),
-                "the note stands either way: " + err[0]);
+                "the note is there either way: " + err[0]);
         assertEquals(2, err[0].lines().filter(l -> l.contains("note: padded:")).count(),
-                "and each stands once: " + err[0]);
+                "and each is there once: " + err[0]);
     }
 }

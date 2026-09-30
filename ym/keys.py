@@ -156,7 +156,7 @@ def main() -> int:
     if not wrong:
         print(f'OK  every key of BINARIES.md 4.6 step 4, over {TUNES} subtunes')
     if '--keep' in sys.argv:
-        print(f'the work stands under {work}')
+        print(f'the work is under {work}')
     else:
         shutil.rmtree(work, ignore_errors=True)
     return 1 if wrong else 0

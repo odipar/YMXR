@@ -77,7 +77,7 @@ final class BinariesConformanceTest {
         under.sort(null);
         List<String> sorted = new ArrayList<>(listed);
         sorted.sort(null);
-        assertEquals(sorted, under, "the manifest lists what stands under the kit");
+        assertEquals(sorted, under, "the manifest lists what is under the kit");
     }
 
     @Test

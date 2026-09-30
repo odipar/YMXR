@@ -226,7 +226,7 @@ final class Check {
         try {
             return new Result(path, true, of(YmDump.read(data), flags));
         } catch (RuntimeException failed) {
-            return new Result(path, true, List.of("the converter refuses it: "
+            return new Result(path, true, List.of("the converter fails on it: "
                     + failed.getMessage()));
         }
     }

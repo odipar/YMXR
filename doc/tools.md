@@ -387,7 +387,7 @@ reckons.
 
 **8.4 A file that fails to read** is a verdict of one line: `unreadable:
 <message>`, `the archive does not unpack: <message>`, or `the converter
-refuses it: <message>` for a dump the converter rejects. A flag
+fails on it: <message>` for a dump the converter rejects. A flag
 outside the converter's is that verdict with the message `not a flag of
 the tool: X`, exit 1, in place of the wrong call of 3.2 (19.5).
 
@@ -491,9 +491,9 @@ tune, then `ymxr-multi: N tunes, B bytes`.
 read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
 with the line, exit 1: a version word other than 3 to 6, `version V is not
 3, 4, 5 or 6`; a count outside 1 to 99, `N tunes, and a multi file has 1 to
-99`; an index past the file's end, `the entries of N tunes stand past the
-file's B bytes`; an entry outside the file, `tune N stands at A for B bytes,
-and the file has F`, A its offset.
+99`; an index past the file's end, `the entries of N tunes end past the
+file's B bytes`; an entry outside the file, `tune N is at A for B bytes, and
+the file has F`, A its offset.
 
 ---
 
@@ -528,7 +528,7 @@ prints the text as passed.
 |---|---|
 | the multi file fails to read | the line of 11.4 |
 | zero tune files | `no tune files: an SNDH file has one subtune at least` |
-| more than 99 | `N tune files: the '##' tag's two digits hold at most 99 subtunes` |
+| more than 99 | `N tune files: the '##' tag's two digits count at most 99 subtunes` |
 | subtune N fails to read | `subtune N: <message>` |
 | subtune 1 has a rate of 0 | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | subtune N has a rate other than subtune 1's | `subtune N plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
@@ -584,7 +584,7 @@ starts the next subtune where a subtune that plays once has ended.
 **13.2 Errors**, each exit 1: the lines of BINARIES.md 4's tag reader
 for a file outside the layout (`not an SNDH file: no SNDH at 12`, `the
 SNDH file's tags have no '##' subtune count`, `the SNDH file's tags have
-no TC or !V rate`, `the SNDH file's FRMS tag at A stands before the '##'
+no TC or !V rate`, `the SNDH file's FRMS tag at A comes before the '##'
 count that sizes it`, the same with `TIME` and with `!#SN`, `the SNDH
 file's tag X at A is not one this reads`, `not an SNDH file: no HDNS
 ends its tags`, `the SNDH file has no core: no YMXS past its tags`, `the
@@ -914,7 +914,7 @@ off the path or the Java tree is unbuilt.
 | a dump whose slots name a 128th source | the counted note `N effect frames dropped: a tune names at most 127 sources` | `... at most 0 sources` |
 | `ymxr-check` on a named file that is absent | the verdict `unreadable: <message>`, counted as a dump, exit 1 | the error `<stat message>`, exit 2, before any verdict |
 | `ymxr-check` on a named file that is present and fails to read | `unreadable: <message>` | `unreadable: <file name>` |
-| `ymxr-check` with a flag the converter rejects | the verdict `the converter refuses it: not a flag of the tool: X` (8.4) | the verdict `not a flag of the tool: X` |
+| `ymxr-check` with a flag the converter rejects | the verdict `the converter fails on it: not a flag of the tool: X` (8.4) | the verdict `not a flag of the tool: X` |
 | `ymxr-check` on an LHA archive that fails to unpack | `the archive does not unpack: <message>`, counted as a dump | `not a YM3!/YM3b/YM5!/YM6! dump`, uncounted |
 | `ymxr-check` on several files | read in parallel | read in order |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |

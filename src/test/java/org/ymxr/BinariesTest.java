@@ -61,12 +61,12 @@ final class BinariesTest {
         assertEquals(Bound.VERSION_WIDE_COUNTED, Tune.getWord(core, 18),
                 "the highest bound tune version the core reads");
         assertEquals(PlayerTest.equates().get("YMXR_FIXED"), Tune.getWord(core, 20),
-                "the workspace's fixed bytes are the player's own");
+                "the workspace's fixed bytes are the player's");
         assertEquals(flags, Tune.getWord(core, 22), "the flags word");
         assertEquals(0, Tune.getWord(core, 26));
         int state = Tune.getWord(core, 24);
         assertTrue(state >= Sndh.CORE_DESCRIPTOR && state < core.length,
-                "the state byte stands at " + state);
+                "the state byte is at " + state);
         assertEquals(0, Tune.getLong(core, 28));
         assertEquals(0, Tune.getLong(core, 32));
         for (int entry = 0; entry < 12; entry += 4) {
@@ -229,7 +229,7 @@ final class BinariesTest {
                 at = to + 1;
             } else if (name.equals("FRMS")) {
                 order.add(name);
-                assertTrue(subtunes >= 0, "'##' stands before FRMS");
+                assertTrue(subtunes >= 0, "'##' comes before FRMS");
                 at += 4;
                 frames = new int[subtunes];
                 for (int i = 0; i < subtunes; i++) {
@@ -238,7 +238,7 @@ final class BinariesTest {
                 at += 4 * subtunes;
             } else if (name.equals("TIME")) {
                 order.add(name);
-                assertTrue(subtunes >= 0, "'##' stands before TIME");
+                assertTrue(subtunes >= 0, "'##' comes before TIME");
                 at += 4;
                 seconds = new int[subtunes];
                 for (int i = 0; i < subtunes; i++) {
@@ -247,7 +247,7 @@ final class BinariesTest {
                 at += 2 * subtunes;
             } else if (name.equals("!#SN")) {
                 order.add(name);
-                assertTrue(subtunes >= 0, "'##' stands before !#SN");
+                assertTrue(subtunes >= 0, "'##' comes before !#SN");
                 int base = at;
                 at += 4 + 2 * subtunes;
                 for (int i = 0; i < subtunes; i++) {
@@ -310,7 +310,7 @@ final class BinariesTest {
             tuneAt[i] = Tune.getLong(sndh, header + tableAt + 2 + 4 * i);
             assertEquals(0, tuneAt[i] & 1, "subtune " + (i + 1) + " on an even address");
             assertEquals(next, tuneAt[i],
-                    "subtune " + (i + 1) + " follows what stands before it");
+                    "subtune " + (i + 1) + " follows what comes before it");
             next = Sndh.even(tuneAt[i] + set.tunes().get(i).length);
         }
         int[] imageAt = new int[set.images().size()];
@@ -423,7 +423,7 @@ final class BinariesTest {
         assertEquals("abcdy", tags.flag());
         assertEquals(60, tags.rate());
         assertEquals(List.of("TITL", "CONV", "##", "!V", "FLAG", "FRMS", "TIME", "HDNS"),
-                tags.order(), "the clock tag stands where TC would");
+                tags.order(), "the clock tag is where TC would be");
         // effects 0 to 3 run Timers A, D, B and C
         assertEquals("~ay", Sndh.flag(Sndh.claims(1)));
         assertEquals("~dy", Sndh.flag(Sndh.claims(2)));
@@ -441,7 +441,7 @@ final class BinariesTest {
         Tags claimed = tags(Sndh.of(List.of(tune("four-timers")), options));
         assertEquals("!V", claimed.clock(), "a host cannot call play from a claimed timer");
         assertEquals("abcdy", claimed.flag());
-        assertEquals(60, claimed.rate(), "the clock tag carries the rate either way");
+        assertEquals(60, claimed.rate(), "the clock tag has the rate either way");
         assertEquals("TC50", Sndh.clock(Sndh.claims(0), 50, Sndh.Asked.CHOSEN));
         assertEquals("TC50", Sndh.clock(Sndh.claims(1 | 2 | 4), 50, Sndh.Asked.CHOSEN),
                 "Timers A, D and B");
@@ -667,7 +667,7 @@ final class BinariesTest {
         // the same tunes on the core as it is, whose tunes end within
         // the reach
         assertTrue(Sndh.of(files, options).length > 0,
-                "the core as assembled takes the tunes it ends in reach of");
+                "the core as assembled packs the tunes that end within its reach");
     }
 
     @Test

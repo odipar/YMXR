@@ -166,7 +166,7 @@ final class Sndh {
                     + " at least");
         }
         if (n > MAX_SUBTUNES) {
-            throw new IllegalArgumentException(n + " tune files: the '##' tag's two digits hold"
+            throw new IllegalArgumentException(n + " tune files: the '##' tag's two digits count"
                     + " at most " + MAX_SUBTUNES + " subtunes");
         }
         List<String> names = options.names();

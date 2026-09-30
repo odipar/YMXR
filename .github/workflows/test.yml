@@ -1,4 +1,4 @@
-# The Java suite, run by hand. The Python rigs under 68k/test/emu stand
+# The Java suite, run by hand. The Python rigs under 68k/test/emu are
 # outside it but for the one RigCallsTest drives; doc/tools.md lists them.
 name: test
 
@@ -37,7 +37,7 @@ jobs:
       # This tree resolves DTX and YMXS out of the local repository
       # alone, since pom.xml names no <repositories>: both are built here
       # at the release pom.xml requires, read from pom.xml so the two
-      # cannot drift. DTX assembles its images, so rmac stands above this.
+      # cannot drift. DTX assembles its images, so rmac is installed above this.
       - name: DTX and YMXS at the releases pom.xml requires
         run: |
           dtx=$(grep -A1 '<artifactId>dtx</artifactId>' pom.xml \
@@ -81,7 +81,7 @@ jobs:
         run: python3 68k/test/emu/test_ymxr.py -cycles -abs
       # -stub and -hatari play the tunes on a real MFP, under Hatari. Its
       # version is pinned, built from its tag and kept between runs: the rig
-      # reads Hatari's trace, whose lines 2.4.1, the version Ubuntu carries,
+      # reads Hatari's trace, whose lines 2.4.1, the version Ubuntu ships,
       # writes another way. TOS 2.06, the image a caller runs them under,
       # is Atari's; EmuTOS is free, and its PAL image boots the ST at the
       # 50 Hz the two modes require.

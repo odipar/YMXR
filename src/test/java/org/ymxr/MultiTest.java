@@ -58,10 +58,10 @@ final class MultiTest {
             int at = Tune.getLong(file, Multi.INDEX_AT + 8 * i);
             int bytes = Tune.getLong(file, Multi.INDEX_AT + 8 * i + 4);
             assertEquals(tunes.get(i).length, bytes, "entry " + i + " measures its tune file");
-            assertEquals(0, at % 2, "and stands on a long");
+            assertEquals(0, at % 2, "and is at an even offset");
             assertArrayEquals(tunes.get(i),
                     Arrays.copyOfRange(file, at, at + bytes),
-                    "the tune file stands where the entry says");
+                    "the tune file is at the offset of its entry");
         }
     }
 
@@ -93,6 +93,6 @@ final class MultiTest {
         byte[] file = Multi.of(List.of(tune), List.of("one"));
         byte[] cut = Arrays.copyOf(file, Multi.INDEX_AT + 4);
         assertThrows(IllegalArgumentException.class, () -> Multi.read(cut),
-                "a file its entries stand past");
+                "a file its entries end past");
     }
 }

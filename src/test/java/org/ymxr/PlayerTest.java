@@ -152,7 +152,7 @@ final class PlayerTest {
     void theBoundTuneIsLaidOutAsBinariesDefines() throws IOException {
         Map<String, Integer> said = layout(Files.readString(BINARIES), "1. The bound tune");
         Map<String, Integer> e = equates();
-        assertEquals(0, row(said, "`YMXB`").getValue(), "the magic stands first");
+        assertEquals(0, row(said, "`YMXB`").getValue(), "the magic comes first");
         assertEquals(e.get("TF_VERSION"), row(said, "the version").getValue());
         assertEquals(e.get("TF_RATE"), row(said, "the frame rate").getValue());
         assertEquals(e.get("TF_EFFECTS"), row(said, "effects used").getValue());
@@ -278,7 +278,7 @@ final class PlayerTest {
             assertEquals(lean, equate, row + " is measured at " + lean
                     + " cycles with neither switch, and the player has " + equate);
             assertEquals(full, lean + drop + END, row + " is measured at " + full
-                    + " cycles as it stands, and the lean path plus the level and the end"
+                    + " cycles as it is, and the lean path plus the level and the end"
                     + " of interrupt is " + (lean + drop + END));
         }
     }

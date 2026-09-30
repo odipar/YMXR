@@ -73,7 +73,7 @@ func Trace(tune ymxr.File, calls int) []byte {
 		first = true
 		for i := 0; i < 4; i++ {
 			e := model.Effect[i]
-			if !e.Touched {
+			if !e.Set {
 				continue
 			}
 			if !first {

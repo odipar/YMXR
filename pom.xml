@@ -14,8 +14,8 @@
         <maven.compiler.release>23</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- The assembler that builds the SNDH core and the program stub
-             the tools combine with bound tunes. Nothing else in the build
-             runs it. -->
+             the tools combine with bound tunes; the build runs it for those
+             two alone. -->
         <rmac>rmac</rmac>
         <jspecify.version>1.0.0</jspecify.version>
         <errorprone.version>2.36.0</errorprone.version>
