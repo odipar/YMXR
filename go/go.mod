@@ -6,8 +6,8 @@ go 1.26
 // twenty-two images, and YMXS's tune data structure. Both are at the
 // releases the pom names for their Java artifacts.
 require (
-	github.com/odipar/dtx/go v0.11.11
-	github.com/odipar/ymxs/go v0.4.7
+	github.com/odipar/dtx/go v0.11.12
+	github.com/odipar/ymxs/go v0.4.9
 )
 
 require github.com/odipar/st4/go v0.1.11 // indirect

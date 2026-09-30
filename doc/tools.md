@@ -878,10 +878,10 @@ BINARIES.md is absent from `target/classes/org/ymxr/68k`, or a file under
 `mvn -q process-classes dependency:build-classpath` with standard input
 closed, under the lock `target/.building`, a directory one process creates
 and the others wait for, one second at a time, up to 180 seconds, after
-which a waiting process writes `run: a build has held <lock> for three
+which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
-needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.11.11`
-and YMXS `0.4.7` in the local Maven repository, `mvn install` in each
+needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.11.12`
+and YMXS `0.4.9` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
 so that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
@@ -894,7 +894,7 @@ run test.yml`.
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images
 embedded; it runs by itself. The Go tree requires the modules
-`github.com/odipar/dtx/go v0.11.11` and `github.com/odipar/ymxs/go v0.4.7`,
+`github.com/odipar/dtx/go v0.11.12` and `github.com/odipar/ymxs/go v0.4.9`,
 which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and

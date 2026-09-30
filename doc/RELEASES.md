@@ -34,6 +34,46 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.18, 2026-09-30
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.18>, built from the commit
+tagged `v0.4.18`.
+
+The tools read DTX 0.11.12 and YMXS 0.4.9, a count of 1 reads in the
+singular, and the lines they report read the plain verb. A file a tool
+writes is the bytes it was: over the eleven dumps under `ym/test`, through
+`ym-to-ymxr`, `ym-to-ymxs`, `ymxr-bind`, `ymxr-sndh`, `ymxr-prg` and
+`ymxs-to-prg`, 66 outputs of 66 match those of the 0.4.17 executables.
+The 68000 sources moved comments and one label, so the nine 68000
+binaries are 0.4.17's.
+
+- **The libraries.** `pom.xml` and `go.mod` name DTX 0.11.12 and YMXS
+  0.4.9, where 0.4.17 named DTX 0.11.10 and YMXS 0.4.4, and the Go tree
+  reads ST4 0.1.11 beside them, which DTX requires. A line DTX or YMXS
+  reports through a tool here reads as those releases word it.
+- **The report.** A count of 1 reads in the singular: a dump of one frame
+  reads `1 frame` and its table `1 row`, and a set of one tune `1 tune in
+  a multi file`. The Go `ym-to-ymxs` prints a dump's name as it is, where
+  0.4.17 quoted it with Go's escapes.
+- **Reworded lines.** `the table is at A to B, and the file has F bytes`,
+  `source N is at A to B`, `tune N is at A for B bytes` and `the entries
+  of N tunes end past the file's F bytes`, where 0.4.17 read `stands at`
+  and `stand past`; `the SNDH file's FRMS tag at A comes before the '##'
+  count that sizes it`; `the '##' tag's two digits count at most 99
+  subtunes`; the verdict `the converter fails on it: <message>` of
+  `ymxr-check`; and `run: a build has kept <lock> for three minutes`.
+  SPEC.md, BINARIES.md and tools.md quote the new lines.
+- **The Go module.** The flag of an effect whose row set one of its
+  columns is `trace.Effect.Set`, where 0.4.17 named it `Touched`, and a
+  caller of `go/trace` changes with it. `report.Count` is new.
+
+The workflow plays the tunes on Hatari's MFP, the suite plays every core
+and the kit on the rig, the documents read what was measured, both
+conformance kits read again cold, and a stale assembler listing is
+dropped.
+
+Checks: `bin/suite` green, 195 tests and 0 skipped.
+
 ### 0.4.17, 2026-09-23
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.17>, built from the commit
