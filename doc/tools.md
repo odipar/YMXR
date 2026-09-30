@@ -69,7 +69,7 @@ its noun, singular for a count of 1 and plural for any other: `1 row`,
 | `ymxs-to-ymxr` | a structure | a tune file, or a multi file (BINARIES.md 0) of several | `-kK`, `-mN`, `-copies[S]` |
 | `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
 | `ymxs-to-prg` | a structure | a TOS program (BINARIES.md 4) | the flags of `ymxs-to-sndh` and `-rROWS` |
-| `ymxr-check` | a dump, or the files named | one verdict a dump, on standard output | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
+| `ymxr-check` | a dump or a tune file, or the files named | one verdict a file, on standard output | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
 | `ymxr-layout` | a multi file, a bound tune, an SNDH file or a program | the record of BINARIES.md 6 | - |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
@@ -346,17 +346,19 @@ omits a summary line.
 
 ## 8. ymxr-check
 
-**8.1** The input is a dump on standard input, or the files the
-arguments name: a file named is read as a dump, and for a directory
-named every file directly under it whose name ends `.ym` in either case,
-in name order. The flags are those of `ym-to-ymxr`; the dump is
-converted at them and the conversion replayed against the dump (8.3).
+**8.1** The input is a dump or a tune file on standard input, or the
+files the arguments name, and for a directory named every file directly
+under it whose name ends `.ym` or `.ymxr` in either case, in name order.
+A file whose first four bytes are `YMXR` is read as a tune file (8.7),
+and every other file as a dump. The flags are those of `ym-to-ymxr`; a
+dump is converted at them and the conversion replayed against the dump
+(8.3).
 
 **8.2 The verdict** of a dump is written on standard output: `<name>:
 replays to its dump`, or `<name>:` and one line of 8.3 under it, each
 two spaces in; `<name>` is `standard input` or the file's name. A file
-that is other than a dump after unpacking is `<name>: not a
-YM3!/YM3b/YM5!/YM6! dump`.
+that is neither a dump after unpacking nor a tune file is `<name>:
+neither a YM3!/YM3b/YM5!/YM6! dump nor a tune file`.
 
 **8.3 The check** converts the dump as `ym-to-ymxr` does, reads the tune
 file back, and steps a model of SPEC.md 4 through one pass and one loop
@@ -397,14 +399,36 @@ the tool: X`, exit 1, in place of the wrong call of 3.2 (19.5).
 **8.5 Several files.** The report is the heading `N files to read`,
 then `, at <flags>` where flags were passed; the progress lines `read`
 (1.8); the verdicts in the order the arguments name the files, a
-directory's `.ym` files sorted by name within it; and on standard output
-after them `N dumps, M wrong`, then `, K files not a dump` where K is
-above 0. The Java tree reads the files in parallel, the Go tree in
-order; the verdicts are in that order in both.
+directory's `.ym` and `.ymxr` files sorted by name within it; and on
+standard output after them `N dumps, M wrong`, then `, T tune files, U
+wrong` where T is above 0, then `, K files neither a dump nor a tune
+file` where K is above 0. The Java tree reads the files in parallel, the
+Go tree in order; the verdicts are in that order in both.
 
-**8.6 The exit** is 0 where every dump replays, 1 where any dump fails or
-standard input is other than a dump, and 2 where a directory fails to
-list or, in the Go tree, a named file fails to stat (19.5).
+**8.6 The exit** is 0 where every dump replays and every tune file
+follows rule 3, 1 where any dump fails, any tune file has a line of 8.7,
+or standard input is neither, and 2 where a directory fails to list or,
+in the Go tree, a named file fails to stat (19.5).
+
+**8.7 A tune file** is read as SPEC.md 3.3 defines, and its starts against
+rule 3 of SPEC.md 6: its verdict is `<name>: every start follows rule 3`,
+or `<name>:` and a line under it for each start that leaves bit 5 of the
+control column at 0 outside rule 3(a), in row order, where the place can
+be a row the source started lacks (SPEC.md 8.4). The rows are read in
+frame order, once from row 0 and once from the repeat row after the
+wrap, with the kept target of SPEC.md 4.1 and 4.5, since every later
+pass reads as the second does. A tune file that fails to read is the
+line `the tune file does not read: <message>`, the message a line of
+SPEC.md 3.3.4. The lines, `r` the row, `i` the effect, `S` the source,
+`N` its row count and `T` the kept target:
+
+| line | condition |
+|---|---|
+| `r: effect i starts source S of N rows on target T with bit 5 at 0, and no source has started on the effect` | no start before it on the effect |
+| `r: effect i starts source S of N rows on target T with bit 5 at 0, and the source last started ran on target T2` | the start before it ran on another target |
+| `r: effect i starts source S of N rows on target T with bit 5 at 0, and the source last started had M rows` | the start before it had another row count |
+| the last two with `after the wrap` after `and` | the first start at or after the repeat row, against the table's last start |
+| `r: effect i starts source S, and the file has K sources` | S is past the file's source count (SPEC.md 8.5) |
 
 ---
 
@@ -918,7 +942,7 @@ off the path or the Java tree is unbuilt.
 | `ymxr-check` on a named file that is absent | the verdict `unreadable: <message>`, counted as a dump, exit 1 | the error `<stat message>`, exit 2, before any verdict |
 | `ymxr-check` on a named file that is present and fails to read | `unreadable: <message>` | `unreadable: <file name>` |
 | `ymxr-check` with a flag the converter rejects | the verdict `the converter fails on it: not a flag of the tool: X` (8.4) | the verdict `not a flag of the tool: X` |
-| `ymxr-check` on an LHA archive that fails to unpack | `the archive does not unpack: <message>`, counted as a dump | `not a YM3!/YM3b/YM5!/YM6! dump`, uncounted |
+| `ymxr-check` on an LHA archive that fails to unpack | `the archive does not unpack: <message>`, counted as a dump | `neither a YM3!/YM3b/YM5!/YM6! dump nor a tune file`, uncounted |
 | `ymxr-check` on several files | read in parallel | read in order |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |
 
