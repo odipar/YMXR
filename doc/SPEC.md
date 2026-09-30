@@ -858,10 +858,10 @@ exception, and sets bit 6 where the timer is stopped** (YMXS rules 3
 and 4).
 
 - 3(a) The exception: the source started has the row count of the source
-  last started on the effect, on the same kept target. The row may then
-  leave bit 5 at 0, and the place is left at its row number (1.8.4); a
-  stop between the two starts leaves the place as it is (YMXS, SPEC.md
-  3.4.3).
+  last started on the effect in frame order, through the wrap (4.5), on
+  the same kept target. The row may then leave bit 5 at 0, and the place
+  is left at its row number (1.8.4); a stop between the two starts leaves
+  the place as it is (YMXS, SPEC.md 3.4.3).
 - 3(b) A timer is stopped before its first start, after a stop, and
   after its source that plays once has run out (5.1 step 5). Where the
   rows leave open whether a source has run out at the start row, bit 6

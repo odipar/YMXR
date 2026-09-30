@@ -36,7 +36,7 @@ columns, source markers or counts, and timer assignments.
 |---|---|
 | a row's registers | each in its column, with the set bit, and the bit beside it where a column that fills its byte is 0 (1.1, 1.2, 1.7) |
 | a count of 0 | the count column at 0, and bit 4 of the control column beside it, which marks that 0 as the value the MFP counts 256 for (1.1, 1.9) |
-| `Start` | source; target if changed; control and count if a reset is set, the rate changes or the timer may be stopped |
+| `Start` | source; target if changed; control and count if a reset is set, or the place's reset below, the rate changes or the timer may be stopped |
 | `Retune` | control if the select changes, a reset is set or the count changes to 0; count if changed |
 | `Stop` | the source column at `$80`, the rate columns left unset (1.8) |
 | a source | a column a register of its target (3.1.3), repeating at its repeat row: bit 7 of the marker's column set on the last row (3.2), or, where that register reads its whole byte, rows a player counts and bit 31 of the index entry (3.1.6) |
@@ -53,6 +53,19 @@ as running only where its previous source repeats and no row stopped it.
 
 The player's kept values run through the wrap, so the repeat row writes
 its targets again.
+
+## The place's reset
+
+A start with `placeReset` clear leaves bit 5 of its control column at 0
+where the start is inside rule 3(a) of SPEC.md 6: the start before it on
+the same timer ran a source of its row count on its target. Every other
+start has bit 5 set, so the place is row 0 there, as on a start with the
+reset, where the place a player keeps could be a row the source lacks
+(SPEC.md 8.4). From the second pass on, the first start on a timer at or
+after the repeat row follows the last start of the table, so bit 5 is set
+there where that start differs as well. YMXS's check reads the first pass
+alone (YMXS, SPEC.md 6.3), so a tool warns of each of these starts but
+that one (tools.md 7.2).
 
 ## What is an error
 

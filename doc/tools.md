@@ -308,7 +308,10 @@ row where it arises:
 finding of YMXS's check of the writing rules (YMXS, SPEC.md 6.3) is a
 line `<tool>: warning: <finding>`, with `tune N: ` between `warning: `
 and the finding where the multi has more than one tune. `-silent` leaves
-them.
+them. A start of such a finding under rule 3, `placeReset` clear outside
+rule 3(a), is written with bit 5 of its control column set, and so is the
+start at or after the repeat row that only the wrap puts outside rule
+3(a) (ymxs.md): the place is row 0 there.
 
 **7.3 The tune file** of a tune is named by the tune's title (4.6). The
 report per tune: the packing report (4.5), then the row
