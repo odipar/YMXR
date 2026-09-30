@@ -129,6 +129,58 @@ final class YmxsTest {
         assertEquals(0, column[count][3] & 0xFF, "and leaves the count unwritten");
     }
 
+    /**
+     * Starts outside rule 3(a) of SPEC.md 6, and one inside it. The tune
+     * repeats to row 1, so the start there follows the last start on its
+     * timer after the wrap, where it follows the start of row 0 before.
+     */
+    static Tune outsideRule3a() {
+        org.ymxs.YMXS.Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        org.ymxs.YMXS.Single soft = Tunes.repeating("square 6", List.of(6, 0), 0);
+        org.ymxs.YMXS.Single four = Tunes.repeating("four rows", List.of(9, 10, 11, 12), 0);
+        Timing stopped = new Timing(Chip.prescaler(4), 100, true, true);
+        Timing kept = new Timing(Chip.prescaler(4), 100, false, false);
+        List<Row> rows = new ArrayList<>();
+        Map<Timer, Effect> first = new EnumMap<>(Timer.class);
+        first.put(Timer.A, new StartOne(Tunes.setting(Register.R8), loud, stopped));
+        first.put(Timer.D, new StartOne(Tunes.setting(Register.R10), soft,
+                new Timing(Chip.prescaler(4), 100, true, false)));
+        rows.add(new Row(Map.of(), first));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), soft, kept)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), four, kept)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R9), four, kept)));
+        rows.add(row(Map.of(), Timer.D, new StartOne(Tunes.setting(Register.R10), loud, kept)));
+        rows.add(new Row(Map.of(), Map.of()));
+        return built(rows, 1);
+    }
+
+    @Test
+    void aStartOutsideRule3aIsWrittenWithThePlaceReset() {
+        Tune tune = outsideRule3a();
+        byte[][] column = Schema.of(tune).columns().column;
+        int a = Columns.EFFECT + 2;
+        int d = Columns.EFFECT + 4 + 2;
+        assertEquals(Columns.PLACE_RESET, column[d][0] & Columns.PLACE_RESET,
+                "row 0 starts on a timer that has run none");
+        assertEquals(Columns.PLACE_RESET, column[a][1] & Columns.PLACE_RESET,
+                "row 1 matches the start before it, and the wrap reaches it from"
+                        + " row 3's start on another target");
+        assertEquals(Columns.PLACE_RESET, column[a][2] & Columns.PLACE_RESET,
+                "row 2 starts a source of another row count");
+        assertEquals(Columns.PLACE_RESET, column[a][3] & Columns.PLACE_RESET,
+                "row 3 starts on another target");
+        assertEquals(0, column[d][4] & Columns.PLACE_RESET,
+                "row 4 matches the start before it, and the wrap reaches it from"
+                        + " itself");
+        // YMXS's check reads the first pass, so its lines of rule 3 are of
+        // rows 0, 2 and 3, and row 1 is a breach only after the wrap
+        List<String> warned = org.ymxs.Check.writing(tune).stream()
+                .filter(line -> line.contains("without the place's reset")).toList();
+        assertEquals(List.of("row 0:", "row 2:", "row 3:"), warned.stream()
+                .map(line -> line.substring(0, line.indexOf(':') + 1)).toList(),
+                warned.toString());
+    }
+
     @Test
     void aStartOnATimerAtTheRateItCountsSetsNoRateColumn() {
         org.ymxs.YMXS.Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);

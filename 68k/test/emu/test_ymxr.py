@@ -1046,15 +1046,50 @@ def built(name, tune):
     return at, struct.unpack(">H", r.stdout[4:6])[0]
 
 
+def unplace(at, row, effect):
+    """The tune file at `at` with bit 5 of effect `effect`'s control column
+    cleared on `row`: a start that moves no place. ymxs-to-ymxr writes the
+    place's reset on every start outside rule 3(a) of SPEC.md 6
+    (doc/ymxs.md), so a tune file of another writer is made here. The row
+    table goes through dtx-write -text and back, packed at the unit and
+    ring ymxs-to-ymxr packs at, and the sources' tables follow it on a
+    long, their index entries moved by as many bytes (SPEC.md 3.3)."""
+    f = open(at, "rb").read()
+    table_at = long_at(f, 12)
+    entries = [long_at(f, 16 + 4 * i) for i in range(f[9])]
+    first = entries[0] & ~COUNTED if entries else len(f)
+    r = subprocess.run([DTX_WRITE, "-text"], input=f[table_at:first],
+                       capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    lines = r.stdout.decode().split("\n")
+    rows = [i for i, line in enumerate(lines) if line[:1].isdigit()]
+    cells = lines[rows[row]].split(",")
+    c = 16 + 4 * effect                 # effect i's control column (SPEC.md 1)
+    assert int(cells[c]) & 0x20, "the writer set the place's reset"
+    cells[c] = str(int(cells[c]) & ~0x20)
+    lines[rows[row]] = ",".join(cells)
+    r = subprocess.run([DTX_WRITE, "-v2", "-k2", "-m960"],
+                       input="\n".join(lines).encode(), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    table = r.stdout + bytes(-len(r.stdout) % 4)
+    moved = table_at + len(table) - first
+    out = bytearray(f[:table_at] + table + f[first:])
+    for i, entry in enumerate(entries):
+        struct.pack_into(">I", out, 16 + 4 * i, entry + moved)
+    with open(at, "wb") as w:
+        w.write(out)
+
+
 def unplaced(code, symbols):
     """A start that moves no place, and no start on that timer before it:
     the place is row 0 of the source the row names (SPEC.md 4.1 step 4).
 
-    No conversion of a dump writes such a row - rule 3 of SPEC.md 6 has a
-    start set bit 5 of the control column with it, and its one exception
-    needs a source started before - so the tune is written here through
-    YMXS's form, which ymxs-to-ymxr warns about and converts. The model
-    reads the place as row 0 and check reads the player against it.
+    No writer here writes such a row - rule 3 of SPEC.md 6 has a start set
+    bit 5 of the control column with it, its one exception needs a source
+    started before, and ymxs-to-ymxr sets the bit on a start outside it -
+    so the tune is written through YMXS's form, which ymxs-to-ymxr warns
+    about, and the bit is cleared in the file it writes. The model reads
+    the place as row 0 and check reads the player against it.
     """
     rows = 8
     def column(at, value):
@@ -1070,6 +1105,7 @@ def unplaced(code, symbols):
                    "count": column(0, 200), "timerReset": column(0, 1),
                    "placeReset": column(0, 0)}}]}
     at = built("unplaced", tune)[0]
+    unplace(at, 0, 0)
     frames = check(at, code, symbols)[0]
     return "a start that moves no place is at row 0: %d frames" % frames
 

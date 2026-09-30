@@ -133,6 +133,16 @@ final class ParityTest {
         }
     }
 
+    /** The starts outside rule 3(a) that the writer sets the place's reset
+     *  on (SPEC.md 6), the one only the wrap makes a breach among them: one
+     *  file and one report, the check's warnings in it. */
+    @Test
+    void aStartOutsideRule3aConvertsTheSameInBothTrees() throws Exception {
+        byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.outsideRule3a()))
+                .getBytes(StandardCharsets.UTF_8);
+        assertTrue(both("ymxs-to-ymxr", structure).length > 0, "the structure converts");
+    }
+
     @Test
     void everyDumpBindsAndCombinesTheSameInBothTrees() throws Exception {
         for (Path dump : dumps()) {
