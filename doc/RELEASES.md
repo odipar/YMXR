@@ -34,6 +34,42 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.19, 2026-09-30
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.19>, built from the commit
+tagged `v0.4.19`.
+
+A start that clears `placeReset` outside rule 3(a) of SPEC.md 6 is written
+with bit 5 of its control column set, so the place is row 0 there. The
+place such a start left could be a row the new source lacks, where SPEC.md
+8.4 leaves what the next tick reads to a later version and the player's
+general handler writes the bytes after the source's last row until one has
+bit 7 set. YMXS's check warned of such a start, and 0.4.18 converted it as
+it was.
+
+- **The starts it covers.** A start on a timer that has run no source, a
+  start of another row count than the one before it on the timer, and a
+  start on another target. The wrap counts as well: from the second pass
+  on, the first start on a timer at or after the repeat row follows the
+  last start of the table, which YMXS's check reads no pass of, so bit 5
+  is set there where that start differs. Rule 3(a) of SPEC.md reads the
+  last start in frame order, through the wrap, and ymxs.md and tools.md
+  7.2 define what the writer writes.
+- **What moves.** A structure with such a start converts to other bytes:
+  the rig's start on a timer that has run none is written with the
+  control column `$C4` by 0.4.18 and `$E4` by this release. A structure
+  under the rule converts as it did: over the eleven dumps under `ym/test`,
+  through `ym-to-ymxr`, `ym-to-ymxs`, `ymxr-bind`, `ymxr-sndh`, `ymxr-prg`
+  and `ymxs-to-prg`, 66 outputs of 66 match those of the 0.4.18
+  executables, and both conformance kits build to the files they record.
+
+The nine 68000 binaries are 0.4.18's, and the Go module's API is as it
+was. The rig clears the bit again in the file it plays for the start
+that moves no place, so the player's row 0 for a file of another writer
+is read as before.
+
+Checks: `bin/suite` green, 197 tests and 0 skipped.
+
 ### 0.4.18, 2026-09-30
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.18>, built from the commit
