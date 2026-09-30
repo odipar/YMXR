@@ -143,6 +143,17 @@ final class ParityTest {
         assertTrue(both("ymxs-to-ymxr", structure).length > 0, "the structure converts");
     }
 
+    /** A tune file with starts outside rule 3(a): one verdict and one exit
+     *  in both trees, and one for the file this writer writes. */
+    @Test
+    void aTuneFileChecksTheSameInBothTrees() throws Exception {
+        both("ymxr-check", PlacesTest.outsideRule3a());
+        byte[] tune = both("ym-to-ymxr", Files.readAllBytes(Path.of("ym/test/DBA 2.ym")),
+                "-silent");
+        assertEquals("standard input: every start follows rule 3\n",
+                new String(both("ymxr-check", tune), StandardCharsets.UTF_8));
+    }
+
     @Test
     void everyDumpBindsAndCombinesTheSameInBothTrees() throws Exception {
         for (Path dump : dumps()) {

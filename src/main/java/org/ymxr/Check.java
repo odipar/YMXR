@@ -20,6 +20,10 @@ import org.ymxs.ym.Lha;
  * the dump flags. {@code ConversionTest} runs it on the tunes under
  * {@code ym/test}, and {@code bin/ymxr-check} on any dumps, the corpus
  * among them.
+ *
+ * <p>A tune file is read against rule 3 of SPEC.md 6 instead ({@link
+ * #places}): a writer other than this repository's can leave bit 5 of a
+ * start at 0 where the place is outside the source it starts.
  */
 final class Check {
 
@@ -193,9 +197,93 @@ final class Check {
         return wrong;
     }
 
-    /** What one line of the tool reports of a file: no dump where the file is
-     *  not a YM3!/YM3b/YM5!/YM6! dump, and otherwise an empty list, or the faults. */
-    record Result(Path file, boolean dump, List<String> wrong) {
+    /** What a file is to the tool: a dump, a tune file, or neither. */
+    enum Kind { DUMP, TUNE, NEITHER }
+
+    /** What one line of the tool reports of a file: its kind, and an empty
+     *  list, or the faults. */
+    record Result(Path file, Kind kind, List<String> wrong) {
+    }
+
+    /**
+     * The starts of a tune file that leave bit 5 of the control column at
+     * 0 outside rule 3(a) of SPEC.md 6, a line each: no source has started
+     * on the effect, or the source last started on it in frame order,
+     * through the wrap (4.5), ran on another target or had another row
+     * count, where the place can be a row the source started lacks (8.4).
+     * Two passes read every start, the table's rows and the rows from the
+     * repeat row after the wrap, since every later pass reads as the
+     * second does. A start that names a source past the file's is a line
+     * too, the rows of that source being unknown.
+     */
+    static List<String> places(TuneFile file) {
+        Table table = file.table();
+        int rows = table.rows();
+        int repeat = table.repeat();
+        record Said(int row, int effect, String line) {
+        }
+        List<Said> said = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            byte[] targets = table.column(Columns.EFFECT + 4 * i);
+            byte[] sources = table.column(Columns.EFFECT + 4 * i + 1);
+            byte[] controls = table.column(Columns.EFFECT + 4 * i + 2);
+            // the kept target is register 0 before a row sets one (4.1)
+            int target = 0;
+            int lastTarget = -1;
+            int lastRows = -1;
+            for (int pass = 0; pass < (repeat < rows ? 2 : 1); pass++) {
+                // after the wrap the first start follows the table's last
+                // start, and every later one the start it follows in the
+                // first pass, whose line the first pass wrote
+                String wrapped = pass == 0 ? "" : " after the wrap";
+                for (int r = pass == 0 ? 0 : repeat; r < rows; r++) {
+                    if ((targets[r] & 0x80) != 0) {
+                        target = targets[r] & 0x7F;
+                    }
+                    if ((sources[r] & 0x80) == 0 || (sources[r] & 0x7F) == 0) {
+                        continue;
+                    }
+                    int source = sources[r] & 0x7F;
+                    String start = r + ": effect " + i + " starts source " + source;
+                    if (source > file.sources().size()) {
+                        String line = start + ", and the file has "
+                                + Report.count(file.sources().size(), "source", "sources");
+                        if (said.stream().noneMatch(one -> one.line().equals(line))) {
+                            said.add(new Said(r, i, line));
+                        }
+                        lastRows = -1;
+                        wrapped = "";
+                        continue;
+                    }
+                    int count = file.sources().get(source - 1).rows();
+                    boolean reset = (controls[r] & 0xA0) == 0xA0;
+                    String why = null;
+                    if (reset) {
+                        // bit 5 set: the place is row 0, inside the source
+                    } else if (lastRows < 0) {
+                        why = "and no source has started on the effect";
+                    } else if (lastTarget != target) {
+                        why = "and" + wrapped + " the source last started ran on target "
+                                + lastTarget;
+                    } else if (lastRows != count) {
+                        why = "and" + wrapped + " the source last started had "
+                                + Report.count(lastRows, "row", "rows");
+                    }
+                    if (why != null) {
+                        String line = start + " of " + Report.count(count, "row", "rows")
+                                + " on target " + target + " with bit 5 at 0, " + why;
+                        if (said.stream().noneMatch(one -> one.line().equals(line))) {
+                            said.add(new Said(r, i, line));
+                        }
+                    }
+                    lastTarget = target;
+                    lastRows = count;
+                    wrapped = "";
+                }
+            }
+        }
+        said.sort(java.util.Comparator.comparingInt(Said::row).thenComparingInt(Said::effect));
+        return said.stream().map(Said::line).toList();
     }
 
     /** The file at {@code path}, checked at the tool's flags; a dump the
@@ -205,41 +293,51 @@ final class Check {
         try {
             data = Files.readAllBytes(path);
         } catch (IOException failed) {
-            return new Result(path, true, List.of("unreadable: " + failed.getMessage()));
+            return new Result(path, Kind.DUMP, List.of("unreadable: " + failed.getMessage()));
         }
         return of(data, path, flags);
     }
 
-    /** The dump in {@code data}, under the name it is reported by. */
+    /** The dump or the tune file in {@code data}, under the name it is
+     *  reported by. */
     static Result of(byte[] data, Path path, List<String> flags) {
+        if (data.length >= 4 && Arrays.equals(Arrays.copyOf(data, 4), Tune.MAGIC)) {
+            try {
+                return new Result(path, Kind.TUNE, places(TuneFile.read(data)));
+            } catch (RuntimeException failed) {
+                return new Result(path, Kind.TUNE, List.of("the tune file does not read: "
+                        + failed.getMessage()));
+            }
+        }
         if (Lha.isArchive(data)) {
             try {
                 data = Lha.unpack(data);
             } catch (RuntimeException failed) {
-                return new Result(path, true, List.of("the archive does not unpack: "
+                return new Result(path, Kind.DUMP, List.of("the archive does not unpack: "
                         + failed.getMessage()));
             }
         }
         if (!YmDump.isDump(data)) {
-            return new Result(path, false, List.of());
+            return new Result(path, Kind.NEITHER, List.of());
         }
         try {
-            return new Result(path, true, of(YmDump.read(data), flags));
+            return new Result(path, Kind.DUMP, of(YmDump.read(data), flags));
         } catch (RuntimeException failed) {
-            return new Result(path, true, List.of("the converter fails on it: "
+            return new Result(path, Kind.DUMP, List.of("the converter fails on it: "
                     + failed.getMessage()));
         }
     }
 
-    /** The dumps named, and every {@code .ym} under a directory named. */
+    /** The files named, and every {@code .ym} and {@code .ymxr} under a
+     *  directory named. */
     static List<Path> dumps(String[] args) throws IOException {
         List<Path> out = new ArrayList<>();
         for (String arg : args) {
             Path path = Path.of(arg);
             if (Files.isDirectory(path)) {
                 try (Stream<Path> files = Files.list(path)) {
-                    out.addAll(files.filter(p -> p.toString().toLowerCase().endsWith(".ym"))
-                            .sorted().toList());
+                    out.addAll(files.filter(p -> p.toString().toLowerCase().endsWith(".ym")
+                            || p.toString().toLowerCase().endsWith(".ymxr")).sorted().toList());
                 }
             } else {
                 out.add(path);
@@ -253,11 +351,13 @@ final class Check {
      * standard output saying whether the tune it converts to replays to
      * that dump, and the wrong frames under it where it does not. The
      * flags are the converter's, and an exit of 1 marks a dump that does not
-     * replay.
+     * replay. A tune file on standard input is read against rule 3 of
+     * SPEC.md 6 ({@link #places}), and exit 1 marks one with a start
+     * outside it.
      *
      * <p>A corpus is read by naming files and directories instead:
-     * {@code ymxr-check corpus/} reads every {@code .ym} under it, in
-     * parallel, one line a file and a count at the end. The tool reports how
+     * {@code ymxr-check corpus/} reads every {@code .ym} and {@code .ymxr}
+     * under it, in parallel, one line a file and a count at the end. The tool reports how
      * far through it is on standard error, which a run of thousands runs
      * for minutes.
      */
@@ -275,7 +375,8 @@ final class Check {
             Result result = of(tool.bytes(), Path.of("standard input"), flags);
             said(result);
             System.out.flush();
-            System.exit(result.dump() && result.wrong().isEmpty() ? Tool.DONE : Tool.WRONG);
+            System.exit(result.kind() != Kind.NEITHER && result.wrong().isEmpty()
+                    ? Tool.DONE : Tool.WRONG);
             return;
         }
         List<Path> files;
@@ -295,28 +396,36 @@ final class Check {
                 }).toList();
         int dumps = 0;
         int failed = 0;
+        int tunes = 0;
+        int placed = 0;
         for (Result result : results) {
-            if (result.dump()) {
+            if (result.kind() == Kind.DUMP) {
                 dumps++;
                 failed += result.wrong().isEmpty() ? 0 : 1;
+            } else if (result.kind() == Kind.TUNE) {
+                tunes++;
+                placed += result.wrong().isEmpty() ? 0 : 1;
             }
             said(result);
         }
-        int others = results.size() - dumps;
+        int others = results.size() - dumps - tunes;
         System.out.println(Report.count(dumps, "dump", "dumps") + ", " + failed + " wrong"
+                + (tunes == 0 ? "" : ", " + Report.count(tunes, "tune file", "tune files")
+                + ", " + placed + " wrong")
                 + (others == 0 ? "" : ", " + Report.count(others, "file", "files")
-                + " not a dump"));
+                + " neither a dump nor a tune file"));
         System.out.flush();
-        System.exit(failed == 0 ? Tool.DONE : Tool.WRONG);
+        System.exit(failed == 0 && placed == 0 ? Tool.DONE : Tool.WRONG);
     }
 
     /** One file's verdict, on standard output, which the tool is for. */
     private static void said(Result result) {
         String name = result.file().getFileName().toString();
-        if (!result.dump()) {
-            System.out.println(name + ": not a YM3!/YM3b/YM5!/YM6! dump");
+        if (result.kind() == Kind.NEITHER) {
+            System.out.println(name + ": neither a YM3!/YM3b/YM5!/YM6! dump nor a tune file");
         } else if (result.wrong().isEmpty()) {
-            System.out.println(name + ": replays to its dump");
+            System.out.println(name + (result.kind() == Kind.DUMP ? ": replays to its dump"
+                    : ": every start follows rule 3"));
         } else {
             System.out.println(name + ":");
             for (String line : result.wrong()) {

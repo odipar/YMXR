@@ -7,6 +7,7 @@ package check
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/odipar/ymxr/go/convert"
 	"github.com/odipar/ymxr/go/report"
@@ -216,4 +217,100 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// Places lists the starts of a tune file that leave bit 5 of the control
+// column at 0 outside rule 3(a) of SPEC.md 6, a line each: no source has
+// started on the effect, or the source last started on it in frame order,
+// through the wrap (4.5), ran on another target or had another row count,
+// where the place can be a row the source started lacks (8.4). Two passes
+// read every start, the table's rows and the rows from the repeat row after
+// the wrap, since every later pass reads as the second does. A start that
+// names a source past the file's is a line too, the rows of that source
+// being unknown.
+func Places(file ymxr.File) []string {
+	type said struct {
+		row, effect int
+		line        string
+	}
+	var lines []said
+	seen := map[string]bool{}
+	rows := file.Table.Rows()
+	repeat := file.Table.Repeat()
+	passes := 1
+	if repeat < rows {
+		passes = 2
+	}
+	for i := 0; i < 4; i++ {
+		targets := file.Table.Column(ymxr.Effect + 4*i)
+		sources := file.Table.Column(ymxr.Effect + 4*i + 1)
+		controls := file.Table.Column(ymxr.Effect + 4*i + 2)
+		// the kept target is register 0 before a row sets one (4.1)
+		target := 0
+		lastTarget, lastRows := -1, -1
+		for pass := 0; pass < passes; pass++ {
+			// after the wrap the first start follows the table's last start,
+			// and every later one the start it follows in the first pass,
+			// whose line the first pass wrote
+			wrapped, from := "", 0
+			if pass == 1 {
+				wrapped, from = " after the wrap", repeat
+			}
+			for r := from; r < rows; r++ {
+				if targets[r]&0x80 != 0 {
+					target = int(targets[r] & 0x7F)
+				}
+				if sources[r]&0x80 == 0 || sources[r]&0x7F == 0 {
+					continue
+				}
+				source := int(sources[r] & 0x7F)
+				start := fmt.Sprintf("%d: effect %d starts source %d", r, i, source)
+				if source > len(file.Sources) {
+					line := start + ", and the file has " +
+						report.Count(len(file.Sources), "source", "sources")
+					if !seen[line] {
+						seen[line] = true
+						lines = append(lines, said{r, i, line})
+					}
+					lastRows = -1
+					wrapped = ""
+					continue
+				}
+				count := file.Sources[source-1].Rows()
+				why := ""
+				switch {
+				case controls[r]&0xA0 == 0xA0:
+				case lastRows < 0:
+					why = "and no source has started on the effect"
+				case lastTarget != target:
+					why = fmt.Sprintf("and%s the source last started ran on target %d",
+						wrapped, lastTarget)
+				case lastRows != count:
+					why = "and" + wrapped + " the source last started had " +
+						report.Count(lastRows, "row", "rows")
+				}
+				if why != "" {
+					line := start + " of " + report.Count(count, "row", "rows") +
+						fmt.Sprintf(" on target %d with bit 5 at 0, ", target) + why
+					if !seen[line] {
+						seen[line] = true
+						lines = append(lines, said{r, i, line})
+					}
+				}
+				lastTarget, lastRows = target, count
+				wrapped = ""
+			}
+		}
+	}
+	sort.SliceStable(lines, func(a, b int) bool {
+		if lines[a].row != lines[b].row {
+			return lines[a].row < lines[b].row
+		}
+		return lines[a].effect < lines[b].effect
+	})
+	out := make([]string, len(lines))
+	for k, one := range lines {
+		out[k] = one.line
+	}
+	return out
 }
