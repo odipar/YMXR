@@ -1110,6 +1110,63 @@ def unplaced(code, symbols):
     return "a start that moves no place is at row 0: %d frames" % frames
 
 
+def halves(code, symbols):
+    """A square started again with bits 5 and 6 of the control column at
+    0, on the target of the square before it and at its row count, with
+    the timer running (rule 3(a) of SPEC.md 6): the place keeps its row
+    number (1.8.4) and the timer its period (1.9), so each tick reads the
+    row after the one the tick before it read, across both starts, and no
+    half of the wave is written twice. The second start names a square of
+    the first's two levels swapped: the row moves on and the level is the
+    new source's, so the level of the tick before the start is written
+    again.
+
+    check reads every tick against the model; this reads the rows the
+    ticks read, in order, and the levels they write.
+    """
+    rows = 24
+    starts = {0: 1, 8: 2, 16: 3}
+    def column(value, first=None):
+        return [(first if r == 0 and first is not None else value)
+                if r in starts else -1 for r in range(rows)]
+    tune = {"format": "ymxs", "version": 3, "tunes": [{
+        "title": "A square that keeps its half", "composer": "",
+        "writer": "68k/test/emu/test_ymxr.py", "rate": 50, "rows": rows,
+        "repeat": 0,
+        "sources": [{"name": "fifteen", "repeat": 0, "values": [15, 0]},
+                    {"name": "twelve", "repeat": 0, "values": [12, 3]},
+                    {"name": "twelve swapped", "repeat": 0, "values": [3, 12]}],
+        "registers": {"r7": [0x3E if r == 0 else -1 for r in range(rows)]},
+        "timerA": {"shape": column(0), "target": column(8),
+                   "source": [starts.get(r, -1) for r in range(rows)],
+                   "prescaler": column(200), "count": column(60),
+                   "timerReset": column(0, first=1),
+                   "placeReset": column(0, first=1)}}]}
+    at = built("halves", tune)[0]
+    ticked = []
+    frames, ticks = check(at, code, symbols, ticked=ticked)[:2]
+    mine = [(f, source, row, writes[0][1] & 0x7F)
+            for f, i, source, row, writes in ticked if i == 0]
+    # a pass is the table's rows once: row 0's start sets bit 5, so each
+    # pass begins at row 0 of its first source
+    passes = [[one for one in mine if one[0] // rows == k]
+              for k in range(frames // rows)]
+    for ran in passes:
+        assert [row for _, _, row, _ in ran] == [k % 2 for k in range(len(ran))], \
+            "a tick reads the row the tick before it read: %s" % ran
+        sources = [source for _, source, _, _ in ran]
+        assert sources == sorted(sources) and set(sources) == {1, 2, 3}, \
+            "the three squares play in turn: %s" % sources
+        one, two = sources.index(2), sources.index(3)
+        assert ran[one][3] != ran[one - 1][3], \
+            "the first start writes the new square's level: %s" % ran[one - 1:one + 1]
+        assert ran[two][3] == ran[two - 1][3], \
+            "the second start writes the level again, the row moved on: %s" % (
+                ran[two - 1:two + 1],)
+    return ("a square started again with bits 5 and 6 at 0 keeps its half:"
+            " %d frames, %d ticks" % (frames, len(mine)))
+
+
 def voices(code, symbols):
     """A target that writes several registers (SPEC.md 2.1): a source of
     three columns on setVoiceA, whose rows move the voice's period and its
@@ -1252,10 +1309,13 @@ def wholebyte(code, symbols):
             % (frames, ticks))
 
 
-def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
+def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
+          ticked=None):
     """The tune on the player, against the model frame by frame and tick
     by tick; with kit, each frame against the reader's entry as well,
-    and a tune that plays once to the call that reports its end.
+    and a tune that plays once to the call that reports its end. With
+    ticked, a list, each tick is added to it as (frame, effect, source,
+    row, writes): the row the tick read, the writes the player made.
 
     With parts, the counter splits ST4's decoder out of the advance and
     counts the operations each refill parses, so one pass over the frames
@@ -1511,6 +1571,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
         for i in timers.due(clocks):
             fx = model.fx[i]
             assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, i)
+            read = (fx["source"], fx["place"])
             want, then = model.tick(i)
             if cycles:
                 cycles._settle(None)
@@ -1534,6 +1595,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False):
                 tick_cycles += cycles.cycles - before
             ticks += 1
             assert masked(m.psg) == masked(want), "frame %d: tick of effect %d wrote %s, not %s" % (f, i, m.psg, want)
+            if ticked is not None:
+                ticked.append((f, i) + read + (list(m.psg),))
             timers.apply(m.mfp)
             if model.counted(i):
                 if then != "stop":
@@ -2861,6 +2924,7 @@ def main():
               % core(defines, first))
         print("    %s" % patched_code_follows_the_subtune(defines, tunes))
         print("    %s" % unplaced(code, symbols))
+        print("    %s" % halves(code, symbols))
         print("    %s" % voices(code, symbols))
         print("    %s" % envelope(code, symbols))
         print("    %s" % wholebyte(code, symbols))
