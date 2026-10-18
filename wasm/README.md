@@ -1,15 +1,15 @@
 # The YMXR tools as WebAssembly
 
-The twelve tools of YMXR as one WebAssembly module, `ymxr.wasm`, and the
-scripts that run it in a web page and under Node. A run is the tool's
-executable run once: its flags, standard input in, standard output and
-the exit code out, and standard error a line at a time while it runs.
-[doc/tools.md](../doc/tools.md) defines the tools, and its section 20.5
-the module.
+The twelve tools of YMXR and YMXS's `ymxs-check` as one WebAssembly
+module, `ymxr.wasm`, and the scripts that run it in a web page and under
+Node. A run is the tool's executable run once: its flags, standard input
+in, standard output and the exit code out, and standard error a line at
+a time while it runs. [doc/tools.md](../doc/tools.md) defines the tools,
+and its section 20.5 the module.
 
 | file | what it is |
 |---|---|
-| `ymxr.wasm` | the twelve tools, a WASI command module: the first argument is the tool, the rest its flags |
+| `ymxr.wasm` | the twelve tools and `ymxs-check`, a WASI command module: the first argument is the tool, the rest its flags |
 | `ymxr.js` | the module's interface in a page: `run`, which runs a tool in a Web Worker |
 | `ymxr-worker.js` | the Web Worker `ymxr.js` starts |
 | `ymxr-wasi.js` | the WASI functions the module imports, for the worker and for Node |
@@ -53,12 +53,16 @@ The calls a page makes to write a file of a structure:
 | SNDH | `run("ymxs-to-sndh", flags, json)` |
 | TOS program | `run("ymxs-to-prg", flags, json)` |
 | tune file, or multi file | `run("ymxs-to-ymxr", flags, json)` |
+| the check of the structure | `run("ymxs-check", [], json)` |
 
 The flags are those of the executables: `-kK`, `-mN`, `-copies[S]`,
 `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, and
-`-rROWS` for a program. A page that checks a structure before writing it
-reads the converter's warnings: `ymxs-to-sndh` and `ymxs-to-prg` run
-YMXS's check and report each finding as a warning line.
+`-rROWS` for a program. A page checks a structure before writing a file
+of it with `ymxs-check`, YMXS's tool, built into the module from YMXS's
+source: the structure passes through to standard output, each finding
+is a warning line, and text outside the form exits 1 with standard output
+empty. `ymxs-to-sndh` and `ymxs-to-prg` run the same check as they read
+the structure.
 
 ## From .NET in the browser
 
@@ -107,5 +111,6 @@ tool. It imports 21 WASI functions, which `ymxr-wasi.js` supplies with no
 dependency beyond WebAssembly, `TextEncoder`, `crypto` and `performance`.
 
 The tools write the same bytes, the same report and the same exit code
-as the executables of the same release, which `WasmTest` reads the
-module against.
+as the executables of the same release, and `ymxs-check` those of YMXS's
+executable of the version YMXR's go.mod requires, which `WasmTest` reads
+the module against.

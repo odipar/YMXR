@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -18,9 +19,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The WebAssembly module against the executables (doc/tools.md 20.5): the
- * twelve tools built for WASI as ymxr.wasm, run under Node through the host
- * the module ships with ({@code wasm/ymxr-node.mjs}), write the bytes, the
- * report and the exit code the Go executables write for the same call.
+ * twelve tools and YMXS's ymxs-check built for WASI as ymxr.wasm, run under
+ * Node through the host the module ships with ({@code wasm/ymxr-node.mjs}),
+ * write the bytes, the report and the exit code the Go executables write
+ * for the same call, ymxs-check those of YMXS's executable of the version
+ * go.mod requires.
  *
  * <p>Skipped where go or node is off the path; bin/suite requires both.
  */
@@ -35,6 +38,8 @@ final class WasmTest {
         Assumptions.assumeTrue(onThePath("node", "--version"), "no node on the path");
         Path into = Files.createTempDirectory("ymxr-wasm");
         build(into, List.of("go", "build", "-o", into + "/", "./cmd/..."), List.of());
+        build(into, List.of("go", "build", "-o", into + "/",
+                "github.com/odipar/ymxs/go/cmd/ymxs-check"), List.of());
         build(into, List.of("go", "build", "-o", into.resolve("ymxr.wasm").toString(), "./wasm"),
                 List.of("GOOS=wasip1", "GOARCH=wasm"));
         built = into;
@@ -182,8 +187,36 @@ final class WasmTest {
         assertEquals(native_.said().toLowerCase(), wasm.said().toLowerCase());
     }
 
+    /** YMXS's ymxs-check, which a page runs from the module: every dump's
+     *  structure, a structure the check warns of, and text outside the form
+     *  read as YMXS's executable reads them. */
+    @Test
+    void theCheckReadsTheSameAsYmxsExecutable() throws Exception {
+        for (Path dump : dumps()) {
+            both("ymxs-check", executable("ym-to-ymxs", Files.readAllBytes(dump), "-silent").out());
+        }
+        byte[] warned = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.outsideRule3a()))
+                .getBytes(StandardCharsets.UTF_8);
+        both("ymxs-check", warned);
+        assertTrue(module("ymxs-check", warned).said().contains("warning"),
+                "the structure outside rule 3(a) is warned of");
+        byte[] text = "not json".getBytes(StandardCharsets.UTF_8);
+        assertEquals(0, both("ymxs-check", text).length, "text outside the form passes on empty");
+        assertEquals(1, module("ymxs-check", text).exit(), "and exits 1");
+    }
+
+    /** wasm/ymxr.js as a page runs it, under Node with a thread for the Web
+     *  Worker (src/test/js/ymxr.test.mjs): a run against the run in the same
+     *  thread, the order of the queue, the lines of standard error, a wrong
+     *  call, stop() and a signal. */
+    @Test
+    void thePageScriptRunsTheQueueAndStopsARun() throws Exception {
+        Ran tests = ran(List.of("node", "--test", "src/test/js/ymxr.test.mjs"), new byte[0]);
+        assertEquals(0, tests.exit(), new String(tests.out(), StandardCharsets.UTF_8) + tests.said());
+    }
+
     /** A wrong call: a flag outside the tool's is the executable's line,
-     *  and a first argument outside the twelve names them. */
+     *  and a first argument outside the thirteen names them. */
     @Test
     void aWrongCallIsTheExecutablesLine() throws Exception {
         both("ymxs-to-sndh", new byte[0], "-z");
@@ -191,6 +224,7 @@ final class WasmTest {
         assertEquals(2, none.exit(), none.said());
         assertEquals("ymxr: the first argument names a tool: ym-to-ymxr, ym-to-ymxs,"
                 + " ymxr-bind, ymxr-check, ymxr-layout, ymxr-multi, ymxr-prg, ymxr-sndh,"
-                + " ymxr-trace, ymxs-to-prg, ymxs-to-sndh, ymxs-to-ymxr\n", none.said());
+                + " ymxr-trace, ymxs-check, ymxs-to-prg, ymxs-to-sndh, ymxs-to-ymxr\n",
+                none.said());
     }
 }

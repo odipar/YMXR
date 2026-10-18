@@ -1,8 +1,9 @@
-// The twelve tools of YMXR in a web page (doc/tools.md 20). A run is the
-// tool's executable run once: its flags, standard input in, standard
-// output and the exit code out, and standard error a line at a time while
-// it runs. The tools run in a Web Worker, one run at a time in the order
-// they are asked for, from ymxr.wasm beside this file.
+// The twelve tools of YMXR and YMXS's ymxs-check in a web page
+// (doc/tools.md 20). A run is the tool's executable run once: its flags,
+// standard input in, standard output and the exit code out, and standard
+// error a line at a time while it runs. The tools run in a Web Worker, one
+// run at a time in the order they are asked for, from ymxr.wasm beside this
+// file.
 //
 //   import { run } from "./ymxr/ymxr.js";
 //   const { exitCode, output, report } = await run("ymxs-to-sndh", ["-silent"], json,
@@ -28,8 +29,8 @@ function started() {
 /**
  * Runs a tool once.
  *
- * @param tool the tool's name: ymxs-to-sndh, ymxs-to-prg, ymxs-to-ymxr or
- *     any other of the twelve
+ * @param tool the tool's name: ymxs-to-sndh, ymxs-to-prg, ymxs-to-ymxr,
+ *     ymxs-check or any other of the thirteen
  * @param flags the tool's arguments, as its executable reads them
  * @param input standard input: a Uint8Array, a string, an ArrayBuffer or
  *     an array of byte values

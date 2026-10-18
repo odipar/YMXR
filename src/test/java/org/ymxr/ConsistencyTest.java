@@ -45,7 +45,9 @@ final class ConsistencyTest {
     private static final Path PLAN = Path.of("doc/plan.md");
     private static final Path WRITING = Path.of("doc/writing.md");
 
-    /** Every document of the repository, which every check here reads. */
+    /** Every document of the repository, which every check here reads.
+     *  dist/ is the output of release/publish.sh, which git ignores: the
+     *  copy of wasm/README.md there links what the zip lacks. */
     private static final List<Path> DOCUMENTS = documents();
 
     private static List<Path> documents() {
@@ -53,6 +55,7 @@ final class ConsistencyTest {
             return tree.filter(Files::isRegularFile)
                     .filter(at -> at.toString().endsWith(".md"))
                     .filter(at -> !at.toString().contains("/target/"))
+                    .filter(at -> !at.toString().startsWith("./dist/"))
                     .filter(at -> !at.toString().contains("/.git"))
                     .sorted()
                     .toList();

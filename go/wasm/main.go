@@ -1,8 +1,9 @@
-// Command wasm is the twelve tools in one program, for WebAssembly: its
-// first argument names the tool, and the arguments after it are that
-// tool's. Built with GOOS=wasip1 GOARCH=wasm it is ymxr.wasm, a WASI
-// command module that reads standard input, writes standard output and
-// standard error, and exits as the tool does (doc/tools.md 20).
+// Command wasm is the twelve tools and YMXS's ymxs-check in one program,
+// for WebAssembly: its first argument names the tool, and the arguments
+// after it are that tool's. Built with GOOS=wasip1 GOARCH=wasm it is
+// ymxr.wasm, a WASI command module that reads standard input, writes
+// standard output and standard error, and exits as the tool does
+// (doc/tools.md 20).
 //
 //	ymxr.wasm ymxs-to-sndh -silent < tune.json > tune.sndh
 package main
@@ -22,12 +23,14 @@ import (
 	"github.com/odipar/ymxr/go/internal/cli/ymxrprg"
 	"github.com/odipar/ymxr/go/internal/cli/ymxrsndh"
 	"github.com/odipar/ymxr/go/internal/cli/ymxrtrace"
+	"github.com/odipar/ymxr/go/internal/cli/ymxscheck"
 	"github.com/odipar/ymxr/go/internal/cli/ymxstoprg"
 	"github.com/odipar/ymxr/go/internal/cli/ymxstosndh"
 	"github.com/odipar/ymxr/go/internal/cli/ymxstoymxr"
 )
 
-// tools is each tool by its name.
+// tools is each tool by its name: the twelve, and YMXS's ymxs-check, which
+// a page runs to check a structure before writing a file of it.
 var tools = map[string]func(){
 	"ym-to-ymxr":   ymtoymxr.Main,
 	"ym-to-ymxs":   ymtoymxs.Main,
@@ -38,6 +41,7 @@ var tools = map[string]func(){
 	"ymxr-prg":     ymxrprg.Main,
 	"ymxr-sndh":    ymxrsndh.Main,
 	"ymxr-trace":   ymxrtrace.Main,
+	"ymxs-check":   ymxscheck.Main,
 	"ymxs-to-prg":  ymxstoprg.Main,
 	"ymxs-to-sndh": ymxstosndh.Main,
 	"ymxs-to-ymxr": ymxstoymxr.Main,

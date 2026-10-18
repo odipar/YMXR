@@ -13,9 +13,9 @@ below it.
   executable contains the nine 68000 binaries of BINARIES.md and DTX's
   twenty-two images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed
-- one zip of the twelve tools as one WebAssembly module, beside the
-  scripts that run it in a web page and under Node (tools.md 20.5 to
-  20.7)
+- one zip of the twelve tools and YMXS's `ymxs-check` as one
+  WebAssembly module, beside the scripts that run it in a web page and
+  under Node (tools.md 20.5 to 20.7)
 - `MANIFEST.txt`: every zip's size and sha256, what it contains, and the
   source commit the release was built from
 

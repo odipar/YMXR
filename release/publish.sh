@@ -10,9 +10,9 @@
 #
 # They are built from go/, so there are six of them: go build
 # cross-compiles to any target from any host, with no toolchain installed
-# for that target. A seventh target, wasm, is the twelve as one
-# WebAssembly module beside the scripts a page and Node run it through
-# (doc/tools.md 20.5).
+# for that target. A seventh target, wasm, is the twelve and YMXS's
+# ymxs-check as one WebAssembly module beside the scripts a page and Node
+# run it through (doc/tools.md 20.5).
 #
 # NO JAVA RUNS AT RELEASE TIME, but the Maven build runs first: it
 # assembles the nine binaries with rmac and writes them into
@@ -67,7 +67,7 @@ mkdir -p "$OUT/release"
 
 for target in $TARGETS; do
     if [ "$target" = wasm ]; then
-        # One WASI module for the twelve, its first argument the tool, and
+        # One WASI module for the thirteen, its first argument the tool, and
         # the scripts beside it; -s -w as for the executables.
         rm -rf "$OUT/wasm"
         mkdir -p "$OUT/wasm"

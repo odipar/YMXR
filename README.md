@@ -62,8 +62,9 @@ the Go tools ([tools.md](doc/tools.md) 16.6).
 
 `ymxr-check` compares a converted tune with its dump and reads a tune file
 against rule 3 of the specification, and `ymxr-trace` prints the frame record
-the conformance kit uses. A release also has the twelve as one WebAssembly
-module, which a web page runs in a worker ([wasm/README.md](wasm/README.md)).
+the conformance kit uses. A release also has the twelve and YMXS's
+`ymxs-check` as one WebAssembly module, which a web page runs in a worker
+([wasm/README.md](wasm/README.md)).
 A tool writes its output to standard output and its report to standard error;
 `-silent` drops the report and the summary and keeps the output and the notes
 ([tools.md](doc/tools.md) 3.3).
