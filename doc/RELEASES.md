@@ -37,6 +37,36 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.22, 2026-10-18
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.22>, built from the commit
+tagged `v0.4.22`.
+
+The WebAssembly module runs YMXS's `ymxs-check` beside the twelve tools,
+so a page checks a structure before writing a file of it as the desktop
+does with YMXS's executable. The executables write what 0.4.21's wrote:
+over the eleven dumps under `ym/test`, through `ym-to-ymxr`,
+`ym-to-ymxs`, `ymxr-bind`, `ymxr-sndh`, `ymxr-prg` and `ymxs-to-prg`, 66
+outputs of 66 match those of the 0.4.21 executables.
+
+- **`ymxs-check` in the module.** It is the main of YMXS's command at the
+  version go.mod requires, v0.4.9, line for line and over the same
+  packages (tools.md 20.5). `WasmTest` reads it against YMXS's executable
+  over every dump's structure, a structure the check warns of, and text
+  outside the form; over the eleven dumps' structures the module's
+  output, report and exit match those of the YMXS 0.4.9 release
+  executable. The zips of executables leave it out, and `ymxr.wasm`
+  grows by 5,836 bytes to 4,974,574.
+- **A test of `ymxr.js`.** `src/test/js/ymxr.test.mjs` runs it under
+  Node, with a thread of `worker_threads` for the Web Worker: a run
+  against the same run without the worker, the order of the queue, the
+  lines of standard error, a wrong call, `stop()` and a signal
+  (tools.md 20.6).
+- **`dist/`.** `ConsistencyTest` leaves out the output of
+  `release/publish.sh`, so the suite passes after a publish.
+
+Checks: `bin/suite` green, 206 tests and 0 skipped.
+
 ### 0.4.21, 2026-10-18
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.21>, built from the commit
