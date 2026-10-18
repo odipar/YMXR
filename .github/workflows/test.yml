@@ -20,6 +20,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
+      # WasmTest runs the WebAssembly module of the tools under Node, and
+      # skips where node is absent.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       # The build assembles the nine binaries of BINARIES.md at
       # process-classes, eight cores and the program stub, and
       # BinariesTest reads the copies under go/binaries/data against that
@@ -56,8 +61,9 @@ jobs:
           echo "DTX_WRITE=$RUNNER_TEMP/DTX/bin/dtx-write" >> "$GITHUB_ENV"
           echo "DTX_REPO=$RUNNER_TEMP/DTX" >> "$GITHUB_ENV"
       # ParityTest runs the two trees against one another and skips where
-      # go is absent, so a runner without it is green and asleep.
-      - run: go version && rmac | sed -n '7p' && "$DTX_WRITE" -help | head -1
+      # go is absent, and WasmTest where node is, so a runner without either
+      # is green and asleep.
+      - run: go version && node --version && rmac | sed -n '7p' && "$DTX_WRITE" -help | head -1
       # A skipped test is a check that did not run, and a run that skips
       # one is green and asleep. bin/suite (doc/tools.md 19.6) requires
       # what the skipping tests need, reads gofmt -l go beside them, runs
