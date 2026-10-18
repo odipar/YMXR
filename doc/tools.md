@@ -1015,12 +1015,12 @@ directory` where macOS and Linux write `no such file or directory`.
 |---|---|
 | `ymxr-wasi.js` | the 21 WASI functions the module imports, standard input from a buffer, standard output and standard error to buffers, and a read-only directory of the files a caller passes, open as `/`; it runs in a Web Worker and under Node |
 | `ymxr-worker.js` | the Web Worker a page runs the tools in: it compiles the module once, and sends each line of standard error as the tool writes it |
-| `ymxr.js` | the page's interface, an ES module: `run(tool, flags, input, options)` resolves to `{ exitCode, output, report }`, the options `onReport`, `files` and `signal`; `runTool(tool, flags, input, onReport)` is the same with the callback as an argument |
+| `ymxr.js` | the page's interface, an ES module: `run(tool, flags, input, options)` resolves to `{ exitCode, output, report }`, the options `onReport`, `files` and `signal`; `runTool(tool, flags, input, onReport)` is the same with the callback as an argument; `stop()` stops the run in progress as its signal would |
 | `ymxr-node.mjs` | a tool run under Node as its executable runs, the module beside it or at `YMXR_WASM`; an argument naming a file or a directory puts it in the tool's directory |
 
 A page runs one tool at a time in one worker, in the order the runs are
-asked for; a run stopped through its signal ends the worker, and the
-next run starts another.
+asked for; a run stopped through its signal or `stop()` ends the worker,
+and the next run starts another.
 
 **20.7 The zip** `ymxr-tools-wasm-v<version>.zip` has `ymxr.wasm`, the
 four scripts and `README.md`, which tells a page how to serve the folder

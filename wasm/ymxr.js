@@ -17,6 +17,8 @@ const script = new URL("./ymxr-worker.js", import.meta.url);
 let worker;
 let runs = 0;
 let queue = Promise.resolve();
+// the stop of the run in progress, which stop() calls
+let running;
 
 function started() {
   worker ??= new Worker(script, { type: "module" });
@@ -48,11 +50,17 @@ export function run(tool, flags = [], input = new Uint8Array(0), { onReport, fil
       }
       const id = ++runs;
       const at = started();
+      const end = () => {
+        at.removeEventListener("message", listen);
+        signal?.removeEventListener("abort", stop);
+        running = undefined;
+      };
       const stop = () => {
         // a tool runs to its end once started, so a stopped run ends the
         // worker, and the next run starts another
         at.terminate();
         worker = undefined;
+        end();
         reject(new DOMException("The run was stopped", "AbortError"));
       };
       const listen = ({ data }) => {
@@ -63,14 +71,14 @@ export function run(tool, flags = [], input = new Uint8Array(0), { onReport, fil
           onReport?.(data.line);
           return;
         }
-        at.removeEventListener("message", listen);
-        signal?.removeEventListener("abort", stop);
+        end();
         if (data.error !== undefined) {
           reject(new Error(data.error));
         } else {
           resolve({ exitCode: data.exitCode, output: data.output, report: data.report });
         }
       };
+      running = stop;
       at.addEventListener("message", listen);
       signal?.addEventListener("abort", stop, { once: true });
       at.postMessage({ id, wasm, tool, flags: [...flags], input: bytes, files });
@@ -86,4 +94,13 @@ export function run(tool, flags = [], input = new Uint8Array(0), { onReport, fil
  */
 export function runTool(tool, flags, input, onReport) {
   return run(tool, flags, input, { onReport });
+}
+
+/**
+ * Stops the run in progress as its signal would, for a caller whose
+ * interop passes no AbortSignal: its {@code Promise} rejects with an
+ * AbortError, and the runs after it start as asked for.
+ */
+export function stop() {
+  running?.();
 }
