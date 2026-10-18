@@ -994,20 +994,25 @@ the module at. The published release has the seven zips and the
 
 **20.4** [RELEASES.md](RELEASES.md) lists the releases.
 
-**20.5 The WebAssembly module.** `ymxr.wasm` is the twelve tools in one
-WASI preview 1 command module, built from `go/wasm` with `GOOS=wasip1
-GOARCH=wasm`: its first argument names the tool and the arguments after
-it are that tool's, read as the executable reads them. It reads standard
-input, writes standard output and standard error, and exits with the
-tool's exit code. A first argument outside the twelve is `ymxr: the
-first argument names a tool: ` and the twelve names, exit 2. The tools
-write the same bytes, report and exit code as the executables;
-`WasmTest` runs the calls of a page that writes a file, every dump's
-structure through `ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg`, the
-other nine on one dump, and the two that read named files, under Node
-against the executables. A message of the system, the one for a missing
-file among them, is the WASI runtime's, which writes `No such file or
-directory` where macOS and Linux write `no such file or directory`.
+**20.5 The WebAssembly module.** `ymxr.wasm` is the twelve tools and
+YMXS's `ymxs-check` in one WASI preview 1 command module, built from
+`go/wasm` with `GOOS=wasip1 GOARCH=wasm`: its first argument names the
+tool and the arguments after it are that tool's, read as the executable
+reads them. It reads standard input, writes standard output and standard
+error, and exits with the tool's exit code. A first argument outside the
+thirteen is `ymxr: the first argument names a tool: ` and the thirteen
+names, exit 2. `ymxs-check` is the main of YMXS's command at the version
+go.mod requires, over the same packages, for a page to check a structure
+before writing a file of it; the zips of executables leave it out, and
+YMXS's releases ship it. The tools write the same bytes, report and exit
+code as the executables; `WasmTest` runs the calls of a page that writes
+a file, every dump's structure through `ymxs-to-ymxr`, `ymxs-to-sndh` and
+`ymxs-to-prg`, the other nine on one dump, the two that read named files,
+and `ymxs-check` over every dump's structure, a structure it warns of and
+text outside the form, under Node against the executables, YMXS's among
+them. A message of the system, the one for a missing file among them, is
+the WASI runtime's, which writes `No such file or directory` where macOS
+and Linux write `no such file or directory`.
 
 **20.6 The scripts.** Four scripts in `wasm/` run the module:
 
@@ -1020,7 +1025,11 @@ directory` where macOS and Linux write `no such file or directory`.
 
 A page runs one tool at a time in one worker, in the order the runs are
 asked for; a run stopped through its signal or `stop()` ends the worker,
-and the next run starts another.
+and the next run starts another. `src/test/js/ymxr.test.mjs` runs
+`ymxr.js` under Node, with a thread of `worker_threads` for the Web
+Worker, and `WasmTest` runs it: a run against the same run without the
+worker, the order of the queue, the lines of standard error, a wrong
+call, `stop()` and a signal.
 
 **20.7 The zip** `ymxr-tools-wasm-v<version>.zip` has `ymxr.wasm`, the
 four scripts and `README.md`, which tells a page how to serve the folder
