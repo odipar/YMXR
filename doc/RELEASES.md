@@ -37,6 +37,45 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.20, 2026-10-18
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.20>, built from the commit
+tagged `v0.4.20`.
+
+The twelve tools are also one WebAssembly module, which a web page runs
+in a worker, and `ymxr-check` reads a tune file against rule 3. A file
+the executables write is the bytes it was: over the eleven dumps under
+`ym/test`, through `ym-to-ymxr`, `ym-to-ymxs`, `ymxr-bind`, `ymxr-sndh`,
+`ymxr-prg` and `ymxs-to-prg`, 66 outputs of 66 match those of the 0.4.19
+executables.
+
+- **The WebAssembly module.** A seventh zip, `ymxr-tools-wasm-v0.4.20.zip`,
+  has `ymxr.wasm`, the twelve tools as one WASI module of 4.9 MB, its
+  first argument the tool, and four scripts with no dependency:
+  `ymxr.js`, whose `run` runs a tool in a Web Worker and sends each line
+  of standard error as the tool writes it; the worker; the 21 WASI
+  functions the module imports; and `ymxr-node.mjs`, which runs a tool
+  under Node. The module writes the bytes, the report and the exit code
+  of the executables, which `WasmTest` reads under Node; in a browser it
+  wrote the SNDH file and the program of `DBA 2.ym` byte for byte while
+  the page's thread stayed free. tools.md 20.5 to 20.7 and the zip's
+  README define it.
+- **`ymxr-check` on a tune file.** A file that opens with `YMXR` is read
+  against rule 3: each start that leaves bit 5 at 0 outside rule 3(a) is
+  a line, a tune file with one counts as wrong, and a directory
+  contributes its `.ymxr` files. A file of neither kind reads `neither a
+  YM3!/YM3b/YM5!/YM6! dump nor a tune file`, where 0.4.19 read `not a
+  YM3!/YM3b/YM5!/YM6! dump`, and the summary counts the tune files
+  (tools.md 8).
+- **The Go module.** Each tool's `main` is in `go/internal/cli`, which
+  `cmd/<tool>` and `go/wasm` call, and the exported API is as it was.
+
+The rig reads a square that keeps its half across two starts with bits 5
+and 6 at 0, and `bin/suite` and the workflow require `node` for
+`WasmTest`.
+
+Checks: `bin/suite` green, 204 tests and 0 skipped.
+
 ### 0.4.19, 2026-09-30
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.19>, built from the commit
