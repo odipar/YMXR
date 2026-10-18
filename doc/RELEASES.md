@@ -37,6 +37,29 @@ and a release's number names the tools rather than either.
 
 ## Published
 
+### 0.4.21, 2026-10-18
+
+<https://github.com/odipar/YMXR/releases/tag/v0.4.21>, built from the commit
+tagged `v0.4.21`.
+
+`ymxr.js` stops the run in progress through `stop()`, for a page whose
+interop passes no `AbortSignal`, as a .NET page's `[JSImport]` does. The
+Go tree is 0.4.20's, and the tools write what 0.4.20's wrote: over the
+eleven dumps under `ym/test`, through `ym-to-ymxr`, `ym-to-ymxs`,
+`ymxr-bind`, `ymxr-sndh`, `ymxr-prg` and `ymxs-to-prg`, 66 outputs of 66
+match those of the 0.4.20 executables.
+
+- **`stop()`.** It stops the run in progress as its signal would: the
+  worker ends, the run's `Promise` rejects with an `AbortError`, and the
+  runs after it start as asked for (tools.md 20.6). In a browser,
+  RhYMe's export dialog stopped a pack with copies through it within a
+  second, and its next run started another worker.
+- **From .NET.** The zip's README lists the two `[JSImport]`
+  declarations, and the absolute URL `JSHost.ImportAsync` needs, since
+  the runtime resolves a relative URL against `_framework/`.
+
+Checks: `bin/suite` green, 204 tests and 0 skipped.
+
 ### 0.4.20, 2026-10-18
 
 <https://github.com/odipar/YMXR/releases/tag/v0.4.20>, built from the commit
