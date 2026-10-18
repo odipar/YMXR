@@ -64,10 +64,27 @@ YMXS's check and report each finding as a warning line.
 
 `runTool(tool, flags, input, onReport)` is `run` with the lines of
 standard error as a fourth argument rather than an option, and `input`
-may be an array of byte values as well as a `Uint8Array`. An application
-on .NET WebAssembly imports `ymxr.js` with `JSHost.ImportAsync`, declares
-`runTool` with `[JSImport]`, and reads `exitCode`, `output` and `report`
-as the properties of the object the `Promise` resolves to.
+may be an array of byte values as well as a `Uint8Array`. `stop()` stops
+the run in progress as its signal would, for an interop that passes no
+`AbortSignal`.
+
+An application on .NET WebAssembly imports `ymxr.js` with
+`JSHost.ImportAsync` and its absolute URL: the runtime resolves a
+relative URL against `_framework/`, the folder of its script. It
+declares the two functions with `[JSImport]`, and reads `exitCode`,
+`output` and `report` as the properties of the object the `Promise`
+resolves to:
+
+```csharp
+[JSImport("runTool", "ymxr")]
+static partial Task<JSObject> RunTool(string tool,
+    [JSMarshalAs<JSType.Array<JSType.String>>] string[] flags,
+    [JSMarshalAs<JSType.Array<JSType.Number>>] byte[] input,
+    [JSMarshalAs<JSType.Function<JSType.String>>] Action<string> report);
+
+[JSImport("stop", "ymxr")]
+static partial void Stop();
+```
 
 An application reads the exit code, the output and each line of standard
 error from the executable's process, so code that runs the executable
