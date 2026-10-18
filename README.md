@@ -60,8 +60,9 @@ player, and a TOS program plays the SNDH file on a bare machine.
 [`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
 the Go tools ([tools.md](doc/tools.md) 16.6).
 
-`ymxr-check` compares a converted tune with its dump, and `ymxr-trace`
-prints the frame record the conformance kit uses. A tool writes its
+`ymxr-check` compares a converted tune with its dump and reads a tune
+file against rule 3 of the specification, and `ymxr-trace` prints the
+frame record the conformance kit uses. A tool writes its
 output to standard output and its report to standard error; `-silent`
 drops the report and the summary and keeps the output and the notes
 ([tools.md](doc/tools.md) 3.3).
