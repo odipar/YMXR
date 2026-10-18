@@ -961,24 +961,25 @@ bytes.
 
 ## 20. A release
 
-**20.1** `release/publish.sh [version]` builds the twelve tools from the
-Go tree for `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64`
-and `linux-arm64`, one zip a platform in `dist/release`, named
-`ymxr-tools-<platform>-v<version>.zip`, the Windows executables with
-`.exe`. The version is the argument, or the first `<version>` of
-`pom.xml`. `TARGETS`, a space-separated list, limits the platforms;
-`OUT` replaces `dist`. A platform outside the six is `publish: <target>
-is not a platform this builds`, exit 1. The nine binaries it requires
-under `go/binaries/data` are the ones `go/binaries/binaries.go` names,
-so the two lists agree: a missing one is `publish:
-<path> is not built: run mvn process-classes` and a Go file naming none
-is `publish: go/binaries/binaries.go names no binary`, exit 1 either
-way. After the zips the script runs `manifest.sh` (20.2); then, where
-the host is macOS or Linux on x64 or arm64 and its platform was built,
-it runs the host's executables from a directory outside the repository
-with an empty environment, `ym/test/Turrican - world 4-3.ym` through
-`ym-to-ymxs` and `ymxs-to-prg`, and prints the byte count of the
-program.
+**20.1** `release/publish.sh [version]` builds the twelve tools from the Go
+tree for `win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64` and
+`linux-arm64`, one zip a platform in `dist/release`, named
+`ymxr-tools-<platform>-v<version>.zip`, the Windows executables with `.exe`,
+and for `wasm` the WebAssembly module of 20.5 and its scripts in
+`ymxr-tools-wasm-v<version>.zip`. The version is the argument, or the first
+`<version>` of `pom.xml`. `TARGETS`, a space-separated list, limits the seven;
+`OUT` replaces `dist`. A target outside the seven is `publish: <target> is not
+a platform this builds`, exit 1. The nine binaries it requires under
+`go/binaries/data` are the ones `go/binaries/binaries.go` names, so the two
+lists agree: a missing one is `publish: <path> is not built: run mvn
+process-classes` and a Go file naming none is `publish:
+go/binaries/binaries.go names no binary`, exit 1 either way. After the zips
+the script runs `manifest.sh` (20.2); then, where the host is macOS or Linux
+on x64 or arm64 and its platform was built, it runs the host's executables
+from a directory outside the repository with an empty environment,
+`ym/test/Turrican - world 4-3.ym` through `ym-to-ymxs` and `ymxs-to-prg`, and
+prints the byte count of the program; where `wasm` was built and `node` is on
+the path, it runs the same through the module under Node (20.6).
 
 **20.2** `release/manifest.sh VERSION DIR` writes `DIR/MANIFEST.txt`:
 each zip's name, size and sha256, its contents, and the source commit,
@@ -987,11 +988,43 @@ each zip's name, size and sha256, its contents, and the source commit,
 **20.3** A release is the commit tagged `v<version>`, the tag's message
 `YMXR <version>`, and the Go tree of that commit is tagged
 `go/v<version>` beside it (19.1), which is the version a caller reaches
-the module at. The published release has the six zips and the
+the module at. The published release has the seven zips and the
 `MANIFEST.txt` of 20.1 under it, and its text is the newest entry of
 [RELEASES.md](RELEASES.md).
 
 **20.4** [RELEASES.md](RELEASES.md) lists the releases.
+
+**20.5 The WebAssembly module.** `ymxr.wasm` is the twelve tools in one
+WASI preview 1 command module, built from `go/wasm` with `GOOS=wasip1
+GOARCH=wasm`: its first argument names the tool and the arguments after
+it are that tool's, read as the executable reads them. It reads standard
+input, writes standard output and standard error, and exits with the
+tool's exit code. A first argument outside the twelve is `ymxr: the
+first argument names a tool: ` and the twelve names, exit 2. The tools
+write the same bytes, report and exit code as the executables;
+`WasmTest` runs the calls of a page that writes a file, every dump's
+structure through `ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg`, the
+other nine on one dump, and the two that read named files, under Node
+against the executables. A message of the system, the one for a missing
+file among them, is the WASI runtime's, which writes `No such file or
+directory` where macOS and Linux write `no such file or directory`.
+
+**20.6 The scripts.** Four scripts in `wasm/` run the module:
+
+| script | what it is |
+|---|---|
+| `ymxr-wasi.js` | the 21 WASI functions the module imports, standard input from a buffer, standard output and standard error to buffers, and a read-only directory of the files a caller passes, open as `/`; it runs in a Web Worker and under Node |
+| `ymxr-worker.js` | the Web Worker a page runs the tools in: it compiles the module once, and sends each line of standard error as the tool writes it |
+| `ymxr.js` | the page's interface, an ES module: `run(tool, flags, input, options)` resolves to `{ exitCode, output, report }`, the options `onReport`, `files` and `signal`; `runTool(tool, flags, input, onReport)` is the same with the callback as an argument |
+| `ymxr-node.mjs` | a tool run under Node as its executable runs, the module beside it or at `YMXR_WASM`; an argument naming a file or a directory puts it in the tool's directory |
+
+A page runs one tool at a time in one worker, in the order the runs are
+asked for; a run stopped through its signal ends the worker, and the
+next run starts another.
+
+**20.7 The zip** `ymxr-tools-wasm-v<version>.zip` has `ymxr.wasm`, the
+four scripts and `README.md`, which tells a page how to serve the folder
+and call the tools.
 
 ---
 

@@ -77,3 +77,6 @@ dist/
 __pycache__/
 /doc/conformance/SOURCES.generated.md
 /doc/conformance/MANIFEST.generated.txt
+
+# the WebAssembly module, where a build beside its scripts writes it
+/wasm/ymxr.wasm

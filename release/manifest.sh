@@ -40,7 +40,11 @@ MANIFEST="$DIR/MANIFEST.txt"
     for zip in "$DIR"/ymxr-tools-*.zip; do
         name=$(basename "$zip")
         platform=$(echo "$name" | sed "s/^ymxr-tools-//; s/-v$VERSION\.zip$//")
-        echo "$name  $(size "$zip")  $(sha "$zip")  the tools for $platform"
+        if [ "$platform" = wasm ]; then
+            echo "$name  $(size "$zip")  $(sha "$zip")  the tools as one WebAssembly module, and the scripts that run it"
+        else
+            echo "$name  $(size "$zip")  $(sha "$zip")  the tools for $platform"
+        fi
     done
 } > "$MANIFEST"
 echo "$MANIFEST: $(grep -c . "$MANIFEST") lines"

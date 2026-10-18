@@ -17,6 +17,14 @@ if ! command -v go >/dev/null 2>&1; then
     exit 2
 fi
 
+# WasmTest runs the tools' WebAssembly module under Node, and skips where
+# node is absent.
+if ! command -v node >/dev/null 2>&1; then
+    echo "suite: WasmTest runs the WebAssembly module under Node, and node is"\
+         "not on the path" >&2
+    exit 2
+fi
+
 # RigCallsTest plays the built tunes on the 68000 player under emulation:
 # python3 with unicorn in it, rmac to assemble the cores, and DTX's
 # packer to read a table back. RMAC and DTX_WRITE name the last two where

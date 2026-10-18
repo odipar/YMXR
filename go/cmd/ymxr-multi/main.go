@@ -3,63 +3,8 @@
 // the names in the order the files are named.
 package main
 
-import (
-	"fmt"
-	"os"
-	"strings"
-
-	"github.com/odipar/ymxs/go/tool"
-
-	"github.com/odipar/ymxr/go/report"
-	"github.com/odipar/ymxr/go/ymxr"
-)
+import "github.com/odipar/ymxr/go/internal/cli/ymxrmulti"
 
 func main() {
-	t, args := tool.Of("ymxr-multi", os.Args[1:], "-n")
-	var named, files []string
-	for _, flag := range args {
-		switch {
-		case strings.HasPrefix(flag, "-n"):
-			named = append(named, flag[2:])
-		case strings.HasPrefix(flag, "-"):
-			t.Usage("not a flag of the tool: " + flag)
-		default:
-			files = append(files, flag)
-		}
-	}
-	if len(files) == 0 {
-		t.Usage("ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME]...")
-	}
-	if len(named) > len(files) {
-		t.Usage(fmt.Sprintf("%d names for %d tune files", len(named), len(files)))
-	}
-	var tunes [][]byte
-	var names []string
-	for i, name := range files {
-		file, err := os.ReadFile(name)
-		if err != nil {
-			t.Wrong(tool.Failed, "cannot read "+name+": "+err.Error())
-		}
-		tunes = append(tunes, file)
-		// -n names a tune, then the name the tune file records, then
-		// the file it was read from
-		switch recorded := ymxr.TuneName(file); {
-		case i < len(named):
-			names = append(names, named[i])
-		case recorded != "":
-			names = append(names, recorded)
-		default:
-			names = append(names, ymxr.Stem(name))
-		}
-	}
-	file, err := ymxr.Multi(tunes, names)
-	if err != nil {
-		t.Wrong(tool.Wrong, err.Error())
-	}
-	for i, tune := range tunes {
-		t.Report(names[i] + ": " + report.Count(len(tune), "byte", "bytes"))
-	}
-	t.Report(report.Count(len(tunes), "tune", "tunes") + ", " +
-		report.Count(len(file), "byte", "bytes"))
-	t.WriteBytes(file)
+	ymxrmulti.Main()
 }

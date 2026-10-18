@@ -10,7 +10,9 @@
 #
 # They are built from go/, so there are six of them: go build
 # cross-compiles to any target from any host, with no toolchain installed
-# for that target.
+# for that target. A seventh target, wasm, is the twelve as one
+# WebAssembly module beside the scripts a page and Node run it through
+# (doc/tools.md 20.5).
 #
 # NO JAVA RUNS AT RELEASE TIME, but the Maven build runs first: it
 # assembles the nine binaries with rmac and writes them into
@@ -28,7 +30,7 @@ OUT=${OUT:-dist}
 # resolved one: a build runs from go/, where a relative path counts from
 # somewhere else.
 case $OUT in /*) ;; *) OUT=$REPO/$OUT ;; esac
-TARGETS=${TARGETS:-"win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64"}
+TARGETS=${TARGETS:-"win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64 wasm"}
 TOOLS="ym-to-ymxs ymxs-to-ymxr ymxs-to-sndh ymxs-to-prg \
        ym-to-ymxr ymxr-multi ymxr-bind ymxr-sndh ymxr-prg \
        ymxr-trace ymxr-layout ymxr-check"
@@ -64,6 +66,20 @@ rm -rf "$OUT/release"
 mkdir -p "$OUT/release"
 
 for target in $TARGETS; do
+    if [ "$target" = wasm ]; then
+        # One WASI module for the twelve, its first argument the tool, and
+        # the scripts beside it; -s -w as for the executables.
+        rm -rf "$OUT/wasm"
+        mkdir -p "$OUT/wasm"
+        (cd go && GOOS=wasip1 GOARCH=wasm \
+            go build -ldflags="-s -w" -o "$OUT/wasm/ymxr.wasm" ./wasm)
+        cp wasm/ymxr.js wasm/ymxr-worker.js wasm/ymxr-wasi.js wasm/ymxr-node.mjs \
+           wasm/README.md "$OUT/wasm/"
+        zip="ymxr-tools-wasm-v$VERSION.zip"
+        (cd "$OUT/wasm" && zip -q -X "../release/$zip" *)
+        echo "$OUT/release/$zip: $(wc -c < "$OUT/release/$zip" | tr -d ' ') bytes"
+        continue
+    fi
     case "$target" in
         win-*)   os=windows; ext=.exe ;;
         osx-*)   os=darwin;  ext= ;;
@@ -116,5 +132,16 @@ if [ -n "$host" ] && [ -d "$OUT/$host" ]; then
          "$(wc -c < "$try/TUNE.PRG" | tr -d ' ') bytes of program"
     rm -rf "$try"
 fi
+# The module, tried the same way under Node where it is on the path: the
+# runner and the module from the zip's directory alone.
+if [ -d "$OUT/wasm" ] && command -v node >/dev/null 2>&1; then
+    try=$(mktemp -d)
+    cp "ym/test/Turrican - world 4-3.ym" "$try/tune.ym"
+    (cd "$try" && node "$OUT/wasm/ymxr-node.mjs" ym-to-ymxs -silent < tune.ym \
+        | node "$OUT/wasm/ymxr-node.mjs" ymxs-to-prg -silent > TUNE.PRG)
+    echo "tried: the same through the module under Node," \
+         "$(wc -c < "$try/TUNE.PRG" | tr -d ' ') bytes of program"
+    rm -rf "$try"
+fi
 
-echo "$OUT/release is this release: the tools, one zip a platform."
+echo "$OUT/release is this release: the tools, one zip a platform and one of the module."
