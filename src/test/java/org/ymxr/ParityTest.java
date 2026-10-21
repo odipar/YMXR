@@ -169,8 +169,8 @@ final class ParityTest {
     @Test
     void theFlagsReadTheSameInBothTrees() throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym"));
-        for (String[] flags : new String[][] {{"-k2"}, {"-m480"}, {"-r"}, {"-r100"},
-                {"-copies"}, {"-k2", "-m1129", "-copies"}}) {
+        for (String[] flags : new String[][] {{"-k1"}, {"-m480"}, {"-r"}, {"-r100"},
+                {"-copies"}, {"-k1", "-m1129", "-copies"}}) {
             List<String> argv = new ArrayList<>(List.of("-silent"));
             argv.addAll(List.of(flags));
             both("ym-to-ymxr", dump, argv.toArray(new String[0]));
@@ -352,7 +352,7 @@ final class ParityTest {
     void aSetOfSubtunesIsReportedTheSameInBothTrees() throws Exception {
         byte[] dump = Files.readAllBytes(dumps().get(0));
         byte[] one = both("ym-to-ymxr", dump, "-silent");
-        byte[] two = both("ym-to-ymxr", dump, "-silent", "-k2");
+        byte[] two = both("ym-to-ymxr", dump, "-silent", "-k1");
         byte[] shared = multiOf(List.of(one, one));
         byte[] split = multiOf(List.of(one, two));
         // One image for the two that agree, and two for the two that do

@@ -90,7 +90,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | tune | A rate and a table of rows, with a title, a composer and a writer for display (YMXS, SPEC.md 1.3); a tune file encodes the rate, the table and the title, as its name (SPEC.md 3.3). | YMXS, SPEC.md 1.3; SPEC.md 3 |
 | tune file | The values fixed for a tune, its name, its DTX3 table and one DTX1 table a source, in one file (SPEC.md 3.3). A bound tune adds DTX's reader to it. | SPEC.md 3.3 |
 | ubiquitous language | The terms of this glossary, used with one meaning in every document, comment and name. | requirements.md R0.6 |
-| unit | `k`, the bytes ST4 packs at once, 1, 2 or 4, one for every live column of a DTX3 table (DTX, SPEC.md 2.4): 1 by default. `R` and `RR` divide by it (SPEC.md 6, rule 6). | tools.md |
+| unit | `k`, the bytes ST4 packs at once, 1, 2 or 4, one for every live column of a DTX3 table (DTX, SPEC.md 2.4): 2 by default. `R` and `RR` divide by it (SPEC.md 6, rule 6). | tools.md |
 | unset row | A row of the tune's table that leaves every column unset: a frame that reads it leaves every register as it is and every timer running (SPEC.md 6, rule 6). | terminology.md, 3. Tables, rows and procedures |
 | version | The word at offset 4 of a tune file, a multi file and a bound tune: $0007, a tune whose table is DTX3 (SPEC.md 3.3.5). A reader reads that one, and reports $0003 to $0006, whose table is DTX2. | SPEC.md 3.3 |
 | voice | One of the YM2149's three outputs, A, B and C, each with a volume and a mixing setting. | terminology.md, 1. The sound chip |

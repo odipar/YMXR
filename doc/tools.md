@@ -162,7 +162,7 @@ The tools that write a tune file share the packer's flags and the padding:
 the tune files it reads again, through `-mN` and `-copies[S]` (11.1).
 
 **4.1 `-kK`.** K is the unit the table packs at, DTX's `k`, 1, 2 or 4
-(DTX, SPEC.md 2.4), 1 by default.
+(DTX, SPEC.md 2.4), 2 by default.
 
 **4.2 `-mN`.** N is the ring in bytes. Without `-m` the writer chooses one:
 it packs the table through each of 60, 120, 240, 480, 960 and 1,920 bytes
@@ -983,7 +983,7 @@ requires the same exit code, the same bytes on standard output and, with
 the progress lines dropped, the same text on standard error: every dump
 under `ym/test` through `ym-to-ymxs`, `ym-to-ymxr`, `ymxs-to-ymxr`,
 `ymxr-bind`, `ymxr-sndh`, `ymxr-prg`, `ymxr-trace -r200` and
-`ymxr-check`; the flags `-k2`, `-m480`, `-r`, `-r100`, `-copies`, `-k2
+`ymxr-check`; the flags `-k1`, `-m480`, `-r`, `-r100`, `-copies`, `-k1
 -m1129 -copies`, `-tOne -cTwo -perf`, `-lean`, `-r2000`; two tune files
 through `ymxr-multi`, `ymxr-sndh` and `ymxr-prg`. Skipped where `go` is
 off the path or the Java tree is unbuilt.

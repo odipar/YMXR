@@ -22,7 +22,7 @@
 # The converter's options, which a tune file is packed already and needs
 # none of:
 #
-#   -kK        the unit the table packs at, 1, 2 or 4; 1 by default, and
+#   -kK        the unit the table packs at, 1, 2 or 4; 2 by default, and
 #              above 1 a tune whose row count or repeat row fails to
 #              divide by K is padded until both divide (SPEC.md 6, rule 6)
 #   -mN        the ring in bytes; without it the writer chooses the one

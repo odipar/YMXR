@@ -33,7 +33,7 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -cost              the raster monitor's runs under
                                        Hatari, as ym/cost.sh makes them:
                                        the two tunes against YMX, one at
-                                       unit 2, and DBA 2's first write,
+                                       unit 1, and DBA 2's first write,
                                        against performance.md
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
@@ -2011,13 +2011,13 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
         for one in parts.values():
             idles.update(one["idles"])
         three = sorted(c for c, _ in idles.most_common(3))
-        at_two = refill(tunes[0], code, symbols, dtx, "-k2")["idle"]
+        at_one = refill(tunes[0], code, symbols, dtx, "-k1")["idle"]
         reads(r"([\d,]+) cycles inside the decoder where the match's source is"
               r" after the ring's start, ([\d,]+) where it is before that"
               r" start, and ([\d,]+) where it crosses that start.*?The ([\d,]+)"
-              r" and the ([\d,]+) above the first.*?A refill at unit 2 is"
+              r" and the ([\d,]+) above the first.*?A refill at unit 1 is"
               r" ([\d,]+)\.", three[0], three[1], three[2], three[1] - three[0],
-              three[2] - three[0], at_two)
+              three[2] - three[0], at_one)
         slopes = sorted((one["slope"], stem) for stem, one in parts.items()
                         if one["slope"])
         reads(r"about ([\d,]+) to ([\d,]+) an operation to parse",
@@ -2404,7 +2404,7 @@ def monitor_runs():
     (-cost): the two tunes of the section against YMX, each over the run
     the section names, their first calls, as many as the section counts,
     on average, at the 99th in a hundred and at most against the table's
-    YMXR rows; Synergy Credits packed at unit 2 over a run of the same
+    YMXR rows; Synergy Credits packed at unit 1 over a run of the same
     length against its figure at most; and on DBA 2, the least cycles from
     the VBL to the frame procedure's first chip write, against the raster
     monitor's paragraph. A run reads the table within the bounds the
@@ -2440,14 +2440,14 @@ def monitor_runs():
             stale.append("performance.md reads %s for %s, and the run measures %s" % (
                 "/".join(row.groups()), tune, "/".join(str(x) for x in (average, near, most))))
         read.append("%s %d/%d/%d over the first %d of %d calls" % (tune, average, near, most, counted, made))
-    unit = re.search(r"the refill is fifteen units, and a run of the same length reads ([\d,]+)"
+    unit = re.search(r"the refill is thirty units, and a run of the same length reads ([\d,]+)"
                      r" at most", said)
-    assert unit, "performance.md has no run of Synergy Credits at unit 2"
-    _, _, _, most = calls(os.path.join(ROOT, "ym", "test", "Synergy Credits.ym"), vbls, counted, unit=2)
+    assert unit, "performance.md has no run of Synergy Credits at unit 1"
+    _, _, _, most = calls(os.path.join(ROOT, "ym", "test", "Synergy Credits.ym"), vbls, counted, unit=1)
     if abs(most - int(unit.group(1).replace(",", ""))) > call_within:
-        stale.append("performance.md reads %s at most for Synergy Credits at unit 2, and the run"
+        stale.append("performance.md reads %s at most for Synergy Credits at unit 1, and the run"
                      " measures %d" % (unit.group(1), most))
-    read.append("Synergy Credits at unit 2 %d at most" % most)
+    read.append("Synergy Credits at unit 1 %d at most" % most)
     lands = re.search(r"Measured on %s over ([\d,]+) frames, the call's first register write"
                       r" is at least ([\d,]+) cycles after the VBL" % FIRST_TUNE, said)
     assert lands, "performance.md has no first write on " + FIRST_TUNE

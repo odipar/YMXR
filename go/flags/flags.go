@@ -34,7 +34,7 @@ type Packing struct {
 }
 
 // Unit is the unit the table packs at by default.
-const Unit = 1
+const Unit = 2
 
 // PackingFlags is the packer's flags.
 var PackingFlags = []string{"-k", "-m", "-copies"}

@@ -668,32 +668,35 @@ final class ConsistencyTest {
 
     /**
      * performance.md's refill parts against its table: the fixed part
-     * outside the decoder and the heaviest parse inside make the most
-     * Turrican's advance costs a frame, at least the advance in its
-     * costliest frame, which the table reads. The sentence gave the sum
-     * from before DTX took its state block in a6, and the table gave the
-     * figure after it.
+     * outside the decoder, the 16 of a refill that ends at the ring's end
+     * and the heaviest parse inside make the advance in Turrican's
+     * costliest frame. The sentence gave the sum from before DTX took its
+     * state block in a6, and the table gave the figure after it.
      */
     @Test
     void theRefillPartsAddUpToTheAdvanceMeasured() throws IOException {
         String perf = read(PERF);
-        Matcher parts = wrapped("A refill of ([\\d,]+) outside and the heaviest"
-                + " ([\\d,]+) inside are ([\\d,]+), the most Turrican's advance costs a"
-                + " frame; its costliest call is another frame, whose advance is the"
-                + " ([\\d,]+) of the table above").matcher(perf);
+        Matcher parts = wrapped("A refill of ([\\d,]+) outside, ([\\d,]+) more at the ring's"
+                + " end, and the heaviest ([\\d,]+) inside are the ([\\d,]+) the table above"
+                + " reads").matcher(perf);
         assertTrue(parts.find(), "performance.md has no refill parts");
         long outside = number(parts.group(1));
-        long inside = number(parts.group(2));
-        long whole = number(parts.group(3));
-        assertEquals(whole, outside + inside, () -> outside + " outside and "
-                + inside + " inside make " + (outside + inside)
-                + ", and the sentence reads " + whole);
+        long end = number(parts.group(2));
+        long inside = number(parts.group(3));
+        long whole = number(parts.group(4));
+        assertEquals(whole, outside + end + inside, () -> outside + " outside, " + end
+                + " at the ring's end and " + inside + " inside make "
+                + (outside + end + inside) + ", and the sentence reads " + whole);
         long[] turrican = Objects.requireNonNull(
                 playCalls(perf).get("Turrican - world 4-3"),
                 "performance.md's table names no Turrican - world 4-3");
-        assertEquals(string(turrican[3]), parts.group(4),
+        assertEquals(string(turrican[3]), string(whole),
                 "the table reads another advance in the costliest frame");
-        assertTrue(whole >= turrican[3], "the most the advance costs is below the costliest frame's");
+        Matcher step = wrapped("A refill that ends at the ring's end costs ([\\d,]+) more")
+                .matcher(perf);
+        assertTrue(step.find(), "performance.md has no refill at the ring's end");
+        assertEquals(string(end), string(number(step.group(1))),
+                "the two sentences read the ring's end differently");
         Matcher spends = wrapped("The advance spends ([\\d,]+) cycles a refill"
                 + " outside the decoder").matcher(perf);
         assertTrue(spends.find(), "performance.md has no fixed part");
@@ -809,7 +812,7 @@ final class ConsistencyTest {
                 + number(split.group(4)) * busy) / (double) (idle + busy)),
                 "YMX's two kinds of call average to its row on Turrican - world 4-3");
 
-        Matcher ours = wrapped("YMXR refills (\\S+) units of a byte on the turns that refill a"
+        Matcher ours = wrapped("YMXR refills (\\S+) units of two bytes on the turns that refill a"
                 + " live column, (\\S+) in (\\S+) on Turrican - world 4-3, and runs an idle turn on"
                 + " the rest; YMX serves a round-robin of (\\S+) slots, (\\S+) of them a live"
                 + " stream, so its group is (\\S+) bytes, (\\S+) units at unit 2, and it refills on"
@@ -818,7 +821,7 @@ final class ConsistencyTest {
         int units = count(ours.group(1));
         int slots = count(ours.group(4));
         int live = count(ours.group(5));
-        assertEquals(Columns.C, units, "YMXR's units at unit 1");
+        assertEquals(Columns.C / 2, units, "YMXR's units at unit 2");
         assertTrue(count(ours.group(2)) <= Columns.C, "YMXR's live columns on Turrican - world 4-3");
         assertEquals(Columns.C, count(ours.group(3)), "the turns of a period");
         assertEquals(slots, count(ours.group(6)), "YMX's group, a byte a slot");
@@ -826,7 +829,8 @@ final class ConsistencyTest {
         assertEquals(live, count(ours.group(8)), "the rows YMX refills on");
         assertEquals(slots, count(ours.group(9)), "the rows YMX refills over");
         assertEquals(slots - live, count(ours.group(10)), "YMX's slots without a stream");
-        Matcher against = wrapped("(\\S+) units against (\\S+), which is why").matcher(section);
+        Matcher against = wrapped("the smaller of the two, (\\S+) units against (\\S+)\\.")
+                .matcher(section);
         assertTrue(against.find(), "performance.md has no refills set against each other");
         assertEquals(slots / 2, count(against.group(1)), "YMX's refill");
         assertEquals(units, count(against.group(2)), "YMXR's refill");
@@ -840,9 +844,9 @@ final class ConsistencyTest {
         Matcher heaviest = wrapped("at its heaviest are [\\d,]+ over (\\w+) operations").matcher(perf);
         assertTrue(heaviest.find(), "performance.md has no heaviest refill of Turrican - world 4-3");
         assertEquals(heaviest.group(1), worst.group(3), "Turrican - world 4-3's heaviest refill");
-        Matcher two = wrapped("the refill is (\\S+) units, and a run of the same length").matcher(section);
-        assertTrue(two.find(), "performance.md has no refill at unit 2");
-        assertEquals(Columns.C / 2, count(two.group(1)), "YMXR's units at unit 2");
+        Matcher one = wrapped("the refill is (\\S+) units, and a run of the same length").matcher(section);
+        assertTrue(one.find(), "performance.md has no refill at unit 1");
+        assertEquals(Columns.C, count(one.group(1)), "YMXR's units at unit 1");
     }
 
     /**
@@ -1076,7 +1080,7 @@ final class ConsistencyTest {
         assertEquals(Math.round(100.0 * number(refill.group(4)) / most),
                 Long.parseLong(refill.group(5)), "the share at unit 1");
         assertTrue(heaviest > 0, "the table reads no advance");
-        Matcher under = wrapped("The costliest frame of the (\\w+) is (.+?)'s ([\\d,]+), ([\\d,]+)"
+        Matcher under = wrapped("The costliest frame of the (\\w+) is (.+?)'s? ([\\d,]+), ([\\d,]+)"
                 + " cycles under the budget").matcher(plan);
         assertTrue(under.find(), "plan.md has no costliest frame against the budget");
         assertEquals(calls.size(), spelled(under.group(1)), "the tunes the table measures, again");

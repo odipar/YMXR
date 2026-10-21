@@ -545,17 +545,18 @@ func packed(said *report.Report, written Written, chose string) error {
 			continue
 		}
 		bytes := payload.Bytes(payload.Map[c], len(table)-dtx.HeaderLength)
-		said.Row(Name(c), fmt.Sprintf("%7d -> %6d bytes  (%5.1f%%)", frames, bytes,
-			100.0*float64(bytes)/float64(frames)))
+		said.Row(Name(c), fmt.Sprintf("%7d -> %6d bytes  (%5s%%)", frames, bytes,
+			report.Fixed(100.0*float64(bytes)/float64(frames), 1)))
 	}
 	said.Say(fmt.Sprintf("the sources: %s of %s, %s",
 		report.Count(written.Sources, "table", "tables"),
 		report.Count(written.SourceRows, "row", "rows"),
 		report.Count(written.SourceBytes, "byte", "bytes")))
 	raw := C * frames
-	said.Say(fmt.Sprintf("packed %s into %d (%.1f%%), the state block %s, the file %s",
+	said.Say(fmt.Sprintf("packed %s into %d (%s%%), the state block %s, the file %s",
 		report.Count(raw, "byte", "bytes"), len(table),
-		100.0*float64(len(table))/float64(raw), report.Count(state, "byte", "bytes"),
+		report.Fixed(100.0*float64(len(table))/float64(raw), 1),
+		report.Count(state, "byte", "bytes"),
 		report.Count(len(written.File), "byte", "bytes")))
 	return nil
 }
