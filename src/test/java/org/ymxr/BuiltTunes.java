@@ -18,6 +18,10 @@ import java.util.List;
  */
 final class BuiltTunes {
 
+    /** The ring a test packs through: one ring named, so a test packs once
+     *  rather than through the rings the writer chooses among. */
+    static final int RING = 960;
+
     /** The frames the preempt tune runs for. */
     static final int PREEMPT_FRAMES = 400;
     /** The frames the retrigger-retune tune runs for. */
@@ -227,12 +231,12 @@ final class BuiltTunes {
                 Sources.Source.of(Effects.SID, 15, looping, 2),
                 Sources.Source.of(Effects.SID, 10, fifth, 1)));
         Columns columns = new Columns(c, repeat, 0b1111);
-        return Tune.write(columns, sources, 60, YmToYmxr.UNIT, Tune.RING, new Report());
+        return Tune.write(columns, sources, 60, YmToYmxr.UNIT, RING, new Report());
     }
 
     /**
      * The four kinds of target that write several registers (SPEC.md
-     * 2.1), one an effect, so the kit has a tune of version 4: a voice on
+     * 2.1), one an effect, so the kit has a tune of each: a voice on
      * Timer A, a noise on Timer D, a buzzer on Timer B and a tone on Timer
      * C. The marker is in a different column under each kind - the
      * coarse nibble of a voice and a tone, the noise period of a noise,
@@ -334,7 +338,7 @@ final class BuiltTunes {
                 new Sources.Source(Effects.SID, 0, tone, 0),
                 new Sources.Source(Effects.SID, 0, fifth, 0)));
         Columns columns = new Columns(c, repeat, 0b1111);
-        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, new Report());
     }
 
     /**
@@ -386,13 +390,13 @@ final class BuiltTunes {
                 new Sources.Source(Effects.BUZZER, 0, sweep, 2),
                 new Sources.Source(Effects.BUZZER, 0, fall, fall[0].length)));
         Columns columns = new Columns(c, 0, 0b0001);
-        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, new Report());
     }
 
     /**
      * The six targets whose register reads every bit of its byte (SPEC.md
      * 2.1.2), each running a counted source, so the kit has a tune of
-     * version 5: `setR0` and `setR4` on Timer A, `setR7` on Timer D,
+     * each: `setR0` and `setR4` on Timer A, `setR7` on Timer D,
      * `setR11` on Timer B, and `setR12` and `setR2` on Timer C. Rows with
      * bit 7 set are in every one of the six sources, where a source the
      * marker ends reads that bit as its end (3.2.1), and bit 31 of each of
@@ -515,7 +519,7 @@ final class BuiltTunes {
                 source(toneB, 0),
                 source(one, one.length)));
         Columns columns = new Columns(c, repeat, 0b1111);
-        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, new Report());
     }
 
     /** A counted source of one column: the rows and the row it repeats to,
@@ -526,7 +530,7 @@ final class BuiltTunes {
 
     /**
      * `setEnvelope` with a counted source (SPEC.md 2.1.3), so the kit has
-     * a tune of version 6: both registers of that target read every bit of
+     * a tune of it: both registers of that target read every bit of
      * their byte, so the rows of a source on it are whole bytes and a tick
      * counts them. The high byte reaches 255, an envelope period of 65,323
      * and a cycle of 8.36 seconds, which a marked source could not write:
@@ -573,7 +577,7 @@ final class BuiltTunes {
                 new Sources.Source(Effects.BUZZER, 0, sweep, 2, true),
                 new Sources.Source(Effects.BUZZER, 0, fall, fall[0].length, true)));
         Columns columns = new Columns(c, 0, 0b0001);
-        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, Tune.RING, new Report());
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, new Report());
     }
 
     /** Three tones and no noise, the same under both tunes' effects. */

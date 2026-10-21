@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import org.dtx.St4;
 import org.ymxs.tool.Tool;
 
 /**
@@ -14,9 +13,12 @@ import org.ymxs.tool.Tool;
  * ym-to-ymxr in.ym out.ymxr [-kK] [-mN] [-rRR] [-copies[S]] [-silent]
  * </pre>
  *
- * {@code -k} is the unit the table packs at, 2 by default; {@code -m} the
- * ring in bytes, 960; {@code -r} the row the tune repeats to, the dump's
- * loop frame by default, and {@code -r} alone a tune that plays once.
+ * {@code -k} is the unit the table packs at, 1 by default; {@code -m} the
+ * ring in bytes, which the writer chooses by default; {@code -copies} packs
+ * each live column with copies and without and keeps the smaller, and
+ * {@code -copiesS} searches the copies S seconds; {@code -r} the
+ * row the tune repeats to, the dump's loop frame by default, and {@code -r}
+ * alone a tune that plays once.
  * The tool reports what it read, the flags it took, the sources it found
  * and what each column packed to; {@code -silent} leaves the summary
  * line and the notes.
@@ -24,7 +26,7 @@ import org.ymxs.tool.Tool;
 public final class YmToYmxr {
 
     /** The unit a table packs at unless {@code -k} names another. */
-    static final int UNIT = 2;
+    static final int UNIT = 1;
 
     /** The flag that turns a tool's report off. Every tool reads it, and
      *  the tools that accept the converter's flags pass it through. */
@@ -53,7 +55,7 @@ public final class YmToYmxr {
 
     static Converted convert(YmDump.Song song, List<String> flags, Report report) {
         int unit = UNIT;
-        int ring = Tune.RING;
+        int ring = Tune.CHOOSE;
         int repeat = -1;
         boolean once = false;
         boolean copies = false;
@@ -64,10 +66,10 @@ public final class YmToYmxr {
             } else if (flag.startsWith("-m")) {
                 ring = Integer.parseInt(flag.substring(2));
             } else if (flag.startsWith("-copies")) {
-                // the packer's, spelled as DTX's dtx-write spells it:
-                // a match beyond the ring copies from the column's literal
-                // stream, which packs a small ring far smaller,
-                // and -copiesS searches S seconds for a better parse
+                // the packer's, spelled as DTX's dtx-write spells it: a
+                // live column is packed with copies from its literal stream
+                // and without, the smaller kept, and -copiesS searches S
+                // seconds for a better parse with them
                 copies = true;
                 seconds = flag.length() > 7 ? Double.parseDouble(flag.substring(7)) : 0;
             } else if (flag.equals("-r")) {
@@ -99,7 +101,7 @@ public final class YmToYmxr {
         Columns columns = made.columns();
         found(report, sources, columns);
         Tune.Written written = Tune.write(columns, made.sources(), song.playerHz(), unit, ring,
-                copies ? new St4(true, seconds) : new St4(), report, song.name());
+                copies ? Tune.packers(seconds) : Tune.packers(), report, song.name());
         String said = Report.count(song.frames(), "frame", "frames") + " at "
                 + song.playerHz() + " Hz, " + Report.count(sources.count(), "source", "sources")
                 + ", effects " + Integer.toBinaryString(columns.effects) + ", repeats at "
@@ -135,14 +137,16 @@ public final class YmToYmxr {
         report.say("the flags: " + (flags.isEmpty() ? "none, so the defaults below"
                 : String.join(" ", flags)));
         report.row("-k, the unit", unit + (unit == UNIT ? ", the default" : ", asked for"));
-        report.row("-m, the ring", Report.count(ring, "byte", "bytes")
-                + (ring == Tune.RING ? ", the default" : ", asked for"));
+        report.row("-m, the ring", ring == Tune.CHOOSE
+                ? "the one the writer chooses, the default"
+                : Report.count(ring, "byte", "bytes") + ", asked for");
         report.row("-r, the repeat row", once ? "none, the tune plays once"
                 : repeat + (flags.stream().anyMatch(f -> f.startsWith("-r")) ? ", asked for"
                 : ", the dump's loop frame"));
-        report.row("-copies", !copies ? "no, the default: a match beyond the ring is not packed"
-                : seconds == 0 ? "yes, the opening passes alone"
-                : "yes, " + seconds + " seconds of search, which packs another parse a run");
+        report.row("-copies", !copies ? "no, the default: a live column packs without copies"
+                : (seconds == 0 ? "yes, the opening passes alone"
+                : "yes, " + seconds + " seconds of search, which packs another parse a run")
+                + ", where copies pack a live column smaller");
     }
 
     /** The sources and the effects the dump's frames came to. */

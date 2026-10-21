@@ -15,6 +15,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | claim | The operation a player performs on a timer at init, for each effect the effects used byte marks: it stops the timer, writes its vector, clears its pending bit, and sets its enable bit and its mask bit. | terminology.md, 2. The timers |
 | column | One field of a row, `W` bytes wide: one byte in a tune's table. | requirements.md R1.1 |
 | conformance kit | The tune files under `doc/conformance/tunes`, each with its table unpacked beside it and, in `MANIFEST.txt`, the size and the digest of the tune file, of the unpacked table and of the record a reader produces; a reader is tested against it. | README.md |
+| constant column | A column of a tune's table whose value is the same in every row, which a DTX3 table has as its value, with neither ring nor decoder (DTX, SPEC.md 2.4). | SPEC.md 3.3.3 |
 | control column | Column 14 + 4i + 2 of effect i: bit 7 the set bit, bit 6 the timer's reset, bit 5 the place's reset, bit 4 the count column's 0 as a value, bits 2 to 0 the select. | SPEC.md 1.9 |
 | corpus | The 544 YM files YMX 0.8.3 was tested against, all of which read from 0.4.13 on; the figures of experiments.md and performance.md are measured over it. | experiments.md |
 | count column | Column 14 + 4i + 3 of effect i: the timer count, the byte written to the timer's data register; 0 where the row leaves it unset, and bit 4 of the control column marks 0 as a value. | SPEC.md 1.9 |
@@ -31,9 +32,10 @@ repository encodes YMXS's structure and reads DTX's table.
 | frame rate | The frames a second at which the host calls the player, recorded once in the tune file. | SPEC.md 3.3 |
 | generator | One of the YM2149's five: three tone, one noise, one envelope. | terminology.md, 1. The sound chip |
 | host | The program that calls the player once a frame, provides the workspace, and runs every timer outside the tune's. | BINARIES.md 5 |
-| image | DTX's reader packaged with a table: its code, its column table and the table, entered through calls at its first bytes. A bound tune has one; a tune file has the table alone. | BINARIES.md 1 |
+| image | DTX's reader packaged with a table: its code and the table, entered through calls at its first bytes. A bound tune has one; a tune file has the table alone. | BINARIES.md 1 |
 | index entry | 4 bytes of the tune file for a source: bits 30 to 0 the offset of its DTX1 table, and bit 31 the mark of a counted source. | SPEC.md 3.1, 3.3 |
 | kept value | The target and the count of an effect as the player keeps them from the last row that set them: a row that leaves the column unset leaves the kept value, and bit 6 of the control column writes the kept count (SPEC.md 1.8, 1.9). | requirements.md R4.6 |
+| live column | A column of a tune's table whose values change, which a DTX3 table packs with ST4 and a reader unpacks through a ring (DTX, SPEC.md 2.4). | SPEC.md 3.3.3 |
 | loop | The frames from the one that reads the repeat row to the one that reads the last row. | YMXS, SPEC.md 4.5 |
 | marker | Bit 7 of the column SPEC.md 2.1 names for a source's target, set in the last row alone: a tick tests it after the write; where the source repeats, the next tick reads row `RR`, and otherwise the timer stops. A counted source ends on its row count instead. | SPEC.md 3.2, 5 |
 | metadata | `R`, `C`, `RR` and `W`: the four values that describe a table. | terminology.md, 3. Tables, rows and procedures |
@@ -56,7 +58,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | record | The lines a reader produces of a tune file: the fixed values on the first line, then one entry a frame. | SPEC.md 7 |
 | register | One byte of the YM2149's settings. Sixteen: fourteen are the sound, two are I/O ports. | terminology.md, 1. The sound chip |
 | release | The operation a player performs on a claimed timer at stop: it stops the timer, clears its enable bit and its mask bit, and clears its pending bit. | terminology.md, 2. The timers |
-| ring | The bytes a column of a DTX2 table unpacks through, one size for the payload (DTX, SPEC.md 2.3): 960 by default; the tools of this repository round it to a multiple of 30, a row's bytes, from 60 to 1,110, the largest multiple of 30 a 16-bit displacement reaches. | tools.md |
+| ring | The bytes a live column of a DTX3 table unpacks through, one size for the payload (DTX, SPEC.md 2.4): a multiple of 30, a row's bytes, from 60 to the largest a 16-bit displacement reaches at the table's live columns, which the tools of this repository choose by default. | tools.md |
 | row | One step of a table: `C` values, one a column. | terminology.md, 3. Tables, rows and procedures |
 | `RR` | The row a table repeats to after its last row; `R` where the table plays once. | requirements.md R1.1 |
 | sample | A recording, one value a tick, played as a source through a voice's volume register at the rate of the recording. | terminology.md, 5. Effects |
@@ -86,11 +88,11 @@ repository encodes YMXS's structure and reads DTX's table.
 | tone period | A voice's 12-bit divider: R0 and R1, R2 and R3, R4 and R5. | terminology.md, 1. The sound chip |
 | tracker | A program that produces tunes; its terms map onto the schema (R3.2). | requirements.md R3.2 |
 | tune | A rate and a table of rows, with a title, a composer and a writer for display (YMXS, SPEC.md 1.3); a tune file encodes the rate, the table and the title, as its name (SPEC.md 3.3). | YMXS, SPEC.md 1.3; SPEC.md 3 |
-| tune file | The values fixed for a tune, its name, its DTX2 table and one DTX1 table a source, in one file (SPEC.md 3.3). A bound tune adds DTX's reader to it. | SPEC.md 3.3 |
+| tune file | The values fixed for a tune, its name, its DTX3 table and one DTX1 table a source, in one file (SPEC.md 3.3). A bound tune adds DTX's reader to it. | SPEC.md 3.3 |
 | ubiquitous language | The terms of this glossary, used with one meaning in every document, comment and name. | requirements.md R0.6 |
-| unit | `k`, the bytes ST4 packs at once, 1, 2 or 4, one for every column of a DTX2 table (DTX, SPEC.md 2.3): 2 by default. `R` and `RR` divide by it (SPEC.md 6, rule 6). | tools.md |
+| unit | `k`, the bytes ST4 packs at once, 1, 2 or 4, one for every live column of a DTX3 table (DTX, SPEC.md 2.4): 1 by default. `R` and `RR` divide by it (SPEC.md 6, rule 6). | tools.md |
 | unset row | A row of the tune's table that leaves every column unset: a frame that reads it leaves every register as it is and every timer running (SPEC.md 6, rule 6). | terminology.md, 3. Tables, rows and procedures |
-| version | The word at offset 4 of a tune file, a multi file and a bound tune: $0003 to $0006, the lowest a tune reads under (SPEC.md 3.3.5). A reader reads those four. | SPEC.md 3.3 |
+| version | The word at offset 4 of a tune file, a multi file and a bound tune: $0007, a tune whose table is DTX3 (SPEC.md 3.3.5). A reader reads that one, and reports $0003 to $0006, whose table is DTX2. | SPEC.md 3.3 |
 | voice | One of the YM2149's three outputs, A, B and C, each with a volume and a mixing setting. | terminology.md, 1. The sound chip |
 | volume | R8, R9 or R10: bits 3 to 0 the level of a voice, and bit 4 set selects the level of the envelope instead. | terminology.md, 1. The sound chip |
 | `W` | The bytes of every value of a table: 1, 2 or 4; one in a tune's table and in a source's. | requirements.md R1.1 |

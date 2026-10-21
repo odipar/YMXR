@@ -273,13 +273,7 @@ final class Sndh {
      *     lean ones where {@code lean} does
      */
     static int binds(List<byte[]> tuneFiles) {
-        int most = Bound.VERSION;
-        for (byte[] file : tuneFiles) {
-            if (file.length >= 6) {
-                most = Math.max(most, Tune.getWord(file, 4));
-            }
-        }
-        return Math.min(most, Bound.VERSION_WIDE_COUNTED);
+        return Bound.VERSION;
     }
 
     static void checkCore(byte[] core, boolean monitor, boolean lean, int binds) {

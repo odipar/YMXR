@@ -1,20 +1,21 @@
-{"kind":"program","bytes":48216}
-{"part":"prg","text":48184}
-{"part":"stub","at":28,"bytes":1760,"version":1,"subtunes":2,"flags":0,"rate":50,"rows":2000,"core":1906}
-{"part":"sndh","at":1788}
-{"part":"entry","to":[1906,1910,1914]}
-{"part":"tag","name":"TITL","at":1804,"text":"Two"}
-{"part":"tag","name":"COMM","at":1812,"text":"Jochen Hippel"}
-{"part":"tag","name":"CONV","at":1830,"text":"YMXR (ym-to-ymxr)"}
-{"part":"tag","name":"##","at":1852,"count":2}
-{"part":"tag","name":"TC","at":1857,"rate":50}
-{"part":"tag","name":"FLAG","at":1862,"text":"~y"}
-{"part":"tag","name":"FRMS","at":1870,"frames":[0,4]}
-{"part":"tag","name":"!#SN","at":1882,"names":["Circus","Once"]}
-{"part":"tag","name":"HDNS","at":1902}
-{"part":"core","at":1906,"version":1,"binds":6,"fixed":2120,"flags":4,"state":2560,"subtunetable":10750,"work":15778}
-{"part":"subtunes","at":10750,"tunes":[10760,10784]}
-{"part":"tune","number":1,"at":10760,"bytes":24,"version":3,"rate":50,"effects":0,"sources":0,"stateblock":30312,"image":10810,"table":1928}
-{"part":"tune","number":2,"at":10784,"bytes":26,"version":3,"rate":50,"effects":0,"sources":0,"stateblock":30312,"image":10810,"table":3748}
-{"part":"image","number":1,"at":10810}
-{"part":"workspace","at":15778,"bytes":32434}
+{"kind":"program","bytes":16742}
+{"part":"prg","text":16710}
+{"part":"stub","at":28,"bytes":1770,"version":2,"subtunes":2,"flags":0,"rate":50,"rows":2000,"core":1924,"prescaler":5,"count":0,"ticks":150}
+{"part":"sndh","at":1798}
+{"part":"entry","to":[1924,1928,1932]}
+{"part":"tag","name":"TITL","at":1814,"text":"Two"}
+{"part":"tag","name":"COMM","at":1822,"text":"Jochen Hippel"}
+{"part":"tag","name":"CONV","at":1840,"text":"YMXR (ym-to-ymxr)"}
+{"part":"tag","name":"##","at":1862,"count":2}
+{"part":"tag","name":"TC","at":1867,"rate":50}
+{"part":"tag","name":"FLAG","at":1872,"text":"~y"}
+{"part":"tag","name":"FRMS","at":1880,"frames":[0,4]}
+{"part":"tag","name":"!#SN","at":1892,"names":["Circus","Once"]}
+{"part":"tag","name":"TIME","at":1912,"seconds":[0,1]}
+{"part":"tag","name":"HDNS","at":1920}
+{"part":"core","at":1924,"version":1,"binds":7,"fixed":2120,"flags":4,"state":2578,"subtunetable":10926,"work":13200}
+{"part":"subtunes","at":10926,"tunes":[10936,10960]}
+{"part":"tune","number":1,"at":10936,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":10984,"table":1448}
+{"part":"tune","number":2,"at":10960,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":10984,"table":1856}
+{"part":"image","number":1,"at":10984}
+{"part":"workspace","at":13200,"bytes":3538}

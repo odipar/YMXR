@@ -2,7 +2,7 @@
 
 **1.** The kit is eleven files under `files/`, of the four kinds
 [BINARIES.md](../BINARIES.md) defines, and the record of each under
-`records/`: 153 lines over the eleven. The kit tests one document,
+`records/`: 160 lines over the eleven. The kit tests one document,
 BINARIES.md: an implementer who has read it alone writes a reader (2),
 and a record equal to the reference byte for byte shows that the
 document defines the layouts.

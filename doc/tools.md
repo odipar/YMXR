@@ -161,22 +161,34 @@ padding: `ym-to-ymxr`, `ymxs-to-ymxr`, `ymxs-to-sndh`,
 `ymxs-to-prg`, and `ymxr-check` for the conversion it checks.
 
 **4.1 `-kK`.** K is the unit the table packs at, DTX's `k`, 1, 2 or 4
-(DTX, SPEC.md 2.3), 2 by default.
+(DTX, SPEC.md 2.4), 1 by default.
 
-**4.2 `-mN`.** N is the ring in bytes, 960 by default. The table packs
-through the multiple of 30 nearest N, at least 60 and at most 1,110; where
-that differs from N the tool notes `the ring is A bytes: a multiple of the
-period within the player's reach`, A the ring used.
+**4.2 `-mN`.** N is the ring in bytes. Without `-m` the writer chooses
+one: it packs the table through each of 60, 120, 240, 480, 960 and 1,920
+bytes the player reaches and keeps the one whose table and state block
+come to the least. Under `-copies` that pass is without copies, and the
+writer then packs with copies where they pay through the two that came to
+the least and keeps the one of the two that comes to the less. A ring the
+packager finds no period
+for at unit K is left out (DTX, abi.md 4), and the tool notes `a ring of A
+has no period at unit K`. With `-mN` the table packs through the multiple
+of 30 nearest N, at least 60 and at most the largest the player reaches;
+where that differs from N the tool notes `the ring is A bytes: a multiple
+of the period within the player's reach`, A the ring used.
 
-Note: the player reaches column 29 of the ring through a 16-bit
-displacement, and 32,767 divided by 29 is 1,129, the largest ring; 1,110
-is the largest multiple of 30 within it.
+Note: the player reaches slot L less 1's ring through a 16-bit
+displacement from slot 0's, L the live columns, so the largest ring is
+32,767 divided by L less 1: 1,129 at 30 live columns, the most a tune has,
+and 32,512, DTX3's bound, at 2 or fewer.
 
-**4.3 `-copies[S]`.** With `-copies` every column packs with copies from
-its literal stream, which sets bit 0 of the payload's flags byte (DTX,
-SPEC.md 2.3). S, a decimal number of seconds, is the time the packer
-searches for a better parse; with S above 0 the parse differs from run
-to run. With S absent the packer reads its opening passes alone.
+**4.3 `-copies[S]`.** Each live column packs with copies from its
+literal stream and without, and the smaller is kept; a payload with one
+column of copies sets bit 0 of its flags byte (DTX, SPEC.md 2.4). S, a
+decimal number of seconds, is the time the packer searches for a better
+parse with copies; with S above 0 the parse differs from run to run.
+With S absent the packer reads its opening passes alone. Without the flag
+a live column packs without copies, which converts a tune in a fraction
+of the time.
 
 **4.4 The padding.** Before a tune is encoded, the tool performs rule 6
 of SPEC.md 6 on it, R its row count, RR its repeat row where it repeats,
@@ -195,17 +207,20 @@ K the unit, an *unset row* a row with every column unset:
    - otherwise: append K minus R modulo K unset rows. Note
      `padded: N unset rows at row R, so the table packs at unit K`.
 
-The period of the DTX2 table is 30 rows.
+The period of the DTX3 table is 30 rows.
 
 **4.5 The packing report.** A tool that writes a tune file reports, per
 tune: the heading `the table: 30 columns of R rows, B bytes, packed at
-unit K through a ring of A`, B = 30 R; a row a column, named `R0` to
-`R13` and `effect i target`, `effect i source`, `effect i timer control`,
-`effect i timer count` for i 0 to 3, the value
-`%7d -> %6d bytes  (%5.1f%%)`, two spaces before the parenthesis, of the
-rows in, the bytes out and their ratio; the heading `the sources: N
-tables of R rows, B bytes`; and the heading `packed X bytes into Y
-(Z%), the file F bytes`, X = 30 R, Y the DTX2 table, F the tune file.
+unit K through a ring of A`, B = 30 R, then `, the one the writer chose`
+where `-m` is absent, then `, L live columns`; a row a column, named `R0`
+to `R13` and `effect i target`, `effect i source`, `effect i timer
+control`, `effect i timer count` for i 0 to 3, the value `%7d -> constant
+V` for a constant column, V its value, and `%7d -> %6d bytes  (%5.1f%%)`
+for a live one, two spaces before the parenthesis, of the rows in, the
+bytes of its slot's streams and their ratio; the heading `the sources: N
+tables of R rows, B bytes`; and the heading `packed X bytes into Y (Z%),
+the state block S bytes, the file F bytes`, X = 30 R, Y the DTX3 table, S
+the state block its reader needs (DTX, abi.md 3), F the tune file.
 
 **4.6 The name** of a tune file (SPEC.md 3.3) is the text the tool's
 section names, its characters below space dropped, stripped of
@@ -238,12 +253,13 @@ dump's loop frame L is past its last frame: the tune plays once`.
    `digidrums`, `N of B bytes in all`, where the dump has any.
 2. The heading `the flags: <flags>`, the arguments as passed, or `none, so
    the defaults below`. Rows: `-k, the unit`, `K, the default` or `K,
-   asked for`; `-m, the ring`, `N bytes, the default` or `N bytes, asked
-   for`;
+   asked for`; `-m, the ring`, `the one the writer chooses, the default`
+   or `N bytes, asked for`;
    `-r, the repeat row`, `none, the tune plays once`, `RR, asked for` or
-   `RR, the dump's loop frame`; `-copies`, `no, the default: a match beyond
-   the ring is not packed`, `yes, the opening passes alone` or `yes, S
-   seconds of search, which packs another parse a run`.
+   `RR, the dump's loop frame`; `-copies`, `no, the default: a live column
+   packs without copies`, `yes, the opening passes alone, where copies
+   pack a live column smaller` or `yes, S seconds of search, which packs
+   another parse a run, where copies pack a live column smaller`.
 3. The heading `the effects: E of 4 run, S sources, at most 127`. Rows
    for each kind present: `square waves`, `digidrums`, `sinus SIDs`,
    `buzzers`, the value `N, R rows in all`.
@@ -586,9 +602,9 @@ several subtunes; a row a subtune, its name or `the tune`, `B bytes
 bound to B2, its table in image I`, B the tune file's bytes, B2 the
 bound tune's, I the number of its image from 1; the heading `the images:
 N images of B bytes, DTX's reader once a set of tunes that share one`
-with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX2 at
-unit K, a ring of A, values of W`, W the width of a value in bytes, then
-`, with copies` where packed so; the heading `the file: B bytes, the
+with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX3 at
+unit K, values of W`, W the width of a value in bytes; the heading `the
+file: B bytes, the
 core C, the images I, the tunes T, the workspace and the rest W`, C, I,
 T and W the bytes of the core, the images, the bound tunes, and the
 remainder. The summary line is `ymxr-sndh: B bytes, N subtunes`.
@@ -907,7 +923,7 @@ closed, under the lock `target/.building`, a directory one process creates
 and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
-needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.11.12`
+needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.12.0`
 and YMXS `0.4.9` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
@@ -921,7 +937,7 @@ run test.yml`.
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images
 embedded; it runs by itself. The Go tree requires the modules
-`github.com/odipar/dtx/go v0.11.12` and `github.com/odipar/ymxs/go v0.4.9`,
+`github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go v0.4.9`,
 which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and
@@ -929,7 +945,7 @@ requires the same exit code, the same bytes on standard output and, with
 the progress lines dropped, the same text on standard error: every dump
 under `ym/test` through `ym-to-ymxs`, `ym-to-ymxr`, `ymxs-to-ymxr`,
 `ymxr-bind`, `ymxr-sndh`, `ymxr-prg`, `ymxr-trace -r200` and
-`ymxr-check`; the flags `-k1`, `-m480`, `-r`, `-r100`, `-copies`, `-k1
+`ymxr-check`; the flags `-k2`, `-m480`, `-r`, `-r100`, `-copies`, `-k2
 -m1129 -copies`, `-tOne -cTwo -perf`, `-lean`, `-r2000`; two tune files
 through `ymxr-multi`, `ymxr-sndh` and `ymxr-prg`. Skipped where `go` is
 off the path or the Java tree is unbuilt.

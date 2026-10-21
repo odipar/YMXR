@@ -35,19 +35,10 @@ type MultiRead struct {
 }
 
 // IsMulti is whether the file opens as a multi file.
-// multiVersion is the version of a multi file: the highest of the tune
-// files in it (SPEC.md 3.3.5).
+// multiVersion is the version of a multi file, its tune files' (SPEC.md
+// 3.3.5).
 func multiVersion(tunes [][]byte) int {
-	most := Version
-	for _, tune := range tunes {
-		if len(tune) >= 6 && GetWord(tune, 4) > most {
-			most = GetWord(tune, 4)
-		}
-	}
-	if most > VersionWideCounted {
-		most = VersionWideCounted
-	}
-	return most
+	return Version
 }
 
 func IsMulti(file []byte) bool {
@@ -102,9 +93,12 @@ func ReadMulti(file []byte) (MultiRead, error) {
 		return MultiRead{}, errors.New("not a YMXM file")
 	}
 	version := GetWord(file, 4)
-	if version < Version || version > VersionWideCounted {
-		return MultiRead{}, fmt.Errorf("version %d is not %d, %d, %d or %d", version,
-			Version, VersionColumns, VersionCounted, VersionWideCounted)
+	if version >= VersionDtx2 && version <= VersionDtx2Last {
+		return MultiRead{}, fmt.Errorf("version %d has DTX2 tables, and this reads %d:"+
+			" write the tunes again with ym-to-ymxr or ymxs-to-ymxr", version, Version)
+	}
+	if version != Version {
+		return MultiRead{}, fmt.Errorf("version %d is not %d", version, Version)
 	}
 	count := GetWord(file, MultiCountAt)
 	if count < 1 || count > MostTunes {

@@ -106,7 +106,7 @@ final class ReportTest {
         assertTrue(said.contains("500 at 50 Hz (0:10)"), said);
         assertTrue(said.contains("-k, the unit           " + YmToYmxr.UNIT + ", the default"),
                 said);
-        assertTrue(said.contains("-m, the ring           " + Tune.RING + " bytes, the default"),
+        assertTrue(said.contains("-m, the ring           the one the writer chooses, the default"),
                 said);
         assertTrue(said.contains("the table: " + Columns.C + " columns of 500 rows, "
                 + Columns.C * 500 + " bytes"), said);
@@ -143,12 +143,12 @@ final class ReportTest {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican 2 -"
                 + " world completed 1.ym"));
         Caught c = caught(true);
-        YmToYmxr.convert(dump, List.of("-k1", "-m1920", "-r10"), c.report());
+        YmToYmxr.convert(dump, List.of("-k2", "-m1920", "-r10"), c.report());
         String said = c.said();
         // A flag passed reads as requested, and a source of a kind is
         // counted with its rows.
-        assertTrue(said.contains("the flags: -k1 -m1920 -r10"), said);
-        assertTrue(said.contains("-k, the unit           1, asked for"), said);
+        assertTrue(said.contains("the flags: -k2 -m1920 -r10"), said);
+        assertTrue(said.contains("-k, the unit           2, asked for"), said);
         assertTrue(said.contains("-m, the ring           1920 bytes, asked for"), said);
         assertTrue(said.contains("-r, the repeat row     10, asked for"), said);
         assertTrue(said.contains("digidrums"), "the dump's digidrums are said: " + said);
@@ -161,34 +161,19 @@ final class ReportTest {
                 + " you blew it!.ym"));
         Caught c = caught(true);
         byte[] file = YmToYmxr.convert(dump, List.of(), c.report()).written().file();
-        // The account has a row a column; the file has each column's
-        // data set at a separate offset, so the two are compared.
-        int table = Tune.getLong(file, Tune.TABLE_AT);
-        // A DTX2 file is its header, then a payload whose offsets count
-        // from the payload's first byte (DTX abi.md 2.3).
-        int payload = table + org.dtx.Dtx.HEADER;
-        int[] at = new int[Columns.C];
-        for (int i = 0; i < Columns.C; i++) {
-            at[i] = Tune.getLong(file, payload + 4 + 4 * i);
-        }
-        // The table runs to the first source's table, or to the file's
-        // end where the tune has none.
-        int sources = file[Tune.COUNT_AT] & 0xFF;
-        int ends = sources > 0 ? Tune.getLong(file, Tune.INDEX_AT) : file.length;
+        // The account has a row a column; the file has each live column's
+        // streams at a separate offset and each constant column's value,
+        // so the two are compared (DTX, SPEC.md 2.4).
+        byte[] table = TuneFile.read(file).dtx3();
+        org.dtx.Dtx3.Payload payload = org.dtx.Dtx3.payload(table);
         String said = c.said();
         for (int i = 0; i < Columns.C; i++) {
-            // A set runs to the next set's offset, less the padding that
-            // puts that one on a long; the last runs to the table's end.
-            int to = i + 1 < Columns.C ? at[i + 1] : ends - payload;
-            int most = to - at[i];
-            int least = Math.max(0, most - 3);
-            boolean found = false;
-            for (int bytes = least; bytes <= most && !found; bytes++) {
-                found = said.contains(String.format("  %-22s %7d -> %6d bytes",
-                        Tune.name(i), 500, bytes));
-            }
-            assertTrue(found, "no row for column " + i + " reading " + least + " to " + most
-                    + " bytes in " + said);
+            String row = payload.live(i)
+                    ? String.format("  %-22s %7d -> %6d bytes", Tune.name(i), 500,
+                            payload.bytes(payload.map()[i], table.length - org.dtx.Dtx.HEADER))
+                    : String.format("  %-22s %7d -> constant %d", Tune.name(i), 500,
+                            payload.constants()[i]);
+            assertTrue(said.contains(row), "no row " + row + " in " + said);
         }
         Files.write(work.resolve("t.ymxr"), file);
     }
@@ -213,7 +198,8 @@ final class ReportTest {
                 System.setOut(new PrintStream(o, true, StandardCharsets.UTF_8));
                 System.setErr(new PrintStream(e, true, StandardCharsets.UTF_8));
                 System.setIn(new ByteArrayInputStream(dump));
-                YmToYmxr.main(i == 0 ? new String[0] : new String[] {YmToYmxr.SILENT});
+                YmToYmxr.main(i == 0 ? new String[] {"-k2"}
+                        : new String[] {"-k2", YmToYmxr.SILENT});
             } finally {
                 System.setOut(wasOut);
                 System.setErr(wasErr);
@@ -229,9 +215,9 @@ final class ReportTest {
                 "the summary names the tool, on standard error: " + err[0]);
         assertTrue(err[0].contains("the flags:") && err[0].contains("the table: "),
                 "the account is on standard error: " + err[0]);
-        // Turrican 2 has 178 frames repeating to 177: a row goes in before
-        // the repeat, the count is then odd, and the loop of one row is
-        // written twice (SPEC.md 6, rule 6), which is two notes
+        // Turrican 2 has 178 frames repeating to 177: at unit 2 a row goes in
+        // before the repeat, the count is then odd, and the loop of one row
+        // is written twice (SPEC.md 6, rule 6), which is two notes
         String before = "  padded: 1 unset row at row 177, before the repeat row, so the table"
                 + " packs at unit 2" + System.lineSeparator();
         String after = "  padded: the loop's 1 row written twice, so the table packs at unit 2"

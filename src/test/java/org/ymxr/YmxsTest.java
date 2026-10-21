@@ -60,7 +60,7 @@ final class YmxsTest {
         Schema.Made made = Schema.of(Padding.toUnit(back, YmToYmxr.UNIT, new Report()).tune());
         // the tune file records the tune's name, as ymxs-to-ymxr writes it
         return org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
-                YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report(), back.title()).file();
+                YmToYmxr.UNIT, org.ymxr.Tune.CHOOSE, new Report(), back.title()).file();
     }
 
     @Test
@@ -235,16 +235,15 @@ final class YmxsTest {
                 + " register, which the count column is: " + said);
         // A source on a register that fills its byte has no marker in it:
         // its rows are whole bytes and a player counts them (3.1), which
-        // the version word says (3.3.5).
+        // bit 31 of its index entry marks, in a file of version 7 (3.3.5).
         org.ymxs.YMXS.Single whole = Tunes.repeating("whole", List.of(200), 0);
         List<Row> counted = List.of(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R0),
                 whole, new Timing(Chip.prescaler(4), 100, true, true))));
         Schema.Made made = Schema.of(built(counted, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
-                YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report()).file();
-        assertEquals(org.ymxr.Tune.VERSION_COUNTED, org.ymxr.Tune.getWord(file, 4),
-                "a tune with a counted source is version "
-                        + org.ymxr.Tune.VERSION_COUNTED);
+                YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
+        assertEquals(org.ymxr.Tune.VERSION, org.ymxr.Tune.getWord(file, 4),
+                "a tune with a counted source is version " + org.ymxr.Tune.VERSION);
         TuneFile read = TuneFile.read(file);
         assertEquals(200, read.sources().get(0).column(0)[0] & 0xFF,
                 "the row is the value, with no marker in bit 7");
@@ -256,7 +255,7 @@ final class YmxsTest {
     void aSourceOnTheEnvelopePeriodIsCountedAndReachesTheWholeRange() {
         // Both registers of `setEnvelope` read every bit of their byte, so
         // a source on it is counted: its two columns are whole bytes, it
-        // reaches a period of 0 to 65,535, and the file is version 6
+        // reaches a period of 0 to 65,535, and the file is version 7
         // (SPEC.md 2.1.3, 3.3.5).
         org.ymxs.YMXS.Pair sweep = new org.ymxs.YMXS.Pair("period",
                 Tunes.repeating(List.of(new org.ymxs.YMXS.Two(0, 200),
@@ -266,10 +265,10 @@ final class YmxsTest {
                 new Timing(Chip.prescaler(4), 100, true, true))));
         Schema.Made made = Schema.of(built(rows, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
-                YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report()).file();
-        assertEquals(org.ymxr.Tune.VERSION_WIDE_COUNTED, org.ymxr.Tune.getWord(file, 4),
+                YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
+        assertEquals(org.ymxr.Tune.VERSION, org.ymxr.Tune.getWord(file, 4),
                 "a tune with a counted source of several columns is version "
-                        + org.ymxr.Tune.VERSION_WIDE_COUNTED);
+                        + org.ymxr.Tune.VERSION);
         TuneFile read = TuneFile.read(file);
         assertTrue(read.counted().get(0), "bit 31 of the index entry marks it counted");
         assertEquals(200, read.sources().get(0).column(1)[0] & 0xFF,
@@ -290,7 +289,7 @@ final class YmxsTest {
                 new Timing(Chip.prescaler(4), 100, true, true))));
         Schema.Made made = Schema.of(built(rows, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
-                YmToYmxr.UNIT, org.ymxr.Tune.RING, new Report()).file();
+                YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
         TuneFile read = TuneFile.read(file);
         assertTrue(read.counted().get(0), "a source on setR7 is counted");
         assertEquals(0xF8, read.sources().get(0).column(0)[0] & 0xFF,

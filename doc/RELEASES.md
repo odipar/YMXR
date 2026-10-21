@@ -11,7 +11,7 @@ below it.
 - one zip a platform, over six: Windows, macOS and Linux, each on x64 and
   arm64. A zip contains the twelve tools as executables, and each
   executable contains the nine 68000 binaries of BINARIES.md and DTX's
-  twenty-two images, so one converts a dump and writes a program on a
+  forty images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed
 - one zip of the twelve tools and YMXS's `ymxs-check` as one
   WebAssembly module, beside the scripts that run it in a web page and

@@ -33,7 +33,7 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -cost              the raster monitor's runs under
                                        Hatari, as ym/cost.sh makes them:
                                        the two tunes against YMX, one at
-                                       unit 1, and DBA 2's first write,
+                                       unit 2, and DBA 2's first write,
                                        against performance.md
        test_ymxr.py -perf [tunes]      the player built with the raster
                                        monitor in, against the same model:
@@ -110,14 +110,14 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 3 where every source of the tune is one column and 4
-# where one has several, and a reader and the player read both.
-TUNE_VERSIONS = (3, 4, 5, 6)
+# (BINARIES.md 1): 7, a tune whose table is DTX3, which a reader and the
+# player read.
+TUNE_VERSIONS = (7,)
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
 COUNTED = 1 << 31
-BOUND_VERSIONS = (3, 4, 5, 6)
+BOUND_VERSIONS = (7,)
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209
@@ -695,6 +695,11 @@ class Machine:
         self.select = None
         self.stray = []
         self.palette = []
+        # The image of a bound tune: DTX's init writes the ring's size into
+        # the decoder's code where the table has copies (DTX, abi.md 2), so
+        # a write there is the reader's, wherever the tune is loaded.
+        self.images = []
+        self.image(FILE, tune_bytes)
         mu.hook_add(UC_HOOK_MEM_WRITE, self._write)
         self.rte_at = None
         self.stopped = None
@@ -704,6 +709,13 @@ class Machine:
         # pixels: the raster monitor waits for it, and a value that never
         # moved would run the wait to its ceiling
         mu.hook_add(UC_HOOK_MEM_READ, self._beam, begin=VIDEO, end=VIDEO + 1)
+
+    def image(self, at, tune_bytes):
+        """The image of the bound tune loaded at `at`, where init writes."""
+        if tune_bytes[:4] == b"YMXB":
+            image_at = struct.unpack(">i", tune_bytes[16:20])[0]
+            if image_at > 0:
+                self.images.append((at + image_at, at + len(tune_bytes)))
 
     def _beam(self, mu, access, address, size, value, data):
         self.beam = (self.beam + 1) & 0xFF
@@ -735,6 +747,8 @@ class Machine:
             self.palette.append((value & 0xFFFF, len(self.psg)))
         elif address < 0x1000 or CODE <= address < CODE + 0x10000:
             pass                        # a vector, or the player patching itself
+        elif any(lo <= address < hi for lo, hi in self.images):
+            pass                        # DTX's init writing its decoder
         elif not (WORK <= address < WORK + 0x40000 or STACK <= address < STACK + 0x10000):
             self.stray.append((address, size, value))
 
@@ -1051,9 +1065,10 @@ def unplace(at, row, effect):
     cleared on `row`: a start that moves no place. ymxs-to-ymxr writes the
     place's reset on every start outside rule 3(a) of SPEC.md 6
     (doc/ymxs.md), so a tune file of another writer is made here. The row
-    table goes through dtx-write -text and back, packed at the unit and
-    ring ymxs-to-ymxr packs at, and the sources' tables follow it on a
-    long, their index entries moved by as many bytes (SPEC.md 3.3)."""
+    table goes through dtx-write -text and back, a DTX3 table packed at the
+    unit and ring its payload defines (DTX, SPEC.md 2.4), and the sources'
+    tables follow it on a long, their index entries moved by as many bytes
+    (SPEC.md 3.3)."""
     f = open(at, "rb").read()
     table_at = long_at(f, 12)
     entries = [long_at(f, 16 + 4 * i) for i in range(f[9])]
@@ -1068,7 +1083,9 @@ def unplace(at, row, effect):
     assert int(cells[c]) & 0x20, "the writer set the place's reset"
     cells[c] = str(int(cells[c]) & ~0x20)
     lines[rows[row]] = ",".join(cells)
-    r = subprocess.run([DTX_WRITE, "-v2", "-k2", "-m960"],
+    ring = struct.unpack(">H", f[table_at + 16:table_at + 18])[0]
+    unit = f[table_at + 18]
+    r = subprocess.run([DTX_WRITE, "-v3", "-k%d" % unit, "-m%d" % ring],
                        input="\n".join(lines).encode(), capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     table = r.stdout + bytes(-len(r.stdout) % 4)
@@ -1203,8 +1220,8 @@ def voices(code, symbols):
                    "count": column(starts, 90), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
     at, version = built("voices", tune)
-    assert version == TUNE_VERSIONS[1], \
-        "a tune with a source of several columns is version 4 (SPEC.md 3.3.5)"
+    assert version == TUNE_VERSIONS[0], \
+        "a tune with a source of several columns is version 7 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
     return ("a target of three registers and one of two: %d frames, %d ticks"
             % (frames, ticks))
@@ -1240,8 +1257,8 @@ def envelope(code, symbols):
                    "count": column(starts, 120), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
     at, version = built("envelope", tune)
-    assert version == TUNE_VERSIONS[3], \
-        "a source on setEnvelope is counted, so the tune is version 6 (SPEC.md 3.3.5)"
+    assert version == TUNE_VERSIONS[0], \
+        "a source on setEnvelope is counted, in a tune of version 7 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
     return ("the envelope period a counted source of two columns: %d frames, %d ticks"
             % (frames, ticks))
@@ -1264,6 +1281,7 @@ def outofreach(code, symbols):
     far = WORK - 0x10000
     m = Machine(code, symbols, bound)
     m.mu.mem_write(far, bound)
+    m.image(far, bound)
     assert m.call("init", a0=far, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
         "init took a tune %d bytes from the handlers" % (far - CODE)
     return "a tune %d bytes off: init reports -1" % (far - CODE)
@@ -1273,7 +1291,7 @@ def wholebyte(code, symbols):
     """A source whose one column fills its byte (SPEC.md 3.1): setR0 is
     the tone's fine byte, which reads every bit, so its rows carry no
     marker and the player counts them. Bit 31 of the source's index entry
-    marks it and the version word is 5.
+    marks it, in a tune of version 7.
 
     The rows here run to 255, which the marker's 0 to 127 could not carry,
     so this tune is one no version before wrote. The model counts the rows
@@ -1302,8 +1320,8 @@ def wholebyte(code, symbols):
                    "count": column(starts, 100), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
     at, version = built("wholebyte", tune)
-    assert version == TUNE_VERSIONS[2], \
-        "a tune with a counted source is version 5 (SPEC.md 3.3.5)"
+    assert version == TUNE_VERSIONS[0], \
+        "a tune with a counted source is version 7 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
     return ("a column that fills its byte: %d frames, %d ticks"
             % (frames, ticks))
@@ -1338,7 +1356,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init took a bound tune of version %d" % (BOUND_VERSIONS[-1] + 1)
-        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0), 0, None
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0)), 0, None
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
@@ -1362,6 +1380,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
+    # the frame procedure as init patched it: a constant column's read is
+    # an immediate (68k/YMXR.S, ymxr_put)
+    patched = bytes(m.mu.mem_read(CODE, len(code)))
     # Timer C's nibble is the host's 200 Hz clock, kept unless effect 3 runs
     nibble = 0 if tune.effects & 8 else 0x50
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "init moved Timer C's nibble"
@@ -1640,8 +1661,24 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             assert timers.mode[i] == 0 or i == 3, "stop left effect %d's timer running" % i
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "stop moved Timer C's nibble"
     return (frames, ticks, cost, tick_cost, tick_cycles,
-            (costliest[0], tune.R, tune.RR, advance, steps, tune.effects), boundaries,
-            parts_of(refills_of) if refills_of else None)
+            (costliest[0], tune.R, tune.RR, advance, steps, tune.effects, patched,
+             (len(bound), long_at(bound, 12))),
+            boundaries, refill_parts(refills_of, file, tune))
+
+
+def refill_parts(rows, file, tune):
+    """parts_of a run's frames, with what the table's payload marks: a
+    DTX3 table at the tune file's field at 12, its flags at 19 past it
+    (DTX's SPEC.md 2.4), bit 1 a loop longer than the ring, replayed, and
+    L, the live columns, at 20; and the loop's rows."""
+    if not rows:
+        return None
+    parts = parts_of(rows)
+    table = long_at(file, 12)
+    parts["replayed"] = bool(file[table + 19] & 2)
+    parts["live"] = struct.unpack(">H", file[table + 20:table + 22])[0]
+    parts["loop"] = tune.R - tune.RR
+    return parts
 
 
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+) .* pc=([0-9a-f]+)")
@@ -1654,11 +1691,43 @@ CPU_CLOCK = 8021247.0
 ROM = 0xE00000
 
 
+# The turns of a period: the column count, the slots one each and the
+# rest idle (tools.md 4).
+PERIOD = 30
+
+
 # The words performance.md spells a small count with, so the rig reads the
 # sentence back as it is.
 WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
          7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
-         12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
+         12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
+         16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
+         20: "twenty", 21: "twenty-one", 22: "twenty-two", 23: "twenty-three",
+         24: "twenty-four", 25: "twenty-five", 26: "twenty-six",
+         27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine",
+         30: "thirty"}
+
+
+def footprint_read(footprints):
+    """performance.md's bound tunes and state blocks, a fixture a row,
+    against the binder's and the field at 12 of what it bound (BINARIES.md
+    1.1); the release's columns beside them are that release's, and the
+    last column is the two together against them."""
+    text = open(os.path.join(ROOT, "doc", "performance.md")).read()
+    stale = []
+    for stem, (bound, state) in sorted(footprints.items()):
+        row = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (-?\d+)%% \|$"
+                        % re.escape(stem), text, re.M)
+        if not row:
+            stale.append("performance.md has no footprint of " + stem)
+            continue
+        was_bound, was_state, said_bound, said_state, share = (int(x) for x in row.groups())
+        got = round(100.0 * (bound + state) / (was_bound + was_state) - 100)
+        if (said_bound, said_state, share) != (bound, state, got):
+            stale.append("performance.md reads %d, %d and %d%% for %s's footprint, and the rig"
+                         " counts %d, %d and %d%%" % (said_bound, said_state, share, stem,
+                                                      bound, state, got))
+    return stale
 
 
 def dense_read(savings, costs):
@@ -1814,11 +1883,22 @@ def decoder_of(file, bound, tune, dtx):
             (at + labels["new_offset"], at + labels["begin_literals"]))
 
 
-def parts_of(rows):
+def parts_of(every):
     """The refill figures of performance.md over a run's frames, each frame
     (the cycles outside the decoder, the cycles inside it, the operations
-    parsed)."""
-    idle = Counter(dec for _, dec, ops in rows if ops == 0)
+    parsed). A turn past the last slot runs no decoder (DTX, abi.md 4): its
+    cycles are the idle turn's, and the refill figures read the rest.
+
+    A refill that parses no operation copies inside a match, at one of a
+    few costs: `idles` counts each, and `idle` is the least of the ones a
+    twentieth of those refills or more read. A refill that ends at
+    the ring's end puts the pointer back by N, so `outsides` lists the
+    costs outside the decoder a twentieth of the refills or more read."""
+    turns = Counter(out for out, dec, _ in every if dec == 0)
+    rows = [row for row in every if row[1]] or every
+    idles = Counter(dec for _, dec, ops in rows if ops == 0)
+    common = sorted(c for c, n in idles.items() if 20 * n >= sum(idles.values()))
+    outs = Counter(out for out, _, _ in rows)
     heaviest = max(rows, key=lambda row: row[1])
     # The fit of the decoder's cycles on the operations parsed, over every
     # refill: its slope is an operation's cost to parse. A tune whose
@@ -1828,8 +1908,10 @@ def parts_of(rows):
     var = sum((ops - mean_o) ** 2 for _, _, ops in rows)
     cov = sum((ops - mean_o) * (dec - mean_d) for _, dec, ops in rows)
     return {"frames": len(rows),
-            "outside": min(out for out, _, _ in rows),
-            "idle": idle.most_common(1)[0][0] if idle else None,
+            "turn": turns.most_common(1)[0][0] if turns else None,
+            "outside": min(outs),
+            "outsides": sorted(c for c, n in outs.items() if 20 * n >= len(rows)),
+            "idle": common[0] if common else None, "idles": idles,
             "heaviest": heaviest[1], "operations": heaviest[2],
             "slope": cov / var if var else None}
 
@@ -1891,27 +1973,51 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
         if not m:
             stale.append("performance.md has no \"%s\"" % claim)
             return
-        got = tuple(str(w).lower() for w in want)
+        got = tuple(str(w).replace(",", "").lower() for w in want)
         if tuple(g.replace(",", "").lower() for g in m.groups()) != got:
             stale.append("performance.md reads %s where the rig counts %s"
                          % (str(m.groups()), str(got)))
 
     if whole:
-        floors = sorted({one["outside"] for one in parts.values()})
-        fits = sum(1 for one in parts.values() if one["outside"] == floors[0])
+        # A run shorter than a period refills each slot once, after the
+        # seed, so its floor is read apart from the others.
+        full = {stem: one for stem, one in parts.items() if one["frames"] >= PERIOD}
+        replayed = sorted({one["outside"] for one in full.values() if one["replayed"]})
+        fitting = sorted({one["outside"] for one in full.values() if not one["replayed"]})
         reads(r"The advance spends ([\d,]+) cycles a refill outside the"
               r" decoder,.*?; ([\d,]+) where a column fits the ring",
-              floors[-1], floors[0])
-        reads(r"(\w+) of the eleven tunes fit", WORDS.get(fits, fits))
-        idle = {stem: one["idle"] for stem, one in parts.items()}
-        odd = idle.pop("capture", None)
-        rest = sorted(set(idle.values()))
-        at_one = refill(tunes[0], code, symbols, dtx, "-k1")["idle"]
-        reads(r"the cost most of its refills read: ([\d,]+) cycles inside the"
-              r" decoder on ten of the eleven,.*?and ([\d,]+) on capture,.*?"
-              r"The ([\d,]+) between them.*?A refill at unit 1 is ([\d,]+)\.",
-              rest[0] if len(rest) == 1 else rest, odd,
-              odd - rest[0] if len(rest) == 1 else "", at_one)
+              replayed[0] if len(replayed) == 1 else replayed,
+              fitting[0] if len(fitting) == 1 else fitting)
+        fits = sorted(stem for stem, one in parts.items() if not one["replayed"])
+        reads(r"(\w+) of the eleven tunes fits?:", WORDS.get(len(fits), len(fits)))
+        for stem in fits:
+            reads(r"%s, whose loop is (\w+)" % re.escape(stem),
+                  WORDS.get(parts[stem]["loop"], parts[stem]["loop"]))
+        steps = sorted({one["outsides"][1] - one["outsides"][0]
+                        for one in full.values() if len(one["outsides"]) > 1})
+        reads(r"A refill that ends at the ring's end costs ([\d,]+) more",
+              steps[0] if len(steps) == 1 else steps)
+        for stem, one in sorted(parts.items()):
+            if stem not in full:
+                reads(r"%s plays (\w+) frames,.*? and reads ([\d,]+)\." % re.escape(stem),
+                      WORDS.get(one["frames"], one["frames"]), one["outside"])
+        lives = sorted(one["live"] for one in parts.values())
+        reads(r"([\d,]+) to ([\d,]+) of the thirty columns are live", lives[0], lives[-1])
+        turns = sorted({one["turn"] for one in parts.values() if one["turn"]})
+        reads(r"A turn past the last slot costs the advance ([\d,]+) cycles",
+              turns[0] if len(turns) == 1 else turns)
+        # the three costs of a refill that parses no operation, over the set
+        idles = Counter()
+        for one in parts.values():
+            idles.update(one["idles"])
+        three = sorted(c for c, _ in idles.most_common(3))
+        at_two = refill(tunes[0], code, symbols, dtx, "-k2")["idle"]
+        reads(r"([\d,]+) cycles inside the decoder where the match's source is"
+              r" after the ring's start, ([\d,]+) where it is before that"
+              r" start, and ([\d,]+) where it crosses that start.*?The ([\d,]+)"
+              r" and the ([\d,]+) above the first.*?A refill at unit 2 is"
+              r" ([\d,]+)\.", three[0], three[1], three[2], three[1] - three[0],
+              three[2] - three[0], at_two)
         slopes = sorted((one["slope"], stem) for stem, one in parts.items()
                         if one["slope"])
         reads(r"about ([\d,]+) to ([\d,]+) an operation to parse",
@@ -1926,6 +2032,8 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
               int(ends[0]), int(ends[-1]))
     one = parts.get("Turrican - world 4-3")
     if one:
+        reads(r"refill a live column, (\w+) in thirty on Turrican - world 4-3",
+              WORDS.get(one["live"], one["live"]))
         reads(r"the ([\d,]+) above and ([\d,]+) at its heaviest are ([\d,]+)"
               r" over (\w+) operations, about ([\d,]+) each",
               one["idle"], one["heaviest"], one["heaviest"] - one["idle"],
@@ -2296,7 +2404,7 @@ def monitor_runs():
     (-cost): the two tunes of the section against YMX, each over the run
     the section names, their first calls, as many as the section counts,
     on average, at the 99th in a hundred and at most against the table's
-    YMXR rows; Synergy Credits packed at unit 1 over a run of the same
+    YMXR rows; Synergy Credits packed at unit 2 over a run of the same
     length against its figure at most; and on DBA 2, the least cycles from
     the VBL to the frame procedure's first chip write, against the raster
     monitor's paragraph. A run reads the table within the bounds the
@@ -2332,14 +2440,14 @@ def monitor_runs():
             stale.append("performance.md reads %s for %s, and the run measures %s" % (
                 "/".join(row.groups()), tune, "/".join(str(x) for x in (average, near, most))))
         read.append("%s %d/%d/%d over the first %d of %d calls" % (tune, average, near, most, counted, made))
-    unit = re.search(r"packed at unit 1, the refill was thirty units, and a run of the same length"
-                     r" reads ([\d,]+) at most", said)
-    assert unit, "performance.md has no run of Synergy Credits at unit 1"
-    _, _, _, most = calls(os.path.join(ROOT, "ym", "test", "Synergy Credits.ym"), vbls, counted, unit=1)
+    unit = re.search(r"the refill is fifteen units, and a run of the same length reads ([\d,]+)"
+                     r" at most", said)
+    assert unit, "performance.md has no run of Synergy Credits at unit 2"
+    _, _, _, most = calls(os.path.join(ROOT, "ym", "test", "Synergy Credits.ym"), vbls, counted, unit=2)
     if abs(most - int(unit.group(1).replace(",", ""))) > call_within:
-        stale.append("performance.md reads %s at most for Synergy Credits at unit 1, and the run"
+        stale.append("performance.md reads %s at most for Synergy Credits at unit 2, and the run"
                      " measures %d" % (unit.group(1), most))
-    read.append("Synergy Credits at unit 1 %d at most" % most)
+    read.append("Synergy Credits at unit 2 %d at most" % most)
     lands = re.search(r"Measured on %s over ([\d,]+) frames, the call's first register write"
                       r" is at least ([\d,]+) cycles after the VBL" % FIRST_TUNE, said)
     assert lands, "performance.md has no first write on " + FIRST_TUNE
@@ -2646,11 +2754,13 @@ SPURIOUS = 0x60
 
 
 # The head of an effect: a bra.w over its columns where a tune does not run
-# it, and the read's opcode where it does (68k/YMXR.S, the EFFECT macro).
-# Init writes one or the other, so a set where one subtune runs an effect
-# and the next does not reads the head back as the branch it began as.
+# it, and the read's opcode where it does (68k/YMXR.S, the EFFECT macro):
+# move.b d16(a1),d1 where the target column is live, and move.b #v,d1
+# where it is constant (DTX, SPEC.md 2.4). Init writes one or the other,
+# so a set where one subtune runs an effect and the next does not reads the
+# head back as the branch it began as.
 HEAD_BRANCH = 0x6000
-HEAD_READ = 0x1229
+HEAD_READ = (0x1229, 0x123C)
 
 
 def heads(m, symbols):
@@ -2660,7 +2770,12 @@ def heads(m, symbols):
 
 
 def want_heads(effects):
-    return [HEAD_READ if effects & (1 << i) else HEAD_BRANCH for i in range(4)]
+    return [HEAD_READ if effects & (1 << i) else (HEAD_BRANCH,) for i in range(4)]
+
+
+def heads_are(got, effects):
+    """Whether each head is the one init writes for these effects."""
+    return all(one in want for one, want in zip(got, want_heads(effects)))
 
 
 def patched_code_follows_the_subtune(defines, tunes):
@@ -2672,8 +2787,12 @@ def patched_code_follows_the_subtune(defines, tunes):
     address. A word written on one path and left alone on another reads
     the subtune before it. So every subtune is inited alone on a fresh
     image, and then after every other, all at one address, and the code
-    and the tunes' images must read the same both ways. The workspace is
-    outside both and is not compared.
+    and the subtune's bound tune must read the same both ways. The
+    workspace is outside both and is not compared, and so are the other
+    subtunes' bound tunes: each is bound alone here, with a separate image,
+    which DTX's init writes the ring's size into where its table has copies
+    (DTX, abi.md 2), and the subtune after it reads the image it is bound
+    with alone.
     """
     code, symbols = assemble("YMXR_sndh.S", defines=defines)
     work = tempfile.mkdtemp()
@@ -2739,10 +2858,14 @@ def patched_code_follows_the_subtune(defines, tunes):
             m.call("core-init", d0=a + 1)
             m.call("core-init", d0=b + 1)
             got = image(m)
-            for region, name, base in ((0, "the code", CODE), (1, "the tunes", FILE)):
-                if got[region] != alone[b][region]:
+            mine = slice(offsets[b], offsets[b] + len(bounds[b][1]))
+            got = (got[0], got[1][mine])
+            was = (alone[b][0], alone[b][1][mine])
+            for region, name, base in ((0, "the code", CODE),
+                                       (1, "the tune", FILE + offsets[b])):
+                if got[region] != was[region]:
                     where = [i for i in range(len(got[region]))
-                             if got[region][i] != alone[b][region][i]]
+                             if got[region][i] != was[region][i]]
                     near = {}
                     for sym, at in symbols.items():
                         if not sym.startswith(".") and at <= where[0]:
@@ -2754,7 +2877,7 @@ def patched_code_follows_the_subtune(defines, tunes):
                             name, bounds[a][0], bounds[b][0], bounds[b][0], len(where),
                             label, where[0] - max(near) if near else where[0],
                             base + where[0], got[region][where[0]],
-                            alone[b][region][where[0]]))
+                            was[region][where[0]]))
             pairs += 1
     return "%d subtunes in one set: the code after any one then another is the " \
         "code after the other alone, %d ordered pairs%s" % (
@@ -2800,10 +2923,11 @@ def core(defines, ym):
         "init left $60 at %08x, not the core's handler at %08x" % (
             at, CODE + symbols["sndh_spurious"])
     assert bytes(m.mu.mem_read(at, 2)) == b"\x4e\x73", "the handler at $60 is not an rte"
-    assert heads(m, symbols) == want_heads(bound[8]), \
+    assert heads_are(heads(m, symbols), bound[8]), \
         "init left the effect heads at %s, not %s for effects %s" % (
             ["%04X" % h for h in heads(m, symbols)],
-            ["%04X" % h for h in want_heads(bound[8])], format(bound[8], "04b"))
+            ["/".join("%04X" % o for o in h) for h in want_heads(bound[8])],
+            format(bound[8], "04b"))
     m.call("core-exit")
     assert not m.byte(CODE + symbols["sndh_state"]) & 1, "the core's exit left the tune playing"
     assert masked(m.psg) == masked(HUSHED), \
@@ -2940,6 +3064,7 @@ def main():
         cycles_of = test_dtx
     costs = dense(cycles_of, code, symbols) if cycles_of and not perf else None
     savings = {}                        # dense columns' saving by tune, and its effects
+    footprints = {}                     # the bound tune's bytes and its state block's, by tune
     general = {}                        # every tick's cost the fixtures counted, by kind
     walker = None                       # the register steps walked, once a count runs
     stale = []
@@ -2991,11 +3116,12 @@ def main():
                 if costs and where[4] and PCREL and not LEAN:
                     # the walk of the frame procedure, frame by frame, is the rig's count
                     walker = walker or FrameWalk(cycles_of, code, symbols)
+                    tune_walk = FrameWalk(cycles_of, where[6], symbols)
                     for f, (_, counted, _, row) in enumerate(where[4]):
-                        if walker.registers(row) != counted:
+                        if tune_walk.registers(row) != counted:
                             stale.append("%s frame %d: the walk of the register steps reads %d,"
                                          " and the rig counts %d" % (os.path.basename(ym), f,
-                                                                     walker.registers(row), counted))
+                                                                     tune_walk.registers(row), counted))
                             break
                 if costs and where[4]:
                     savings[os.path.basename(ym)[:-3].replace("  ", " ")] = (
@@ -3008,6 +3134,7 @@ def main():
                 for then in sorted(tick_cost):
                     line += ", a tick %s %s" % (then, "/".join(str(c) for c in sorted(tick_cost[then])))
                 stem = os.path.basename(ym)[:-3].replace("  ", " ")
+                footprints[stem] = where[7]
                 row = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$"
                                 % re.escape(stem),
                                 open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
@@ -3021,6 +3148,16 @@ def main():
                 if PCREL and said != counted:
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
+                # the table against 0.4.22: that release's call and this
+                # one's, on average and at most
+                against = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$"
+                                    % re.escape(stem),
+                                    open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
+                if PCREL and (not against or (int(against.group(2)), int(against.group(4)))
+                              != (average, max(cost))):
+                    stale.append("performance.md's table against 0.4.22 reads %s for %s, and the"
+                                 " rig counts %d and %d" % (against and against.groups(), stem,
+                                                            average, max(cost)))
                 # plan.md's closing figures, on the tune it names. No
                 # figure reached them: its call had moved twice and its
                 # ticks once,
@@ -3108,6 +3245,10 @@ def main():
     if costs and not args and wide is None and not kit and PCREL and not LEAN:
         # plan.md's shares, gates and parts over the eleven fixtures
         stale += plan_read(walker or FrameWalk(cycles_of, code, symbols), tunes, measured)
+    if footprints and not args and wide is None and not kit and PCREL and not LEAN:
+        # the bound tunes and their state blocks against performance.md's
+        # table of them
+        stale += footprint_read(footprints)
     if savings and not args and wide is None and not kit and PCREL and not LEAN:
         # a run over the eleven fixtures reads the section against YMX's
         # dense columns as the rig counts them
@@ -3280,11 +3421,17 @@ def plan_figures(walker, tunes):
                "column": walker.walk(walker.at["c_6"], walker.at["c_13"], lambda n: True),
                "pair": walker.tones(unset) // 3, "volumes": walker.volumes([0] * 13 + [1] + [0] * 16),
                "tones": walker.tones(unset), "tunes": {}}
+    base = walker
     for ym in tunes:
         work = tempfile.mkdtemp(prefix="ymxr68")
         file, _ = convert(ym, work)
-        tune = Tune(bind(file, work), work)
+        bound = bind(file, work)
+        tune = Tune(bound, work)
         model = Model(tune)
+        # the tune's frame procedure as init patched it
+        m = Machine(base.code, base.at, bound)
+        assert m.call("init", a0=FILE, a1=WORK + 0x100) == 0, "init rejected the tune"
+        walker = FrameWalk(base.module, bytes(m.mu.mem_read(CODE, len(base.code))), base.at)
         none = {"tone": 0, "volume": 0, "envelope": 0}
         columns = 0
         net = {"13": 0, "6": 0, "tone": 0}
@@ -3438,8 +3585,8 @@ def plan_read(walker, tunes, parts):
          r" program counter and its step cost", (tick["register"], tick["through"]),
          "the read and the step")
     if parts and "Turrican 2 - world completed 1" in parts:
-        read(r"a refill of Turrican 2 - world completed 1 parses (\w+) operations, the bound at"
-             r" unit 2", (WORDS[parts["Turrican 2 - world completed 1"]["operations"]],),
+        read(r"a refill of Turrican 2 - world completed 1 parses (\w+) operations at its"
+             r" heaviest", (WORDS[parts["Turrican 2 - world completed 1"]["operations"]],),
              "Turrican 2 - world completed 1's heaviest refill")
     return stale
 

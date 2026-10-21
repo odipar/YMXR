@@ -74,7 +74,7 @@ A tool writes its output to standard output and its report to standard error;
 | word | definition |
 |---|---|
 | YM dump | a YM5 or YM6 file: the registers of the YM2149, recorded one frame at a time |
-| tune file | the values fixed for a tune, its name, its DTX2 table and one DTX1 table a source, in one file |
+| tune file | the values fixed for a tune, its name, its DTX3 table and one DTX1 table a source, in one file |
 | SNDH file | tunes with DTX's reader and the player added, in SNDH, the Atari ST scene's shared music container |
 | TOS program | an SNDH file behind a program stub, which runs on an Atari ST |
 | player | the program that reads the tune's table one row a frame, writes the columns that row sets to the YM2149 and the MFP, and at each tick of a timer writes one row of its source |
@@ -184,13 +184,13 @@ YMXR, its specification, its player, its tools and its tests are © 2026
 Robbert van Dalen, written by Claude (Anthropic's Claude Code) under
 Robbert van Dalen's direction.
 
-[DTX](https://github.com/odipar/DTX), © 2026 Robbert van Dalen, is the
-table format a tune is laid out in, and a release ships its 68000 images.
-Each image has a decoder of [ST4](https://github.com/odipar/ST4), © 2026
-Robbert van Dalen, which packs a DTX2 column. The ST4 compressor derives
-from the [ZX1](https://github.com/einar-saukas/ZX1) format and algorithm
-by Einar Saukas (© 2021), with thanks to introspec/spke; the BSD 3-Clause
-License that covers it is in the licence files of ST4 and DTX.
+[DTX](https://github.com/odipar/DTX), © 2026 Robbert van Dalen, is the table
+format a tune is laid out in, and a release ships its 68000 images. Each
+image has a decoder of [ST4](https://github.com/odipar/ST4), © 2026 Robbert
+van Dalen, which packs a DTX3 table's live columns. The ST4 compressor
+derives from the [ZX1](https://github.com/einar-saukas/ZX1) format and
+algorithm by Einar Saukas (© 2021), with thanks to introspec/spke; the BSD
+3-Clause License that covers it is in the licence files of ST4 and DTX.
 
 Arnaud Carré (Leonard/Oxygene) defined the YM5 and YM6 register-dump
 formats that `ym-to-ymxr` reads. The LHA depacker in `Lha.java` and

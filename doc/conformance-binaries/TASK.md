@@ -34,13 +34,13 @@ of the repository from the tunes of the other kit.
 | `set.ymxr` | a multi file of two tunes, named | 4 |
 | `named.ymxr` | the same, its names above $7E | 4 |
 | `one.ymxb` | a bound tune written alone | 3 |
-| `one.snd` | an SNDH file of one subtune that plays once | 14 |
-| `two.snd` | two subtunes, a composer and their names | 17 |
-| `timers.snd` | one subtune claiming four timers, at 60 Hz | 19 |
-| `perf.snd` | one subtune behind the core with the raster monitor in | 14 |
-| `abs.snd` | one subtune behind the core whose ticks read an address | 14 |
-| `two.prg` | a program around `two.snd`, 2,000 rows | 20 |
-| `timers.prg` | a program around `timers.snd`, the VBL asked for | 22 |
+| `one.snd` | an SNDH file of one subtune that plays once | 15 |
+| `two.snd` | two subtunes, a composer and their names | 18 |
+| `timers.snd` | one subtune claiming four timers, at 60 Hz | 20 |
+| `perf.snd` | one subtune behind the core with the raster monitor in | 15 |
+| `abs.snd` | one subtune behind the core whose ticks read an address | 15 |
+| `two.prg` | a program around `two.snd`, 2,000 rows | 21 |
+| `timers.prg` | a program around `timers.snd`, the VBL asked for | 23 |
 | `armed.prg` | the same, its stub of the later descriptor version | 22 |
 
 **4. The rules.**

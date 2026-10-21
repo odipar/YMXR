@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/odipar/dtx/go/dtx"
-	"github.com/odipar/dtx/go/st4"
 	"github.com/odipar/ymxs/go/check"
 	"github.com/odipar/ymxs/go/text"
 	"github.com/odipar/ymxs/go/tool"
@@ -35,7 +34,7 @@ type Packing struct {
 }
 
 // Unit is the unit the table packs at by default.
-const Unit = 2
+const Unit = 1
 
 // PackingFlags is the packer's flags.
 var PackingFlags = []string{"-k", "-m", "-copies"}
@@ -73,7 +72,7 @@ func AskedOf(t *tool.Tool, args []string) sndh.Asked {
 
 // PackingOf is the packing the flags ask for.
 func PackingOf(t *tool.Tool, args []string) Packing {
-	out := Packing{Unit: Unit, Ring: ymxr.Ring}
+	out := Packing{Unit: Unit, Ring: ymxr.Choose}
 	for _, flag := range args {
 		switch {
 		case strings.HasPrefix(flag, "-copies"):
@@ -90,9 +89,13 @@ func PackingOf(t *tool.Tool, args []string) Packing {
 	return out
 }
 
-// Packer packs a column under this packing.
-func (p Packing) Packer() dtx.Packer {
-	return st4.Packer{CopiesFlag: p.Copies, Seconds: p.Seconds}
+// Packers packs a live column under this packing: without copies, or under
+// -copies with copies and without, the smaller kept.
+func (p Packing) Packers() []dtx.Packer {
+	if !p.Copies {
+		return ymxr.Plain()
+	}
+	return ymxr.Packers(p.Seconds)
 }
 
 // Only reads every argument against the flags the tool reads: a call that
@@ -177,7 +180,7 @@ func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 		t.Wrong(tool.Wrong, err.Error())
 	}
 	written, err := ymxr.WriteNamed(made.Columns, made.Sources, made.Rate,
-		packing.Unit, packing.Ring, packing.Packer(), said, tune.Title)
+		packing.Unit, packing.Ring, packing.Packers(), said, tune.Title)
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
