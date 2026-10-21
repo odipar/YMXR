@@ -160,12 +160,48 @@ func Read(t *tool.Tool) ymxs.Multi {
 	return multi
 }
 
-// TuneFiles is one tune file a tune, in the multi's order.
+// TuneFiles is one tune file a tune, in the multi's order. A multi of
+// several tunes is a set, and without -m its rings are chosen for it
+// (tools.md 4.7).
 func TuneFiles(t *tool.Tool, multi ymxs.Multi, packing Packing,
 	said *report.Report) [][]byte {
 	var out [][]byte
-	for _, tune := range multi.Tunes {
-		out = append(out, TuneFile(t, tune, packing, said))
+	if len(multi.Tunes) == 1 || packing.Ring != ymxr.Choose {
+		for _, tune := range multi.Tunes {
+			out = append(out, TuneFile(t, tune, packing, said))
+		}
+		return out
+	}
+	made := make([]schema.Made, len(multi.Tunes))
+	written := make([]ymxr.Written, len(multi.Tunes))
+	for i, tune := range multi.Tunes {
+		padded, _ := ymxr.PadToUnit(tune, packing.Unit, said)
+		one, err := schema.Of(padded)
+		if err != nil {
+			t.Wrong(tool.Wrong, err.Error())
+		}
+		// without copies: the set's choice packs with them through the
+		// ring it chooses
+		packed, err := ymxr.Pack(one.Columns, one.Sources, one.Rate, packing.Unit,
+			ymxr.Choose, packing.Packers()[:1], said, tune.Title)
+		if err != nil {
+			t.Wrong(tool.Wrong, err.Error())
+		}
+		made[i], written[i] = one, packed
+	}
+	set, err := ymxr.ForSet(written, packing.Packers(), said)
+	if err != nil {
+		t.Wrong(tool.Wrong, err.Error())
+	}
+	for i, tune := range multi.Tunes {
+		if err := ymxr.Report(said, set[i], ymxr.ChoseForSet); err != nil {
+			t.Wrong(tool.Wrong, err.Error())
+		}
+		row(said, tune, made[i], set[i].File)
+		out = append(out, set[i].File)
+	}
+	if err := ymxr.SaySet(said, set); err != nil {
+		t.Wrong(tool.Wrong, err.Error())
 	}
 	return out
 }
@@ -184,11 +220,16 @@ func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}
+	row(said, tune, made, written.File)
+	return written.File
+}
+
+// row is a tune's row of the report (tools.md 7.3).
+func row(said *report.Report, tune ymxs.Tune, made schema.Made, file []byte) {
 	said.Row(Title(tune), fmt.Sprintf("%s at %d Hz, %s: %s",
 		report.Count(len(ymxs.Rows(tune)), "row", "rows"), made.Rate,
 		report.Count(made.Sources.Count(), "source", "sources"),
-		report.Count(len(written.File), "byte", "bytes")))
-	return written.File
+		report.Count(len(file), "byte", "bytes")))
 }
 
 // Title names a tune, and its writer where it has no title.

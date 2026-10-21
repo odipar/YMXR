@@ -130,7 +130,7 @@ final class ConformanceTest {
             Tune.Written it = YmToYmxr.convert(dump, List.of(), new Report()).written();
             byte[] file = it.file().clone();
             Tune.putWord(file, 4, WRONG_VERSION);
-            return new Tune.Written(file, it.repeat());
+            return it.withFile(file);
         } catch (IOException failed) {
             throw new IllegalStateException(failed);
         }

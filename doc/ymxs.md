@@ -87,8 +87,9 @@ The tools read standard input, write standard output and report on
 standard error (tools.md).
 
 A YMXS multi of several tunes is a set of subtunes, one tune file each,
-which `ymxs-to-sndh` puts behind one core. `ymxs-to-ymxr` writes those
-tune files as one multi file (BINARIES.md 0), which `ymxr-sndh` reads.
+their rings chosen for the set (tools.md 4.7), which `ymxs-to-sndh` puts
+behind one core. `ymxs-to-ymxr` writes those tune files as one multi file
+(BINARIES.md 0), which `ymxr-sndh` reads.
 
 ```bash
 bin/ym-to-ymxs < tune.ym | bin/ymxs-to-prg > TUNE.PRG

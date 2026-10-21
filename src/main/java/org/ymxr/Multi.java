@@ -16,9 +16,10 @@ import org.ymxs.tool.Tool;
  * passes tune files between tools, so that a tool reads one input and
  * writes one output.
  *
- * <p>{@code ymxr-multi tune.ymxr more.ymxr [-nNAME]...} writes one on
- * standard output, and {@code ymxs-to-ymxr} writes one where the structure
- * it reads has several tunes.
+ * <p>{@code ymxr-multi tune.ymxr more.ymxr [-nNAME]... [-mN] [-copies[S]]}
+ * writes one on standard output, each table packed again through the ring
+ * chosen for the set (tools.md 4.7), and {@code ymxs-to-ymxr} writes one
+ * where the structure it reads has several tunes.
  */
 final class Multi {
 
@@ -154,25 +155,35 @@ final class Multi {
 
     /**
      * {@code ymxr-multi}: the tune files named, as one multi file on
-     * standard output. Each tune is named by its file unless
-     * {@code -nNAME} names it, the names in the order the files are named.
+     * standard output, each table packed again through the ring chosen for
+     * the set, or through the ring {@code -mN} names, and with copies where
+     * they pay under {@code -copies[S]} (tools.md 4.2, 4.3, 4.7). Each tune
+     * is named by its file unless {@code -nNAME} names it, the names in the
+     * order the files are named.
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
-        Tool tool = Tool.of("ymxr-multi", flags, "-n");
+        Tool tool = Tool.of("ymxr-multi", flags, "-n", "-m", "-copies");
         List<String> named = new ArrayList<>();
         List<String> files = new ArrayList<>();
+        List<String> packing = new ArrayList<>();
         for (String flag : flags) {
             if (flag.startsWith("-n")) {
                 named.add(flag.substring(2));
+            } else if (flag.startsWith("-m") || flag.startsWith("-copies")) {
+                packing.add(flag);
             } else if (flag.startsWith("-")) {
                 throw tool.usage("not a flag of the tool: " + flag);
             } else {
                 files.add(flag);
             }
         }
+        // The call is read before a file is, so a flag that is not a
+        // number is an exit of 2 and every file is left unread.
+        Ymxs.Packing packed = Ymxs.Packing.of(tool, packing);
         if (files.isEmpty()) {
-            throw tool.usage("ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME]...");
+            throw tool.usage("ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME]... [-mN]"
+                    + " [-copies[S]]");
         }
         if (named.size() > files.size()) {
             throw tool.usage(named.size() + " names for " + files.size() + " tune files");
@@ -192,8 +203,22 @@ final class Multi {
             names.add(i < named.size() ? named.get(i)
                     : !recorded.isEmpty() ? recorded : stem(files.get(i)));
         }
+        if (tunes.size() > MOST) {
+            // before the packing, which would run for every tune first
+            throw tool.wrong(Tool.WRONG, tunes.size() + " tunes, and a multi file has " + MOST
+                    + " at most");
+        }
+        Report report = new Report(tool.reports());
         byte[] file;
         try {
+            List<Tune.Written> set = SetRings.ofFiles(tunes, packed.packers(), packed.ring(),
+                    report);
+            tunes.clear();
+            for (Tune.Written tune : set) {
+                Tune.packed(report, tune, packed.ring() == Tune.CHOOSE ? Tune.CHOSE_FOR_SET : "");
+                tunes.add(tune.file());
+            }
+            SetRings.say(report, set);
             file = of(tunes, names);
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));

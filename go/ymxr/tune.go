@@ -95,11 +95,37 @@ func Packers(seconds float64) []dtx.Packer {
 	return []dtx.Packer{st4.Packer{}, st4.Packer{CopiesFlag: true, Seconds: seconds}}
 }
 
-// Written is a tune file written: the file, and the row it repeats to, R
-// where it plays once.
+// Chose and ChoseForSet are the heading's words for a ring the writer
+// chose: for the tune, and for the set it is a subtune of (tools.md 4.5,
+// 4.7).
+const (
+	Chose       = ", the one the writer chose"
+	ChoseForSet = ", the one the writer chose for the set"
+)
+
+// Packed is a table packed: its bytes, and the state block its reader
+// needs.
+type Packed struct {
+	Table []byte
+	State int
+}
+
+// Written is a tune file written: the file, the row it repeats to, R where
+// it plays once, its DTX3 table, the table's rows and unit, and the
+// sources' tables, rows and bytes the packing report reads (tools.md 4.5).
+// Plain is the table packed without copies through each ring the writer
+// chose among, by ring, and empty where a ring was named: a set's rings are
+// chosen among these (tools.md 4.7).
 type Written struct {
-	File   []byte
-	Repeat int
+	File        []byte
+	Repeat      int
+	Table       []byte
+	Frames      int
+	Unit        int
+	Sources     int
+	SourceRows  int
+	SourceBytes int
+	Plain       map[int]Packed
 }
 
 // Write is the file: its table packed at unit through a ring of that many
@@ -182,6 +208,24 @@ func TuneName(file []byte) string {
 // WriteNamed is the same, with the tune named.
 func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	packers []dtx.Packer, said *report.Report, name string) (Written, error) {
+	written, err := Pack(columns, sources, frameRate, unit, ring, packers, said, name)
+	if err != nil {
+		return Written{}, err
+	}
+	chose := ""
+	if ring == Choose {
+		chose = Chose
+	}
+	if err := packed(said, written, chose); err != nil {
+		return Written{}, err
+	}
+	return written, nil
+}
+
+// Pack is the tune file WriteNamed writes, without the packing report: a
+// set reports its tunes once their rings are chosen for it.
+func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
+	packers []dtx.Packer, said *report.Report, name string) (Written, error) {
 	if frameRate < 1 || frameRate > MostRate {
 		return Written{}, fmt.Errorf("a frame rate of %d, and the frame rate is a"+
 			" word, 1 to %d", frameRate, MostRate)
@@ -202,11 +246,7 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	live := Live(columns.Column)
 	var rings []int
 	if ring == Choose {
-		for _, one := range Rings {
-			if one <= ReachOf(live) {
-				rings = append(rings, one)
-			}
-		}
+		rings = RingsOf(live)
 	} else {
 		at := RingOf(ring, live)
 		if at != ring {
@@ -238,34 +278,21 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	var table []byte
 	at := 0
 	least := -1
+	plain := map[int]Packed{}
 	if len(rings) > 1 {
-		// A ring the packager finds no period for at this unit is left out
-		// (DTX abi.md 4): at a unit of 4 a period divides by 4.
-		plain := map[int]int{}
-		var cheapest []int
-		for _, one := range rings {
-			made, err := packTable(columns.Column, frames, repeat, unit, one, first)
-			if err != nil {
-				return Written{}, err
-			}
-			state, err := State(made)
-			if err != nil {
-				said.Note(fmt.Sprintf("a ring of %d has no period at unit %d", one, unit))
-				continue
-			}
-			plain[one] = len(made) + state
-			cheapest = append(cheapest, one)
-			if cost := len(made) + state; least < 0 || cost < least {
-				least, table, at = cost, made, one
-			}
+		var err error
+		plain, err = Candidates(columns.Column, frames, repeat, unit, rings, first[0], said)
+		if err != nil {
+			return Written{}, err
 		}
-		if len(cheapest) == 0 {
-			return Written{}, fmt.Errorf("no ring the writer chooses among has a period"+
-				" at unit %d (DTX abi.md 4)", unit)
-		}
+		// in ring order, and the sort is stable: of two that come to the
+		// same, the smaller ring is first
+		cheapest := sortedRings(plain)
+		cost := func(one int) int { return len(plain[one].Table) + plain[one].State }
 		sort.SliceStable(cheapest, func(a, b int) bool {
-			return plain[cheapest[a]] < plain[cheapest[b]]
+			return cost(cheapest[a]) < cost(cheapest[b])
 		})
+		least, table, at = cost(cheapest[0]), plain[cheapest[0]].Table, cheapest[0]
 		if tried > len(cheapest) {
 			tried = len(cheapest)
 		}
@@ -338,14 +365,83 @@ func WriteNamed(columns Columns, sources *Sources, frameRate, unit, ring int,
 	for i := range tables {
 		copy(file[sourceAt[i]:], tables[i])
 	}
-	if err := packed(said, table, frames, len(tables), sourceRows, sourceBytes, at, unit,
-		ring == Choose, len(file)); err != nil {
-		return Written{}, err
-	}
 	if repeat > frames {
 		repeat = frames
 	}
-	return Written{File: file, Repeat: repeat}, nil
+	return Written{File: file, Repeat: repeat, Table: table, Frames: frames, Unit: unit,
+		Sources: len(tables), SourceRows: sourceRows, SourceBytes: sourceBytes,
+		Plain: plain}, nil
+}
+
+// Candidates is the table packed with packer through each of rings, by
+// ring. A ring the packager finds no period for at this unit is left out,
+// with a note (DTX abi.md 4): at a unit of 4 a period divides by 4. Where
+// no ring has a period it is an error.
+func Candidates(column [][]byte, frames, repeat, unit int, rings []int, packer dtx.Packer,
+	said *report.Report) (map[int]Packed, error) {
+	plain := map[int]Packed{}
+	for _, one := range rings {
+		made, err := packTable(column, frames, repeat, unit, one, []dtx.Packer{packer})
+		if err != nil {
+			return nil, err
+		}
+		state, err := State(made)
+		if err != nil {
+			said.Note(fmt.Sprintf("a ring of %d has no period at unit %d", one, unit))
+			continue
+		}
+		plain[one] = Packed{Table: made, State: state}
+	}
+	if len(plain) == 0 {
+		return nil, fmt.Errorf("no ring the writer chooses among has a period"+
+			" at unit %d (DTX abi.md 4)", unit)
+	}
+	return plain, nil
+}
+
+// RingsOf is the rings the writer chooses among for a table of live live
+// columns: each of Rings the player reaches.
+func RingsOf(live int) []int {
+	var rings []int
+	for _, one := range Rings {
+		if one <= ReachOf(live) {
+			rings = append(rings, one)
+		}
+	}
+	return rings
+}
+
+// sortedRings is the rings of plain, in ascending order.
+func sortedRings(plain map[int]Packed) []int {
+	rings := make([]int, 0, len(plain))
+	for one := range plain {
+		rings = append(rings, one)
+	}
+	sort.Ints(rings)
+	return rings
+}
+
+// WithTable is the tune file with table in place of its DTX3 table, every
+// other part as it is: the source tables after it move by what the table's
+// length moves them, and the index records where each now begins (SPEC.md
+// 3.3).
+func WithTable(file, table []byte) []byte {
+	tableAt := GetLong(file, TableAt)
+	count := int(file[CountAt])
+	from := len(file)
+	if count > 0 {
+		from = GetLong(file, IndexAt) &^ Counted
+	}
+	to := Align(tableAt + len(table))
+	out := make([]byte, to+len(file)-from)
+	copy(out, file[:tableAt])
+	copy(out[tableAt:], table)
+	copy(out[to:], file[from:])
+	for i := 0; i < count; i++ {
+		entry := GetLong(out, IndexAt+4*i)
+		PutLong(out, IndexAt+4*i, (entry&^Counted)+to-from|entry&Counted)
+	}
+	return out
 }
 
 // packTable is the columns as a DTX3 file, packed.
@@ -422,11 +518,11 @@ func (c counted) Copies() bool {
 }
 
 // packed says what the packing came to, a column at a time and in all.
-func packed(said *report.Report, table []byte, frames, sources, sourceRows, sourceBytes,
-	ring, unit int, chose bool, file int) error {
+func packed(said *report.Report, written Written, chose string) error {
 	if !said.Says() {
 		return nil
 	}
+	table, frames := written.Table, written.Frames
 	header, err := dtx.ReadHeader(table)
 	if err != nil {
 		return err
@@ -439,13 +535,9 @@ func packed(said *report.Report, table []byte, frames, sources, sourceRows, sour
 	if err != nil {
 		return err
 	}
-	chosen := ""
-	if chose {
-		chosen = ", the one the writer chose"
-	}
 	said.Say(fmt.Sprintf("the table: %s of %s, %s, packed at unit %d through a ring of %d%s, %s",
 		report.Count(C, "column", "columns"), report.Count(frames, "row", "rows"),
-		report.Count(C*frames, "byte", "bytes"), unit, ring, chosen,
+		report.Count(C*frames, "byte", "bytes"), written.Unit, payload.Ring, chose,
 		report.Count(payload.Live(), "live column", "live columns")))
 	for c := 0; c < C; c++ {
 		if !payload.IsLive(c) {
@@ -456,13 +548,15 @@ func packed(said *report.Report, table []byte, frames, sources, sourceRows, sour
 		said.Row(Name(c), fmt.Sprintf("%7d -> %6d bytes  (%5.1f%%)", frames, bytes,
 			100.0*float64(bytes)/float64(frames)))
 	}
-	said.Say(fmt.Sprintf("the sources: %s of %s, %s", report.Count(sources, "table", "tables"),
-		report.Count(sourceRows, "row", "rows"), report.Count(sourceBytes, "byte", "bytes")))
+	said.Say(fmt.Sprintf("the sources: %s of %s, %s",
+		report.Count(written.Sources, "table", "tables"),
+		report.Count(written.SourceRows, "row", "rows"),
+		report.Count(written.SourceBytes, "byte", "bytes")))
 	raw := C * frames
 	said.Say(fmt.Sprintf("packed %s into %d (%.1f%%), the state block %s, the file %s",
 		report.Count(raw, "byte", "bytes"), len(table),
 		100.0*float64(len(table))/float64(raw), report.Count(state, "byte", "bytes"),
-		report.Count(file, "byte", "bytes")))
+		report.Count(len(written.File), "byte", "bytes")))
 	return nil
 }
 

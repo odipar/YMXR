@@ -19,15 +19,16 @@
 # The converter's options (tools.md 4, 5):
 #
 #   -kK        the unit the table packs at, 1, 2 or 4; 1 by default
-#   -mN        the ring in bytes; without it the writer chooses the one
-#              whose table and state block come to the least
+#   -mN        the ring in bytes, which reaches ymxr-multi too; without it
+#              the rings are chosen for the set (tools.md 4.7)
 #   -rRR       the row the tune repeats to; -r alone plays it once
-#   -copies[S] each live column packs with copies from its literal stream
-#              and without, the smaller kept; -copiesS searches S seconds
 #
 # The set's (tools.md 11.1):
 #
 #   -nNAME     the name of the i-th subtune, for the i-th -n named
+#   -copies[S] each live column packs with copies from its literal stream
+#              and without, through the set's ring, the smaller kept;
+#              -copiesS searches S seconds
 #
 # The SNDH file's (tools.md 12):
 #
@@ -159,14 +160,17 @@ while [ "$left" -gt 0 ]; do
     at=$((at + 1))
     name=$(basename "$arg")
     mkdir "$work/$at"
+    # -copies reaches ymxr-multi alone, which packs each table again
+    # through the ring it chooses for the set (tools.md 4.7)
     "$tools/ym-to-ymxr" ${unit:+"$unit"} ${ring:+"$ring"} ${repeat:+"$repeat"} \
-        ${copies:+"$copies"} $silent < "$arg" > "$work/$at/${name%.*}.ymxr"
+        $silent < "$arg" > "$work/$at/${name%.*}.ymxr"
     set -- "$@" "$work/$at/${name%.*}.ymxr"
 done
 while IFS= read -r named; do
     set -- "$@" "$named"
 done < "$work/names"
-"$tools/ymxr-multi" "$@" $silent > "$work/SET.YMXR"
+"$tools/ymxr-multi" "$@" ${ring:+"$ring"} ${copies:+"$copies"} $silent \
+    > "$work/SET.YMXR"
 "$tools/ymxr-sndh" $perf $lean $ticks $clock $silent ${title:+"-t$title"} \
     ${composer:+"-c$composer"} < "$work/SET.YMXR" > "$work/SET.SND"
 exec "$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"
