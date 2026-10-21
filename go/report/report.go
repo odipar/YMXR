@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -53,6 +55,43 @@ type Report struct {
 
 	// Most is the sources a tune names, which the overflow note reports.
 	Most int
+}
+
+// Fixed is v with places digits after the point as the Java tree's
+// %.Nf writes it: the shortest decimal that reads back as v, rounded half
+// up. Go's %.Nf rounds the exact value half to even, so 3,600 of 57,600,
+// 6.25 per cent, read 6.2 here and 6.3 there.
+func Fixed(v float64, places int) string {
+	digits := strconv.FormatFloat(v, 'f', -1, 64)
+	sign := ""
+	if strings.HasPrefix(digits, "-") {
+		sign, digits = "-", digits[1:]
+	}
+	whole, frac, _ := strings.Cut(digits, ".")
+	if len(frac) <= places {
+		frac += strings.Repeat("0", places-len(frac))
+	} else {
+		up := frac[places] >= '5'
+		frac = frac[:places]
+		if up {
+			// add one at the last place kept, carrying left
+			kept := []byte(whole + frac)
+			i := len(kept) - 1
+			for ; i >= 0 && kept[i] == '9'; i-- {
+				kept[i] = '0'
+			}
+			if i < 0 {
+				kept = append([]byte{'1'}, kept...)
+			} else {
+				kept[i]++
+			}
+			whole, frac = string(kept[:len(kept)-places]), string(kept[len(kept)-places:])
+		}
+	}
+	if places == 0 {
+		return sign + whole
+	}
+	return sign + whole + "." + frac
 }
 
 // Count is a count and its noun: one for a count of 1 and many for any

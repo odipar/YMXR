@@ -18,7 +18,7 @@
 #
 # The converter's options (tools.md 4, 5):
 #
-#   -kK        the unit the table packs at, 1, 2 or 4; 1 by default
+#   -kK        the unit the table packs at, 1, 2 or 4; 2 by default
 #   -mN        the ring in bytes, which reaches ymxr-multi too; without it
 #              the rings are chosen for the set (tools.md 4.7)
 #   -rRR       the row the tune repeats to; -r alone plays it once
@@ -56,8 +56,8 @@
 #   bin/ymxr-set a.ym b.ym c.ym > SET.PRG
 #       the three as subtunes 1, 2 and 3, the program playing the first
 #
-#   bin/ymxr-set -k2 -copies -tHippel ym/test/*.ym > SET.PRG
-#       every dump under ym/test, packed two bytes a unit with copies
+#   bin/ymxr-set -k1 -copies -tHippel ym/test/*.ym > SET.PRG
+#       every dump under ym/test, packed a byte a unit with copies
 #
 #   bin/ymxr-set -perf -rows3000 a.ym b.ym > SET.PRG
 #       the core with the raster monitor in, the program stopping after

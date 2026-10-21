@@ -1,4 +1,4 @@
-{"kind":"sndh","bytes":14940}
+{"kind":"sndh","bytes":14952}
 {"part":"entry","to":[126,130,134]}
 {"part":"tag","name":"TITL","at":16,"text":"Two"}
 {"part":"tag","name":"COMM","at":24,"text":"Jochen Hippel"}
@@ -10,9 +10,9 @@
 {"part":"tag","name":"!#SN","at":94,"names":["Circus","Once"]}
 {"part":"tag","name":"TIME","at":114,"seconds":[0,1]}
 {"part":"tag","name":"HDNS","at":122}
-{"part":"core","at":126,"version":1,"binds":7,"fixed":2120,"flags":4,"state":780,"subtunetable":9128,"work":11402}
+{"part":"core","at":126,"version":1,"binds":7,"fixed":2120,"flags":4,"state":780,"subtunetable":9128,"work":11414}
 {"part":"subtunes","at":9128,"tunes":[9138,9162]}
-{"part":"tune","number":1,"at":9138,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":9186,"table":1448}
-{"part":"tune","number":2,"at":9162,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":9186,"table":1856}
+{"part":"tune","number":1,"at":9138,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":9186,"table":1460}
+{"part":"tune","number":2,"at":9162,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":9186,"table":1868}
 {"part":"image","number":1,"at":9186}
-{"part":"workspace","at":11402,"bytes":3538}
+{"part":"workspace","at":11414,"bytes":3538}

@@ -18,7 +18,7 @@ import (
 )
 
 // Unit is the unit a table packs at by default.
-const Unit = 1
+const Unit = 2
 
 // Converted is a conversion: the tune file written, the dump's frame the
 // tune repeats to, or its frame count where it plays once, the sources it

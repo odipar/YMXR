@@ -1,5 +1,5 @@
-{"kind":"program","bytes":16742}
-{"part":"prg","text":16710}
+{"kind":"program","bytes":16754}
+{"part":"prg","text":16722}
 {"part":"stub","at":28,"bytes":1770,"version":2,"subtunes":2,"flags":0,"rate":50,"rows":2000,"core":1924,"prescaler":5,"count":0,"ticks":150}
 {"part":"sndh","at":1798}
 {"part":"entry","to":[1924,1928,1932]}
@@ -13,9 +13,9 @@
 {"part":"tag","name":"!#SN","at":1892,"names":["Circus","Once"]}
 {"part":"tag","name":"TIME","at":1912,"seconds":[0,1]}
 {"part":"tag","name":"HDNS","at":1920}
-{"part":"core","at":1924,"version":1,"binds":7,"fixed":2120,"flags":4,"state":2578,"subtunetable":10926,"work":13200}
+{"part":"core","at":1924,"version":1,"binds":7,"fixed":2120,"flags":4,"state":2578,"subtunetable":10926,"work":13212}
 {"part":"subtunes","at":10926,"tunes":[10936,10960]}
-{"part":"tune","number":1,"at":10936,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":10984,"table":1448}
-{"part":"tune","number":2,"at":10960,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":10984,"table":1856}
+{"part":"tune","number":1,"at":10936,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":10984,"table":1460}
+{"part":"tune","number":2,"at":10960,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":10984,"table":1868}
 {"part":"image","number":1,"at":10984}
-{"part":"workspace","at":13200,"bytes":3538}
+{"part":"workspace","at":13212,"bytes":3538}

@@ -143,12 +143,12 @@ final class ReportTest {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican 2 -"
                 + " world completed 1.ym"));
         Caught c = caught(true);
-        YmToYmxr.convert(dump, List.of("-k2", "-m1920", "-r10"), c.report());
+        YmToYmxr.convert(dump, List.of("-k1", "-m1920", "-r10"), c.report());
         String said = c.said();
         // A flag passed reads as requested, and a source of a kind is
         // counted with its rows.
-        assertTrue(said.contains("the flags: -k2 -m1920 -r10"), said);
-        assertTrue(said.contains("-k, the unit           2, asked for"), said);
+        assertTrue(said.contains("the flags: -k1 -m1920 -r10"), said);
+        assertTrue(said.contains("-k, the unit           1, asked for"), said);
         assertTrue(said.contains("-m, the ring           1920 bytes, asked for"), said);
         assertTrue(said.contains("-r, the repeat row     10, asked for"), said);
         assertTrue(said.contains("digidrums"), "the dump's digidrums are said: " + said);

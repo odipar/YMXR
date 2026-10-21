@@ -4,9 +4,9 @@ What a play call could cost, and what each step saves. performance.md has
 the cost today; every figure below compares with it, and each is marked as
 measured on the rig or counted from the 68000's manual.
 
-Two figures matter. A call is 1,154 to 2,201
-cycles on average by tune, and the costliest frame of a tune is 1,902 to
-6,062. R4.5 budgets 6,656 a frame and binds the costliest frame. Most of
+Two figures matter. A call is 1,048 to 1,995
+cycles on average by tune, and the costliest frame of a tune is 1,660 to
+5,086. R4.5 budgets 6,656 a frame and binds the costliest frame. Most of
 what follows moves the average, and the text points out each step that
 moves the costliest frame.
 
@@ -14,22 +14,22 @@ moves the costliest frame.
 
 ## Where the time is
 
-DTX's advance is 50 to 59 per cent of an average call and 53 to 90 per
-cent of the costliest frame: 4,136 of Turrican - world 4-3's 4,838 and
-4,516 of Synergy Credits' 5,898. A refill parses at most one ST4
-operation a unit at about 200 to 280 cycles each, and its window is the
-schema's thirty columns, thirty units at unit 1, so thirty operations
+DTX's advance is 45 to 53 per cent of an average call and 46 to 86 per
+cent of the costliest frame: 3,716 of Turrican - world 4-3's 4,362 and
+2,924 of Synergy Credits' 5,086. A refill parses at most one ST4
+operation a unit at about 190 to 260 cycles each, and its window is the
+schema's thirty columns, fifteen units at unit 2, so fifteen operations
 bound a tune's costliest frame.
 
-The frame procedure is the rest, 502 to 1,092. A column the row leaves
+The frame procedure is the rest, 501 to 1,092. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset: a
-row sets 0.6 to 13.0 of the fourteen register columns, 3.4 on the median
+row sets 0.6 to 13.0 of the fourteen register columns, 3.3 on the median
 tune. Whole groups go unset, and a gate can skip them; over 40,000 rows a
 tune:
 
 | tune | tone unset | volume unset | envelope unset | columns a row |
 |---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 58% | 93% | 100% | 0.6 |
+| Big - Samantha Fox Strip Poker 6 | 58% | 94% | 100% | 0.6 |
 | Chambers of Shaolin 5 - you blew it! | 21% | 86% | 100% | 2.4 |
 | Circus Attractions 2 | 0% | 0% | 75% | 6.5 |
 | DBA 2 | 23% | 56% | 98% | 2.2 |
@@ -39,7 +39,7 @@ tune:
 | Synergy Credits | 26% | 82% | 62% | 3.2 |
 | Turrican - world 4-3 | 0% | 40% | 94% | 3.7 |
 | Turrican 2 - world completed 1 | 0% | 0% | 0% | 13.0 |
-| capture | 27% | 42% | 88% | 3.4 |
+| capture | 27% | 42% | 88% | 3.3 |
 
 The volume group is unset on 40 per cent of the rows or more on nine of
 the eleven and the envelope group on 62 per cent or more on eight; on the
@@ -91,7 +91,7 @@ that moves to the longer path along both, and counts a gate that skips at
 |---|---|---|
 | Retrigger retune, built | 98% | -44 |
 | Digidrum preempt, built | 100% | -42 |
-| Big - Samantha Fox Strip Poker 6 | 93% | -39 |
+| Big - Samantha Fox Strip Poker 6 | 94% | -39 |
 | Synergy Credits | 82% | -32 |
 | Chambers of Shaolin 5 - you blew it! | 86% | -30 |
 | DBA 2 | 56% | **+5** |
@@ -129,9 +129,9 @@ R3.5 also requires a column to be one value, and a mask column is several.
 **Three fusions in ST4's decoder**: a one-unit literal run, a one-unit rep
 match, and a two-unit new-offset match, each fused at the gamma's exit. Each
 was counted, and each was wrong as written. Most of the costliest frame is
-ST4's refill - up to thirty operations at 200 to 280 - and ST4 alone has
-room to move that frame far, so it needs a separate pass rather than these
-three repaired.
+ST4's refill - fifteen operations at 190 to 260 - and ST4 alone has room to
+move that frame far, so it needs a separate pass rather than these three
+repaired.
 
 ---
 
@@ -154,14 +154,14 @@ call now:
 | a separate tick for a one-row source | 74 a tick | 445 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
-its count. Synergy Credits reads 2,201 cycles a call against the 2,469
+its count. Synergy Credits reads 1,995 cycles a call against the 2,469
 this document opened at and 2,585 cycles of ticks against 5,380, so
-4,786 a frame against 7,849. performance.md has the call, and `-cycles`
+4,580 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
 What was left was the costliest frame. A refill parses at most one ST4
 operation per unit of its window, so the frame R4.5 binds is one operation
-per unit at 200 to 280 cycles each, and every step above leaves it as it
+per unit at 190 to 260 cycles each, and every step above leaves it as it
 was. ST4 has since made that pass (research.md, "A penalty a block,
 against the costliest frame").
 
@@ -188,11 +188,12 @@ a sixth on average and by a fifteenth to more than a quarter in the
 costliest frame, Synergy Credits' from 5,778 to 5,094. The costliest frame
 of any tune was then that one, 1,562 cycles under the budget.
 
-DTX3 (DTX's SPEC.md 2.4) moved the default back to unit 1 for the memory a
-tune needs: a constant column has neither ring nor refill, the live columns
-share a ring of 60 to 240 bytes, and the bound tune and the state block of
-every fixture come to 47 to 90 per cent less (performance.md). The window
-is 30 units again, and a refill of Turrican 2 - world completed 1 parses
-eighteen operations at its heaviest. The costliest frame of the eleven is
-capture's 6,062, 594 cycles under the budget; `-k2` packs at unit 2 where a
-host needs the margin.
+DTX3 (DTX's SPEC.md 2.4) cut the memory a tune needs: a constant column has
+neither ring nor refill, the live columns share a ring of 60 to 240 bytes,
+and the bound tune and the state block of every fixture come to 46 to 90
+per cent less (performance.md). Release 0.5.0 packed at unit 1, whose
+window is 30 units, and the costliest frame of five of Scavenger's tunes
+passed the budget, DBA 4's at 7,214. The default is unit 2 again, where a
+refill of Turrican 2 - world completed 1 parses fifteen operations at its
+heaviest. The costliest frame of the eleven is Synergy Credits' 5,086,
+1,570 cycles under the budget.

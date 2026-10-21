@@ -1,4 +1,4 @@
-{"kind":"sndh","bytes":14460}
+{"kind":"sndh","bytes":14472}
 {"part":"entry","to":[82,86,90]}
 {"part":"tag","name":"TITL","at":16,"text":"Once"}
 {"part":"tag","name":"CONV","at":25,"text":"YMXR (ym-to-ymxr)"}
@@ -8,8 +8,8 @@
 {"part":"tag","name":"FRMS","at":64,"frames":[4]}
 {"part":"tag","name":"TIME","at":72,"seconds":[1]}
 {"part":"tag","name":"HDNS","at":78}
-{"part":"core","at":82,"version":1,"binds":7,"fixed":2120,"flags":4,"state":736,"subtunetable":9084,"work":10922}
+{"part":"core","at":82,"version":1,"binds":7,"fixed":2120,"flags":4,"state":736,"subtunetable":9084,"work":10934}
 {"part":"subtunes","at":9084,"tunes":[9090]}
-{"part":"tune","number":1,"at":9090,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":9114,"table":1448}
+{"part":"tune","number":1,"at":9090,"bytes":24,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":9114,"table":1460}
 {"part":"image","number":1,"at":9114}
-{"part":"workspace","at":10922,"bytes":3538}
+{"part":"workspace","at":10934,"bytes":3538}

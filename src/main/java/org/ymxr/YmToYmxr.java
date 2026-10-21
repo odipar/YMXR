@@ -26,7 +26,7 @@ import org.ymxs.tool.Tool;
 public final class YmToYmxr {
 
     /** The unit a table packs at unless {@code -k} names another. */
-    static final int UNIT = 1;
+    static final int UNIT = 2;
 
     /** The flag that turns a tool's report off. Every tool reads it, and
      *  the tools that accept the converter's flags pass it through. */
