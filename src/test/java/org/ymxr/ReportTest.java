@@ -178,6 +178,62 @@ final class ReportTest {
         Files.write(work.resolve("t.ymxr"), file);
     }
 
+    /** ymxr-multi's report (tools.md 11.3): each tune's packing report,
+     *  its ring the one chosen for the set, then the set's heading, whose
+     *  figures are the tables in the file it wrote and the largest state
+     *  block among them, then the summary lines. */
+    @Test
+    void aSetReportsEachTunesRingAndTheSetsTablesAndStateBlock(@TempDir Path work)
+            throws Exception {
+        List<String> names = List.of("DBA 2.ym", "Synergy Credits.ym");
+        String[] files = new String[names.size()];
+        for (int i = 0; i < names.size(); i++) {
+            Path at = work.resolve(i + ".ymxr");
+            Files.write(at, YmToYmxr.convert(Files.readAllBytes(Path.of("ym/test", names.get(i))),
+                    List.of(), new Report()).written().file());
+            files[i] = at.toString();
+        }
+        ByteArrayOutputStream o = new ByteArrayOutputStream();
+        ByteArrayOutputStream e = new ByteArrayOutputStream();
+        PrintStream wasOut = System.out;
+        PrintStream wasErr = System.err;
+        try {
+            System.setOut(new PrintStream(o, true, StandardCharsets.UTF_8));
+            System.setErr(new PrintStream(e, true, StandardCharsets.UTF_8));
+            Multi.main(files);
+        } finally {
+            System.setOut(wasOut);
+            System.setErr(wasErr);
+        }
+        String said = e.toString(StandardCharsets.UTF_8);
+        List<String> lines = said.lines().toList();
+        assertEquals(2, lines.stream().filter(one -> one.startsWith("the table: ")
+                && one.contains(Tune.CHOSE_FOR_SET + ", ")).count(),
+                "a heading for each tune, its ring chosen for the set: " + said);
+        // the set as the writer chose it, which the file has in it
+        List<byte[]> read = new java.util.ArrayList<>();
+        for (String file : files) {
+            read.add(Files.readAllBytes(Path.of(file)));
+        }
+        List<Tune.Written> chosen = SetRings.ofFiles(read, Tune.packers(), Tune.CHOOSE,
+                new Report());
+        List<byte[]> written = Multi.read(o.toByteArray()).tunes();
+        long tables = 0;
+        int state = 0;
+        for (int i = 0; i < chosen.size(); i++) {
+            assertArrayEquals(chosen.get(i).file(), written.get(i), "tune " + (i + 1));
+            tables += chosen.get(i).table().length;
+            state = Math.max(state, Tune.state(chosen.get(i).table()));
+        }
+        String heading = "the set: 2 tunes, the tables " + tables + " bytes, the state block "
+                + state + " bytes";
+        int set = lines.indexOf(heading);
+        assertTrue(set > 0, "the set's heading reads the tables and state block of the file"
+                + " written, " + heading + ": " + said);
+        assertTrue(lines.get(set + 1).startsWith("ymxr-multi: "),
+                "the summary lines follow the set's heading: " + said);
+    }
+
     @Test
     void aToolSaysItsAccountOnStandardErrorAndWritesItsFileOnStandardOutput()
             throws Exception {

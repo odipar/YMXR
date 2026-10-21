@@ -530,13 +530,15 @@ ring N is at most 32,767 divided by L less 1, where L is the table's live
 columns and is 2 or more, and one DTX's packager binds (DTX, abi.md 4).
 
 Note: a player reaches slot L less 1's ring through a 16-bit displacement
-from slot 0's, L less 1 rings on. The reference writer packs through a
-ring that is a multiple of 30 bytes, 60 upward: through each of 60, 120,
-240, 480, 960 and 1,920 bytes the player reaches, keeping the one whose
-table and state block come to the least. With copies asked for, it packs
-with them where they pack a live column smaller through the two of those
-that came to the least, and keeps the one of the two that comes to the
-less (tools.md 4.2, 4.3).
+from slot 0's, L less 1 rings on. The reference writer packs through a ring
+that is a multiple of 30 bytes, 60 upward: through each of 60, 120, 240,
+480, 960 and 1,920 bytes the player reaches, keeping the one whose table and
+state block come to the least. With copies asked for, it packs with them
+where they pack a live column smaller through the two of those that came to
+the least, and keeps the one of the two that comes to the less (tools.md
+4.2, 4.3). The tunes of a set share one workspace, sized for the largest
+state block among them, and the reference writer chooses their rings for the
+set (tools.md 4.7).
 
 **3.3.4** Errors of the file. A reader reads a file free of the
 conditions below and reports the first one present as its line, in the

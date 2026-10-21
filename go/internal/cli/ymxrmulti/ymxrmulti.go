@@ -9,25 +9,31 @@ import (
 
 	"github.com/odipar/ymxs/go/tool"
 
+	"github.com/odipar/ymxr/go/flags"
 	"github.com/odipar/ymxr/go/report"
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
 func Main() {
-	t, args := tool.Of("ymxr-multi", os.Args[1:], "-n")
-	var named, files []string
+	t, args := tool.Of("ymxr-multi", os.Args[1:], "-n", "-m", "-copies")
+	var named, files, asked []string
 	for _, flag := range args {
 		switch {
 		case strings.HasPrefix(flag, "-n"):
 			named = append(named, flag[2:])
+		case strings.HasPrefix(flag, "-m") || strings.HasPrefix(flag, "-copies"):
+			asked = append(asked, flag)
 		case strings.HasPrefix(flag, "-"):
 			t.Usage("not a flag of the tool: " + flag)
 		default:
 			files = append(files, flag)
 		}
 	}
+	// The call is read before a file is, so a flag that is not a number
+	// is an exit of 2 and every file is left unread.
+	packing := flags.PackingOf(t, asked)
 	if len(files) == 0 {
-		t.Usage("ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME]...")
+		t.Usage("ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME]... [-mN] [-copies[S]]")
 	}
 	if len(named) > len(files) {
 		t.Usage(fmt.Sprintf("%d names for %d tune files", len(named), len(files)))
@@ -50,6 +56,29 @@ func Main() {
 		default:
 			names = append(names, ymxr.Stem(name))
 		}
+	}
+	if len(tunes) > ymxr.MostTunes {
+		// before the packing, which would run for every tune first
+		t.Wrong(tool.Wrong, fmt.Sprintf("%d tunes, and a multi file has %d at most",
+			len(tunes), ymxr.MostTunes))
+	}
+	said := report.Of(t.Reports())
+	set, err := ymxr.OfFiles(tunes, packing.Packers(), packing.Ring, said)
+	if err != nil {
+		t.Wrong(tool.Wrong, err.Error())
+	}
+	chose := ""
+	if packing.Ring == ymxr.Choose {
+		chose = ymxr.ChoseForSet
+	}
+	for i, tune := range set {
+		if err := ymxr.Report(said, tune, chose); err != nil {
+			t.Wrong(tool.Wrong, err.Error())
+		}
+		tunes[i] = tune.File
+	}
+	if err := ymxr.SaySet(said, set); err != nil {
+		t.Wrong(tool.Wrong, err.Error())
 	}
 	file, err := ymxr.Multi(tunes, names)
 	if err != nil {

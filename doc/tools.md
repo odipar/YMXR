@@ -73,7 +73,7 @@ its noun, singular for a count of 1 and plural for any other: `1 row`,
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
 | `ymxr-layout` | a multi file, a bound tune, an SNDH file or a program | the record of BINARIES.md 6 | - |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
-| `ymxr-multi` | the tune files named | a multi file | `-nNAME` |
+| `ymxr-multi` | the tune files named | a multi file | `-nNAME`, `-mN`, `-copies[S]` |
 | `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
 | `ymxr-prg` | an SNDH file | a TOS program | `-rROWS`, `-vbl` |
 
@@ -107,14 +107,14 @@ the tool, listed in section 2, or makes the call wrong (3.2); for
 `ymxr-multi` and `ymxr-check` an argument that begins with a character
 other than `-` names a file (9, 12).
 
-**3.2 A wrong call** writes one line and exits with 2. A tool reads a
-flag outside its flags before standard input, `ymxr-check` excepted
-(8.4), and `ym-to-ymxr`, `ymxr-check`, `ymxr-trace`, `ymxr-prg` and
-`ymxs-to-prg` the numbers of their flags before it, standard input then
-unread; `ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg` read the numbers
-of `-kK`, `-mN` and `-copies[S]` after reading and checking the structure
-(7.1), so an error of the structure is reported first, exit 1. X is the
-argument.
+**3.2 A wrong call** writes one line and exits with 2. A tool reads a flag
+outside its flags before standard input, `ymxr-check` excepted (8.4), and
+`ym-to-ymxr`, `ymxr-check`, `ymxr-trace`, `ymxr-prg` and `ymxs-to-prg` the
+numbers of their flags before it, standard input then unread, and
+`ymxr-multi` before it reads a file; `ymxs-to-ymxr`, `ymxs-to-sndh` and
+`ymxs-to-prg` read the numbers of `-kK`, `-mN` and `-copies[S]` after
+reading and checking the structure (7.1), so an error of the structure is
+reported first, exit 1. X is the argument.
 
 | tool | condition | line |
 |---|---|---|
@@ -125,7 +125,7 @@ argument.
 | `ym-to-ymxr`, `ymxr-check` | the rest of X after `-r` is other than a decimal integer, `-r` alone excepted | `not a row count: X` |
 | `ymxr-trace`, `ymxr-prg`, `ymxs-to-prg` | the rest of X after `-r` is other than a decimal integer, `-r` alone included | `not a row count: X` |
 | `ym-to-ymxs` | the rest of X after `-r` is other than a decimal integer, `-r` alone excepted | `not a row number: X` |
-| `ymxr-multi` | X names zero files | `ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME]...` |
+| `ymxr-multi` | X names zero files | `ymxr-multi tune.ymxr [more.ymxr ...] [-nNAME]... [-mN] [-copies[S]]` |
 | `ymxr-multi` | more `-nNAME` flags than files | `N names for M tune files` |
 
 **3.3 `-silent`.** With `-silent` a tool omits the report and the summary
@@ -156,25 +156,27 @@ of 1.5 that remain, the counted notes.
 
 ## 4. The packer's flags and the padding
 
-The tools that write a tune file share the packer's flags and the
-padding: `ym-to-ymxr`, `ymxs-to-ymxr`, `ymxs-to-sndh`,
-`ymxs-to-prg`, and `ymxr-check` for the conversion it checks.
+The tools that write a tune file share the packer's flags and the padding:
+`ym-to-ymxr`, `ymxs-to-ymxr`, `ymxs-to-sndh`, `ymxs-to-prg`, and
+`ymxr-check` for the conversion it checks. `ymxr-multi` packs the tables of
+the tune files it reads again, through `-mN` and `-copies[S]` (11.1).
 
 **4.1 `-kK`.** K is the unit the table packs at, DTX's `k`, 1, 2 or 4
 (DTX, SPEC.md 2.4), 1 by default.
 
-**4.2 `-mN`.** N is the ring in bytes. Without `-m` the writer chooses
-one: it packs the table through each of 60, 120, 240, 480, 960 and 1,920
-bytes the player reaches and keeps the one whose table and state block
-come to the least. Under `-copies` that pass is without copies, and the
-writer then packs with copies where they pay through the two that came to
-the least and keeps the one of the two that comes to the less. A ring the
-packager finds no period
-for at unit K is left out (DTX, abi.md 4), and the tool notes `a ring of A
-has no period at unit K`. With `-mN` the table packs through the multiple
-of 30 nearest N, at least 60 and at most the largest the player reaches;
-where that differs from N the tool notes `the ring is A bytes: a multiple
-of the period within the player's reach`, A the ring used.
+**4.2 `-mN`.** N is the ring in bytes. Without `-m` the writer chooses one:
+it packs the table through each of 60, 120, 240, 480, 960 and 1,920 bytes
+the player reaches and keeps the one whose table and state block come to the
+least. Under `-copies` that pass is without copies, and the writer then
+packs with copies where they pay through the two that came to the least and
+keeps the one of the two that comes to the less. A ring the packager finds
+no period for at unit K is left out (DTX, abi.md 4), and the tool notes
+`a ring of A has no period at unit K`. With `-mN` the table packs through
+the multiple of 30 nearest N, at least 60 and at most the largest the player
+reaches; where that differs from N the tool notes
+`the ring is A bytes: a multiple of the period within the player's reach`, A
+the ring used. The tunes of a set have their rings chosen for the set
+instead (4.7).
 
 Note: the player reaches slot L less 1's ring through a 16-bit
 displacement from slot 0's, L the live columns, so the largest ring is
@@ -210,22 +212,44 @@ K the unit, an *unset row* a row with every column unset:
 The period of the DTX3 table is 30 rows.
 
 **4.5 The packing report.** A tool that writes a tune file reports, per
-tune: the heading `the table: 30 columns of R rows, B bytes, packed at
-unit K through a ring of A`, B = 30 R, then `, the one the writer chose`
-where `-m` is absent, then `, L live columns`; a row a column, named `R0`
-to `R13` and `effect i target`, `effect i source`, `effect i timer
-control`, `effect i timer count` for i 0 to 3, the value `%7d -> constant
-V` for a constant column, V its value, and `%7d -> %6d bytes  (%5.1f%%)`
-for a live one, two spaces before the parenthesis, of the rows in, the
-bytes of its slot's streams and their ratio; the heading `the sources: N
-tables of R rows, B bytes`; and the heading `packed X bytes into Y (Z%),
-the state block S bytes, the file F bytes`, X = 30 R, Y the DTX3 table, S
-the state block its reader needs (DTX, abi.md 3), F the tune file.
+tune: the heading `the table: 30 columns of R rows, B bytes, packed at unit
+K through a ring of A`, B = 30 R, then `, the one the writer chose` where
+`-m` is absent, or `, the one the writer chose for the set` where 4.7 chose
+it, then `, L live columns`; a row a column, named `R0` to `R13` and `effect
+i target`, `effect i source`, `effect i timer control`, `effect i timer
+count` for i 0 to 3, the value `%7d -> constant V` for a constant column, V
+its value, and `%7d -> %6d bytes  (%5.1f%%)` for a live one, two spaces
+before the parenthesis, of the rows in, the bytes of its slot's streams and
+their ratio; the heading `the sources: N tables of R rows, B bytes`; and the
+heading `packed X bytes into Y (Z%), the state block S bytes, the file F
+bytes`, X = 30 R, Y the DTX3 table, S the state block its reader needs (DTX,
+abi.md 3), F the tune file.
 
 **4.6 The name** of a tune file (SPEC.md 3.3) is the text the tool's
 section names, its characters below space dropped, stripped of
 surrounding white space, and cut to 255 bytes of UTF-8 on a character
 boundary; where the text is then empty the name word is 0.
+
+**4.7 A set's rings.** A set's subtunes share one workspace, which has
+the largest state block among them (BINARIES.md 3.1). Where a tool writes
+the tune files of a set, `ymxr-multi` (11) and a tool of section 7 on a
+multi of several tunes (7.3), and `-m` is absent, the writer chooses each
+table's ring for the set:
+
+1. It packs each table without copies through each ring 4.2 packs it
+   through.
+2. For each state block B one of those packings needs, each tune packs
+   through the ring whose table is the fewest bytes among those whose state
+   block is B or less, the smaller ring of two of the same bytes.
+3. It keeps the B whose tables and B come to the fewest bytes, the
+   smaller B of two that come to the same.
+4. Under `-copies` each table then packs with copies through its ring
+   where they pay (4.3).
+
+A set of one tune comes to the ring 4.2 chooses. After the packing
+report of each tune (4.5) the report has the heading `the set: N tunes,
+the tables T bytes, the state block S bytes`, T the bytes of the DTX3
+tables and S the largest state block.
 
 ---
 
@@ -330,9 +354,12 @@ start at or after the repeat row that only the wrap puts outside rule
 3(a) (ymxs.md): the place is row 0 there.
 
 **7.3 The tune file** of a tune is named by the tune's title (4.6). The
-report per tune: the packing report (4.5), then the row
-`<title>`, `(untitled)` where blank, with the value `R rows at H Hz, S
-sources: B bytes`, R the row count before padding.
+report per tune: the packing report (4.5), then the row `<title>`,
+`(untitled)` where blank, with the value
+`R rows at H Hz, S sources: B bytes`, R the row count before padding. A
+multi of several tunes is a set, and without `-m` its rings are chosen for
+it (4.7): every tune is packed before the first tune's report, and the set's
+heading follows the last.
 
 **7.4 `ymxs-to-ymxr`.** The flags are `-kK`, `-mN` and `-copies[S]`. A
 multi of one tune writes that tune file and omits the summary line. A
@@ -516,19 +543,25 @@ file the reader rejects is its message, exit 1.
 
 ## 11. ymxr-multi
 
-**11.1** The arguments name tune files, one subtune each in the order
-named, and `-nNAME` flags, the i-th naming the i-th file; the output is
-the multi file (BINARIES.md 0). A tune is named by its `-nNAME`, else by
-the name its tune file records (SPEC.md 3.3), else by the stem of its
-file name: the name after the last `/`, up to its last `.`.
+**11.1** The arguments name tune files, one subtune each in the order named,
+`-nNAME` flags, the i-th naming the i-th file, and the packer's `-mN` and
+`-copies[S]` (4.2, 4.3); the output is the multi file (BINARIES.md 0). Each
+table is unpacked and packed again at the unit its tune file packs at:
+through the rings chosen for the set (4.7) where `-m` is absent, and through
+the ring `-mN` names as 4.2 reads it otherwise. Every other part of a tune
+file is as the file has it. A tune is named by its `-nNAME`, else by the
+name its tune file records (SPEC.md 3.3), else by the stem of its file name:
+the name after the last `/`, up to its last `.`.
 
 **11.2 Errors.** A file that fails to read is `cannot read F: <message>`,
-exit 2; a file the reader rejects (writing.md 7) is its message, exit 1;
-a hundred tune files or more is `N tunes, and a multi file has 99 at
-most`, exit 1.
+exit 2; a file the reader rejects (writing.md 7) is its message, exit 1; a
+hundred tune files or more is `N tunes, and a multi file has 99 at most`,
+exit 1, before a table is packed.
 
-**11.3 The summary lines** are `ymxr-multi: <name>: B bytes` for each
-tune, then `ymxr-multi: N tunes, B bytes`.
+**11.3 The report** is each tune's packing report (4.5), in the order named,
+then the set's heading of 4.7. The summary lines are
+`ymxr-multi: <name>: B bytes` for each tune, then
+`ymxr-multi: N tunes, B bytes`.
 
 **11.4 Reading a multi file.** A file of 8 bytes or more beginning `YMXM` is
 read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
@@ -709,27 +742,28 @@ SNDH core performs it.
 
 ## 16. The scripts
 
-**16.1 `ym/play.sh [options] tune [more ...] [out.wav]`** converts,
-combines and runs under Hatari with the emulator's sound on. The first
-name is a dump or a tune file; a later name ending `.ym` or `.ymxr` in
-either case is another, one subtune each in the order named, each named
-by its file; any other name records the run instead: Hatari writes an
-AVI, `ym/avi.py` reads its sound out as that WAV and its last frame as a
-PNG of the same stem. The options `-kK`, `-mN`, `-rRR`, `-r`,
-`-copies[S]` reach `ym-to-ymxr`, and with a tune file among the names
-are the error `ym/play.sh: <name> is a tune file, and -k, -m and -r pack
-one`, exit 2; `-tTITLE` and `-cCOMPOSER`, `-perf`, `-lean`, `-vbl` and
-`-tc` reach `ymxr-sndh`, the title the first name's stem by default;
-`-vN` stops the run after N frames, and `-vbl` is read as the clock
-before it; `-silent` reaches every tool; `-h` prints the head of the
-script, exit 0, and a call with zero names prints it, exit 2. Several
-tunes go through `ymxr-multi`, each named by its stem, and the program
-picks between them as 13.1 defines. The script writes `TUNE.SND` and
-`TUNE.PRG` under a temporary directory: `ym/play.sh: TUNE.SND and
-TUNE.PRG are under <dir>` on standard error. A second name to record to
-is the error `ym/play.sh: <a> and <b> both name a file to record to`,
-exit 2; an option outside these is `ym/play.sh does not read <option>`,
-exit 2.
+**16.1 `ym/play.sh [options] tune [more ...] [out.wav]`** converts, combines
+and runs under Hatari with the emulator's sound on. The first name is a dump
+or a tune file; a later name ending `.ym` or `.ymxr` in either case is
+another, one subtune each in the order named, each named by its file; any
+other name records the run instead: Hatari writes an AVI, `ym/avi.py` reads
+its sound out as that WAV and its last frame as a PNG of the same stem. The
+options `-kK`, `-mN`, `-rRR`, `-r`, `-copies[S]` reach `ym-to-ymxr`, and
+with a tune file among the names are the error
+`ym/play.sh: <name> is a tune file, and -k, -m and -r pack one`, exit 2;
+where several names are a set, `-mN` reaches `ymxr-multi` beside
+`ym-to-ymxr`, and `-copies[S]` reaches `ymxr-multi` in place of it;
+`-tTITLE` and `-cCOMPOSER`, `-perf`, `-lean`, `-vbl` and `-tc` reach
+`ymxr-sndh`, the title the first name's stem by default; `-vN` stops the run
+after N frames, and `-vbl` is read as the clock before it; `-silent` reaches
+every tool; `-h` prints the head of the script, exit 0, and a call with zero
+names prints it, exit 2. Several tunes go through `ymxr-multi`, each named
+by its stem, and the program picks between them as 13.1 defines. The script
+writes `TUNE.SND` and `TUNE.PRG` under a temporary directory:
+`ym/play.sh: TUNE.SND and TUNE.PRG are under <dir>` on standard error. A
+second name to record to is the error
+`ym/play.sh: <a> and <b> both name a file to record to`, exit 2; an option
+outside these is `ym/play.sh does not read <option>`, exit 2.
 
 **16.2 `ym/play-ymxs.sh [options] [tune.ymxs] [out.wav]`** runs
 `ymxs-to-prg` on the file named, or on standard input otherwise, and the
@@ -780,7 +814,9 @@ converter:
 
 | option | reaches |
 |---|---|
-| `-kK`, `-mN`, `-rRR`, `-r`, `-copies[S]` | `ym-to-ymxr` (4, 5) |
+| `-kK`, `-rRR`, `-r` | `ym-to-ymxr` (4, 5) |
+| `-mN` | `ym-to-ymxr` and `ymxr-multi` (4.2, 11.1) |
+| `-copies[S]` | `ymxr-multi`, which packs each table again through the set's ring (4.3, 4.7) |
 | `-nNAME`, the i-th naming the i-th dump | `ymxr-multi` (11.1) |
 | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` | `ymxr-sndh` (12) |
 | `-rowsN`, the rows the program plays | `ymxr-prg` as `-rN` (13.1) |

@@ -3,6 +3,8 @@ package org.ymxr;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.dtx.Dtx;
 import org.dtx.Dtx1;
 import org.dtx.Dtx3;
@@ -84,9 +86,29 @@ final class Tune {
      *  16-bit displacement. */
     static final int REACH = 32767;
 
-    /** A tune file written: the file, and the row it repeats to, `R` where
-     *  it plays once. */
-    record Written(byte[] file, int repeat) {
+    /** The heading's words for a ring the writer chose: for the tune, and
+     *  for the set it is a subtune of (tools.md 4.5, 4.7). */
+    static final String CHOSE = ", the one the writer chose";
+    static final String CHOSE_FOR_SET = ", the one the writer chose for the set";
+
+    /** A table packed: its bytes, and the state block its reader needs. */
+    record Packed(byte[] table, int state) {
+    }
+
+    /** A tune file written: the file, the row it repeats to, `R` where it
+     *  plays once, its DTX3 table, the table's rows and unit, and the
+     *  sources' tables, rows and bytes the packing report reads (tools.md
+     *  4.5). `plain` is the table packed without copies through each ring
+     *  the writer chose among, by ring, and empty where a ring was named:
+     *  a set's rings are chosen among these (tools.md 4.7). */
+    record Written(byte[] file, int repeat, byte[] table, int frames, int unit, int sources,
+                   int sourceRows, int sourceBytes, SortedMap<Integer, Packed> plain) {
+
+        /** The same tune in another file, its table as it is. */
+        Written withFile(byte[] other) {
+            return new Written(other, repeat, table, frames, unit, sources, sourceRows,
+                    sourceBytes, plain);
+        }
     }
 
     private Tune() {
@@ -147,6 +169,15 @@ final class Tune {
     /** The same, with the tune named. */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          List<Packer> packers, Report report, String name) {
+        Written written = pack(columns, sources, frameRate, unit, ring, packers, report, name);
+        packed(report, written, ring == CHOOSE ? CHOSE : "");
+        return written;
+    }
+
+    /** The tune file {@link #write} writes, without the packing report: a
+     *  set reports its tunes once their rings are chosen for it. */
+    static Written pack(Columns columns, Sources sources, int frameRate, int unit, int ring,
+                        List<Packer> packers, Report report, String name) {
         if (frameRate < 1 || frameRate > MOST_RATE) {
             throw new IllegalArgumentException("a frame rate of " + frameRate
                     + ", and the frame rate is a word, 1 to " + MOST_RATE);
@@ -164,11 +195,7 @@ final class Tune {
         int live = live(columns.column);
         List<Integer> rings = new ArrayList<>();
         if (ring == CHOOSE) {
-            for (int one : RINGS) {
-                if (one <= reach(live)) {
-                    rings.add(one);
-                }
-            }
+            rings = rings(live);
         } else {
             int at = ringOf(ring, live);
             if (at != ring) {
@@ -192,36 +219,28 @@ final class Tune {
         byte[] table = new byte[0];
         int at = 0;
         long least = Long.MAX_VALUE;
+        SortedMap<Integer, Packed> plain = new TreeMap<>();
         if (rings.size() > 1) {
-            // A ring the packager finds no period for at this unit is left
-            // out (DTX abi.md 4): at a unit of 4 a period divides by 4.
-            java.util.Map<Integer, Long> plain = new java.util.HashMap<>();
-            List<Integer> cheapest = new ArrayList<>();
-            for (int one : rings) {
-                byte[] made = table(columns.column, frames, repeat, unit, one, first);
-                try {
-                    long cost = made.length + (long) state(made);
-                    plain.put(one, cost);
-                    cheapest.add(one);
-                    if (cost < least) {
-                        least = cost;
-                        table = made;
-                        at = one;
-                    }
-                } catch (IllegalArgumentException unbound) {
-                    report.note("a ring of " + one + " has no period at unit " + unit);
-                }
-            }
-            if (cheapest.isEmpty()) {
-                throw new IllegalArgumentException("no ring the writer chooses among has a"
-                        + " period at unit " + unit + " (DTX abi.md 4)");
-            }
-            cheapest.sort(java.util.Comparator.comparing(plain::get));
+            plain = candidates(columns.column, frames, repeat, unit, rings, first.get(0), report);
+            // in ring order, and the sort is stable: of two that come to the
+            // same, the smaller ring is first
+            List<java.util.Map.Entry<Integer, Packed>> cheapest =
+                    new ArrayList<>(plain.entrySet());
+            cheapest.sort(java.util.Comparator.comparingLong(
+                    one -> one.getValue().table().length + (long) one.getValue().state()));
+            Packed best = cheapest.get(0).getValue();
+            least = best.table().length + (long) best.state();
+            table = best.table();
+            at = cheapest.get(0).getKey();
             // With one packer the pass above is the packing: its least is
             // the table.
-            kept = packers.size() > 1 ? cheapest.subList(0, Math.min(tried, cheapest.size()))
-                    : List.of();
-            least = packers.size() > 1 ? Long.MAX_VALUE : least;
+            kept = new ArrayList<>();
+            if (packers.size() > 1) {
+                for (int i = 0; i < Math.min(tried, cheapest.size()); i++) {
+                    kept.add(cheapest.get(i).getKey());
+                }
+                least = Long.MAX_VALUE;
+            }
         }
         for (int one : kept) {
             byte[] made = table(columns.column, frames, repeat, unit, one, every);
@@ -270,9 +289,65 @@ final class Tune {
         for (int i = 0; i < tables.length; i++) {
             System.arraycopy(tables[i], 0, file, sourceAt[i], tables[i].length);
         }
-        packed(report, table, frames, tables.length, sourceRows, sourceBytes, at, unit,
-                ring == CHOOSE, file.length);
-        return new Written(file, repeat < frames ? repeat : frames);
+        return new Written(file, repeat < frames ? repeat : frames, table, frames, unit,
+                tables.length, sourceRows, sourceBytes, plain);
+    }
+
+    /** The table packed with `packer` through each of `rings`, by ring. A
+     *  ring the packager finds no period for at this unit is left out, with
+     *  a note (DTX abi.md 4): at a unit of 4 a period divides by 4.
+     *
+     *  @throws IllegalArgumentException where no ring has a period */
+    static SortedMap<Integer, Packed> candidates(byte[][] column, int frames, int repeat,
+                                                 int unit, List<Integer> rings, Packer packer,
+                                                 Report report) {
+        SortedMap<Integer, Packed> plain = new TreeMap<>();
+        for (int one : rings) {
+            byte[] made = table(column, frames, repeat, unit, one, List.of(packer));
+            try {
+                plain.put(one, new Packed(made, state(made)));
+            } catch (IllegalArgumentException unbound) {
+                report.note("a ring of " + one + " has no period at unit " + unit);
+            }
+        }
+        if (plain.isEmpty()) {
+            throw new IllegalArgumentException("no ring the writer chooses among has a"
+                    + " period at unit " + unit + " (DTX abi.md 4)");
+        }
+        return plain;
+    }
+
+    /** The rings the writer chooses among for a table of `live` live
+     *  columns: each of {@link #RINGS} the player reaches. */
+    static List<Integer> rings(int live) {
+        List<Integer> rings = new ArrayList<>();
+        for (int one : RINGS) {
+            if (one <= reach(live)) {
+                rings.add(one);
+            }
+        }
+        return rings;
+    }
+
+    /** The tune file with `table` in place of its DTX3 table, every other
+     *  part as it is: the source tables after it move by what the table's
+     *  length moves them, and the index records where each now begins
+     *  (SPEC.md 3.3). */
+    static byte[] withTable(byte[] file, byte[] table) {
+        int tableAt = getLong(file, TABLE_AT);
+        int count = file[COUNT_AT] & 0xFF;
+        int from = count == 0 ? file.length : getLong(file, INDEX_AT) & ~COUNTED;
+        int to = align(tableAt + table.length);
+        byte[] out = new byte[to + file.length - from];
+        System.arraycopy(file, 0, out, 0, tableAt);
+        System.arraycopy(table, 0, out, tableAt, table.length);
+        System.arraycopy(file, from, out, to, file.length - from);
+        for (int i = 0; i < count; i++) {
+            int entry = getLong(out, INDEX_AT + 4 * i);
+            putLong(out, INDEX_AT + 4 * i, ((entry & ~COUNTED) + to - from)
+                    | (entry & COUNTED));
+        }
+        return out;
     }
 
     /**
@@ -325,8 +400,8 @@ final class Tune {
     }
 
     /** The columns as a DTX3 file, packed. */
-    private static byte[] table(byte[][] column, int frames, int repeat, int unit, int ring,
-                                List<Packer> packers) {
+    static byte[] table(byte[][] column, int frames, int repeat, int unit, int ring,
+                        List<Packer> packers) {
         int rr = repeat < frames ? repeat : frames;
         return Dtx3.write(Table.of(frames, rr, 1, column), packers, unit, ring);
     }
@@ -365,7 +440,7 @@ final class Tune {
      * count runs over each pack of a live column. DTX packs the columns at
      * once, so the count is one every pack shares.
      */
-    private static final class Watched {
+    static final class Watched {
 
         private final Report report;
         private final int total;
@@ -394,17 +469,17 @@ final class Tune {
     }
 
     /** What the packing came to, a column at a time and in all. */
-    private static void packed(Report report, byte[] table, int frames, int sources,
-                               int sourceRows, int sourceBytes, int ring, int unit, boolean chose,
-                               int file) {
+    static void packed(Report report, Written written, String chose) {
         if (!report.says()) {
             return;
         }
+        byte[] table = written.table();
+        int frames = written.frames();
         Dtx3.Payload payload = Dtx3.payload(table);
         report.say("the table: " + Report.count(Columns.C, "column", "columns") + " of "
                 + Report.count(frames, "row", "rows") + ", "
                 + Report.count((long) Columns.C * frames, "byte", "bytes") + ", packed at unit "
-                + unit + " through a ring of " + ring + (chose ? ", the one the writer chose" : "")
+                + written.unit() + " through a ring of " + payload.ring() + chose
                 + ", " + Report.count(payload.live(), "live column", "live columns"));
         for (int c = 0; c < Columns.C; c++) {
             if (!payload.live(c)) {
@@ -416,14 +491,15 @@ final class Tune {
             report.row(name(c), String.format(Locale.ROOT, "%7d -> %6d bytes  (%5.1f%%)",
                     frames, bytes, 100.0 * bytes / frames));
         }
-        report.say("the sources: " + Report.count(sources, "table", "tables") + " of "
-                + Report.count(sourceRows, "row", "rows") + ", "
-                + Report.count(sourceBytes, "byte", "bytes"));
+        report.say("the sources: " + Report.count(written.sources(), "table", "tables") + " of "
+                + Report.count(written.sourceRows(), "row", "rows") + ", "
+                + Report.count(written.sourceBytes(), "byte", "bytes"));
         int raw = Columns.C * frames;
         report.say(String.format(Locale.ROOT, "packed %s into %d (%.1f%%), the state block %s,"
                         + " the file %s",
                 Report.count(raw, "byte", "bytes"), table.length, 100.0 * table.length / raw,
-                Report.count(state(table), "byte", "bytes"), Report.count(file, "byte", "bytes")));
+                Report.count(state(table), "byte", "bytes"),
+                Report.count(written.file().length, "byte", "bytes")));
     }
 
     /** What a column is, for a reported row: a register by its number, and

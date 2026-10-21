@@ -342,21 +342,48 @@ final class ParityTest {
      * A set of subtunes reported, where the report has the most to say.
      *
      * <p>The tunes of one multi file are grouped by what an image fixes
-     * once, so a set that agrees on those shares one image and one that
-     * does not is split. Both cases are here: two tune files packed
-     * through one ring, and two packed through two.
+     * once, the unit among it, so a set that agrees on those shares one
+     * image and one that does not is split. Both cases are here: two tune
+     * files packed at one unit, and two packed at two. The two packed
+     * through rings of 900 and 300 bytes split until DTX3, whose image
+     * leaves the ring to each table.
      */
     @Test
     void aSetOfSubtunesIsReportedTheSameInBothTrees() throws Exception {
         byte[] dump = Files.readAllBytes(dumps().get(0));
-        byte[] wide = both("ym-to-ymxr", dump, "-silent", "-m900");
-        byte[] narrow = both("ym-to-ymxr", dump, "-silent", "-m300");
-        byte[] shared = multiOf(List.of(wide, wide));
-        byte[] split = multiOf(List.of(wide, narrow));
+        byte[] one = both("ym-to-ymxr", dump, "-silent");
+        byte[] two = both("ym-to-ymxr", dump, "-silent", "-k2");
+        byte[] shared = multiOf(List.of(one, one));
+        byte[] split = multiOf(List.of(one, two));
         // One image for the two that agree, and two for the two that do
         // not: the rows that say so are in the report alone.
         both("ymxr-prg", both("ymxr-sndh", shared, "-perf"));
         both("ymxr-prg", both("ymxr-sndh", split));
+    }
+
+    /**
+     * A set's rings chosen for it (tools.md 4.7): through ymxr-multi under
+     * each of its packing flags, and through ymxs-to-ymxr and ymxs-to-sndh
+     * on a structure of two tunes. One file and one report in both trees.
+     */
+    @Test
+    void aSetsRingsAreChosenTheSameInBothTrees() throws Exception {
+        List<byte[]> tunes = new ArrayList<>();
+        List<org.ymxs.YMXS.Tune> structures = new ArrayList<>();
+        for (String name : List.of("Big - Samantha Fox Strip Poker 6.ym",
+                "Turrican 2 - world completed 1.ym")) {
+            byte[] dump = Files.readAllBytes(Path.of("ym", "test", name));
+            tunes.add(both("ym-to-ymxr", dump, "-silent"));
+            structures.add(org.ymxs.Text.read(new String(both("ym-to-ymxs", dump, "-silent"),
+                    StandardCharsets.UTF_8)).tunes().get(0));
+        }
+        multiOf(tunes);
+        multiOf(tunes, "-m480");
+        multiOf(tunes, "-copies");
+        byte[] structure = org.ymxs.Text.write(new org.ymxs.YMXS.Multi(structures))
+                .getBytes(StandardCharsets.UTF_8);
+        both("ymxs-to-ymxr", structure);
+        both("ymxs-to-sndh", structure, "-copies");
     }
 
     /** Every tool of the twelve (tools.md 2), for a check that runs them

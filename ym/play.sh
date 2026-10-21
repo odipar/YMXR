@@ -33,6 +33,10 @@
 #              for a better parse, and a search of some seconds packs
 #              another parse every run
 #
+# Several tunes are a set, whose rings ymxr-multi chooses for it
+# (tools.md 4.7): -mN reaches it beside the converter, and -copies[S]
+# reaches it in place of the converter.
+#
 # The tags:
 #
 #   -tTITLE    the title, the dump's or the file's name by default
@@ -228,8 +232,15 @@ while [ "$left" -gt 0 ]; do
             # were passed, and two tunes may share a name.
             mkdir -p "$work/$at"
             file=$work/$at/${name%.*}.ymxr
+            # a set's tables pack again through its rings, with copies
+            # where asked, so -copies reaches ymxr-multi alone there
+            if [ "$tunes" -gt 1 ]; then
+                packs=
+            else
+                packs=$copies
+            fi
             "$here/bin/ym-to-ymxr" ${unit:+"$unit"} ${ring:+"$ring"} \
-                ${repeat:+"$repeat"} ${copies:+"$copies"} $silent \
+                ${repeat:+"$repeat"} ${packs:+"$packs"} $silent \
                 < "$tune" > "$file"
             ;;
     esac
@@ -243,7 +254,8 @@ done
 # subtunes is made from (BINARIES.md 0); one tune goes in as the
 # tune file it is.
 if [ "$tunes" -gt 1 ]; then
-    "$here/bin/ymxr-multi" "$@" $silent > "$work/TUNE.YMXR"
+    "$here/bin/ymxr-multi" "$@" ${ring:+"$ring"} ${copies:+"$copies"} $silent \
+        > "$work/TUNE.YMXR"
 else
     cp "$1" "$work/TUNE.YMXR"
 fi

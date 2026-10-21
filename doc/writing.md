@@ -132,10 +132,13 @@ column is packed with ST4. Three of its settings reach a player:
 | the ring | the bytes a live column unpacks through: a multiple of thirty, at least 60, and at most 32,767 divided by the live columns less one |
 | the period | thirty rows, the column count |
 
-**6.2** The ring sets the size of the state block a host allocates, a
-ring a live column and a fixed part; a smaller ring packs to more bytes
-(experiments.md), so the reference writer chooses the ring whose table
-and state block come to the least (SPEC.md 3.3.3).
+**6.2** The ring sets the size of the state block a host allocates, a ring a
+live column and a fixed part; a smaller ring packs to more bytes
+(experiments.md), so the reference writer chooses the ring whose table and
+state block come to the least (SPEC.md 3.3.3). The subtunes of a set share
+one workspace, sized for the largest state block among them, so the writer
+chooses their rings for the set: a tune packs through a wider ring where its
+state block stays within the largest (tools.md 4.7).
 
 ---
 

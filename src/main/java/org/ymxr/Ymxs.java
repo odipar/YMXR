@@ -73,12 +73,40 @@ final class Ymxs {
         return multi;
     }
 
-    /** One tune file a tune, in the multi's order. */
+    /** One tune file a tune, in the multi's order. A multi of several
+     *  tunes is a set, and without {@code -m} its rings are chosen for it
+     *  (tools.md 4.7). */
     static List<byte[]> tuneFiles(Tool tool, Multi multi, Packing packing, Report report) {
         List<byte[]> out = new ArrayList<>();
-        for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
-            out.add(tuneFile(tool, tune, packing, report));
+        if (multi.tunes().size() == 1 || packing.ring() != Tune.CHOOSE) {
+            for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
+                out.add(tuneFile(tool, tune, packing, report));
+            }
+            return out;
         }
+        List<Schema.Made> made = new ArrayList<>();
+        List<Tune.Written> written = new ArrayList<>();
+        List<Tune.Written> set;
+        try {
+            for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
+                Schema.Made one = Schema.of(Padding.toUnit(tune, packing.unit(), report).tune());
+                made.add(one);
+                // without copies: the set's choice packs with them through
+                // the ring it chooses
+                written.add(Tune.pack(one.columns(), one.sources(), one.rate(), packing.unit(),
+                        Tune.CHOOSE, List.of(packing.packers().get(0)), report, tune.title()));
+            }
+            set = SetRings.forSet(written, packing.packers(), report);
+        } catch (IllegalArgumentException wrong) {
+            throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
+        }
+        for (int i = 0; i < set.size(); i++) {
+            org.ymxs.YMXS.Tune tune = multi.tunes().get(i);
+            Tune.packed(report, set.get(i), Tune.CHOSE_FOR_SET);
+            row(report, tune, made.get(i), set.get(i).file());
+            out.add(set.get(i).file());
+        }
+        SetRings.say(report, set);
         return out;
     }
 
@@ -96,11 +124,17 @@ final class Ymxs {
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }
+        row(report, tune, made, written.file());
+        return written.file();
+    }
+
+    /** A tune's row of the report (tools.md 7.3). */
+    private static void row(Report report, org.ymxs.YMXS.Tune tune, Schema.Made made,
+                            byte[] file) {
         report.row(title(tune), Report.count(org.ymxs.Tunes.size(tune.table()), "row", "rows")
                 + " at " + made.rate() + " Hz, "
                 + Report.count(made.sources().count(), "source", "sources") + ": "
-                + Report.count(written.file().length, "byte", "bytes"));
-        return written.file();
+                + Report.count(file.length, "byte", "bytes"));
     }
 
     /** What a tune is called, its writer where it has no title. */
