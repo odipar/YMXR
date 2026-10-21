@@ -973,7 +973,7 @@ push starts it: a caller starts it from the Actions tab or by `gh workflow
 run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
-./cmd/...`, with the nine 68000 binaries and DTX's twenty-two images
+./cmd/...`, with the nine 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go v0.4.9`,
 which a build fetches.
