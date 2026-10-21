@@ -51,11 +51,23 @@ at most Synergy Credits' 5,086, the play call is 2 to 27 per cent cheaper
 on average than under 0.4.22, and the SNDH files come to 915,678 bytes
 against 1,463,170 under 0.4.22 and 867,494 under 0.5.0.
 
+An SNDH file contains its workspace, so those figures are the memory the
+tunes use as they play. The workspace is zero bytes, which a packer
+removes: packed with ICE!, the files come to 433,824 bytes against 407,435
+under 0.4.22, 6.5 per cent more, and larger for 24 of the 25. The writer
+keeps the ring size whose table and state block come to the least, and a
+table packs less tightly through a smaller ring. At `-m960`, 0.4.22's ring
+size, the files come to 1,066,458 bytes in memory and to 400,489 packed,
+1.7 per cent less than under 0.4.22 and smaller for each of the 25. 0.4.22
+at the best of the ring sizes 60 to 960, through `-mN`, comes to 1,066,930
+bytes in memory: the ring size and the constant columns each save 27.1 per
+cent of the memory, and together 37.4.
+
 - **The format is 0.5.0's.** A tune file is version 7, and a file 0.5.0
   wrote reads as it did. Over the eleven dumps under `ym/test`, the SNDH
-  files come to 226,220 bytes against 223,880 under 0.5.0 and 525,428
-  under 0.4.22; `ym-to-ymxs` writes what 0.5.0's wrote, 11 structures of
-  11.
+  files come to 226,220 bytes in memory against 223,880 under 0.5.0 and
+  525,428 under 0.4.22, and to 91,666 packed with ICE! against 92,516 and
+  88,261; `ym-to-ymxs` writes what 0.5.0's wrote, 11 structures of 11.
 - **The Go tree's packing report** rounds a ratio on a half as the Java
   tree does: 3,600 bytes of 57,600 read 6.2 per cent in Go, whose `%.1f`
   rounds half to even, and 6.3 in Java.
@@ -69,41 +81,50 @@ against 1,463,170 under 0.4.22 and 867,494 under 0.5.0.
 
 Checks: `bin/suite` green, 217 tests and 0 skipped.
 
+Corrected after the release: the figures of SNDH files are named as the
+memory a tune uses, and the files packed with ICE! are beside them.
+
 ### 0.5.0, 2026-10-21
 
 <https://github.com/odipar/YMXR/releases/tag/v0.5.0>, built from the commit
 tagged `v0.5.0`.
 
-A tune file is version 7, its table DTX3 (DTX 0.12.0): a constant column
-is its value, the live columns share one ring the writer chooses, and the
-rings of a set are chosen for the set. Over the eleven dumps under
-`ym/test`, the SNDH files the dumps convert to, each with its workspace in
-it, come to 223,880 bytes against 525,428 under 0.4.22, 37 to 68 per cent
-less each.
+A tune file is version 7, its table DTX3 (DTX 0.12.0): a constant column is
+its value, each live column unpacks through a ring of the one size the
+writer chooses for the table, and the ring sizes of a set are chosen for
+the set. Over the eleven dumps under `ym/test`, the SNDH files the dumps
+convert to come to 223,880 bytes against 525,428 under 0.4.22, 37 to 68 per
+cent less each. An SNDH file contains its workspace, so that is the memory
+a tune uses as it plays. The workspace is zero bytes, which a packer
+removes: packed with ICE!, the files come to 92,516 bytes against 88,261,
+4.8 per cent more, since a table packs less tightly through the smaller
+rings the writer chooses.
 `ym-to-ymxs` writes what 0.4.22's wrote, 11 structures of 11, and
 `ym-to-ymxr`, `ymxr-bind`, `ymxr-sndh`, `ymxr-prg` and `ymxs-to-prg`
 write 55 new files.
 
 - **Version 7** (SPEC.md 3.3.3, 3.3.5). A column whose rows are one value
-  is stored as that value, and init writes it into each read of the
-  column as an immediate, so it has neither ring nor refill. Each table's
-  payload has its ring, which init reads. A tune file or a multi file of
+  is stored as that value, and init writes it into each read of the column
+  as an immediate, so it has neither ring nor refill. Each table's payload
+  has its ring size, which init reads. A tune file or a multi file of
   version 3 to 6 has DTX2 tables, and every reader rejects it with a line
   that names `ym-to-ymxr` and `ymxs-to-ymxr`, which write it again.
-- **The ring the writer chooses** (tools.md 4.1, 4.2). Without `-m` the
-  writer packs through each of 60, 120, 240, 480, 960 and 1,920 bytes the
-  player reaches and keeps the one whose table and state block come to
-  the least. A table packs at unit 1 by default, and `-k2` packs at unit
-  2; `-copies[S]` packs with copies where they pay, as before.
-- **A set's rings** (tools.md 4.7). A set's subtunes share one
-  workspace, so each tune packs through the ring of the fewest table
+- **The ring size the writer chooses** (tools.md 4.1, 4.2). Without `-m`
+  the writer packs the table through rings of each of 60, 120, 240, 480,
+  960 and 1,920 bytes the player reaches and keeps the size whose table and
+  state block come to the least. A table packs at unit 1 by default, and
+  `-k2` packs at unit 2; `-copies[S]` packs with copies where they pay, as
+  before.
+- **A set's ring sizes** (tools.md 4.7). A set's subtunes share one
+  workspace, so each tune packs through the ring size of the fewest table
   bytes under the state block that comes to the least for the set.
-  `ymxr-multi` packs the tables of the tune files it reads again and
-  reads `-mN` and `-copies[S]`; `ymxs-to-ymxr`, `ymxs-to-sndh` and
-  `ymxs-to-prg` choose the rings of a multi of several tunes. Three
-  games of the corpus, 53 tunes as three SNDH files, come to 241,364
-  bytes, against 313,936 with each tune at its ring alone and 419,928
-  under 0.4.22.
+  `ymxr-multi` packs the tables of the tune files it reads again and reads
+  `-mN` and `-copies[S]`; `ymxs-to-ymxr`, `ymxs-to-sndh` and `ymxs-to-prg`
+  choose the ring sizes of a multi of several tunes. Three games of the
+  corpus, 53 tunes as three SNDH files, come to 241,364 bytes in memory,
+  against 313,936 with each tune at the ring size chosen for it alone and
+  419,928 under 0.4.22, and to 130,603 packed with ICE! against 169,194
+  under 0.4.22, 22.8 per cent less.
 - **What it costs** (performance.md). The play call is cheaper on average
   on six of the eleven dumps and dearer on five, and its costliest frame
   is higher on every one, at most capture's 6,062 cycles against R4.5's
@@ -124,6 +145,11 @@ write 55 new files.
   each dump's bound tune and state block.
 
 Checks: `bin/suite` green, 217 tests and 0 skipped.
+
+Corrected after the release: the live columns of a table each have a ring,
+of one size, where this entry read that they share one ring; the figures of
+SNDH files are named as the memory a tune uses, and the files packed with
+ICE! are beside them.
 
 ### 0.4.22, 2026-10-18
 
