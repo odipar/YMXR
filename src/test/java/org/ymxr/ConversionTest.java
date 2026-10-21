@@ -1,5 +1,6 @@
 package org.ymxr;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -123,12 +124,12 @@ final class ConversionTest {
         Schema.Made made = Schema.of(Padding.toUnit(
                 Ym.read(song, sources, frames, report), 2, report).tune());
         Tune.Written written = Tune.write(made.columns(), made.sources(), song.playerHz(),
-                2, Tune.RING, report);
+                2, BuiltTunes.RING, report);
         TuneFile tune = TuneFile.read(written.file());
         assertEquals(32, tune.table().rows(), "the frames and one row that sets no column");
         assertEquals(32, tune.table().repeat(), "a tune that plays once repeats at its row count");
         // the payload's byte 2 is k, the unit (DTX, SPEC.md 2.3)
-        assertEquals(2, tune.dtx2()[Dtx.HEADER + 2] & 0xFF, "the table's unit");
+        assertEquals(2, tune.dtx3()[Dtx.HEADER + 2] & 0xFF, "the table's unit");
         assertEquals(List.of("padded: 1 unset row at row 31, so the table packs at unit 2"),
                 report.notes().stream().filter(n -> n.startsWith("padded")).toList(),
                 "the tool says what it added: " + report.notes());
@@ -230,8 +231,8 @@ final class ConversionTest {
 
     @Test
     void aSourceOfAnotherShapeIsRejected() throws IOException {
-        // SPEC.md 3.1: a source is one column of one byte at this version,
-        // the row shape 2.1's procedures read, and a reader rejects another
+        // SPEC.md 3.1: a source is one, two or three columns of one byte,
+        // the row shapes 2.1's procedures read, and a reader rejects another
         // shape as it rejects a tune of another version. The player reads a
         // source's rows a byte at a time from byte 16 of its table, so a
         // width of 2 read as this version reads it plays something else.
@@ -247,9 +248,9 @@ final class ConversionTest {
         assertThrows(IllegalArgumentException.class, () -> TuneFile.read(wide),
                 "a source of two-byte values is not read");
         byte[] many = file.clone();
-        many[at + 9] = 2;
+        many[at + 9] = 4;
         assertThrows(IllegalArgumentException.class, () -> TuneFile.read(many),
-                "a source of two columns is not read");
+                "a source of four columns is not read");
     }
 
     @Test
@@ -288,7 +289,7 @@ final class ConversionTest {
                 "a source past the file's end is read against its length");
         byte[] variant = file.clone();
         variant[tableAt + 3] = 1;
-        assertEquals("the table is DTX1, and a tune's table is DTX2 (SPEC.md 3.3.3)",
+        assertEquals("the table is DTX1, and a tune's table is DTX3 (SPEC.md 3.3.3)",
                 assertThrows(IllegalArgumentException.class,
                         () -> TuneFile.read(variant)).getMessage(),
                 "a table of another variant is read as none");
@@ -304,19 +305,19 @@ final class ConversionTest {
 
     @Test
     void theCopiesFlagIsTakenAndStatedInTheTable() throws IOException {
-        // -copies packs a match beyond the ring as a copy from the column's
-        // separate literal stream, which packs a small ring far smaller
-        // (DTX, dtx-write). The format block's byte 3 records it, and the binder
-        // reads that byte to pick the reader that reads such a table, so a
-        // table packed one way and read the other, which this separates.
+        // -copies packs a live column with copies from its literal stream
+        // where they pack it smaller, which packs a small ring far smaller
+        // (DTX, SPEC.md 2.4). The payload's flags byte records it, and the
+        // binder reads that byte to pick the reader that reads such a table,
+        // so a table packed one way and read the other, which this separates.
         byte[] dump = Files.readAllBytes(Path.of("ym/test/DBA 5.ym"));
         byte[] plain = YmToYmxr.convert(dump, List.of(), new Report()).written().file();
         byte[] copies = YmToYmxr.convert(dump, List.of("-copies"), new Report())
                 .written().file();
-        assertEquals(0, TuneFile.read(plain).dtx2()[Dtx.HEADER + 3] & 1,
+        assertEquals(0, TuneFile.read(plain).dtx3()[Dtx.HEADER + 3] & 1,
                 "the default packs no copies");
-        assertEquals(1, TuneFile.read(copies).dtx2()[Dtx.HEADER + 3] & 1,
-                "-copies records it in the table");
+        assertEquals(1, TuneFile.read(copies).dtx3()[Dtx.HEADER + 3] & 1,
+                "-copies records them in the table");
         assertTrue(copies.length < plain.length, () -> "DBA 5 packs to " + copies.length
                 + " bytes with copies and " + plain.length + " without");
     }
@@ -329,8 +330,8 @@ final class ConversionTest {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Big - Samantha Fox Strip Poker 6.ym"));
         byte[] searched = YmToYmxr.convert(dump, List.of("-copies0"), new Report())
                 .written().file();
-        assertEquals(1, TuneFile.read(searched).dtx2()[Dtx.HEADER + 3] & 1,
-                "-copies0 packs copies, the opening passes alone");
+        assertArrayEquals(YmToYmxr.convert(dump, List.of("-copies"), new Report()).written()
+                .file(), searched, "-copies0 is -copies, the opening passes alone");
         assertThrows(NumberFormatException.class,
                 () -> YmToYmxr.convert(dump, List.of("-copiesnow"), new Report()),
                 "a search of what is not a number is rejected");

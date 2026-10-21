@@ -25,7 +25,7 @@ full, then produce the file of section 2.
 ## 2. What a writer produces
 
 **2.1** A tune file (SPEC.md 3.3): the header, the tune's table as a
-DTX2 file, the source index, and one DTX1 table a source. The file has
+DTX3 file, the source index, and one DTX1 table a source. The file has
 tables alone; a tool binds it with DTX's reader into the layout a player
 reads (BINARIES.md 1).
 
@@ -53,8 +53,8 @@ leaves the rows between unset.
 
 **4.1** Four columns an effect: the target, the source, the timer's
 control and its count (SPEC.md 1.8, 1.9). The target column selects a
-target of SPEC.md 2.1: a register, 0 to 13, or from version 4 a target
-of two or three registers, 14 to 24. A row starts an effect by setting
+target of SPEC.md 2.1: a register, 0 to 13, or a target of two or three
+registers, 14 to 24. A row starts an effect by setting
 the source column to the source's number, 1 to 127, and stops it by
 setting the column to `$80`: the set bit with source 0 under it. A
 source column of 0 is unset (SPEC.md 1.1).
@@ -99,16 +99,13 @@ every bit of a row is a value, bit 31 of its index entry is 1, and a
 tick counts `R` rows (SPEC.md 3.1.6). A counted source on `setR7` sets
 bits 7 and 6 of every row, the directions of the two ports (SPEC.md 6,
 rule 2(f)). A source of two columns on `setEnvelope` is counted as well;
-a file of version 4 or 5 has the marked form in its place, the marker in
-bit 7 of R12's column (SPEC.md 2.1.3, 2.1.4). Targets 25 upward are left
+versions 4 and 5 wrote the marked form in its place, the marker in bit 7
+of R12's column (SPEC.md 2.1.3, 2.1.4). Targets 25 upward are left
 to a later version (SPEC.md 2.1, R6.2).
 
-**5.4** A writer writes the lowest version the tune reads under (SPEC.md
-3.3.5): 3 where every source is one column and every target 0 to 13, 4
-with a source of several columns or a target of 14 upward, 5 with a
-counted source of one column, and 6 with a counted source of several
-columns, so a player of an older version reads every tune that version
-encodes.
+**5.4** A writer writes version 7 (SPEC.md 3.3.5): its table is DTX3,
+which a player of an earlier version reads wrongly, and version 7 encodes
+every source of 5.1 to 5.3. Versions 3 to 6 had a DTX2 table.
 
 **5.5** The shape of a source sets its sound (SPEC.md 2.2):
 
@@ -125,18 +122,20 @@ two sources, and the source column selects one of them.
 
 ## 6. Packing the table
 
-**6.1** The table goes into the file as a DTX2 file, which DTX's writer
-packs (DTX, SPEC.md 2.3). Three of its settings reach a player:
+**6.1** The table goes into the file as a DTX3 file, which DTX's writer
+packs (DTX, SPEC.md 2.4): a constant column is its value, and each live
+column is packed with ST4. Three of its settings reach a player:
 
 | setting | what it requires |
 |---|---|
-| the unit K | `R` and `RR` divide by K, DTX's `k` (DTX R5.6 and R5.11); rule 6 of SPEC.md 6 lengthens a tune until they do |
-| the ring | the bytes a column unpacks through: a multiple of thirty, at least 60 and at most 1,110 |
+| the unit K | `R` and `RR` divide by K, DTX's `k` (DTX R8.9); rule 6 of SPEC.md 6 lengthens a tune until they do |
+| the ring | the bytes a live column unpacks through: a multiple of thirty, at least 60, and at most 32,767 divided by the live columns less one |
 | the period | thirty rows, the column count |
 
-**6.2** The ring sets the size of the state block a host allocates,
-thirty rings and a fixed part; a smaller ring packs to more bytes
-(experiments.md).
+**6.2** The ring sets the size of the state block a host allocates, a
+ring a live column and a fixed part; a smaller ring packs to more bytes
+(experiments.md), so the reference writer chooses the ring whose table
+and state block come to the least (SPEC.md 3.3.3).
 
 ---
 
@@ -144,10 +143,8 @@ thirty rings and a fixed part; a smaller ring packs to more bytes
 
 A reader rejects a file with a condition of SPEC.md 3.3.4, reports the
 first (SPEC.md 7) and produces zero entries. Among them: a version other
-than 3 to 6, a source other than one, two or three columns of one byte,
-and a source newer than the file's version: a source of several columns
-in version 3, a counted source below version 5, and a counted source of
-several columns below version 6.
+than 7, versions 3 to 6 among them, whose table is DTX2, and a source
+other than one, two or three columns of one byte.
 
 ---
 
@@ -168,8 +165,8 @@ and reports the frame and the register that differ; `-hatari` plays it on
 a real MFP (tools.md 17.1).
 
 **8.3** `doc/conformance/tunes/` has fifteen tune files: fourteen a
-reader reads, of versions 3 to 6, and `wrong-version.ymxr`, version
-`$0007`, which a reader rejects (7); `MANIFEST.txt` lists the sha256 and
+reader reads, of version 7, and `wrong-version.ymxr`, version `$0008`,
+which a reader rejects (7); `MANIFEST.txt` lists the sha256 and
 the size of the record of each, the rejected one's empty.
 
 ---

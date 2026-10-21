@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/odipar/dtx/go/st4"
-
 	"github.com/odipar/ymxr/go/report"
 	"github.com/odipar/ymxr/go/schema"
 	"github.com/odipar/ymxr/go/ym"
@@ -20,7 +18,7 @@ import (
 )
 
 // Unit is the unit a table packs at by default.
-const Unit = 2
+const Unit = 1
 
 // Converted is a conversion: the tune file written, the dump's frame the
 // tune repeats to, or its frame count where it plays once, the sources it
@@ -42,7 +40,7 @@ type Converted struct {
 // -copies[S], as the tool does it.
 func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 	unit := Unit
-	ring := ymxr.Ring
+	ring := ymxr.Choose
 	repeat := -1
 	once := false
 	copies := false
@@ -55,10 +53,10 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 		case strings.HasPrefix(flag, "-m"):
 			ring, err = strconv.Atoi(flag[2:])
 		case strings.HasPrefix(flag, "-copies"):
-			// the packer's, spelled as DTX's dtx-write spells it: a
-			// match beyond the ring copies from the column's literal
-			// stream, which packs a small ring far smaller, and -copiesS
-			// searches S seconds for a better parse
+			// the packer's, spelled as DTX's dtx-write spells it: a live
+			// column is packed with copies from its literal stream and
+			// without, the smaller kept, and -copiesS searches S seconds
+			// for a better parse with them
 			copies = true
 			if len(flag) > 7 {
 				seconds, err = strconv.ParseFloat(flag[7:], 64)
@@ -98,8 +96,12 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 		return Converted{}, err
 	}
 	found(said, sources, made.Columns.Effects)
+	packers := ymxr.Plain()
+	if copies {
+		packers = ymxr.Packers(seconds)
+	}
 	written, err := ymxr.WriteNamed(made.Columns, made.Sources, song.PlayerHz, unit, ring,
-		st4.Packer{CopiesFlag: copies, Seconds: seconds}, said, song.Name)
+		packers, said, song.Name)
 	if err != nil {
 		return Converted{}, err
 	}
@@ -131,11 +133,11 @@ func flagsRead(said *report.Report, args []string, unit, ring, repeat int,
 		asked = ", the default"
 	}
 	said.Row("-k, the unit", fmt.Sprintf("%d%s", unit, asked))
-	asked = ", asked for"
-	if ring == ymxr.Ring {
-		asked = ", the default"
+	if ring == ymxr.Choose {
+		said.Row("-m, the ring", "the one the writer chooses, the default")
+	} else {
+		said.Row("-m, the ring", report.Count(ring, "byte", "bytes")+", asked for")
 	}
-	said.Row("-m, the ring", report.Count(ring, "byte", "bytes")+asked)
 	if once {
 		said.Row("-r, the repeat row", "none, the tune plays once")
 	} else {
@@ -149,12 +151,13 @@ func flagsRead(said *report.Report, args []string, unit, ring, repeat int,
 	}
 	switch {
 	case !copies:
-		said.Row("-copies", "no, the default: a match beyond the ring is not packed")
+		said.Row("-copies", "no, the default: a live column packs without copies")
 	case seconds == 0:
-		said.Row("-copies", "yes, the opening passes alone")
+		said.Row("-copies", "yes, the opening passes alone, where copies pack a live column"+
+			" smaller")
 	default:
 		said.Row("-copies", fmt.Sprintf("yes, %s seconds of search, which packs another"+
-			" parse a run", said2(seconds)))
+			" parse a run, where copies pack a live column smaller", said2(seconds)))
 	}
 }
 

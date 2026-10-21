@@ -31,7 +31,7 @@ final class PlacesTest {
             column[at[0]][at[1]] &= (byte) ~Columns.PLACE_RESET;
         }
         return Tune.write(made.columns(), made.sources(), made.rate(), YmToYmxr.UNIT,
-                Tune.RING, new Report()).file();
+                BuiltTunes.RING, new Report()).file();
     }
 
     @Test
@@ -59,7 +59,7 @@ final class PlacesTest {
             }
         }
         byte[] ours = Tune.write(Schema.of(YmxsTest.outsideRule3a()).columns(),
-                Schema.of(YmxsTest.outsideRule3a()).sources(), 50, YmToYmxr.UNIT, Tune.RING,
+                Schema.of(YmxsTest.outsideRule3a()).sources(), 50, YmToYmxr.UNIT, BuiltTunes.RING,
                 new Report()).file();
         assertEquals(List.of(), Check.places(TuneFile.read(ours)),
                 "the writer's bit 5 puts every start inside rule 3");

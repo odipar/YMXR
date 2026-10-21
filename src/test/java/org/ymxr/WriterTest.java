@@ -30,7 +30,7 @@ final class WriterTest {
     }
 
     private static Tune.Written at(int rate) {
-        return Tune.write(oneRow(), new Sources(List.of()), rate, 1, Tune.RING,
+        return Tune.write(oneRow(), new Sources(List.of()), rate, 1, BuiltTunes.RING,
                 new Report());
     }
 

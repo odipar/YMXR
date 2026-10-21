@@ -2,7 +2,6 @@ package org.ymxr;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.dtx.St4;
 import org.ymxs.Check;
 import org.ymxs.Text;
 import org.ymxs.YMXS.Multi;
@@ -24,7 +23,7 @@ final class Ymxs {
 
         static Packing of(Tool tool, List<String> flags) {
             int unit = YmToYmxr.UNIT;
-            int ring = Tune.RING;
+            int ring = Tune.CHOOSE;
             boolean copies = false;
             double seconds = 0;
             for (String flag : flags) {
@@ -40,8 +39,8 @@ final class Ymxs {
             return new Packing(unit, ring, copies, seconds);
         }
 
-        org.dtx.Packer packer() {
-            return copies ? new St4(true, seconds) : new St4();
+        java.util.List<org.dtx.Packer> packers() {
+            return copies ? Tune.packers(seconds) : Tune.packers();
         }
     }
 
@@ -93,7 +92,7 @@ final class Ymxs {
             // schema's are: a structure the columns or the header cannot
             // carry is the tune's, and the tool names it and exits 1.
             written = Tune.write(made.columns(), made.sources(), made.rate(),
-                    packing.unit(), packing.ring(), packing.packer(), report, tune.title());
+                    packing.unit(), packing.ring(), packing.packers(), report, tune.title());
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }

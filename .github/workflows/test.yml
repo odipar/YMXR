@@ -74,9 +74,10 @@ jobs:
       # performance.md's sentences over the whole set are read back by a
       # run of -refill over the eleven fixtures whole: which tunes fit the
       # ring, a refill's cost outside and inside the decoder, the ends of
-      # the fit, and the 44 between the two costs of a refill that parses
-      # no operation. RigCallsTest runs one tune of the set; this runs all
-      # of them, a few minutes the suite leaves to this step.
+      # the fit, the three costs of a refill that parses no operation, and
+      # each tune's bound tune and state block. RigCallsTest runs one tune
+      # of the set; this runs all of them, a few minutes the suite leaves
+      # to this step.
       - name: performance.md over the whole set
         run: python3 68k/test/emu/test_ymxr.py -refill
       # The player whose ticks read a row through an absolute address has

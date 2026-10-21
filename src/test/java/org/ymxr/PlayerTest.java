@@ -223,8 +223,8 @@ final class PlayerTest {
         assertTrue(e.size() > 20, "the player's equates read as " + e.size());
         assertEquals(java.nio.ByteBuffer.wrap(Bound.MAGIC).getInt(), e.get("YMXR_MAGIC"),
                 "the player's magic is the bound tune's");
-        assertEquals(Bound.VERSION_WIDE_COUNTED, e.get("YMXR_VERSION"),
-                "the newest version the player reads (SPEC.md 3.3.5)");
+        assertEquals(Bound.VERSION, e.get("YMXR_VERSION"),
+                "the version the player reads (SPEC.md 3.3.5)");
         assertEquals(Columns.C, e.get("YMXR_COLUMNS"));
         assertEquals(Tune.FRAME_RATE_AT, e.get("TF_RATE"));
         assertEquals(Tune.EFFECTS_AT, e.get("TF_EFFECTS"));
@@ -235,7 +235,7 @@ final class PlayerTest {
         assertEquals(Bound.INDEX_AT, e.get("TF_INDEX"));
         assertEquals(Bound.FORMAT_AT, e.get("IM_FORMAT"));
         assertEquals(Columns.EFFECT, 14);
-        assertEquals(Tune.MAX_RING, 32767 / (Columns.C - 1));
+        assertEquals(Tune.REACH, 32767, "a 16-bit displacement's reach");
     }
 
     /** Each tick kind as a triple: the text of its row in
@@ -285,9 +285,9 @@ final class PlayerTest {
 
     @Test
     void theTuneFileIsLaidOutAsTheSpecificationDefines() {
-        // SPEC.md 3.3: the version, where the DTX2 table's offset is
+        // SPEC.md 3.3: the version, where the DTX3 table's offset is
         // and where the source index begins
-        assertEquals(0x0003, Tune.VERSION);
+        assertEquals(0x0007, Tune.VERSION);
         assertEquals(12, Tune.TABLE_AT);
         assertEquals(16, Tune.INDEX_AT);
         // the bound tune keeps the header to offset 12 and puts the state
@@ -336,12 +336,17 @@ final class PlayerTest {
     @Test
     void theRingIsAMultipleOfThePeriodWithinReach() {
         // the ring asked for, a multiple of 30 already
-        assertEquals(960, Tune.ringOf(960));
+        assertEquals(960, Tune.ringOf(960, Columns.C));
         // the nearest multiple of 30
-        assertEquals(90, Tune.ringOf(100));
+        assertEquals(90, Tune.ringOf(100, Columns.C));
         // two periods at least
-        assertEquals(60, Tune.ringOf(30));
-        // the widest ring the player reads
-        assertEquals(1110, Tune.ringOf(4000));
+        assertEquals(60, Tune.ringOf(30, Columns.C));
+        // the widest ring the player reads at thirty live columns: slot 29
+        // is 29 rings past slot 0, through a 16-bit displacement
+        assertEquals(1110, Tune.ringOf(4000, Columns.C));
+        // and at thirteen, slot 12 twelve rings on
+        assertEquals(2730, Tune.ringOf(4000, 13));
+        // at one live column, DTX3's bound
+        assertEquals(32490, Tune.ringOf(40000, 1));
     }
 }

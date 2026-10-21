@@ -632,9 +632,11 @@ final class ConsistencyTest {
     }
 
     /**
-     * The share plan.md reads for the advance, and the two tunes it names,
-     * against the table. The percentages round the table's figures, so a figure
-     * that moves without its percentage moving is caught here.
+     * The share plan.md reads for the advance, of an average call and of the
+     * costliest frame over the table, and the two tunes it names. The
+     * percentages round the table's figures, so a figure that moves without
+     * its percentage moving is caught here. The costliest frame's share was
+     * read over the two tunes named, and read as the table's.
      */
     @Test
     void thePlanReadsTheAdvanceShareMeasured() throws IOException {
@@ -657,26 +659,28 @@ final class ConsistencyTest {
         assertEquals(string(synergy[3]), said.group(7), "Synergy Credits' advance");
         assertEquals(string(synergy[1]), said.group(8),
                 "Synergy Credits' costliest frame");
-        long one = Math.round(100.0 * turrican[3] / turrican[1]);
-        long two = Math.round(100.0 * synergy[3] / synergy[1]);
-        assertEquals(Math.min(one, two), Long.parseLong(said.group(3)),
+        long[] costliest = range(calls, call -> Math.round(100.0 * call[3] / call[1]));
+        assertEquals(costliest[0], Long.parseLong(said.group(3)),
                 "the least share of a costliest frame");
-        assertEquals(Math.max(one, two), Long.parseLong(said.group(4)),
+        assertEquals(costliest[1], Long.parseLong(said.group(4)),
                 "the greatest share of a costliest frame");
     }
 
     /**
      * performance.md's refill parts against its table: the fixed part
-     * outside the decoder and the heaviest parse inside make the advance in
-     * Turrican's costliest frame. The sentence gave the sum from before DTX
-     * took its state block in a6, and the table gave the figure after it.
+     * outside the decoder and the heaviest parse inside make the most
+     * Turrican's advance costs a frame, at least the advance in its
+     * costliest frame, which the table reads. The sentence gave the sum
+     * from before DTX took its state block in a6, and the table gave the
+     * figure after it.
      */
     @Test
     void theRefillPartsAddUpToTheAdvanceMeasured() throws IOException {
         String perf = read(PERF);
         Matcher parts = wrapped("A refill of ([\\d,]+) outside and the heaviest"
-                + " ([\\d,]+) inside is the ([\\d,]+) the table above reads")
-                .matcher(perf);
+                + " ([\\d,]+) inside are ([\\d,]+), the most Turrican's advance costs a"
+                + " frame; its costliest call is another frame, whose advance is the"
+                + " ([\\d,]+) of the table above").matcher(perf);
         assertTrue(parts.find(), "performance.md has no refill parts");
         long outside = number(parts.group(1));
         long inside = number(parts.group(2));
@@ -687,8 +691,9 @@ final class ConsistencyTest {
         long[] turrican = Objects.requireNonNull(
                 playCalls(perf).get("Turrican - world 4-3"),
                 "performance.md's table names no Turrican - world 4-3");
-        assertEquals(string(turrican[3]), string(whole),
+        assertEquals(string(turrican[3]), parts.group(4),
                 "the table reads another advance in the costliest frame");
+        assertTrue(whole >= turrican[3], "the most the advance costs is below the costliest frame's");
         Matcher spends = wrapped("The advance spends ([\\d,]+) cycles a refill"
                 + " outside the decoder").matcher(perf);
         assertTrue(spends.find(), "performance.md has no fixed part");
@@ -698,7 +703,7 @@ final class ConsistencyTest {
 
     /** The words the section against YMX spells a count with. */
     private static final Map<String, Integer> COUNT = Map.of(
-            "three", 3, "twelve", 12, "fifteen", 15, "twenty-one", 21,
+            "three", 3, "twelve", 12, "fifteen", 15, "seventeen", 17, "twenty-one", 21,
             "twenty-four", 24, "thirty", 30);
 
     /** A ratio spelled as a part: an eighth less is one part in eight. */
@@ -734,7 +739,8 @@ final class ConsistencyTest {
      * on that player, so its figures are read against each other:
      * the refill's two kinds of call make its calls and its average. The
      * sentences read 721 where the play-call table makes 722 and placed a
-     * frame counted from 0 as the 5,346th.
+     * frame counted from 0 as the 5,346th. A ratio is a part less or a
+     * share more or less, each by its sign.
      */
     @Test
     void theComparisonWithYmxReadsItsTables() throws IOException {
@@ -750,17 +756,19 @@ final class ConsistencyTest {
                 "no YMXR row, Turrican");
         Matcher ratio = wrapped("YMXR costs (an? \\w+) less on average on Turrican - world 4-3"
                 + " and (an? \\w+) less on Synergy Credits, and at their worst (\\d+) per cent"
-                + " more on Turrican - world 4-3 and (\\d+) per cent less on Synergy Credits")
-                .matcher(section);
+                + " (more|less) on Turrican - world 4-3 and (\\d+) per cent (more|less) on Synergy"
+                + " Credits").matcher(section);
         assertTrue(ratio.find(), "performance.md has no ratio against YMX");
         assertEquals(Math.round(ty[0] / (double) (ty[0] - tr[0])), part(ratio.group(1)),
                 ratio.group(1));
         assertEquals(Math.round(sy[0] / (double) (sy[0] - sr[0])), part(ratio.group(2)),
                 ratio.group(2));
-        assertEquals(Math.round(100.0 * (tr[2] - ty[2]) / ty[2]), Long.parseLong(ratio.group(3)),
-                "the worst call more on Turrican - world 4-3");
-        assertEquals(Math.round(100.0 * (sy[2] - sr[2]) / sy[2]), Long.parseLong(ratio.group(4)),
-                "the worst call less on Synergy Credits");
+        assertEquals(Math.round(100.0 * (tr[2] - ty[2]) / ty[2]),
+                Long.parseLong(ratio.group(3)) * (ratio.group(4).equals("more") ? 1 : -1),
+                "the worst call on Turrican - world 4-3");
+        assertEquals(Math.round(100.0 * (sr[2] - sy[2]) / sy[2]),
+                Long.parseLong(ratio.group(5)) * (ratio.group(6).equals("more") ? 1 : -1),
+                "the worst call on Synergy Credits");
 
         Map<String, long[]> calls = playCalls(perf);
         long[] turrican = Objects.requireNonNull(calls.get("Turrican - world 4-3"),
@@ -801,37 +809,40 @@ final class ConsistencyTest {
                 + number(split.group(4)) * busy) / (double) (idle + busy)),
                 "YMX's two kinds of call average to its row on Turrican - world 4-3");
 
-        Matcher ours = wrapped("YMXR refills (\\S+) units every row; YMX serves a round-robin of"
-                + " (\\S+) slots, (\\S+) of them a live stream, so its group is (\\S+) bytes,"
-                + " (\\S+) units at the same unit 2, and it refills on (\\S+) rows in (\\S+):"
-                + " the (\\S+) slots without a stream").matcher(section);
+        Matcher ours = wrapped("YMXR refills (\\S+) units of a byte on the turns that refill a"
+                + " live column, (\\S+) in (\\S+) on Turrican - world 4-3, and runs an idle turn on"
+                + " the rest; YMX serves a round-robin of (\\S+) slots, (\\S+) of them a live"
+                + " stream, so its group is (\\S+) bytes, (\\S+) units at unit 2, and it refills on"
+                + " (\\S+) rows in (\\S+): the (\\S+) slots without a stream").matcher(section);
         assertTrue(ours.find(), "performance.md has no refill of the two players");
         int units = count(ours.group(1));
-        int slots = count(ours.group(2));
-        int live = count(ours.group(3));
-        assertEquals(Columns.C / 2, units, "YMXR's units at unit 2");
-        assertEquals(slots, count(ours.group(4)), "YMX's group, a byte a slot");
-        assertEquals(slots / 2, count(ours.group(5)), "YMX's units at unit 2");
-        assertEquals(live, count(ours.group(6)), "the rows YMX refills on");
-        assertEquals(slots, count(ours.group(7)), "the rows YMX refills over");
-        assertEquals(slots - live, count(ours.group(8)), "YMX's slots without a stream");
+        int slots = count(ours.group(4));
+        int live = count(ours.group(5));
+        assertEquals(Columns.C, units, "YMXR's units at unit 1");
+        assertTrue(count(ours.group(2)) <= Columns.C, "YMXR's live columns on Turrican - world 4-3");
+        assertEquals(Columns.C, count(ours.group(3)), "the turns of a period");
+        assertEquals(slots, count(ours.group(6)), "YMX's group, a byte a slot");
+        assertEquals(slots / 2, count(ours.group(7)), "YMX's units at unit 2");
+        assertEquals(live, count(ours.group(8)), "the rows YMX refills on");
+        assertEquals(slots, count(ours.group(9)), "the rows YMX refills over");
+        assertEquals(slots - live, count(ours.group(10)), "YMX's slots without a stream");
         Matcher against = wrapped("(\\S+) units against (\\S+), which is why").matcher(section);
         assertTrue(against.find(), "performance.md has no refills set against each other");
         assertEquals(slots / 2, count(against.group(1)), "YMX's refill");
         assertEquals(units, count(against.group(2)), "YMXR's refill");
-        Matcher columns = wrapped("(\\S+) columns here against (\\S+) live streams there")
+        Matcher worst = wrapped("YMX's worst frame parses (\\S+) operations of (\\S+), and"
+                + " Turrican - world 4-3's heaviest refill here (\\S+) of (\\S+)\\.")
                 .matcher(section);
-        assertTrue(columns.find(), "performance.md has no columns against streams");
-        assertEquals(Columns.C, count(columns.group(1)), "YMXR's columns");
-        assertEquals(live, count(columns.group(2)), "YMX's live streams");
-        Matcher worst = wrapped("(\\S+) of (\\S+) here and (\\S+) of (\\S+) there").matcher(section);
         assertTrue(worst.find(), "performance.md has no worst frame's parse");
-        assertEquals(List.of(units, units, slots / 2, slots / 2), List.of(count(worst.group(1)),
-                count(worst.group(2)), count(worst.group(3)), count(worst.group(4))),
-                "the worst frames parse an operation a unit");
-        Matcher one = wrapped("the refill was (\\S+) units").matcher(section);
-        assertTrue(one.find(), "performance.md has no refill at unit 1");
-        assertEquals(Columns.C, count(one.group(1)), "YMXR's units at unit 1");
+        assertEquals(List.of(slots / 2, slots / 2, units), List.of(count(worst.group(1)),
+                count(worst.group(2)), count(worst.group(4))),
+                "YMX's worst frame parses an operation a unit, and a refill here is the window");
+        Matcher heaviest = wrapped("at its heaviest are [\\d,]+ over (\\w+) operations").matcher(perf);
+        assertTrue(heaviest.find(), "performance.md has no heaviest refill of Turrican - world 4-3");
+        assertEquals(heaviest.group(1), worst.group(3), "Turrican - world 4-3's heaviest refill");
+        Matcher two = wrapped("the refill is (\\S+) units, and a run of the same length").matcher(section);
+        assertTrue(two.find(), "performance.md has no refill at unit 2");
+        assertEquals(Columns.C / 2, count(two.group(1)), "YMXR's units at unit 2");
     }
 
     /**
@@ -958,27 +969,26 @@ final class ConsistencyTest {
     @Test
     void theWritersGuideReadsTheFormatAndTheKit() throws IOException {
         String guide = read(WRITING);
-        Matcher reads = wrapped("a version other than (\\d) to (\\d)").matcher(guide);
-        assertTrue(reads.find(), "writing.md names no versions a reader reads");
-        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(1)), "the first version read");
-        assertEquals(Tune.VERSION_WIDE_COUNTED, Integer.parseInt(reads.group(2)),
-                "the last version read");
-        Matcher lowest = wrapped("\\(SPEC\\.md 3\\.3\\.5\\): (\\d) where every source is one"
-                + " column and every target 0 to 13, (\\d) with a source of several columns or a"
-                + " target of 14 upward, (\\d) with a counted source of one column, and (\\d) with"
-                + " a counted source of several columns").matcher(guide);
-        assertTrue(lowest.find(), "writing.md names no version a writer writes");
-        assertEquals(List.of(Tune.VERSION, Tune.VERSION_COLUMNS, Tune.VERSION_COUNTED,
-                Tune.VERSION_WIDE_COUNTED), List.of(Integer.parseInt(lowest.group(1)),
-                Integer.parseInt(lowest.group(2)), Integer.parseInt(lowest.group(3)),
-                Integer.parseInt(lowest.group(4))), "the version of each shape");
+        Matcher reads = wrapped("a version other than (\\d), versions (\\d) to (\\d) among them,"
+                + " whose table is DTX2").matcher(guide);
+        assertTrue(reads.find(), "writing.md names no version a reader reads");
+        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(1)), "the version read");
+        assertEquals(Tune.VERSION_DTX2, Integer.parseInt(reads.group(2)),
+                "the first version of a DTX2 table");
+        assertEquals(Tune.VERSION_DTX2_LAST, Integer.parseInt(reads.group(3)),
+                "the last version of a DTX2 table");
+        Matcher writes = wrapped("A writer writes version (\\d) \\(SPEC\\.md 3\\.3\\.5\\)")
+                .matcher(guide);
+        assertTrue(writes.find(), "writing.md names no version a writer writes");
+        assertEquals(Tune.VERSION, Integer.parseInt(writes.group(1)), "the version written");
 
-        Matcher ring = wrapped("the bytes a column unpacks through: a multiple of (\\w+), at"
-                + " least (\\d+) and at most ([\\d,]+)").matcher(guide);
+        Matcher ring = wrapped("the bytes a live column unpacks through: a multiple of (\\w+),"
+                + " at least (\\d+), and at most ([\\d,]+) divided by the live columns less one")
+                .matcher(guide);
         assertTrue(ring.find(), "writing.md has no ring");
         assertEquals(Columns.C, count(ring.group(1)), "the ring's multiple, the period");
-        assertEquals(Tune.ringOf(0), Integer.parseInt(ring.group(2)), "the least ring");
-        assertEquals(Tune.ringOf(Integer.MAX_VALUE / 2), number(ring.group(3)), "the most ring");
+        assertEquals(Tune.ringOf(0, Columns.C), Integer.parseInt(ring.group(2)), "the least ring");
+        assertEquals(Tune.REACH, number(ring.group(3)), "the reach a ring is bounded by");
 
         Path kit = Path.of("doc/conformance/tunes");
         List<Path> files;
@@ -986,7 +996,7 @@ final class ConsistencyTest {
             files = at.filter(one -> one.toString().endsWith(".ymxr")).sorted().toList();
         }
         Matcher tunes = wrapped("`doc/conformance/tunes/` has (\\w+) tune files: (\\w+) a reader"
-                + " reads, of versions (\\d) to (\\d), and `wrong-version\\.ymxr`, version"
+                + " reads, of version (\\d), and `wrong-version\\.ymxr`, version"
                 + " `\\$([0-9A-F]{4})`").matcher(guide);
         assertTrue(tunes.find(), "writing.md has no count of the kit's tune files");
         assertEquals(files.size(), spelled(tunes.group(1)), "the kit's tune files");
@@ -996,19 +1006,19 @@ final class ConsistencyTest {
             byte[] file = Files.readAllBytes(one);
             int version = (file[4] & 0xFF) << 8 | file[5] & 0xFF;
             if (one.getFileName().toString().equals("wrong-version.ymxr")) {
-                assertEquals(Integer.parseInt(tunes.group(5), 16), version,
+                assertEquals(Integer.parseInt(tunes.group(4), 16), version,
                         "wrong-version.ymxr's version");
-                assertTrue(version > Tune.VERSION_WIDE_COUNTED, "wrong-version.ymxr is one a"
-                        + " reader reads");
+                assertTrue(version != Tune.VERSION, "wrong-version.ymxr is one a reader"
+                        + " reads");
             } else {
                 versions.add(version);
                 read++;
             }
         }
         assertEquals(read, spelled(tunes.group(2)), "the kit's tune files a reader reads");
-        assertEquals(List.of(Integer.parseInt(tunes.group(3)), Integer.parseInt(tunes.group(4))),
+        assertEquals(List.of(Integer.parseInt(tunes.group(3)), Integer.parseInt(tunes.group(3))),
                 List.of(versions.first(), versions.last()),
-                "the versions of the kit's tune files");
+                "the version of the kit's tune files");
         String manifest = read(Path.of("doc/conformance/MANIFEST.txt"));
         for (Path one : files) {
             assertTrue(manifest.contains(" tunes/" + one.getFileName() + "\n"),
@@ -1016,25 +1026,14 @@ final class ConsistencyTest {
         }
     }
 
-    /** A ratio spelled as a part, to a fifteenth. */
-    private static final List<String> PARTS = List.of("", "a whole", "a half", "a third",
-            "a quarter", "a fifth", "a sixth", "a seventh", "an eighth", "a ninth", "a tenth",
-            "an eleventh", "a twelfth", "a thirteenth", "a fourteenth", "a fifteenth");
-
-    /** The part a fall from one figure to another nears: a fall of an eighth is 1 in 8. */
-    private static String fall(long from, long to) {
-        return PARTS.get((int) Math.round(from / (double) (from - to)));
-    }
-
     /**
      * plan.md against requirements.md and performance.md: the budget, the
-     * heaviest refill and its shares, the tunes that packed at unit 1 and
-     * what padding them saved, the costliest frame against the budget, an
-     * operation's cost, the square's tick, the window, and the arithmetic of
-     * the thirty-first column. The rig reads the shares and gates the rows
-     * give; this reads what the other documents give. The document read ten
-     * tunes where the fixtures are eleven and five that packed at unit 1
-     * where performance.md counts six.
+     * shares of the heaviest refill of #171, the costliest frame against the
+     * budget, an operation's cost, the square's tick, the window, and the
+     * arithmetic of the thirty-first column. The rig reads the shares and
+     * gates the rows give; this reads what the other documents give. The
+     * document read ten tunes where the fixtures are eleven and five that
+     * packed at unit 1 where performance.md counted six.
      */
     @Test
     void thePlanReadsTheBudgetAndTheTables() throws IOException {
@@ -1065,57 +1064,25 @@ final class ConsistencyTest {
                 worst = one.getKey();
             }
         }
-        Matcher refill = wrapped("The heaviest refill of the (\\w+) tunes costs ([\\d,]+) cycles at"
+        // The refill of #171 is a history the table no longer has: its two
+        // figures read against the budget alone.
+        Matcher refill = wrapped("The heaviest refill of the (\\w+) tunes cost ([\\d,]+) cycles at"
                 + " unit 2, (\\d+) per cent of R4\\.5's [\\d,]+-cycle budget, against ([\\d,]+) at"
                 + " unit 1 and (\\d+) per cent").matcher(plan);
         assertTrue(refill.find(), "plan.md has no heaviest refill");
         assertEquals(calls.size(), spelled(refill.group(1)), "the tunes the table measures");
-        assertEquals(heaviest, number(refill.group(2)), "the heaviest refill the table reads");
-        assertEquals(Math.round(100.0 * heaviest / most), Long.parseLong(refill.group(3)),
-                "the heaviest refill's share of the budget");
+        assertEquals(Math.round(100.0 * number(refill.group(2)) / most),
+                Long.parseLong(refill.group(3)), "the heaviest refill's share of the budget");
         assertEquals(Math.round(100.0 * number(refill.group(4)) / most),
                 Long.parseLong(refill.group(5)), "the share at unit 1");
-
-        int table = perf.indexOf("| tune | on average at unit 1 |");
-        assertTrue(table >= 0, "performance.md has no table at unit 1");
-        Matcher units = Pattern.compile("^\\| ([^|]+?) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\|$",
-                Pattern.MULTILINE).matcher(perf.substring(table, perf.indexOf("\n\n", table)));
-        Map<String, long[]> byTune = new LinkedHashMap<>();
-        while (units.find()) {
-            byTune.put(units.group(1), new long[] {Long.parseLong(units.group(2)),
-                Long.parseLong(units.group(3)), Long.parseLong(units.group(4)),
-                Long.parseLong(units.group(5))});
-        }
-        Matcher before = wrapped("(\\w+) of the (\\w+) tunes packed at unit 1 before it; measured again"
-                + " at unit 2, their calls fell by (an? \\w+) to (an? \\w+) on average and by (an? \\w+)"
-                + " to more than a quarter in the costliest frame, Synergy Credits' from ([\\d,]+) to"
-                + " ([\\d,]+)").matcher(plan);
-        assertTrue(before.find(), "plan.md has no tunes that packed at unit 1");
-        assertEquals(byTune.size(), spelled(before.group(1).toLowerCase()), "the tunes padded");
-        assertEquals(calls.size(), spelled(before.group(2)), "the tunes measured");
-        Comparator<long[]> onAverage = Comparator.comparingDouble(row -> (row[0] - row[1]) / (double) row[0]);
-        Comparator<long[]> atMost = Comparator.comparingDouble(row -> (row[2] - row[3]) / (double) row[2]);
-        long[] leastAverage = byTune.values().stream().min(onAverage).orElseThrow();
-        long[] mostAverage = byTune.values().stream().max(onAverage).orElseThrow();
-        long[] leastFrame = byTune.values().stream().min(atMost).orElseThrow();
-        long[] mostFrame = byTune.values().stream().max(atMost).orElseThrow();
-        assertEquals(fall(leastAverage[0], leastAverage[1]), before.group(3).replaceAll("\\s+", " "),
-                "the least fall on average");
-        assertEquals(fall(mostAverage[0], mostAverage[1]), before.group(4).replaceAll("\\s+", " "),
-                "the greatest fall on average");
-        assertEquals(fall(leastFrame[2], leastFrame[3]), before.group(5).replaceAll("\\s+", " "),
-                "the least fall in the costliest frame");
-        assertTrue((mostFrame[2] - mostFrame[3]) / (double) mostFrame[2] > 0.25,
-                "the greatest fall in the costliest frame is a quarter or less");
-        long[] synergy = Objects.requireNonNull(byTune.get("Synergy Credits"),
-                "the unit-1 table has no Synergy Credits");
-        assertEquals(synergy[2], number(before.group(6)), "Synergy Credits at unit 1");
-        assertEquals(synergy[3], number(before.group(7)), "Synergy Credits at unit 2");
-        Matcher under = wrapped("The costliest frame of any tune is now that one, ([\\d,]+) cycles"
-                + " under the budget").matcher(plan);
+        assertTrue(heaviest > 0, "the table reads no advance");
+        Matcher under = wrapped("The costliest frame of the (\\w+) is (.+?)'s ([\\d,]+), ([\\d,]+)"
+                + " cycles under the budget").matcher(plan);
         assertTrue(under.find(), "plan.md has no costliest frame against the budget");
-        assertEquals("Synergy Credits", worst, "the tune of the costliest frame");
-        assertEquals(most - costliest, number(under.group(1)), "the costliest frame under the budget");
+        assertEquals(calls.size(), spelled(under.group(1)), "the tunes the table measures, again");
+        assertEquals(worst, under.group(2), "the tune of the costliest frame");
+        assertEquals(costliest, number(under.group(3)), "the costliest frame");
+        assertEquals(most - costliest, number(under.group(4)), "the costliest frame under the budget");
 
         Matcher parse = wrapped("about (\\d+) to (\\d+) an operation to parse").matcher(perf);
         assertTrue(parse.find(), "performance.md has no operation's cost");
@@ -1173,11 +1140,11 @@ final class ConsistencyTest {
                 + " period goes from (\\d+) to (\\d+): a refill grows (\\w+) unit at unit 2 and"
                 + " (\\w+) at unit 1").matcher(plan);
         assertTrue(wider.find(), "plan.md has no thirty-first column's ring");
-        assertEquals(Tune.RING, Integer.parseInt(wider.group(1)), "the ring");
-        assertEquals(Tune.RING, Integer.parseInt(wider.group(2)), "the ring, again");
-        assertTrue(Tune.RING % 31 != 0, "the ring divides by 31");
+        assertEquals(BuiltTunes.RING, Integer.parseInt(wider.group(1)), "the ring");
+        assertEquals(BuiltTunes.RING, Integer.parseInt(wider.group(2)), "the ring, again");
+        assertTrue(BuiltTunes.RING % 31 != 0, "the ring divides by 31");
         int period = 31;
-        while (Tune.RING % period != 0) {
+        while (BuiltTunes.RING % period != 0) {
             period++;
         }
         assertEquals(Columns.C, Integer.parseInt(wider.group(3)), "the period today");

@@ -267,18 +267,9 @@ func TunesEnd(core []byte, set Set, tags []byte) int {
 // flags against the switches requested: the flags word records whether the
 // raster monitor is in and whether the ticks are the lean ones, and the
 // file the core was read from does not.
-// Binds is the highest version the tune files bind at (SPEC.md 3.3.5).
+// Binds is the version the tune files bind at (SPEC.md 3.3.5).
 func Binds(tuneFiles [][]byte) int {
-	most := BoundVersion
-	for _, file := range tuneFiles {
-		if len(file) >= 6 && ymxr.GetWord(file, 4) > most {
-			most = ymxr.GetWord(file, 4)
-		}
-	}
-	if most > BoundVersionWideCounted {
-		most = BoundVersionWideCounted
-	}
-	return most
+	return BoundVersion
 }
 
 func CheckCore(core []byte, monitor, lean bool, binds int) error {

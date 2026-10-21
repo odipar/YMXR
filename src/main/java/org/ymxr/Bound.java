@@ -36,19 +36,8 @@ import org.jspecify.annotations.Nullable;
 final class Bound {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'B'};
-    /** The version of a bound tune whose sources are one column (SPEC.md
-     *  3.3.5). */
+    /** The version of a bound tune, its tune file's (SPEC.md 3.3.5). */
     static final int VERSION = Tune.VERSION;
-
-    /** The version of a bound tune with a source of several columns. */
-    static final int VERSION_COLUMNS = Tune.VERSION_COLUMNS;
-
-    /** The version of a bound tune with a source whose column fills its
-     *  byte, which a player counts the rows of. */
-    static final int VERSION_COUNTED = Tune.VERSION_COUNTED;
-
-    /** The version of one with a counted source of several columns. */
-    static final int VERSION_WIDE_COUNTED = Tune.VERSION_WIDE_COUNTED;
     static final int STATE_AT = 12;
     static final int IMAGE_AT = 16;
     static final int TABLE_AT = 20;
@@ -91,7 +80,7 @@ final class Bound {
         int[] image = new int[tuneFiles.size()];
         int[] table = new int[tuneFiles.size()];
         for (int i = 0; i < tuneFiles.size(); i++) {
-            String key = shape(TuneFile.read(tuneFiles.get(i)).dtx2());
+            String key = shape(TuneFile.read(tuneFiles.get(i)).dtx3());
             int at = keys.indexOf(key);
             if (at < 0) {
                 at = keys.size();
@@ -105,7 +94,7 @@ final class Bound {
         for (List<Integer> group : groups) {
             List<byte[]> tables = new ArrayList<>();
             for (int i : group) {
-                tables.add(TuneFile.read(tuneFiles.get(i)).dtx2());
+                tables.add(TuneFile.read(tuneFiles.get(i)).dtx3());
             }
             Packager.Packaged made = Packager.packaged(tables);
             images.add(made.image());
@@ -122,16 +111,15 @@ final class Bound {
     }
 
     /** What an image fixes once, as a key two tables are grouped by and as
-     *  a reader of the report sees it: the variant, the width, and under
-     *  DTX2 the unit, the copies flag and the ring (DTX abi.md 1). The
-     *  period follows the ring and C, which the schema fixes. */
-    private static String shape(byte[] dtx2) {
-        Dtx.Header header = Dtx.header(dtx2);
+     *  a reader of the report sees it: the variant, the width and the unit
+     *  (DTX abi.md 1). Under DTX3 each table defines its ring, and the
+     *  image has the copy code where a table of it has copies, so neither
+     *  separates two tables. The period follows C, which the schema fixes. */
+    private static String shape(byte[] dtx3) {
+        Dtx.Header header = Dtx.header(dtx3);
         int payload = header.length();
-        return "DTX" + header.variant() + " at unit " + (dtx2[payload + 2] & 0xFF)
-                + ", a ring of " + Tune.getWord(dtx2, payload)
-                + ", values of " + header.width()
-                + ((dtx2[payload + 3] & 1) != 0 ? ", with copies" : "");
+        return "DTX" + header.variant() + " at unit " + (dtx3[payload + 2] & 0xFF)
+                + ", values of " + header.width();
     }
 
     /** A bound tune with no image in it: the header, the state block's
@@ -146,7 +134,7 @@ final class Bound {
      *  put in, the index recomputed, then the image, then the file's DTX1
      *  tables as they are. */
     static byte[] of(byte[] tuneFile) {
-        byte[] image = Packager.image(TuneFile.read(tuneFile).dtx2());
+        byte[] image = Packager.image(TuneFile.read(tuneFile).dtx3());
         return build(tuneFile, image,
                 Tune.getLong(image, FORMAT_AT + FORMAT_TABLE_AT),
                 Tune.getLong(image, FORMAT_AT + FORMAT_STATE_AT));

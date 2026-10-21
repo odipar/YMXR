@@ -1,5 +1,5 @@
-github.com/odipar/dtx/go v0.11.12 h1:KHyMjFGZr8VwIr/+qy2d+V9nZkXIYrJOmttrFmNLHlI=
-github.com/odipar/dtx/go v0.11.12/go.mod h1:3/FPJk4VokxZ3pvIK53bK+xt3xyjQH9M/VLxUNIPgj8=
+github.com/odipar/dtx/go v0.12.0 h1:7PXWjsVuwCtaA1OLO6PYl73prhmKm6DzxlDg87K0hhU=
+github.com/odipar/dtx/go v0.12.0/go.mod h1:3/FPJk4VokxZ3pvIK53bK+xt3xyjQH9M/VLxUNIPgj8=
 github.com/odipar/st4/go v0.1.11 h1:9qClv/Q0+R3O1eFINqpUzxByEhgJ/TU4vAXmge2GeS0=
 github.com/odipar/st4/go v0.1.11/go.mod h1:xD8FllM+rAb/78hl9IFd7L3AIz+IQuNT++L7fuBSiNM=
 github.com/odipar/ymxs/go v0.4.9 h1:fval8+B2oc2FUoyReoBhvmRcv9g1pV/3aT/22Od8TEg=

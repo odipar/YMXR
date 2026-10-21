@@ -24,14 +24,14 @@ lists; the stub (4) is an SNDH host of the core (5.4).
 
 **Terms.** A *subtune* is one tune of an SNDH file, numbered from 1 in the
 order of the subtune table (2.5); a *set* is the tunes of one SNDH file.
-An *image* is the output of DTX's packager for one DTX2 table or several:
-the reader's code, then a column table and the table for each (DTX,
-abi.md 1); its *format block* is the 28 bytes at its offset 16, and a
-*state block* is the bytes DTX's reader requires of a host for one table,
-counted in the format block's field at +4. The *claims* of a tune are the
-timers its effects run: effects 0 to 3 run Timers A, D, B and C (SPEC.md
-2.3), and the *claims byte* has bit 0 for A, 1 for B, 2 for C and 3 for D.
-The four timers on the MC68901:
+An *image* is the output of DTX's packager for one DTX3 table or several:
+the reader's code, then the table for each (DTX, abi.md 1); its *format
+block* is the 28 bytes at its offset 16, and a *state block* is the bytes
+DTX's reader requires of a host for one table, counted in the format
+block's field at +4. The *claims* of a tune are the timers its effects
+run: effects 0 to 3 run Timers A, D, B and C (SPEC.md 2.3), and the
+*claims byte* has bit 0 for A, 1 for B, 2 for C and 3 for D. The four
+timers on the MC68901:
 
 | timer | vector | control register, its nibble | data register | enable, pending, in-service, mask registers | bit |
 |---|---|---|---|---|---|
@@ -97,16 +97,16 @@ condition met of the table below; then reads each tune file as SPEC.md
 ## 1. The bound tune
 
 **1.1** A bound tune combines tune metadata, a source index and DTX1
-tables with an image in place of the tune file's DTX2 table. The packager
+tables with an image in place of the tune file's DTX3 table. The packager
 builds that image using the table's unit and copies flag (DTX, SPEC.md
-2.3; abi.md 1). Every unpacked row matches the tune file byte for byte.
+2.4; abi.md 1). Every unpacked row matches the tune file byte for byte.
 
 **1.2 Layout.**
 
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0003 to $0006: the version of the tune file bound (SPEC.md 3.3.5) |
+| 4 | 2 | the version, $0007: the version of the tune file bound (SPEC.md 3.3.5) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
@@ -124,27 +124,29 @@ row through a displacement reaches 32,767 bytes (5.5).
 
 **1.3 A bound tune written alone.** A tool writes it from one tune file:
 bytes 6 to 11 are the tune file's; the field at 12 is the field at +4 of
-the format block of the image the packager makes of the tune's DTX2 table
+the format block of the image the packager makes of the tune's DTX3 table
 alone; the field at 20 is that format block's field at +8; DTX1 table 1
 is at align(24 + 4`S`) and each next at align(the end of the one before);
 the index is those offsets; the field at 16 is align(the last table's
 end), where the image is.
 
-**1.4 A set.** A set shares images. The *shape* of a DTX2 table is its
-variant, its unit `k`, its ring `N`, its width `W` and its copies flag
-(DTX, SPEC.md 1, 2.3). A tool groups the tunes by shape in tune order,
-the first tune of a shape opening its group, and packages the tables of
-each group, in tune order, into one image; the field at 20 of each tune
-is the offset the packager reports for its table's header in that image.
-A bound tune of a set has the layout of 1.2 with the image absent and the
-field at 16 written 0; 3.1 places the images and patches the field.
+**1.4 A set.** A set shares images. The *shape* of a DTX3 table is its
+variant, its unit `k` and its width `W` (DTX, SPEC.md 1, 2.4): each table
+of an image defines its ring, and an image has the copy code where a table
+of it has copies (DTX, abi.md 5). A tool groups the tunes by shape in tune
+order, the first tune of a shape opening its group, and packages the
+tables of each group, in tune order, into one image; the field at 20 of
+each tune is the offset the packager reports for its table's header in
+that image. A bound tune of a set has the layout of 1.2 with the image
+absent and the field at 16 written 0; 3.1 places the images and patches
+the field.
 
 **1.5 What the player reads.** At init (5.1), in order:
 
-1. Bytes 0 to 5; where they are other than `YMXB` and a version $0003
-   to $0006 (SPEC.md 3.3.5), report -1 and stop.
+1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007
+   (SPEC.md 3.3.5), report -1 and stop.
 2. The field at 16 and the field at 8.
-3. Byte 19 of the image, the variant; where it is other than 2, report
+3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
    header, `R` and `RR` (DTX, SPEC.md 1).

@@ -2,7 +2,7 @@
 
 YMXR encodes YMXS tune data (YMXS, SPEC.md 1) as DTX tables for
 playback on the Atari ST's YM2149 and MC68901, in a tune file of version
-3 to 6 (3.3.5). This document defines
+7 (3.3.5). This document defines
 columns (1), target, source and timer maps (2), file layout (3), frames
 (4), ticks (5), writer rules and checks (6), reader output (7), and later
 versions (8).
@@ -346,21 +346,21 @@ and a writer sets in the rows of a counted source on `setR7` (rule
 
 **2.1.3** `setEnvelope` writes R11 and R12, the low and the high byte of
 the envelope period (YMXS, SPEC.md 2.5), and both registers read eight
-bits. A writer writes a source on this target counted (3.1.6), which
-makes the file version 6 (3.3.5): its rows are whole bytes, so it writes
-R12 a value of 0 to 255 and reaches an envelope period of 0 to 65,535,
-the whole range a frame's R11 and R12 columns reach (1.1). A file of
-version 4 or 5 has the marked form of 2.1.4 in its place, whose rows
-before the last write R12 0 to 127. The envelope frequency is 2,000,000
-/ (256 x envelope period) (terminology.md 1.4): period 32,767 is one
-cycle in 4.19 seconds and period 65,535 one in 8.39 seconds.
+bits. A writer writes a source on this target counted (3.1.6): its rows
+are whole bytes, so it writes R12 a value of 0 to 255 and reaches an
+envelope period of 0 to 65,535, the whole range a frame's R11 and R12
+columns reach (1.1). Versions 4 and 5 wrote the marked form of 2.1.4 in
+its place, whose rows before the last write R12 0 to 127. The envelope
+frequency is 2,000,000 / (256 x envelope period) (terminology.md 1.4):
+period 32,767 is one cycle in 4.19 seconds and period 65,535 one in 8.39
+seconds.
 
-**2.1.4** A file of version 4 or 5 writes a marked source on that target
+**2.1.4** A marked source on that target, which versions 4 and 5 wrote
 (3.3.5): bits 6 to 0 of R12's column are the value, the marker is in
 bit 7, and the tick that reads the last row writes that bit into R12 with
 the value, a period 32,768 above the one the rows before it write. A
-player reads such a source as this clause defines it, and a writer of
-version 6 writes a counted source in its place.
+player reads such a source as this clause defines it, and a writer writes
+a counted source in its place.
 
 ### 2.2 The sources
 
@@ -466,8 +466,8 @@ starts at (5.1). Bit 31 of the index entry of every other source is 0.
 A writer writes a source counted where the marker's column would write
 a register that reads every bit of its byte: a source of one
 column on a target of 2.1.2, and a source of two columns on `setEnvelope`
-(2.1.3). A file with a counted source of one column is version 5, and one
-with a counted source of several columns version 6 (3.3.5).
+(2.1.3). Versions 5 and 6 marked these two in the version word, and
+version 7 encodes both (3.3.5).
 
 ### 3.2 The rows
 
@@ -493,24 +493,24 @@ a value.
 | offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, `$0003`, `$0004`, `$0005` or `$0006` (3.3.5) |
+| 4 | 2 | the version, `$0007` (3.3.5) |
 | 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
 | 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bits 7 to 4 are 0 |
 | 9 | 1 | S, the source count, 0 to 127 |
 | 10 | 2 | the offset of the name, or 0 for a tune with an empty name |
-| 12 | 4 | the offset of the DTX2 table |
+| 12 | 4 | the offset of the DTX3 table |
 | 16 | 4S | the source index: index entry 1 to S, bit 31 of each the mark of a counted source (3.1.1) |
 | 16 + 4S | 2 to 256 | the name, where the word at 10 is other than 0: its UTF-8 bytes, 1 to 255, and a zero byte |
-| on a long | | the DTX2 table (3.3.3) |
+| on a long | | the DTX3 table (3.3.3) |
 | on a long each | | the DTX1 tables of sources 1 to S, in that order (3.1.2) |
 
-**3.3.1** Each table begins on a long: the DTX2 table at the first offset
+**3.3.1** Each table begins on a long: the DTX3 table at the first offset
 on a long at or after the end of the name, or of the index where the name
 is empty, and each DTX1 table at the first on a long at or after the end
 of the table before it. Each byte between the end of one of those and the
-start of the next is 0. The DTX2 table ends where the table of source 1
+start of the next is 0. The DTX3 table ends where the table of source 1
 begins, or at the file's end where S is 0. A tune file is data alone; a
-tool binds it with a reader of DTX2 into the bound tune a player reads
+tool binds it with a reader of DTX3 into the bound tune a player reads
 (BINARIES.md 1).
 
 **3.3.2** The name is for display. A writer drops each character below
@@ -520,18 +520,23 @@ left empty. A reader reads an empty name where the word at 10 is 0 or at
 or past the file's end, and otherwise the bytes from the word's offset to
 the first zero byte or the file's end.
 
-**3.3.3** The DTX2 table is the tune's table as a complete DTX file (DTX,
-SPEC.md 1 and 2.3), header and payload: R rows, 1 upward, C = 30, W = 1,
-RR the repeat row or R for a tune that plays once. A reader unpacks each
-column at the payload's unit k, 1, 2 or 4, with copies where bit 0 of the
-payload's flags byte is 1 (DTX, SPEC.md 2.3); R and RR divide by k (rule
-6). The ring N is at most 1,129 bytes and one DTX's packager binds (DTX,
-abi.md 4).
+**3.3.3** The DTX3 table is the tune's table as a complete DTX file (DTX,
+SPEC.md 1 and 2.4), header and payload: R rows, 1 upward, C = 30, W = 1,
+RR the repeat row or R for a tune that plays once. A constant column is
+its value in the payload, and a reader unpacks each live column at the
+payload's unit k, 1, 2 or 4, with copies where bit 0 of the payload's
+flags byte is 1 (DTX, SPEC.md 2.4); R and RR divide by k (rule 6). The
+ring N is at most 32,767 divided by L less 1, where L is the table's live
+columns and is 2 or more, and one DTX's packager binds (DTX, abi.md 4).
 
-Note: a player reaching column 29's ring through a 16-bit displacement
-from column 0's reads a ring of at most 32,767 divided by 29. The
-reference writer packs through a ring that is a multiple of 30 bytes, 60
-to 1,110, 960 by default.
+Note: a player reaches slot L less 1's ring through a 16-bit displacement
+from slot 0's, L less 1 rings on. The reference writer packs through a
+ring that is a multiple of 30 bytes, 60 upward: through each of 60, 120,
+240, 480, 960 and 1,920 bytes the player reaches, keeping the one whose
+table and state block come to the least. With copies asked for, it packs
+with them where they pack a live column smaller through the two of those
+that came to the least, and keeps the one of the two that comes to the
+less (tools.md 4.2, 4.3).
 
 **3.3.4** Errors of the file. A reader reads a file free of the
 conditions below and reports the first one present as its line, in the
@@ -546,30 +551,28 @@ reports a condition reads no further field. A name offset other than 16 +
 |---|---|
 | the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
-| the version is other than 3, 4, 5 or 6 (3.3.5) | `version V is not 3, 4, 5 or 6` |
+| the version is 3, 4, 5 or 6, a tune file whose table is DTX2 (3.3.5) | `version V has a DTX2 table, and this reads 7: write the tune again with ym-to-ymxr or ymxs-to-ymxr` |
+| the version is other than 3 to 7 (3.3.5) | `version V is not 7` |
 | the table begins or ends outside the file | `the table is at A to B, and the file has F bytes` |
-| the table is a DTX variant other than 2 (3.3.3), its header read as DTX defines it (DTX, SPEC.md 2.3) | `the table is DTX X, and a tune's table is DTX2 (SPEC.md 3.3.3)` |
+| the table is a DTX variant other than 3 (3.3.3), its header read as DTX defines it (DTX, SPEC.md 2.4) | `the table is DTX X, and a tune's table is DTX3 (SPEC.md 3.3.3)` |
 | the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N is at A to B, and the file has F bytes` |
 | source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
-| the version is 3 and source N has several columns (3.3.5) | `source N is C columns, and version 3 writes one` |
-| the version is below 5 and bit 31 of source N's index entry is 1 (3.1.6) | `source N is counted, and version V writes the marker` |
-| the version is below 6 and source N is counted with several columns (3.1.6) | `source N is counted and C columns, and version V counts one` |
 
-**3.3.5** The version. A tune whose sources are one column and whose
-target columns are 0 to 13 is version 3; one with a source of several
-columns or a target column of 14 upward is version 4 (2.1); one with a
-counted source of one column is version 5 (3.1.6), whichever its targets
-are, since a player of 3 or 4 would read bit 31 of that source's index
-entry as part of an offset; and one with a counted source of several
-columns is version 6, which a player of 5 would read as a counted source
-of one column. A writer writes the lowest of the four a tune reads under,
-so a player of an older version reads every tune that version encodes. A
-player of this version reads 3, 4, 5 and 6.
+**3.3.5** The version. Every tune file is version 7: its table is DTX3,
+which a player of an earlier version reads wrongly. Versions 3 to 6 are
+tune files whose table is DTX2, and a reader of this version reports them
+(3.3.4); the tools write such a tune again from the dump or the structure
+it was converted from. A player of this version reads 7.
+
+Note: versions 3 to 6 told apart a tune's sources, from one column each to
+a counted source of several columns, so that a player of an older version
+read every tune that version encoded. A DTX3 table needs a player of 7 at
+every shape of source, and version 7 encodes each of them.
 
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
-Attractions #2` begins `594D5852 0003 0032 00 00 0010 00000028`: the 22
-bytes of the name at 16, and the DTX2 table at 40.
+Attractions #2` begins `594D5852 0007 0032 00 00 0010 00000028`: the 22
+bytes of the name at 16, and the DTX3 table at 40.
 
 ---
 
@@ -584,8 +587,8 @@ reading only set columns and keeping values needed by later rows (R4.6).
 The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
-1. Read the version; for a version other than 3, 4, 5 or 6 (3.3.5),
-   report -1 and leave every register and every timer as it is. A reader
+1. Read the version; for a version other than 7 (3.3.5), report -1 and
+   leave every register and every timer as it is. A reader
    reports the line of 3.3.4 in place of that, and its record is empty
    (7.4).
 2. Read R and RR of the tune's table and the effects used.
@@ -845,8 +848,8 @@ numbers the maps assign.**
   register that reads seven bits or fewer, and every column beside it is
   a whole byte, as is every column of a counted source (3.1.6). A source
   on `setEnvelope` is counted, so both its columns are whole bytes
-  (2.1.3), except in a file of version 4 or 5, which has the marked form
-  of 2.1.4.
+  (2.1.3), except a source of the marked form of 2.1.4, which versions 4
+  and 5 wrote.
 - 2(f) A counted source on `setR7` has bits 7 and 6 of every row set, the
   directions of the two I/O ports (1.4.2): a tick writes the row whole,
   so a writer sets the two bits where a row's write reads them from the

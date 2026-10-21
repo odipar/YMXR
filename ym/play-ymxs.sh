@@ -23,13 +23,14 @@
 #
 # The packer's options:
 #
-#   -kK        the unit the table packs at, 1 or 2; 2 by default, and a
-#              tune whose row count or repeat row is odd is padded until
-#              both divide (SPEC.md 6, rule 6)
-#   -mN        the ring in bytes, 960 by default
-#   -copies[S] a match beyond the ring packs as a copy from the column's
-#              separate literal stream, which packs a small ring far
-#              smaller; -copiesS searches S seconds for a better parse
+#   -kK        the unit the table packs at, 1, 2 or 4; 1 by default, and
+#              above 1 a tune whose row count or repeat row fails to
+#              divide by K is padded until both divide (SPEC.md 6, rule 6)
+#   -mN        the ring in bytes; without it the writer chooses the one
+#              whose table and state block come to the least
+#   -copies[S] each live column packs with copies from its literal stream
+#              and without, the smaller kept; -copiesS searches S seconds
+#              for a better parse
 #
 # The tags, the first tune's title and composer by default:
 #

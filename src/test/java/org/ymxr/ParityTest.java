@@ -169,8 +169,8 @@ final class ParityTest {
     @Test
     void theFlagsReadTheSameInBothTrees() throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym"));
-        for (String[] flags : new String[][] {{"-k1"}, {"-m480"}, {"-r"}, {"-r100"},
-                {"-copies"}, {"-k1", "-m1129", "-copies"}}) {
+        for (String[] flags : new String[][] {{"-k2"}, {"-m480"}, {"-r"}, {"-r100"},
+                {"-copies"}, {"-k2", "-m1129", "-copies"}}) {
             List<String> argv = new ArrayList<>(List.of("-silent"));
             argv.addAll(List.of(flags));
             both("ym-to-ymxr", dump, argv.toArray(new String[0]));

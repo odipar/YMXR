@@ -25,20 +25,8 @@ final class Multi {
     /** The four bytes a multi file opens with. */
     static final byte[] MAGIC = {'Y', 'M', 'X', 'M'};
 
-    /** The version of a multi file whose tune files are version 3. */
+    /** The version of a multi file, its tune files' (SPEC.md 3.3.5). */
     static final int VERSION = Tune.VERSION;
-
-    /** The version of one with a tune file of version 4 in it, which is
-     *  the highest of the tune files (SPEC.md 3.3.5). */
-    static final int VERSION_COLUMNS = Tune.VERSION_COLUMNS;
-
-    /** The version of a multi file with a tune of a source whose column
-     *  fills its byte. */
-    static final int VERSION_COUNTED = Tune.VERSION_COUNTED;
-
-    /** The version of a multi file with a counted source of several
-     *  columns in a tune of it (SPEC.md 3.3.5). */
-    static final int VERSION_WIDE_COUNTED = Tune.VERSION_WIDE_COUNTED;
 
     static final int COUNT_AT = 6;
     static final int INDEX_AT = 8;
@@ -119,10 +107,13 @@ final class Multi {
             throw new IllegalArgumentException("not a YMXM file");
         }
         int version = Tune.getWord(file, 4);
-        if (version < VERSION || version > VERSION_WIDE_COUNTED) {
-            throw new IllegalArgumentException("version " + version + " is not " + VERSION
-                    + ", " + VERSION_COLUMNS + ", " + VERSION_COUNTED + " or "
-                    + VERSION_WIDE_COUNTED);
+        if (version >= Tune.VERSION_DTX2 && version <= Tune.VERSION_DTX2_LAST) {
+            throw new IllegalArgumentException("version " + version + " has DTX2 tables,"
+                    + " and this reads " + VERSION + ": write the tunes again with"
+                    + " ym-to-ymxr or ymxs-to-ymxr");
+        }
+        if (version != VERSION) {
+            throw new IllegalArgumentException("version " + version + " is not " + VERSION);
         }
         int count = Tune.getWord(file, COUNT_AT);
         if (count < 1 || count > MOST) {

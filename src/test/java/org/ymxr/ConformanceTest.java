@@ -52,9 +52,9 @@ final class ConformanceTest {
         }
     }
 
-    /** The version word in {@code wrong-version}: one past the highest
-     *  version the reader reads (SPEC.md 3.3.5). */
-    static final int WRONG_VERSION = Tune.VERSION_WIDE_COUNTED + 1;
+    /** The version word in {@code wrong-version}: one past the version the
+     *  reader reads (SPEC.md 3.3.5). */
+    static final int WRONG_VERSION = Tune.VERSION + 1;
 
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(
@@ -66,21 +66,21 @@ final class ConformanceTest {
                     "four frames whose RR is R: the frame after the last row reports -1"),
             Fixture.of("turrican", "Turrican - world 4-3.ym", "",
                     "three drums on Timer D, each ending by its marker; RR at 160, a loop longer than the ring replayed at its exact rows; R13 rewritten"),
-            Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "",
+            Fixture.of("turrican-2", "Turrican 2 - world completed 1.ym", "-k2",
                     "a loop of one row, RR at 177, odd, so an unset row goes in before it and the loop's row is written twice, and the table packs at unit 2; six drums before it, the last stopped by a row"),
-            Fixture.of("synergy", "Synergy Credits.ym", "",
+            Fixture.of("synergy", "Synergy Credits.ym", "-k2",
                     "nine SIDs on Timers A and D at once, six of them named by both; a square replacing a square on the target of its effect, its place unmoved; the select changed without the source, and the count alone; a running source stopped by a row; a tone fine byte 0 with the coarse bit beside it; 5,377 rows, odd, so an unset row goes in at the end and the table packs at unit 2"),
             Fixture.of("preempt", "Digidrum preempt, built.ym", "",
                     "a drum starting on the voice a SID runs on stops the SID first, and the SID starts again when the drum ends; R8 passed between them with its column unset"),
             Fixture.of("retune", "Retrigger retune, built.ym", "",
                     "a one-row buzzer source on R13, restarted over a running timer with a new rate; select 7; stopped at the wrap alone"),
-            Fixture.of("fine-zero", "Big - Samantha Fox Strip Poker 6.ym", "",
+            Fixture.of("fine-zero", "Big - Samantha Fox Strip Poker 6.ym", "-k2",
                     "a tone fine byte moving to 0: on voice A without the coarse set bit, on B and C with it;"
                     + " 215 rows, odd, so an unset row goes in at the end and the table packs at unit 2"),
             Fixture.built("four-timers", "`BuiltTunes.fourTimers`", BuiltTunes::fourTimers,
                     "all four effects on Timers A, D, B and C at 60 Hz; the rows section 4 allows and the dumps leave out: a count alone, a select alone with the count kept, bit 5 alone, bit 5 with a new source on a running timer, bit 6 alone, a stop with the volume set, the same source again, a target set while running and read at the next start, a target other than a volume register, a drum closing on 5, R13 set beside a buzzer, a source repeating to its row 2, a stop with no source running, values under a clear set bit, a fine byte and an envelope period byte other than 0 with the bit beside them"),
             Fixture.built("voices", "`BuiltTunes.voices`", BuiltTunes::voices,
-                    "version 4: the four kinds of target that write several registers, one an"
+                    "the four kinds of target that write several registers, one an"
                     + " effect, and the marker in a different column under each - the coarse"
                     + " nibble of a voice on Timer A and of a tone on Timer C, the noise period"
                     + " on Timer D, the envelope shape of a buzzer on Timer B; a source of"
@@ -89,7 +89,7 @@ final class ConformanceTest {
                     + " running source of the same row count that leaves the place where it"
                     + " is"),
             Fixture.built("envelope", "`BuiltTunes.envelope`", BuiltTunes::envelope,
-                    "version 4: `setEnvelope`, the one target whose marked register reads"
+                    "`setEnvelope`, the one target whose marked register reads"
                     + " eight bits, so the marker's column is the envelope period's high"
                     + " byte, 0 to 127, and the column beside it a whole byte; a source of"
                     + " two columns repeating to a row above 0, one that plays once and"
@@ -97,7 +97,7 @@ final class ConformanceTest {
                     + " column, a start that changes the source on a running timer, and the"
                     + " envelope shape set from column 13 while the period ticks"),
             Fixture.built("counted", "`BuiltTunes.counted`", BuiltTunes::counted,
-                    "version 5: a counted source on each of the six targets whose"
+                    "a counted source on each of the six targets whose"
                     + " register reads every bit of its byte - `setR0` and `setR4` on"
                     + " Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and"
                     + " `setR2` on Timer C - with rows of bit 7 set in every one of"
@@ -110,7 +110,7 @@ final class ConformanceTest {
                     + " it"),
             Fixture.built("envelope-counted", "`BuiltTunes.envelopeCounted`",
                     BuiltTunes::envelopeCounted,
-                    "version 6: a counted source of two columns on `setEnvelope`, whose"
+                    "a counted source of two columns on `setEnvelope`, whose"
                     + " two registers read every bit of their byte, so its rows are whole"
                     + " bytes and a tick counts them; the high byte runs past 127, where"
                     + " a marked source of this target stops, and reaches 255, a period"
@@ -268,16 +268,13 @@ final class ConformanceTest {
     @Test
     void theTaskNamesTheVersionsAndTheTargetsTheKitReaches() throws IOException {
         String task = Files.readString(KIT.resolve("TASK.md"));
-        for (int version : new int[] {Tune.VERSION, Tune.VERSION_COLUMNS,
-                                      Tune.VERSION_COUNTED}) {
-            assertTrue(task.contains(String.format(Locale.ROOT, "$%04X", version)),
-                    "TASK.md leaves out version " + version + ", which a reader"
-                    + " of this kit reads");
-        }
+        assertTrue(task.contains(String.format(Locale.ROOT, "$%04X", Tune.VERSION)),
+                "TASK.md leaves out version " + Tune.VERSION + ", which a reader of"
+                + " this kit reads");
         int most = 0;
         for (Fixture f : FIXTURES) {
             byte[] file = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));
-            if (Tune.getWord(file, 4) > Tune.VERSION_COUNTED) {
+            if (Tune.getWord(file, 4) != Tune.VERSION) {
                 continue;
             }
             for (List<Integer> row : targets(file)) {

@@ -39,25 +39,13 @@ var BoundMagic = []byte{'Y', 'M', 'X', 'B'}
 
 // Where a bound tune's fields are.
 const (
-	// BoundVersion is the version of a bound tune whose sources are one
-	// column (SPEC.md 3.3.5).
+	// BoundVersion is the version of a bound tune, its tune file's
+	// (SPEC.md 3.3.5).
 	BoundVersion = ymxr.Version
-
-	// BoundVersionColumns is the version of one with a source of several
-	// columns.
-	BoundVersionColumns = ymxr.VersionColumns
-
-	// BoundVersionCounted is the version of one with a source whose column
-	// fills its byte, which a player counts the rows of.
-	BoundVersionCounted = ymxr.VersionCounted
-
-	// BoundVersionWideCounted is the version of one with a counted source
-	// of several columns.
-	BoundVersionWideCounted = ymxr.VersionWideCounted
-	StateAt                 = 12
-	ImageAt                 = 16
-	BoundTableAt            = 20
-	BoundIndexAt            = 24
+	StateAt      = 12
+	ImageAt      = 16
+	BoundTableAt = 20
+	BoundIndexAt = 24
 )
 
 // The image's format block, and where the state block's bytes and the
@@ -101,7 +89,7 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 		if err != nil {
 			return Set{}, err
 		}
-		key, err := shape(read.Dtx2)
+		key, err := shape(read.Dtx3)
 		if err != nil {
 			return Set{}, err
 		}
@@ -128,7 +116,7 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 			if err != nil {
 				return Set{}, err
 			}
-			tables = append(tables, read.Dtx2)
+			tables = append(tables, read.Dtx3)
 		}
 		made, at, err := pack.Images(tables)
 		if err != nil {
@@ -152,22 +140,18 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 }
 
 // shape is the values an image fixes once, as a key two tables are
-// grouped by
-// and as a reader of the report sees it: the variant, the width, and under
-// DTX2 the unit, the copies flag and the ring (DTX abi.md 1). The period
-// follows the ring and C, which the schema fixes.
-func shape(dtx2 []byte) (string, error) {
-	header, err := dtx.ReadHeader(dtx2)
+// grouped by and as a reader of the report sees it: the variant, the width
+// and the unit (DTX abi.md 1). Under DTX3 each table defines its ring, and
+// the image has the copy code where a table of it has copies, so neither
+// separates two tables. The period follows C, which the schema fixes.
+func shape(dtx3 []byte) (string, error) {
+	header, err := dtx.ReadHeader(dtx3)
 	if err != nil {
 		return "", err
 	}
 	payload := header.Length()
-	copies := ""
-	if dtx2[payload+3]&1 != 0 {
-		copies = ", with copies"
-	}
-	return fmt.Sprintf("DTX%d at unit %d, a ring of %d, values of %d%s", header.Variant,
-		int(dtx2[payload+2]), ymxr.GetWord(dtx2, payload), header.Width, copies), nil
+	return fmt.Sprintf("DTX%d at unit %d, values of %d", header.Variant,
+		int(dtx3[payload+2]), header.Width), nil
 }
 
 // Bound is the bound tune of a tune file: the header with the magic and
@@ -179,7 +163,7 @@ func Bound(tuneFile []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	image, err := pack.Image(read.Dtx2)
+	image, err := pack.Image(read.Dtx3)
 	if err != nil {
 		return nil, err
 	}

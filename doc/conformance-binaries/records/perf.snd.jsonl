@@ -1,14 +1,15 @@
-{"kind":"sndh","bytes":45954}
-{"part":"entry","to":[80,84,88]}
+{"kind":"sndh","bytes":15884}
+{"part":"entry","to":[86,90,94]}
 {"part":"tag","name":"TITL","at":16,"text":"Watched"}
 {"part":"tag","name":"CONV","at":28,"text":"YMXR (ym-to-ymxr)"}
 {"part":"tag","name":"##","at":50,"count":1}
 {"part":"tag","name":"!V","at":55,"rate":50}
 {"part":"tag","name":"FLAG","at":60,"text":"~y"}
 {"part":"tag","name":"FRMS","at":68,"frames":[4]}
-{"part":"tag","name":"HDNS","at":76}
-{"part":"core","at":80,"version":1,"binds":6,"fixed":2120,"flags":5,"state":734,"subtunetable":10342,"work":13520}
-{"part":"subtunes","at":10342,"tunes":[10348]}
-{"part":"tune","number":1,"at":10348,"bytes":24,"version":3,"rate":50,"effects":0,"sources":0,"stateblock":30312,"image":10372,"table":1928}
-{"part":"image","number":1,"at":10372}
-{"part":"workspace","at":13520,"bytes":32434}
+{"part":"tag","name":"TIME","at":76,"seconds":[1]}
+{"part":"tag","name":"HDNS","at":82}
+{"part":"core","at":86,"version":1,"binds":7,"fixed":2120,"flags":5,"state":740,"subtunetable":10506,"work":12346}
+{"part":"subtunes","at":10506,"tunes":[10512]}
+{"part":"tune","number":1,"at":10512,"bytes":26,"version":7,"rate":50,"effects":0,"sources":0,"stateblock":1416,"image":10538,"table":1448}
+{"part":"image","number":1,"at":10538}
+{"part":"workspace","at":12346,"bytes":3538}
