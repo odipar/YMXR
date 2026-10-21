@@ -2,7 +2,7 @@
 
 **1.** The kit is eleven files under `files/`, of the four kinds
 [BINARIES.md](../BINARIES.md) defines, and the record of each under
-`records/`: 160 lines over the eleven. The kit tests one document,
+`records/`: 159 lines over the eleven. The kit tests one document,
 BINARIES.md: an implementer who has read it alone writes a reader (2),
 and a record equal to the reference byte for byte shows that the
 document defines the layouts.
@@ -32,14 +32,15 @@ reads neither the tune format nor DTX.
 | `SOURCES.md` | a row a file: its name, the tool call that wrote it, its input, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
 
 The eleven are written from three tunes of the other kit
-(`../conformance/tunes`), `circus`, `plays-once` and `four-timers`, by
-the calls `SOURCES.md` records, with the binaries of release 0.4.10
-under nine of them and 0.4.11's under `armed.prg`, whose stub is of the
-later descriptor version, and `named.ymxr`, whose names have characters
-above $7E: the kit has a program of each descriptor version and a text
-the record escapes. The published music in those tunes belongs to its
-composers, and the repository's LICENSE excludes it: a copy of the kit
-has the files for the exercise alone.
+(`../conformance/tunes`), `circus`, `plays-once` and `four-timers`, by the
+calls `SOURCES.md` records, with the tools of this repository under nine of
+them, release 0.4.10's under `timers.prg`, whose stub is of the first
+descriptor version, and 0.4.11's under `armed.prg`, whose stub is of the
+later one; `named.ymxr` has names with characters above $7E: the kit has a
+program of each descriptor version and a text the record escapes. The
+published music in those tunes belongs to its composers, and the
+repository's LICENSE excludes it: a copy of the kit has the files for the
+exercise alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of these
@@ -83,8 +84,8 @@ failed rule 3 of 5.
   counted those 4 bytes into the workspace and the implementer's 32,434
   was right against 2.6's `align(2120 + 30312) + 2`. The clause reads
   `the bytes from W to the end of the SNDH file` now, 6.5 says where
-  that end is, and the records of `two.prg` and `timers.prg` carry
-  32,434. That was the one defect of the run.
+  that end is, and the records of `two.prg` and `timers.prg` carried
+  32,434; `timers.prg`'s still does. That was the one defect of the run.
 - 6.1 read that every offset of the record counts from the file's first
   byte, `the fields of 1.2 among them`, where `table` is an offset from
   the image's first byte (1.2) and 6.3 converted the field at 16 alone.
