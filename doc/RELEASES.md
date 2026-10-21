@@ -36,6 +36,39 @@ a release's number names the tools rather than either.
 
 ## Published
 
+### 0.5.1, 2026-10-21
+
+<https://github.com/odipar/YMXR/releases/tag/v0.5.1>, built from the commit
+tagged `v0.5.1`.
+
+A table packs at unit 2 by default again, and `-k1` packs at unit 1. At
+0.5.0's unit 1 a refill is thirty units of a byte, and the costliest frame
+of five of Scavenger's eleven tunes in the corpus passed R4.5's 6,656
+cycles, DBA 4's at 7,214. At unit 2 a refill is fifteen units of two
+bytes. Over 25 tunes of the corpus, Scavenger's eleven among them, the
+costliest frame is within 5 per cent below and 7 per cent above 0.4.22's,
+at most Synergy Credits' 5,086, the play call is 2 to 27 per cent cheaper
+on average than under 0.4.22, and the SNDH files come to 915,678 bytes
+against 1,463,170 under 0.4.22 and 867,494 under 0.5.0.
+
+- **The format is 0.5.0's.** A tune file is version 7, and a file 0.5.0
+  wrote reads as it did. Over the eleven dumps under `ym/test`, the SNDH
+  files come to 226,220 bytes against 223,880 under 0.5.0 and 525,428
+  under 0.4.22; `ym-to-ymxs` writes what 0.5.0's wrote, 11 structures of
+  11.
+- **The Go tree's packing report** rounds a ratio on a half as the Java
+  tree does: 3,600 bytes of 57,600 read 6.2 per cent in Go, whose `%.1f`
+  rounds half to even, and 6.3 in Java.
+- **performance.md and plan.md** are measured again at unit 2, and the
+  rig's comparison at the other unit is at unit 1. The conformance kit's
+  tunes are written again, their rows and records as they were, and nine
+  files of the binaries kit with their records.
+- **0.5.0's entry is corrected.** Its figures of SNDH files added each
+  file's workspace, which the file contains, a second time; it reads the
+  SNDH files alone now.
+
+Checks: `bin/suite` green, 217 tests and 0 skipped.
+
 ### 0.5.0, 2026-10-21
 
 <https://github.com/odipar/YMXR/releases/tag/v0.5.0>, built from the commit
@@ -44,8 +77,9 @@ tagged `v0.5.0`.
 A tune file is version 7, its table DTX3 (DTX 0.12.0): a constant column
 is its value, the live columns share one ring the writer chooses, and the
 rings of a set are chosen for the set. Over the eleven dumps under
-`ym/test`, the SNDH file each converts to and its workspace come to
-279,866 bytes against 886,042 under 0.4.22, 52 to 77 per cent less each.
+`ym/test`, the SNDH files the dumps convert to, each with its workspace in
+it, come to 223,880 bytes against 525,428 under 0.4.22, 37 to 68 per cent
+less each.
 `ym-to-ymxs` writes what 0.4.22's wrote, 11 structures of 11, and
 `ym-to-ymxr`, `ymxr-bind`, `ymxr-sndh`, `ymxr-prg` and `ymxs-to-prg`
 write 55 new files.
@@ -67,9 +101,9 @@ write 55 new files.
   `ymxr-multi` packs the tables of the tune files it reads again and
   reads `-mN` and `-copies[S]`; `ymxs-to-ymxr`, `ymxs-to-sndh` and
   `ymxs-to-prg` choose the rings of a multi of several tunes. Three
-  games of the corpus, 53 tunes as three SNDH files, come to 283,610
-  bytes with their workspaces, against 336,662 with each tune at its ring
-  alone and 520,110 under 0.4.22.
+  games of the corpus, 53 tunes as three SNDH files, come to 241,364
+  bytes, against 313,936 with each tune at its ring alone and 419,928
+  under 0.4.22.
 - **What it costs** (performance.md). The play call is cheaper on average
   on six of the eleven dumps and dearer on five, and its costliest frame
   is higher on every one, at most capture's 6,062 cycles against R4.5's
