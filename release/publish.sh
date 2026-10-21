@@ -1,7 +1,7 @@
 #!/bin/sh
 # The standalone YMXR executables: the twelve tools of doc/tools.md, one
 # set per platform, each containing the nine 68000 binaries and DTX's
-# twenty-two images, so a machine with neither this repository nor a
+# forty images, so a machine with neither this repository nor a
 # toolchain can convert a dump and write a program that plays it.
 #
 #   release/publish.sh [version]      # the six platforms below

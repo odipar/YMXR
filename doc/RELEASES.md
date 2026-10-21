@@ -30,12 +30,66 @@ executable built from one embeds these. `BinariesTest` reads them against
 the assembly the build makes, so one that does not match what rmac writes
 today fails the build.
 
-A player pins a version of this format: a tune file is 3, 4, 5 or 6
-(SPEC.md 3.3.5) and a bound tune the version of the tune file bound
-(BINARIES.md 1), a writer writes the lowest version a tune reads under,
-and a release's number names the tools rather than either.
+A player pins a version of this format: a tune file is 7 (SPEC.md 3.3.5)
+and a bound tune the version of the tune file bound (BINARIES.md 1), and
+a release's number names the tools rather than either.
 
 ## Published
+
+### 0.5.0, 2026-10-21
+
+<https://github.com/odipar/YMXR/releases/tag/v0.5.0>, built from the commit
+tagged `v0.5.0`.
+
+A tune file is version 7, its table DTX3 (DTX 0.12.0): a constant column
+is its value, the live columns share one ring the writer chooses, and the
+rings of a set are chosen for the set. Over the eleven dumps under
+`ym/test`, the SNDH file each converts to and its workspace come to
+279,866 bytes against 886,042 under 0.4.22, 52 to 77 per cent less each.
+`ym-to-ymxs` writes what 0.4.22's wrote, 11 structures of 11, and
+`ym-to-ymxr`, `ymxr-bind`, `ymxr-sndh`, `ymxr-prg` and `ymxs-to-prg`
+write 55 new files.
+
+- **Version 7** (SPEC.md 3.3.3, 3.3.5). A column whose rows are one value
+  is stored as that value, and init writes it into each read of the
+  column as an immediate, so it has neither ring nor refill. Each table's
+  payload has its ring, which init reads. A tune file or a multi file of
+  version 3 to 6 has DTX2 tables, and every reader rejects it with a line
+  that names `ym-to-ymxr` and `ymxs-to-ymxr`, which write it again.
+- **The ring the writer chooses** (tools.md 4.1, 4.2). Without `-m` the
+  writer packs through each of 60, 120, 240, 480, 960 and 1,920 bytes the
+  player reaches and keeps the one whose table and state block come to
+  the least. A table packs at unit 1 by default, and `-k2` packs at unit
+  2; `-copies[S]` packs with copies where they pay, as before.
+- **A set's rings** (tools.md 4.7). A set's subtunes share one
+  workspace, so each tune packs through the ring of the fewest table
+  bytes under the state block that comes to the least for the set.
+  `ymxr-multi` packs the tables of the tune files it reads again and
+  reads `-mN` and `-copies[S]`; `ymxs-to-ymxr`, `ymxs-to-sndh` and
+  `ymxs-to-prg` choose the rings of a multi of several tunes. Three
+  games of the corpus, 53 tunes as three SNDH files, come to 283,610
+  bytes with their workspaces, against 336,662 with each tune at its ring
+  alone and 520,110 under 0.4.22.
+- **What it costs** (performance.md). The play call is cheaper on average
+  on six of the eleven dumps and dearer on five, and its costliest frame
+  is higher on every one, at most capture's 6,062 cycles against R4.5's
+  6,656, where 0.4.22's was Synergy Credits' 5,094: a refill is thirty
+  units at unit 1. The player is 8,318 bytes, 8,160 under 0.4.22, and
+  7,962 where a tick reads an absolute address, against 7,804.
+- **The tools** contain DTX 0.12.0's forty images, and `ymxr.wasm` is
+  5,113,030 bytes, 138,456 more. The Go module's `ymxr.Written` has the
+  table and the packings the writer chose among, and `Pack`, `ForSet` and
+  `OfFiles` write a set's tune files.
+- **The kits.** The conformance kit's tunes are version 7, their rows and
+  records as they were. Nine of the binaries kit's eleven files are
+  written again; `timers.prg` is 0.4.10's program, of stub descriptor
+  version 1, and `armed.prg` 0.4.11's, of version 2.
+- **performance.md and plan.md** are measured again at the new defaults,
+  and the rig reads the new figures back: the idle turn, the three costs
+  of a refill that parses no operation, the tunes that fit the ring, and
+  each dump's bound tune and state block.
+
+Checks: `bin/suite` green, 217 tests and 0 skipped.
 
 ### 0.4.22, 2026-10-18
 
