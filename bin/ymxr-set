@@ -18,11 +18,12 @@
 #
 # The converter's options (tools.md 4, 5):
 #
-#   -kK        the unit the table packs at, 1, 2 or 4; 2 by default
-#   -mN        the ring in bytes, 960 by default
+#   -kK        the unit the table packs at, 1, 2 or 4; 1 by default
+#   -mN        the ring in bytes; without it the writer chooses the one
+#              whose table and state block come to the least
 #   -rRR       the row the tune repeats to; -r alone plays it once
-#   -copies[S] a match beyond the ring packs as a copy from the column's
-#              separate literal stream; -copiesS searches S seconds
+#   -copies[S] each live column packs with copies from its literal stream
+#              and without, the smaller kept; -copiesS searches S seconds
 #
 # The set's (tools.md 11.1):
 #
@@ -54,8 +55,8 @@
 #   bin/ymxr-set a.ym b.ym c.ym > SET.PRG
 #       the three as subtunes 1, 2 and 3, the program playing the first
 #
-#   bin/ymxr-set -k1 -copies -tHippel ym/test/*.ym > SET.PRG
-#       every dump under ym/test, packed a byte a unit with copies
+#   bin/ymxr-set -k2 -copies -tHippel ym/test/*.ym > SET.PRG
+#       every dump under ym/test, packed two bytes a unit with copies
 #
 #   bin/ymxr-set -perf -rows3000 a.ym b.ym > SET.PRG
 #       the core with the raster monitor in, the program stopping after
