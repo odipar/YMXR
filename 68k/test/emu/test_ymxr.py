@@ -941,6 +941,10 @@ class Timers:
                                         # frame, a tick's time inside one
         self.ier = dict(ier)            # by register address
         self.imr = dict(imr)
+        self.scaled = False             # a select written to a running
+                                        # timer scales the time to its next
+                                        # fire, as a real MFP's counter
+                                        # runs on at the new prescaler
 
     @staticmethod
     def of_machine(m, effects):
@@ -967,6 +971,9 @@ class Timers:
                 if reg == t["ctrl"]:
                     mode = (value >> t["shift"]) & 0x0F
                     started = mode and self.mode[i] == 0 and self.loaded[i]
+                    if self.scaled and mode and self.mode[i] and mode != self.mode[i]:
+                        self.phase[i] = self.now + (self.phase[i] - self.now) \
+                            * PRESCALER[mode & 7] / PRESCALER[self.mode[i] & 7]
                     self.mode[i] = mode
                     if started:
                         self.restarts[i] += 1
@@ -1889,6 +1896,12 @@ def refill_parts(rows, file, tune):
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+) .* pc=([0-9a-f]+)")
 MFPW = re.compile(r"mfp write \S+ ([0-9a-f]+)=0x([0-9a-f]+) video_cyc=(\d+) .* pc=([0-9a-f]+)")
 VBLA = re.compile(r"^VBL=(\d+) clock=(\d+)")
+# the video cycle the VBL comes at, and the cycles it is pending: a
+# write's video_cyc counts from the video frame's first cycle, a few dozen
+# before the VBL, and the exception, the line above, waits for a handler
+# of a higher level to return
+VBLV = re.compile(r"^VBL \d+ video_cyc=(\d+) pending_cyc=(\d+)")
+VIDEO_CYC = re.compile(r"video_cyc=(\d+)")
 CYCLE = re.compile(r"video_cyc=(\d+)")
 
 # The ST's CPU, cycles a second: the clock a trace counts in.
@@ -2691,6 +2704,11 @@ def hatari(ym, code, symbols, perf=False):
     # clock the program plays from (BINARIES.md 4.3): Hatari's ST here
     # refreshes at 50 Hz, the rate the tune plays at
     assert tune.rate == 50, "-hatari requires tunes at 50 Hz, and this one plays at %d" % tune.rate
+    if tune.effects & 0x10 and "ymxr_bank1" not in symbols:
+        # a row defers a start, so the tool writes the core with the
+        # deferred start in (BINARIES.md 2.1), and the rig assembles it too
+        code, symbols = assemble("YMXR_sndh.S", defines=[
+            d for d in DEFINES if d != "-dYMXR_DEFER=1"] + ["-dYMXR_DEFER=1"])
     sndh = os.path.join(work, "TUNE.SND")
     # These switches select the core in the file; the rig assembled the same
     # core, and the comparison below fails where the two differ. A switch
@@ -2760,12 +2778,26 @@ def hatari(ym, code, symbols, perf=False):
     env = symbols["ymxr_env1"] - symbols["ymxr_env0"]
     envs = [(base + symbols["ymxr_env%d" % i], base + symbols["ymxr_env%d" % i] + env)
             for i in range(4)]
+    # With the deferred start in, every handler has a copy in bank 1, BANK
+    # bytes on, and each effect an installer after the banks, which the
+    # tick that performs a start runs: its writes are that tick's.
+    bank = (symbols["ymxr_bank1"] - symbols["ymxr_tick0"]) if "ymxr_bank1" in symbols else None
+    installers = []
+    if bank is not None:
+        ends = ["ymxr_inst1", "ymxr_inst2", "ymxr_inst3", "ymxr_reach"]
+        installers = [(base + symbols["ymxr_inst%d" % i], base + symbols[ends[i]])
+                      for i in range(4)]
 
     def where(pc):
         if frame[0] <= pc < frame[1]:
             return "frame"
         if stop[0] <= pc < stop[1]:
             return "stop"
+        for i in range(4):
+            if installers and installers[i][0] <= pc < installers[i][1]:
+                return i
+        if bank is not None and base + symbols["ymxr_bank1"] <= pc < installers[0][0]:
+            pc -= bank
         for i in range(4):
             if (ticks[i][0] <= pc < ticks[i][1]
                     or squares[i][0] <= pc < squares[i][1]
@@ -2777,21 +2809,47 @@ def hatari(ym, code, symbols, perf=False):
                 return i
         return None
 
-    # the trace as frames: each a list of (kind, reg, value) and its
-    # length in MFP clocks
+    # the trace as frames: each a list of (kind, reg, value), its length
+    # in MFP clocks, when a handler stopped its timer, and when an
+    # installer reprogrammed it, by effect
     frames = []
     clock = None
     current = []
     stops = {}
+    installed = {}
+    start = 0                           # the video cycle the frame's VBL
+                                        # exception came at
+    last = 0                            # the video cycle of the latest line
+    wrapped = False                     # a video frame began in this frame
+    frame_cycles = 0
+
+    def since(video_cyc):
+        """A write's MFP clocks from the frame's VBL exception. A tick the
+        exception waits for, after the next video frame's first cycle,
+        counts on from the video frame before."""
+        return (video_cyc - start + (frame_cycles if wrapped else 0)) * MFP_PER_CPU
+
     for line in open(trace, errors="replace"):
+        v = VBLV.match(line)
+        if v:
+            last = int(v.group(1)) + int(v.group(2))
+            wrapped = True
+            continue
+        v = VIDEO_CYC.search(line)
+        if v:
+            last = int(v.group(1))
         v = VBLA.match(line)
         if v:
             now = int(v.group(2))
             if clock is not None:
-                frames.append((current, (now - clock) * MFP_PER_CPU, stops))
+                frame_cycles = now - clock
+                frames.append((current, (now - clock) * MFP_PER_CPU, stops, installed))
             clock = now
+            start = last
+            wrapped = False
             current = []
             stops = {}
+            installed = {}
             continue
         w = WRITE.search(line)
         if w:
@@ -2808,16 +2866,24 @@ def hatari(ym, code, symbols, perf=False):
                 reg, value = 0xFF000000 | int(w.group(1), 16), int(w.group(2), 16)
                 at = where(pc)
                 kind = "mfp_tick" if at in (0, 1, 2, 3) else "mfp"
-                if kind == "mfp_tick" and reg == TIMER[at]["ctrl"] \
+                if kind == "mfp_tick" and installers \
+                        and installers[at][0] <= pc < installers[at][1]:
+                    # an installer's write, at the tick that performs a
+                    # deferred start: the timer's new rate from that time
+                    kind = "mfp_install"
+                    installed.setdefault(at, (since(int(w.group(3))), []))[1].append(
+                        (reg, value))
+                elif kind == "mfp_tick" and reg == TIMER[at]["ctrl"] \
                         and (value >> TIMER[at]["shift"]) & 0x0F == 0:
-                    stops[at] = int(w.group(3)) * MFP_PER_CPU
+                    stops[at] = since(int(w.group(3)))
                 current.append((kind, reg, value))
-    first = next(i for i, (events, _, _) in enumerate(frames)
+    first = next(i for i, (events, _, _, _) in enumerate(frames)
                  if any(kind == "frame" for kind, _, _ in events))
     model = Model(tune)
     timers = Timers(tune.effects, [0, 0, 0, 0], [256] * 4,
                     {0xFFFFFA07: 0, 0xFFFFFA09: 0}, {0xFFFFFA13: 0, 0xFFFFFA15: 0})
-    for events, _, _ in frames[:first]:
+    timers.scaled = True
+    for events, _, _, _ in frames[:first]:
         timers.apply([(reg, value) for kind, reg, value in events if kind in ("mfp", "mfp_tick")])
     played = 0
     counted = [0, 0, 0, 0]
@@ -2880,6 +2946,18 @@ def hatari(ym, code, symbols, perf=False):
                 got.append((one[1], one[2]))
             return got
 
+        def installs(at, kind):
+            """Whether the tick of effect `kind` at event `at` writes its
+            timer's data register before the next tick of any effect: the
+            installer of a deferred start writes the count there, and a
+            handler writes the chip and its end of interrupt alone."""
+            for one in events[at + 1:]:
+                if one[0] in (0, 1, 2, 3):
+                    return False
+                if one[0] == "mfp_install" and one[1] == TIMER[kind]["data"]:
+                    return True
+            return False
+
         at = 0
         while at < len(events):
             kind, reg, value = events[at]
@@ -2895,6 +2973,11 @@ def hatari(ym, code, symbols, perf=False):
             elif kind in (0, 1, 2, 3):
                 if not stepped[kind] and not model.fx[kind]["running"]:
                     # no source ran before the step, so the tick is after it
+                    upto(kind)
+                if not stepped[kind] and installs(at, kind):
+                    # the tick runs the installer of a start the step armed
+                    # (SPEC.md 4.8), so it is after the step: a frame that
+                    # arms a start writes neither the chip nor the timer
                     upto(kind)
                 fx = model.fx[kind]
                 assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, kind)
@@ -2922,7 +3005,7 @@ def hatari(ym, code, symbols, perf=False):
             want = model.writes()
         assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
-    for f, (events, clocks, stops) in enumerate(frames[first:first + STUB_FRAMES]):
+    for f, (events, clocks, stops, installed) in enumerate(frames[first:first + STUB_FRAMES]):
         was = list(counted)
         replay(events, f)
         played += 1
@@ -2931,12 +3014,23 @@ def hatari(ym, code, symbols, perf=False):
             # the ticks replay read, since a tick of a target of several
             # registers is several writes of the trace
             got = counted[i] - was[i]
-            # a timer its handler stopped ticks only until that write
-            want_ticks = timers.expected(i, stops.get(i, clocks))
+            # a timer its handler stopped ticks only until that write, and
+            # one an installer reprogrammed at its rate before the write
+            # and at the new one after it
+            end = stops.get(i, clocks)
+            if i in installed:
+                at, writes = installed[i]
+                want_ticks = timers.expected(i, at)
+                timers.apply(writes)
+                want_ticks += timers.expected(i, end - at)
+            else:
+                want_ticks = timers.expected(i, end)
             expected[i] += want_ticks
             if os.environ.get("YMXR_TICKS") and abs(got - want_ticks) > 1:
-                print("frame %d: effect %d ticked %d, the rates say %d; mode %s count %s" % (
-                    f, i, got, want_ticks, timers.mode, timers.count))
+                print("frame %d: effect %d ticked %d, the rates say %d; mode %s count %s;"
+                      " stopped at %s, installed at %s, of %d clocks" % (
+                          f, i, got, want_ticks, timers.mode, timers.count, stops.get(i),
+                          installed[i][0] if i in installed else None, clocks))
         timers.apply([(reg, value) for kind, reg, value in events if kind == "mfp_tick"])
     # The count fixes the rates, not the phase: a timer stopped or restarted
     # inside a frame is counted for the frame whole, so five in a hundred
@@ -2953,7 +3047,7 @@ def hatari(ym, code, symbols, perf=False):
                 "effect %d ticked %d times, the rates allow %d" % (i, counted[i], expected[i])
             assert perf or expected[i] - counted[i] <= allowed, \
                 "effect %d ticked %d times, the rates say %d" % (i, counted[i], expected[i])
-    stopped = [(reg, value) for events, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
+    stopped = [(reg, value) for events, _, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
                for kind, reg, value in events if kind == "stop"]
     assert masked(stopped) == masked(HUSHED), "the stop wrote %s" % stopped
     return played, sum(counted)
@@ -3110,12 +3204,16 @@ def core(defines, ym):
     the MFP raising an interrupt and the 68000 acknowledging it leaves the
     MFP with no vector to place on the bus, and the 68000 runs exception 24
     rather than the timer's handler. The tick that acknowledge belonged to is
-    the one the write cancelled, so the handler returns."""
-    code, symbols = assemble("YMXR_sndh.S", defines=defines)
+    the one the write cancelled, so the handler returns. A tune whose
+    effects byte sets bit 4 is on the core with the deferred start in, as
+    the tools select it (BINARIES.md 2.1)."""
     work = tempfile.mkdtemp()
     file, _ = convert(ym, work)
     bound = bind(file, work)
     assert bound is not None, "the binder rejected " + os.path.basename(ym)
+    if bound[8] & 0x10:
+        defines = [d for d in defines if d != "-dYMXR_DEFER=1"] + ["-dYMXR_DEFER=1"]
+    code, symbols = assemble("YMXR_sndh.S", defines=defines)
     # The core reads its subtune table and its workspace as offsets from
     # its first byte, which the tool patches (BINARIES.md 3). The table
     # is after the bound tune here, one entry, and the workspace at
@@ -3211,16 +3309,17 @@ def main():
         tunes = args or sorted(os.path.join(ROOT, "ym", "test", f)
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
-        # No dump converts to a target of several registers or to a
-        # counted source, so the kit's tunes of versions 4 to 6 go on the
-        # end of a run on a real MFP: with the dumps before them every
-        # handler shape of the player is read there against the same model
-        # as the rest, the counted shapes of one column and of several
-        # among them.
+        # No dump converts to a target of several registers, to a counted
+        # source or to a deferred start, so the kit's tunes of versions 4
+        # to 6 and its deferred tune go on the end of a run on a real MFP:
+        # with the dumps before them every handler shape of the player is
+        # read there against the same model as the rest, the counted
+        # shapes of one column and of several among them, and the switch
+        # of the core with the deferred start in.
         if real and not args:
             tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes", one)
                              for one in ("voices.ymxr", "counted.ymxr",
-                                         "envelope-counted.ymxr")]
+                                         "envelope-counted.ymxr", "deferred.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]
