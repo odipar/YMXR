@@ -10,8 +10,8 @@ below it.
 
 - one zip a platform, over six: Windows, macOS and Linux, each on x64 and
   arm64. A zip contains the twelve tools as executables, and each
-  executable contains the nine 68000 binaries of BINARIES.md and DTX's
-  forty images, so one converts a dump and writes a program on a
+  executable contains the seventeen 68000 binaries of BINARIES.md and
+  DTX's forty images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed
 - one zip of the twelve tools and YMXS's `ymxs-check` as one
   WebAssembly module, beside the scripts that run it in a web page and
@@ -30,11 +30,60 @@ and an executable built from one embeds these. `BinariesTest` reads them
 against the assembly the build makes, so one that does not match what rmac
 writes today fails the build.
 
-A player pins a version of this format: a tune file is 7 (SPEC.md 3.3.5)
+A player pins a version of this format: a tune file is 8 (SPEC.md 3.3.5)
 and a bound tune the version of the tune file bound (BINARIES.md 1), and
 a release's number names the tools rather than either.
 
 ## Published
+
+### 0.6.0, 2026-10-29
+
+<https://github.com/odipar/YMXR/releases/tag/v0.6.0>, built from the commit
+tagged `v0.6.0`.
+
+A tune file is version 8, and encodes version 5 of YMXS's structure (YMXS
+0.5.0): a start can wait for the last row of the source its timer runs,
+and a start with bit 5 of the control column at 0 leaves the place at its
+number modulo the row count of the source it starts. A reader and the
+player read version 7 as before. Over the eleven dumps under `ym/test`,
+`ym-to-ymxs` writes what 0.5.1's wrote but for the version and the
+`deferred` column, 11 structures of 11, and `ym-to-ymxr` writes 0.5.1's
+tune files but for the version word, 11 of 11. The SNDH files come to
+227,496 bytes against 226,220, 116 bytes more each: 98 of the core, for the
+modulo, 16 of workspace and 2 of padding.
+
+- **A deferred start** (SPEC.md 4.8, 5.1 step 5). Bit 3 of the control
+  column defers a start, and bit 4 of the effects used marks a tune with
+  one. The frame arms the start in the bank of handlers the timer does not
+  run and writes one word into the running handler; the tick that reads
+  the source's last row runs an installer, which writes the rate, the
+  vector and the select. A stop or a start drops a pending start, a second
+  deferred start replaces it, and a retune keeps it.
+- **Sixteen cores** (BINARIES.md 2.1). The deferred start is in a core
+  assembled with `YMXR_DEFER=1`, with `-defer` in its name and bit 3 of
+  its flags word, and the tools put one under a file only where a subtune
+  sets bit 4; init of a core without it reports -1 for such a tune.
+  `YMXR_sndh.bin` is 9,100 bytes, 98 more than 0.5.1's, and
+  `YMXR_sndh-defer.bin` 13,496.
+- **What it costs** (performance.md). On a core without the deferred
+  start, the play call of each of the eleven dumps counts what it counted
+  under 0.5.1, at most Synergy Credits' 5,086 cycles. On a core with it,
+  the switch costs 142 to 212 cycles against the 88 or 98 of the tick it
+  replaces, and Synergy Credits' play call counts 2,005 cycles on average
+  and 5,118 at most, against 1,995 and 5,086.
+- **The checks.** `ymxr-check` reports a start past the file's sources
+  alone, since every other start reads a row of its source. The rig plays
+  fourteen built tunes of deferred starts against its model, every build
+  of the player among them, and `-hatari` plays the conformance kit's
+  `deferred` tune on Hatari's MFP.
+- **The tools** contain the seventeen binaries, and `ymxr.wasm` is
+  5,234,035 bytes, 106,838 more.
+- **The kits.** The conformance kit has a sixteenth tune, `deferred`, and
+  every other tune file differs from 0.5.1's by its version word. The
+  binaries kit is 0.5.1's: its files are of version 7, which every reader
+  and the player read.
+
+Checks: `bin/suite` green, 230 tests and 0 skipped.
 
 ### 0.5.1, 2026-10-21
 
