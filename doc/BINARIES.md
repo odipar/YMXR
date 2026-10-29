@@ -106,7 +106,7 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0007: the version of the tune file bound (SPEC.md 3.3.5) |
+| 4 | 2 | the version, $0008: the version of the tune file bound (SPEC.md 3.3.5) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
@@ -143,9 +143,11 @@ the field.
 
 **1.5 What the player reads.** At init (5.1), in order:
 
-1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007
-   (SPEC.md 3.3.5), report -1 and stop.
-2. The field at 16 and the field at 8.
+1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007 or
+   $0008 (SPEC.md 3.3.5), report -1 and stop.
+2. The field at 16 and the field at 8; where bit 4 of the field at 8 is
+   set and the player is assembled without the deferred start (2.1),
+   report -1 and stop.
 3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
@@ -164,8 +166,8 @@ The player skips fields 6, 10 and 12. The host supplies the frame clock
 ## 2. The SNDH core
 
 **2.1** The core is position-independent code: the player under three
-entries, with the procedures of 2.7 to 2.9. Eight cores are assembled
-from one source, one for each setting of the player's three switches; a
+entries, with the procedures of 2.7 to 2.9. Sixteen cores are assembled
+from one source, one for each setting of the player's four switches; a
 tool selects one by name and checks its flags word (2.3, 2.10).
 
 | core | switches | flags word |
@@ -179,13 +181,21 @@ tool selects one by name and checks its flags word (2.3, 2.10).
 | `YMXR_sndh-lean-abs.bin` | that row and the lean tick | 2 |
 | `YMXR_sndh-perf-lean-abs.bin` | that row and the two above | 3 |
 
+Each of the eight has a twin with `-defer` before `.bin`, assembled with
+the deferred start in, `YMXR_DEFER=1`, whose flags word is the eight's
+plus 8: `YMXR_sndh-defer.bin` reads 12. Init of a core without it
+reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
+core with it is 4,396 bytes larger.
+
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
 through the program counter for a file whose last bound tune ends within
 32,767 bytes of the core's first byte, and the core that reads an
 absolute address for a file whose tunes end further off (5.5). A caller
 that names the third reads back that core, or the line of 2.10 where the
-file's tunes end past the reach.
+file's tunes end past the reach. The tool selects a core with the
+deferred start in where the effects byte of a subtune sets bit 4, and
+one without it where none does.
 
 **2.2 Layout**, from the core's first byte:
 
@@ -196,8 +206,8 @@ file's tunes end past the reach.
 | 8 | 4 | `bra.w` to play (2.9) |
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
-| 18 | 2 | the highest bound tune version this core reads, 6 |
-| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,120 |
+| 18 | 2 | the highest bound tune version this core reads, 8 |
+| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, or 2,312 with the deferred start in |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
 | 26 | 2 | zero |
@@ -214,6 +224,7 @@ core's first byte and are even.
 | 0 | the player's raster monitor (`YMXR_PERF=1`): play and each tick handler write the background colour register as performance.md defines | a screen on which those writes are read |
 | 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires with `YMXR_NEST=0`; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
 | 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte, which the tool that writes it reads (2.10, 5.5) |
+| 3 | the deferred start (`YMXR_DEFER=1`, performance.md): the frame arms the start of SPEC.md 4.8, and the tick that reads the running source's last row performs it | this core under a tune whose effects byte sets bit 4, which init of a core with bit 3 clear reports -1 for (1.5) |
 
 **2.4 The state byte**, at the offset in the field at 24: bit 0 is
 set from init's step 8 to exit's step 1, while a tune plays; bit 1 is set
@@ -295,6 +306,7 @@ file (3) and reports the first condition met:
 | the lean tick is selected and bit 1 of the flags word F is clear | `the core's flags at 22 read F, and the lean tick asked for needs bit 1 set` |
 | the row read through the program counter is selected and bit 2 of the flags word F is clear | `the core's flags at 22 read F, and the row read through the program counter asked for needs bit 2 set` |
 | that row is selected and the file's last bound tune ends B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
+| the effects byte of a subtune sets bit 4 and bit 3 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that defers a start needs bit 3 set` |
 
 ---
 
@@ -591,7 +603,7 @@ called in supervisor mode:
 
 | call | in | out |
 |---|---|---|
-| init, at 0 | `a0` the bound tune (1), even; `a1` the workspace, on a long | `d0` 0, or -1 for a bound tune of 1.5's two conditions |
+| init, at 0 | `a0` the bound tune (1), even; `a1` the workspace, on a long | `d0` 0, or -1 for a bound tune of a condition of 1.5 |
 | play, at 4 | `a0` the workspace | `d0` 0, or -1 where the tune has ended (SPEC.md 4): every register of the chip and the MFP is left as it is |
 | stop, at 8 | `a0` the workspace | the timers of the claims byte released and the registers written as 5.3 lists |
 
@@ -599,18 +611,18 @@ A call clobbers `d0` to `d5` and `a0` to `a5` and keeps `d6`, `d7` and
 `a6`. Init reads row 0; each play writes the row the call before it read
 and then reads the next.
 
-**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,120,
-then the bound tune's field at 12 bytes, on a long. Before init the host
-keeps, and after stop restores, what the player writes (5.3): of each
-timer in the claims byte, the vector, the nibble of the control register,
-the enable bit and the mask bit (Terms). While a tune plays the host has
-the address of an `rte` in the vector at $60 (2.7 Note). With the lean
-tick the player keeps the MFP's vector register at init and restores it
-at stop, and the host leaves it alone between. The host calls init with
-bit 3 of the MFP's vector register set, software end-of-interrupt mode.
-Note: TOS leaves it so. A host calls play once a frame at the tune's
-rate, the field at 6 of the bound tune, and calls stop before a second
-init on one workspace.
+**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,136 or
+2,312 with the deferred start in (2.2), then the bound tune's field at 12
+bytes, on a long. Before init the host keeps, and after stop restores,
+what the player writes (5.3): of each timer in the claims byte, the
+vector, the nibble of the control register, the enable bit and the mask
+bit (Terms). While a tune plays the host has the address of an `rte` in
+the vector at $60 (2.7 Note). With the lean tick the player keeps the
+MFP's vector register at init and restores it at stop, and the host
+leaves it alone between. The host calls init with bit 3 of the MFP's
+vector register set, software end-of-interrupt mode. Note: TOS leaves it
+so. A host calls play once a frame at the tune's rate, the field at 6 of
+the bound tune, and calls stop before a second init on one workspace.
 
 **5.3 What the player writes outside the tune.** At init, at level 7,
 for each timer in the claims byte: the nibble of its control register

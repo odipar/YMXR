@@ -143,6 +143,23 @@ final class ParityTest {
         assertTrue(both("ymxs-to-ymxr", structure).length > 0, "the structure converts");
     }
 
+    /** A deferred start (SPEC.md 4.8): one tune file in both trees, and one
+     *  record of it, bit 3 of the control column as `deferred`. */
+    @Test
+    void aDeferredStartConvertsTheSameInBothTrees() throws Exception {
+        byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.deferred()))
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] tune = both("ymxs-to-ymxr", structure, "-silent");
+        String record = new String(both("ymxr-trace", tune), StandardCharsets.UTF_8);
+        assertTrue(record.contains("\"deferred\":true"), record);
+        // the core with the deferred start in, and the report that names it
+        byte[] sndh = both("ymxr-sndh", tune, "-tDeferred");
+        assertEquals(Sndh.CORE_PCREL | Sndh.CORE_DEFER, Tune.getWord(sndh,
+                Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
+        both("ymxr-sndh", tune, "-perf", "-lean", "-abs");
+        both("ymxr-prg", sndh, "-silent");
+    }
+
     /** A tune file with starts outside rule 3(a): one verdict and one exit
      *  in both trees, and one for the file this writer writes. */
     @Test

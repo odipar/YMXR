@@ -36,9 +36,18 @@ import (
 // Magic is the four bytes a tune file opens with.
 var Magic = []byte{'Y', 'M', 'X', 'R'}
 
-// Version is the version of every tune file (SPEC.md 3.3.5): its table is
-// DTX3, which a player of an earlier version reads wrongly.
-const Version = 0x0007
+// Version is the version a writer writes (SPEC.md 3.3.5): its table is
+// DTX3, which a player of an earlier version reads wrongly, and bit 3 of a
+// control column marks a deferred start.
+const Version = 0x0008
+
+// VersionBefore is the version before it, which a reader reads beside it:
+// a file of version 7 has bit 3 of every control column at 0 (SPEC.md
+// 3.3.5).
+const VersionBefore = 0x0007
+
+// Reads is the versions a reader reads, as its report names them.
+var Reads = fmt.Sprintf("%d or %d", VersionBefore, Version)
 
 // VersionDtx2 and VersionDtx2Last are the first and the last version whose
 // table is DTX2, which a reader reports with the tool that writes the tune
@@ -625,11 +634,11 @@ func Read(file []byte) (File, error) {
 	// this version reads wrongly, and the tools write the tune again from
 	// what it was converted from.
 	if version >= VersionDtx2 && version <= VersionDtx2Last {
-		return File{}, fmt.Errorf("version %d has a DTX2 table, and this reads %d: write"+
-			" the tune again with ym-to-ymxr or ymxs-to-ymxr", version, Version)
+		return File{}, fmt.Errorf("version %d has a DTX2 table, and this reads %s: write"+
+			" the tune again with ym-to-ymxr or ymxs-to-ymxr", version, Reads)
 	}
-	if version != Version {
-		return File{}, fmt.Errorf("version %d is not %d", version, Version)
+	if version != Version && version != VersionBefore {
+		return File{}, fmt.Errorf("version %d is not %s", version, Reads)
 	}
 	count := int(file[CountAt])
 	tableAt := GetLong(file, TableAt)

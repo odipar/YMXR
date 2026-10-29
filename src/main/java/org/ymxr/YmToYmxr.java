@@ -160,7 +160,7 @@ public final class YmToYmxr {
             kinds[source.kind()]++;
             rows[source.kind()] += source.rows();
         }
-        report.say("the effects: " + Integer.bitCount(columns.effects) + " of 4 run, "
+        report.say("the effects: " + Integer.bitCount(columns.effects & 0x0F) + " of 4 run, "
                 + Report.count(sources.count(), "source", "sources") + ", at most " + Sources.MOST);
         for (int kind = 0; kind <= Effects.BUZZER; kind++) {
             if (kinds[kind] > 0) {

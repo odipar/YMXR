@@ -15,6 +15,13 @@ const (
 	PlaceReset = 0x20
 )
 
+// Deferred is bit 3 of a control column, a deferred start (SPEC.md 1.9,
+// 4.8).
+const Deferred = 0x08
+
+// Defers is bit 4 of the effects used: a row defers a start (SPEC.md 3.3).
+const Defers = 0x10
+
 // CountValue is bit 4 of a control column: the count column beside it is
 // 0, and that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9).
 const CountValue = 0x10

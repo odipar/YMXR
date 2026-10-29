@@ -22,10 +22,12 @@ final class Replay {
 
     /** What one effect runs after a row: source 0 where it runs no source.
      *  {@code set} marks the row that set one of its columns, {@code timer}
-     *  that the row's control column had bit 6 and {@code place} bit 5. */
+     *  that the row's control column had bit 6, {@code place} bit 5 and
+     *  {@code deferred} bit 3. */
     record Effect(int target, int source, int select, int count, boolean started,
-                  boolean set, boolean timer, boolean place) {
-        static final Effect NONE = new Effect(0, 0, 0, 0, false, false, false, false);
+                  boolean set, boolean timer, boolean place, boolean deferred) {
+        static final Effect NONE = new Effect(0, 0, 0, 0, false, false, false, false,
+                false);
     }
 
     final int[] registers = new int[14];
@@ -76,6 +78,7 @@ final class Replay {
             int count = was.count();
             boolean timer = false;
             boolean place = false;
+            boolean deferred = false;
             // Bit 4 marks the count column's 0 as the value the MFP counts
             // 256 for, and a player reads it where the row sets the control
             // column (SPEC.md 1.1, 1.9).
@@ -88,9 +91,11 @@ final class Replay {
                 select = r[t + 2] & 7;
                 timer = (r[t + 2] & 0x40) != 0;
                 place = (r[t + 2] & 0x20) != 0;
+                deferred = (r[t + 2] & Columns.DEFERRED) != 0;
             }
             boolean set = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0;
-            effect[i] = new Effect(target, source, select, count, started, set, timer, place);
+            effect[i] = new Effect(target, source, select, count, started, set, timer, place,
+                    deferred);
         }
         envelopeWritten = false;
         Arrays.fill(written, -1);

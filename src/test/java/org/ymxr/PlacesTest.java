@@ -10,17 +10,17 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * A tune file read against rule 3 of SPEC.md 6 ({@link Check#places}): each
- * start that leaves bit 5 of the control column at 0 outside rule 3(a) is a
- * line, and a file this repository writes has none.
+ * A tune file read against rule 3 of SPEC.md 6 ({@link Check#places}): a
+ * start that leaves bit 5 of the control column at 0 leaves the place at
+ * its number modulo the row count of the source it starts (1.8.4), and a
+ * start that names a source past the file's is a line.
  */
 final class PlacesTest {
 
     /**
-     * The starts of {@link YmxsTest#outsideRule3a} with bit 5 at 0, as a
-     * writer other than this one can leave them: this writer sets the bit
-     * on each start outside rule 3(a) (doc/ymxs.md), and the test clears it
-     * again before the file is written.
+     * The starts of {@link YmxsTest#outsideRule3a} with bit 5 at 0, on
+     * another target, across row counts and across the wrap, and one on a
+     * timer that has run none.
      */
     private static byte[] written() {
         Schema.Made made = Schema.of(YmxsTest.outsideRule3a());
@@ -35,18 +35,19 @@ final class PlacesTest {
     }
 
     @Test
-    void aStartOutsideRule3aIsALine() {
-        List<String> lines = Check.places(TuneFile.read(written()));
-        List<String> heads = lines.stream()
-                .map(line -> line.substring(0, line.indexOf(" starts"))).toList();
-        assertEquals(List.of("0: effect 1", "1: effect 0", "2: effect 0", "3: effect 0"), heads,
-                lines.toString());
-        List<String> why = lines.stream()
-                .map(line -> line.substring(line.indexOf("with bit 5 at 0, ") + 17)).toList();
-        assertEquals(List.of("and no source has started on the effect",
-                "and after the wrap the source last started ran on target 9",
-                "and the source last started had 2 rows",
-                "and the source last started ran on target 8"), why, lines.toString());
+    void aStartWithBit5At0ReadsARowOfItsSource() {
+        assertEquals(List.of(), Check.places(TuneFile.read(written())),
+                "the place is a row of the source modulo its R");
+    }
+
+    @Test
+    void aStartPastTheFilesSourcesIsALine() {
+        Schema.Made made = Schema.of(YmxsTest.outsideRule3a());
+        made.columns().column[Columns.EFFECT + 1][2] = (byte) (0x80 | 9);
+        byte[] file = Tune.write(made.columns(), made.sources(), made.rate(), YmToYmxr.UNIT,
+                BuiltTunes.RING, new Report()).file();
+        assertEquals(List.of("2: effect 0 starts source 9, and the file has 3 sources"),
+                Check.places(TuneFile.read(file)));
     }
 
     @Test

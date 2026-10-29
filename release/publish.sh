@@ -1,6 +1,6 @@
 #!/bin/sh
 # The standalone YMXR executables: the twelve tools of doc/tools.md, one
-# set per platform, each containing the nine 68000 binaries and DTX's
+# set per platform, each containing the seventeen 68000 binaries and DTX's
 # forty images, so a machine with neither this repository nor a
 # toolchain can convert a dump and write a program that plays it.
 #
@@ -15,7 +15,7 @@
 # run it through (doc/tools.md 20.5).
 #
 # NO JAVA RUNS AT RELEASE TIME, but the Maven build runs first: it
-# assembles the nine binaries with rmac and writes them into
+# assembles the seventeen binaries with rmac and writes them into
 # go/binaries/data, which go:embed reads. The Java tree is the reference
 # and ParityTest checks the two against one another, byte for byte; a
 # release is built from one tree.
@@ -43,8 +43,8 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-# What go:embed reads: the nine binaries the build assembles, the eight
-# cores of BINARIES.md 2.1 and the program stub. A tree whose build has
+# What go:embed reads: the seventeen binaries the build assembles, the
+# sixteen cores of BINARIES.md 2.1 and the program stub. A tree whose build has
 # not run has none of them, and a tool would then have no core to put a
 # tune behind. The names are read off the Go file that embeds them, so
 # the list here and the list there cannot drift.

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalInt;
 import org.ymxs.Chip;
 import org.ymxs.Tunes;
 import org.ymxs.YMXS.Effect;
@@ -62,7 +61,6 @@ final class Schema {
                     + " sources, and a source column numbers " + Sources.MOST);
         }
         byte[][] column = new byte[Columns.C][frames];
-        boolean[][] placed = placed(rows, tune.table().repeat());
         int[] target = new int[4];
         int[] select = new int[4];
         // Whether the timer is known to be counting: a start sets it where
@@ -83,7 +81,7 @@ final class Schema {
             for (Map.Entry<Timer, Effect> one : Tunes.effects(row).entrySet()) {
                 int i = effect(one.getKey());
                 used |= effect(out, i, one.getValue(), sources, target, select, count,
-                        counting, f, placed[f][i]);
+                        counting, f);
             }
             for (int c = 0; c < Columns.C; c++) {
                 column[c][f] = out[c];
@@ -111,61 +109,11 @@ final class Schema {
         }
     }
 
-    /**
-     * The starts written with the place's reset where the structure clears
-     * it: each start outside rule 3(a) of SPEC.md 6, where the place the
-     * player keeps may be a row the source started lacks (section 8.4).
-     * Such a start plays from row 0, as a start with the reset does.
-     *
-     * <p>A start leaves bit 5 at 0 where the start before it on the same
-     * timer ran a source of its row count on its target. After the wrap
-     * the first start on a timer at or after the repeat row follows the
-     * last start of the table, so it leaves bit 5 at 0 where that start
-     * matches as well. YMXS's check reads the first pass alone and warns
-     * where the start before it differs (tools.md 7.2).
-     */
-    static boolean[][] placed(List<Row> rows, OptionalInt repeat) {
-        boolean[][] out = new boolean[rows.size()][4];
-        for (Timer timer : TIMERS) {
-            List<Integer> at = new ArrayList<>();
-            List<Start> starts = new ArrayList<>();
-            for (int f = 0; f < rows.size(); f++) {
-                if (Tunes.effects(rows.get(f)).get(timer) instanceof Start start) {
-                    at.add(f);
-                    starts.add(start);
-                }
-            }
-            for (int k = 0; k < starts.size(); k++) {
-                Start start = starts.get(k);
-                if (Tunes.placeReset(start)) {
-                    continue;
-                }
-                boolean keeps = k > 0 && matches(starts.get(k - 1), start);
-                boolean wraps = repeat.isPresent() && at.get(k) >= repeat.getAsInt()
-                        && (k == 0 || at.get(k - 1) < repeat.getAsInt());
-                if (wraps) {
-                    keeps = keeps && matches(starts.get(starts.size() - 1), start);
-                }
-                out[at.get(k)][effect(timer)] = !keeps;
-            }
-        }
-        return out;
-    }
-
-    /** Whether {@code later} runs a source of the row count of the one
-     *  {@code before} runs, on its target: rule 3(a). */
-    private static boolean matches(Start before, Start later) {
-        return Tunes.target(before).equals(Tunes.target(later))
-                && Tunes.size(Tunes.rows(Tunes.source(before)))
-                        == Tunes.size(Tunes.rows(Tunes.source(later)));
-    }
-
     /** One row's operation on one effect, as its four columns; the bit of
-     *  the effects word where the row starts one. {@code place} marks a
-     *  start written with the place's reset ({@link #placed}). */
+     *  the effects word where the row starts one. */
     private static int effect(byte[] out, int i, Effect effect, List<Source> sources,
                               int[] target, int[] select, int[] count, boolean[] counting,
-                              int at, boolean place) {
+                              int at) {
         int t = Columns.EFFECT + 4 * i;
         switch (effect) {
             case Stop ignored -> {
@@ -184,23 +132,35 @@ final class Schema {
                 out[t + 1] = (byte) (0x80 | (sources.indexOf(Tunes.source(start)) + 1));
                 int now = select(Tunes.prescaler(start));
                 int rate = counted(Tunes.count(start), at);
-                int resets = resets(Tunes.timerReset(start),
-                        Tunes.placeReset(start) || place);
+                int resets = resets(Tunes.timerReset(start), Tunes.placeReset(start));
+                boolean deferred = Tunes.deferred(start);
                 // A start on a timer already counting, at the rate it
                 // counts, sets no rate column: step 2 resolves the source
                 // and the ticks read it from here on, at the rate the
                 // control register already has (SPEC.md 4). The timer is
                 // known to be counting only where the source it runs
                 // repeats, since a source that plays once stops it at its
-                // marker (section 5) and no row says when.
-                if (resets != 0 || now != select[i] || rate != count[i] || !counting[i]) {
-                    out[t + 2] = (byte) (0x80 | resets | marked(rate) | now);
+                // marker (section 5) and no row says when. A deferred start
+                // sets the control column, whose bit 3 marks it (1.9).
+                if (resets != 0 || now != select[i] || rate != count[i] || !counting[i]
+                        || deferred) {
+                    out[t + 2] = (byte) (0x80 | resets | (deferred ? Columns.DEFERRED : 0)
+                            | marked(rate) | now);
                     out[t + 3] = (byte) rate;
                 }
                 select[i] = now;
                 count[i] = rate;
                 counting[i] = Tunes.rows(Tunes.source(start)).repeat().isPresent();
-                return 1 << i;
+                if (deferred) {
+                    // Until the tick that performs it, the timer counts at the
+                    // rate of the effect before it, apart from the rate a row
+                    // keeps: the next row that sets a rate sets both columns
+                    // (4.8).
+                    select[i] = -1;
+                    count[i] = -1;
+                    counting[i] = false;
+                }
+                return 1 << i | (deferred ? Columns.DEFERS : 0);
             }
             case Retune retune -> {
                 int now = select(retune.timing().prescaler());

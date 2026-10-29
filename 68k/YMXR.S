@@ -73,10 +73,11 @@
 ; default, no byte and no cycle of it remains.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
-YMXR_VERSION    equ     $0007           ; the version it reads, a bound tune
-                                        ; whose table is DTX3 (SPEC.md 3.3.5)
+YMXR_VERSION    equ     $0008           ; the version it reads, a bound tune
+                                        ; whose table is DTX3 (SPEC.md 3.3.5),
+                                        ; and 7, whose control columns have
+                                        ; bit 3 at 0
 YMXR_COLUMNS    equ     30
-YMXR_SITES      equ     22              ; the other read sites (ymxr_sites)
 
 ; The raster monitor, off unless the assembly defines it (rmac
 ; -dYMXR_PERF=1).
@@ -105,6 +106,22 @@ YMXR_AEOI       equ     0
                 .endif
                 .if     YMXR_AEOI&YMXR_NEST
                 .error  "YMXR_AEOI=1 requires YMXR_NEST=0"
+                .endif
+; Deferred starts (SPEC.md 4.8): a second bank of handlers, an installer
+; an effect, and the frame's paths that arm, settle and drop a pending
+; start, off unless the assembly defines it (rmac -dYMXR_DEFER=1). A core
+; without them reports -1 at init for a tune whose effects used have bit
+; 4 set, and a tool binds such a tune on a core with them (BINARIES.md
+; 2.1); every other tune runs a core without them, which is as long and
+; as fast as the player was before deferred starts.
+                .if     ^^defined YMXR_DEFER
+                .else
+YMXR_DEFER      equ     0
+                .endif
+                .if     YMXR_DEFER
+YMXR_SITES      equ     26              ; the other read sites (ymxr_sites)
+                .else
+YMXR_SITES      equ     22
                 .endif
 ; A tick reads its row through the program counter: the place is a
 ; displacement in the instruction that reads it, so the read costs 4
@@ -157,12 +174,14 @@ PERF_SQ         equ     56      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     32      ; a source of one row, no place stepped
 PERF_LOOP       equ     98      ; the marker, the place to row RR
 PERF_STOP       equ     108     ; the marker, the timer stopped
+PERF_SWITCH     equ     150     ; the marker, a pending start performed
                 .else
 PERF_ON         equ     76      ; a row written, the place stepped
 PERF_SQ         equ     56      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     32      ; a source of one row, no place stepped
 PERF_LOOP       equ     114     ; the marker, the place to row RR
 PERF_STOP       equ     116     ; the marker, the timer stopped
+PERF_SWITCH     equ     150     ; the marker, a pending start performed
                 .endif
 
 ; What each switch adds to a path: the level is dropped on the three
@@ -202,10 +221,25 @@ WS_ROWS         equ     8               ; rows to the last, or to the wrap
 WS_R            equ     12
 WS_RR           equ     16
 WS_EFFECTS      equ     20              ; a byte: the effects the tune runs
+WS_ARMING       equ     22              ; a byte: set while a deferred start
+                                        ; is armed, so widestart patches the
+                                        ; record's mirror and the other bank
 WS_VECTOR       equ     21              ; a byte: the MFP's vector register as
                                         ; init found it, kept where the player
                                         ; runs automatic end of interrupt
-WS_FX           equ     24              ; four effects, FX_SIZE each. The
+WS_SOURCES      equ     24              ; a source's first row and its loop
+                                        ; cell, eight bytes each, resolved at
+                                        ; init: the source column's seven bits
+                                        ; reach 127, so the room is there whether
+                                        ; the tune names that many or one. A
+                                        ; start indexes it off the workspace
+                                        ; with a byte's displacement, so it is
+                                        ; first
+WS_WIDE         equ     1040            ; a source of several columns: its loop
+                                        ; cell and the stride from one column
+                                        ; to the next, eight bytes each and one
+                                        ; a source, resolved at init beside it
+WS_FX           equ     2056            ; four effects, FX_SIZE each. The
                                         ; instances below add FX_SIZE a time
                                         ; rather than multiplying: rmac reads
                                         ; an expression left to right, so
@@ -225,18 +259,27 @@ FX_FIRST        equ     4               ; the place at row 0: the running
 FX_FIRST2       equ     8               ; the same for the second column a
 FX_FIRST3       equ     12              ; handler of several writes, and the
                                         ; third
-FX_SIZE         equ     16
-WS_SOURCES      equ     88              ; a source's first row and its loop
-                                        ; cell, eight bytes each, resolved at
-                                        ; init: the source column's seven bits
-                                        ; reach 127, so the room is there whether
-                                        ; the tune names that many or one
-WS_WIDE         equ     1104            ; a source of several columns: its loop
-                                        ; cell and the stride from one column
-                                        ; to the next, eight bytes each and one
-                                        ; a source, resolved at init beside it
-YMXR_FIXED      equ     2120
-WS_STATE        equ     2120            ; the image's state block, on a long
+FX_ROWS         equ     16              ; R of the running source, where it
+                                        ; has several columns or is counted
+FX_PENDING      equ     20              ; a byte: a deferred start is armed
+                                        ; and the running handler hooked
+FX_HOOKW        equ     22              ; the word the hook wrote over
+FX_ARMED        equ     24              ; the handler the armed start aims at
+FX_HOOK         equ     28              ; the hooked word's address
+ARMOFF          equ     32              ; the mirror: the armed start's target,
+                                        ; shape, places at row 0 and R, at
+                                        ; the offsets above plus ARMOFF
+FX_APLACE       equ     52              ; the row the armed start is at
+FX_ABANK        equ     56              ; the bank it is armed in, 0 or BANK
+                .if     YMXR_DEFER
+FX_SIZE         equ     64
+YMXR_FIXED      equ     2312
+WS_STATE        equ     2312            ; the image's state block, on a long
+                .else
+FX_SIZE         equ     20              ; up to FX_ROWS, which a place's
+YMXR_FIXED      equ     2136            ; reset on a counted source reads
+WS_STATE        equ     2136
+                .endif
 
 ; The chip.
 YM_SELECT       equ     $FFFF8800
@@ -286,6 +329,13 @@ q\{col}:
 ; that sets no envelope column falls into.
                 .macro  RREAD   col
 r\{col}:
+                move.b  $7FFF(a1),d1
+                .endm
+
+; The count column at a deferred start's site (4.8), which init patches
+; from the table of sites as it patches the two above.
+                .macro  DREAD   col
+d\{col}:
                 move.b  $7FFF(a1),d1
                 .endm
 
@@ -380,22 +430,22 @@ q\{ct}:         bra.w   \{tick}_done
 \{tick}_some:
                 READ2   \cc
                 tst.b   d2                      ; the timer's reset stops the
-                bpl.s   .kept\~                 ; timer before the source is
-                btst    #6,d2                   ; switched, so no tick of the
-                beq.s   .kept\~                 ; old rate reads the new
-                andi.b  #\keep,\ctrl.w          ; source, and the tick latched
+                bpl.s   \{tick}_kept            ; timer before the source is
+\{tick}_rs:     btst    #6,d2                   ; switched, so no tick of the
+                beq.s   \{tick}_kept            ; old rate reads the new
+\{tick}_rstop:  andi.b  #\keep,\ctrl.w          ; source, and the tick latched
                 move.b  #255-(1<<\bit),(\ier+4).w ; before the stop is dropped
-.kept\~:
+\{tick}_kept:
                 READ    \ct
                 bpl.s   .t\~
                 and.b   #$7F,d1
                 move.b  d1,\fx+FX_TARGET(a0)
 .t\~:           READ    \cs
-                bpl.w   \{tick}_rate
-                and.w   #$7F,d1
-                beq.w   \{tick}_stop
+\{tick}_unset:  bpl.w   \{tick}_rate            ; _retune where a row defers
+                and.w   #$7F,d1                 ; a start, and bra.w _check
+\{tick}_set:    beq.w   \{tick}_stop            ; below (4.8)
 ; a start: the source as init resolved it, the handler aimed at its rows
-                lsl.w   #3,d1
+\{tick}_now:    lsl.w   #3,d1
                 movea.l WS_SOURCES-8(a0,d1.w),a4    ; its first row
                 move.l  WS_SOURCES-4(a0,d1.w),d0    ; the loop cell: row RR,
 \{tick}_pick:   bmi.w   \{tick}_shaped  ; 0 where it plays once,
@@ -418,27 +468,45 @@ q\{ct}:         bra.w   \{tick}_done
                 ori.w   #$0700,sr
                 move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
                 move.l  a4,d1                   ; the place: the first row,
-                btst    #5,d2                   ; or the row it is at in
-                bne.s   \{tick}_put     ; the rows it replaces, which
-                tst.b   \fx+FX_SHAPE(a0)        ; the square keeps in bit 7 of
-                beq.s   \{tick}_same    ; its immediate, and a
-\{tick}_keep:   bpl.s   \{tick}_put     ; source of one row is at
-                lea     \sq(pc),a3              ; row 0
-                tst.b   SQ_VAL(a3)
+                btst    #5,d2                   ; or the row the running
+                bne.s   \{tick}_put             ; handler is at, modulo R of
+                move.b  \fx+FX_SHAPE(a0),d3     ; this source (1.8.4): every
+                beq.s   \{tick}_tickat          ; handler that steps a place
+                bpl.s   \{tick}_other           ; keeps it at one offset, a
+                .if     YMXR_DEFER              ; square in bit 7 of its
+                movea.l \vector.w,a3            ; immediate, and a source of
+                .else                           ; one row is at row 0. With
+                lea     \sq(pc),a3              ; two banks the running one
+                .endif                          ; is the one the vector
+                tst.b   SQ_VAL(a3)              ; names
                 bpl.s   \{tick}_put
-                addq.l  #1,d1
-                bra.s   \{tick}_put
+                moveq   #1,d3
+                bra.s   \{tick}_putm
+\{tick}_other:  cmp.b   #1,d3
+                beq.s   \{tick}_put
+                movea.l \vector.w,a3
+                bra.s   \{tick}_same
+\{tick}_tickat:
+                .if     YMXR_DEFER
+                movea.l \vector.w,a3
+                .else
+                lea     \tick(pc),a3
+                .endif
 \{tick}_same:
                 .if     YMXR_PCREL
-                move.w  TICK_PTR(a5),d3         ; the place, a displacement
+                move.w  TICK_PTR(a3),d3         ; the place, a displacement
                 ext.l   d3                      ; from the instruction that
-                lea     TICK_PTR(a5),a3         ; reads the row
+                lea     TICK_PTR(a3),a3         ; reads the row
                 add.l   a3,d3
-                add.l   d3,d1
                 .else
-                add.l   TICK_PTR(a5),d1
+                move.l  TICK_PTR(a3),d3
                 .endif
-                sub.l   \fx+FX_FIRST(a0),d1
+                sub.l   \fx+FX_FIRST(a0),d3     ; its row number
+\{tick}_putm:   move.l  DT_ROWS-DT_PAYLOAD(a4),d4   ; R, out of the source's
+                cmp.l   d4,d3                       ; DTX1 header
+                bcs.s   .inr\~
+                bsr.w   ymxr_rem
+.inr\~:         add.l   d3,d1
 \{tick}_put:
                 .if     YMXR_PCREL
                 lea     TICK_PTR(a5),a3
@@ -460,34 +528,6 @@ q\{ct}:         bra.w   \{tick}_done
 ; before the select steps the place on, and the reset below would undo it
                 bclr    #5,d2
                 bra.w   \{tick}_rate
-
-; A start of a source of one column, where the running source has
-; several: the place is in the running handler's first column, and
-; the row it is at is that place against the place at row 0. Init
-; aims the branch above here where a source of the tune has several
-; columns, and at the place below where every source is one column.
-\{tick}_wput:   cmp.b   #1,\fx+FX_SHAPE(a0)     ; a source of one row was
-                beq.s   \{tick}_put             ; at row 0
-                lea     \two(pc),a3             ; both shapes place their
-                .if     YMXR_PCREL=0            ; first column at one offset
-                move.l  TW2_PTR1(a3),d3
-                .endif
-                cmp.b   #2,\fx+FX_SHAPE(a0)
-                beq.s   .w2\~
-                lea     \three(pc),a3
-                .if     YMXR_PCREL=0
-                move.l  TW3_PTR1(a3),d3
-                .endif
-.w2\~:
-                .if     YMXR_PCREL
-                move.w  TW2_PTR1(a3),d3
-                ext.l   d3
-                add.l   a3,d3
-                add.l   #TW2_PTR1,d3
-                .endif
-                add.l   d3,d1
-                sub.l   \fx+FX_FIRST(a0),d1
-                bra.s   \{tick}_put
 
 ; A start of a source of several columns (SPEC.md 3.1.3), in the routine
 ; every effect shares: the effect alone is here, since the branch
@@ -522,13 +562,30 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  d5,SQ_MASK(a5)
                 btst    #5,d2
                 bne.s   .first\~
-                tst.b   \fx+FX_SHAPE(a0)
-                beq.s   .fromrow\~
-                bpl.s   .first\~                ; a source of one row was
-                tst.b   SQ_VAL(a5)              ; at row 0
+                .if     YMXR_DEFER
+                movea.l \vector.w,a3            ; the running handler: a
+                .endif                          ; square at the row of its
+                move.b  \fx+FX_SHAPE(a0),d0     ; immediate, a source of one
+                beq.s   .tick\~                 ; row at row 0, and every
+                bpl.s   .other\~                ; other at its place, whose
+                .if     YMXR_DEFER              ; row number modulo 2 is the
+                tst.b   SQ_VAL(a3)              ; row of the two (1.8.4).
+                .else                           ; With one bank the running
+                tst.b   SQ_VAL(a5)              ; square is this one
+                .endif
                 bmi.s   .marked\~
                 bra.s   .first\~
-.fromrow\~:     lea     \tick(pc),a3
+.other\~:       cmp.b   #1,d0
+                beq.s   .first\~
+                .if     YMXR_DEFER=0
+                movea.l \vector.w,a3
+                .endif
+                bra.s   .fromrow\~
+.tick\~:
+                .if     YMXR_DEFER=0
+                lea     \tick(pc),a3
+                .endif
+.fromrow\~:
                 .if     YMXR_PCREL
                 move.w  TICK_PTR(a3),d0
                 ext.l   d0
@@ -563,6 +620,64 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  #1,\fx+FX_SHAPE(a0)
                 bclr    #5,d2
                 bra.w   \{tick}_rate
+                .if     YMXR_DEFER
+; A tune whose rows defer a start (SPEC.md 3.3, 4.8) has init aim three
+; branches of each effect here: the timer's reset, which a deferred start
+; makes at the switch; a start or a stop, with a start pending or one to
+; arm; and a row that leaves the source column unset. Every other tune
+; runs the branches the assembler wrote, and the frame of a version 7
+; tune.
+\{tick}_rck:    btst    #6,d2
+                beq.w   \{tick}_kept
+                btst    #3,d2
+                bne.w   \{tick}_kept
+                bra.w   \{tick}_rstop
+\{tick}_check:  beq.s   \{tick}_drop            ; source 0, the and's Z: a stop
+                tst.b   \fx+FX_PENDING(a0)      ; a start pending on the timer:
+                bne.s   \{tick}_pending         ; switched, dropped or replaced
+\{tick}_go:     tst.b   d2                      ; a deferred start
+                bpl.w   \{tick}_now
+                btst    #3,d2
+                beq.w   \{tick}_now
+; on a running timer it is armed, its rate and the handler it aims at
+; written into the installer and the running handler hooked, and the row
+; leaves the timer as it is; on a stopped timer it is a start at the
+; frame. d1 the source.
+\{tick}_defer:  move.w  d1,d3
+                DREAD   \cn                     ; the count column
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                bsr.w   ymxr_arm
+                beq.w   \{tick}_done
+                bclr    #3,d2                   ; the timer is stopped: d1 the
+                bra.w   \{tick}_now             ; source, started at once
+; the record follows a switch the tick has made, a start at the frame
+; drops the pending start, and a deferred start replaces it
+\{tick}_pending:
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                moveq   #1,d5                   ; dropped
+                tst.b   d2
+                bpl.s   .pend\~
+                btst    #3,d2
+                beq.s   .pend\~
+                moveq   #0,d5                   ; replaced: the record settled
+.pend\~:        bsr.w   ymxr_pend
+                bra.s   \{tick}_go
+\{tick}_drop:   tst.b   \fx+FX_PENDING(a0)      ; a stop drops a pending start
+                beq.w   \{tick}_stop
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                moveq   #1,d5
+                bsr.w   ymxr_pend
+                bra.w   \{tick}_stop
+; a row that leaves the source column unset leaves a pending start
+; pending, and reads the record a switch has made
+\{tick}_retune: tst.b   \fx+FX_PENDING(a0)
+                beq.w   \{tick}_rate
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                moveq   #0,d5
+                bsr.w   ymxr_pend
+                bra.w   \{tick}_rate
+                .endif
+
 \{tick}_stop:   andi.b  #\keep,\ctrl.w          ; select 0: the timer stops
                 move.b  #255-(1<<\bit),(\ier+4).w ; and drops its latched tick
 \{tick}_rate:   READ    \cn
@@ -621,7 +736,11 @@ q\{ct}:         bra.w   \{tick}_done
                 tst.b   \fx+FX_SHAPE(a0)
                 beq.s   \{tick}_place
 \{tick}_reset:  bpl.s   \{tick}_done    ; a source of one row is at
-                lea     \sq(pc),a5              ; row 0 and moves no place
+                .if     YMXR_DEFER              ; row 0 and moves no place;
+                movea.l \vector.w,a5            ; with two banks the square
+                .else                           ; is the one the vector
+                lea     \sq(pc),a5              ; names
+                .endif
                 movea.l \fx+FX_FIRST(a0),a3
                 move.b  (a3),SQ_VAL(a5)
                 bra.s   \{tick}_done
@@ -632,7 +751,12 @@ q\{ct}:         bra.w   \{tick}_done
                 bsr.w   ymxr_widereset
                 bra.s   \{tick}_done
 
-\{tick}_place: lea     \tick(pc),a5
+\{tick}_place:
+                .if     YMXR_DEFER
+                movea.l \vector.w,a5
+                .else
+                lea     \tick(pc),a5
+                .endif
                 .if     YMXR_PCREL
                 move.l  \fx+FX_FIRST(a0),d1
                 lea     TICK_PTR(a5),a3
@@ -700,7 +824,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; interrupt level drops once the select and the value are written, so a
 ; higher timer may nest, and the in-service bit is cleared by hand, as
 ; software end-of-interrupt mode asks.
-                .macro  TICK    name,eoi,eoir,ctrl,keep,ier,bit,colour
+                .macro  TICK    name,eoi,eoir,ctrl,keep,ier,bit,colour,inst
 \name:
                 MARK    \colour
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
@@ -758,6 +882,12 @@ q\{ct}:         bra.w   \{tick}_done
                 .else
                 dc.l    0                       ; the loop cell
                 .endif
+                .if     YMXR_DEFER
+; A start pending on the timer writes one word at the head of the last
+; row's path, a bra.s here, so the source ends at its last row and the
+; effect's installer performs the start (SPEC.md 4.8).
+\{name}_hook:   bra.w   \inst
+                .endif
                 .endm
 
 ; A tick of a source whose one column fills its byte: every bit of the
@@ -773,7 +903,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; The two branch targets are named rather than local: the labels the
 ; patching reads are between a branch and its target, and a label ends
 ; the run a local one belongs to.
-                .macro  TICKC   name,eoi,eoir,ctrl,keep,ier,bit,colour
+                .macro  TICKC   name,eoi,eoir,ctrl,keep,ier,bit,colour,inst
 \name:
                 MARK    \colour
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
@@ -825,6 +955,9 @@ q\{ct}:         bra.w   \{tick}_done
                 dc.l    0                       ; the loop cell
                 .endif
 \{name}_left:   dc.w    0                       ; the rows left
+                .if     YMXR_DEFER
+\{name}_hook:   bra.w   \inst                   ; a pending start, as above
+                .endif
                 .endm
 
 ; A tick of a target that writes several registers (SPEC.md 2.1): a
@@ -835,7 +968,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; that order, and the places, the registers and the loop cells are the
 ; immediates it patches, so this handler uses no register either. A tune
 ; whose sources are one column enters none of this.
-                .macro  TICKW   name,columns,counted,eoi,eoir,ctrl,keep,ier,bit,colour
+                .macro  TICKW   name,columns,counted,eoi,eoir,ctrl,keep,ier,bit,colour,inst
 \name:
                 MARK    \colour
 \{name}_sel1:   move.b  #8,YM_SELECT.w          ; +3: the first register
@@ -925,6 +1058,9 @@ q\{ct}:         bra.w   \{tick}_done
                 .if     \counted
 \{name}_left:   dc.w    0                       ; the rows left
                 .endif
+                .if     YMXR_DEFER
+\{name}_hook:   bra.w   \inst                   ; a pending start, as above
+                .endif
                 .endm
 
 ; A square's tick: a source of two rows that repeats to row 0 is two
@@ -934,7 +1070,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; 1.9 defines for a square is which of the two rows the immediate is at,
 ; and bit 7 tells them apart, the last row of a source being its marker
 ; (3.2). A source of any other shape runs the handler above.
-                .macro  SQUARE  name,eoi,eoir,colour
+                .macro  SQUARE  name,eoi,eoir,colour,inst
 \name:
                 MARK    \colour
 \{name}_sel:    move.b  #8,YM_SELECT.w          ; +3: the target register
@@ -943,11 +1079,21 @@ q\{ct}:         bra.w   \{tick}_done
                 move.w  #$2500,sr
                 .endif
 \{name}_tog:    eori.b  #$0F,($12345678).l      ; +3 the two rows' difference,
-                COUNT   PERF_SQ,PERF_DROP       ; +4 the row's address
+\{name}_after:  COUNT   PERF_SQ,PERF_DROP       ; +4 the row's address
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
+                .if     YMXR_DEFER
+; A start pending on the timer writes a bra.s here over the eori's first
+; word: the row written last ends the source where it is the marker, row
+; 1, and the installer performs the start; at row 0 the eori below moves
+; to row 1 as the handler's does (SPEC.md 4.8).
+\{name}_hook:   btst    #7,\{name}_val+3(pc)
+                bne.w   \inst
+\{name}_htog:   eori.b  #$0F,($12345678).l      ; +3 and +4, as the eori above
+                bra.s   \{name}_after
+                .endif
                 .endm
 
 ; A source of one row repeating writes that row on every tick and moves
@@ -959,15 +1105,65 @@ q\{ct}:         bra.w   \{tick}_done
 ; the two handlers above: a start writes the register into the
 ; select, and the source's shape picks the handler where the register
 ; does not.
-                .macro  ONEROW  name,eoi,eoir,colour
+                .macro  ONEROW  name,eoi,eoir,colour,inst
 \name:
                 MARK    \colour
 \{name}_sel:    move.b  #8,YM_SELECT.w          ; +3: the target register
 \{name}_val:    move.b  #$0F,YM_SELECT+2.w      ; +3: the source's one row
+\{name}_end:
                 .if     YMXR_NEST
                 move.w  #$2500,sr
                 .endif
                 COUNT   PERF_ONEROW,PERF_DROP
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+                .if     YMXR_DEFER
+; A start pending on the timer writes a bra.s here over the first word
+; after the row's write: the one row is the last (SPEC.md 4.8).
+\{name}_hook:   bra.w   \inst
+                .endif
+                .endm
+
+; The word a hook writes: a bra.s to the stub, or a nop where the stub
+; follows the word, as in a one-row handler of the lean tick, whose word
+; is its rte; a bra.s of 0 would read the next word as a displacement.
+                .macro  HOOKW   p
+                .if     (\{p}_HOOK-\{p}_LAST-2)=0
+\{p}_HOOKW      equ     $4E71
+                .else
+\{p}_HOOKW      equ     $6000|(\{p}_HOOK-\{p}_LAST-2)
+                .endif
+                .endm
+
+; An effect's installer, which the hook of 4.8 branches to at the tick
+; that reads the last row of the running source. Every operand is
+; patched at the frame that arms the start: the hooked word and its
+; address, the skip over the stop where the start leaves timerReset
+; clear, the count, the armed handler and the select. The tick runs at
+; the timer's level, so no tick of the other timer of a shared control
+; register lands between the read and the write of it.
+                .macro  INSTALL name,ctrl,data,keep,ier,bit,shift,shared,vector,eoi,eoir
+\name:
+\{name}_back:   move.w  #$4E71,($12345678).l    ; +2 the word, +4 its address
+\{name}_skip:   bra.s   \{name}_run             ; a nop where the start sets
+                andi.b  #\keep,\ctrl.w          ; timerReset: the timer stopped
+                move.b  #255-(1<<\bit),(\ier+4).w ; and its latched tick dropped
+\{name}_run:
+\{name}_cnt:    move.b  #0,\data.w              ; +3: the count
+\{name}_vec:    move.l  #$12345678,\vector.w    ; +2: the armed handler
+                .if     \shared
+                move.w  d0,-(sp)                ; the other timer's bits kept
+                move.b  \ctrl.w,d0
+                and.b   #\keep,d0
+\{name}_sel:    or.b    #0,d0                   ; +3: the select, shifted
+                move.b  d0,\ctrl.w
+                move.w  (sp)+,d0
+                .else
+\{name}_sel:    move.b  #0,\ctrl.w              ; +3: the select
+                .endif
+                COUNT   PERF_SWITCH,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
@@ -983,8 +1179,10 @@ q\{ct}:         bra.w   \{tick}_done
 YMXR_init:
                 cmp.l   #YMXR_MAGIC,(a0)
                 bne     .bad
-                cmp.w   #YMXR_VERSION,TF_VERSION(a0)    ; version 7, a DTX3
-                bne     .bad                            ; table (SPEC.md 3.3.5)
+                move.w  TF_VERSION(a0),d0               ; version 7 or 8, a
+                subq.w  #YMXR_VERSION-1,d0              ; DTX3 table (SPEC.md
+                cmp.w   #1,d0                           ; 3.3.5)
+                bhi     .bad
                 move.l  a6,-(sp)
                 movea.l a1,a6
                 move.l  a0,WS_TUNE(a6)
@@ -992,6 +1190,10 @@ YMXR_init:
                 adda.l  TF_IMAGE(a0),a2
                 move.l  a2,WS_IMAGE(a6)
                 move.b  TF_EFFECTS(a0),WS_EFFECTS(a6)
+                .if     YMXR_DEFER=0
+                btst    #4,WS_EFFECTS(a6)       ; a tune that defers a start
+                bne     .bad6                   ; needs a core with them
+                .endif
                 cmp.b   #3,IM_VARIANT(a2)       ; a DTX3 image: its rows come
                 bne     .bad6                   ; round by themselves
 ; The table to read, which the image may carry beside others: subtunes
@@ -1161,26 +1363,6 @@ YMXR_init:
                 bsr     ymxr_put
                 dbra    d2,.site
 
-; The tick handlers: each one's step and loop operands name a
-; separate pair of cells, its place is parked on a marker until a start,
-; and the register it selects is R0 until a start aims it (SPEC.md 5.2.1).
-                lea     ymxr_tick0(pc),a5
-                bsr     ymxr_link
-                lea     ymxr_tick1(pc),a5
-                bsr     ymxr_link
-                lea     ymxr_tick2(pc),a5
-                bsr     ymxr_link
-                lea     ymxr_tick3(pc),a5
-                bsr     ymxr_link
-                lea     ymxr_cnt0(pc),a5
-                bsr     ymxr_linkc
-                lea     ymxr_cnt1(pc),a5
-                bsr     ymxr_linkc
-                lea     ymxr_cnt2(pc),a5
-                bsr     ymxr_linkc
-                lea     ymxr_cnt3(pc),a5
-                bsr     ymxr_linkc
-
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
                 bclr    #3,MFP_VECTOR.w             ; the MFP ends each
@@ -1196,14 +1378,45 @@ YMXR_init:
 ; where the next, running that effect beside another, needs the drop.
                 move.l  #$46FC2500,d3           ; move.w #$2500,sr, the drop,
                 move.b  WS_EFFECTS(a6),d0       ; which a handler keeps unless
-                move.b  d0,d1                   ; its effect runs alone
+                and.b   #$0F,d0                 ; its effect runs alone
+                move.b  d0,d1
                 subq.b  #1,d1
                 and.b   d1,d0                   ; more than one bit set
                 bne.s   .nests
                 move.l  #$4E714E71,d3           ; nop nop, for the one it runs
-.nests:         lea     ymxr_tick0(pc),a5
+.nests:
+                .endif
+
+; Where deferred starts are assembled in, every handler is in two banks
+; (4.8), and each bank is patched the same way: the loop below runs bank 0
+; with d6 at 0 and bank 1 with d6 at BANK; otherwise it runs bank 0
+; alone.
+                move.l  d6,-(sp)
+                moveq   #0,d6
+.banks:
+; The tick handlers: each one's step and loop operands name a
+; separate pair of cells, its place is parked on a marker until a start,
+; and the register it selects is R0 until a start aims it (SPEC.md 5.2.1).
+                lea     ymxr_tick0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.link:          bsr     ymxr_link
+                lea     TICK_SIZE(a5),a5
+                dbra    d2,.link
+                lea     ymxr_cnt0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.linkc:         bsr     ymxr_linkc
+                lea     TICKC_SIZE(a5),a5
+                dbra    d2,.linkc
+
+                .if     YMXR_NEST
+                lea     ymxr_tick0(pc),a5
+                adda.w  d6,a5
                 lea     ymxr_sq0(pc),a4
+                adda.w  d6,a4
                 lea     ymxr_one0(pc),a3
+                adda.w  d6,a3
                 moveq   #0,d4
                 moveq   #3,d2
 .each:          move.l  #$46FC2500,d0           ; a handler the tune does not
@@ -1221,11 +1434,16 @@ YMXR_init:
                 .endif
 
 ; A square's handler names the row it is at in the one instruction
-; that moves between the two.
+; that moves between the two, and so does the copy of that instruction in
+; its hook (4.8).
                 lea     ymxr_sq0(pc),a5
+                adda.w  d6,a5
                 moveq   #3,d2
 .sq:            lea     SQ_VAL(a5),a3
                 move.l  a3,SQ_PTR(a5)
+                .if     YMXR_DEFER
+                move.l  a3,SQ_HPTR(a5)
+                .endif
                 lea     SQ_SIZE(a5),a5
                 dbra    d2,.sq
 
@@ -1235,6 +1453,7 @@ YMXR_init:
 ; start writes the values, and no timer reaches one of these handlers
 ; before a start has aimed its vector there.
                 lea     ymxr_two0(pc),a5
+                adda.w  d6,a5
                 moveq   #3,d2
 .linktwo:       lea     TW2_CELLS(a5),a3
                 move.l  a3,TW2_LOOPT(a5)
@@ -1250,6 +1469,7 @@ YMXR_init:
                 lea     TW2_SIZE(a5),a5
                 dbra    d2,.linktwo
                 lea     ymxr_three0(pc),a5
+                adda.w  d6,a5
                 moveq   #3,d2
 .linkthree:     lea     TW3_CELLS(a5),a3
                 move.l  a3,TW3_LOOPT(a5)
@@ -1270,6 +1490,7 @@ YMXR_init:
                 lea     TW3_SIZE(a5),a5
                 dbra    d2,.linkthree
                 lea     ymxr_env0(pc),a5
+                adda.w  d6,a5
                 moveq   #3,d2
 .linkenv:       lea     TWC_CELLS(a5),a3
                 move.l  a3,TWC_LOOPT(a5)
@@ -1288,18 +1509,34 @@ YMXR_init:
                 move.w  #1,TWC_LEFT(a5)
                 lea     TWC_SIZE(a5),a5
                 dbra    d2,.linkenv
+                .if     YMXR_DEFER
+                tst.w   d6
+                bne.s   .banked
+                move.w  #BANK,d6
+                bra     .banks
+.banked:
+                .endif
+                move.l  (sp)+,d6
 
 ; The effects' records: the kept target, select, count and shape empty
-; until a start, and the first row the parked place, so a start that moves
-; no place is at row 0 of the source it names (SPEC.md 4.1 step 4).
+; until a start, the first row the parked place, so a start that moves
+; no place is at row 0 of the source it names (SPEC.md 4.1 step 4), and
+; no start pending.
                 lea     WS_FX(a6),a0
                 lea     ymxr_park(pc),a1
                 moveq   #3,d0
-.clear:         clr.l   (a0)+
-                move.l  a1,(a0)+
-                move.l  a1,(a0)+
-                move.l  a1,(a0)+
+.clear:         movea.l a0,a2
+                moveq   #FX_SIZE/4-1,d1
+.zero:          clr.l   (a2)+
+                dbra    d1,.zero
+                move.l  a1,FX_FIRST(a0)
+                move.l  a1,FX_FIRST2(a0)
+                move.l  a1,FX_FIRST3(a0)
+                lea     FX_SIZE(a0),a0
                 dbra    d0,.clear
+                .if     YMXR_DEFER
+                sf      WS_ARMING(a6)
+                .endif
 
 ; The effects the tune runs are read every row; the others are jumped
 ; over by the branch at each macro's head, where the tune does not run
@@ -1347,10 +1584,10 @@ YMXR_init:
                 btst    #0,d0
                 beq.s   .only
                 move.w  #PICK_SQ,d1
-.only:          move.l  #((WIDE_ONE&$FF)<<16)|((KEEP_PUT&$FF)<<8)|(RESET_DONE&$FF),d0
+.only:          move.l  #((WIDE_ONE&$FF)<<16)|(RESET_DONE&$FF),d0
                 btst    #2,d5                   ; and the three branches that
                 beq.s   .aims                   ; lie elsewhere where it has
-                move.l  #((WIDE_WIDEN&$FF)<<16)|((KEEP_WIDE&$FF)<<8)|(RESET_WIDE&$FF),d0
+                move.l  #((WIDE_WIDEN&$FF)<<16)|(RESET_WIDE&$FF),d0
 .aims:          lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
                 lea     ymxr_resets(pc),a2
@@ -1361,11 +1598,35 @@ YMXR_init:
                 move.l  d0,d5
                 move.w  (a2)+,d4
                 move.b  d5,(a4,d4.w)            ; the place's reset, at the site
-                lsr.l   #8,d5                   ; the table names
-                move.b  d5,KEEP_AT(a1)
-                lsr.l   #8,d5
+                swap    d5                      ; the table names
                 move.b  d5,WIDE_AT(a1)
                 dbra    d2,.pick
+
+                .if     YMXR_DEFER
+; A tune that defers a start, bit 4 of the effects used (SPEC.md 3.3),
+; aims three branches of every effect at the paths that read a pending
+; start (4.8); every other tune keeps the three the assembler wrote, so
+; its frame costs what it cost before deferred starts. Each is written
+; on every init, as the heads are.
+                lea     ymxr_frame(pc),a4
+                lea     ymxr_overs(pc),a3
+                moveq   #3,d2
+.defers:        move.w  (a3)+,d4
+                lea     (a4,d4.w),a1            ; the effect's head
+                btst    #4,WS_EFFECTS(a6)
+                beq.s   .plain
+                move.w  #$6000,RS_AT(a1)        ; bra.w
+                move.w  #RS_DEFER,RS_AT+2(a1)
+                move.w  #UNSET_DEFER,UNSET_AT(a1)
+                move.w  #$6000,SET_AT(a1)       ; bra.w
+                move.w  #SET_DEFER,SET_AT+2(a1)
+                bra.s   .aimed
+.plain:         move.l  #$08020006,RS_AT(a1)    ; btst #6,d2
+                move.w  #UNSET_RATE,UNSET_AT(a1)
+                move.w  #$6700,SET_AT(a1)       ; beq.w
+                move.w  #SET_STOP,SET_AT+2(a1)
+.aimed:         dbra    d2,.defers
+                .endif
 
 ; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body is two bytes past the slot
@@ -1742,48 +2003,100 @@ ymxr_sites:
                 dc.w    q_11-ymxr_frame+2,11,q_12-ymxr_frame+2,12
                 dc.w    r_8-ymxr_frame+2,8,r_9-ymxr_frame+2,9
                 dc.w    r_10-ymxr_frame+2,10,r_7-ymxr_frame+2,7
+                .if     YMXR_DEFER
+                dc.w    d_17-ymxr_frame+2,17,d_21-ymxr_frame+2,21
+                dc.w    d_25-ymxr_frame+2,25,d_29-ymxr_frame+2,29
+                .endif
 
 ; ---------------------------------------------------------------- ticks
 
-                TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
-                TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
-                TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
-                TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+                TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 
-                SQUARE  ymxr_sq0,$DF,$FFFFFA0F,$070
-                SQUARE  ymxr_sq1,$EF,$FFFFFA11,$007
-                SQUARE  ymxr_sq2,$FE,$FFFFFA0F,$707
-                SQUARE  ymxr_sq3,$DF,$FFFFFA11,$077
+                SQUARE  ymxr_sq0,$DF,$FFFFFA0F,$070,ymxr_inst0
+                SQUARE  ymxr_sq1,$EF,$FFFFFA11,$007,ymxr_inst1
+                SQUARE  ymxr_sq2,$FE,$FFFFFA0F,$707,ymxr_inst2
+                SQUARE  ymxr_sq3,$DF,$FFFFFA11,$077,ymxr_inst3
 
-                ONEROW  ymxr_one0,$DF,$FFFFFA0F,$070
-                ONEROW  ymxr_one1,$EF,$FFFFFA11,$007
-                ONEROW  ymxr_one2,$FE,$FFFFFA0F,$707
-                ONEROW  ymxr_one3,$DF,$FFFFFA11,$077
+                ONEROW  ymxr_one0,$DF,$FFFFFA0F,$070,ymxr_inst0
+                ONEROW  ymxr_one1,$EF,$FFFFFA11,$007,ymxr_inst1
+                ONEROW  ymxr_one2,$FE,$FFFFFA0F,$707,ymxr_inst2
+                ONEROW  ymxr_one3,$DF,$FFFFFA11,$077,ymxr_inst3
 
-                TICKC   ymxr_cnt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
-                TICKC   ymxr_cnt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
-                TICKC   ymxr_cnt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
-                TICKC   ymxr_cnt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+                TICKC   ymxr_cnt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKC   ymxr_cnt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKC   ymxr_cnt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKC   ymxr_cnt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 
 ; The handlers of a target that writes two registers, and of one that
 ; writes three: one an effect, as the three above are.
-                TICKW   ymxr_two0,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
-                TICKW   ymxr_two1,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
-                TICKW   ymxr_two2,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
-                TICKW   ymxr_two3,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+                TICKW   ymxr_two0,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_two1,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_two2,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_two3,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 
-                TICKW   ymxr_three0,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
-                TICKW   ymxr_three1,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
-                TICKW   ymxr_three2,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
-                TICKW   ymxr_three3,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+                TICKW   ymxr_three0,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_three1,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_three2,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_three3,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 
 ; The counted shape of two columns: `setEnvelope` writes R11 and R12 and
 ; both read every bit of their byte, so the rows of a source on it are
 ; whole bytes and a tick counts them (SPEC.md 2.1.3, 3.1.6).
-                TICKW   ymxr_env0,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070
-                TICKW   ymxr_env1,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007
-                TICKW   ymxr_env2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707
-                TICKW   ymxr_env3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077
+                TICKW   ymxr_env0,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_env1,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_env2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_env3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+
+                .if     YMXR_DEFER
+; Bank 1: every handler again, in the order of bank 0, BANK bytes on. A
+; deferred start on a running timer is armed in the bank its vector does
+; not point into, so the handler its first tick reads is patched whole
+; while the running one plays on (SPEC.md 4.8).
+ymxr_bank1:
+                TICK    ymxr_tick0b,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICK    ymxr_tick1b,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICK    ymxr_tick2b,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICK    ymxr_tick3b,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                SQUARE  ymxr_sq0b,$DF,$FFFFFA0F,$070,ymxr_inst0
+                SQUARE  ymxr_sq1b,$EF,$FFFFFA11,$007,ymxr_inst1
+                SQUARE  ymxr_sq2b,$FE,$FFFFFA0F,$707,ymxr_inst2
+                SQUARE  ymxr_sq3b,$DF,$FFFFFA11,$077,ymxr_inst3
+                ONEROW  ymxr_one0b,$DF,$FFFFFA0F,$070,ymxr_inst0
+                ONEROW  ymxr_one1b,$EF,$FFFFFA11,$007,ymxr_inst1
+                ONEROW  ymxr_one2b,$FE,$FFFFFA0F,$707,ymxr_inst2
+                ONEROW  ymxr_one3b,$DF,$FFFFFA11,$077,ymxr_inst3
+                TICKC   ymxr_cnt0b,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKC   ymxr_cnt1b,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKC   ymxr_cnt2b,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKC   ymxr_cnt3b,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_two0b,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_two1b,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_two2b,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_two3b,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_three0b,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_three1b,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_three2b,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_three3b,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_env0b,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_env1b,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_env2b,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_env3b,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+
+; The installers, one an effect: the start a deferred row armed, performed
+; at the tick that reads the running source's last row. The hook in the
+; running handler branches here: the word it replaced is written back,
+; the timer is stopped where the start sets timerReset, the count and the
+; select are written, and the vector is aimed at the armed handler, whose
+; next tick reads the new source (SPEC.md 4.8). Every operand is patched
+; at the frame that arms the start.
+                INSTALL ymxr_inst0,$FFFFFA19,$FFFFFA1F,$F0,$FFFFFA07,5,0,0,$134,$DF,$FFFFFA0F
+                INSTALL ymxr_inst1,$FFFFFA1D,$FFFFFA25,$F0,$FFFFFA09,4,0,1,$110,$EF,$FFFFFA11
+                INSTALL ymxr_inst2,$FFFFFA1B,$FFFFFA21,$F0,$FFFFFA07,0,0,0,$120,$FE,$FFFFFA0F
+                INSTALL ymxr_inst3,$FFFFFA1D,$FFFFFA23,$0F,$FFFFFA09,5,4,1,$114,$DF,$FFFFFA11
+                .endif
 ymxr_reach:                             ; past the last handler, which the
                                         ; reach init measures runs to
 ; The offsets the patching writes at, measured off the first handler's
@@ -1855,6 +2168,10 @@ ONE_SIZE        equ     ymxr_one1-ymxr_one0
 \{p}_LOOP2R     equ     \{name}_loop2-\name+2
 \{p}_LOOP2W     equ     \{name}_loop2-\name+6
 \{p}_CELLS      equ     \{name}_cells-\name
+\{p}_LAST       equ     \{name}_loopt-\name
+                .if     YMXR_DEFER
+\{p}_HOOK       equ     \{name}_hook-\name
+                .endif
                 .endm
 
                 TWAT    TW2,ymxr_two0
@@ -1876,6 +2193,77 @@ TWC_RELD        equ     ymxr_env0_reld-ymxr_env0+2
 TWC_RELDA       equ     ymxr_env0_reld-ymxr_env0+4
 TWC_LEFT        equ     ymxr_env0_left-ymxr_env0
 TWC_SIZE        equ     ymxr_env1-ymxr_env0
+
+                .if     YMXR_DEFER
+; A pending start (SPEC.md 4.8): bank 1 at a fixed distance from bank 0;
+; in each handler the word the hook writes over, at the head of the path
+; that ends the source, and the hook it branches to; the square's copy of
+; the eori that moves to its other row; and the installer's operands.
+BANK            equ     ymxr_bank1-ymxr_tick0
+TICK_LAST       equ     ymxr_tick0_mark-ymxr_tick0
+TICK_HOOK       equ     ymxr_tick0_hook-ymxr_tick0
+TICKC_LAST      equ     ymxr_cnt0_mark-ymxr_cnt0
+TICKC_HOOK      equ     ymxr_cnt0_hook-ymxr_cnt0
+SQ_LAST         equ     ymxr_sq0_tog-ymxr_sq0
+SQ_HOOK         equ     ymxr_sq0_hook-ymxr_sq0
+SQ_HMASK        equ     ymxr_sq0_htog-ymxr_sq0+3
+SQ_HPTR         equ     ymxr_sq0_htog-ymxr_sq0+4
+ONE_LAST        equ     ymxr_one0_end-ymxr_one0
+ONE_HOOK        equ     ymxr_one0_hook-ymxr_one0
+INST_BACKW      equ     ymxr_inst0_back-ymxr_inst0+2
+INST_BACKA      equ     ymxr_inst0_back-ymxr_inst0+4
+INST_SKIP       equ     ymxr_inst0_skip-ymxr_inst0
+INST_SKIPW      equ     $6000|(ymxr_inst0_run-ymxr_inst0_skip-2)
+INST_CNT        equ     ymxr_inst0_cnt-ymxr_inst0+3
+INST_VEC        equ     ymxr_inst0_vec-ymxr_inst0+2
+INST_SEL        equ     ymxr_inst0_sel-ymxr_inst0+3   ; a control register for one timer
+INSTS_SEL       equ     ymxr_inst1_sel-ymxr_inst1+3   ; one that two timers share
+                .endif
+
+; Every handler that steps a place keeps it at one offset, which a start
+; reads through the vector for every shape the timer runs; bank 1 lays the
+; handlers out as bank 0 does; and each hook is within the byte a bra.s
+; branches by.
+                .if     (TICKC_PTR<>TICK_PTR)|(TW2_PTR1<>TICK_PTR)|(TW3_PTR1<>TICK_PTR)|(TWC_PTR1<>TICK_PTR)
+                .error  "a handler that steps a place keeps it at another offset"
+                .endif
+                .if     YMXR_DEFER
+                .if     (ymxr_env3b-ymxr_env3)<>BANK
+                .error  "bank 1 is laid out apart from bank 0"
+                .endif
+                .if     (TICK_HOOK-TICK_LAST-2)>127
+                .error  "the general handler's hook is past a bra.s"
+                .endif
+                .if     (TICKC_HOOK-TICKC_LAST-2)>127
+                .error  "the counted handler's hook is past a bra.s"
+                .endif
+                .if     (TW2_HOOK-TW2_LAST-2)>127
+                .error  "the handler of two columns has its hook past a bra.s"
+                .endif
+                .if     (TW3_HOOK-TW3_LAST-2)>127
+                .error  "the handler of three columns has its hook past a bra.s"
+                .endif
+                .if     (TWC_HOOK-TWC_LAST-2)>127
+                .error  "the counted handler of two columns has its hook past a bra.s"
+                .endif
+                .if     (SQ_HOOK-SQ_LAST-2)>127
+                .error  "the square's hook is past a bra.s"
+                .endif
+                .if     (ONE_HOOK-ONE_LAST-2)>127
+                .error  "the one-row handler's hook is past a bra.s"
+                .endif
+; The word a hook writes, out of the macro defined above the handlers.
+                HOOKW   TICK
+                HOOKW   TICKC
+                HOOKW   TW2
+                HOOKW   TW3
+                HOOKW   TWC
+                HOOKW   SQ
+                HOOKW   ONE
+                .if     (ymxr_inst1_skip-ymxr_inst1)<>INST_SKIP
+                .error  "the installers place the skip apart"
+                .endif
+                .endif
 
 ; The start's dispatch: where the branch that leaves the general
 ; handler's path has its displacement, and where the two shapes with
@@ -1901,10 +2289,29 @@ PICK_BOTH       equ     ymxr_tick0_shaped-ymxr_tick0_pick-2
 WIDE_AT         equ     ymxr_tick0_wide-ymxr_tick0_over+1
 WIDE_ONE        equ     ymxr_tick0_one-ymxr_tick0_wide-2
 WIDE_WIDEN      equ     ymxr_tick0_widen-ymxr_tick0_wide-2
-KEEP_AT         equ     ymxr_tick0_keep-ymxr_tick0_over+1
-KEEP_PUT        equ     ymxr_tick0_put-ymxr_tick0_keep-2
-KEEP_WIDE       equ     ymxr_tick0_wput-ymxr_tick0_keep-2
 RESET_DONE      equ     ymxr_tick0_done-ymxr_tick0_reset-2
+; The three branches a tune that defers a start aims at the paths that
+; read a pending one (4.8), each at one offset from an effect's head, and
+; the displacements of both aims.
+                .if     YMXR_DEFER
+RS_AT           equ     ymxr_tick0_rs-ymxr_tick0_over
+RS_DEFER        equ     ymxr_tick0_rck-ymxr_tick0_rs-2
+UNSET_AT        equ     ymxr_tick0_unset-ymxr_tick0_over+2
+UNSET_RATE      equ     ymxr_tick0_rate-ymxr_tick0_unset-2
+UNSET_DEFER     equ     ymxr_tick0_retune-ymxr_tick0_unset-2
+SET_AT          equ     ymxr_tick0_set-ymxr_tick0_over
+SET_STOP        equ     ymxr_tick0_stop-ymxr_tick0_set-2
+SET_DEFER       equ     ymxr_tick0_check-ymxr_tick0_set-2
+                .if     (ymxr_tick3_rs-ymxr_tick3_over)<>RS_AT
+                .error  "effect 3 lays the timer's reset out apart from effect 0"
+                .endif
+                .if     (ymxr_tick3_check-ymxr_tick3_set-2)<>SET_DEFER
+                .error  "effect 3 lays its pending paths out apart from effect 0"
+                .endif
+                .if     (ymxr_tick3_rate-ymxr_tick3_unset-2)<>UNSET_RATE
+                .error  "effect 3 lays its rate out apart from effect 0"
+                .endif
+                .endif
 RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
 
 ; One column of a start of a source of several columns: the register the
@@ -1966,20 +2373,27 @@ ymxr_widereset:
                 lea     WS_FX(a0),a3
                 adda.w  d4,a3                   ; the effect's record
                 cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
-                beq.s   .moves                  ; row 0 and moves no place
-                move.w  d3,d4
-                mulu    #TW2_SIZE,d4
-                lea     ymxr_two0(pc),a5
-                adda.w  d4,a5
+                beq.w   .moves                  ; row 0 and moves no place
+                lea     ymxr_timers(pc),a5
+                lsl.w   #3,d3
+                movea.w (a5,d3.w),a5
+                movea.l (a5),a5                 ; the running handler
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 cmp.b   #2,FX_SHAPE(a3)
-                beq.s   .two
-                move.w  d3,d4
-                mulu    #TW3_SIZE,d4
-                lea     ymxr_three0(pc),a5
-                adda.w  d4,a5
-                WPLACE  FX_FIRST3,TW3_PTR3
+                beq.w   .two
+                cmp.b   #3,FX_SHAPE(a3)
+                beq.s   .three
+                cmp.b   #4,FX_SHAPE(a3)
+                beq.s   .counted
+                WPLACE  FX_FIRST2,TWC_PTR2      ; a counted source of two
+                WPLACE  FX_FIRST,TWC_PTR1       ; columns: both places, and
+                move.w  FX_ROWS+2(a3),TWC_LEFT(a5) ; R rows left
+                bra.s   .reset
+.counted:       WPLACE  FX_FIRST,TICKC_PTR      ; the counted handler: the
+                move.w  FX_ROWS+2(a3),TICKC_LEFT(a5) ; place and R rows left
+                bra.s   .reset
+.three:         WPLACE  FX_FIRST3,TW3_PTR3
                 WPLACE  FX_FIRST2,TW3_PTR2
                 WPLACE  FX_FIRST,TW3_PTR1
                 bra.s   .reset
@@ -2006,7 +2420,12 @@ ymxr_widestart:
                 mulu    #FX_SIZE,d4
                 lea     WS_FX(a0),a3
                 adda.w  d4,a3                   ; the effect's record
-                lea     WS_WIDE(a0),a2
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)           ; a deferred start is armed in
+                beq.s   .rec                    ; the record's mirror (4.8)
+                lea     ARMOFF(a3),a3
+                .endif
+.rec:           lea     WS_WIDE(a0),a2
                 move.l  -8(a2,d1.w),d5          ; the source's loop cell
                 addq.l  #1,d0
                 beq.s   .two                    ; two columns
@@ -2025,61 +2444,31 @@ ymxr_widestart:
                 lea     ymxr_two0(pc),a5
 .handler:       adda.w  d0,a5                   ; this effect's handler
                 move.l  d5,d0                   ; the loop cell
-; The row the place is at, off the running handler where the row does
-; not reset the place (SPEC.md 1.9).
-                moveq   #0,d3
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)           ; a deferred start: the bank and
+                beq.s   .running                ; the row the arming chose (4.8)
+                adda.w  FX_ABANK-ARMOFF(a3),a5
+                move.l  FX_APLACE-ARMOFF(a3),d3
+                bra.w   .at
+                .endif
+; The row the place is at, off the running handler through the vector
+; where the row does not reset the place, modulo R of this source (SPEC.md
+; 1.8.4): every handler that steps a place keeps it at one offset, a
+; square in bit 7 of its immediate, and a source of one row is at row 0.
+.running:       moveq   #0,d3
                 btst    #5,d2
-                .if     YMXR_PCREL
                 bne.w   .at
-                .else
-                bne.s   .at
-                .endif
+                lea     ymxr_timers(pc),a2
+                move.w  d6,d5
+                lsl.w   #3,d5
+                movea.w (a2,d5.w),a2
+                movea.l (a2),a2                 ; the running handler
                 move.b  FX_SHAPE(a3),d5
-                beq.s   .running
+                beq.s   .steps
                 bmi.s   .square
-                cmp.b   #1,d5                   ; a source of one row at row 0
-                .if     YMXR_PCREL
+                cmp.b   #1,d5
                 beq.w   .at
-                .else
-                beq.s   .at
-                .endif
-                cmp.b   #4,d5
-                beq.s   .wascounted
-                move.w  d6,d5
-                mulu    #TW2_SIZE,d5
-                lea     ymxr_two0(pc),a2
-                cmp.b   #2,FX_SHAPE(a3)
-                beq.s   .first
-                move.w  d6,d5
-                mulu    #TW3_SIZE,d5
-                lea     ymxr_three0(pc),a2
-.first:         adda.w  d5,a2                   ; the running handler's first
-                .if     YMXR_PCREL
-                move.w  TW2_PTR1(a2),d3         ; column, which both shapes
-                ext.l   d3                      ; place at one offset
-                add.l   a2,d3
-                add.l   #TW2_PTR1,d3
-                .else
-                move.l  TW2_PTR1(a2),d3
-                .endif
-                bra.s   .rows
-.wascounted:    move.w  d6,d5
-                mulu    #TICKC_SIZE,d5
-                lea     ymxr_cnt0(pc),a2
-                adda.w  d5,a2
-                .if     YMXR_PCREL
-                move.w  TICKC_PTR(a2),d3
-                ext.l   d3
-                add.l   a2,d3
-                add.l   #TICKC_PTR,d3
-                .else
-                move.l  TICKC_PTR(a2),d3
-                .endif
-                bra.s   .rows
-.running:       move.w  d6,d5
-                mulu    #TICK_SIZE,d5
-                lea     ymxr_tick0(pc),a2
-                adda.w  d5,a2
+.steps:
                 .if     YMXR_PCREL
                 move.w  TICK_PTR(a2),d3
                 ext.l   d3
@@ -2088,18 +2477,19 @@ ymxr_widestart:
                 .else
                 move.l  TICK_PTR(a2),d3
                 .endif
-.rows:          sub.l   FX_FIRST(a3),d3         ; the place against the place at
-                bra.s   .at                     ; row 0
-.square:        move.w  d6,d5
-                mulu    #SQ_SIZE,d5
-                lea     ymxr_sq0(pc),a2
-                adda.w  d5,a2
-                tst.b   SQ_VAL(a2)              ; the row a square is at, in
-                bpl.s   .at                     ; bit 7 of its immediate
+                sub.l   FX_FIRST(a3),d3         ; the place against the place at
+                bra.s   .mod                    ; row 0
+.square:        tst.b   SQ_VAL(a2)
+                bpl.w   .at
                 moveq   #1,d3
+.mod:           move.l  d4,-(sp)
+                move.l  DT_ROWS-DT_PAYLOAD(a4),d4
+                bsr.w   ymxr_rem
+                move.l  (sp)+,d4
 ; A register, a place and a loop cell a column, out of the target's row
-; of the map.
-.at:            cmp.w   #1,d4                   ; a source whose column fills
+; of the map; and R, which a pending start and a place's reset read.
+.at:            move.l  DT_ROWS-DT_PAYLOAD(a4),FX_ROWS(a3)
+                cmp.w   #1,d4                   ; a source whose column fills
                 beq.w   .countedaim             ; its byte
                 cmp.w   #4,d4                   ; a counted source of two
                 beq.w   .envaim                 ; columns
@@ -2217,6 +2607,330 @@ ymxr_widestart:
                 move.l  (sp)+,d6
                 moveq   #1,d0
                 rts
+
+; A row number modulo R (SPEC.md 1.8.4): d3 the number, d4 R; d5
+; scratch. A number below R is one compare. At R or above, one divu: its
+; quotient fits a word where the number is below R times 65,536, which
+; every place of a core reading a row through the program counter is,
+; and where divu overflows, a source of 65,536 rows or more, two divu, the
+; high word over R and then its remainder above the low word; where R
+; itself is past a word, subtractions of R shifted.
+ymxr_rem:       cmp.l   d4,d3
+                bcs.s   .in
+                cmp.l   #$FFFF,d4
+                bhi.s   .long
+                move.l  d3,d5
+                divu    d4,d5
+                bvc.s   .one
+                move.l  d3,d5                   ; the quotient past a word
+                clr.w   d5
+                swap    d5
+                divu    d4,d5
+                move.w  d3,d5
+                divu    d4,d5
+.one:           clr.w   d5
+                swap    d5                      ; the remainder
+                move.l  d5,d3
+.in:            rts
+.long:          move.l  d4,d5                   ; R doubled while at or below
+.up:            cmp.l   d3,d5                   ; the number
+                bhi.s   .down
+                add.l   d5,d5
+                bra.s   .up
+.down:          cmp.l   d4,d5                   ; then halved back to R, and
+                bcs.s   .in                     ; subtracted where it fits
+                cmp.l   d5,d3
+                bcs.s   .half
+                sub.l   d5,d3
+.half:          lsr.l   #1,d5
+                bra.s   .down
+
+                .if     YMXR_DEFER
+; A switch the installer has made (SPEC.md 4.8): the armed start's shape,
+; places at row 0 and row count become the record's, and no start is
+; pending. a3 the record.
+ymxr_take:      move.b  FX_SHAPE+ARMOFF(a3),FX_SHAPE(a3)
+                move.l  FX_FIRST+ARMOFF(a3),FX_FIRST(a3)
+                move.l  FX_FIRST2+ARMOFF(a3),FX_FIRST2(a3)
+                move.l  FX_FIRST3+ARMOFF(a3),FX_FIRST3(a3)
+                move.l  FX_ROWS+ARMOFF(a3),FX_ROWS(a3)
+                clr.b   FX_PENDING(a3)
+                rts
+
+; A row that acts on an effect with a start pending (SPEC.md 4.8), at
+; level 7, so the tick that would perform it is either before the test or
+; after the row: where the vector names the armed handler, the switch has
+; run and the record is the armed start's; otherwise, where d5 is 1, the
+; start is dropped and the hooked word written back. d4 the effect. Z
+; where no start is pending after it. a3 the record; a5 scratch.
+ymxr_pend:      movem.l d4/a6,-(sp)
+                lea     ymxr_timers(pc),a6
+                lsl.w   #3,d4
+                adda.w  d4,a6                   ; the effect's timer
+                lsr.w   #3,d4
+                mulu    #FX_SIZE,d4
+                lea     WS_FX(a0),a3
+                adda.w  d4,a3                   ; its record
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                movea.w (a6),a5
+                movea.l (a5),a5                 ; the handler the vector names
+                cmpa.l  FX_ARMED(a3),a5
+                bne.s   .still
+                bsr.s   ymxr_take
+                bra.s   .done
+.still:         tst.w   d5
+                beq.s   .done                   ; left pending
+                movea.l FX_HOOK(a3),a5          ; dropped
+                move.w  FX_HOOKW(a3),(a5)
+                clr.b   FX_PENDING(a3)
+.done:          move.w  (sp)+,sr
+                movem.l (sp)+,d4/a6
+                tst.b   FX_PENDING(a3)
+                rts
+
+; A deferred start on a running timer, armed (SPEC.md 4.8): the handler of
+; its source's shape, in the bank the vector does not point into, patched
+; as a start patches it, at the last row of the running source modulo R
+; of this one; its count, select, timer reset and handler into the
+; effect's installer; and one word of the running handler, the head of the
+; path that ends its source, written as a bra.s to its hook. A start
+; pending already is replaced: its hook stays, and the arming runs at
+; level 7, since the installer it patches may run. d1 the count column,
+; d2 the control byte, d3 the source, d4 the effect. Z where the start is
+; pending; NZ where the timer is stopped, with d1 the source, which the
+; frame then starts at once. d0, d3 to d5 and a3 to a5 are clobbered.
+ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
+                move.w  sr,-(sp)
+                move.w  d4,d6                   ; the effect
+                lea     ymxr_timers(pc),a6
+                lsl.w   #3,d4
+                adda.w  d4,a6                   ; its timer
+                move.w  d6,d4
+                mulu    #FX_SIZE,d4
+                lea     WS_FX(a0),a3
+                adda.w  d4,a3                   ; its record
+                tst.b   FX_PENDING(a3)
+                beq.s   .first
+                ori.w   #$0700,sr               ; a start pending: replaced,
+                movea.w (a6),a5                 ; unless the tick performed it
+                movea.l (a5),a5                 ; since the frame read it
+                cmpa.l  FX_ARMED(a3),a5
+                bne.s   .live
+                bsr.w   ymxr_take
+.first:         lea     ymxr_park(pc),a4        ; no source connected before
+                cmpa.l  FX_FIRST(a3),a4         ; the first start
+                beq.w   .stopped
+                movea.w 2(a6),a4                ; the select bits of the
+                move.b  (a4),d5                 ; timer's control register
+                and.b   6(a6),d5
+                beq.w   .stopped
+; The rate the start writes at the switch, kept as a frame keeps it (4.3):
+; the count column, or the kept count where it is 0 and bit 4 is clear;
+; and the select. The target its source runs on is the mirror's.
+.live:          tst.b   d1
+                bne.s   .cnt
+                btst    #4,d2
+                bne.s   .cnt
+                move.b  FX_COUNT(a3),d1
+.cnt:           move.b  d1,FX_COUNT(a3)
+                move.b  d1,d7                   ; the count
+                move.b  d2,d5
+                and.b   #7,d5
+                move.b  d5,FX_SELECT(a3)
+                move.b  FX_TARGET(a3),FX_TARGET+ARMOFF(a3)
+; The source, and the row it starts at: row 0 with bit 5, and otherwise
+; the running source's last row, R - 1 of it, modulo R of this one.
+                move.w  4(sp),d3
+                lsl.w   #3,d3
+                movea.l WS_SOURCES-8(a0,d3.w),a4    ; its first row
+                move.l  WS_SOURCES-4(a0,d3.w),d0    ; its cell
+                move.w  d3,d1                   ; its entry, for widestart
+                moveq   #0,d3
+                btst    #5,d2
+                bne.s   .placed
+                move.b  FX_SHAPE(a3),d5         ; R of a running source of
+                cmp.b   #2,d5                   ; several columns, or of a
+                bcs.s   .header                 ; counted one, in the record;
+                cmp.b   #5,d5                   ; of any other, in the header
+                bhi.s   .header                 ; before its first row
+                move.l  FX_ROWS(a3),d3
+                bra.s   .last
+.header:        movea.l FX_FIRST(a3),a5
+                move.l  DT_ROWS-DT_PAYLOAD(a5),d3
+.last:          subq.l  #1,d3
+                move.l  DT_ROWS-DT_PAYLOAD(a4),d4
+                bsr.w   ymxr_rem
+.placed:        move.l  d3,FX_APLACE(a3)
+; The bank the vector does not point into.
+                moveq   #0,d4
+                movea.w (a6),a5
+                movea.l (a5),a5                 ; the running handler
+                lea     ymxr_bank1(pc),a2
+                cmpa.l  a2,a5
+                bcc.s   .bank
+                move.w  #BANK,d4
+.bank:          move.w  d4,FX_ABANK(a3)
+                tst.l   d0
+                bmi.s   .shaped
+; the general handler: the target, the place and the loop cell
+                move.w  d6,d5
+                mulu    #TICK_SIZE,d5
+                lea     ymxr_tick0(pc),a5
+                adda.w  d5,a5
+                adda.w  d4,a5
+                move.b  FX_TARGET(a3),TICK_SEL(a5)
+                add.l   a4,d3                   ; the row the place is at
+                .if     YMXR_PCREL
+                lea     TICK_PTR(a5),a2
+                sub.l   a2,d3
+                move.w  d3,TICK_PTR(a5)
+                tst.l   d0                      ; 0: the source plays once
+                beq.s   .once
+                sub.l   a2,d0
+.once:          move.w  d0,TICK_CELL(a5)
+                .else
+                move.l  d3,TICK_PTR(a5)
+                move.l  d0,TICK_CELL(a5)
+                .endif
+                clr.b   FX_SHAPE+ARMOFF(a3)
+                bra.s   .single
+.shaped:        addq.l  #1,d0
+                bne.s   .notsq
+; a square: its two rows, and the row the place is at
+                move.w  d6,d5
+                mulu    #SQ_SIZE,d5
+                lea     ymxr_sq0(pc),a5
+                adda.w  d5,a5
+                adda.w  d4,a5
+                move.b  FX_TARGET(a3),SQ_SEL(a5)
+                move.b  (a4),d5
+                move.b  1(a4),d0
+                eor.b   d0,d5
+                move.b  d5,SQ_MASK(a5)
+                move.b  (a4,d3.w),SQ_VAL(a5)
+                st      FX_SHAPE+ARMOFF(a3)
+                bra.s   .single
+.notsq:         addq.l  #1,d0
+                bne.s   .wide
+; a source of one row
+                move.w  d6,d5
+                mulu    #ONE_SIZE,d5
+                lea     ymxr_one0(pc),a5
+                adda.w  d5,a5
+                adda.w  d4,a5
+                move.b  FX_TARGET(a3),ONE_SEL(a5)
+                move.b  (a4),ONE_VAL(a5)
+                move.b  #1,FX_SHAPE+ARMOFF(a3)
+.single:        move.l  a4,FX_FIRST+ARMOFF(a3)
+                move.l  DT_ROWS-DT_PAYLOAD(a4),FX_ROWS+ARMOFF(a3)
+                bra.s   .armed
+; a source of several columns, or counted: widestart into the mirror, at
+; the bank and the row above
+.wide:          subq.l  #1,d0                   ; the tag as a start passes it
+                move.w  d6,d4
+                st      WS_ARMING(a0)
+                bsr.w   ymxr_widestart
+                sf      WS_ARMING(a0)
+                lea     -ARMOFF(a3),a3          ; the record, past its mirror
+; the installer: the count, the handler, the select and the timer reset
+.armed:         move.l  a5,FX_ARMED(a3)
+                lea     ymxr_timers(pc),a4
+                adda.w  4(a6),a4                ; the effect's installer
+                move.b  d7,INST_CNT(a4)
+                move.l  a5,INST_VEC(a4)
+                move.b  FX_SELECT(a3),d5
+                move.b  7(a6),d0
+                and.b   #$7F,d0
+                lsl.b   d0,d5                   ; at the timer's bits
+                tst.b   7(a6)
+                bmi.s   .shares
+                move.b  d5,INST_SEL(a4)
+                bra.s   .sel
+.shares:        move.b  d5,INSTS_SEL(a4)
+.sel:           move.w  #INST_SKIPW,INST_SKIP(a4)
+                btst    #6,d2
+                beq.s   .reset
+                move.w  #$4E71,INST_SKIP(a4)    ; a nop: the stop runs
+.reset:         tst.b   FX_PENDING(a3)
+                bne.w   .hooked                 ; replaced: the hook stays
+; the hook: the word at the head of the running handler's path that ends
+; its source, by the shape it runs, and the branch to its stub
+                movea.w (a6),a5
+                movea.l (a5),a5                 ; the running handler
+                move.b  FX_SHAPE(a3),d5
+                bne.s   .h1
+                lea     TICK_LAST(a5),a2
+                move.w  #TICK_HOOKW,d4
+                bra.s   .hook
+.h1:            bpl.s   .h2
+                move.b  SQ_MASK(a5),SQ_HMASK(a5)    ; the square's other row
+                lea     SQ_LAST(a5),a2
+                move.w  #SQ_HOOKW,d4
+                bra.s   .hook
+.h2:            cmp.b   #1,d5
+                bne.s   .h3
+                lea     ONE_LAST(a5),a2
+                move.w  #ONE_HOOKW,d4
+                bra.s   .hook
+.h3:            cmp.b   #2,d5
+                bne.s   .h4
+                lea     TW2_LAST(a5),a2
+                move.w  #TW2_HOOKW,d4
+                bra.s   .hook
+.h4:            cmp.b   #3,d5
+                bne.s   .h5
+                lea     TW3_LAST(a5),a2
+                move.w  #TW3_HOOKW,d4
+                bra.s   .hook
+.h5:            cmp.b   #4,d5
+                bne.s   .h6
+                lea     TICKC_LAST(a5),a2
+                move.w  #TICKC_HOOKW,d4
+                bra.s   .hook
+.h6:            lea     TWC_LAST(a5),a2
+                move.w  #TWC_HOOKW,d4
+.hook:          move.w  (a2),FX_HOOKW(a3)       ; the word as it is, written
+                move.w  (a2),INST_BACKW(a4)     ; back at the switch or the
+                move.l  a2,INST_BACKA(a4)       ; drop
+                move.l  a2,FX_HOOK(a3)
+                ori.w   #$0700,sr               ; the timer still running, and
+                movea.w 2(a6),a5                ; the hook in place: one test
+                move.b  (a5),d5                 ; and one word against a tick
+                and.b   6(a6),d5
+                beq.s   .stopped
+                move.w  d4,(a2)
+                st      FX_PENDING(a3)
+.hooked:        move.w  (sp)+,sr
+                movem.l (sp)+,d3/d6-d7/a6
+                lea     YM_SELECT.w,a2
+                moveq   #0,d0
+                rts
+.stopped:       move.w  (sp)+,sr
+                movem.l (sp)+,d3/d6-d7/a6
+                move.w  d3,d1                   ; the source
+                lea     YM_SELECT.w,a2
+                moveq   #1,d0
+                rts
+                .endif
+
+; Each effect's timer, as a start reads it: its vector, by which a start
+; finds the running handler, and where deferred starts are assembled in,
+; its control register, its installer from this table, the select bits of
+; that register, and the shift of the select into them, bit 7 set where
+; two timers share the register.
+                .macro  TIMERAT vector,ctrl,inst,mask,shift
+                .if     YMXR_DEFER
+                dc.w    \vector,\ctrl,\inst-ymxr_timers
+                .else
+                dc.w    \vector,\ctrl,0
+                .endif
+                dc.b    \mask,\shift
+                .endm
+ymxr_timers:    TIMERAT $134,$FA19,ymxr_inst0,$07,$00
+                TIMERAT $110,$FA1D,ymxr_inst1,$07,$80
+                TIMERAT $120,$FA1B,ymxr_inst2,$07,$00
+                TIMERAT $114,$FA1D,ymxr_inst3,$70,$84
 
 ; The targets that write several registers (SPEC.md 2.1): a register and
 ; the column that writes it, one slot a column and eight bytes a target,

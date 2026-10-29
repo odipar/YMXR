@@ -174,7 +174,7 @@ final class Ym {
                                 Tunes.setting(Chip.register(slot[i].target())),
                                 source(made, sources, number[i]),
                                 new Timing(Chip.prescaler(Columns.PRESCALER[slot[i].select()]),
-                                        slot[i].count(), stopped, !unmoved)));
+                                        slot[i].count(), stopped, !unmoved), false));
                         running[i] = slot[i];
                         runningNumber[i] = number[i];
                         lastKind[i] = slot[i].kind();

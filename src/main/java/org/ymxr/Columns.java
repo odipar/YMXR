@@ -23,6 +23,10 @@ final class Columns {
 
     static final int TIMER_RESET = 0x40;
     static final int PLACE_RESET = 0x20;
+    /** Bit 3 of the control column, a deferred start (SPEC.md 1.9, 4.8). */
+    static final int DEFERRED = 0x08;
+    /** Bit 4 of the effects used: a row defers a start (SPEC.md 3.3). */
+    static final int DEFERS = 0x10;
 
     /** Bit 4 of a control column: the count column beside it is 0, and
      *  that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9). */

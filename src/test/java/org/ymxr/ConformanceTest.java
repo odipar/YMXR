@@ -118,6 +118,11 @@ final class ConformanceTest {
                     + " plays once and stops its timer at its count, a start that changes"
                     + " the source on a running timer, and the envelope shape set from"
                     + " column 13 while the period ticks"),
+            Fixture.built("deferred", "`BuiltTunes.deferred`", BuiltTunes::deferred,
+                    "deferred starts, bit 3 of the control column, on Timer A and on"
+                    + " Timer C: a fall after a loop, a source with the place at its number,"
+                    + " bit 5 at 0, a deferred start a stop drops, and one on a stopped"
+                    + " timer"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));

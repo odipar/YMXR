@@ -80,8 +80,8 @@ func Trace(tune ymxr.File, calls int) []byte {
 				out.WriteByte(',')
 			}
 			fmt.Fprintf(&out, "\"%d\":{\"target\":%d,\"source\":%d,\"select\":%d,"+
-				"\"count\":%d,\"timer\":%t,\"place\":%t}", i, e.Target, e.Source,
-				e.Select, e.Count, e.Timer, e.Place)
+				"\"count\":%d,\"timer\":%t,\"place\":%t,\"deferred\":%t}", i, e.Target,
+				e.Source, e.Select, e.Count, e.Timer, e.Place, e.Deferred)
 			first = false
 		}
 		out.WriteString("}}\n")

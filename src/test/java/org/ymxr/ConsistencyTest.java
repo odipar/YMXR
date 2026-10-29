@@ -47,7 +47,9 @@ final class ConsistencyTest {
 
     /** Every document of the repository, which every check here reads.
      *  dist/ is the output of release/publish.sh, which git ignores: the
-     *  copy of wasm/README.md there links what the zip lacks. */
+     *  copy of wasm/README.md there links what the zip lacks. Under
+     *  .claude/worktrees/, which git ignores too, are checkouts of other
+     *  branches. */
     private static final List<Path> DOCUMENTS = documents();
 
     private static List<Path> documents() {
@@ -56,6 +58,7 @@ final class ConsistencyTest {
                     .filter(at -> at.toString().endsWith(".md"))
                     .filter(at -> !at.toString().contains("/target/"))
                     .filter(at -> !at.toString().startsWith("./dist/"))
+                    .filter(at -> !at.toString().startsWith("./.claude/worktrees/"))
                     .filter(at -> !at.toString().contains("/.git"))
                     .sorted()
                     .toList();
@@ -973,13 +976,15 @@ final class ConsistencyTest {
     @Test
     void theWritersGuideReadsTheFormatAndTheKit() throws IOException {
         String guide = read(WRITING);
-        Matcher reads = wrapped("a version other than (\\d), versions (\\d) to (\\d) among them,"
-                + " whose table is DTX2").matcher(guide);
+        Matcher reads = wrapped("a version other than (\\d) and (\\d), versions (\\d) to (\\d)"
+                + " among them, whose table is DTX2").matcher(guide);
         assertTrue(reads.find(), "writing.md names no version a reader reads");
-        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(1)), "the version read");
-        assertEquals(Tune.VERSION_DTX2, Integer.parseInt(reads.group(2)),
+        assertEquals(Tune.VERSION_BEFORE, Integer.parseInt(reads.group(1)),
+                "the version before the one written");
+        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(2)), "the version read");
+        assertEquals(Tune.VERSION_DTX2, Integer.parseInt(reads.group(3)),
                 "the first version of a DTX2 table");
-        assertEquals(Tune.VERSION_DTX2_LAST, Integer.parseInt(reads.group(3)),
+        assertEquals(Tune.VERSION_DTX2_LAST, Integer.parseInt(reads.group(4)),
                 "the last version of a DTX2 table");
         Matcher writes = wrapped("A writer writes version (\\d) \\(SPEC\\.md 3\\.3\\.5\\)")
                 .matcher(guide);

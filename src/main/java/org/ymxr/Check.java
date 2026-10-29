@@ -206,84 +206,30 @@ final class Check {
     }
 
     /**
-     * The starts of a tune file that leave bit 5 of the control column at
-     * 0 outside rule 3(a) of SPEC.md 6, a line each: no source has started
-     * on the effect, or the source last started on it in frame order,
-     * through the wrap (4.5), ran on another target or had another row
-     * count, where the place can be a row the source started lacks (8.4).
-     * Two passes read every start, the table's rows and the rows from the
-     * repeat row after the wrap, since every later pass reads as the
-     * second does. A start that names a source past the file's is a line
-     * too, the rows of that source being unknown.
+     * The starts of a tune file that name a source past the file's, a line
+     * each, the rows of that source being unknown. A start that leaves bit
+     * 5 of the control column at 0 leaves the place at its number modulo
+     * the row count of the source it starts (SPEC.md 1.8.4), so every
+     * other start reads a row of its source.
      */
     static List<String> places(TuneFile file) {
         Table table = file.table();
-        int rows = table.rows();
-        int repeat = table.repeat();
-        record Said(int row, int effect, String line) {
-        }
-        List<Said> said = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            byte[] targets = table.column(Columns.EFFECT + 4 * i);
-            byte[] sources = table.column(Columns.EFFECT + 4 * i + 1);
-            byte[] controls = table.column(Columns.EFFECT + 4 * i + 2);
-            // the kept target is register 0 before a row sets one (4.1)
-            int target = 0;
-            int lastTarget = -1;
-            int lastRows = -1;
-            for (int pass = 0; pass < (repeat < rows ? 2 : 1); pass++) {
-                // after the wrap the first start follows the table's last
-                // start, and every later one the start it follows in the
-                // first pass, whose line the first pass wrote
-                String wrapped = pass == 0 ? "" : " after the wrap";
-                for (int r = pass == 0 ? 0 : repeat; r < rows; r++) {
-                    if ((targets[r] & 0x80) != 0) {
-                        target = targets[r] & 0x7F;
-                    }
-                    if ((sources[r] & 0x80) == 0 || (sources[r] & 0x7F) == 0) {
-                        continue;
-                    }
-                    int source = sources[r] & 0x7F;
-                    String start = r + ": effect " + i + " starts source " + source;
-                    if (source > file.sources().size()) {
-                        String line = start + ", and the file has "
-                                + Report.count(file.sources().size(), "source", "sources");
-                        if (said.stream().noneMatch(one -> one.line().equals(line))) {
-                            said.add(new Said(r, i, line));
-                        }
-                        lastRows = -1;
-                        wrapped = "";
-                        continue;
-                    }
-                    int count = file.sources().get(source - 1).rows();
-                    boolean reset = (controls[r] & 0xA0) == 0xA0;
-                    String why = null;
-                    if (reset) {
-                        // bit 5 set: the place is row 0, inside the source
-                    } else if (lastRows < 0) {
-                        why = "and no source has started on the effect";
-                    } else if (lastTarget != target) {
-                        why = "and" + wrapped + " the source last started ran on target "
-                                + lastTarget;
-                    } else if (lastRows != count) {
-                        why = "and" + wrapped + " the source last started had "
-                                + Report.count(lastRows, "row", "rows");
-                    }
-                    if (why != null) {
-                        String line = start + " of " + Report.count(count, "row", "rows")
-                                + " on target " + target + " with bit 5 at 0, " + why;
-                        if (said.stream().noneMatch(one -> one.line().equals(line))) {
-                            said.add(new Said(r, i, line));
-                        }
-                    }
-                    lastTarget = target;
-                    lastRows = count;
-                    wrapped = "";
+        List<String> said = new ArrayList<>();
+        for (int r = 0; r < table.rows(); r++) {
+            for (int i = 0; i < 4; i++) {
+                int source = table.column(Columns.EFFECT + 4 * i + 1)[r] & 0xFF;
+                if ((source & 0x80) == 0 || (source & 0x7F) == 0) {
+                    continue;
+                }
+                source &= 0x7F;
+                if (source > file.sources().size()) {
+                    said.add(r + ": effect " + i + " starts source " + source
+                            + ", and the file has " + Report.count(file.sources().size(),
+                            "source", "sources"));
                 }
             }
         }
-        said.sort(java.util.Comparator.comparingInt(Said::row).thenComparingInt(Said::effect));
-        return said.stream().map(Said::line).toList();
+        return said;
     }
 
     /** The file at {@code path}, checked at the tool's flags; a dump the

@@ -147,7 +147,7 @@ final class Ymxs {
     static final String[] PACKING = {"-k", "-m", "-copies"};
 
     /** The tags {@code ymxs-to-sndh} reads, the switches that select the
-     *  core among the eight (BINARIES.md 2.1), and the clock asked for. */
+     *  core among the sixteen (BINARIES.md 2.1), and the clock asked for. */
     static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel", "-abs",
         "-vbl", "-tc"};
 

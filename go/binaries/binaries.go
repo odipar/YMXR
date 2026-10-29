@@ -3,12 +3,13 @@
 // file's entries, and the program stub, which goes in front of an SNDH
 // file.
 //
-// Three switches of the player's are in the core, the raster monitor,
-// the lean tick and the row read through an absolute address, and each of
-// their eight settings is a separate core, so a file that requests two
-// uses the core that is both. A tick reads its row through the program
-// counter where YMXR_PCREL is at 1, its value unasked
-// (doc/performance.md).
+// Four switches of the player's are in the core, the raster monitor, the
+// lean tick, the row read through an absolute address and the deferred
+// start, and each of their sixteen settings is a separate core, so a file
+// that requests two uses the core that is both. A tick reads its row
+// through the program counter where YMXR_PCREL is at 1, its value unasked,
+// and a file uses a core with the deferred start in where a subtune defers
+// one (doc/performance.md).
 //
 // The files are build output. The Maven build writes them into data/,
 // which go:embed reads only inside its module. A tree built without
@@ -30,56 +31,54 @@ import (
 //go:embed data
 var data embed.FS
 
-// The nine, by the file each is carried as. The four with abs in the name
-// are the four above with the player's YMXR_PCREL=0: a tick reads its row
-// through an absolute address rather than a displacement from the
-// instruction that reads it (doc/performance.md).
+// The core with no switch set, and the stub, by the file each is carried
+// as.
 const (
-	Core                = "YMXR_sndh.bin"
-	Monitor             = "YMXR_sndh-perf.bin"
-	Lean                = "YMXR_sndh-lean.bin"
-	MonitorLean         = "YMXR_sndh-perf-lean.bin"
-	Absolute            = "YMXR_sndh-abs.bin"
-	MonitorAbsolute     = "YMXR_sndh-perf-abs.bin"
-	LeanAbsolute        = "YMXR_sndh-lean-abs.bin"
-	MonitorLeanAbsolute = "YMXR_sndh-perf-lean-abs.bin"
-	Stub                = "YMXR_prg.bin"
+	Core = "YMXR_sndh.bin"
+	Stub = "YMXR_prg.bin"
 )
 
-// All is the nine, in the order the build writes them.
-func All() []string {
-	return []string{Core, Monitor, Lean, MonitorLean,
-		Absolute, MonitorAbsolute, LeanAbsolute, MonitorLeanAbsolute, Stub}
+// all is the seventeen by name, so release/publish.sh reads the list off
+// this file.
+var all = []string{
+	Core, "YMXR_sndh-perf.bin", "YMXR_sndh-lean.bin", "YMXR_sndh-perf-lean.bin",
+	"YMXR_sndh-abs.bin", "YMXR_sndh-perf-abs.bin", "YMXR_sndh-lean-abs.bin",
+	"YMXR_sndh-perf-lean-abs.bin",
+	"YMXR_sndh-defer.bin", "YMXR_sndh-perf-defer.bin", "YMXR_sndh-lean-defer.bin",
+	"YMXR_sndh-perf-lean-defer.bin", "YMXR_sndh-abs-defer.bin",
+	"YMXR_sndh-perf-abs-defer.bin", "YMXR_sndh-lean-abs-defer.bin",
+	"YMXR_sndh-perf-lean-abs-defer.bin",
+	Stub,
 }
 
-// Named is the core of the three switches: the raster monitor in where
-// monitor, ticks that neither drop the interrupt level nor write their end
-// of interrupt where lean, and a row read through the program counter
-// where pcrel, which every core but the four named for an absolute
-// address does.
-func Named(monitor, lean, pcrel bool) string {
-	if pcrel {
-		if monitor {
-			if lean {
-				return MonitorLean
-			}
-			return Monitor
-		}
-		if lean {
-			return Lean
-		}
-		return Core
-	}
+// All is the seventeen, in the order the build writes them: the sixteen
+// cores, then the stub.
+func All() []string {
+	return append([]string(nil), all...)
+}
+
+// Named is the core of the four switches (doc/performance.md), each a
+// suffix of its name in this order: -perf where monitor, the raster
+// monitor in; -lean where lean, ticks that neither drop the interrupt
+// level nor write their end of interrupt; -abs where pcrel is false, a row
+// read through an absolute address, where every other core reads it
+// through the program counter; and -defer where deferred, the deferred
+// start in.
+func Named(monitor, lean, pcrel, deferred bool) string {
+	name := "YMXR_sndh"
 	if monitor {
-		if lean {
-			return MonitorLeanAbsolute
-		}
-		return MonitorAbsolute
+		name += "-perf"
 	}
 	if lean {
-		return LeanAbsolute
+		name += "-lean"
 	}
-	return Absolute
+	if !pcrel {
+		name += "-abs"
+	}
+	if deferred {
+		name += "-defer"
+	}
+	return name + ".bin"
 }
 
 // Read is a binary as this executable contains it, or as YMXR_68K names a

@@ -7,12 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -31,38 +35,56 @@ final class PlayerTest {
     private static final Path BINARIES = Path.of("doc/BINARIES.md");
 
     /** Every {@code NAME equ VALUE} in the player, decimal or hex, as it
-     *  is assembled: {@code YMXR_PCREL} is at 1 unless a host defines
-     *  it, so the else branch of a block that tests it is left out
-     *  (68k/YMXR.S). */
+     *  is assembled without the deferred start. */
     static Map<String, Integer> equates() throws IOException {
+        return equates(false);
+    }
+
+    /**
+     * Every {@code NAME equ VALUE} in the player, decimal or hex, as it is
+     * assembled with {@code YMXR_DEFER} at 1 where {@code defer} and at 0
+     * where not: {@code YMXR_PCREL} is at 1 unless a host defines it, so
+     * the branch of a block on either switch that the assembly skips is
+     * left out (68k/YMXR.S). A block on another condition is read on both
+     * branches.
+     */
+    static Map<String, Integer> equates(boolean defer) throws IOException {
+        Map<String, Integer> switches = Map.of("YMXR_PCREL", 1, "YMXR_DEFER", defer ? 1 : 0);
         Map<String, Integer> out = new HashMap<>();
         Pattern equate = Pattern.compile("^(\\w+)\\s+equ\\s+(\\$?[0-9A-Fa-f]+)");
-        int depth = 0;
-        int pcrel = 0;
-        boolean left = false;
+        Pattern on = Pattern.compile("^\\.if\\s+(\\w+)(?:=(\\d+))?\\s*(?:;.*)?$");
+        // a block a switch decides: whether the assembly reads its first
+        // branch, empty for a block on another condition
+        Deque<Optional<Boolean>> blocks = new ArrayDeque<>();
+        Deque<Boolean> second = new ArrayDeque<>();
         for (String line : Files.readString(PLAYER).split("\n")) {
             String said = line.trim();
             if (said.startsWith(".if")) {
-                depth++;
-                if (pcrel == 0 && said.matches("\\.if\\s+YMXR_PCREL")) {
-                    pcrel = depth;
-                }
+                Matcher m = on.matcher(said);
+                Integer value = m.matches() ? switches.get(m.group(1)) : null;
+                blocks.push(value == null ? Optional.empty() : Optional.of(m.group(2) == null
+                        ? value != 0 : value == Integer.parseInt(m.group(2))));
+                second.push(false);
                 continue;
             }
             if (said.startsWith(".else")) {
-                left = left || depth == pcrel;
+                second.pop();
+                second.push(true);
                 continue;
             }
             if (said.startsWith(".endif")) {
-                if (depth == pcrel) {
-                    pcrel = 0;
-                    left = false;
-                }
-                depth--;
+                blocks.pop();
+                second.pop();
                 continue;
             }
+            boolean read = true;
+            Iterator<Boolean> branch = second.iterator();
+            for (Optional<Boolean> block : blocks) {
+                boolean other = branch.next();
+                read &= block.isEmpty() || block.get() != other;
+            }
             Matcher m = equate.matcher(line);
-            if (!left && m.find()) {
+            if (read && m.find()) {
                 String value = m.group(2);
                 out.put(m.group(1), value.startsWith("$")
                         ? (int) Long.parseLong(value.substring(1), 16)
@@ -186,11 +208,12 @@ final class PlayerTest {
         assertEquals(Sndh.CORE_STATE_AT, row(said, "where the core's state byte").getValue());
         assertEquals(Sndh.CORE_TABLE_AT, row(said, "the subtune table").getValue());
         assertEquals(Sndh.CORE_WORK_AT, row(said, "the workspace").getValue());
-        Map<String, Integer> bits = flags(binaries, "2. The SNDH core", 3);
+        Map<String, Integer> bits = flags(binaries, "2. The SNDH core", 4);
         assertEquals(Sndh.CORE_MONITOR, 1 << row(bits, "the player's raster monitor").getValue());
         assertEquals(Sndh.CORE_LEAN, 1 << row(bits, "the lean tick").getValue());
         assertEquals(Sndh.CORE_PCREL,
                 1 << row(bits, "the row read through the program counter").getValue());
+        assertEquals(Sndh.CORE_DEFER, 1 << row(bits, "the deferred start").getValue());
     }
 
     /**
@@ -287,7 +310,7 @@ final class PlayerTest {
     void theTuneFileIsLaidOutAsTheSpecificationDefines() {
         // SPEC.md 3.3: the version, where the DTX3 table's offset is
         // and where the source index begins
-        assertEquals(0x0007, Tune.VERSION);
+        assertEquals(0x0008, Tune.VERSION);
         assertEquals(12, Tune.TABLE_AT);
         assertEquals(16, Tune.INDEX_AT);
         // the bound tune keeps the header to offset 12 and puts the state

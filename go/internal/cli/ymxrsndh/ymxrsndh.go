@@ -83,13 +83,14 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	at := even(int(ymxr.GetWord(file, 2)) + 2)
 	flags := ymxr.GetWord(file, at+sndh.CoreFlagsAt)
 	monitor, lean := flags&1 != 0, flags&2 != 0
-	pcrel := flags&4 != 0
-	core, err := binaries.Read(binaries.Named(monitor, lean, pcrel))
+	pcrel, deferred := flags&4 != 0, flags&8 != 0
+	carried := binaries.Named(monitor, lean, pcrel, deferred)
+	core, err := binaries.Read(carried)
 	if err != nil {
 		return
 	}
-	said.Say(fmt.Sprintf("the core: %s, %s",
-		binaries.Named(monitor, lean, pcrel), report.Count(len(core), "byte", "bytes")))
+	said.Say(fmt.Sprintf("the core: %s, %s", carried,
+		report.Count(len(core), "byte", "bytes")))
 	var switches []string
 	if monitor {
 		switches = append(switches, "-perf, the raster monitor in")
@@ -106,6 +107,9 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	} else {
 		switches = append(switches, "-abs, ticks that read a row through an absolute"+
 			" address")
+	}
+	if deferred {
+		switches = append(switches, "the deferred start in: a subtune defers a start")
 	}
 	if len(switches) == 0 {
 		said.Row("the switches", "none, the plain core")

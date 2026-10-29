@@ -66,6 +66,11 @@ const coreLean = 2
 // file's tunes are within that of the core (BINARIES.md 5.5).
 const corePcrel = 4
 
+// coreDefer is the core's flag bit 3: the deferred start assembled in (the
+// player's YMXR_DEFER=1, doc/performance.md), which a tune whose effects
+// byte sets bit 4 requires (SPEC.md 3.3).
+const coreDefer = 8
+
 // pcrelReach is the bytes from the core's first byte a bound tune of a
 // file built on the core above ends within, which a displacement
 // reaches.
@@ -139,11 +144,12 @@ type Options struct {
 }
 
 // Of is the file, from the tune files as subtunes 1 up, around the core
-// the options' three switches select: the raster monitor in where they
-// ask to read the run, the lean tick where the options select it, ticks
-// that read a row through the program counter where they select that, the
-// core of any two or three where they select them, and the plain core
-// where none.
+// the options' three switches and the tunes select: the raster monitor in
+// where they ask to read the run, the lean tick where the options select
+// it, ticks that read a row through the program counter where they select
+// that, the core of any two or three where they select them, and the plain
+// core where none. The deferred start is in the core where a subtune
+// defers a start.
 func Of(tuneFiles [][]byte, options Options) ([]byte, error) {
 	return around(nil, tuneFiles, options)
 }
@@ -168,6 +174,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	frames := make([]int, n)
 	rate := 0
 	claimed := 0
+	defers := false
 	for i, file := range tuneFiles {
 		tune, err := ymxr.Read(file)
 		if err != nil {
@@ -188,6 +195,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 			frames[i] = tune.Table.Rows()
 		}
 		claimed |= Claims(tune.Effects)
+		defers = defers || tune.Effects&ymxr.Defers != 0
 	}
 	// The tunes are bound as a set, so those that agree on what an image
 	// fixes once share one and the reader's code appears once for them
@@ -218,19 +226,21 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		pcrel = ymxr.GetWord(core, CoreFlagsAt)&corePcrel != 0
 	}
 	if core == nil {
-		core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, pcrel))
+		core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, pcrel,
+			defers))
 		if err != nil {
 			return nil, err
 		}
 		if pcrel && options.Ticks == Chosen && TunesEnd(core, set, tags) > pcrelReach {
 			pcrel = false
-			core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, false))
+			core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, false,
+				defers))
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
-	if err := checkCore(core, options.Monitor, options.Lean, pcrel,
+	if err := checkCore(core, options.Monitor, options.Lean, pcrel, defers,
 		Binds(tuneFiles)); err != nil {
 		return nil, err
 	}
@@ -273,10 +283,10 @@ func Binds(tuneFiles [][]byte) int {
 }
 
 func CheckCore(core []byte, monitor, lean bool, binds int) error {
-	return checkCore(core, monitor, lean, false, binds)
+	return checkCore(core, monitor, lean, false, false, binds)
 }
 
-func checkCore(core []byte, monitor, lean, pcrel bool, binds int) error {
+func checkCore(core []byte, monitor, lean, pcrel, defers bool, binds int) error {
 	if len(core) < coreLength ||
 		!bytes.Equal(coreMagic, core[coreMagicAt:coreMagicAt+4]) {
 		return fmt.Errorf("not an SNDH core: no YMXS at %d", coreMagicAt)
@@ -303,6 +313,10 @@ func checkCore(core []byte, monitor, lean, pcrel bool, binds int) error {
 	if pcrel && flags&corePcrel == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and the row read through the"+
 			" program counter asked for needs bit 2 set", CoreFlagsAt, flags)
+	}
+	if defers && flags&coreDefer == 0 {
+		return fmt.Errorf("the core's flags at %d read %d, and a subtune that defers a"+
+			" start needs bit 3 set", CoreFlagsAt, flags)
 	}
 	return nil
 }

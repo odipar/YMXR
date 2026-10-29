@@ -103,9 +103,11 @@ versions 4 and 5 wrote the marked form in its place, the marker in bit 7
 of R12's column (SPEC.md 2.1.3, 2.1.4). Targets 25 upward are left
 to a later version (SPEC.md 2.1, R6.2).
 
-**5.4** A writer writes version 7 (SPEC.md 3.3.5): its table is DTX3,
-which a player of an earlier version reads wrongly, and version 7 encodes
-every source of 5.1 to 5.3. Versions 3 to 6 had a DTX2 table.
+**5.4** A writer writes version 8 (SPEC.md 3.3.5): its table is DTX3,
+which a player of version 6 or before reads wrongly, bit 3 of a control
+column is a deferred start, which a player of version 7 reads as 0, and
+version 8 encodes every source of 5.1 to 5.3. Versions 3 to 6 had a DTX2
+table.
 
 **5.5** The shape of a source sets its sound (SPEC.md 2.2):
 
@@ -146,8 +148,8 @@ state block stays within the largest (tools.md 4.7).
 
 A reader rejects a file with a condition of SPEC.md 3.3.4, reports the
 first (SPEC.md 7) and produces zero entries. Among them: a version other
-than 7, versions 3 to 6 among them, whose table is DTX2, and a source
-other than one, two or three columns of one byte.
+than 7 and 8, versions 3 to 6 among them, whose table is DTX2, and a
+source other than one, two or three columns of one byte.
 
 ---
 
@@ -167,8 +169,8 @@ frame against a model of SPEC.md 4 and 5 built from the tune's tables,
 and reports the frame and the register that differ; `-hatari` plays it on
 a real MFP (tools.md 17.1).
 
-**8.3** `doc/conformance/tunes/` has fifteen tune files: fourteen a
-reader reads, of version 7, and `wrong-version.ymxr`, version `$0008`,
+**8.3** `doc/conformance/tunes/` has sixteen tune files: fifteen a
+reader reads, of version 8, and `wrong-version.ymxr`, version `$0009`,
 which a reader rejects (7); `MANIFEST.txt` lists the sha256 and
 the size of the record of each, the rejected one's empty.
 

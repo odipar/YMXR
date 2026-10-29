@@ -22,13 +22,13 @@ below it.
 The version names every file. It is read out of `pom.xml`, or is
 the script's one argument.
 
-The nine binaries are assembled from `68k/` by rmac on the machine that
-cuts the release, so the caller's machine has an assembler to install or
-not as it pleases. They are committed under `go/binaries/data`: a Go module
-fetched by its import path contains the files a commit has in it, and an
-executable built from one embeds these. `BinariesTest` reads them against
-the assembly the build makes, so one that does not match what rmac writes
-today fails the build.
+The seventeen binaries are assembled from `68k/` by rmac on the machine
+that cuts the release, so the caller's machine has an assembler to install
+or not as it pleases. They are committed under `go/binaries/data`: a Go
+module fetched by its import path contains the files a commit has in it,
+and an executable built from one embeds these. `BinariesTest` reads them
+against the assembly the build makes, so one that does not match what rmac
+writes today fails the build.
 
 A player pins a version of this format: a tune file is 7 (SPEC.md 3.3.5)
 and a bound tune the version of the tune file bound (BINARIES.md 1), and

@@ -22,8 +22,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * The nine binaries as the build assembled them, and what the tools make
- * of them: each of the eight cores' descriptors and the stub's as
+ * The seventeen binaries as the build assembled them, and what the tools
+ * make of them: each of the sixteen cores' descriptors and the stub's as
  * BINARIES.md defines them, an SNDH file from the kit's tunes read back
  * tag by tag and part by part, and a program around it.
  */
@@ -60,7 +60,8 @@ final class BinariesTest {
         assertEquals(1, Tune.getWord(core, 16));
         assertEquals(Bound.VERSION, Tune.getWord(core, 18),
                 "the bound tune version the core reads");
-        assertEquals(PlayerTest.equates().get("YMXR_FIXED"), Tune.getWord(core, 20),
+        assertEquals(PlayerTest.equates((flags & Sndh.CORE_DEFER) != 0).get("YMXR_FIXED"),
+                Tune.getWord(core, 20),
                 "the workspace's fixed bytes are the player's");
         assertEquals(flags, Tune.getWord(core, 22), "the flags word");
         assertEquals(0, Tune.getWord(core, 26));
@@ -99,21 +100,23 @@ final class BinariesTest {
     }
 
     @Test
-    void eachOfTheThreeSwitchesEightSettingsIsACoreWhoseFlagsSayWhichItIs() throws IOException {
+    void eachOfTheFourSwitchesSixteenSettingsIsACoreWhoseFlagsReadItBack() throws IOException {
         // The tool selects a core by the switches passed and checks it against
-        // the flags word (Sndh.checkCore), so each of the eight settings
+        // the flags word (Sndh.checkCore), so each of the sixteen settings
         // needs a separate core whose word reads the setting back.
         Set<String> named = new LinkedHashSet<>();
-        for (int setting = 0; setting < 8; setting++) {
+        for (int setting = 0; setting < 16; setting++) {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
             boolean lean = (setting & Sndh.CORE_LEAN) != 0;
             boolean pcrel = (setting & Sndh.CORE_PCREL) != 0;
-            byte[] core = Binaries.core(monitor, lean, pcrel);
+            boolean defer = (setting & Sndh.CORE_DEFER) != 0;
+            byte[] core = Binaries.core(monitor, lean, pcrel, defer);
             assertCore(core, setting);
-            Sndh.checkCore(core, monitor, lean, pcrel, Bound.VERSION);
-            named.add(Binaries.binary(monitor, lean, pcrel).name());
+            Sndh.checkCore(core, monitor, lean, pcrel, defer, Bound.VERSION);
+            named.add(Binaries.binary(monitor, lean, pcrel, defer).name());
         }
-        assertEquals(8, named.size(), "the eight settings are eight binaries: " + named);
+        assertEquals(16, named.size(), "the sixteen settings are sixteen binaries: " + named);
+        assertEquals(17, Binaries.all().size(), "the sixteen cores and the stub");
     }
 
     @Test
@@ -166,6 +169,23 @@ final class BinariesTest {
                     binary.name() + " under go/binaries/data is not the one the build"
                             + " assembled");
         }
+    }
+
+    /** The Go tree lists the seventeen by name, which release/publish.sh
+     *  reads, and its list is the build's. */
+    @Test
+    void theGoTreeListsTheBinariesTheBuildWrites() throws IOException {
+        String go = Files.readString(Path.of("go/binaries/binaries.go"));
+        Set<String> listed = new LinkedHashSet<>();
+        Matcher name = Pattern.compile("YMXR_[A-Za-z0-9_-]*\\.bin").matcher(go);
+        while (name.find()) {
+            listed.add(name.group());
+        }
+        Set<String> written = new LinkedHashSet<>();
+        for (Binaries.Binary binary : Binaries.all()) {
+            written.add(binary.name());
+        }
+        assertEquals(written, listed, "go/binaries/binaries.go lists another set of binaries");
     }
 
     @Test
@@ -563,7 +583,7 @@ final class BinariesTest {
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(files, new Sndh.Options("Wrong", null, null, false, false)));
         assertEquals("subtune 2: version " + ConformanceTest.WRONG_VERSION
-                + " is not " + Tune.VERSION,
+                + " is not " + Tune.READS,
                 wrong.getMessage());
     }
 
@@ -643,6 +663,48 @@ final class BinariesTest {
                     Tune.getWord(Prg.of(sndh, 0), 28 + Prg.STUB_FLAGS_AT),
                     "-perf alone of the three sets a stub flag, the VBL it names");
         }
+    }
+
+    @Test
+    void aFileWithASubtuneThatDefersAStartUsesTheCoreWithTheDeferredStartIn()
+            throws IOException {
+        // A core without the deferred start is smaller and init returns -1
+        // for a tune that defers a start (BINARIES.md 2.1), so a file uses
+        // the larger core only where a subtune's effects byte sets bit 4.
+        List<byte[]> plain = List.of(tune("chambers"));
+        List<byte[]> deferring = List.of(tune("chambers"), tune("deferred"));
+        assertEquals(0, tune("chambers")[Tune.EFFECTS_AT] & Columns.DEFERS);
+        assertEquals(Columns.DEFERS, tune("deferred")[Tune.EFFECTS_AT] & Columns.DEFERS);
+        for (int setting = 0; setting < 8; setting++) {
+            boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
+            boolean lean = (setting & Sndh.CORE_LEAN) != 0;
+            boolean pcrel = (setting & Sndh.CORE_PCREL) != 0;
+            Sndh.Options options = new Sndh.Options("Deferred", null, null, monitor, lean,
+                    pcrel ? Sndh.Ticks.PCREL : Sndh.Ticks.ABSOLUTE);
+            for (List<byte[]> files : List.of(plain, deferring)) {
+                boolean defer = files == deferring;
+                byte[] sndh = Sndh.of(files, options);
+                assertEquals(setting | (defer ? Sndh.CORE_DEFER : 0), Tune.getWord(sndh,
+                        Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
+                        "bit 3 of the file's flags where a subtune defers a start");
+                assertCombined(Binaries.core(monitor, lean, pcrel, defer), sndh, files,
+                        tags(sndh));
+            }
+            byte[] without = Binaries.core(monitor, lean, pcrel);
+            IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                    () -> Sndh.of(without, deferring, options));
+            assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
+                    && said(wrong).contains("needs bit 3 set"), said(wrong));
+        }
+        Matcher larger = Pattern.compile("a core with it is ([\\d,]+) bytes larger")
+                .matcher(String.join(" ", Files.readString(Path.of("doc/BINARIES.md"))
+                        .split("\\s+")));
+        assertTrue(larger.find(), "BINARIES.md 2.1 has no size of the deferred start");
+        assertEquals(Integer.parseInt(larger.group(1).replace(",", "")),
+                Binaries.core(false, false, true, true).length
+                        - Binaries.core(false, false, true).length,
+                "the bytes the deferred start adds to the plain core, as BINARIES.md 2.1"
+                        + " reads them");
     }
 
     @Test
