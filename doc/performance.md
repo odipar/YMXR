@@ -400,14 +400,16 @@ reading of the shapes are 400 bytes, the SNDH core going to 4,600 from
 4,200.
 
 Init resolves every source the tune names into its first row and its loop
-cell, eight bytes each in the workspace, so a start reads two longs where
-it walked the tune's index and read the source's header: 48 cycles against
-100. That is 38 a frame on Synergy Credits, 22 on DBA 2 and 21 on DBA 5, and
-60 to 94 off their costliest frames. The source column's seven bits reach
-127, so the room is sized for 127 sources. A second table of the same
-room is beside it, where a source of several columns has its loop cell
-and the stride from one column to the next, and an effect's record is 16
-bytes where it was 8, so YMXR_FIXED is 2,120 bytes against 56.
+cell, eight bytes each in the workspace, so a start reads two longs where it
+walked the tune's index and read the source's header: 48 cycles against 100.
+That is 38 a frame on Synergy Credits, 22 on DBA 2 and 21 on DBA 5, and 60
+to 94 off their costliest frames. The source column's seven bits reach 127,
+so the room is sized for 127 sources. A second table of the same room is
+beside it, where a source of several columns has its loop cell and the
+stride from one column to the next, and an effect's record is 20 bytes where
+it was 8, the last 4 its source's row count, so YMXR_FIXED is 2,136 bytes
+against 56. With the deferred start in, the record is 64 bytes, the last 44
+a pending start's, and YMXR_FIXED 2,312 (A deferred start).
 
 ## A counted tick of two columns
 
@@ -438,9 +440,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,318 bytes, 896 of them the counted shapes' eight
+The player is 8,416 bytes, 896 of them the counted shapes' eight
 instances, four of one column and four of two; where a tick reads an
-absolute address, 7,962 bytes and 952, instances of 138 bytes against the
+absolute address, 8,086 bytes and 952, instances of 138 bytes against the
 marked shape's 122.
 
 ## A tick through an absolute address
@@ -508,12 +510,12 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 7,962 bytes against 8,318. Two figures
+assembles this build, which is 8,086 bytes against 8,416. Two figures
 move against each other: a place is a word where it was a long, which
-shortens each shape a tick runs, and a start does the arithmetic that
-turns a row's address into a displacement, which is longer than the
-shapes save. Over a timer's block that is 46 bytes, and the init and the
-routines the four timers share, the reach check among them, are 172 more.
+shortens a timer's handlers by 40 bytes, and a start does the arithmetic
+that turns a row's address into a displacement, 38 bytes more of the
+timer's frame code. The init and the routines the four timers share, the
+reach check among them, are 338 bytes more.
 
 What the two cores do to a tune, under Hatari over 900 frames of Turrican -
 world 4-3, counted from the frame the player first writes in: both write
@@ -528,3 +530,58 @@ The rig reads these figures back: `-cycles` and `-cycles -abs` its counts,
 `-clock` the program's clock and `-cost` the comparison with YMX under
 Hatari; `-hatari` plays the same tunes on a cycle-exact machine, where the
 MFP fires the ticks.
+
+## A deferred start
+
+`YMXR_DEFER=1` assembles a player with the deferred start (SPEC.md 4.8)
+in, and the tools put a core of that build under a file only where a
+subtune's effects byte sets bit 4 (BINARIES.md 2.1). Init of a player
+without it reports -1 for such a tune. The deferred start leaves the
+five paths of A tick as they are: the handlers keep their instructions,
+each gains a stub after its last one, and the stub runs on one tick
+alone. The figures below are counted from the 68000's instruction
+timings, on that build with the row read through the program counter,
+and start at the head of the path that ends a source.
+
+At the frame of a deferred start on a running timer the player patches
+the handler of the start's shape in the bank its vector does not point
+into, writes the rate into the effect's installer, and writes one word
+into the running handler, at the head of its last row's path: a `bra.s`
+to its stub, or a `nop` where the stub follows the word. The tick that
+reads the last row runs the stub and the installer, which writes the word
+back, stops the timer where the start sets the timer's reset, writes the
+count, the vector and the select, and returns; the next tick runs the
+armed handler.
+
+| the tick that reads the last row | cycles |
+|---|---|
+| today's, to row `RR` | 88 |
+| today's, the timer stopped | 98 |
+| the switch on Timer A or B | 142 |
+| the same, with `timerReset` | 172 |
+| the switch on Timer C or D, whose control register is shared | 182 |
+| the same, with `timerReset` | 212 |
+
+A square's stub tests the row it wrote: the tick that writes row 0 after
+the start is armed costs 48 cycles more than a square's tick, and the
+tick that writes row 1 runs the installer.
+
+A tune whose rows defer no start has bit 4 of its effects used at 0
+(SPEC.md 3.3), and init of this build leaves its frame the branches the
+assembler wrote. A start with bit 5 at 0 and a row that resets the place
+read the running handler through the vector, 8 or 16 cycles more than
+the build without the deferred start, which reads it at its address as
+version 7 did. On that build the play call of each of the eleven
+fixtures counts the cycles of version 7, and on this build the play call
+of Synergy Credits counts 2,005 cycles on average and 5,118 at most,
+against 1,995 and 5,086. On either build a start with bit 5 at 0, after
+a source whose handler steps a place, compares the row number with R, 32
+cycles. A tune with bit 4 set runs each row that sets an effect's
+target, source or control column through a test of the pending start,
+about 50 cycles a start and 22 a stop or a retune.
+
+The second bank, the installers and the stubs make the player 12,812
+bytes against 8,416, and 12,630 against 8,086 where a tick reads an
+absolute address. Each handler gains a stub: an instance of the wide
+handler is 132 bytes against 128, and of the marked shape of two columns
+116 against 112.

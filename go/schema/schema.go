@@ -59,7 +59,6 @@ func Of(tune ymxs.Tune) (Made, error) {
 	for c := range column {
 		column[c] = make([]byte, frames)
 	}
-	place := placed(rows, at, repeats)
 	var target, selects, count [4]int
 	// Whether the timer is known to be counting: a start sets it where the
 	// source it runs repeats, and a stop clears it.
@@ -84,7 +83,7 @@ func Of(tune ymxs.Tune) (Made, error) {
 				return Made{}, err
 			}
 			runs, err := effect(out, i, one.Effect, sources, &target, &selects, &count,
-				&counting, f, place[f][i])
+				&counting, f)
 			if err != nil {
 				return Made{}, err
 			}
@@ -124,58 +123,10 @@ func registers(row ymxs.Row, out []byte) {
 	}
 }
 
-// placed marks the starts written with the place's reset where the
-// structure clears it: each start outside rule 3(a) of SPEC.md 6, where the
-// place the player keeps may be a row the source started lacks (section
-// 8.4). Such a start plays from row 0, as a start with the reset does.
-//
-// A start leaves bit 5 at 0 where the start before it on the same timer ran
-// a source of its row count on its target. After the wrap the first start
-// on a timer at or after the repeat row follows the last start of the
-// table, so it leaves bit 5 at 0 where that start matches as well. YMXS's
-// check reads the first pass alone and warns where the start before it
-// differs (tools.md 7.2).
-func placed(rows []ymxs.Row, repeat int, repeats bool) [][4]bool {
-	out := make([][4]bool, len(rows))
-	for i, timer := range timers {
-		var at []int
-		var starts []ymxs.Start
-		for f, row := range rows {
-			for _, one := range ymxs.Effects(row) {
-				if start, is := one.Effect.(ymxs.Start); is && one.Timer == timer {
-					at = append(at, f)
-					starts = append(starts, start)
-				}
-			}
-		}
-		for k, start := range starts {
-			if ymxs.StartTiming(start).PlaceReset {
-				continue
-			}
-			keeps := k > 0 && matches(starts[k-1], start)
-			wraps := repeats && at[k] >= repeat && (k == 0 || at[k-1] < repeat)
-			if wraps {
-				keeps = keeps && matches(starts[len(starts)-1], start)
-			}
-			out[at[k]][i] = !keeps
-		}
-	}
-	return out
-}
-
-// matches reports whether later runs a source of the row count of the one
-// before runs, on its target: rule 3(a).
-func matches(before, later ymxs.Start) bool {
-	return ymxs.TargetEqual(ymxs.StartTarget(before), ymxs.StartTarget(later)) &&
-		len(ymxs.SourceRows(ymxs.StartSource(before)).Rows) ==
-			len(ymxs.SourceRows(ymxs.StartSource(later)).Rows)
-}
-
 // effect writes one row's operation on one effect, as its four columns,
-// and the bit of the effects word where the row starts one. place marks a
-// start written with the place's reset (placed).
+// and the bit of the effects word where the row starts one.
 func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
-	target, selects, count *[4]int, counting *[4]bool, at int, place bool) (int, error) {
+	target, selects, count *[4]int, counting *[4]bool, at int) (int, error) {
 	t := ymxr.Effect + 4*i
 	switch e := one.(type) {
 	case ymxs.Stop:
@@ -200,20 +151,37 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		if err != nil {
 			return 0, err
 		}
-		reset := resets(timing.TimerReset, timing.PlaceReset || place)
+		reset := resets(timing.TimerReset, timing.PlaceReset)
+		deferred := ymxs.StartDeferred(e)
 		// A start on a timer already counting, at the rate it counts,
 		// sets no rate column: step 2 resolves the source and the ticks
 		// read it from here on, at the rate the control register already
 		// has (SPEC.md 4). The timer is known to be counting only where
 		// the source it runs repeats, since a source that plays once
-		// stops it at its marker (section 5) and no row says when.
-		if reset != 0 || now != selects[i] || rate != count[i] || !counting[i] {
-			out[t+2] = byte(0x80 | reset | marked(rate) | now)
+		// stops it at its marker (section 5) and no row says when. A
+		// deferred start sets the control column, whose bit 3 marks it
+		// (1.9).
+		if reset != 0 || now != selects[i] || rate != count[i] || !counting[i] ||
+			deferred {
+			mark := 0
+			if deferred {
+				mark = ymxr.Deferred
+			}
+			out[t+2] = byte(0x80 | reset | mark | marked(rate) | now)
 			out[t+3] = byte(rate)
 		}
 		selects[i] = now
 		count[i] = rate
 		_, counting[i] = ymxs.SourceRows(ymxs.StartSource(e)).Repeat()
+		if deferred {
+			// Until the tick that performs it, the timer counts at the
+			// rate of the effect before it, apart from the rate a row
+			// keeps: the next row that sets a rate sets both columns (4.8).
+			selects[i] = -1
+			count[i] = -1
+			counting[i] = false
+			return 1<<i | ymxr.Defers, nil
+		}
 		return 1 << i, nil
 	case ymxs.Retune:
 		now, err := selectOf(e.Timing.Prescaler)

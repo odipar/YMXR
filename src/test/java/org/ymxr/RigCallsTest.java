@@ -43,10 +43,10 @@ import org.junit.jupiter.api.TestFactory;
  * so every tune with a source failed. So this also runs {@code -refill}
  * over one tune with a source, whole, against performance.md.
  *
- * <p>The same capped run plays on each of the eight cores a release ships,
- * the three switches {@code -abs}, {@code -lean} and {@code -perf} alone and
- * together, since {@code BinariesTest} reads a core's bytes and leaves what
- * the core does to the rig. The kit's tunes play too, capped: their
+ * <p>The same capped run plays on each of the sixteen cores a release
+ * ships, the four switches {@code -abs}, {@code -lean}, {@code -perf} and
+ * {@code -defer} alone and together, since {@code BinariesTest} reads a
+ * core's bytes and leaves what the core does to the rig. The kit's tunes play too, capped: their
  * versions 4 to 6 have the targets of several registers and the counted
  * sources, which no dump converts to. The modes under Hatari,
  * {@code -hatari} and {@code -stub}, need an emulator and a TOS image, and
@@ -169,13 +169,25 @@ final class RigCallsTest {
         return ran.waitFor() + "\n" + said;
     }
 
-    /** The eight cores a release ships, as the rig's switches select them:
-     *  the plain core, and {@code -abs}, {@code -lean} and {@code -perf}
-     *  alone and together. */
-    private static final List<List<String>> CORES = List.of(
-            List.of(), List.of("-abs"), List.of("-lean"), List.of("-perf"),
-            List.of("-perf", "-lean"), List.of("-perf", "-abs"),
-            List.of("-lean", "-abs"), List.of("-perf", "-lean", "-abs"));
+    /** The sixteen cores a release ships, as the rig's switches select
+     *  them: the plain core, and {@code -abs}, {@code -lean}, {@code -perf}
+     *  and {@code -defer} alone and together. */
+    private static final List<List<String>> CORES = cores();
+
+    private static List<List<String>> cores() {
+        List<String> switches = List.of("-perf", "-lean", "-abs", "-defer");
+        List<List<String>> out = new ArrayList<>();
+        for (int setting = 0; setting < 1 << switches.size(); setting++) {
+            List<String> core = new ArrayList<>();
+            for (int i = 0; i < switches.size(); i++) {
+                if ((setting & 1 << i) != 0) {
+                    core.add(switches.get(i));
+                }
+            }
+            out.add(List.copyOf(core));
+        }
+        return List.copyOf(out);
+    }
 
     @TestFactory
     Stream<DynamicTest> theRigPlaysTheBuiltTunesOnEveryCore() {

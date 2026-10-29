@@ -2,7 +2,7 @@
 
 YMXR encodes YMXS tune data (YMXS, SPEC.md 1) as DTX tables for
 playback on the Atari ST's YM2149 and MC68901, in a tune file of version
-7 (3.3.5). This document defines
+8 (3.3.5). This document defines
 columns (1), target, source and timer maps (2), file layout (3), frames
 (4), ticks (5), writer rules and checks (6), reader output (7), and later
 versions (8).
@@ -240,14 +240,15 @@ target, and each tick writes the registers of that target (5.1). A row
 that sets it to 0, the byte `$80`, is a stop: the timer stops and is
 idle, and the place is left as it is.
 
-**1.8.4** A start places the source: where the row sets the control
-column with bit 5 at 1, the place is row 0; otherwise the place keeps its
-row number, which is then a row number of the source started (YMXS,
-SPEC.md 3.4.3); before the first start on the timer that number is 0 (4.1
-step 4). A start sets the rate where the row sets the control column or
-the count column (1.9), and leaves the timer counting at the kept select
-and count where it leaves both unset: a row that connects a second source
-to a running timer at the rate it counts sets the source column alone.
+**1.8.4** A start places the source: where the row sets the control column
+with bit 5 at 1, the place is row 0; otherwise the place keeps its row
+number modulo R of the source started, R its row count, so that number is a
+row of it (YMXS, SPEC.md 3.4.3); before the first start on the timer that
+number is 0 (4.1 step 4). A start sets the rate where the row sets the
+control column or the count column (1.9), and leaves the timer counting at
+the kept select and count where it leaves both unset: a row that connects a
+second source to a running timer at the rate it counts sets the source
+column alone.
 
 **1.8.5** A stopped timer starts at the write of a select (1.9.4), bit 6
 of the control column 1 or 0; rule 3 fixes the value a writer sets.
@@ -279,12 +280,12 @@ row sets it (1.1.1):
 | 6 | `timerReset` (YMXS, SPEC.md 3.4.1): the player stops the timer, writes the count, then writes the select (4.3) |
 | 5 | `placeReset` (YMXS, SPEC.md 3.4.3): the place is row 0 |
 | 4 | the count column's 0 is a value (1.9.1) |
-| 3 | unassigned, 0 |
+| 3 | `deferred` (YMXS, SPEC.md 3.5): on a running timer the start is pending until the tick that reads the last row of the running source (4.8) |
 | 2 to 0 | the select: 1 to 7 for the divisors 4, 10, 16, 50, 64, 100 and 200 (YMXS, SPEC.md 3.3.2); 0 unassigned (section 8) |
 
 **1.9.3** A row that sets the control column sets the select, the two
-resets and bit 4 at once. A row that leaves it unset sets a count of 1 to
-255 or leaves the count unset, and leaves the timer running as it is.
+resets, bit 4 and bit 3 at once. A row that leaves it unset sets a count of
+1 to 255 or leaves the count unset, and leaves the timer running as it is.
 Rule 4 fixes on which rows a writer sets the two columns.
 
 **1.9.4** The select reaches the timer's control register (2.3). Timers A
@@ -453,7 +454,8 @@ of values wider than a byte is left to a later version (section 8).
 
 **3.1.4** RR below R marks a source that repeats: the tick that reads row
 R - 1 places the next at row RR (5.1). RR equal to R marks a source that
-plays once: the tick that reads row R - 1 stops the timer (5.1).
+plays once: the tick that reads row R - 1 stops the timer (5.1). Where a
+start is pending on the timer, that tick performs it instead (4.8).
 
 **3.1.5** A writer numbers the sources in first-start order (YMXS,
 SPEC.md 1.9).
@@ -493,9 +495,9 @@ a value.
 | offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, `$0007` (3.3.5) |
+| 4 | 2 | the version, `$0008` (3.3.5) |
 | 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
-| 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bits 7 to 4 are 0 |
+| 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bit 4 is 1 where a row defers a start (4.8); bits 7 to 5 are 0 |
 | 9 | 1 | S, the source count, 0 to 127 |
 | 10 | 2 | the offset of the name, or 0 for a tune with an empty name |
 | 12 | 4 | the offset of the DTX3 table |
@@ -553,24 +555,29 @@ reports a condition reads no further field. A name offset other than 16 +
 |---|---|
 | the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
-| the version is 3, 4, 5 or 6, a tune file whose table is DTX2 (3.3.5) | `version V has a DTX2 table, and this reads 7: write the tune again with ym-to-ymxr or ymxs-to-ymxr` |
-| the version is other than 3 to 7 (3.3.5) | `version V is not 7` |
+| the version is 3, 4, 5 or 6, a tune file whose table is DTX2 (3.3.5) | `version V has a DTX2 table, and this reads 7 or 8: write the tune again with ym-to-ymxr or ymxs-to-ymxr` |
+| the version is other than 3 to 8 (3.3.5) | `version V is not 7 or 8` |
 | the table begins or ends outside the file | `the table is at A to B, and the file has F bytes` |
 | the table is a DTX variant other than 3 (3.3.3), its header read as DTX defines it (DTX, SPEC.md 2.4) | `the table is DTX X, and a tune's table is DTX3 (SPEC.md 3.3.3)` |
 | the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N is at A to B, and the file has F bytes` |
 | source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
 
-**3.3.5** The version. Every tune file is version 7: its table is DTX3,
-which a player of an earlier version reads wrongly. Versions 3 to 6 are
-tune files whose table is DTX2, and a reader of this version reports them
-(3.3.4); the tools write such a tune again from the dump or the structure
-it was converted from. A player of this version reads 7.
+**3.3.5** The version. A writer writes version 8: its table is DTX3, which
+a player of version 6 or before reads wrongly, and bit 3 of a control
+column is a deferred start (1.9.2), which a player of version 7 reads as
+0. A player of this version reads 8 and 7: a tune file of version 7 has
+bit 3 at 0 in every control column, and a start with bit 5 at 0 in it
+names a source of the row count of the one last started, where the
+modulo of 1.8.4 leaves the place as it is. Versions 3 to 6 are tune files
+whose table is DTX2, and a reader of this version reports them (3.3.4);
+the tools write such a tune again from the dump or the structure it was
+converted from.
 
 Note: versions 3 to 6 told apart a tune's sources, from one column each to
 a counted source of several columns, so that a player of an older version
-read every tune that version encoded. A DTX3 table needs a player of 7 at
-every shape of source, and version 7 encodes each of them.
+read every tune that version encoded. A DTX3 table needs a player of 7 or
+8 at every shape of source, and both encode each of them.
 
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
 Attractions #2` begins `594D5852 0007 0032 00 00 0010 00000028`: the 22
@@ -589,7 +596,7 @@ reading only set columns and keeping values needed by later rows (R4.6).
 The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
-1. Read the version; for a version other than 7 (3.3.5), report -1 and
+1. Read the version; for a version other than 7 and 8 (3.3.5), report -1 and
    leave every register and every timer as it is. A reader
    reports the line of 3.3.4 in place of that, and its record is empty
    (7.4).
@@ -598,8 +605,9 @@ frame rate (3.3). The player, in order:
    row, row RR where it repeats and the end where it plays once (3.1.4).
 4. Set the kept target, source, select and count of each effect to 0,
    and the place of each timer to 0, the row number a start that moves
-   no place keeps (1.8.4); a tick before the first start on a timer
-   writes the register of the target this leaves (5.2.1).
+   no place keeps (1.8.4), with no start pending (4.8); a tick before
+   the first start on a timer writes the register of the target this
+   leaves (5.2.1).
 5. Read row 0, the current row.
 6. At interrupt level 7, for each effect i the effects used names, 0 to
    3 in order, claim its timer (2.3.3).
@@ -652,15 +660,21 @@ For effect i, its target column T, source column S, control column K and
 count column N, columns 14 + 4i to 17 + 4i, and its timer (2.3), in
 order:
 
-1. Where K is set with bit 6 at 1: stop the timer (2.3.3).
+1. Where K is set with bit 6 at 1 and bit 3 at 0: stop the timer
+   (2.3.3).
 2. Where T is set: the kept target is bits 6 to 0 of T.
-3. Where S is set and bits 6 to 0 are 0: stop the timer (2.3.3). Where S
-   is set and bits 6 to 0 are s, 1 to 127: start source s. At interrupt
-   level 7: the registers the timer's tick writes are the registers of
-   the kept target; the place is row 0 of source s where K is set with bit 5
-   at 1, and otherwise the row number the place has, in source s; the
-   loop row of the tick is the loop row of source s (3.1.4). From this
-   step a tick of the timer reads source s.
+3. Where S is set and bits 6 to 0 are 0: drop the start pending on the
+   timer (4.8), and stop the timer (2.3.3). Where S is set and bits 6 to
+   0 are s, 1 to 127, with K set and bit 3 at 1, on a timer running with
+   a source connected: the start is pending (4.8), and steps 4 to 6 keep
+   the count and the select and write neither, and leave the place as it
+   is. Where S is set and bits 6 to 0 are s, 1 to 127, otherwise: drop
+   the start pending on the timer, and start source s. At interrupt level
+   7: the registers the timer's tick writes are the registers of the kept
+   target; the place is row 0 of source s where K is set with bit 5 at 1,
+   and otherwise the row number the place has modulo R of source s
+   (1.8.4); the loop row of the tick is the loop row of source s (3.1.4).
+   From this step a tick of the timer reads source s.
 4. Where N is other than 0, or K is set with bit 4 at 1: the count is N,
    and the step writes it to the timer's data register and keeps it.
    Otherwise the count keeps the value it has, and where K is set with
@@ -704,9 +718,9 @@ Note: on a 68000 the two bytes of a write are one `movep.w`.
 ### 4.5 The wrap
 
 When RR is below R, the frame after row R - 1 reads row RR and performs
-it as any row. The wrap preserves timers, places and the kept target,
-source, select and count of each effect (4.1 step 4; YMXS, SPEC.md
-4.5). YMXS, SPEC.md 6 rules 1(d) and 6(a) define the repeat row's
+it as any row. The wrap preserves timers, places, pending starts and the
+kept target, source, select and count of each effect (4.1 step 4; YMXS,
+SPEC.md 4.5). YMXS, SPEC.md 6 rules 1(d) and 6(a) define the repeat row's
 operations on a running timer.
 
 ### 4.6 The end
@@ -731,6 +745,31 @@ player, in order:
 
 Every other timer is left as it is.
 
+### 4.8 A deferred start
+
+A start whose control column has bit 3 at 1, on a timer running with a
+source connected, is *pending* on that timer from 4.3 step 3 (YMXS,
+SPEC.md 3.5). It is source s, the kept target after 4.3 step 2, the
+count and the select the row keeps at 4.3 steps 4 and 5, bit 6 of K, and
+a place: row 0 where bit 5 of K is 1, and otherwise R - 1 of the source
+running, its last row, modulo R of source s (1.8.4). One start at most is
+pending on a timer:
+
+- a row that starts a source with bit 3 at 0, or with K unset, or that
+  stops the timer through the source column, drops it (4.3 step 3);
+- a second deferred start on the timer replaces it;
+- a row that leaves the source column unset leaves it pending, and the
+  count and the select it writes are the running effect's.
+
+While a start is pending, the last row of the running source ends the
+source, a source that repeats included: the tick that reads it performs
+the pending start (5.1 step 5). The wrap (4.5) and the end (4.6) leave a
+pending start pending, and the stop (4.7) releases its timer with it.
+
+A deferred start on a stopped timer, or before the first start on it, is
+a start with bit 3 at 0 (4.3 step 3). Whether the timer runs is read
+against a tick together with the start becoming pending (4.2.1).
+
 ---
 
 ## 5. The tick
@@ -754,10 +793,15 @@ names its registers and the column of the source each is written from
    whose byte written at step 2 has bit 7 set, the marker, is the last.
 4. Where the row is before the last: the place is the row after it, in
    every column.
-5. Where the row is the last: for a source that repeats, the place is
-   row RR; for a source that plays once, stop the timer (2.3.3). The
-   timer is idle, the place stays at row R - 1, and each register keeps
-   the value written until a row sets it.
+5. Where the row is the last and a start is pending on the timer (4.8):
+   where its bit 6 is 1, stop the timer (2.3.3); write its count to the
+   timer's data register and its select to its control register (1.9.4);
+   from this tick the timer reads its source, on its target, at its
+   place, and no start is pending. Where the row is the last and none is
+   pending: for a source that repeats, the place is row RR; for a source
+   that plays once, stop the timer (2.3.3). The timer is idle, the place
+   stays at row R - 1, and each register keeps the value written until a
+   row sets it.
 6. Where bit 3 of the vector register `$FFFA17` is 1, software end of
    interrupt: clear the timer's in-service bit (2.3.2).
 
@@ -858,15 +902,13 @@ numbers the maps assign.**
   player. The structure's value for such a row is the mixer's six bits,
   0 to 63 (YMXS, SPEC.md 5.1).
 
-**Rule 3: a start sets bit 5 of the control column with it, with one
-exception, and sets bit 6 where the timer is stopped** (YMXS rules 3
+**Rule 3: a start sets bit 5 of the control column where the structure
+sets `placeReset`, and bit 6 where the timer is stopped** (YMXS rules 3
 and 4).
 
-- 3(a) The exception: the source started has the row count of the source
-  last started on the effect in frame order, through the wrap (4.5), on
-  the same kept target. The row may then leave bit 5 at 0, and the place
-  is left at its row number (1.8.4); a stop between the two starts leaves
-  the place as it is (YMXS, SPEC.md 3.4.3).
+- 3(a) A start with bit 5 at 0 leaves the place at its row number modulo
+  R of the source it starts (1.8.4), on any kept target; a stop between
+  two starts leaves the place as it is (YMXS, SPEC.md 3.4.3).
 - 3(b) A timer is stopped before its first start, after a stop, and
   after its source that plays once has run out (5.1 step 5). Where the
   rows leave open whether a source has run out at the start row, bit 6
@@ -887,6 +929,10 @@ while the effect runs** (YMXS rule 5).
 - 4(c) A row before the first start of an effect leaves both columns
   unset: a select written to a timer with its source disconnected starts
   it (5.2).
+- 4(d) A deferred start sets the control column, bit 3 at 1 (4.8). Until
+  the tick that performs it the timer counts at the rate of the effect
+  before it, so the next row that sets a rate column of the effect sets
+  both.
 
 **Rule 5: a row that sets a count of 0 sets bit 4 of the control column
 with it.** A row that leaves the control column unset sets a count of 1
@@ -1009,7 +1055,7 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 ### 7.2 The first line
 
 `{"rate":H,"effects":E,"sources":[...]}`: `rate` the frame rate H (3.3);
-`effects` the effects used E as a decimal integer, 0 to 15; `sources`
+`effects` the effects used E as a decimal integer, 0 to 31; `sources`
 the sources in index order, source 1 first, each
 `{"rows":[...],"repeat":RR}` with `rows` one list of C times R integers,
 0 to 255: the C columns of row 0, then those of row 1, and so on, column
@@ -1046,7 +1092,9 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   sets (1.1.3), regardless of the effects used byte (4.2); keyed by number
   as text, `"0"` to `"3"`, in ascending order; `{}` for a row that leaves
   every effect column unset. Each is
-  `{"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b}`,
+
+      {"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b,"deferred":b}
+
   where each of `target`, `source`, `select` and `count` is the value kept
   for the effect (4.3), which a row that leaves its column unset leaves as
   it is: `target` the kept target after 4.3 step 2, 0 to 127; `source` the
@@ -1056,9 +1104,10 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   1) leaves it as it is, and so does the tick that ends a source that
   plays once; `select`, 0 to 7, and `count`, 0 to 255, the kept select and
   count after 4.3 steps 4 and 5, 0 until a row sets them and kept through
-  a stop; `timer` and `place`, each `true` or `false`: where the row sets
-  the control column, `timer` is its bit 6 and `place` its bit 5 (1.9.2),
-  and where the row leaves that column unset, both are `false`.
+  a stop; `timer`, `place` and `deferred`, each `true` or `false`: where
+  the row sets the control column, `timer` is its bit 6, `place` its bit
+  5 and `deferred` its bit 3 (1.9.2), and where the row leaves that column
+  unset, all three are `false`.
 
 For the first frame after the end (4.6), `{"result":-1}`, where the
 record ends.
@@ -1096,7 +1145,7 @@ sets columns 14 to 17 to `$8D`, `$81`, `$E5` and `$3C`, a start of source
 1 on `setR13` at select 5 and count 60 with both resets, beside columns
 0, 2, 4, 6, 10 and 11:
 
-    {"result":0,"w":{"0":72,"2":56,"4":40,"6":8,"10":10,"11":24},"e":{"0":{"target":13,"source":1,"select":5,"count":60,"timer":true,"place":true}}}
+    {"result":0,"w":{"0":72,"2":56,"4":40,"6":8,"10":10,"11":24},"e":{"0":{"target":13,"source":1,"select":5,"count":60,"timer":true,"place":true,"deferred":false}}}
 
 ### 7.6 The conformance kit
 
@@ -1111,7 +1160,8 @@ and the length `MANIFEST.txt` lists.
 
 A player of this version is unconstrained in each item below. A number
 missing from the list is a clause a version has defined, and the rest
-keep their numbers: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
+keep their numbers: 8.1 is defined at 3.3.4, 8.4 at 1.8.4, and 8.6 at
+4.2.1 and 5.2.1.
 
 **8.2** Targets 25 to 127 (2.1).
 
@@ -1119,12 +1169,7 @@ keep their numbers: 8.1 is defined at 3.3.4 and 8.6 at 4.2.1 and 5.2.1.
 (3.1.3), and a source (3.1.4) or a tune's table (3.3.3) whose RR is above
 R.
 
-**8.4** The row a tick reads where the place is outside the rows of the
-source connected (1.8.4; YMXS, SPEC.md 8.4). A start that leaves bit 5 at
-0 names a source of the row count of the one last started (rule 3(a)), so
-a tune under the rules leaves the place inside them.
-
-**8.5** The unassigned bits and values: select 0 and bit 3 of a control
-column (1.9.2), bits 5 and 4 of a coarse column (1.2.2), bits 6 and 5 of
+**8.5** The unassigned bits and values: select 0 of a control column
+(1.9.2), bits 5 and 4 of a coarse column (1.2.2), bits 6 and 5 of
 columns 6, 8, 9 and 10, bit 6 of column 7, bit 4 of column 13, and a
 source column above S (3.3).

@@ -26,16 +26,17 @@ import (
 
 // Effect records one effect's run after a row: source 0 where it runs no
 // source. Set is true where the row set one of its columns, Timer that the
-// row's control column had bit 6 and Place bit 5.
+// row's control column had bit 6, Place bit 5 and Deferred bit 3.
 type Effect struct {
-	Target  int
-	Source  int
-	Select  int
-	Count   int
-	Started bool
-	Set     bool
-	Timer   bool
-	Place   bool
+	Target   int
+	Source   int
+	Select   int
+	Count    int
+	Started  bool
+	Set      bool
+	Timer    bool
+	Place    bool
+	Deferred bool
 }
 
 // Replay is the model over one table.
@@ -101,6 +102,7 @@ func (m *Replay) Step() {
 		count := was.Count
 		timer := false
 		place := false
+		deferred := false
 		// Bit 4 marks the count column's 0 as the value the MFP counts 256
 		// for, and a player reads it where the row sets the control column
 		// (SPEC.md 1.1, 1.9).
@@ -112,10 +114,12 @@ func (m *Replay) Step() {
 			selects = int(r[t+2]) & 7
 			timer = r[t+2]&0x40 != 0
 			place = r[t+2]&0x20 != 0
+			deferred = r[t+2]&ymxr.Deferred != 0
 		}
 		set := (r[t]|r[t+1]|r[t+2])&0x80 != 0 || r[t+3] != 0
 		m.Effect[i] = Effect{Target: target, Source: source, Select: selects,
-			Count: count, Started: started, Set: set, Timer: timer, Place: place}
+			Count: count, Started: started, Set: set, Timer: timer, Place: place,
+			Deferred: deferred}
 	}
 	m.EnvelopeWritten = false
 	for i := range m.Written {

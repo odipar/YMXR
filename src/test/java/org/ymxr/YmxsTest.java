@@ -108,7 +108,7 @@ final class YmxsTest {
         org.ymxs.YMXS.Single square = Tunes.repeating("square 12", List.of(12, 0), 0);
         List<Row> rows = new ArrayList<>();
         rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), square, new Timing(
-                Chip.prescaler(4), 100, true, true))));
+                Chip.prescaler(4), 100, true, true), false)));
         // the rate does not move: neither rate column is written
         rows.add(row(Map.of(), Timer.A, new Retune(new Timing(Chip.prescaler(4), 100, false, false))));
         // the count alone
@@ -129,8 +129,26 @@ final class YmxsTest {
         assertEquals(0, column[count][3] & 0xFF, "and leaves the count unwritten");
     }
 
+    /** A square, then a deferred start of a fall on its timer, then a
+     *  retune before the switch (SPEC.md 4.8). */
+    static Tune deferred() {
+        org.ymxs.YMXS.Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        org.ymxs.YMXS.Single fall = Tunes.once("fall", List.of(15, 10, 5, 0));
+        Timing stopped = new Timing(Chip.prescaler(4), 100, true, true);
+        Timing same = new Timing(Chip.prescaler(4), 100, false, true);
+        List<Row> rows = new ArrayList<>();
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), loud, stopped,
+                false)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), fall, same,
+                true)));
+        rows.add(row(Map.of(), Timer.A, new org.ymxs.YMXS.Retune(same)));
+        rows.add(new Row(Map.of(), Map.of()));
+        return built(rows, 0);
+    }
+
     /**
-     * Starts outside rule 3(a) of SPEC.md 6, and one inside it. The tune
+     * Starts on another target, across row counts and across the wrap, each
+     * with placeReset clear, and one on a timer that has run none. The tune
      * repeats to row 1, so the start there follows the last start on its
      * timer after the wrap, where it follows the start of row 0 before.
      */
@@ -142,43 +160,66 @@ final class YmxsTest {
         Timing kept = new Timing(Chip.prescaler(4), 100, false, false);
         List<Row> rows = new ArrayList<>();
         Map<Timer, Effect> first = new EnumMap<>(Timer.class);
-        first.put(Timer.A, new StartOne(Tunes.setting(Register.R8), loud, stopped));
+        first.put(Timer.A, new StartOne(Tunes.setting(Register.R8), loud, stopped, false));
         first.put(Timer.D, new StartOne(Tunes.setting(Register.R10), soft,
-                new Timing(Chip.prescaler(4), 100, true, false)));
+                new Timing(Chip.prescaler(4), 100, true, false), false));
         rows.add(new Row(Map.of(), first));
-        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), soft, kept)));
-        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), four, kept)));
-        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R9), four, kept)));
-        rows.add(row(Map.of(), Timer.D, new StartOne(Tunes.setting(Register.R10), loud, kept)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), soft, kept, false)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), four, kept, false)));
+        rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R9), four, kept, false)));
+        rows.add(row(Map.of(), Timer.D, new StartOne(Tunes.setting(Register.R10), loud, kept, false)));
         rows.add(new Row(Map.of(), Map.of()));
         return built(rows, 1);
     }
 
+    /**
+     * Bit 5 of a start is the structure's placeReset (SPEC.md 1.8.4, rule
+     * 3): a start with it clear leaves the place at its number modulo R of
+     * the source it starts, on another target and across row counts, so the
+     * writer sets the bit exactly where the structure sets it, and
+     * YMXS's check reports the start on a timer that has run none alone.
+     */
     @Test
-    void aStartOutsideRule3aIsWrittenWithThePlaceReset() {
+    void aStartWritesBit5AsItsPlaceReset() {
         Tune tune = outsideRule3a();
         byte[][] column = Schema.of(tune).columns().column;
         int a = Columns.EFFECT + 2;
         int d = Columns.EFFECT + 4 + 2;
-        assertEquals(Columns.PLACE_RESET, column[d][0] & Columns.PLACE_RESET,
-                "row 0 starts on a timer that has run none");
-        assertEquals(Columns.PLACE_RESET, column[a][1] & Columns.PLACE_RESET,
-                "row 1 matches the start before it, and the wrap reaches it from"
-                        + " row 3's start on another target");
-        assertEquals(Columns.PLACE_RESET, column[a][2] & Columns.PLACE_RESET,
-                "row 2 starts a source of another row count");
-        assertEquals(Columns.PLACE_RESET, column[a][3] & Columns.PLACE_RESET,
-                "row 3 starts on another target");
-        assertEquals(0, column[d][4] & Columns.PLACE_RESET,
-                "row 4 matches the start before it, and the wrap reaches it from"
-                        + " itself");
-        // YMXS's check reads the first pass, so its lines of rule 3 are of
-        // rows 0, 2 and 3, and row 1 is a breach only after the wrap
+        assertEquals(Columns.PLACE_RESET, column[a][0] & Columns.PLACE_RESET,
+                "row 0 sets placeReset on Timer A");
+        assertEquals(0, column[d][0] & Columns.PLACE_RESET,
+                "row 0 clears it on Timer D, which has run none");
+        for (int[] at : new int[][] {{a, 1}, {a, 2}, {a, 3}, {d, 4}}) {
+            assertEquals(0, column[at[0]][at[1]] & Columns.PLACE_RESET,
+                    "row " + at[1] + " leaves the place at its number modulo R");
+        }
         List<String> warned = org.ymxs.Check.writing(tune).stream()
                 .filter(line -> line.contains("without the place's reset")).toList();
-        assertEquals(List.of("row 0:", "row 2:", "row 3:"), warned.stream()
+        assertEquals(List.of("row 0:"), warned.stream()
                 .map(line -> line.substring(0, line.indexOf(':') + 1)).toList(),
                 warned.toString());
+    }
+
+    /**
+     * A deferred start sets the control column with bit 3 (SPEC.md 4.8),
+     * the effects used have bit 4 set, and the next row that sets a rate
+     * of the effect sets both columns, since the timer counts at the rate
+     * of the effect before the start until the tick that performs it.
+     */
+    @Test
+    void aDeferredStartSetsBit3AndTheEffectsUsedBit4() {
+        Schema.Made made = Schema.of(deferred());
+        byte[][] column = made.columns().column;
+        int control = Columns.EFFECT + 2;
+        int count = Columns.EFFECT + 3;
+        assertEquals(0, column[control][0] & Columns.DEFERRED, "row 0 starts at once");
+        assertEquals(0x80 | Columns.DEFERRED, column[control][1] & (0x80 | Columns.DEFERRED),
+                "row 1 sets the control column with bit 3");
+        assertEquals(0x80, column[control][2] & 0x80, "row 2 sets the select of a timer"
+                + " whose rate the switch writes");
+        assertEquals(100, column[count][2] & 0xFF, "and the count");
+        assertEquals(Columns.DEFERS | 1, made.columns().effects,
+                "effect 0 runs, and a row defers a start");
     }
 
     @Test
@@ -187,17 +228,17 @@ final class YmxsTest {
         org.ymxs.YMXS.Single soft = Tunes.repeating("square 6", List.of(6, 0), 0);
         List<Row> rows = new ArrayList<>();
         rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), loud, new Timing(
-                Chip.prescaler(4), 100, true, true))));
+                Chip.prescaler(4), 100, true, true), false)));
         // a second source on the running timer, at the rate it counts
         rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), soft, new Timing(
-                Chip.prescaler(4), 100, false, false))));
+                Chip.prescaler(4), 100, false, false), false)));
         // the same, with the count moved
         rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), loud, new Timing(
-                Chip.prescaler(4), 90, false, false))));
+                Chip.prescaler(4), 90, false, false), false)));
         // the timer stopped, then started again at the rate it last ran
         rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP)));
         rows.add(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8), loud, new Timing(
-                Chip.prescaler(4), 90, false, false))));
+                Chip.prescaler(4), 90, false, false), false)));
         byte[][] column = Schema.of(built(rows, 0)).columns().column;
         int source = Columns.EFFECT + 1;
         int control = Columns.EFFECT + 2;
@@ -228,7 +269,7 @@ final class YmxsTest {
     void aStructureThisFormatCannotEncodeIsAnError() {
         org.ymxs.YMXS.Single square = Tunes.repeating("square 12", List.of(12, 0), 0);
         List<Row> big = List.of(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R8),
-                square, new Timing( Chip.prescaler(4), Chip.MOST_COUNT + 1, true, true))));
+                square, new Timing( Chip.prescaler(4), Chip.MOST_COUNT + 1, true, true), false)));
         String said = String.valueOf(assertThrows(IllegalArgumentException.class,
                 () -> Schema.of(built(big, 0))).getMessage());
         assertTrue(said.contains("count of 256"), "a count of 256 is past the timer's data"
@@ -238,7 +279,7 @@ final class YmxsTest {
         // bit 31 of its index entry marks, in a file of version 7 (3.3.5).
         org.ymxs.YMXS.Single whole = Tunes.repeating("whole", List.of(200), 0);
         List<Row> counted = List.of(row(Map.of(), Timer.A, new StartOne(Tunes.setting(Register.R0),
-                whole, new Timing(Chip.prescaler(4), 100, true, true))));
+                whole, new Timing(Chip.prescaler(4), 100, true, true), false)));
         Schema.Made made = Schema.of(built(counted, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
                 YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
@@ -262,7 +303,7 @@ final class YmxsTest {
                         new org.ymxs.YMXS.Two(255, 255)), 0));
         List<Row> rows = List.of(row(Map.of(), Timer.A, new org.ymxs.YMXS.StartPair(
                 new org.ymxs.YMXS.SetEnvelope(), sweep,
-                new Timing(Chip.prescaler(4), 100, true, true))));
+                new Timing(Chip.prescaler(4), 100, true, true), false)));
         Schema.Made made = Schema.of(built(rows, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
                 YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
@@ -286,7 +327,7 @@ final class YmxsTest {
         org.ymxs.YMXS.Single gate = Tunes.repeating("gate", List.of(56, 57), 0);
         List<Row> rows = List.of(row(Map.of(), Timer.A, new StartOne(
                 Tunes.setting(Register.R7), gate,
-                new Timing(Chip.prescaler(4), 100, true, true))));
+                new Timing(Chip.prescaler(4), 100, true, true), false)));
         Schema.Made made = Schema.of(built(rows, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
                 YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();

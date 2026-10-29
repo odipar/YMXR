@@ -76,7 +76,8 @@ final class Trace {
                         .append(e.target()).append(",\"source\":").append(e.source())
                         .append(",\"select\":").append(e.select()).append(",\"count\":")
                         .append(e.count()).append(",\"timer\":").append(e.timer())
-                        .append(",\"place\":").append(e.place()).append('}');
+                        .append(",\"place\":").append(e.place())
+                        .append(",\"deferred\":").append(e.deferred()).append('}');
                 first = false;
             }
             line.append("}}\n");

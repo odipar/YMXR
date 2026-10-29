@@ -110,11 +110,12 @@ final class Multi {
         int version = Tune.getWord(file, 4);
         if (version >= Tune.VERSION_DTX2 && version <= Tune.VERSION_DTX2_LAST) {
             throw new IllegalArgumentException("version " + version + " has DTX2 tables,"
-                    + " and this reads " + VERSION + ": write the tunes again with"
+                    + " and this reads " + Tune.READS + ": write the tunes again with"
                     + " ym-to-ymxr or ymxs-to-ymxr");
         }
-        if (version != VERSION) {
-            throw new IllegalArgumentException("version " + version + " is not " + VERSION);
+        if (version != VERSION && version != Tune.VERSION_BEFORE) {
+            throw new IllegalArgumentException("version " + version + " is not "
+                    + Tune.READS);
         }
         int count = Tune.getWord(file, COUNT_AT);
         if (count < 1 || count > MOST) {

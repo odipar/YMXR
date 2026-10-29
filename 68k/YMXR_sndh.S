@@ -28,9 +28,11 @@
 ;        neither drops the interrupt level nor writes an end of
 ;        interrupt (YMXR_NEST=0 and YMXR_AEOI=1), which a host uses only
 ;        where no MFP interrupt of the host nests and the vector register
-;        is the player's, and bit 2 where a tick reads its row through a
+;        is the player's, bit 2 where a tick reads its row through a
 ;        displacement from the instruction that reads it (YMXR_PCREL=1),
-;        which requires the tunes within 32,767 bytes of the core
+;        which requires the tunes within 32,767 bytes of the core, and
+;        bit 3 where the deferred start is assembled in (YMXR_DEFER=1),
+;        which a tune whose effects byte sets bit 4 requires
 ;   +24  where the state byte is, a word: bit 0 set while a tune plays,
 ;        bit 1 once it has played its last row and does not repeat
 ;   +26  zero
@@ -51,10 +53,11 @@ sndh_core:
                 dc.w    1
                 dc.w    YMXR_VERSION
                 dc.w    YMXR_FIXED
-                dc.w    YMXR_PERF|(YMXR_AEOI<<1)|(YMXR_PCREL<<2)
+                dc.w    YMXR_PERF|(YMXR_AEOI<<1)|(YMXR_PCREL<<2)|(YMXR_DEFER<<3)
                                         ; the flags: the monitor, the tick
-                                        ; a host claims the MFP for, and the
-                                        ; row read through the program counter
+                                        ; a host claims the MFP for, the row
+                                        ; read through the program counter,
+                                        ; and the deferred start
                 dc.w    sndh_state-sndh_core
                 dc.w    0
 sndh_table:     dc.l    0

@@ -27,7 +27,7 @@ import org.ymxs.tool.Tool;
  *  16      2      the descriptor's version, 1
  *  18      2      the bound tune's version the core reads
  *  20      2      YMXR_FIXED, the workspace's bytes before the state block
- *  22      2      flags: bit 0 the raster monitor, bit 1 the lean tick
+ *  22      2      flags: bits 0 to 3, the four switches below
  *  24      2      where the core's state byte is
  *  26      2      zero
  *  28      4      the subtune table's offset, patched here
@@ -68,6 +68,11 @@ final class Sndh {
      *  doc/performance.md), which reaches 32,767 bytes, so the file's
      *  tunes are within that of the core (BINARIES.md 5.5). */
     static final int CORE_PCREL = 4;
+
+    /** The core's flag bit 3: the deferred start assembled in (the
+     *  player's YMXR_DEFER=1, doc/performance.md), which a tune whose
+     *  effects byte sets bit 4 requires (SPEC.md 3.3). */
+    static final int CORE_DEFER = 8;
 
     /** What a displacement reaches, the bytes from the core's first byte
      *  a bound tune of a file built on the core above ends within. */
@@ -138,11 +143,12 @@ final class Sndh {
 
     /**
      * The file, from the tune files as subtunes 1 up, around the core the
-     * options' three switches select: the raster monitor in where they ask
-     * to read the run, the lean tick where the options select it, ticks
-     * that read a row through the program counter where they select that,
-     * the core of any two or three where they select them, and the plain
-     * core where none.
+     * options' three switches and the tunes select: the raster monitor in
+     * where they ask to read the run, the lean tick where the options
+     * select it, ticks that read a row through the program counter where
+     * they select that, the core of any two or three where they select
+     * them, and the plain core where none. The deferred start is in the
+     * core where a subtune defers a start.
      *
      * @throws IllegalArgumentException where a tune file is not one this
      *     reads, the bound tunes are not of the version the core reads,
@@ -176,6 +182,7 @@ final class Sndh {
         int[] frames = new int[n];
         int rate = 0;
         int claimed = 0;
+        boolean defers = false;
         for (int i = 0; i < n; i++) {
             TuneFile tune;
             try {
@@ -199,6 +206,7 @@ final class Sndh {
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
+            defers |= (tune.effects() & Columns.DEFERS) != 0;
         }
         // The tunes are bound as a set, so those that agree on what an
         // image fixes once share one and the reader's code appears once for
@@ -221,14 +229,14 @@ final class Sndh {
             pcrel = (Tune.getWord(core, CORE_FLAGS_AT) & CORE_PCREL) != 0;
         }
         if (core == null) {
-            core = Binaries.core(options.monitor(), options.lean(), pcrel);
+            core = Binaries.core(options.monitor(), options.lean(), pcrel, defers);
             if (pcrel && options.ticks() == Ticks.CHOSEN
                     && tunesEnd(core, set, tags) > PCREL_REACH) {
                 pcrel = false;
-                core = Binaries.core(options.monitor(), options.lean(), false);
+                core = Binaries.core(options.monitor(), options.lean(), false, defers);
             }
         }
-        checkCore(core, options.monitor(), options.lean(), pcrel, binds(tuneFiles));
+        checkCore(core, options.monitor(), options.lean(), pcrel, defers, binds(tuneFiles));
         if (pcrel) {
             // A tick of this core reads its row through a displacement
             // from the instruction that reads it, which reaches
@@ -269,8 +277,9 @@ final class Sndh {
      * @throws IllegalArgumentException where the core is not one, is of
      *     another descriptor version, reads bound tunes below the version
      *     {@code binds} names, has no raster monitor in
-     *     where {@code monitor} selects one, or its ticks are not the
-     *     lean ones where {@code lean} does
+     *     where {@code monitor} selects one, its ticks are not the
+     *     lean ones where {@code lean} does, or it has no deferred start
+     *     in where {@code defers}
      */
     static int binds(List<byte[]> tuneFiles) {
         return Bound.VERSION;
@@ -282,6 +291,11 @@ final class Sndh {
 
     static void checkCore(byte[] core, boolean monitor, boolean lean, boolean pcrel,
                           int binds) {
+        checkCore(core, monitor, lean, pcrel, false, binds);
+    }
+
+    static void checkCore(byte[] core, boolean monitor, boolean lean, boolean pcrel,
+                          boolean defers, int binds) {
         if (core.length < CORE_DESCRIPTOR || !Arrays.equals(CORE_MAGIC,
                 Arrays.copyOfRange(core, CORE_MAGIC_AT, CORE_MAGIC_AT + 4))) {
             throw new IllegalArgumentException("not an SNDH core: no YMXS at " + CORE_MAGIC_AT);
@@ -309,6 +323,10 @@ final class Sndh {
             throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
                     + flags + ", and the row read through the program counter asked for needs"
                     + " bit 2 set");
+        }
+        if (defers && (flags & CORE_DEFER) == 0) {
+            throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
+                    + flags + ", and a subtune that defers a start needs bit 3 set");
         }
     }
 
@@ -631,8 +649,9 @@ final class Sndh {
         boolean monitor = (flags & CORE_MONITOR) != 0;
         boolean lean = (flags & CORE_LEAN) != 0;
         boolean pcrel = (flags & CORE_PCREL) != 0;
-        Binaries.Binary binary = Binaries.binary(monitor, lean, pcrel);
-        int core = Binaries.core(monitor, lean, pcrel).length;
+        boolean defer = (flags & CORE_DEFER) != 0;
+        Binaries.Binary binary = Binaries.binary(monitor, lean, pcrel, defer);
+        int core = Binaries.core(monitor, lean, pcrel, defer).length;
         report.say("the core: " + binary.name() + ", " + Report.count(core, "byte", "bytes"));
         List<String> switches = new ArrayList<>();
         if (monitor) {
@@ -649,6 +668,9 @@ final class Sndh {
                     + " past the " + PCREL_REACH + " bytes a displacement reaches");
         } else {
             switches.add("-abs, ticks that read a row through an absolute address");
+        }
+        if (defer) {
+            switches.add("the deferred start in: a subtune defers a start");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));

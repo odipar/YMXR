@@ -394,6 +394,68 @@ final class BuiltTunes {
     }
 
     /**
+     * Deferred starts, bit 3 of the control column (SPEC.md 1.9, 4.8): on
+     * Timer A a loop of four rows, then a fall that waits for the loop's
+     * last row, then a source of three rows with the place at its number
+     * modulo its R, bit 5 at 0; a deferred start a stop drops before the
+     * switch; and a deferred start on the stopped timer, which starts at
+     * its frame. On Timer C, whose control register Timer D shares, a loop
+     * and then a deferred start with both resets.
+     */
+    static Tune.Written deferred() {
+        int frames = 48;
+        byte[][] c = new byte[Columns.C][frames];
+        // the mixer with the tones of voices A and B alone, their periods;
+        // R8 and R9 are the two effects', which every row leaves unset
+        c[7][0] = (byte) (0x80 | 0x3C);
+        c[0][0] = 0x60;
+        c[1][0] = (byte) (0x80 | 1);
+        c[2][0] = 0x40;
+        c[3][0] = (byte) (0x80 | 1);
+        int start = 0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET;
+        int defer = 0x80 | Columns.DEFERRED;
+        int e0 = Columns.EFFECT;
+        int e3 = Columns.EFFECT + 12;
+        c[e0][0] = (byte) (0x80 | 8);                    // setR8 on Timer A
+        c[e0 + 1][0] = (byte) (0x80 | 1);
+        c[e0 + 2][0] = (byte) (start | 7);
+        c[e0 + 3][0] = (byte) 200;
+        c[e0 + 1][3] = (byte) (0x80 | 2);                // the fall, after the loop
+        c[e0 + 2][3] = (byte) (defer | Columns.PLACE_RESET | 4);
+        c[e0 + 3][3] = 100;
+        c[e0 + 1][12] = (byte) (0x80 | 3);               // three rows, the place kept
+        c[e0 + 2][12] = (byte) (defer | 7);
+        c[e0 + 3][12] = (byte) 200;
+        c[e0 + 1][20] = (byte) (0x80 | 1);               // dropped by the stop
+        c[e0 + 2][20] = (byte) (defer | Columns.PLACE_RESET | 7);
+        c[e0 + 3][20] = (byte) 200;
+        c[e0 + 1][21] = (byte) 0x80;
+        c[e0 + 1][30] = (byte) (0x80 | 2);               // on the stopped timer
+        c[e0 + 2][30] = (byte) (defer | Columns.TIMER_RESET | Columns.PLACE_RESET | 4);
+        c[e0 + 3][30] = 100;
+        c[e3][0] = (byte) (0x80 | 9);                    // setR9 on Timer C
+        c[e3 + 1][0] = (byte) (0x80 | 1);
+        c[e3 + 2][0] = (byte) (start | 7);
+        c[e3 + 3][0] = (byte) 180;
+        c[e3 + 1][6] = (byte) (0x80 | 3);
+        c[e3 + 2][6] = (byte) (defer | Columns.TIMER_RESET | Columns.PLACE_RESET | 7);
+        c[e3 + 3][6] = (byte) 120;
+        byte[][] loop = {{15, 12, 9, (byte) (0x80 | 6)}};
+        byte[][] fall = new byte[1][16];
+        for (int r = 0; r < 16; r++) {
+            fall[0][r] = (byte) (15 - r);
+        }
+        fall[0][15] |= (byte) 0x80;
+        byte[][] three = {{10, 5, (byte) (0x80 | 1)}};
+        Sources sources = new Sources(List.of(
+                new Sources.Source(Effects.SID, 0, loop, 0),
+                new Sources.Source(Effects.DRUM, 0, fall, fall[0].length),
+                new Sources.Source(Effects.SID, 0, three, 0)));
+        Columns columns = new Columns(c, 0, Columns.DEFERS | 0b1001);
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, new Report());
+    }
+
+    /**
      * The six targets whose register reads every bit of its byte (SPEC.md
      * 2.1.2), each running a counted source, so the kit has a tune of
      * each: `setR0` and `setR4` on Timer A, `setR7` on Timer D,

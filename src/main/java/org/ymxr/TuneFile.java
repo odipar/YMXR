@@ -24,12 +24,12 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
         // what it was converted from.
         if (version >= Tune.VERSION_DTX2 && version <= Tune.VERSION_DTX2_LAST) {
             throw new IllegalArgumentException("version " + version + " has a DTX2"
-                    + " table, and this reads " + Tune.VERSION + ": write the tune again"
+                    + " table, and this reads " + Tune.READS + ": write the tune again"
                     + " with ym-to-ymxr or ymxs-to-ymxr");
         }
-        if (version != Tune.VERSION) {
+        if (version != Tune.VERSION && version != Tune.VERSION_BEFORE) {
             throw new IllegalArgumentException("version " + version + " is not "
-                    + Tune.VERSION);
+                    + Tune.READS);
         }
         int count = file[Tune.COUNT_AT] & 0xFF;
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);

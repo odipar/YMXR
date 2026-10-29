@@ -110,14 +110,15 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 7, a tune whose table is DTX3, which a reader and the
+# (BINARIES.md 1): 8, which a writer writes, and 7, whose control columns
+# have bit 3 at 0, each a tune whose table is DTX3, which a reader and the
 # player read.
-TUNE_VERSIONS = (7,)
+TUNE_VERSIONS = (8, 7)
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
 COUNTED = 1 << 31
-BOUND_VERSIONS = (7,)
+BOUND_VERSIONS = (7, 8)
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209
@@ -186,6 +187,10 @@ ENTRY = 64
 
 PERF = "-perf" in sys.argv
 LEAN = "-lean" in sys.argv
+# -defer runs every tune on the player with the deferred start in
+# (YMXR_DEFER=1); without it, check plays a tune whose effects byte sets
+# bit 4 on that player and every other tune on the player without it.
+DEFER = "-defer" in sys.argv
 
 # The row of performance.md's lean table each kind of tick reads, the
 # five kinds being what a lean tick has: it drops no interrupt level, so
@@ -197,6 +202,20 @@ LEAN_ROW = {"on": "a row written, the place stepped",
             "one": "a source of one row, no place stepped"}
 DEFINED = {"YMXR_PERF": 1 if PERF else 0,
            "YMXR_NEST": 0 if LEAN else 1, "YMXR_AEOI": 1 if LEAN else 0}
+
+# The switches main assembles the player with, and the player each set of
+# them assembles to with the deferred start in.
+DEFINES = []
+_DEFERRING = {}
+
+
+def deferring(defines):
+    """The player assembled with those switches and the deferred start in
+    (YMXR_DEFER=1), and its symbols."""
+    defines = tuple(d for d in defines if d != "-dYMXR_DEFER=1") + ("-dYMXR_DEFER=1",)
+    if defines not in _DEFERRING:
+        _DEFERRING[defines] = assemble(defines=defines)
+    return _DEFERRING[defines]
 
 
 def equate(name, symbols=None):
@@ -367,11 +386,13 @@ def entry(model, writes):
         fx = model.fx[i]
         if not fx["set"]:
             continue
-        one = {"target": fx["target"], "source": fx["source"]}
-        one["select"] = fx["select"]
-        one["count"] = fx["count"]
-        one["timer"] = fx["restart"]
-        one["place"] = fx["reset_place"]
+        kept = fx["kept"]
+        one = {"target": fx["target"], "source": kept["source"]}
+        one["select"] = kept["select"]
+        one["count"] = kept["count"]
+        one["timer"] = bool(fx["bits"] & 0x40)
+        one["place"] = bool(fx["bits"] & 0x20)
+        one["deferred"] = bool(fx["bits"] & 0x08)
         e[str(i)] = one
     return {"result": 0, "w": w, "e": e}
 
@@ -450,8 +471,10 @@ class Model:
         self.playing = None
         # target is the one the player keeps after step 1, and using the
         # target the running effect writes: the one kept at its start
+        # pending is the deferred start armed on the timer, None where none
+        # is (SPEC.md 4.8)
         self.fx = [dict(target=0, using=0, source=0, select=0, count=0, place=None,
-                        running=False) for _ in range(4)]
+                        running=False, pending=None) for _ in range(4)]
 
     def frame(self):
         """(the chip writes in order, the effects' state after the row)."""
@@ -484,8 +507,39 @@ class Model:
         fx["selected"] = False
         fx["reset_place"] = False
         fx["set"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
+        # What the reader records of the row (SPEC.md 7.3): the source the
+        # last row that set the column named, the kept select and count,
+        # and the control bits the row sets. A deferred start's are the
+        # row's, where the timer runs on the effect before it until the
+        # switch, which the fields below follow.
+        kept = fx.setdefault("kept", dict(source=0, select=0, count=0))
+        fx["bits"] = r[t + 2] if r[t + 2] & 0x80 else 0
+        if r[t + 1] & 0x80:
+            kept["source"] = r[t + 1] & 0x7F
+        if r[t + 2] & 0x80:
+            kept["select"] = r[t + 2] & 7
+            if r[t + 3] or r[t + 2] & 0x10:
+                kept["count"] = r[t + 3]
+        elif r[t + 3]:
+            kept["count"] = r[t + 3]
         if r[t + 1] & 0x80:
             source = r[t + 1] & 0x7F
+            if r[t + 2] & 0x80 and r[t + 2] & 0x08 and source and fx["running"]:
+                # A deferred start on a running timer is armed: the row
+                # leaves the timer, its source, its rate and its place as
+                # they are, and the tick that reads the running source's
+                # last row performs it, at row 0 with bit 5 and otherwise
+                # at that last row modulo R of this source (SPEC.md 4.8).
+                was = self.tune.sources[fx["source"]][1]
+                R = self.tune.sources[source][1]
+                fx["pending"] = dict(
+                    source=source, using=fx["target"],
+                    place=0 if r[t + 2] & 0x20 else (was - 1) % R,
+                    select=r[t + 2] & 7,
+                    count=r[t + 3] if r[t + 3] or r[t + 2] & 0x10 else fx["count"])
+                return
+            # a stop and a start at the frame drop a pending start (4.8)
+            fx["pending"] = None
             fx["source"] = source
             if source == 0:
                 # a row that stops an effect moves no place, so a source
@@ -495,9 +549,11 @@ class Model:
                 at, R, RR, columns = self.tune.sources[source]
                 # row 0 where the row sets bit 5 of the control column, and
                 # where it does not, the row number already in the place
-                # (SPEC.md 1.9)
+                # modulo R of this source (SPEC.md 1.8.4)
                 if r[t + 2] & 0x20 or fx["place"] is None:
                     fx["place"] = 0
+                else:
+                    fx["place"] %= R
                 fx["using"] = fx["target"]
                 # The effect runs from here: a stopped timer starts on the
                 # select the row writes, bit 6 set or clear, and select 0 is
@@ -570,6 +626,15 @@ class Model:
         else:
             last = bool(write[-1][1] & 0x80)
         if last:
+            pending = fx["pending"]
+            if pending:
+                # the source ends at its last row, a source that repeats
+                # included, and the tick performs the pending start: the
+                # next tick reads its source at its place (SPEC.md 4.8)
+                fx.update(source=pending["source"], using=pending["using"],
+                          place=pending["place"], select=pending["select"],
+                          count=pending["count"], running=True, pending=None)
+                return write, "switch"
             if RR < R:
                 fx["place"] = RR
                 return write, "loop"
@@ -872,6 +937,8 @@ class Timers:
                                         # the control register is 0
         self.phase = [float(PRESCALER[self.mode[i] & 7] * self.count[i]) for i in range(4)]
         self.restarts = [0, 0, 0, 0]
+        self.now = 0.0                  # where the writes fall: 0 at a
+                                        # frame, a tick's time inside one
         self.ier = dict(ier)            # by register address
         self.imr = dict(imr)
 
@@ -903,7 +970,7 @@ class Timers:
                     self.mode[i] = mode
                     if started:
                         self.restarts[i] += 1
-                        self.phase[i] = self.period(i)
+                        self.phase[i] = self.now + self.period(i)
                         self.loaded[i] = False
                 elif reg == t["data"]:
                     if self.mode[i] == 0:
@@ -938,8 +1005,10 @@ class Timers:
             if self.pending[i] is not None:
                 self.count[i] = self.pending[i]
                 self.pending[i] = None
+            self.now = self.phase[i]
             self.phase[i] += self.period(i)
             yield i
+            self.now = 0.0
         for i in range(4):
             if self.mode[i]:
                 self.phase[i] -= clocks
@@ -1060,53 +1129,13 @@ def built(name, tune):
     return at, struct.unpack(">H", r.stdout[4:6])[0]
 
 
-def unplace(at, row, effect):
-    """The tune file at `at` with bit 5 of effect `effect`'s control column
-    cleared on `row`: a start that moves no place. ymxs-to-ymxr writes the
-    place's reset on every start outside rule 3(a) of SPEC.md 6
-    (doc/ymxs.md), so a tune file of another writer is made here. The row
-    table goes through dtx-write -text and back, a DTX3 table packed at the
-    unit and ring its payload defines (DTX, SPEC.md 2.4), and the sources'
-    tables follow it on a long, their index entries moved by as many bytes
-    (SPEC.md 3.3)."""
-    f = open(at, "rb").read()
-    table_at = long_at(f, 12)
-    entries = [long_at(f, 16 + 4 * i) for i in range(f[9])]
-    first = entries[0] & ~COUNTED if entries else len(f)
-    r = subprocess.run([DTX_WRITE, "-text"], input=f[table_at:first],
-                       capture_output=True)
-    assert r.returncode == 0, r.stderr.decode()
-    lines = r.stdout.decode().split("\n")
-    rows = [i for i, line in enumerate(lines) if line[:1].isdigit()]
-    cells = lines[rows[row]].split(",")
-    c = 16 + 4 * effect                 # effect i's control column (SPEC.md 1)
-    assert int(cells[c]) & 0x20, "the writer set the place's reset"
-    cells[c] = str(int(cells[c]) & ~0x20)
-    lines[rows[row]] = ",".join(cells)
-    ring = struct.unpack(">H", f[table_at + 16:table_at + 18])[0]
-    unit = f[table_at + 18]
-    r = subprocess.run([DTX_WRITE, "-v3", "-k%d" % unit, "-m%d" % ring],
-                       input="\n".join(lines).encode(), capture_output=True)
-    assert r.returncode == 0, r.stderr.decode()
-    table = r.stdout + bytes(-len(r.stdout) % 4)
-    moved = table_at + len(table) - first
-    out = bytearray(f[:table_at] + table + f[first:])
-    for i, entry in enumerate(entries):
-        struct.pack_into(">I", out, 16 + 4 * i, entry + moved)
-    with open(at, "wb") as w:
-        w.write(out)
-
-
 def unplaced(code, symbols):
     """A start that moves no place, and no start on that timer before it:
     the place is row 0 of the source the row names (SPEC.md 4.1 step 4).
 
-    No writer here writes such a row - rule 3 of SPEC.md 6 has a start set
-    bit 5 of the control column with it, its one exception needs a source
-    started before, and ymxs-to-ymxr sets the bit on a start outside it -
-    so the tune is written through YMXS's form, which ymxs-to-ymxr warns
-    about, and the bit is cleared in the file it writes. The model reads
-    the place as row 0 and check reads the player against it.
+    The tune is written through YMXS's form with placeReset clear, which
+    ymxs-to-ymxr writes as bit 5 at 0 (doc/ymxs.md). The model reads the
+    place as row 0 and check reads the player against it.
     """
     rows = 8
     def column(at, value):
@@ -1122,9 +1151,166 @@ def unplaced(code, symbols):
                    "count": column(0, 200), "timerReset": column(0, 1),
                    "placeReset": column(0, 0)}}]}
     at = built("unplaced", tune)[0]
-    unplace(at, 0, 0)
     frames = check(at, code, symbols)[0]
     return "a start that moves no place is at row 0: %d frames" % frames
+
+
+def effects_tune(title, rows, sources, timers, registers=None, repeat=0):
+    """A tune of YMXS's form, version 5, from a few operations: `timers`
+    maps a timer's letter to {row: operation}, an operation ("start",
+    source, target, prescaler, count, timerReset, placeReset, deferred),
+    ("retune", prescaler, count, timerReset, placeReset) or ("stop",), a
+    source numbered from 1 into `sources`, each (name, values, repeat)."""
+    def timer(ops):
+        columns = {key: [-1] * rows for key in ("shape", "target", "source", "prescaler",
+                                                 "count", "timerReset", "placeReset",
+                                                 "deferred")}
+        for at, op in ops.items():
+            if op[0] == "start":
+                _, source, target, by, count, tr, pr, deferred = op
+                for key, value in (("shape", 0), ("target", target), ("source", source),
+                                   ("prescaler", by), ("count", count), ("timerReset", tr),
+                                   ("placeReset", pr), ("deferred", deferred)):
+                    columns[key][at] = value
+            elif op[0] == "retune":
+                _, by, count, tr, pr = op
+                for key, value in (("shape", 1), ("prescaler", by), ("count", count),
+                                   ("timerReset", tr), ("placeReset", pr)):
+                    columns[key][at] = value
+            else:
+                columns["shape"][at] = 2
+        return columns
+    tune = {"title": title, "composer": "", "writer": "68k/test/emu/test_ymxr.py",
+            "rate": 50, "rows": rows, "repeat": repeat,
+            "sources": [{"name": name, "repeat": rr, "values": values}
+                        for name, values, rr in sources],
+            "registers": registers or {"r7": [56] + [-1] * (rows - 1)}}
+    for letter, ops in timers.items():
+        tune["timer" + letter] = timer(ops)
+    return {"format": "ymxs", "version": 5, "tunes": [tune]}
+
+
+def deferred(code, symbols):
+    """Deferred starts (SPEC.md 4.8), each played tick by tick against the
+    model: the source running ends at its last row, a source that repeats
+    included, the tick that reads it performs the pending start, and the
+    next tick reads the new source at its place. One tune a case: every
+    shape of handler hooked and armed, in both banks; a stop, a start, a
+    retune and a second deferred start before the switch; a deferred start
+    on a stopped timer; the place kept modulo R; and a timer whose control
+    register two timers share."""
+    loop = ("loop of four", [15, 12, 9, 6], 0)
+    fall = ("fall", list(range(15, -1, -1)), None)
+    square = ("square", [15, 0], 0)
+    other = ("square two", [13, 2], 0)
+    held = ("one row", [11], 0)
+    three = ("three rows", [10, 5, 1], 0)
+    slow, quick = (200, 200), (50, 100)
+    def start(source, target=8, rate=slow, tr=1, pr=1, deferred=0):
+        return ("start", source, target, rate[0], rate[1], tr, pr, deferred)
+    cases = [
+        ("a fall after a loop", [loop, fall],
+         {"A": {0: start(1), 3: start(2, rate=quick, tr=0, deferred=1)}}),
+        ("a fall after a loop, the place kept modulo R", [loop, fall],
+         {"A": {0: start(1), 3: start(2, rate=quick, pr=0, deferred=1)}}),
+        ("a loop after a loop, the general handler in both banks", [loop, three],
+         {"A": {0: start(1), 2: start(2, pr=0, deferred=1), 12: start(1, pr=0, deferred=1)}}),
+        ("a fall after a square", [square, fall],
+         {"A": {0: start(1), 5: start(2, rate=quick, deferred=1)}}),
+        ("a square after a square, both banks", [square, other],
+         {"A": {0: start(1), 4: start(2, pr=0, deferred=1), 9: start(1, pr=0, deferred=1)}}),
+        ("a square after a fall", [fall, square],
+         {"A": {0: start(1), 1: start(2, deferred=1)}}),
+        ("a fall after one row", [held, fall],
+         {"A": {0: start(1), 3: start(2, rate=quick, deferred=1)}}),
+        ("a stop before the switch", [loop, fall],
+         {"A": {0: start(1), 2: start(2, deferred=1), 3: ("stop",), 6: start(1)}}),
+        ("a start before the switch", [loop, fall, square],
+         {"A": {0: start(1), 2: start(2, deferred=1), 3: start(3)}}),
+        ("a retune before the switch", [loop, fall],
+         {"A": {0: start(1), 2: start(2, rate=quick, deferred=1),
+                3: ("retune", 200, 150, 0, 0)}}),
+        ("a second deferred start before the switch", [loop, fall, three],
+         {"A": {0: start(1), 2: start(2, deferred=1), 3: start(3, deferred=1)}}),
+        ("a deferred start on a stopped timer", [fall, loop],
+         {"A": {0: start(1, rate=quick), 8: start(2, deferred=1)}}),
+        ("a fall after a loop on Timer C", [loop, fall],
+         {"C": {0: start(1, target=9), 3: start(2, target=9, rate=quick, deferred=1)}}),
+        ("two timers, one deferred start each", [loop, fall, square],
+         {"A": {0: start(1), 3: start(2, rate=quick, deferred=1)},
+          "D": {0: start(3, target=9), 2: start(2, target=9, tr=0, deferred=1)}}),
+    ]
+    played = 0
+    for title, sources, timers in cases:
+        tune = effects_tune(title, 24, sources, timers)
+        at = built(re.sub(r"[^a-z]+", "-", title), tune)[0]
+        ticked = []
+        frames, ticks = check(at, code, symbols, ticked=ticked)[:2]
+        assert ticks, "%s: no tick" % title
+        played += 1
+    return "deferred starts: %d tunes, every tick against the model" % played
+
+
+def deferred_sizes():
+    """performance.md's sizes of the player with the deferred start in
+    (A deferred start), against the four builds of the two switches: the
+    player with it and without it, each with the row read through the
+    program counter and through an absolute address, and an instance of
+    the wide handler and of the marked shape of two columns in each."""
+    built = {(pcrel, defer): assemble(defines=([] if pcrel else ["-dYMXR_PCREL=0"])
+                                      + (["-dYMXR_DEFER=1"] if defer else []))
+             for pcrel in (True, False) for defer in (True, False)}
+    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read()
+                    .split("## A deferred start")[1].split())
+    sizes = re.search(r"make the player ([\d,]+) bytes against ([\d,]+), and ([\d,]+) against"
+                      r" ([\d,]+) where a tick reads an absolute address", said)
+    counted = tuple(len(built[k][0]) for k in ((True, True), (True, False),
+                                               (False, True), (False, False)))
+    assert sizes and tuple(int(x.replace(",", "")) for x in sizes.groups()) == counted, \
+        "performance.md reads the two families' players as %s, and they assemble to %s" % (
+            sizes and sizes.groups(), counted)
+    shapes = re.search(r"an instance of the wide handler is (\d+) bytes against (\d+), and of"
+                       r" the marked shape of two columns (\d+) against (\d+)", said)
+    def instance(defer, shape):
+        symbols = built[(True, defer)][1]
+        return symbols["ymxr_%s1" % shape] - symbols["ymxr_%s0" % shape]
+    counted = (instance(True, "env"), instance(False, "env"),
+               instance(True, "two"), instance(False, "two"))
+    assert shapes and tuple(int(x) for x in shapes.groups()) == counted, \
+        "performance.md reads the counted instances as %s, and they assemble to %s" % (
+            shapes and shapes.groups(), counted)
+    return ("the deferred start: the player %d bytes against %d, every size performance.md"
+            " reads" % (len(built[(True, True)][0]), len(built[(True, False)][0])))
+
+
+def absolute_sizes():
+    """performance.md's sizes of the player whose ticks read a row through
+    an absolute address (A tick through an absolute address), against the
+    two builds without the deferred start: the players, a timer's handlers
+    and frame code, and the rest. The frame code of the four timers is from
+    ymxr_frame to ymxr_regs, and their handlers from ymxr_tick0 to
+    ymxr_reach."""
+    near, near_symbols = assemble()
+    far, far_symbols = assemble(defines=["-dYMXR_PCREL=0"])
+    def span(symbols, first, last):
+        return symbols[last] - symbols[first]
+    handlers = (span(far_symbols, "ymxr_tick0", "ymxr_reach")
+                - span(near_symbols, "ymxr_tick0", "ymxr_reach")) // 4
+    frame = (span(near_symbols, "ymxr_frame", "ymxr_regs")
+             - span(far_symbols, "ymxr_frame", "ymxr_regs")) // 4
+    rest = len(near) - len(far) - 4 * (frame - handlers)
+    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read()
+                    .split("## A tick through an absolute address")[1].split())
+    m = re.search(r"assembles this build, which is ([\d,]+) bytes against ([\d,]+)\..*?"
+                  r"shortens a timer's handlers by (\d+) bytes, .*? (\d+) bytes more of the"
+                  r" timer's frame code\. The init and the routines the four timers share,"
+                  r" the reach check among them, are (\d+) bytes more", said)
+    counted = (len(far), len(near), handlers, frame, rest)
+    assert m and tuple(int(x.replace(",", "")) for x in m.groups()) == counted, \
+        "performance.md reads the absolute build as %s, and it assembles to %s" % (
+            m and m.groups(), counted)
+    return "the absolute build: %d bytes against %d, every size performance.md reads" % (
+        len(far), len(near))
 
 
 def halves(code, symbols):
@@ -1327,6 +1513,19 @@ def wholebyte(code, symbols):
             % (frames, ticks))
 
 
+def handler_at(m, symbols, name, i):
+    """Effect i's handler of the shape `name` ("tick", "sq", "one", "cnt",
+    "two", "three" or "env"): the instance its vector points into, bank 0
+    or bank 1 (68k/YMXR.S, BANK), and bank 0's where the vector names
+    neither."""
+    at = CODE + symbols["ymxr_%s%d" % (name, i)]
+    if "ymxr_bank1" not in symbols:
+        # a player without the deferred start has bank 0 alone
+        return at
+    bank = symbols["ymxr_bank1"] - symbols["ymxr_tick0"]
+    return at + bank if m.long(TIMER[i]["vector"]) == at + bank else at
+
+
 def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
           ticked=None):
     """The tune on the player, against the model frame by frame and tick
@@ -1361,6 +1560,14 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
     assert tune.version in BOUND_VERSIONS, "the binder wrote version %d" % tune.version
+    if tune.effects & 0x10 and "ymxr_bank1" not in symbols:
+        # A row defers a start, and init of a player without the deferred
+        # start reports -1 (doc/BINARIES.md 1.5 step 2), so the tune plays
+        # on the player assembled with it.
+        assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
+            & 0xFFFFFFFF == 0xFFFFFFFF, \
+            "init of a player without the deferred start took a tune that defers one"
+        code, symbols = deferring(DEFINES)
     m = Machine(code, symbols, bound)
     if cycles:
         # The image is the bound tune's last part (doc/BINARIES.md 1.2),
@@ -1522,7 +1729,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     # the counted handler of several columns: the place of
                     # the column it writes first, that column's register,
                     # and the rows it has left (68k/YMXR.S, TICKW counted)
-                    at = CODE + symbols["ymxr_env%d" % i]
+                    at = handler_at(m, symbols, "env", i)
                     assert m.place(at, TWC_PTR1) == place, \
                         "frame %d: effect %d's place is %x, not %x" % (
                             f, i, m.place(at, TWC_PTR1), place)
@@ -1537,7 +1744,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                 elif model.counted(i):
                     # the counted handler: its place, the register it
                     # selects and the rows it has left (68k/YMXR.S, TICKC)
-                    at = CODE + symbols["ymxr_cnt%d" % i]
+                    at = handler_at(m, symbols, "cnt", i)
                     assert m.place(at, TICKC_PTR) == place, \
                         "frame %d: effect %d's place is %x, not %x" % (
                             f, i, m.place(at, TICKC_PTR), place)
@@ -1550,7 +1757,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     assert m.long(TIMER[i]["vector"]) == at, \
                         "frame %d: effect %d's vector is not its counted handler's" % (f, i)
                 elif model.square(i):
-                    at = CODE + symbols["ymxr_sq%d" % i]
+                    at = handler_at(m, symbols, "sq", i)
                     assert m.byte(at + SQ_VAL) == model.value(i), \
                         "frame %d: effect %d's square is at %02x, not %02x" % (
                             f, i, m.byte(at + SQ_VAL), model.value(i))
@@ -1560,7 +1767,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     assert m.long(TIMER[i]["vector"]) == at, \
                         "frame %d: effect %d's vector is not its square's" % (f, i)
                 elif model.onerow(i):
-                    at = CODE + symbols["ymxr_one%d" % i]
+                    at = handler_at(m, symbols, "one", i)
                     assert m.byte(at + ONE_VAL) == model.value(i), \
                         "frame %d: effect %d's one row is %02x, not %02x" % (
                             f, i, m.byte(at + ONE_VAL), model.value(i))
@@ -1574,8 +1781,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     # column it writes first, and that column's register
                     # (68k/YMXR.S, TICKW)
                     columns = model.wide(i)
-                    at = CODE + symbols["ymxr_%s%d" % ("two" if columns == 2
-                                                       else "three", i)]
+                    at = handler_at(m, symbols, "two" if columns == 2 else "three", i)
                     sel, ptr = TW_SEL1[columns - 2], TW_PTR1[columns - 2]
                     assert m.place(at, ptr) == place, \
                         "frame %d: effect %d's place is %x, not %x" % (
@@ -1586,7 +1792,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     assert m.long(TIMER[i]["vector"]) == at, \
                         "frame %d: effect %d's vector is not its columns' handler" % (f, i)
                 else:
-                    at = CODE + symbols["ymxr_tick%d" % i]
+                    at = handler_at(m, symbols, "tick", i)
                     assert m.place(at, TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.place(at, TICK_PTR), place)
                     assert m.byte(at + TICK_SEL) == fx["using"], "frame %d: effect %d's handler selects R%d, not R%d" % (f, i, m.byte(at + TICK_SEL), fx["using"])
         for i in timers.due(clocks):
@@ -1610,7 +1816,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     kind = ("counted wide " if model.wide(i) else "counted ") + then
                 elif model.wide(i):
                     kind = "wide " + then
-                if bin(tune.effects).count("1") == 1:
+                if bin(tune.effects & 0x0F).count("1") == 1:
                     kind += " alone"        # init took the level's drop out
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
                 tick_cycles += cycles.cycles - before
@@ -1622,7 +1828,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             if model.counted(i):
                 if then != "stop":
                     wide = model.wide(i)
-                    at = CODE + symbols["ymxr_%s%d" % ("env" if wide else "cnt", i)]
+                    at = handler_at(m, symbols, "env" if wide else "cnt", i)
                     ptr, left = (TWC_PTR1, TWC_LEFT) if wide else (TICKC_PTR, TICKC_LEFT)
                     assert m.place(at, ptr) == model.place_address(i), \
                         "frame %d: after a tick effect %d's place is off" % (f, i)
@@ -1633,12 +1839,12 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     assert timers.mode[i] == 0, \
                         "frame %d: effect %d ran out and its timer runs on" % (f, i)
             elif model.square(i):
-                at = CODE + symbols["ymxr_sq%d" % i]
+                at = handler_at(m, symbols, "sq", i)
                 assert m.byte(at + SQ_VAL) == model.value(i), \
                     "frame %d: after a tick effect %d's square is at %02x, not %02x" % (
                         f, i, m.byte(at + SQ_VAL), model.value(i))
             elif model.onerow(i):
-                at = CODE + symbols["ymxr_one%d" % i]
+                at = handler_at(m, symbols, "one", i)
                 assert m.byte(at + ONE_VAL) == model.value(i), \
                     "frame %d: after a tick effect %d's one row is %02x, not %02x" % (
                         f, i, m.byte(at + ONE_VAL), model.value(i))
@@ -1646,12 +1852,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                 assert timers.mode[i] == 0, "frame %d: effect %d ran out and its timer runs on" % (f, i)
             elif model.wide(i):
                 columns = model.wide(i)
-                at = CODE + symbols["ymxr_%s%d" % ("two" if columns == 2
-                                                   else "three", i)]
+                at = handler_at(m, symbols, "two" if columns == 2 else "three", i)
                 assert m.place(at, TW_PTR1[columns - 2]) == model.place_address(i), \
                     "frame %d: after a tick effect %d's place is off" % (f, i)
             else:
-                at = CODE + symbols["ymxr_tick%d" % i]
+                at = handler_at(m, symbols, "tick", i)
                 assert m.place(at, TICK_PTR) == model.place_address(i), "frame %d: after a tick effect %d's place is off" % (f, i)
     boundaries = inside(code, symbols, bound, tune, workspace)
     m.call("stop", a0=workspace)
@@ -1830,17 +2035,23 @@ def counted_read(code, symbols, cycles_of, general):
     wide_size = symbols["ymxr_env1"] - symbols["ymxr_env0"]
     marked_size = symbols["ymxr_two1"] - symbols["ymxr_two0"]
     shapes = 4 * (symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]) + 4 * wide_size
-    if PCREL:
+    if DEFER:
+        # the section's sizes are the player without the deferred start,
+        # and deferred_sizes reads the other build's
+        pass
+    elif PCREL:
         sizes = re.search(r"(\d+) bytes an instance against (\d+)", said)
         player = re.search(r"The player is ([\d,]+) bytes, ([\d,]+) of them the counted shapes'"
                            r" eight instances", said)
     else:
         sizes = re.search(r"instances of (\d+) bytes against the marked shape's (\d+)", said)
         player = re.search(r"where a tick reads an absolute address, ([\d,]+) bytes and ([\d,]+),", said)
-    if not sizes or (int(sizes.group(1)), int(sizes.group(2))) != (wide_size, marked_size):
+    if DEFER:
+        pass
+    elif not sizes or (int(sizes.group(1)), int(sizes.group(2))) != (wide_size, marked_size):
         stale.append("performance.md reads the handlers' instances as %s, and the player"
                      " assembles %d and %d" % (sizes and sizes.groups(), wide_size, marked_size))
-    if not player or tuple(int(x.replace(",", "")) for x in player.groups()) != (len(code), shapes):
+    elif not player or tuple(int(x.replace(",", "")) for x in player.groups()) != (len(code), shapes):
         stale.append("performance.md reads the player as %s, and it assembles to %d bytes, %d"
                      " of them the counted shapes" % (player and player.groups(), len(code), shapes))
     marker = re.search(r"a period ([\d,]+) more than the row's, which the kit's `envelope` tune"
@@ -2793,8 +3004,10 @@ def patched_code_follows_the_subtune(defines, tunes):
     which DTX's init writes the ring's size into where its table has copies
     (DTX, abi.md 2), and the subtune after it reads the image it is bound
     with alone.
+
+    A set of which a subtune defers a start is on the core with the
+    deferred start in, as the tools select it (doc/BINARIES.md 2.1).
     """
-    code, symbols = assemble("YMXR_sndh.S", defines=defines)
     work = tempfile.mkdtemp()
     bounds = []
     # The set is the tunes at the head of the list, and a few are enough:
@@ -2810,6 +3023,9 @@ def patched_code_follows_the_subtune(defines, tunes):
             bounds.append((os.path.basename(ym), bound))
         if len(bounds) == SET_TUNES:
             break
+    if any(bound[8] & 0x10 for _, bound in bounds):
+        defines = [d for d in defines if d != "-dYMXR_DEFER=1"] + ["-dYMXR_DEFER=1"]
+    code, symbols = assemble("YMXR_sndh.S", defines=defines)
     # A tick reads its row through a signed word displacement, so a
     # subtune whose rows are past the reach is left
     # out: these are bound one by one, so each has an image in it, where
@@ -3010,6 +3226,9 @@ def main():
         defines += ["-dYMXR_PCREL=0"]
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
+    if DEFER:
+        defines += ["-dYMXR_DEFER=1"]
+    DEFINES[:] = defines
     code, symbols = assemble(defines=defines)
     global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL, ONE_SEL, ONE_VAL, TW_SEL1, TW_PTR1
     global TICKC_SEL, TICKC_PTR, TICKC_LEFT
@@ -3028,9 +3247,10 @@ def main():
     TWC_PTR1 = equate("TWC_PTR1", symbols)
     TWC_LEFT = equate("TWC_LEFT", symbols)
     TICKC_LEFT = equate("TICKC_LEFT", symbols)
-    print("the player: %d bytes%s%s" % (len(code),
-                                       ", the raster monitor in" if perf else "",
-                                       ", the lean tick" if LEAN else ""))
+    print("the player: %d bytes%s%s%s" % (len(code),
+                                         ", the raster monitor in" if perf else "",
+                                         ", the lean tick" if LEAN else "",
+                                         ", the deferred start in" if DEFER else ""))
     # The checks below read one tune of the list, and a dump of another
     # format is outside a run (convert): the first the converter reads
     # represents them, and the run reports the rest as it reaches them.
@@ -3048,6 +3268,9 @@ def main():
               % core(defines, first))
         print("    %s" % patched_code_follows_the_subtune(defines, tunes))
         print("    %s" % unplaced(code, symbols))
+        print("    %s" % deferred(*deferring(defines)))
+        print("    %s" % deferred_sizes())
+        print("    %s" % absolute_sizes())
         print("    %s" % halves(code, symbols))
         print("    %s" % voices(code, symbols))
         print("    %s" % envelope(code, symbols))
@@ -3145,7 +3368,9 @@ def main():
                 # ticks cost more, which moves three of the eleven tunes, and
                 # the table of tick paths under that build's heading is
                 # what those ticks read against.
-                if PCREL and said != counted:
+                # The tables are the player without the deferred start,
+                # and -defer reads its play call in the section on it.
+                if PCREL and not DEFER and said != counted:
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
                 # the table against 0.4.22: that release's call and this
@@ -3153,7 +3378,8 @@ def main():
                 against = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$"
                                     % re.escape(stem),
                                     open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
-                if PCREL and (not against or (int(against.group(2)), int(against.group(4)))
+                if PCREL and not DEFER and (not against or (int(against.group(2)),
+                                                            int(against.group(4)))
                               != (average, max(cost))):
                     stale.append("performance.md's table against 0.4.22 reads %s for %s, and the"
                                  " rig counts %d and %d" % (against and against.groups(), stem,
@@ -3167,7 +3393,21 @@ def main():
                 # the lean core reads its ticks and not these. Every effect
                 # of this tune is a square, whose tick costs the same under
                 # both builds, so the three figures are under -abs too.
-                if stem == "Synergy Credits" and not LEAN and PCREL:
+                if stem == "Synergy Credits" and not LEAN and PCREL and DEFER:
+                    # the play call of the build with the deferred start,
+                    # against the build without it (A deferred start)
+                    perf_said = " ".join(open(os.path.join(ROOT, "doc", "performance.md"))
+                                         .read().split("## A deferred start")[1].split())
+                    with_it = re.search(
+                        r"the play call of Synergy Credits counts ([\d,]+) cycles on"
+                        r" average and ([\d,]+) at most", perf_said)
+                    if not with_it or tuple(int(x.replace(",", "")) for x in with_it.groups()) \
+                            != (average, max(cost)):
+                        stale.append("performance.md reads the play call of Synergy Credits"
+                                     " with the deferred start in as %s, and the rig counts"
+                                     " %d and %d" % (with_it and with_it.groups(), average,
+                                                    max(cost)))
+                if stem == "Synergy Credits" and not LEAN and PCREL and not DEFER:
                     # the costliest frame, counted from the first as 1,
                     # which the section against YMX places past its run
                     perf_said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())

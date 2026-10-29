@@ -348,10 +348,10 @@ row where it arises:
 finding of YMXS's check of the writing rules (YMXS, SPEC.md 6.3) is a
 line `<tool>: warning: <finding>`, with `tune N: ` between `warning: `
 and the finding where the multi has more than one tune. `-silent` leaves
-them. A start of such a finding under rule 3, `placeReset` clear outside
-rule 3(a), is written with bit 5 of its control column set, and so is the
-start at or after the repeat row that only the wrap puts outside rule
-3(a) (ymxs.md): the place is row 0 there.
+them. A start is written with bit 5 of its control column where the
+structure sets `placeReset` (ymxs.md): a start with it clear leaves the
+place at its number modulo the row count of the source it starts
+(SPEC.md 1.8.4).
 
 **7.3 The tune file** of a tune is named by the tune's title (4.6). The
 report per tune: the packing report (4.5), then the row `<title>`,
@@ -455,22 +455,16 @@ in the Go tree, a named file fails to stat (19.5).
 
 **8.7 A tune file** is read as SPEC.md 3.3 defines, and its starts against
 rule 3 of SPEC.md 6: its verdict is `<name>: every start follows rule 3`,
-or `<name>:` and a line under it for each start that leaves bit 5 of the
-control column at 0 outside rule 3(a), in row order, where the place can
-be a row the source started lacks (SPEC.md 8.4). The rows are read in
-frame order, once from row 0 and once from the repeat row after the
-wrap, with the kept target of SPEC.md 4.1 and 4.5, since every later
-pass reads as the second does. A tune file that fails to read is the
-line `the tune file does not read: <message>`, the message a line of
-SPEC.md 3.3.4. The lines, `r` the row, `i` the effect, `S` the source,
-`N` its row count and `T` the kept target:
+or `<name>:` and a line under it for each start that names a source past
+the file's, in row order, whose rows are unknown. A start that leaves bit
+5 of the control column at 0 leaves the place at its number modulo the row
+count of the source it starts (SPEC.md 1.8.4), so every other start reads
+a row of its source. A tune file that fails to read is the line `the tune
+file does not read: <message>`, the message a line of SPEC.md 3.3.4. The
+line, `r` the row, `i` the effect and `S` the source:
 
 | line | condition |
 |---|---|
-| `r: effect i starts source S of N rows on target T with bit 5 at 0, and no source has started on the effect` | no start before it on the effect |
-| `r: effect i starts source S of N rows on target T with bit 5 at 0, and the source last started ran on target T2` | the start before it ran on another target |
-| `r: effect i starts source S of N rows on target T with bit 5 at 0, and the source last started had M rows` | the start before it had another row count |
-| the last two with `after the wrap` after `and` | the first start at or after the repeat row, against the table's last start |
 | `r: effect i starts source S, and the file has K sources` | S is past the file's source count (SPEC.md 8.5) |
 
 ---
@@ -566,8 +560,9 @@ then the set's heading of 4.7. The summary lines are
 **11.4 Reading a multi file.** A file of 8 bytes or more beginning `YMXM` is
 read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
 with the line, exit 1: a version word of 3 to 6, `version V has DTX2
-tables, and this reads 7: write the tunes again with ym-to-ymxr or
-ymxs-to-ymxr`; any other version word but 7, `version V is not 7`; a count
+tables, and this reads 7 or 8: write the tunes again with ym-to-ymxr or
+ymxs-to-ymxr`; any other version word but 7 and 8, `version V is not 7 or
+8`; a count
 outside 1 to 99, `N tunes, and a multi file has 1 to 99`; an index past the
 file's end, `the entries of N tunes end past the file's B bytes`; an entry
 outside the file, `tune N is at A for B bytes, and the file has F`, A its
@@ -588,17 +583,19 @@ read an absolute address (BINARIES.md 5.5); and two or three together
 the core that is those. Where neither `-pcrel` nor `-abs` is passed the
 tool reads the file's last bound tune against the core's first byte:
 within 32,767 bytes it writes the core that reads through the program
-counter, and further off the core that reads an address. The clock tag
-names Timer C, or the VBL where `-vbl` or `-perf` is passed: the raster
-monitor paints one frame of calls, which reads against the raster where
-the tick comes from the VBL (BINARIES.md 3.2, performance.md). `-tc`
-names Timer C over `-perf`, and `-vbl` and `-tc` together are `-vbl and
--tc name two clocks`, exit 2. A set that claims Timer C names the VBL,
-and `-tc` with such a set is the error of 12.2. The title is `-tTITLE`,
-else the first name, `(untitled)` where a tune file was read or the name
-is blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
-3) each text is reduced to its characters $20 to $7E; the report of 12.4
-prints the text as passed.
+counter, and further off the core that reads an address. Where the
+effects byte of a subtune sets bit 4 the core has the deferred start in,
+and where none does the core is without it (BINARIES.md 2.1). The clock
+tag names Timer C, or the VBL where `-vbl` or `-perf` is passed: the
+raster monitor paints one frame of calls, which reads against the raster
+where the tick comes from the VBL (BINARIES.md 3.2, performance.md).
+`-tc` names Timer C over `-perf`, and `-vbl` and `-tc` together are
+`-vbl and -tc name two clocks`, exit 2. A set that claims Timer C names
+the VBL, and `-tc` with such a set is the error of 12.2. The title is
+`-tTITLE`, else the first name, `(untitled)` where a tune file was read
+or the name is blank; the composer `-cCOMPOSER`, or absent. In the tags
+(BINARIES.md 3) each text is reduced to its characters $20 to $7E; the
+report of 12.4 prints the text as passed.
 
 **12.2 Errors**, each exit 1:
 
@@ -620,8 +617,9 @@ combine: `not an SNDH core: no YMXS at 12`; `the core's descriptor is
 version V, and this writes 1`; `the core reads bound tunes to version V, and
 this binds at W`, W the version the tune binds at; `the core's flags at 22
 read F, and the raster monitor asked for needs bit 0 set`; `... the lean
-tick asked for needs bit 1 set`, or `... the row read through the program
-counter asked for needs bit 2 set`.
+tick asked for needs bit 1 set`, `... the row read through the program
+counter asked for needs bit 2 set`, or `... a subtune that defers a start
+needs bit 3 set`.
 
 **12.4 The report:** the heading `the core: <file>, B bytes` with the
 row `the switches`, of `-perf, the raster monitor in` and `-lean, ticks
@@ -630,19 +628,20 @@ where those were passed, and then one of `ticks that read a row through
 the program counter`, `-abs, ticks that read a row through an absolute
 address` where that was passed, and `ticks that read a row through an
 absolute address: the tunes end past the 32767 bytes a displacement
-reaches` where the tool chose it (12.1), joined by `; `; the heading
-`the tags: TITL <title>`, then `, COMM <composer>` where present, `,
-<clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N names` for
-several subtunes; a row a subtune, its name or `the tune`, `B bytes
-bound to B2, its table in image I`, B the tune file's bytes, B2 the
-bound tune's, I the number of its image from 1; the heading `the images:
-N images of B bytes, DTX's reader once a set of tunes that share one`
-with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX3 at
-unit K, values of W`, W the width of a value in bytes; the heading `the
-file: B bytes, the
-core C, the images I, the tunes T, the workspace and the rest W`, C, I,
-T and W the bytes of the core, the images, the bound tunes, and the
-remainder. The summary line is `ymxr-sndh: B bytes, N subtunes`.
+reaches` where the tool chose it (12.1), and `the deferred start in: a
+subtune defers a start` where the core has it, joined by `; `; the
+heading `the tags: TITL <title>`, then `, COMM <composer>` where
+present, `, <clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N
+names` for several subtunes; a row a subtune, its name or `the tune`, `B
+bytes bound to B2, its table in image I`, B the tune file's bytes, B2
+the bound tune's, I the number of its image from 1; the heading `the
+images: N images of B bytes, DTX's reader once a set of tunes that share
+one` with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX3
+at unit K, values of W`, W the width of a value in bytes; the heading
+`the file: B bytes, the core C, the images I, the tunes T, the workspace
+and the rest W`, C, I, T and W the bytes of the core, the images, the
+bound tunes, and the remainder. The summary line is `ymxr-sndh: B bytes,
+N subtunes`.
 
 ---
 
@@ -791,9 +790,9 @@ the background colour, and `ym/cost.py` on the trace, one line a tune. An
 option outside the two is `ym/cost.sh does not read <option>`, exit 2.
 
 **16.5 `Binaries DIR... [-aRMAC] [-sSOURCES]`**, class
-`org.ymxr.Binaries`, assembles the eight cores and the stub with `rmac
+`org.ymxr.Binaries`, assembles the sixteen cores and the stub with `rmac
 -m68000 -fr -i68k <defines> -o` into each directory named, one line each
-`%-24s %5d bytes`; the assembler is `rmac` on the path or `-aRMAC`, the
+`%-34s %5d bytes`; the assembler is `rmac` on the path or `-aRMAC`, the
 sources `68k` or `-sSOURCES`. A failure is `binaries: no <file>
 assembled from <source> with an assembler at <rmac>: <message>. The
 build needs rmac, and -Drmac=PATH names another.`, exit 1; a call with
@@ -834,29 +833,30 @@ tool's exit code, standard output empty.
 
 ## 17. The rigs
 
-**17.1 `68k/test/emu/test_ymxr.py [mode] [tune ...]`** converts each dump
-named, or every dump under `ym/test`, and a dump the converter reads as
-another format (5.1) is outside the run, named on a line and counted
-apart from the tunes that played wrong. The rig binds each tune through
-`ymxr-bind` and plays it row by row on an emulated 68000 (unicorn),
-against a model of
-SPEC.md 4 and 5 built from the tune's tables: every frame's chip writes
-in order, each timer's programming, each handler's place, and every
-tick's write. The rig fires each tick at the time the model computes, in
-place of the interrupt the emulator lacks. It fires two ticks the tune's
-timers do not: a tick of a timer no row has started, which writes `$80`
-to R0 and stops the timer (SPEC.md 5.2.1), and a tick inside a frame,
-which the rig stops at the head of each effect's step and after the last
-of them (SPEC.md 4.2.1). The frame it stops in is one whose row moves
-what the effect's tick writes, so the reading before that effect's step
-and the reading after it differ, and the run reports how many of the
-boundaries a tick was fired at. A name ending `.ymxr` is played as it
-is, and a run writes one such tune itself: a start that moves no
-place with no start on that timer before it, which no conversion of a
-dump writes, to read the place against SPEC.md 4.1 step 4. A tune whose
-RR equals R is played one frame past its last row, where the call reports
--1 and leaves every register as it is. A tune that fails is named and the
-run continues.
+**17.1 `68k/test/emu/test_ymxr.py [mode] [tune ...]`** converts each
+dump named, or every dump under `ym/test`, and a dump the converter
+reads as another format (5.1) is outside the run, named on a line and
+counted apart from the tunes that played wrong. The rig binds each tune
+through `ymxr-bind` and plays it row by row on an emulated 68000
+(unicorn), against a model of SPEC.md 4 and 5 built from the tune's
+tables: every frame's chip writes in order, each timer's programming,
+each handler's place, and every tick's write. The rig fires each tick at
+the time the model computes, in place of the interrupt the emulator
+lacks. It fires two ticks the tune's timers do not: a tick of a timer no
+row has started, which writes `$80` to R0 and stops the timer (SPEC.md
+5.2.1), and a tick inside a frame, which the rig stops at the head of
+each effect's step and after the last of them (SPEC.md 4.2.1). The frame
+it stops in is one whose row moves what the effect's tick writes, so the
+reading before that effect's step and the reading after it differ, and
+the run reports how many of the boundaries a tick was fired at. A name
+ending `.ymxr` is played as it is, and a run writes such tunes itself: a
+start that moves no place with no start on that timer before it, which
+no conversion of a dump writes, to read the place against SPEC.md 4.1
+step 4, and fourteen tunes of deferred starts on the player with the
+deferred start in, against SPEC.md 4.8, with the sizes of that player
+against performance.md. A tune whose RR equals R is played one frame
+past its last row, where the call reports -1 and leaves every register
+as it is. A tune that fails is named and the run continues.
 
 | mode | reads |
 |---|---|
@@ -871,6 +871,7 @@ run continues.
 | `-cost` | the raster monitor's runs of performance.md, as `ym/cost.sh` makes them: `Synergy Credits` and `Turrican - world 4-3` on the monitor's core over the VBLs the section against YMX names, the first calls, as many as the section counts, on average, at the 99th in a hundred and at most against the table's YMXR rows, and `Synergy Credits` packed at unit 1 over the same run against its figure at most, an average within 2 cycles and a single call within 64: a tick's entry and `rte` fall inside a call or outside it by where the tick lands, which moves with the operating system `TOS` names; then `DBA 2` on the plain core, played from the VBL, the least cycles from the VBL to the frame procedure's first chip write over the frames the raster monitor's paragraph names, which that paragraph reads within one of the shifter's bus slots, 4 cycles: the least moves with the phase the VBL lands at |
 | `-perf` | the player assembled with the raster monitor, against the model |
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
+| `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
@@ -886,17 +887,17 @@ name the emulator and a TOS image as 16.3 reads them; a missing one is exit
 2, a key that lands on another subtune exit 1.
 
 `YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs three things
-on every build: the two built tunes at `-frames24` on each of the eight
-cores of 12.1, `-abs`, `-lean` and `-perf` alone and together and the plain
-core; the conformance kit at `-frames24` under `-kit`; and `-refill` over
-`Turrican 2 - world completed 1` whole, which reads the tune's row of
-performance.md and a refill of a tune with a source. The workflow runs
-`-refill` over the eleven fixtures whole as a step after the suite, which
-reads the sentences over the set, and `-cycles -abs` over them, which reads
-the absolute build's tables. The workflow then runs `-stub`, `-hatari`,
-`-clock` and `-cost` under Hatari 2.6.1, built from its tag, and the PAL
-image of EmuTOS 1.4, which boots the ST at the 50 Hz the two modes require;
-a caller runs them under TOS 2.06, which `TOS` names.
+on every build: the two built tunes at `-frames24` on each of the sixteen
+cores of 12.1, `-abs`, `-lean`, `-perf` and `-defer` alone and together and
+the plain core; the conformance kit at `-frames24` under `-kit`; and
+`-refill` over `Turrican 2 - world completed 1` whole, which reads the
+tune's row of performance.md and a refill of a tune with a source. The
+workflow runs `-refill` over the eleven fixtures whole as a step after the
+suite, which reads the sentences over the set, and `-cycles -abs` over
+them, which reads the absolute build's tables. The workflow then runs
+`-stub`, `-hatari`, `-clock` and `-cost` under Hatari 2.6.1, built from its
+tag, and the PAL image of EmuTOS 1.4, which boots the ST at the 50 Hz the
+two modes require; a caller runs them under TOS 2.06, which `TOS` names.
 
 ---
 
@@ -962,21 +963,20 @@ and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
 needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.12.0`
-and YMXS `0.4.9` in the local Maven repository, `mvn install` in each
+and YMXS `0.5.0` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
-runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it
-so that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
+runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it so
+that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
 whole, which reads performance.md's sentences over the set, `-cycles -abs`
-over the fixtures, which reads the absolute build's tables, and then
-`-stub`, `-hatari`, `-clock` and `-cost` under Hatari and EmuTOS (17). No
-push starts it: a caller starts it from the Actions tab or by `gh workflow
-run test.yml`.
+over the fixtures, which reads the absolute build's tables, and then `-stub`,
+`-hatari`, `-clock` and `-cost` under Hatari and EmuTOS (17). No push starts
+it: a caller starts it from the Actions tab or by `gh workflow run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the nine 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
-`github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go v0.4.9`,
-which a build fetches.
+`github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go
+v0.5.0`, which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and
 requires the same exit code, the same bytes on standard output and, with
@@ -1023,7 +1023,7 @@ and for `wasm` the WebAssembly module of 20.5 and its scripts in
 `ymxr-tools-wasm-v<version>.zip`. The version is the argument, or the first
 `<version>` of `pom.xml`. `TARGETS`, a space-separated list, limits the seven;
 `OUT` replaces `dist`. A target outside the seven is `publish: <target> is not
-a platform this builds`, exit 1. The nine binaries it requires under
+a platform this builds`, exit 1. The seventeen binaries it requires under
 `go/binaries/data` are the ones `go/binaries/binaries.go` names, so the two
 lists agree: a missing one is `publish: <path> is not built: run mvn
 process-classes` and a Go file naming none is `publish:
@@ -1095,7 +1095,7 @@ and call the tools.
 
 | variable | names | read by |
 |---|---|---|
-| `YMXR_68K` | a directory of the nine binaries in place of the embedded ones | the Go tools |
+| `YMXR_68K` | a directory of the seventeen binaries in place of the embedded ones | the Go tools |
 | `YMXR_FLAGS` | flags added to the rig's conversions | `test_ymxr.py` |
 | `YMXR_TICKS` | set, each frame whose tick count differs from the rates' by more than 1 is printed | `test_ymxr.py -hatari` |
 | `COMMIT` | the source commit recorded, `HEAD` by default | `release/manifest.sh` |

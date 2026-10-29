@@ -43,9 +43,17 @@ final class Tune {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
 
-    /** The version of every tune file (SPEC.md 3.3.5): its table is DTX3,
-     *  which a player of an earlier version reads wrongly. */
-    static final int VERSION = 0x0007;
+    /** The version a writer writes (SPEC.md 3.3.5): its table is DTX3,
+     *  which a player of an earlier version reads wrongly, and bit 3 of a
+     *  control column marks a deferred start. */
+    static final int VERSION = 0x0008;
+
+    /** The version before it, which a reader reads beside it: a file of
+     *  version 7 has bit 3 of every control column at 0 (SPEC.md 3.3.5). */
+    static final int VERSION_BEFORE = 0x0007;
+
+    /** The versions a reader reads, as its report names them. */
+    static final String READS = VERSION_BEFORE + " or " + VERSION;
 
     /** The first and the last version whose table is DTX2, which a reader
      *  reports with the tool that writes the tune again (SPEC.md 3.3.4). */

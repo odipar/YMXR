@@ -177,7 +177,7 @@ func found(said *report.Report, sources *ymxr.Sources, effects int) {
 		rows[source.Kind] += source.Rows()
 	}
 	said.Say(fmt.Sprintf("the effects: %d of 4 run, %s, at most %d",
-		bits(effects), report.Count(sources.Count(), "source", "sources"), ymxr.Most))
+		bits(effects&0x0F), report.Count(sources.Count(), "source", "sources"), ymxr.Most))
 	for kind := 0; kind <= ymxr.Buzzer; kind++ {
 		if kinds[kind] > 0 {
 			said.Row(kindName(kind), fmt.Sprintf("%d, %s in all", kinds[kind],

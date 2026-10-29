@@ -1,4 +1,5 @@
-The five 68000 binaries a standalone build contains.
+The seventeen 68000 binaries a standalone build contains: the sixteen
+cores and the program stub.
 
 The Maven build writes them here, as it writes them into the classes the
 jar is made of, and they are committed: a Go module fetched by its import
@@ -8,6 +9,6 @@ one embeds these.
 BinariesTest reads them against the assembly the build makes, so one that
 does not match what rmac writes today fails the build.
 
-A tree without them does not contain one, and Read then gives an error:
-doc/BINARIES.md says what each of them is, and YMXR_68K names a directory
-to read them from instead.
+A tree without them does not contain one, and Read then returns an error:
+doc/BINARIES.md defines each of them, and YMXR_68K names a directory to
+read them from instead.

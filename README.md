@@ -99,11 +99,12 @@ flowchart TD
     tick --> ym
 ```
 
-A tick writes a source byte through its target and advances the
-*place*; at the marker on the last row it repeats the source or stops its
-timer. [SPEC.md](doc/SPEC.md) sections 4 and 5 define the order and where
-a tick may fall. A YMXR reader records the frames instead of writing the
-chips, and its record leaves the ticks out (section 7).
+A tick writes a source byte through its target and advances the *place*;
+at the marker on the last row it repeats the source, stops its timer, or
+performs the deferred start pending on it. [SPEC.md](doc/SPEC.md) sections
+4 and 5 define the order and where a tick may fall. A YMXR reader records
+the frames instead of writing the chips, and its record leaves the ticks
+out (section 7).
 
 ## The documents
 
@@ -127,7 +128,6 @@ to write a reader, SPEC.md sections 1 to 3 and 7, then the
 | [performance.md](doc/performance.md) | measured playback costs |
 | [experiments.md](doc/experiments.md) | experiments and measurements |
 | [plan.md](doc/plan.md) | estimated costs and possible reductions |
-| [deferred.md](doc/deferred.md) | the plan for a deferred start and the place modulo a row count |
 | [RELEASES.md](doc/RELEASES.md) | release history |
 
 ## What is here

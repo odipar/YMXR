@@ -92,7 +92,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | ubiquitous language | The terms of this glossary, used with one meaning in every document, comment and name. | requirements.md R0.6 |
 | unit | `k`, the bytes ST4 packs at once, 1, 2 or 4, one for every live column of a DTX3 table (DTX, SPEC.md 2.4): 2 by default. `R` and `RR` divide by it (SPEC.md 6, rule 6). | tools.md |
 | unset row | A row of the tune's table that leaves every column unset: a frame that reads it leaves every register as it is and every timer running (SPEC.md 6, rule 6). | terminology.md, 3. Tables, rows and procedures |
-| version | The word at offset 4 of a tune file, a multi file and a bound tune: $0007, a tune whose table is DTX3 (SPEC.md 3.3.5). A reader reads that one, and reports $0003 to $0006, whose table is DTX2. | SPEC.md 3.3 |
+| version | The word at offset 4 of a tune file, a multi file and a bound tune: $0008, a tune whose table is DTX3 and whose control columns may defer a start (SPEC.md 3.3.5). A reader reads that one and $0007, and reports $0003 to $0006, whose table is DTX2. | SPEC.md 3.3 |
 | voice | One of the YM2149's three outputs, A, B and C, each with a volume and a mixing setting. | terminology.md, 1. The sound chip |
 | volume | R8, R9 or R10: bits 3 to 0 the level of a voice, and bit 4 set selects the level of the envelope instead. | terminology.md, 1. The sound chip |
 | `W` | The bytes of every value of a table: 1, 2 or 4; one in a tune's table and in a source's. | requirements.md R1.1 |
