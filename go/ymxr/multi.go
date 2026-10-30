@@ -97,7 +97,7 @@ func ReadMulti(file []byte) (MultiRead, error) {
 		return MultiRead{}, fmt.Errorf("version %d has DTX2 tables, and this reads %s:"+
 			" write the tunes again with ym-to-ymxr or ymxs-to-ymxr", version, Reads)
 	}
-	if version != Version && version != VersionBefore {
+	if !ReadsVersion(version) {
 		return MultiRead{}, fmt.Errorf("version %d is not %s", version, Reads)
 	}
 	count := GetWord(file, MultiCountAt)

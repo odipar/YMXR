@@ -11,3 +11,5 @@ require (
 )
 
 require github.com/odipar/st4/go v0.1.11 // indirect
+
+replace github.com/odipar/ymxs/go => ../../YMXS/go

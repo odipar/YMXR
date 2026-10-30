@@ -560,9 +560,9 @@ then the set's heading of 4.7. The summary lines are
 **11.4 Reading a multi file.** A file of 8 bytes or more beginning `YMXM` is
 read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
 with the line, exit 1: a version word of 3 to 6, `version V has DTX2
-tables, and this reads 7 or 8: write the tunes again with ym-to-ymxr or
-ymxs-to-ymxr`; any other version word but 7 and 8, `version V is not 7 or
-8`; a count
+tables, and this reads 7, 8 or 9: write the tunes again with ym-to-ymxr or
+ymxs-to-ymxr`; any other version word but 7, 8 and 9, `version V is not 7,
+8 or 9`; a count
 outside 1 to 99, `N tunes, and a multi file has 1 to 99`; an index past the
 file's end, `the entries of N tunes end past the file's B bytes`; an entry
 outside the file, `tune N is at A for B bytes, and the file has F`, A its

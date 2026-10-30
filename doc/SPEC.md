@@ -495,7 +495,7 @@ a value.
 | offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, `$0008` (3.3.5) |
+| 4 | 2 | the version, `$0009` (3.3.5) |
 | 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
 | 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bit 4 is 1 where a row defers a start (4.8); bits 7 to 5 are 0 |
 | 9 | 1 | S, the source count, 0 to 127 |
@@ -555,21 +555,25 @@ reports a condition reads no further field. A name offset other than 16 +
 |---|---|
 | the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
-| the version is 3, 4, 5 or 6, a tune file whose table is DTX2 (3.3.5) | `version V has a DTX2 table, and this reads 7 or 8: write the tune again with ym-to-ymxr or ymxs-to-ymxr` |
-| the version is other than 3 to 8 (3.3.5) | `version V is not 7 or 8` |
+| the version is 3, 4, 5 or 6, a tune file whose table is DTX2 (3.3.5) | `version V has a DTX2 table, and this reads 7, 8 or 9: write the tune again with ym-to-ymxr or ymxs-to-ymxr` |
+| the version is other than 3 to 9 (3.3.5) | `version V is not 7, 8 or 9` |
 | the table begins or ends outside the file | `the table is at A to B, and the file has F bytes` |
 | the table is a DTX variant other than 3 (3.3.3), its header read as DTX defines it (DTX, SPEC.md 2.4) | `the table is DTX X, and a tune's table is DTX3 (SPEC.md 3.3.3)` |
 | the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N is at A to B, and the file has F bytes` |
 | source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
 
-**3.3.5** The version. A writer writes version 8: its table is DTX3, which
+**3.3.5** The version. A writer writes version 9: its table is DTX3, which
 a player of version 6 or before reads wrongly, and bit 3 of a control
 column is a deferred start (1.9.2), which a player of version 7 reads as
-0. A player of this version reads 8 and 7: a tune file of version 7 has
-bit 3 at 0 in every control column, and a start with bit 5 at 0 in it
-names a source of the row count of the one last started, where the
-modulo of 1.8.4 leaves the place as it is. Versions 3 to 6 are tune files
+0, whose place with bit 5 at 0 continues the count of the rows the running
+source played (4.8). A player of this version reads 9, 8 and 7. A tune
+file of version 8 reads as version 9: version 8 placed a deferred start
+with bit 5 at 0 at R - 1 of the running source, its last row, modulo R of
+the source started. A tune file of version 7 has bit 3 at 0 in every
+control column, and a start with bit 5 at 0 in it names a source of the
+row count of the one last started, where the modulo of 1.8.4 leaves the
+place as it is. Versions 3 to 6 are tune files
 whose table is DTX2, and a reader of this version reports them (3.3.4);
 the tools write such a tune again from the dump or the structure it was
 converted from.
@@ -596,8 +600,8 @@ reading only set columns and keeping values needed by later rows (R4.6).
 The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
-1. Read the version; for a version other than 7 and 8 (3.3.5), report -1 and
-   leave every register and every timer as it is. A reader
+1. Read the version; for a version other than 7, 8 and 9 (3.3.5), report
+   -1 and leave every register and every timer as it is. A reader
    reports the line of 3.3.4 in place of that, and its record is empty
    (7.4).
 2. Read R and RR of the tune's table and the effects used.
@@ -751,9 +755,9 @@ A start whose control column has bit 3 at 1, on a timer running with a
 source connected, is *pending* on that timer from 4.3 step 3 (YMXS,
 SPEC.md 3.5). It is source s, the kept target after 4.3 step 2, the
 count and the select the row keeps at 4.3 steps 4 and 5, bit 6 of K, and
-a place: row 0 where bit 5 of K is 1, and otherwise R - 1 of the source
-running, its last row, modulo R of source s (1.8.4). One start at most is
-pending on a timer:
+a place: row 0 where bit 5 of K is 1, and otherwise R of the source
+running, the count of the rows it played, modulo R of source s (1.8.4).
+One start at most is pending on a timer:
 
 - a row that starts a source with bit 3 at 0, or with K unset, or that
   stops the timer through the source column, drops it (4.3 step 3);
@@ -765,6 +769,19 @@ While a start is pending, the last row of the running source ends the
 source, a source that repeats included: the tick that reads it performs
 the pending start (5.1 step 5). The wrap (4.5) and the end (4.6) leave a
 pending start pending, and the stop (4.7) releases its timer with it.
+
+Note: the row source s begins at, with R the row count of the source
+running, R' that of source s, and P the place a start at its frame finds
+(1.8.4):
+
+| R | R' | a start at its frame, bit 5 at 0 | a deferred start, bit 5 at 0 | either, bit 5 at 1 |
+|---|---|---|---|---|
+| 2 | 2 | P | 0 | 0 |
+| 4 | 4 | P | 0 | 0 |
+| 16 | 4 | P modulo 4 | 0 | 0 |
+| 4 | 3 | P modulo 3 | 1 | 0 |
+| 2 | 4 | P | 2 | 0 |
+| 4 | 16 | P | 4 | 0 |
 
 A deferred start on a stopped timer, or before the first start on it, is
 a start with bit 3 at 0 (4.3 step 3). Whether the timer runs is read

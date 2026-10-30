@@ -30,7 +30,7 @@ published music, by Jochen Hippel, Mad Max and Scavenger as their headers
 record, one of them converted twice (`circus`, `plays-once`), and two
 built (`preempt`, `retune`). Code builds `four-timers`, `voices`,
 `envelope`, `counted`, `envelope-counted` and `deferred`, and
-`wrong-version` is `chambers` with the version word $0009. The published
+`wrong-version` is `chambers` with the version word $000A. The published
 music belongs to its composers, and the repository's LICENSE excludes it:
 a copy of the kit has the tunes for the exercise alone.
 
@@ -405,7 +405,7 @@ Two places changed for entries that left output as it is:
 | `counted` | a counted source on each of the six targets whose register reads every bit of its byte - `setR0` and `setR4` on Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and `setR2` on Timer C - each with rows whose bit 7 is set, where a source the marker ends reads that bit as its end; an index entry whose bit 31 is 1 and whose bits 30 to 0 are the offset (SPEC.md 3.1.1); a square on R8 in the same file, which the marker ends, so a player reads the end of a source from its index entry rather than from the version word; a counted source of one row, one that plays once and stops its timer at its count, one repeating to a row above 0; a target set while an effect runs and read at the next start; a row that sets R12 as it stops the effect running on it |
 | `envelope-counted` | a counted source of two columns on `setEnvelope`, whose two registers read every bit of their byte, so its rows are whole bytes and a tick counts them; the high byte runs past 127, where a marked source of that target stops, and reaches 255, an envelope period of 65,323; one source repeating to a row above 0 and one that plays once and stops its timer at its count, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `deferred` | deferred starts, bit 3 of the control column (SPEC.md 4.8), on Timer A and on Timer C, and bit 4 of the effects used: a fall after a loop, a source with the place at its number, bit 5 at 0, a deferred start a stop drops, and one on a stopped timer |
-| `wrong-version` | the version word $0009: a reader produces an empty record |
+| `wrong-version` | the version word $000A: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.

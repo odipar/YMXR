@@ -310,7 +310,7 @@ final class PlayerTest {
     void theTuneFileIsLaidOutAsTheSpecificationDefines() {
         // SPEC.md 3.3: the version, where the DTX3 table's offset is
         // and where the source index begins
-        assertEquals(0x0008, Tune.VERSION);
+        assertEquals(0x0009, Tune.VERSION);
         assertEquals(12, Tune.TABLE_AT);
         assertEquals(16, Tune.INDEX_AT);
         // the bound tune keeps the header to offset 12 and puts the state

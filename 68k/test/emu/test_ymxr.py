@@ -110,15 +110,15 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 8, which a writer writes, and 7, whose control columns
-# have bit 3 at 0, each a tune whose table is DTX3, which a reader and the
-# player read.
-TUNE_VERSIONS = (8, 7)
+# (BINARIES.md 1): 9, which a writer writes, 8, read as 9, and 7, whose
+# control columns have bit 3 at 0, each a tune whose table is DTX3, which a
+# reader and the player read.
+TUNE_VERSIONS = (9, 8, 7)
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
 COUNTED = 1 << 31
-BOUND_VERSIONS = (7, 8)
+BOUND_VERSIONS = (7, 8, 9)
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209
@@ -529,12 +529,13 @@ class Model:
                 # leaves the timer, its source, its rate and its place as
                 # they are, and the tick that reads the running source's
                 # last row performs it, at row 0 with bit 5 and otherwise
-                # at that last row modulo R of this source (SPEC.md 4.8).
+                # at the running source's R modulo R of this source, the
+                # count of the rows the running source played (SPEC.md 4.8).
                 was = self.tune.sources[fx["source"]][1]
                 R = self.tune.sources[source][1]
                 fx["pending"] = dict(
                     source=source, using=fx["target"],
-                    place=0 if r[t + 2] & 0x20 else (was - 1) % R,
+                    place=0 if r[t + 2] & 0x20 else was % R,
                     select=r[t + 2] & 7,
                     count=r[t + 3] if r[t + 3] or r[t + 2] & 0x10 else fx["count"])
                 return

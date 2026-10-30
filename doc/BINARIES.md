@@ -106,7 +106,7 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0008: the version of the tune file bound (SPEC.md 3.3.5) |
+| 4 | 2 | the version, $0009: the version of the tune file bound (SPEC.md 3.3.5) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
@@ -143,8 +143,8 @@ the field.
 
 **1.5 What the player reads.** At init (5.1), in order:
 
-1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007 or
-   $0008 (SPEC.md 3.3.5), report -1 and stop.
+1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007 to
+   $0009 (SPEC.md 3.3.5), report -1 and stop.
 2. The field at 16 and the field at 8; where bit 4 of the field at 8 is
    set and the player is assembled without the deferred start (2.1),
    report -1 and stop.
@@ -185,7 +185,7 @@ Each of the eight has a twin with `-defer` before `.bin`, assembled with
 the deferred start in, `YMXR_DEFER=1`, whose flags word is the eight's
 plus 8: `YMXR_sndh-defer.bin` reads 12. Init of a core without it
 reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
-core with it is 4,404 bytes larger.
+core with it is 4,402 bytes larger.
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
@@ -206,7 +206,7 @@ one without it where none does.
 | 8 | 4 | `bra.w` to play (2.9) |
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
-| 18 | 2 | the highest bound tune version this core reads, 8 |
+| 18 | 2 | the highest bound tune version this core reads, 9 |
 | 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, or 2,312 with the deferred start in |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
