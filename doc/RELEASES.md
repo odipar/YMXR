@@ -30,39 +30,57 @@ and an executable built from one embeds these. `BinariesTest` reads them
 against the assembly the build makes, so one that does not match what rmac
 writes today fails the build.
 
-A player pins a version of this format: a tune file is 8 (SPEC.md 3.3.5)
+A player pins a version of this format: a tune file is 9 (SPEC.md 3.3.5)
 and a bound tune the version of the tune file bound (BINARIES.md 1), and
 a release's number names the tools rather than either.
 
 ## Published
 
-### 0.6.1, 2026-10-30
+### 0.7.0, 2026-10-30
 
-<https://github.com/odipar/YMXR/releases/tag/v0.6.1>, built from the commit
-tagged `v0.6.1`.
+<https://github.com/odipar/YMXR/releases/tag/v0.7.0>, built from the commit
+tagged `v0.7.0`.
 
-The installer of a deferred start on Timer C or D writes the control
-register the two timers share at level 7, as the frame procedure writes
-it. Under 0.6.0 a tick of the other timer, of a higher priority, could
-nest between the installer's read of the register and its write, and a
-tick that stopped its timer there had the installer run that timer again.
-The tune format is 0.6.0's, and a file without a deferred start is on a
-core of 0.6.0's bytes, so its SNDH file is 0.6.0's.
+A tune file is version 9, and encodes version 6 of YMXS's structure (YMXS
+0.6.0): a deferred start with bit 5 of the control column at 0 places its
+source at R, the row count of the source it follows, modulo the row count
+of the source it starts, where version 8 placed it at R - 1 (SPEC.md
+4.8). A square of two rows deferred after another begins at row 0, where
+under version 8 it began at row 1 and played the half the square before
+it ended on a second time. A reader and the player read 9, 8 and 7, and a
+file of version 8 reads as version 9. Over the eleven dumps under
+`ym/test`, `ym-to-ymxs` writes what 0.6.0's wrote but for the version, 11
+structures of 11, `ym-to-ymxr` writes 0.6.0's tune files but for the
+version word, 11 of 11, and the SNDH files come to 227,496 bytes, as under
+0.6.0.
 
-- **What it costs** (performance.md). The switch on Timer C or D costs 20
-  cycles more, 202 and 232 with `timerReset`, and each core with the
-  deferred start in is 8 bytes larger, 4,404 bytes over the core without
-  it.
+- **The place of a deferred start** (SPEC.md 4.8). The player arms the
+  start at R modulo R' of the source started, one instruction fewer. A
+  table under 4.8 lists the row a source begins at for six pairs of row
+  counts, and a test recomputes it from the rule. Synergy Credits with
+  every start deferred and the place kept writes each half of a square
+  once over 1,000 frames under Hatari, where under 0.6.0 it wrote 262
+  halves twice.
+- **The installer on Timer C or D** writes the control register the two
+  timers share at level 7, as the frame procedure writes it. Under 0.6.0
+  a tick of the other timer, of a higher priority, could nest between the
+  installer's read of the register and its write, and a tick that stopped
+  its timer there had the installer run that timer again. The switch on
+  Timer C or D costs 20 cycles more, 202 and 232 with `timerReset`.
+- **The cores** with the deferred start in are 6 bytes larger, 4,402
+  bytes over the core without it; the eight without it are 0.6.0's size,
+  and their play call counts what it counted.
 - **The rig** reads a tick of a timer of a higher priority past where it
   nests inside an installer under Hatari, and its counts of the whole tick
   read back the four rows of performance.md's table of the switch.
-- **Synergy Credits with every start deferred**, 3,396 of them, plays
-  against the model under the emulator over 10,756 frames and on Hatari's
-  MFP over 2,000.
 - **The tools** contain the seventeen binaries, and `ymxr.wasm` is
-  5,234,089 bytes, 54 more.
+  5,234,451 bytes, 416 more.
+- **The kits.** The conformance kit's tune files are version 9 and
+  `wrong-version` $000A; the rows and the records are 0.6.0's.
 
-Checks: `bin/suite` green, 230 tests and 0 skipped.
+0.6.1 was not published: its fix is in this release.
+
+Checks: `bin/suite` green, 231 tests and 0 skipped.
 
 ### 0.6.0, 2026-10-29
 
