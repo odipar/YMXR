@@ -2948,11 +2948,13 @@ def hatari(ym, code, symbols, perf=False):
 
         def installs(at, kind):
             """Whether the tick of effect `kind` at event `at` writes its
-            timer's data register before the next tick of any effect: the
+            timer's data register before the effect's next tick: the
             installer of a deferred start writes the count there, and a
-            handler writes the chip and its end of interrupt alone."""
+            handler writes the chip and its end of interrupt alone. A tick
+            of a timer of a higher priority nests inside the installer, so
+            the ticks of other effects are read past."""
             for one in events[at + 1:]:
-                if one[0] in (0, 1, 2, 3):
+                if one[0] == kind:
                     return False
                 if one[0] == "mfp_install" and one[1] == TIMER[kind]["data"]:
                     return True

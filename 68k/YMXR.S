@@ -1154,12 +1154,13 @@ q\{ct}:         bra.w   \{tick}_done
 \{name}_cnt:    move.b  #0,\data.w              ; +3: the count
 \{name}_vec:    move.l  #$12345678,\vector.w    ; +2: the armed handler
                 .if     \shared
-                move.w  d0,-(sp)                ; the other timer's bits kept
-                move.b  \ctrl.w,d0
-                and.b   #\keep,d0
+                move.w  d0,-(sp)                ; the other timer's bits kept, at
+                ori.w   #$0700,sr               ; level 7 as the frame keeps them:
+                move.b  \ctrl.w,d0              ; a tick of the other timer nests
+                and.b   #\keep,d0               ; otherwise between read and write
 \{name}_sel:    or.b    #0,d0                   ; +3: the select, shifted
                 move.b  d0,\ctrl.w
-                move.w  (sp)+,d0
+                move.w  (sp)+,d0                ; rte restores the level
                 .else
 \{name}_sel:    move.b  #0,\ctrl.w              ; +3: the select
                 .endif
