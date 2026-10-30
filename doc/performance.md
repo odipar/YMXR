@@ -559,8 +559,16 @@ armed handler.
 | today's, the timer stopped | 98 |
 | the switch on Timer A or B | 142 |
 | the same, with `timerReset` | 172 |
-| the switch on Timer C or D, whose control register is shared | 182 |
-| the same, with `timerReset` | 212 |
+| the switch on Timer C or D, whose control register is shared | 202 |
+| the same, with `timerReset` | 232 |
+
+On Timer C or D the installer reads, masks and writes the control
+register at level 7, as the frame procedure does: a tick of the other
+timer of the pair nests inside the installer and writes the register too.
+The rig counts the tick whole, 26 cycles more than the table on the
+general handler's path and 44 on a square's: 168 and 258 on the
+conformance kit's `deferred`, and 186, 216 and 246 on Synergy Credits with
+every start deferred.
 
 A square's stub tests the row it wrote: the tick that writes row 0 after
 the start is armed costs 48 cycles more than a square's tick, and the
@@ -580,8 +588,8 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,812
-bytes against 8,416, and 12,630 against 8,086 where a tick reads an
+The second bank, the installers and the stubs make the player 12,820
+bytes against 8,416, and 12,638 against 8,086 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.
