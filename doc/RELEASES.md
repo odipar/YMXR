@@ -36,6 +36,34 @@ a release's number names the tools rather than either.
 
 ## Published
 
+### 0.6.1, 2026-10-30
+
+<https://github.com/odipar/YMXR/releases/tag/v0.6.1>, built from the commit
+tagged `v0.6.1`.
+
+The installer of a deferred start on Timer C or D writes the control
+register the two timers share at level 7, as the frame procedure writes
+it. Under 0.6.0 a tick of the other timer, of a higher priority, could
+nest between the installer's read of the register and its write, and a
+tick that stopped its timer there had the installer run that timer again.
+The tune format is 0.6.0's, and a file without a deferred start is on a
+core of 0.6.0's bytes, so its SNDH file is 0.6.0's.
+
+- **What it costs** (performance.md). The switch on Timer C or D costs 20
+  cycles more, 202 and 232 with `timerReset`, and each core with the
+  deferred start in is 8 bytes larger, 4,404 bytes over the core without
+  it.
+- **The rig** reads a tick of a timer of a higher priority past where it
+  nests inside an installer under Hatari, and its counts of the whole tick
+  read back the four rows of performance.md's table of the switch.
+- **Synergy Credits with every start deferred**, 3,396 of them, plays
+  against the model under the emulator over 10,756 frames and on Hatari's
+  MFP over 2,000.
+- **The tools** contain the seventeen binaries, and `ymxr.wasm` is
+  5,234,089 bytes, 54 more.
+
+Checks: `bin/suite` green, 230 tests and 0 skipped.
+
 ### 0.6.0, 2026-10-29
 
 <https://github.com/odipar/YMXR/releases/tag/v0.6.0>, built from the commit
