@@ -560,9 +560,9 @@ then the set's heading of 4.7. The summary lines are
 **11.4 Reading a multi file.** A file of 8 bytes or more beginning `YMXM` is
 read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
 with the line, exit 1: a version word of 3 to 6, `version V has DTX2
-tables, and this reads 7 or 8: write the tunes again with ym-to-ymxr or
-ymxs-to-ymxr`; any other version word but 7 and 8, `version V is not 7 or
-8`; a count
+tables, and this reads 7, 8 or 9: write the tunes again with ym-to-ymxr or
+ymxs-to-ymxr`; any other version word but 7, 8 and 9, `version V is not 7,
+8 or 9`; a count
 outside 1 to 99, `N tunes, and a multi file has 1 to 99`; an index past the
 file's end, `the entries of N tunes end past the file's B bytes`; an entry
 outside the file, `tune N is at A for B bytes, and the file has F`, A its
@@ -963,7 +963,7 @@ and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
 needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.12.0`
-and YMXS `0.5.0` in the local Maven repository, `mvn install` in each
+and YMXS `0.6.0` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it so
 that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
@@ -973,10 +973,10 @@ over the fixtures, which reads the absolute build's tables, and then `-stub`,
 it: a caller starts it from the Actions tab or by `gh workflow run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
-./cmd/...`, with the nine 68000 binaries and DTX's forty images
+./cmd/...`, with the seventeen 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go
-v0.5.0`, which a build fetches.
+v0.6.0`, which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and
 requires the same exit code, the same bytes on standard output and, with

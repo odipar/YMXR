@@ -588,8 +588,8 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,820
-bytes against 8,416, and 12,638 against 8,086 where a tick reads an
+The second bank, the installers and the stubs make the player 12,818
+bytes against 8,416, and 12,636 against 8,086 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.

@@ -113,7 +113,7 @@ final class Multi {
                     + " and this reads " + Tune.READS + ": write the tunes again with"
                     + " ym-to-ymxr or ymxs-to-ymxr");
         }
-        if (version != VERSION && version != Tune.VERSION_BEFORE) {
+        if (!Tune.reads(version)) {
             throw new IllegalArgumentException("version " + version + " is not "
                     + Tune.READS);
         }

@@ -976,15 +976,16 @@ final class ConsistencyTest {
     @Test
     void theWritersGuideReadsTheFormatAndTheKit() throws IOException {
         String guide = read(WRITING);
-        Matcher reads = wrapped("a version other than (\\d) and (\\d), versions (\\d) to (\\d)"
-                + " among them, whose table is DTX2").matcher(guide);
+        Matcher reads = wrapped("a version other than (\\d), (\\d) and (\\d), versions (\\d) to"
+                + " (\\d) among them, whose table is DTX2").matcher(guide);
         assertTrue(reads.find(), "writing.md names no version a reader reads");
-        assertEquals(Tune.VERSION_BEFORE, Integer.parseInt(reads.group(1)),
-                "the version before the one written");
-        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(2)), "the version read");
-        assertEquals(Tune.VERSION_DTX2, Integer.parseInt(reads.group(3)),
+        assertEquals(Tune.OLDEST, Integer.parseInt(reads.group(1)), "the oldest version read");
+        assertEquals(Tune.DEFERRED, Integer.parseInt(reads.group(2)),
+                "the first version with a deferred start");
+        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(3)), "the version read");
+        assertEquals(Tune.VERSION_DTX2, Integer.parseInt(reads.group(4)),
                 "the first version of a DTX2 table");
-        assertEquals(Tune.VERSION_DTX2_LAST, Integer.parseInt(reads.group(4)),
+        assertEquals(Tune.VERSION_DTX2_LAST, Integer.parseInt(reads.group(5)),
                 "the last version of a DTX2 table");
         Matcher writes = wrapped("A writer writes version (\\d) \\(SPEC\\.md 3\\.3\\.5\\)")
                 .matcher(guide);
@@ -1200,6 +1201,34 @@ final class ConsistencyTest {
         assertTrue(all > 20, () -> "only " + all + " rows opened; the check is asleep");
         assertTrue(quiet.isEmpty(), () -> String.join("\n", quiet)
                 + "\nR0.7 allows no second word for a thing that has one.");
+    }
+
+    /**
+     * SPEC.md 4.8's table of the row a source begins at, recomputed from
+     * the rule: a deferred start with bit 5 at 0 at R modulo R', a start at
+     * its frame at the place P modulo R', which is P where R' is R or
+     * more, and either with bit 5 at 1 at row 0.
+     */
+    @Test
+    void theTableOfTheRowASourceBeginsAtFollowsTheRule() throws IOException {
+        String spec = read(SPEC);
+        String section = spec.substring(spec.indexOf("### 4.8 A deferred start"));
+        Matcher row = Pattern.compile("^\\| (\\d+) \\| (\\d+) \\| ([^|]+) \\| (\\d+) \\| (\\d+) \\|$",
+                Pattern.MULTILINE).matcher(section.substring(0, section.indexOf("\n---")));
+        int rows = 0;
+        while (row.find()) {
+            int was = Integer.parseInt(row.group(1));
+            int now = Integer.parseInt(row.group(2));
+            String atFrame = now >= was ? "P" : "P modulo " + now;
+            assertEquals(atFrame, row.group(3).trim(), "a start at its frame, " + was + " to "
+                    + now);
+            assertEquals(was % now, Integer.parseInt(row.group(4)), "a deferred start, "
+                    + was + " to " + now);
+            assertEquals(0, Integer.parseInt(row.group(5)), "bit 5 at 1, " + was + " to "
+                    + now);
+            rows++;
+        }
+        assertTrue(rows >= 4, "SPEC.md 4.8's table read as " + rows + " rows");
     }
 
     @Test

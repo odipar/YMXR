@@ -73,7 +73,11 @@ A start with `deferred` set sets the control column with bit 3 (SPEC.md
 that reads the last row of the running source. Until that tick the
 timer counts at the rate of the effect before it, so the schema counts
 the rate as unknown after a deferred start, and the next row that sets
-a rate column of the effect sets both.
+a rate column of the effect sets both. With `placeReset` clear the
+source started continues the count of the rows the running source
+played, at its row count modulo R of the source started (YMXS, SPEC.md
+3.5.3, version 6). A structure of version 5 reads as version 6, and a
+tune file of version 8 as version 9.
 
 ## What is an error
 

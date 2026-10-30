@@ -27,7 +27,7 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
                     + " table, and this reads " + Tune.READS + ": write the tune again"
                     + " with ym-to-ymxr or ymxs-to-ymxr");
         }
-        if (version != Tune.VERSION && version != Tune.VERSION_BEFORE) {
+        if (!Tune.reads(version)) {
             throw new IllegalArgumentException("version " + version + " is not "
                     + Tune.READS);
         }

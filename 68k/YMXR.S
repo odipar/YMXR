@@ -73,10 +73,10 @@
 ; default, no byte and no cycle of it remains.
 
 YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
-YMXR_VERSION    equ     $0008           ; the version it reads, a bound tune
+YMXR_VERSION    equ     $0009           ; the version it reads, a bound tune
                                         ; whose table is DTX3 (SPEC.md 3.3.5),
-                                        ; and 7, whose control columns have
-                                        ; bit 3 at 0
+                                        ; and 8, read as 9, and 7, whose
+                                        ; control columns have bit 3 at 0
 YMXR_COLUMNS    equ     30
 
 ; The raster monitor, off unless the assembly defines it (rmac
@@ -1180,9 +1180,9 @@ q\{ct}:         bra.w   \{tick}_done
 YMXR_init:
                 cmp.l   #YMXR_MAGIC,(a0)
                 bne     .bad
-                move.w  TF_VERSION(a0),d0               ; version 7 or 8, a
-                subq.w  #YMXR_VERSION-1,d0              ; DTX3 table (SPEC.md
-                cmp.w   #1,d0                           ; 3.3.5)
+                move.w  TF_VERSION(a0),d0               ; version 7 to 9, a
+                subq.w  #YMXR_VERSION-2,d0              ; DTX3 table (SPEC.md
+                cmp.w   #2,d0                           ; 3.3.5)
                 bhi     .bad
                 move.l  a6,-(sp)
                 movea.l a1,a6
@@ -2741,7 +2741,8 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.b  d5,FX_SELECT(a3)
                 move.b  FX_TARGET(a3),FX_TARGET+ARMOFF(a3)
 ; The source, and the row it starts at: row 0 with bit 5, and otherwise
-; the running source's last row, R - 1 of it, modulo R of this one.
+; R of the running source modulo R of this one, the count of the rows the
+; running source played.
                 move.w  4(sp),d3
                 lsl.w   #3,d3
                 movea.l WS_SOURCES-8(a0,d3.w),a4    ; its first row
@@ -2759,8 +2760,7 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 bra.s   .last
 .header:        movea.l FX_FIRST(a3),a5
                 move.l  DT_ROWS-DT_PAYLOAD(a5),d3
-.last:          subq.l  #1,d3
-                move.l  DT_ROWS-DT_PAYLOAD(a4),d4
+.last:          move.l  DT_ROWS-DT_PAYLOAD(a4),d4
                 bsr.w   ymxr_rem
 .placed:        move.l  d3,FX_APLACE(a3)
 ; The bank the vector does not point into.
