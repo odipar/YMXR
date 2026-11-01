@@ -148,11 +148,16 @@ final class ConsistencyTest {
         assertTrue(astray.isEmpty(), () -> "a register column is not its"
                 + " register: " + astray);
 
-        Matcher m = wrapped("(\\d+) columns of the 32 R\\d+\\.\\d+ allows, each"
+        Matcher m = wrapped("(\\d+) columns of the (\\d+) R3\\.4 allows, each"
                 + " one byte, so a row is (\\d+) bytes").matcher(spec);
         assertTrue(m.find(), "SPEC.md has no column and byte count");
         int saidColumns = Integer.parseInt(m.group(1));
-        int saidBytes = Integer.parseInt(m.group(2));
+        int saidBytes = Integer.parseInt(m.group(3));
+        Matcher ceiling = Pattern.compile("\\*\\*R3\\.4\\*\\* At most (\\d+) columns")
+                .matcher(read(REQ));
+        assertTrue(ceiling.find(), "requirements.md's R3.4 has no ceiling");
+        assertEquals(Integer.parseInt(ceiling.group(1)), Integer.parseInt(m.group(2)),
+                "SPEC.md cites R3.4's ceiling");
         int c = columns;
         assertTrue(saidColumns == c && saidBytes == c,
                 () -> "the table has " + c + " columns of one byte; the prose"

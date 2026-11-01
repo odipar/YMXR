@@ -11,7 +11,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | term | what it is | defined in |
 |---|---|---|
 | bound tune | A tune file's tables bound with DTX's reader into the layout the player reads: a header, the source index, the image and the DTX1 tables. | BINARIES.md 1 |
-| `C` | The column count of a table, 1 to 256 (DTX, SPEC.md 1); at most 32 in a tune's table (R3.4), 30 here, and 1 to 3 in a source's, one a register of its target. | requirements.md R1.1, R3.4 |
+| `C` | The column count of a table, 1 to 256 (DTX, SPEC.md 1); at most 128 in a tune's table (R3.4), 30 here, and 1 to 3 in a source's, one a register of its target. | requirements.md R1.1, R3.4 |
 | claim | The operation a player performs on a timer at init, for each effect the effects used byte marks: it stops the timer, writes its vector, clears its pending bit, and sets its enable bit and its mask bit. | terminology.md, 2. The timers |
 | column | One field of a row, `W` bytes wide: one byte in a tune's table. | requirements.md R1.1 |
 | conformance kit | The tune files under `doc/conformance/tunes`, each with its table unpacked beside it and, in `MANIFEST.txt`, the size and the digest of the tune file, of the unpacked table and of the record a reader produces; a reader is tested against it. | README.md |
