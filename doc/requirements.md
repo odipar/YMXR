@@ -83,7 +83,10 @@ Go tree read. Note: they change in that repository.
   maps its terms onto.
 - **R3.3** A writer compiles every choice into the data, at the cost of
   columns, and a player reads a row and writes it.
-- **R3.4** At most 32 columns.
+- **R3.4** At most 128 columns. A frame reads a live column through a
+  16-bit displacement, its slot times the ring's bytes, and a ring is 2C
+  bytes at the least (DTX, abi.md 4), so a table of 128 live columns
+  reaches its last slot at 32,512 bytes, within 32,767.
 - **R3.5** A column is one value of one byte: a table's values are one
   width (R1.1), and a register is a byte. A register's value comes from
   one column, and a value wider than a byte is one column a byte: the
@@ -105,14 +108,15 @@ Go tree read. Note: they change in that repository.
 
 - **R4.1** A player advances two tables at two rates: a clock advances a
   table one row and a procedure writes that row. The frame clock advances
-  each table of the tune one row a frame (R6.4), and a timer advances a
-  source.
+  the tune's table one row a frame, and a timer advances a source.
 - **R4.2** A column the row leaves unset costs a player one test.
 - **R4.3** A player performs R2.2: the frame's procedure writes a row of
   the tune's table to the chips, and a target writes a row of a source.
-- **R4.4** A frame costs the row it reads and the columns that row sets,
-  independent of the column count. R3.6 leaves what a row sets to the
-  writer, and the frame's cost with it.
+- **R4.4** A frame costs the row it reads and the columns that row sets.
+  The column count leaves the average frame as it is and lengthens the
+  costliest refill, since DTX's period is at least the column count (DTX,
+  abi.md 4). R3.6 leaves what a row sets to the writer, and the frame's
+  cost with it.
 - **R4.5** A play call costs at most 6,656 cycles, 13 scanlines of 512,
   the ticks counted apart; performance.md records the costliest call of
   each tune. Note: a demo budgets for the worst frame; R4.4 bounds the
@@ -153,9 +157,5 @@ tune requires beyond a row.
 - **R6.2** A meaning is fixed once assigned: a column's, a bit's within
   its column, a value's within its field. A later version assigns what
   this one leaves unassigned and leaves every assigned meaning as it is.
-- **R6.3** R3.4's ceiling of 32 binds this version and every later one.
-- **R6.4** A schema of more than 32 columns runs a second DTX table
-  beside the first, a row of each a frame; the ceiling is one table's.
-- **R6.5** The columns are split evenly across the tables a tune runs: a
-  schema of 33 columns is 16 and 17.
-- **R6.6** R4.5's worst frame counts every table a tune runs.
+- **R6.3** A later version raises R3.4's ceiling only with a frame that
+  reaches the columns past it.

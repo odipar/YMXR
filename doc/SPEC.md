@@ -8,7 +8,7 @@ columns (1), target, source and timer maps (2), file layout (3), frames
 versions (8).
 
 A tune's table is a DTX table (DTX, SPEC.md 1) of one width (R1.1), a
-byte, the width of a register: 30 columns of the 32 R3.4 allows, each one
+byte, the width of a register: 30 columns of the 128 R3.4 allows, each one
 byte, so a row is 30 bytes. YMXS, SPEC.md 2 to 6 define what each
 register reaches, what a target, a source and a rate are, what a frame
 and a tick do with them, and the rules of the structure; this document
