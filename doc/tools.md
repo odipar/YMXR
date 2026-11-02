@@ -510,7 +510,8 @@ after the report.
 a multi file, a bound tune, an SNDH file or a TOS program; the output is
 its record (BINARIES.md 6), one line of JSON a part: the tags and their
 values, the core's descriptor, the subtune table, each bound tune with
-its sources, the images and the workspace, and of a program the PRG
+its sources, the images, the transformation block of a bound tune of
+version 10 written alone, and the workspace, and of a program the PRG
 header, the stub's descriptor and where the SNDH file begins. The tool
 reads a file, so `-silent` is its one flag.
 
@@ -538,16 +539,19 @@ past its end is `the record runs past the file's B bytes`, exit 1.
 `the table`, `the frame rate` and `the sources` of 9.2; the heading
 `bound: DTX's reader for the table in place of the table` with the rows
 `the reader's image`, `at A, B bytes`, A the image's offset in the bound
-tune; `the source tables`, `N of B bytes`, where the tune has sources;
-`the state block`, `B bytes, which the host finds the workspace for`;
-`in all`, `B bytes, D over the tune file`, D the bound tune's bytes less
-the tune file's. The summary line is `ymxr-bind: B bytes`.
+tune and B its bytes to the transformation block, or to the bound tune's
+end where it has none; `the source tables`, `N of B bytes`, B the bytes
+from source 1 to the image, where the tune has sources; `the
+transformations`, `at A, T of B bytes`, T the transformation count and B
+the bytes from A to the bound tune's end, the block and its pad, for a
+tune file of version 10; `the state block`, `B bytes, which the host
+finds the workspace for`; `in all`, `B bytes, D over the tune file`, D
+the bound tune's bytes less the tune file's. The summary line is
+`ymxr-bind: B bytes`.
 
 **10.3 Errors.** A multi file is `this is a multi file of several tunes,
 and a bound tune is one tune: ymxr-sndh reads a multi file`, exit 1; a
-file the reader rejects is its message, exit 1; a tune file of version 10
-is `the binder writes bound tunes to version 9, and this tune file is
-version 10`, exit 1.
+file the reader rejects is its message, exit 1.
 
 ---
 
@@ -621,7 +625,6 @@ report of 12.4 prints the text as passed.
 | zero tune files | `no tune files: an SNDH file has one subtune at least` |
 | more than 99 | `N tune files: the '##' tag's two digits count at most 99 subtunes` |
 | subtune N fails to read | `subtune N: <message>` |
-| subtune N is version 10 | `subtune N: the binder writes bound tunes to version 9, and this tune file is version 10` |
 | subtune 1 has a rate of 0 | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | subtune N has a rate other than subtune 1's | `subtune N plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
@@ -654,11 +657,12 @@ bytes bound to B2, its table in image I`, B the tune file's bytes, B2
 the bound tune's, I the number of its image from 1; the heading `the
 images: N images of B bytes, DTX's reader once a set of tunes that share
 one` with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX3
-at unit K, values of W`, W the width of a value in bytes; the heading
-`the file: B bytes, the core C, the images I, the tunes T, the workspace
-and the rest W`, C, I, T and W the bytes of the core, the images, the
-bound tunes, and the remainder. The summary line is `ymxr-sndh: B bytes,
-N subtunes`.
+at unit K, values of W`, W the width of a value in bytes, and `DTX3 at
+unit K, 34 columns, values of W` for a table of 34 columns (BINARIES.md
+1.4); the heading `the file: B bytes, the core C, the images I, the
+tunes T, the workspace and the rest W`, C, I, T and W the bytes of the
+core, the images, the bound tunes, and the remainder. The summary line
+is `ymxr-sndh: B bytes, N subtunes`.
 
 ---
 

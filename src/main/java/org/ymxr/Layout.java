@@ -101,15 +101,25 @@ final class Layout {
         }
     }
 
-    /** 6.3: the header, a line a source, and the image of a bound tune
-     *  written alone. */
+    /** 6.3: the header, a line a source, the image of a bound tune
+     *  written alone, and of one of version 10 its transformation
+     *  block. */
     private static void bound(StringBuilder out, byte[] file) {
         out.append("{\"part\":\"header\"").append(fields(file, 0)).append("}\n");
         sources(out, file, 0);
+        int block = word(file, 4) == Tune.VERSION ? Tune.getLong(file, 24) : 0;
         int image = Tune.getLong(file, 16);
         if (image > 0) {
+            // the image ends at the transformation block where the field
+            // at 24 is set, and at the file's end otherwise
             out.append("{\"part\":\"image\",\"at\":").append(image)
-                    .append(",\"bytes\":").append(file.length - image).append("}\n");
+                    .append(",\"bytes\":").append((block > 0 ? block : file.length) - image)
+                    .append("}\n");
+        }
+        if (block > 0) {
+            out.append("{\"part\":\"transformations\",\"at\":").append(block)
+                    .append(",\"count\":").append(word(file, block))
+                    .append(",\"bytes\":").append(file.length - block).append("}\n");
         }
     }
 
@@ -266,27 +276,34 @@ final class Layout {
         }
     }
 
-    /** A line a source of the bound tune at {@code at}, in index
-     *  order. */
+    /** A line a source of the bound tune at {@code at}, in index order:
+     *  the index at 24, and at 28 in version 10, each entry's bit 31 the
+     *  mark of a counted source and outside the offset. */
     private static void sources(StringBuilder out, byte[] file, int at) {
         int sources = file[at + 9] & 0xFF;
+        int index = at + Bound.indexAt(word(file, at + 4));
         for (int i = 0; i < sources; i++) {
             out.append("{\"part\":\"source\",\"number\":").append(i + 1)
-                    .append(",\"at\":").append(at + Tune.getLong(file, at + 24 + 4 * i))
+                    .append(",\"at\":")
+                    .append(at + (Tune.getLong(file, index + 4 * i) & ~Tune.COUNTED))
                     .append("}\n");
         }
     }
 
     /** The fields of 1.2 a record reports of the bound tune at
-     *  {@code at}, its image resolved against the file. */
+     *  {@code at}, its image resolved against the file, and in version 10
+     *  its transformation block. */
     private static String fields(byte[] file, int at) {
-        return ",\"version\":" + word(file, at + 4)
+        int version = word(file, at + 4);
+        return ",\"version\":" + version
                 + ",\"rate\":" + word(file, at + 6)
                 + ",\"effects\":" + (file[at + 8] & 0xFF)
                 + ",\"sources\":" + (file[at + 9] & 0xFF)
                 + ",\"stateblock\":" + Tune.getLong(file, at + 12)
                 + ",\"image\":" + (at + Tune.getLong(file, at + 16))
-                + ",\"table\":" + Tune.getLong(file, at + 20);
+                + ",\"table\":" + Tune.getLong(file, at + 20)
+                + (version == Tune.VERSION
+                        ? ",\"transformations\":" + (at + Tune.getLong(file, at + 24)) : "");
     }
 
     /** Where the next zero byte from {@code from} is. */

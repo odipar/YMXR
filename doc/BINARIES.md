@@ -99,14 +99,18 @@ condition met of the table below; then reads each tune file as SPEC.md
 **1.1** A bound tune combines tune metadata, a source index and DTX1
 tables with an image in place of the tune file's DTX3 table. The packager
 builds that image using the table's unit and copies flag (DTX, SPEC.md
-2.4; abi.md 1). Every unpacked row matches the tune file byte for byte.
+2.4; abi.md 1). Every unpacked row matches the tune file byte for byte. A
+bound tune of version 10 also has the tune file's *transformation block*:
+bytes O to M - 1 of the tune file, O the long at 16 and M the highest of
+O + 2 + 4T and of P + 2 + E of each transformation (SPEC.md 3.4.2), byte
+for byte. Each offset of its index counts from the block's first byte.
 
 **1.2 Layout.**
 
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version, $0009: the version of the tune file bound (SPEC.md 3.3.5) |
+| 4 | 2 | the version of the tune file bound (SPEC.md 3.3.5): $0009, $000A for a tune that maps a value, and $0007 or $0008 for a tune file of that version |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file |
@@ -114,32 +118,41 @@ builds that image using the table's unit and copies flag (DTX, SPEC.md
 | 12 | 4 | the state block's bytes, unsigned: the format block's field at +4 of the image the table is in |
 | 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
 | 20 | 4 | where this tune's table is, from the image's first byte, unsigned: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
-| 24 | 4`S` | the source index: for source 1 to `S`, a long, unsigned, where its DTX1 table begins |
+| 24 | 4`S` | the source index, in versions 7 to 9: for source 1 to `S`, a long, bits 30 to 0 where its DTX1 table begins, unsigned, and bit 31 the mark of a counted source (SPEC.md 3.1.6) |
+| 24 | 4 | in version 10, where the transformation block begins, signed: past the image in a bound tune written alone (1.3), and past the images in an SNDH file (3.1) |
+| 28 | 4`S` | in version 10, the source index, as at 24 in versions 7 to 9 |
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
+| | | in version 10, the transformation block (1.1), on a long, in a bound tune written alone |
 
 The tables come before the image so that a source's rows are within
 reach of the header at any length of image: a player whose ticks read a
-row through a displacement reaches 32,767 bytes (5.5).
+row through a displacement reaches 32,767 bytes (5.5). The transformation
+block comes after the image, so that the sources are within that reach at
+any count of transformations.
 
 **1.3 A bound tune written alone.** A tool writes it from one tune file:
 bytes 6 to 11 are the tune file's; the field at 12 is the field at +4 of
 the format block of the image the packager makes of the tune's DTX3 table
 alone; the field at 20 is that format block's field at +8; DTX1 table 1
-is at align(24 + 4`S`) and each next at align(the end of the one before);
-the index is those offsets; the field at 16 is align(the last table's
-end), where the image is.
+is at align(I + 4`S`), I 24, and 28 in version 10, and each next at
+align(the end of the one before); the index is those offsets, each with
+bit 31 of the tune file's index entry; the field at 16 is align(the last
+table's end), where the image is. In version 10 the field at 24 is
+align(the image's end), where the transformation block is, and the bound
+tune ends at align(the block's end).
 
 **1.4 A set.** A set shares images. The *shape* of a DTX3 table is its
-variant, its unit `k` and its width `W` (DTX, SPEC.md 1, 2.4): each table
-of an image defines its ring, and an image has the copy code where a table
-of it has copies (DTX, abi.md 5). A tool groups the tunes by shape in tune
-order, the first tune of a shape opening its group, and packages the
-tables of each group, in tune order, into one image; the field at 20 of
-each tune is the offset the packager reports for its table's header in
-that image. A bound tune of a set has the layout of 1.2 with the image
-absent and the field at 16 written 0; 3.1 places the images and patches
-the field.
+variant, its unit `k`, its width `W` and its column count `C` (DTX,
+SPEC.md 1, 2.4): each table of an image defines its ring, and an image
+has the copy code where a table of it has copies (DTX, abi.md 5). A tool
+groups the tunes by shape in tune order, the first tune of a shape
+opening its group, and packages the tables of each group, in tune order,
+into one image; the field at 20 of each tune is the offset the packager
+reports for its table's header in that image. A bound tune of a set has
+the layout of 1.2 with the image and the transformation block absent and
+the field at 16, and in version 10 the field at 24, written 0; 3.1 places
+the images and the blocks and patches the fields.
 
 **1.5 What the player reads.** At init (5.1), in order:
 
@@ -326,11 +339,13 @@ the core's first byte, at H.
 | the subtune table | even(L) from the core | the word `N`, then `N` longs, each a bound tune's offset from the core (2.5) |
 | the bound tunes | subtune 1 at even(L) + 2 + 4`N`, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset |
 | the images | from even(the end of the last bound tune), each on a long, from the core | the images of the set (1.4), in group order |
-| the workspace | W = even(the end of the last image), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
+| the transformation blocks | from the end of the last image, each on a long, from the core | the block of each subtune of version 10 (1.1), in subtune order, the subtune's field at 24 patched with its block's offset less its offset |
+| the workspace | W = even(the end of the last block, or of the last image where no subtune is of version 10), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
 
 The subtunes come before the images so that a subtune's sources are
 within reach of the core: a player whose ticks read a row through a
-displacement reaches 32,767 bytes (5.5).
+displacement reaches 32,767 bytes (5.5). The transformation blocks come
+after the images, as in a bound tune written alone (1.2).
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
@@ -703,13 +718,21 @@ report that line alone and stop.
   and 20, I the field at 16 plus the tune's first byte, which 3.1
   patches for a subtune of an SNDH file, so that I is the image's offset
   there, and C the field at 20 as the file has it, an offset from the
-  image's first byte.
+  image's first byte. Where V is 10, `,"transformations":X` ends the
+  line, X the field at 24 plus the tune's first byte, which 3.1 patches
+  as it patches the field at 16.
 - a line a source, 1 to `S`, in index order: `{"part":"source",
-  "number":i,"at":A}`, A the index entry plus the tune's first byte.
+  "number":i,"at":A}`, A bits 30 to 0 of the index entry, at 24, and at
+  28 where V is 10, plus the tune's first byte.
 - `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0,
-  B the file's bytes less I: the image of a bound tune written alone
-  (1.3). A bound tune of a set has that field written 0 (1.4), and the
-  line is in the record of the SNDH file instead (6.4).
+  B the file's bytes less I, or X less I where V is 10 and the field at
+  24 is above 0: the image of a bound tune written alone (1.3). A bound
+  tune of a set has that field written 0 (1.4), and the line is in the
+  record of the SNDH file instead (6.4).
+- `{"part":"transformations","at":X,"count":T,"bytes":B}` where V is 10
+  and the field at 24 is above 0, T the word at X and B the file's bytes
+  less X, the block and its pad: the transformation block of a bound
+  tune written alone (1.3).
 
 **6.4 An SNDH file** (3.1), after the first line:
 
@@ -747,9 +770,11 @@ report that line alone and stop.
   "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
   "stateblock":D,"image":I,"table":C}`, A the offset subtune i has in the
   subtune table, plus H, the fields of 1.2 read at A as 6.3 reads them,
-  its image line left out, and B the bytes to the next subtune, or, for
-  the last, to the image at the lowest offset; then a line a source of
-  that subtune, as 6.3 defines them, each `at` the index entry plus A.
+  `transformations` among them where V is 10, its image and
+  transformations lines left out, and B the bytes to the next subtune,
+  or, for the last, to the image at the lowest offset; then a line a
+  source of that subtune, as 6.3 defines them, each `at` bits 30 to 0 of
+  the index entry plus A.
 - a line an image: `{"part":"image","number":i,"at":I}`, one line for
   each distinct offset the subtunes name, in increasing order of offset,
   i counting from 1.

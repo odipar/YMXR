@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import org.dtx.Table;
@@ -202,10 +203,6 @@ final class Sndh {
                 throw new IllegalArgumentException("subtune " + (i + 1) + " plays at "
                         + tune.frameRate() + " Hz and subtune 1 at " + rate + ": an SNDH file"
                         + " records one rate");
-            }
-            if (tune.version() == Tune.VERSION) {
-                throw new IllegalArgumentException("subtune " + (i + 1) + ": "
-                        + Bound.UNBOUND);
             }
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
@@ -469,15 +466,19 @@ final class Sndh {
      */
     static byte[] combine(byte[] core, List<byte[]> tunes, byte[] tags, int workspace) {
         return combine(core, new Bound.Set(List.of(), List.of(), tunes,
-                new int[tunes.size()], new int[tunes.size()]), tags, workspace);
+                new int[tunes.size()], new int[tunes.size()],
+                Collections.nCopies(tunes.size(), new byte[0])), tags, workspace);
     }
 
     /**
      * The same, of a set whose tunes share their images: the bound tunes
-     * are behind the subtune table, the images behind them, and every
-     * bound tune's {@code IMAGE_AT} is patched to reach the one with its
-     * table in it, from its first byte. A tune whose set has no image is
-     * packaged with one, as a bound tune written by itself does.
+     * are behind the subtune table, the images behind them, and the
+     * transformation blocks of the subtunes of version 10 behind those.
+     * Every bound tune's {@code IMAGE_AT} is patched to reach the image
+     * with its table in it, and the {@code TRANSFORMATIONS_AT} of each of
+     * version 10 to reach its block, from its first byte. A tune whose set
+     * has no image is packaged with one and with its block, as a bound
+     * tune written by itself is.
      */
     static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace) {
         List<byte[]> tunes = set.tunes();
@@ -507,6 +508,18 @@ final class Sndh {
             imageAt[i] = at;
             at += set.images().get(i).length;
         }
+        // Then the transformation blocks, each on a long, in subtune
+        // order: a frame reads them and a tick does not, so they are past
+        // the reach the subtunes are within (BINARIES.md 3.1).
+        int[] blockAt = new int[n];
+        for (int i = 0; i < n; i++) {
+            byte[] block = set.blocks().get(i);
+            if (block.length > 0) {
+                at = Tune.align(at);
+                blockAt[i] = at;
+                at += block.length;
+            }
+        }
         at = even(at);
         int workAt = at;
         byte[] file = new byte[header + workAt + workspace];
@@ -531,6 +544,12 @@ final class Sndh {
                 // and the images are after it.
                 Tune.putLong(file, header + offsets[i] + Bound.IMAGE_AT,
                         imageAt[set.image()[i]] - offsets[i]);
+            }
+            if (blockAt[i] > 0) {
+                byte[] block = set.blocks().get(i);
+                System.arraycopy(block, 0, file, header + blockAt[i], block.length);
+                Tune.putLong(file, header + offsets[i] + Bound.TRANSFORMATIONS_AT,
+                        blockAt[i] - offsets[i]);
             }
         }
         return file;

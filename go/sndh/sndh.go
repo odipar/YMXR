@@ -191,9 +191,6 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 			return nil, fmt.Errorf("subtune %d plays at %d Hz and subtune 1 at %d: an"+
 				" SNDH file records one rate", i+1, tune.FrameRate, rate)
 		}
-		if tune.Version == ymxr.Version {
-			return nil, fmt.Errorf("subtune %d: %s", i+1, Unbound)
-		}
 		if tune.Table.Repeat() >= tune.Table.Rows() {
 			frames[i] = tune.Table.Rows()
 		}
@@ -447,8 +444,10 @@ func seconds(frames, rate int) int {
 // displacements are the header's bytes less 2.
 //
 // The bound tunes are behind the subtune table, the images of the set
-// behind them, and every bound tune's ImageAt is patched to reach the one
-// with its table in it, from its first byte.
+// behind them, and the transformation blocks of the subtunes of version
+// 10 behind those. Every bound tune's ImageAt is patched to reach the image
+// with its table in it, and the BoundTransformationsAt of each of version
+// 10 to reach its block, from its first byte.
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	tunes := set.Tunes
 	header := even(12 + len(tags))
@@ -477,6 +476,17 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 		imageAt[i] = at
 		at += len(set.Images[i])
 	}
+	// Then the transformation blocks, each on a long, in subtune order: a
+	// frame reads them and a tick does not, so they are past the reach the
+	// subtunes are within (BINARIES.md 3.1).
+	blockAt := make([]int, n)
+	for i := 0; i < n && i < len(set.Blocks); i++ {
+		if set.Blocks[i] != nil {
+			at = ymxr.Align(at)
+			blockAt[i] = at
+			at += len(set.Blocks[i])
+		}
+	}
 	at = even(at)
 	workAt := at
 	file := make([]byte, header+workAt+workspace)
@@ -500,6 +510,11 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 			// the images are after it.
 			ymxr.PutLong(file, header+offsets[i]+ImageAt,
 				imageAt[set.Image[i]]-offsets[i])
+		}
+		if blockAt[i] > 0 {
+			copy(file[header+blockAt[i]:], set.Blocks[i])
+			ymxr.PutLong(file, header+offsets[i]+BoundTransformationsAt,
+				blockAt[i]-offsets[i])
 		}
 	}
 	return file, nil

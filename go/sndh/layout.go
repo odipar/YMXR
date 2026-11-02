@@ -82,14 +82,28 @@ func layoutMulti(out *bytes.Buffer, file []byte) {
 	}
 }
 
-// layoutBound is 6.3: the header, a line a source, and the image of a
-// bound tune written alone.
+// layoutBound is 6.3: the header, a line a source, the image of a bound
+// tune written alone, and of one of version 10 its transformation block.
 func layoutBound(out *bytes.Buffer, file []byte) {
 	fmt.Fprintf(out, "{\"part\":\"header\"%s}\n", boundFields(file, 0))
 	layoutSources(out, file, 0)
-	if image := ymxr.GetLong(file, 16); image > 0 {
+	block := 0
+	if ymxr.GetWord(file, 4) == ymxr.Version {
+		block = signedLong(file, BoundTransformationsAt)
+	}
+	if image := signedLong(file, 16); image > 0 {
+		// the image ends at the transformation block where the field at
+		// 24 is set, and at the file's end otherwise
+		ends := len(file)
+		if block > 0 {
+			ends = block
+		}
 		fmt.Fprintf(out, "{\"part\":\"image\",\"at\":%d,\"bytes\":%d}\n",
-			image, len(file)-image)
+			image, ends-image)
+	}
+	if block > 0 {
+		fmt.Fprintf(out, "{\"part\":\"transformations\",\"at\":%d,\"count\":%d,"+
+			"\"bytes\":%d}\n", block, ymxr.GetWord(file, block), len(file)-block)
 	}
 }
 
@@ -159,7 +173,7 @@ func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 	out.WriteString("]}\n")
 	var images []int
 	for _, at := range tunes {
-		image := at + ymxr.GetLong(file, at+16)
+		image := at + signedLong(file, at+16)
 		if !has(images, image) {
 			images = append(images, image)
 		}
@@ -255,22 +269,36 @@ func layoutTags(out *bytes.Buffer, file []byte, from int) int {
 }
 
 // layoutSources is a line a source of the bound tune at `at`, in index
-// order.
+// order: the index at 24, and at 28 in version 10, each entry's bit 31
+// the mark of a counted source and outside the offset.
 func layoutSources(out *bytes.Buffer, file []byte, at int) {
+	index := at + BoundIndex(ymxr.GetWord(file, at+4))
 	for i := 0; i < int(file[at+9]); i++ {
 		fmt.Fprintf(out, "{\"part\":\"source\",\"number\":%d,\"at\":%d}\n",
-			i+1, at+ymxr.GetLong(file, at+24+4*i))
+			i+1, at+ymxr.GetLong(file, index+4*i)&^ymxr.Counted)
 	}
 }
 
 // boundFields is the fields of 1.2 a record reports of the bound tune at
-// `at`, its image resolved against the file.
+// `at`, its image resolved against the file, and in version 10 its
+// transformation block.
 func boundFields(file []byte, at int) string {
-	return fmt.Sprintf(",\"version\":%d,\"rate\":%d,\"effects\":%d,\"sources\":%d,"+
+	fields := fmt.Sprintf(",\"version\":%d,\"rate\":%d,\"effects\":%d,\"sources\":%d,"+
 		"\"stateblock\":%d,\"image\":%d,\"table\":%d",
 		ymxr.GetWord(file, at+4), ymxr.GetWord(file, at+6), file[at+8], file[at+9],
-		ymxr.GetLong(file, at+12), at+ymxr.GetLong(file, at+16),
+		ymxr.GetLong(file, at+12), at+signedLong(file, at+16),
 		ymxr.GetLong(file, at+20))
+	if ymxr.GetWord(file, at+4) == ymxr.Version {
+		fields += fmt.Sprintf(",\"transformations\":%d",
+			at+signedLong(file, at+BoundTransformationsAt))
+	}
+	return fields
+}
+
+// signedLong is the long at `at` as a signed number, as BINARIES.md 1.2
+// defines the fields at 16 and 24.
+func signedLong(b []byte, at int) int {
+	return int(int32(uint32(ymxr.GetLong(b, at))))
 }
 
 // zeroFrom is where the next zero byte from `from` is.
