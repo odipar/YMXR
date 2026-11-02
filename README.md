@@ -60,11 +60,12 @@ player, and a TOS program plays the SNDH file on a bare machine.
 [`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
 the Go tools ([tools.md](doc/tools.md) 16.6).
 
-`ymxr-check` compares a converted tune with its dump and reads a tune file
-against rule 3 of the specification, and `ymxr-trace` prints the frame record
-the conformance kit uses. A release also has the twelve and YMXS's
-`ymxs-check` as one WebAssembly module, which a web page runs in a worker
-([wasm/README.md](wasm/README.md)).
+`ymxr-check` compares a converted tune with its dump, and reads the source
+and mapping columns of a tune file alone against rule 2(b) and the mapping
+column of a stop against rule 3(c) of the specification. `ymxr-trace`
+prints the frame record the conformance kit uses. A release also has the
+twelve and YMXS's `ymxs-check` as one WebAssembly module, which a web page
+runs in a worker ([wasm/README.md](wasm/README.md)).
 A tool writes its output to standard output and its report to standard error;
 `-silent` drops the report and the summary and keeps the output and the notes
 ([tools.md](doc/tools.md) 3.3).
@@ -74,7 +75,7 @@ A tool writes its output to standard output and its report to standard error;
 | word | definition |
 |---|---|
 | YM dump | a YM5 or YM6 file: the registers of the YM2149, recorded one frame at a time |
-| tune file | the values fixed for a tune, its name, its DTX3 table and one DTX1 table a source, in one file |
+| tune file | the values fixed for a tune, its name, its DTX3 table, one DTX1 table a source and, in version 10, its transformations, in one file |
 | SNDH file | tunes with DTX's reader and the player added, in SNDH, the Atari ST scene's shared music container |
 | TOS program | an SNDH file behind a program stub, which runs on an Atari ST |
 | player | the program that reads the tune's table one row a frame, writes the columns that row sets to the YM2149 and the MFP, and at each tick of a timer writes one row of its source |
@@ -105,6 +106,15 @@ performs the deferred start pending on it. [SPEC.md](doc/SPEC.md) sections
 4 and 5 define the order and where a tick may fall. A YMXR reader records
 the frames instead of writing the chips, and its record leaves the ticks
 out (section 7).
+
+Version 10 of the format adds a mapping to the tick
+([SPEC.md](doc/SPEC.md) 1.10, 2.1.5, 3.4): where an effect's mapping
+column is the number of a transformation, each row of its source has a key
+in the column of the last value its target reads, and the value written is
+the transformation's entry for that key, with the marker of a marked
+source and the two port directions of `setR7` read from the row. A reader
+reads versions 7 to 10, and a player 7 to 9 ([SPEC.md](doc/SPEC.md)
+3.3.5).
 
 ## The documents
 

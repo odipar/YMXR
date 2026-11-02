@@ -25,17 +25,20 @@ full, then produce the file of section 2.
 ## 2. What a writer produces
 
 **2.1** A tune file (SPEC.md 3.3): the header, the tune's table as a
-DTX3 file, the source index, and one DTX1 table a source. The file has
-tables alone; a tool binds it with DTX's reader into the layout a player
-reads (BINARIES.md 1).
+DTX3 file, the source index, one DTX1 table a source and, in version 10,
+the transformation index and the transformations (SPEC.md 3.4). The file
+has tables alone; a tool binds it with DTX's reader into the layout a
+player reads (BINARIES.md 1).
 
 ---
 
 ## 3. The table
 
 **3.1** One row a frame, at the rate in the header (SPEC.md 3.3). Thirty
-columns (SPEC.md 1): 0 to 13 reach R0 to R13 in the chip's numbering, 14
-to 29 are four effects of four columns each.
+columns, and thirty-four in version 10 (SPEC.md 1): 0 to 13 reach R0 to
+R13 in the chip's numbering, 14 to 29 are four effects of four columns
+each, and 30 to 33 are the mapping columns of the four effects (SPEC.md
+1.10).
 
 **3.2** Bit 7 of a column is its set bit: at 1 the row sets the column,
 at 0 the value's bits are arbitrary (SPEC.md 1.1). Nine columns fill
@@ -52,21 +55,24 @@ leaves the rows between unset.
 ## 4. The effects
 
 **4.1** Four columns an effect: the target, the source, the timer's
-control and its count (SPEC.md 1.8, 1.9). The target column selects a
-target of SPEC.md 2.1: a register, 0 to 13, or a target of two or three
-registers, 14 to 24. A row starts an effect by setting
+control and its count (SPEC.md 1.8, 1.9); in version 10 a fifth, the
+mapping column, column 30 + i of effect i (SPEC.md 1.10). The target
+column selects a target of SPEC.md 2.1: a register, 0 to 13, or a target
+of two or three registers, 14 to 24. A row starts an effect by setting
 the source column to the source's number, 1 to 127, and stops it by
 setting the column to `$80`: the set bit with source 0 under it. A
 source column of 0 is unset (SPEC.md 1.1).
 
 **4.2** The control column has the prescaler select in bits 2 to 0, the
-timer's reset in bit 6, the place's reset in bit 5, and in bit 4 the
-mark that a count column of 0 is the value 256 (SPEC.md 1.9).
+timer's reset in bit 6, the place's reset in bit 5, in bit 4 the mark
+that a count column of 0 is the value 256, and in bit 3 a deferred start
+(SPEC.md 1.9, 4.8).
 
 **4.3** SPEC.md 2.3 assigns Timers A, D, B and C to effects 0 to 3, so
-a writer selects a timer by selecting an effect. A tune running one
-effect sets columns 14 to 17 and leaves 18 to 29 unset for its whole
-length.
+a writer selects a timer by selecting an effect. A tune running effect 0
+alone sets columns 14 to 17 and leaves 18 to 29 unset for its whole
+length; in version 10 it leaves 31 to 33 unset as well, and sets column
+30 on the rows SPEC.md 6, rule 2(g) lists.
 
 **4.4 SPEC.md 6 binds the writer.** Its rules fix which columns a row
 leaves unset while an effect runs, which effects and numbers a row sets,
@@ -122,6 +128,33 @@ DTX2 table.
 **5.6** The values belong to the source: two SID voices at two levels are
 two sources, and the source column selects one of them.
 
+**5.7 A source through a transformation.** In version 10 the mapping
+column of an effect is the number of a transformation for the last value
+its target reads (SPEC.md 1.10.1): the one value of `setR0` to `setR13`,
+the volume of `setVoiceX` and `setNoiseX`, the shape of `setBuzzer`, the
+coarse nibble of `setToneX` and the high byte of `setEnvelope`. A mapping
+with a transformation for another value is an error of the writer (SPEC.md
+6.5). A source an effect maps through transformation n has keys in its
+column of the last value, 0 to the last key of n, and the value written
+where the key is k is entry k of n (SPEC.md 2.1.5, 3.4.1; YMXS, SPEC.md
+3.6.5). A writer sets the mapping column on a start whose mapping differs
+from the kept mapping, and on a remap on a timer of the tune, the source
+column unset, whose mapping differs from the running mapping (SPEC.md
+1.10.2; SPEC.md 6, rule 2(g)).
+
+The column bounds each key as well (SPEC.md 6, rule 2(h)). On `setToneX`
+and `setBuzzer` the key and the marker share a column, so a key is 0 to
+127 and bit 7 is the marker (SPEC.md 3.2.1). The volume of `setVoiceX` and
+`setNoiseX` is a whole byte, so a key there is 0 to 255, as is a key on
+`setEnvelope`, `setR0`, `setR2`, `setR4`, `setR11` or `setR12`, whose
+source is counted (5.3). On a target of 5.2 the key and the marker share
+the one column as well, and a source that every start maps through a
+transformation is written counted where a key is 128 or more (SPEC.md
+3.1.6). On `setR7` the row of key k is k + 192, the two port directions
+set, and a key is 0 to 63 (SPEC.md 6, rule 2(f)). A row that sets a
+mapping column to a transformation, 1 to 127, makes the file version 10
+(5.4).
+
 ---
 
 ## 6. Packing the table
@@ -149,9 +182,9 @@ state block stays within the largest (tools.md 4.7).
 ## 7. What a reader rejects
 
 A reader rejects a file with a condition of SPEC.md 3.3.4, reports the
-first (SPEC.md 7) and produces zero entries. Among them: a version other
-than 7, 8, 9 and 10, versions 3 to 6 among them, whose table is DTX2, and
-a source other than one, two or three columns of one byte.
+first (SPEC.md 7) and produces an empty record. Among them: a version
+other than 7, 8, 9 and 10, versions 3 to 6 among them, whose table is
+DTX2, and a source other than one, two or three columns of one byte.
 
 ---
 

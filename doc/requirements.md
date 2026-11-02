@@ -64,8 +64,9 @@ Go tree read. Note: they change in that repository.
 
 - **R2.1** The meaning of each column.
 - **R2.2** How a column reaches the YM2149 and the MFP.
-- **R2.3** A tune's sources and their index, and the values fixed for a
-  whole tune, both outside DTX.
+- **R2.3** A tune's sources and their index, in version 10 its
+  transformations and their index (SPEC.md 3.4), and the values fixed for
+  a whole tune, each outside DTX.
 - **R2.4** The two roles that read a tune: a player, which writes to the
   two chips as it reads, and a reader, which reports the record with
   every write recorded in place of the chips (SPEC.md 7).
@@ -76,8 +77,12 @@ Go tree read. Note: they change in that repository.
 
 - **R3.1** The schema covers the registers of the YM2149 and the MFP and
   the effects of the corpus (glossary.md): SID voices, sync buzzers,
-  samples and waveforms. An effect absent from the corpus is outside the
-  schema until a change puts it in.
+  samples and waveforms. It also covers the effects a tune makes through
+  the mappings of YMXS (YMXS, SPEC.md 3.6), a fade among them, which are
+  beyond the corpus: every effect of a dump runs through the identity,
+  and a tune that maps a value is written from a YMXS structure. An
+  effect absent from both is outside the schema until a change puts it
+  in.
 - **R3.2** The schema is an abstraction over those effects rather than
   one tracker's arrangement of them: the ubiquitous language a tracker
   maps its terms onto.
@@ -122,9 +127,10 @@ Go tree read. Note: they change in that repository.
   each tune. Note: a demo budgets for the worst frame; R4.4 bounds the
   average.
 - **R4.6** A player keeps every value it requires of a row it has read:
-  the kept value of an effect is its target and its count. R3.6 leaves an
-  unset value uninterpreted, so a row is read once, and a value the
-  player requires on a later row is the kept value.
+  the kept value of an effect is its target, its select and its count,
+  and in version 10 its mapping (SPEC.md 1.10.3). R3.6 leaves an unset
+  value uninterpreted, so a row is read once, and a value the player
+  requires on a later row is the kept value.
 
 ## R5. Outside the DTX table
 
@@ -136,14 +142,18 @@ tune requires beyond a row.
   rows set (R5.2), so a row of the tune that leaves every column unset
   leaves every timer running.
 - **R5.2** The four columns of an effect select the source, the target
-  and the rate (SPEC.md 1.8, 1.9).
+  and the rate (SPEC.md 1.8, 1.9), and in version 10 a fifth, its mapping
+  column, selects the mapping (SPEC.md 1.10).
 - **R5.3** A source's rows are values that fit the register its target
-  writes (YMXS, SPEC.md 3.2.2); a writer converts a recording to such
+  writes, and keys where an effect maps them through a transformation
+  (YMXS, SPEC.md 3.2.2, 3.6.5); a writer converts a recording to such
   values (R3.3).
 - **R5.4** A player reads the sources from the tune file alone (SPEC.md
-  3.1).
+  3.1); in version 10 the tune file also has every transformation a tick
+  maps through (SPEC.md 3.4).
 - **R5.5** SPEC.md 3 defines the source count, the size of a source and
-  the index entry.
+  the index entry, and in version 10 the transformation count, the size
+  of a transformation and the transformation index (SPEC.md 3.4).
 - **R5.6** A value fixed for a whole tune is recorded once, outside the
   table. Note: as a column it would be set once and repeated on every
   row after.

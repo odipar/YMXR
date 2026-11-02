@@ -51,12 +51,14 @@ assignments.
 | Timer A, D, B, C | effects 0, 1, 2, 3 (2.3) |
 | the tune's sources | numbered 1 upward in the order a row first starts each (3.1) |
 
-## The rate a row leaves alone
+## The kept values a row leaves alone
 
-The schema tracks each effect's target, select and count as the player
-does (R3.6, R4.6), and leaves a column unset where the operation allows:
-a retune with both resets clear that changes only a count other than 0
-leaves the control column unset. For a start, the schema counts the timer
+The schema tracks each effect's target, select, count and mapping as a
+player keeps them (R3.6, R4.6), and leaves a column unset where the
+operation allows: a retune with both resets clear that changes only a
+count other than 0 leaves the control column unset. Of the mapping it
+tracks three values an effect, the kept, the running and the pending
+mapping (SPEC.md 6, rule 2(g)). For a start, the schema counts the timer
 as running only where its previous source repeats and no row stopped it.
 
 The player's kept values run through the wrap, so the repeat row writes
@@ -65,11 +67,11 @@ the mapping of each effect a row maps through a transformation (SPEC.md
 6, rule 2(g)). The kept select, the kept count and whether the timer
 counts run through the wrap as well. Before it reads the rows, the
 schema reads the value of each of the three after the last row. At the
-repeat row each value other than its value after the last row is
-unknown, so the first start or retune at or after the repeat row that
-compares against it writes its rate columns; a value equal to its value
-after the last row is kept, since the second pass starts from it as the
-first does (SPEC.md 6, rule 4(e)).
+repeat row each value other than its value after the last row is open,
+so the first start or retune at or after the repeat row that compares
+against it writes its rate columns; a value equal to its value after the
+last row is kept, since the second pass starts from it as the first does
+(SPEC.md 6, rule 4(e)).
 
 ## The place's reset
 
@@ -86,14 +88,21 @@ of the one before.
 
 A start with `deferred` set sets the control column with bit 3 (SPEC.md
 4.8): a player arms it on a running timer and performs it at the tick
-that reads the last row of the running source. Until that tick the
-timer counts at the rate of the effect before it, so the schema counts
-the rate as unknown after a deferred start, and the next row that sets
-a rate column of the effect sets both. With `placeReset` clear the
-source started continues the count of the rows the running source
-played, at its row count modulo R of the source started (YMXS, SPEC.md
-3.5.3, version 6). A structure of version 5 reads as version 6, and a
-tune file of version 8 as version 9.
+that reads the last row of the running source. Until that tick the timer
+counts at the rate of the effect before it, so the schema counts the
+rate as open after a deferred start, and the next row that sets a rate
+column of the effect sets both. With `placeReset` clear the source
+started continues the count of the rows the running source played, at
+its row count modulo R of the source started (YMXS, SPEC.md 3.5.3,
+version 6). A structure of version 5 reads as version 6, and a tune file
+of version 8 as version 9.
+
+A deferred start keeps the mapping of its row, and a remap while it is
+pending sets the mapping of the effect the timer runs (YMXS, SPEC.md
+3.5.5; SPEC.md 1.10.3). Until the tick that performs the start, the
+effect before it runs through its mapping, so after a deferred start
+through another mapping the schema counts the running mapping as open
+and writes the next remap (SPEC.md 6, rule 2(g)).
 
 ## What is an error
 
