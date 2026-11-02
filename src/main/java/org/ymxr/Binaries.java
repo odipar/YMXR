@@ -15,13 +15,15 @@ import java.util.stream.Stream;
  * The 68000 binaries the tools combine with bound tunes
  * (doc/BINARIES.md): the SNDH core, which {@link Sndh} puts under an SNDH
  * file's entries, and the program stub, which {@link Prg} puts in front
- * of an SNDH file. Four switches of the player's are in the core, the
- * raster monitor, the lean tick, the row read through an absolute address
- * and the deferred start, and each of their sixteen settings is a separate
- * core, so a file that requests two uses the core that is both. A tick
- * reads its row through the program counter where {@code YMXR_PCREL} is at
- * 1, its value unasked, and a file uses a core with the deferred start in
- * where a subtune defers one (doc/performance.md).
+ * of an SNDH file. Five switches of the player's are in the core, the
+ * raster monitor, the lean tick, the row read through an absolute address,
+ * the deferred start and the lookup, and each of their thirty-two settings
+ * is a separate core, so a file that requests two uses the core that is
+ * both. A tick reads its row through the program counter where
+ * {@code YMXR_PCREL} is at 1, its value unasked, a file uses a core with
+ * the deferred start in where a subtune defers one (doc/performance.md),
+ * and a core with the lookup in where a subtune maps a value (SPEC.md
+ * 1.10).
  * The build assembles each once from its source under {@code 68k} and
  * writes it into the classes, the one step rmac is needed for; a tool
  * reads them there and runs no assembler.
@@ -36,22 +38,25 @@ final class Binaries {
     record Binary(String name, String source, List<String> defines) {
     }
 
-    static final Binary CORE = binary(false, false, true, false);
+    static final Binary CORE = binary(false, false, true, false, false);
 
     static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S", List.of());
 
     private Binaries() {
     }
 
-    /** All seventeen, in the order the build writes them: the sixteen
-     *  cores, then the stub. */
+    /** All thirty-three, in the order the build writes them: the
+     *  thirty-two cores, the sixteen without the lookup first, then the
+     *  stub. */
     static List<Binary> all() {
         List<Binary> all = new ArrayList<>();
-        for (boolean defer : new boolean[] {false, true}) {
-            for (boolean pcrel : new boolean[] {true, false}) {
-                for (boolean lean : new boolean[] {false, true}) {
-                    for (boolean monitor : new boolean[] {false, true}) {
-                        all.add(binary(monitor, lean, pcrel, defer));
+        for (boolean map : new boolean[] {false, true}) {
+            for (boolean defer : new boolean[] {false, true}) {
+                for (boolean pcrel : new boolean[] {true, false}) {
+                    for (boolean lean : new boolean[] {false, true}) {
+                        for (boolean monitor : new boolean[] {false, true}) {
+                            all.add(binary(monitor, lean, pcrel, defer, map));
+                        }
                     }
                 }
             }
@@ -71,9 +76,15 @@ final class Binaries {
         return core(monitor, lean, pcrel, false);
     }
 
-    /** The core of the four switches, as carried. */
+    /** The core of the four switches without the lookup, as carried. */
     static byte[] core(boolean monitor, boolean lean, boolean pcrel, boolean defer) {
-        return carried(binary(monitor, lean, pcrel, defer).name());
+        return core(monitor, lean, pcrel, defer, false);
+    }
+
+    /** The core of the five switches, as carried. */
+    static byte[] core(boolean monitor, boolean lean, boolean pcrel, boolean defer,
+                       boolean map) {
+        return carried(binary(monitor, lean, pcrel, defer, map).name());
     }
 
     /** The binary of the three switches without the deferred start. */
@@ -81,8 +92,13 @@ final class Binaries {
         return binary(monitor, lean, pcrel, false);
     }
 
+    /** The binary of the four switches without the lookup. */
+    static Binary binary(boolean monitor, boolean lean, boolean pcrel, boolean defer) {
+        return binary(monitor, lean, pcrel, defer, false);
+    }
+
     /**
-     * The binary of the four switches (doc/performance.md), each a suffix of
+     * The binary of the five switches (doc/performance.md), each a suffix of
      * its name in this order:
      *
      * <ul>
@@ -106,9 +122,14 @@ final class Binaries {
      * <li>{@code -defer} where {@code defer}: the deferred start
      *     ({@code YMXR_DEFER=1}), which a file uses where a subtune's
      *     effects byte sets bit 4 (SPEC.md 3.3).
+     * <li>{@code -map} where {@code map}: the lookup ({@code YMXR_MAP=1}),
+     *     which a file uses where a subtune's effects byte sets bit 5, a
+     *     tune of version 10 (SPEC.md 1.10, 3.3). The core reads bound
+     *     tunes to version 10, and every core without it to version 9.
      * </ul>
      */
-    static Binary binary(boolean monitor, boolean lean, boolean pcrel, boolean defer) {
+    static Binary binary(boolean monitor, boolean lean, boolean pcrel, boolean defer,
+                         boolean map) {
         StringBuilder name = new StringBuilder("YMXR_sndh");
         List<String> defines = new ArrayList<>();
         if (monitor) {
@@ -127,6 +148,10 @@ final class Binaries {
         if (defer) {
             name.append("-defer");
             defines.add("-dYMXR_DEFER=1");
+        }
+        if (map) {
+            name.append("-map");
+            defines.add("-dYMXR_MAP=1");
         }
         return new Binary(name + ".bin", "YMXR_sndh.S", List.copyOf(defines));
     }
@@ -193,9 +218,9 @@ final class Binaries {
     }
 
     /**
-     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the sixteen cores and
-     * the stub assembled and written into each directory named, one line each
-     * with its bytes. The assembler is {@code rmac} on the path unless
+     * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the thirty-two cores
+     * and the stub assembled and written into each directory named, one line
+     * each with its bytes. The assembler is {@code rmac} on the path unless
      * {@code -a} names another, and the sources are under {@code 68k}
      * unless {@code -s} names another directory. A failure to assemble
      * stops the build with the message.
@@ -238,7 +263,7 @@ final class Binaries {
             for (Path at : into) {
                 Files.write(at.resolve(binary.name()), code);
             }
-            System.out.printf("%-34s %5d bytes%n", binary.name(), code.length);
+            System.out.printf("%-38s %5d bytes%n", binary.name(), code.length);
         }
     }
 

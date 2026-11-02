@@ -32,10 +32,15 @@
 ;        displacement from the instruction that reads it (YMXR_PCREL=1),
 ;        which requires the tunes within 32,767 bytes of the core, and
 ;        bit 3 where the deferred start is assembled in (YMXR_DEFER=1),
-;        which a tune whose effects byte sets bit 4 requires
+;        which a tune whose effects byte sets bit 4 requires, and bit 4
+;        where the lookup is assembled in (YMXR_MAP=1), which a tune whose
+;        effects byte sets bit 5 requires
 ;   +24  where the state byte is, a word: bit 0 set while a tune plays,
 ;        bit 1 once it has played its last row and does not repeat
-;   +26  zero
+;   +26  where the reach is measured from: in a core with the lookup,
+;        the first handler's offset, every byte from it on a handler or
+;        an installer; 0 in a core without it, measured from its first
+;        byte
 ;   +28  the subtune table, a long: a word count, then a long an entry,
 ;        each the bound tune's offset. Patched by the tool.
 ;   +32  the workspace, a long. Patched by the tool. The player requires
@@ -53,13 +58,14 @@ sndh_core:
                 dc.w    1
                 dc.w    YMXR_VERSION
                 dc.w    YMXR_FIXED
-                dc.w    YMXR_PERF|(YMXR_AEOI<<1)|(YMXR_PCREL<<2)|(YMXR_DEFER<<3)
+                dc.w    YMXR_PERF|(YMXR_AEOI<<1)|(YMXR_PCREL<<2)|(YMXR_DEFER<<3)|(YMXR_MAP<<4)
                                         ; the flags: the monitor, the tick
                                         ; a host claims the MFP for, the row
                                         ; read through the program counter,
-                                        ; and the deferred start
+                                        ; the deferred start and the lookup
                 dc.w    sndh_state-sndh_core
-                dc.w    0
+                dc.w    (ymxr_tick0-sndh_core)*YMXR_MAP ; where the reach is
+                                        ; measured from
 sndh_table:     dc.l    0
 sndh_work:      dc.l    0
 

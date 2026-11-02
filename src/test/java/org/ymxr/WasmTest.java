@@ -165,6 +165,31 @@ final class WasmTest {
         both("ymxr-check", dump);
     }
 
+    /** A structure that maps a value through the tools that put a core
+     *  under its tune: the module embeds the thirty-two cores, the sixteen
+     *  with the lookup in among them, and reads the one each file needs as
+     *  the executable does, the largest under the tune of version 10 that
+     *  defers a start with the raster monitor in. */
+    @Test
+    void aMappedTuneIsOnTheSameCoreAsTheExecutables() throws Exception {
+        byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.fade()))
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] tune = both("ymxs-to-ymxr", structure, "-silent");
+        both("ymxs-to-sndh", structure);
+        both("ymxs-to-prg", structure, "-r100", "-perf");
+        byte[] sndh = both("ymxr-sndh", tune);
+        assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(sndh,
+                Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
+        both("ymxr-prg", sndh);
+        both("ymxr-layout", sndh);
+        byte[] watched = both("ymxr-sndh", BuiltTunes.mapped().file(), "-perf");
+        assertEquals(Sndh.even(Binaries.core(true, false, true, true, true).length),
+                Tune.getLong(watched, Sndh.even(Tune.getWord(watched, 2) + 2)
+                        + Sndh.CORE_TABLE_AT),
+                "the subtune table follows the core with the raster monitor, the deferred"
+                        + " start and the lookup in");
+    }
+
     /** The two tools that read the files their arguments name: the host
      *  reads them into the directory the module opens as "/". */
     @Test

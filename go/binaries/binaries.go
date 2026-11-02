@@ -3,13 +3,14 @@
 // file's entries, and the program stub, which goes in front of an SNDH
 // file.
 //
-// Four switches of the player's are in the core, the raster monitor, the
-// lean tick, the row read through an absolute address and the deferred
-// start, and each of their sixteen settings is a separate core, so a file
-// that requests two uses the core that is both. A tick reads its row
-// through the program counter where YMXR_PCREL is at 1, its value unasked,
-// and a file uses a core with the deferred start in where a subtune defers
-// one (doc/performance.md).
+// Five switches of the player's are in the core, the raster monitor, the
+// lean tick, the row read through an absolute address, the deferred start
+// and the lookup, and each of their thirty-two settings is a separate core,
+// so a file that requests two uses the core that is both. A tick reads its
+// row through the program counter where YMXR_PCREL is at 1, its value
+// unasked, a file uses a core with the deferred start in where a subtune
+// defers one (doc/performance.md), and a core with the lookup in where a
+// subtune maps a value (SPEC.md 1.10).
 //
 // The files are build output. The Maven build writes them into data/,
 // which go:embed reads only inside its module. A tree built without
@@ -38,8 +39,8 @@ const (
 	Stub = "YMXR_prg.bin"
 )
 
-// all is the seventeen by name, so release/publish.sh reads the list off
-// this file.
+// all is the thirty-three by name, so release/publish.sh reads the list
+// off this file.
 var all = []string{
 	Core, "YMXR_sndh-perf.bin", "YMXR_sndh-lean.bin", "YMXR_sndh-perf-lean.bin",
 	"YMXR_sndh-abs.bin", "YMXR_sndh-perf-abs.bin", "YMXR_sndh-lean-abs.bin",
@@ -48,23 +49,31 @@ var all = []string{
 	"YMXR_sndh-perf-lean-defer.bin", "YMXR_sndh-abs-defer.bin",
 	"YMXR_sndh-perf-abs-defer.bin", "YMXR_sndh-lean-abs-defer.bin",
 	"YMXR_sndh-perf-lean-abs-defer.bin",
+	"YMXR_sndh-map.bin", "YMXR_sndh-perf-map.bin", "YMXR_sndh-lean-map.bin",
+	"YMXR_sndh-perf-lean-map.bin", "YMXR_sndh-abs-map.bin", "YMXR_sndh-perf-abs-map.bin",
+	"YMXR_sndh-lean-abs-map.bin", "YMXR_sndh-perf-lean-abs-map.bin",
+	"YMXR_sndh-defer-map.bin", "YMXR_sndh-perf-defer-map.bin",
+	"YMXR_sndh-lean-defer-map.bin", "YMXR_sndh-perf-lean-defer-map.bin",
+	"YMXR_sndh-abs-defer-map.bin", "YMXR_sndh-perf-abs-defer-map.bin",
+	"YMXR_sndh-lean-abs-defer-map.bin", "YMXR_sndh-perf-lean-abs-defer-map.bin",
 	Stub,
 }
 
-// All is the seventeen, in the order the build writes them: the sixteen
-// cores, then the stub.
+// All is the thirty-three, in the order the build writes them: the
+// thirty-two cores, the sixteen without the lookup first, then the stub.
 func All() []string {
 	return append([]string(nil), all...)
 }
 
-// Named is the core of the four switches (doc/performance.md), each a
+// Named is the core of the five switches (doc/performance.md), each a
 // suffix of its name in this order: -perf where monitor, the raster
 // monitor in; -lean where lean, ticks that neither drop the interrupt
 // level nor write their end of interrupt; -abs where pcrel is false, a row
 // read through an absolute address, where every other core reads it
-// through the program counter; and -defer where deferred, the deferred
-// start in.
-func Named(monitor, lean, pcrel, deferred bool) string {
+// through the program counter; -defer where deferred, the deferred start
+// in; and -map where mapped, the lookup in, which reads bound tunes to
+// version 10 where every other core reads them to version 9.
+func Named(monitor, lean, pcrel, deferred, mapped bool) string {
 	name := "YMXR_sndh"
 	if monitor {
 		name += "-perf"
@@ -77,6 +86,9 @@ func Named(monitor, lean, pcrel, deferred bool) string {
 	}
 	if deferred {
 		name += "-defer"
+	}
+	if mapped {
+		name += "-map"
 	}
 	return name + ".bin"
 }

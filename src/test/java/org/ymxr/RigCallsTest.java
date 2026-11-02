@@ -43,14 +43,14 @@ import org.junit.jupiter.api.TestFactory;
  * so every tune with a source failed. So this also runs {@code -refill}
  * over one tune with a source, whole, against performance.md.
  *
- * <p>The same capped run plays on each of the sixteen cores a release
- * ships, the four switches {@code -abs}, {@code -lean}, {@code -perf} and
- * {@code -defer} alone and together, since {@code BinariesTest} reads a
- * core's bytes and leaves what the core does to the rig. The kit's tunes play too, capped: their
- * versions 4 to 6 have the targets of several registers and the counted
- * sources, which no dump converts to. The modes under Hatari,
- * {@code -hatari} and {@code -stub}, need an emulator and a TOS image, and
- * run by hand.
+ * <p>The same capped run plays on each of the thirty-two cores a release
+ * ships, the five switches {@code -abs}, {@code -lean}, {@code -perf},
+ * {@code -defer} and {@code -map} alone and together, since
+ * {@code BinariesTest} reads a core's bytes and leaves what the core does
+ * to the rig. The kit's tunes play too, capped: their versions 4 to 6 have
+ * the targets of several registers and the counted sources, which no dump
+ * converts to. The modes under Hatari, {@code -hatari} and {@code -stub},
+ * need an emulator and a TOS image, and run by hand.
  *
  * <p>Skipped where the tools the rig runs are absent, which the build is
  * not made to install.
@@ -87,17 +87,19 @@ final class RigCallsTest {
     @Test
     void theRigNamesTheToolsThisRepositoryBuilds() throws IOException {
         String said = rig();
-        for (String named : List.of("ym-to-ymxr", "ymxr-bind", "ymxr-sndh", "ymxr-prg")) {
+        for (String named : List.of("ym-to-ymxr", "ymxr-bind", "ymxr-multi", "ymxr-sndh",
+                "ymxr-prg")) {
             assertTrue(said.contains(named), RIG + " does not run " + named);
         }
     }
 
     /** The flags in the rig that belong to another program: the
      *  assembler's, the emulator's, and DTX's dtx-write, which the rig runs
-     *  to read a table back. */
+     *  to read a table back and to pack one again with a row set by hand,
+     *  at a unit, a ring and its copies. */
     private static final List<String> ANOTHER_PROGRAMS =
             List.of("-m68000", "-fr", "-i", "-o", "-l", "-d", "-s", "-c", "-D",
-                    "-text");
+                    "-text", "-k", "-m", "-copies");
 
     /** The flags the rig reads itself, out of the usage it prints: a line
      *  of that block opens with the rig's name and the flag. A flag the rig
@@ -169,13 +171,13 @@ final class RigCallsTest {
         return ran.waitFor() + "\n" + said;
     }
 
-    /** The sixteen cores a release ships, as the rig's switches select
-     *  them: the plain core, and {@code -abs}, {@code -lean}, {@code -perf}
-     *  and {@code -defer} alone and together. */
+    /** The thirty-two cores a release ships, as the rig's switches select
+     *  them: the plain core, and {@code -abs}, {@code -lean}, {@code -perf},
+     *  {@code -defer} and {@code -map} alone and together. */
     private static final List<List<String>> CORES = cores();
 
     private static List<List<String>> cores() {
-        List<String> switches = List.of("-perf", "-lean", "-abs", "-defer");
+        List<String> switches = List.of("-perf", "-lean", "-abs", "-defer", "-map");
         List<List<String>> out = new ArrayList<>();
         for (int setting = 0; setting < 1 << switches.size(); setting++) {
             List<String> core = new ArrayList<>();

@@ -50,6 +50,11 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        absolute address (68k/YMXR.S): the
                                        same model, and it joins the switches
                                        above
+       test_ymxr.py -map [tunes]       the player built with YMXR_MAP=1, whose
+                                       ticks write a value through a
+                                       transformation (SPEC.md 1.10): the
+                                       same model, and it joins the switches
+                                       above
        test_ymxr.py -xpatch            the real-ST program of 68k/test/st
                                        under Hatari: each case's line of
                                        the XPATCH.TXT it writes against
@@ -78,8 +83,9 @@ ticks counted against the rates the trace shows the timers programmed at. So
 -hatari requires tunes at 50 Hz.
 
 Needs rmac (RMAC, or on the path), DTX's dtx-write (DTX_WRITE, or on the
-path) to read the table back, unicorn (pip install unicorn), and the
-converter, the binder and the two combiners under bin/. DTX's rig, at
+path) to read the table back and to pack one again with a row set by hand,
+unicorn (pip install unicorn), and the converter, the binder, the multi
+file's maker and the two combiners under bin/. DTX's rig, at
 DTX_REPO/68k/test/emu, counts the cycles where it is found; hatari
 (HATARI) with a TOS image (TOS) plays the tune on a real MFP, and runs the
 real-ST program under -xpatch.
@@ -98,7 +104,8 @@ from unicorn import (Uc, UcError, UC_ARCH_M68K, UC_MODE_BIG_ENDIAN,
 from unicorn.m68k_const import (UC_CPU_M68K_M68000, UC_M68K_REG_D0,
                                 UC_M68K_REG_D1, UC_M68K_REG_D2, UC_M68K_REG_D3,
                                 UC_M68K_REG_D6, UC_M68K_REG_D7, UC_M68K_REG_A0,
-                                UC_M68K_REG_A1, UC_M68K_REG_A6, UC_M68K_REG_A7,
+                                UC_M68K_REG_A1, UC_M68K_REG_A3, UC_M68K_REG_A6,
+                                UC_M68K_REG_A7,
                                 UC_M68K_REG_PC, UC_M68K_REG_SR)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -128,15 +135,24 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 9, which a writer writes, 8, read as 9, and 7, whose
-# control columns have bit 3 at 0, each a tune whose table is DTX3, which a
-# reader and the player read.
-TUNE_VERSIONS = (9, 8, 7)
+# (BINARIES.md 1): 10, which a writer writes where a row maps a value, 9,
+# which it writes otherwise, 8, read as 9, and 7, whose control columns
+# have bit 3 at 0, each a tune whose table is DTX3, which a reader reads.
+TUNE_VERSIONS = (10, 9, 8, 7)
+WRITTEN = 9
+MAPPED = 10
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
 COUNTED = 1 << 31
-BOUND_VERSIONS = (7, 8, 9)
+
+
+def bound_versions(symbols):
+    """The bound tune versions a core reads (BINARIES.md 1.5): 7 to 10 with
+    the lookup in, and 7 to 9 without it (68k/YMXR.S, YMXR_MAP)."""
+    return (7, 8, 9, 10) if "ymxr_look" in symbols else (7, 8, 9)
+
+
 # The video address counter's low byte, which the raster monitor waits on,
 # and the background it paints.
 VIDEO = 0xFFFF8209
@@ -150,12 +166,25 @@ PERF_BAR = 0x0770
 # returns to.
 CODE = 0x1000
 # A tick reads its row through a signed word displacement from the
-# handler, so the tune is within 32,767 bytes of the code, as an SNDH
-# file and a program lay it out (doc/BINARIES.md 2 and 3).
-FILE = 0x5000 + 2
-# Where a tune is loaded under -abs, whose ticks read an absolute address
-# and reach any offset.
-ABS_FILE = 0x10000 + 2
+# handler, so the tune is within 32,767 bytes of the handlers, as an SNDH
+# file and a program lay it out (doc/BINARIES.md 2 and 3): past the build
+# a machine runs, where each Machine places it (placed). A run plays on
+# builds with and without the deferred start and the lookup, and an
+# address past the largest build puts the largest fixture past the reach
+# of the smallest.
+FILE = None
+
+
+def placed(length):
+    """Where a tune is loaded after a build of `length` bytes at CODE: the
+    first 256-byte boundary past it, two bytes on so no field assumes a
+    long. Under -abs, whose ticks read an absolute address and reach any
+    offset, 32,768 bytes further, past a displacement's reach from the
+    build's end."""
+    end = CODE + length + (0 if PCREL else 0x8000)
+    return ((end + 0xFF) & ~0xFF) + 2
+
+
 WORK = 0x40000
 STACK = 0x80000
 DONE = 0x90000
@@ -221,19 +250,51 @@ LEAN_ROW = {"on": "a row written, the place stepped",
 DEFINED = {"YMXR_PERF": 1 if PERF else 0,
            "YMXR_NEST": 0 if LEAN else 1, "YMXR_AEOI": 1 if LEAN else 0}
 
-# The switches main assembles the player with, and the player each set of
-# them assembles to with the deferred start in.
+# -map runs every tune on the player with the lookup in (YMXR_MAP=1);
+# without it, check plays a tune whose effects byte sets bit 5 on that
+# player and every other tune on the player without it.
+MAP = "-map" in sys.argv
+
+# The switches main assembles the player with, and every build of a run,
+# by its source and its define set: a tune that defers a start plays on
+# the player with the deferred start in, and one that maps a value on the
+# player with the lookup in (check).
 DEFINES = []
-_DEFERRING = {}
+DEFER_ON = "-dYMXR_DEFER=1"
+MAP_ON = "-dYMXR_MAP=1"
+_BUILT = {}
+
+
+def build(defines, source="YMXR.S"):
+    """The bytes a source assembles to with a define set, and its symbols,
+    assembled once a run."""
+    key = (source, tuple(sorted(set(defines))))
+    if key not in _BUILT:
+        _BUILT[key] = assemble(source, key[1])
+    return _BUILT[key]
+
+
+def switched(defines, defer=False, lookup=False):
+    """A define set with the deferred start in where defer is set and the
+    lookup in where lookup is set, each kept in where the set has it."""
+    out = [d for d in defines if d not in (DEFER_ON, MAP_ON)]
+    if defer or DEFER_ON in defines:
+        out.append(DEFER_ON)
+    if lookup or MAP_ON in defines:
+        out.append(MAP_ON)
+    return out
 
 
 def deferring(defines):
     """The player assembled with those switches and the deferred start in
     (YMXR_DEFER=1), and its symbols."""
-    defines = tuple(d for d in defines if d != "-dYMXR_DEFER=1") + ("-dYMXR_DEFER=1",)
-    if defines not in _DEFERRING:
-        _DEFERRING[defines] = assemble(defines=defines)
-    return _DEFERRING[defines]
+    return build(switched(defines, defer=True))
+
+
+def needs(effects):
+    """The switches a tune of this effects byte plays on (BINARIES.md 2.1):
+    the deferred start for bit 4, the lookup for bit 5."""
+    return bool(effects & 0x10), bool(effects & 0x20)
 
 
 def equate(name, symbols=None):
@@ -275,7 +336,7 @@ def equate(name, symbols=None):
 # address, and clears this.
 PCREL = True
 
-TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = ONE_SEL = ONE_VAL = 0
+TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = SQ_MASK = ONE_SEL = ONE_VAL = 0
 TICKC_SEL = TICKC_PTR = TICKC_LEFT = 0
 TWC_SEL1 = TWC_PTR1 = TWC_LEFT = 0
 TW_SEL1 = TW_PTR1 = (0, 0)
@@ -290,6 +351,14 @@ TARGETS.update({14: [(0, 0), (1, 1)], 15: [(2, 0), (3, 1)], 16: [(4, 0), (5, 1)]
                 19: [(4, 0), (10, 2), (5, 1)],
                 20: [(11, 0), (12, 1)], 21: [(11, 0), (12, 1), (13, 2)],
                 22: [(8, 1), (6, 0)], 23: [(9, 1), (6, 0)], 24: [(10, 1), (6, 0)]})
+
+# The column of a target's last value, the one value a mapping of version
+# 10 maps (SPEC.md 1.10.1): the register of setR0 to setR13, the coarse
+# nibble of setToneX, the volume of setVoiceX and setNoiseX, the high byte
+# of setEnvelope and the shape of setBuzzer (2.1).
+LAST_VALUE = {n: 0 for n in range(14)}
+LAST_VALUE.update({14: 1, 15: 1, 16: 1, 17: 2, 18: 2, 19: 2, 20: 1, 21: 2,
+                   22: 1, 23: 1, 24: 1})
 
 
 def assemble(source="YMXR.S", defines=()):
@@ -372,15 +441,25 @@ def convert(ym, work):
     return r.stdout, said[-1][len("ym-to-ymxr: "):] if said else ""
 
 
+# The bound tune of each tune file a run binds, and the text of each table
+# it reads back: a tool writes the same bytes for the same input, so each
+# is run once a run.
+_BOUND = {}
+_TEXT = {}
+
+
 def bind(file, work):
     """The bound tune of a tune file, through bin/ymxr-bind; None where the
     binder rejects the file, which it reports on a separate line."""
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), "-silent"],
-                       input=file, capture_output=True)
-    if r.returncode == 1 and r.stderr.startswith(b"ymxr-bind: "):
-        return None
-    assert r.returncode == 0, r.stderr.decode()
-    return r.stdout
+    if file not in _BOUND:
+        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), "-silent"],
+                           input=file, capture_output=True)
+        if r.returncode == 1 and r.stderr.startswith(b"ymxr-bind: "):
+            _BOUND[file] = None
+        else:
+            assert r.returncode == 0, r.stderr.decode()
+            _BOUND[file] = r.stdout
+    return _BOUND[file]
 
 
 def trace(file, work, calls):
@@ -411,6 +490,9 @@ def entry(model, writes):
         one["timer"] = bool(fx["bits"] & 0x40)
         one["place"] = bool(fx["bits"] & 0x20)
         one["deferred"] = bool(fx["bits"] & 0x08)
+        if model.tune.version == MAPPED:
+            # the kept mapping after the row (SPEC.md 7.3)
+            one["mapping"] = fx["mapping"]
         e[str(i)] = one
     return {"result": 0, "w": w, "e": e}
 
@@ -437,23 +519,41 @@ class Tune:
         # separate offset
         # (BINARIES.md 2, DTX abi.md 1).
         self.table_at = long_at(file, 20)
+        # Version 10 has the transformation block at the signed long at 24,
+        # after the image, and the source index at 28 (BINARIES.md 1.2): a
+        # word T, then T longs, each transformation's offset from the
+        # block, and at each a word E and E entries (SPEC.md 3.4.2).
+        # transformations[n - 1] is the entries of transformation n.
+        self.transformations = []
+        index_at, end = 24, len(file)
+        if self.version == MAPPED:
+            block = struct.unpack(">i", file[24:28])[0]
+            index_at, end = 28, block
+            for n in range(struct.unpack(">H", file[block:block + 2])[0]):
+                at = block + long_at(file, block + 2 + 4 * n)
+                e = struct.unpack(">H", file[at:at + 2])[0]
+                self.transformations.append(list(file[at + 2:at + 2 + e]))
         # bit 31 of an index entry marks a source whose column fills its
         # byte: its rows carry no marker and a player counts them
         # (SPEC.md 3.1).
-        entries = [long_at(file, 24 + 4 * i) for i in range(count)]
+        entries = [long_at(file, index_at + 4 * i) for i in range(count)]
         index = [at & ~COUNTED for at in entries]
         self.counted = [False] + [bool(at & COUNTED) for at in entries]
         # The image is after the sources' tables and runs to the end of
-        # the bound tune (doc/BINARIES.md 1.2).
-        image = file[self.image_at:]
+        # the bound tune, or to the transformation block (doc/BINARIES.md
+        # 1.2).
+        self.image_end = end
+        image = file[self.image_at:end]
         table_at = self.table_at
         csv = os.path.join(work, "table.csv")
         # dtx-write reads its input on standard input and writes its
         # output on standard output (DTX, doc/tools.md).
-        r = subprocess.run([DTX_WRITE, "-text"], input=image[table_at:],
-                           capture_output=True)
-        assert r.returncode == 0, r.stderr.decode()
-        open(csv, "wb").write(r.stdout)
+        if image[table_at:] not in _TEXT:
+            r = subprocess.run([DTX_WRITE, "-text"], input=image[table_at:],
+                               capture_output=True)
+            assert r.returncode == 0, r.stderr.decode()
+            _TEXT[image[table_at:]] = r.stdout
+        open(csv, "wb").write(_TEXT[image[table_at:]])
         self.rows = []
         for line in open(csv):
             if line.startswith("#") or line.startswith("c0") or not line.strip():
@@ -491,8 +591,12 @@ class Model:
         # target the running effect writes: the one kept at its start
         # pending is the deferred start armed on the timer, None where none
         # is (SPEC.md 4.8)
+        # mapping is the kept mapping, and run the mapping the running
+        # source writes through, each 0 for the identity and n for
+        # transformation n (SPEC.md 1.10)
         self.fx = [dict(target=0, using=0, source=0, select=0, count=0, place=None,
-                        running=False, pending=None) for _ in range(4)]
+                        running=False, pending=None, mapping=0, run=0)
+                   for _ in range(4)]
 
     def frame(self):
         """(the chip writes in order, the effects' state after the row)."""
@@ -516,6 +620,9 @@ class Model:
         r = self.playing
         t = EFFECT + 4 * i
         fx = self.fx[i]
+        # the mapping column of a table of version 10, 34 columns; a table
+        # of 30 leaves every effect through the identity (SPEC.md 1.10.1)
+        m = r[C + i] if len(r) > C else 0
         if r[t] & 0x80:
             fx["target"] = r[t] & 0x7F
         fx["restart"] = False
@@ -524,7 +631,21 @@ class Model:
         # a stopped timer on the select alone.
         fx["selected"] = False
         fx["reset_place"] = False
-        fx["set"] = bool((r[t] | r[t + 1] | r[t + 2]) & 0x80) or r[t + 3] != 0
+        fx["set"] = bool((r[t] | r[t + 1] | r[t + 2] | m) & 0x80) or r[t + 3] != 0
+        if not r[t + 1] & 0x80 and m & 0x80:
+            # A remap: the effect keeps its source, its place and its rate,
+            # and on a timer running a source before the row, its reset
+            # included, that source writes through the mapping from its
+            # next tick; on a stopped timer it is the mapping the next start
+            # keeps. A start pending keeps the mapping of its row (1.10.2,
+            # 1.10.3).
+            fx["mapping"] = m & 0x7F
+            if fx["running"]:
+                fx["run"] = fx["mapping"]
+        elif r[t + 1] & 0x7F and m & 0x80:
+            # a start sets the kept mapping; a stop leaves the mapping
+            # column unread (1.10.3)
+            fx["mapping"] = m & 0x7F
         # What the reader records of the row (SPEC.md 7.3): the source the
         # last row that set the column named, the kept select and count,
         # and the control bits the row sets. A deferred start's are the
@@ -555,7 +676,8 @@ class Model:
                     source=source, using=fx["target"],
                     place=0 if r[t + 2] & 0x20 else was % R,
                     select=r[t + 2] & 7,
-                    count=r[t + 3] if r[t + 3] or r[t + 2] & 0x10 else fx["count"])
+                    count=r[t + 3] if r[t + 3] or r[t + 2] & 0x10 else fx["count"],
+                    mapping=fx["mapping"])
                 return
             # a stop and a start at the frame drop a pending start (4.8)
             fx["pending"] = None
@@ -574,6 +696,9 @@ class Model:
                 else:
                     fx["place"] %= R
                 fx["using"] = fx["target"]
+                # through the mapping column, or the kept mapping where the
+                # row leaves it unset (1.10.2)
+                fx["run"] = fx["mapping"]
                 # The effect runs from here: a stopped timer starts on the
                 # select the row writes, bit 6 set or clear, and select 0 is
                 # unassigned in that column, so a row naming a source writes
@@ -635,24 +760,26 @@ class Model:
         target, and what follows: 'on', 'loop' or 'stop'."""
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
-        write = [(register, columns[c][fx["place"]])
-                 for register, c in TARGETS[fx["using"]]]
+        write = self.ticking(i)
         # A source whose column fills its byte ends on the row its count
         # runs out at; every other ends on the marker, bit 7 of the
-        # column written last (SPEC.md 3.2, 5.1).
+        # column written last, the marker's column of the row (SPEC.md
+        # 3.2, 5.1).
         if self.tune.counted[fx["source"]]:
             last = fx["place"] == R - 1
         else:
-            last = bool(write[-1][1] & 0x80)
+            last = bool(columns[TARGETS[fx["using"]][-1][1]][fx["place"]] & 0x80)
         if last:
             pending = fx["pending"]
             if pending:
                 # the source ends at its last row, a source that repeats
                 # included, and the tick performs the pending start: the
-                # next tick reads its source at its place (SPEC.md 4.8)
+                # next tick reads its source at its place, through the
+                # kept mapping after its row (SPEC.md 4.8, 1.10.3)
                 fx.update(source=pending["source"], using=pending["using"],
                           place=pending["place"], select=pending["select"],
-                          count=pending["count"], running=True, pending=None)
+                          count=pending["count"], running=True, pending=None,
+                          run=pending["mapping"])
                 return write, "switch"
             if RR < R:
                 fx["place"] = RR
@@ -669,8 +796,48 @@ class Model:
         if not fx["running"]:
             return None
         at, R, RR, columns = self.tune.sources[fx["source"]]
-        return [(register, columns[c][fx["place"]])
+        return [(register, self.through(i, c, columns[c][fx["place"]]))
                 for register, c in TARGETS[fx["using"]]]
+
+    def through(self, i, c, byte):
+        """The byte a tick of effect i writes for `byte` of column c of its
+        source: the byte where the column is not the last value of the
+        target or the source runs through the identity, and otherwise the
+        entry of the transformation the key reaches (SPEC.md 1.10.1; YMXS,
+        SPEC.md 3.6.4). The key of a marked column, the marker's, is its
+        bits 6 to 0 and the marker stays in bit 7 (3.2.1); a row of a
+        counted source on setR7 is its key with bits 7 and 6 set, and the
+        tick writes the entry with both set (rule 2(f), 1.4.2); every other
+        row is its key whole."""
+        fx = self.fx[i]
+        if not fx["run"] or c != LAST_VALUE[fx["using"]]:
+            return byte
+        entries = self.tune.transformations[fx["run"] - 1]
+        counted = self.tune.counted[fx["source"]]
+        if counted and fx["using"] == 7:
+            assert byte & 0xC0 == 0xC0, \
+                "a row of %02x on setR7 through a transformation, its port bits clear" % byte
+            key, keep = byte & 0x3F, 0xC0
+        elif not counted and c == TARGETS[fx["using"]][-1][1]:
+            key, keep = byte & 0x7F, byte & 0x80
+        else:
+            key, keep = byte, 0
+        assert key < len(entries), "key %d of transformation %d of %d entries" % (
+            key, fx["run"], len(entries))
+        return entries[key] | keep
+
+    def fill(self, i):
+        """How the page effect i's source reads through its mapping is
+        filled, as through reads a key (68k/YMXR.S, ymxr_fill): 'ports' for
+        a counted source on setR7, 'mirror' for a last value in the
+        marker's column, 'plain' for every other."""
+        fx = self.fx[i]
+        counted = self.tune.counted[fx["source"]]
+        if counted and fx["using"] == 7:
+            return "ports"
+        if not counted and LAST_VALUE[fx["using"]] == TARGETS[fx["using"]][-1][1]:
+            return "mirror"
+        return "plain"
 
     def moved(self, i):
         """The write a tick of effect i makes before the row's step and
@@ -714,13 +881,13 @@ class Model:
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return len(columns) == 1 and R == 1 and RR == 0
 
-    def value(self, i):
-        """The row a handler with its place as an immediate is at,
-        which is its place. Both such handlers run a source of one
-        column."""
+    def value(self, i, row=None):
+        """The row a handler with its place as an immediate is at, which
+        is its place, or row `row`, through the mapping. Both such
+        handlers run a source of one column."""
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
-        return columns[0][fx["place"]]
+        return self.through(i, 0, columns[0][fx["place"] if row is None else row])
 
     def wide(self, i):
         """The columns of effect i's source where it has several, which
@@ -752,16 +919,42 @@ class Model:
 
 class Machine:
     """The player on an emulated 68000, with the chip writes and the MFP
-    writes of every call kept."""
+    writes of every call kept.
+
+    Unicorn translates a run of instructions into a block before it runs
+    any of them, so a write into the operand of the next instruction of
+    the block is read stale by that instruction: a lookup instance's tick
+    writes the key into the low byte of the displacement of the page read
+    after it (68k/YMXR.S, LKEY), and the read would index the page with
+    the key of the tick before. A write to a key byte is marked here; the
+    hook of the next instruction drops the translations at that address
+    and stops, and the run starts again at it, translated afresh. The
+    cycle counter attached to the machine (counter) settles that
+    instruction once.
+
+    The tune is loaded at FILE, which each machine places past its code
+    (placed), so a model and a call that read FILE after the machine is
+    made read the address of that machine's tune."""
 
     def __init__(self, code, symbols, tune_bytes):
+        global FILE
+        FILE = placed(len(code))
         self.symbols = symbols
+        self.size = len(code)
+        # the key byte of every lookup instance: its page read's
+        # displacement, low byte
+        self.keys = {CODE + at + 3 for name, at in symbols.items()
+                     if re.match(r"ymxr_l[kctnbvef][0-3]b?_key$", name)}
+        self.stale = False
+        self.restart = None
+        self.counter = None
+        self.until = None
+        self.ending = None
         mu = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN)
         mu.ctl_set_cpu_model(UC_CPU_M68K_M68000)
-        # The code runs to the page the tune is loaded in, and the tune to
-        # the workspace: -abs loads the tune further off (ABS_FILE).
-        for at, size in ((0, 0x1000), (CODE, (FILE & ~0xFFF) - CODE),
-                         (FILE & ~0xFFF, WORK - (FILE & ~0xFFF)),
+        # The code and the tune after it, to the workspace: -abs loads the
+        # tune further off (placed).
+        for at, size in ((0, 0x1000), (CODE, WORK - CODE),
                          (WORK, 0x40000), (STACK, 0x10000), (DONE, 0x1000),
                          (0xFFFF8000, 0x1000), (0xFFFFF000, 0x1000)):
             mu.mem_map(at, size)
@@ -795,22 +988,39 @@ class Machine:
         mu.hook_add(UC_HOOK_MEM_READ, self._beam, begin=VIDEO, end=VIDEO + 1)
 
     def image(self, at, tune_bytes):
-        """The image of the bound tune loaded at `at`, where init writes."""
+        """The image of the bound tune loaded at `at`, where init writes:
+        to the end of the bound tune, or to the transformation block of
+        version 10, which is after it (BINARIES.md 1.2)."""
         if tune_bytes[:4] == b"YMXB":
             image_at = struct.unpack(">i", tune_bytes[16:20])[0]
+            end = len(tune_bytes)
+            if struct.unpack(">H", tune_bytes[4:6])[0] == MAPPED:
+                end = struct.unpack(">i", tune_bytes[24:28])[0]
             if image_at > 0:
-                self.images.append((at + image_at, at + len(tune_bytes)))
+                self.images.append((at + image_at, at + end))
 
     def _beam(self, mu, access, address, size, value, data):
         self.beam = (self.beam + 1) & 0xFF
         mu.mem_write(VIDEO, bytes([self.beam]))
 
     def _code(self, mu, address, size, data):
-        if self.rte_at is not None and bytes(mu.mem_read(address, 2)) == b"\x4e\x73":
+        if self.stale:
+            # the instruction after a key's write: its block translated
+            # again before it runs
+            self.stale = False
+            mu.ctl_remove_cache(address, address + size)
+            self.restart = address
+            mu.emu_stop()
+        elif self.rte_at is not None and bytes(mu.mem_read(address, 2)) == b"\x4e\x73":
             self.rte_at = address
             mu.emu_stop()
-        elif address == self.stopped:
+        elif address == self.stopped and (self.until is None or self.until(mu)):
             mu.emu_stop()               # the call stopped at a boundary
+        elif self.ending == "next":
+            self.ending = None          # the window ended (window_end)
+            mu.emu_stop()
+        elif self.ending and bytes(mu.mem_read(address, 2)) == b"\x46\xdf":
+            self.ending = "next"
 
     def _write(self, mu, access, address, size, value, data):
         if PSG <= address < PSG + 4:
@@ -829,21 +1039,25 @@ class Machine:
             # a mark of the raster monitor: the colour, and how many chip
             # writes of the call are before it
             self.palette.append((value & 0xFFFF, len(self.psg)))
-        elif address < 0x1000 or CODE <= address < CODE + 0x10000:
-            pass                        # a vector, or the player patching itself
+        elif address < 0x1000 or CODE <= address < CODE + self.size:
+            # a vector, or the player patching itself
+            if any(at in self.keys for at in range(address, address + size)):
+                self.stale = True
         elif any(lo <= address < hi for lo, hi in self.images):
             pass                        # DTX's init writing its decoder
         elif not (WORK <= address < WORK + 0x40000 or STACK <= address < STACK + 0x10000):
             self.stray.append((address, size, value))
 
-    def call(self, name, a0=0, a1=0, d0=0, at=None):
+    def call(self, name, a0=0, a1=0, d0=0, at=None, until=None):
         """One call through the jump table, back at the sentinel. The
         core's three entries are in another order than the player's
         (BINARIES.md 2), so each set has a name a slot.
 
         With at, the call stops at that address and resume runs it on:
         a tick fired between the two falls there (SPEC.md 4.2.1), and the
-        call's chip writes keep the order the tick fell in."""
+        call's chip writes keep the order the tick fell in. With until as
+        well, it stops there where until(mu) is true, so a routine every
+        effect calls stops for one effect."""
         mu = self.mu
         slot = {"init": 0, "play": 4, "stop": 8,
                 "core-init": 0, "core-exit": 4, "core-play": 8}[name]
@@ -858,7 +1072,7 @@ class Machine:
         mu.mem_write(sp - 4, struct.pack(">I", DONE))
         mu.reg_write(UC_M68K_REG_A7, sp - 4)
         self.psg, self.mfp, self.stray, self.palette = [], [], [], []
-        self.stopped = at
+        self.stopped, self.until = at, until
         self._run(CODE + slot, name)
         if at is not None:
             assert mu.reg_read(UC_M68K_REG_PC) == at, \
@@ -868,14 +1082,42 @@ class Machine:
 
     def resume(self, name="play"):
         """The call stopped at an address, run on to the sentinel."""
-        at, self.stopped = self.stopped, None
+        at, self.stopped, self.until = self.stopped, None, None
         assert at is not None, "no call is at an address"
-        self._run(at, name)
+        self._run(self.mu.reg_read(UC_M68K_REG_PC), name)
         return self._returned(name)
+
+    def window_end(self):
+        """The stopped call run on to the instruction after the move.w
+        (sp)+,sr that ends its window at level 7, where a tick due inside
+        the window is served. The run is one emu_start: the status register
+        read between two single steps leaves unicorn's flags of the
+        instruction before it wrong for the branch after it."""
+        mu = self.mu
+        self.stopped, self.until, self.ending = None, None, True
+        self._go(mu.reg_read(UC_M68K_REG_PC), DONE, 50_000_000)
+        assert self.ending is None, "the call ran past its window's end"
+        self.stopped = mu.reg_read(UC_M68K_REG_PC)
+
+    def _go(self, at, until, count):
+        """emu_start from `at`, started again where a key's write stopped
+        it: the instruction there is translated afresh, and the cycle
+        counter settles it once."""
+        while True:
+            self.mu.emu_start(at, until, count=count)
+            if self.restart is None:
+                return
+            at, self.restart = self.restart, None
+            counter = self.counter
+            if counter is not None and counter.pending is not None \
+                    and counter.pending[0] == at:
+                # the counter read the instruction before the stop, and
+                # reads it again where the run starts
+                counter.pending = None
 
     def _run(self, at, name):
         try:
-            self.mu.emu_start(at, DONE, count=50_000_000)
+            self._go(at, DONE, 50_000_000)
         except UcError as bad:
             raise AssertionError("%s stopped: %s at pc %x"
                                  % (name, bad, self.mu.reg_read(UC_M68K_REG_PC)))
@@ -904,7 +1146,7 @@ class Machine:
         mu.reg_write(UC_M68K_REG_SR, 0x2600)
         self.rte_at = 0
         try:
-            mu.emu_start(handler, DONE, count=1000)
+            self._go(handler, DONE, 1000)
         except UcError as bad:
             raise AssertionError("a tick stopped: %s at pc %x" % (bad, mu.reg_read(UC_M68K_REG_PC)))
         assert self.rte_at, "the tick did not reach its rte"
@@ -1062,6 +1304,43 @@ class Timers:
 INSIDE_FRAMES = 2000
 
 
+def reaches(model, i, kind):
+    """Whether effect i's step reaches the boundary `kind` of inside on
+    the row the next frame plays: the page switch, a remap of a running
+    source that steps a place from one transformation to another; the
+    window of a start through a transformation, a start at the frame of a
+    source that steps a place; and a square's level, a remap of a running
+    square. Each with the timer's reset clear, so the timer runs there and
+    a tick can be due. The head and the end of the steps are reached on
+    every row."""
+    if kind is None:
+        return True
+    r = model.tune.rows[model.row]
+    t = EFFECT + 4 * i
+    fx = model.fx[i]
+    m = r[C + i]
+    if r[t + 2] & 0x80 and r[t + 2] & 0x40:
+        return False
+    if kind in ("page", "square"):
+        if r[t + 1] & 0x80 or not m & 0x80 or not fx["running"] or fx["pending"]:
+            return False
+        n = m & 0x7F
+        if kind == "square":
+            return model.square(i) and n != fx["run"]
+        return (not model.square(i) and not model.onerow(i)
+                and n != 0 and fx["run"] != 0 and n != fx["run"])
+    source = r[t + 1] & 0x7F
+    if not r[t + 1] & 0x80 or not source:
+        return False
+    if r[t + 2] & 0x80 and r[t + 2] & 0x08 and fx["running"]:
+        return False
+    if not (m & 0x7F if m & 0x80 else fx["mapping"]):
+        return False
+    at, R, RR, columns = model.tune.sources[source]
+    shaped = not model.tune.counted[source] and len(columns) == 1 and R <= 2 and RR == 0
+    return not shaped
+
+
 def inside(code, symbols, bound, tune, workspace):
     """A tick inside a frame (SPEC.md 4.2.1), against the model stepped
     that far.
@@ -1077,17 +1356,33 @@ def inside(code, symbols, bound, tune, workspace):
     the source and the target the row leaves. The tune plays on around
     the boundary, every tick the timers are due fired after the frame as
     a run does, so the places move as they move in a run. Returns the
-    boundaries a tick was fired at.
+    boundaries a tick was fired at, each its kind below, or None for a
+    head and the end of the steps.
+
+    A tune that maps a value on the player with the lookup in has three
+    boundaries inside an effect's step besides (68k/YMXR.S): at the page
+    switch of a remap between two transformations, before its one write,
+    where the tick reads the mapping the effect ran through; and in the
+    window at level 7 where a start through a transformation writes its
+    lookup instance, and the one where a remap writes a square's level
+    after its mask. A tick due inside a window is served where the window
+    ends, so the rig runs the call on to there and fires it, and the tick
+    reads the effect as the row leaves it.
     """
     if not tune.effects:
-        return 0
+        return []
     at = []
     for i in range(4):
         if tune.effects & 1 << i:
-            # The head of an effect the tune does not run is branched
+            # The boundaries inside a step first, since a few rows reach
+            # them. The head of an effect the tune does not run is branched
             # over; the point after effect 3 is reached on every row.
-            at.append((i, i, CODE + symbols["ymxr_tick%d_over" % i]))
-            at.append((i, 4, CODE + symbols["ymxr_tick3_done"]))
+            if "ymxr_look" in symbols and tune.version == MAPPED:
+                at.append((i, i, CODE + symbols["ymxr_rpage"], "page"))
+                at.append((i, i + 1, CODE + symbols["ymxr_lwindow"], "window"))
+                at.append((i, i + 1, CODE + symbols["ymxr_rlevel"], "square"))
+            at.append((i, i, CODE + symbols["ymxr_tick%d_over" % i], None))
+            at.append((i, 4, CODE + symbols["ymxr_tick3_done"], None))
     m = Machine(code, symbols, bound)
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
@@ -1095,35 +1390,54 @@ def inside(code, symbols, bound, tune, workspace):
     timers.apply(m.mfp)
     clocks = MFP_CLOCK / tune.rate
     left = list(at)
-    fired = 0
+    fired = []
     for f in range(min(INSIDE_FRAMES, MOST_FRAMES or INSIDE_FRAMES)):
+        if f == tune.R + tune.R - tune.RR:
+            # a boundary inside a step is reached in a pass and a loop or
+            # not at all
+            left = [one for one in left if one[3] is None]
         if not left:
             break
         # the first boundary left whose effect this row moves: where the
         # row leaves every one of them as it is, the two readings at
         # each boundary are one and the row plays as a frame of a run
         pick = next(((one, moves) for one in left
-                     for moves in [model.moved(one[0])] if moves), None)
+                     for moves in [model.moved(one[0])]
+                     if moves and reaches(model, one[0], one[3])), None)
         if pick is None:
             d0 = m.call("play", a0=workspace)
             want = model.frame()
         else:
-            (i, step, address), (was, then) = pick
-            m.call("play", a0=workspace, at=address)
+            (i, step, address, kind), (was, then) = pick
+            # a routine every effect calls stops for effect i, whose record
+            # it reads through a3
+            record = workspace + equate("WS_FX", symbols) + i * equate("FX_SIZE", symbols)
+            m.call("play", a0=workspace, at=address,
+                   until=None if kind is None else
+                   (lambda mu: mu.reg_read(UC_M68K_REG_A3) == record))
+            level = (m.mu.reg_read(UC_M68K_REG_SR) >> 8) & 7
+            if kind in ("window", "square"):
+                assert level == 7, \
+                    "frame %d: effect %d's %s boundary is at level %d, not inside its window" % (
+                        f, i, kind, level)
+                m.window_end()
+                level = (m.mu.reg_read(UC_M68K_REG_SR) >> 8) & 7
+            assert level < 6, "frame %d: effect %d's boundary at %x is at level %d" % (
+                f, i, address, level)
             model.begin()
             for j in range(step):
                 model.step(j)
             write, _ = model.tick(i)    # the place stepped, as a tick steps it
-            assert write == (was if step == i else then), \
+            assert write == (was if step <= i else then), \
                 "frame %d: the model reads effect %d at boundary %d as %s, not %s" % (
-                    f, i, step, write, moves)
+                    f, i, step, write, (was, then))
             before = len(m.psg)
             m.fire(TIMER[i]["vector"])
             assert masked(m.psg[before:]) == masked(write), \
-                "frame %d: a tick of effect %d at boundary %d wrote %s, not %s" % (
-                    f, i, step, m.psg[before:], write)
-            left.remove((i, step, address))
-            fired += 1
+                "frame %d: a tick of effect %d at boundary %d%s wrote %s, not %s" % (
+                    f, i, step, "" if kind is None else " (%s)" % kind, m.psg[before:], write)
+            left.remove((i, step, address, kind))
+            fired.append(kind)
             d0 = m.resume()
             for j in range(step, 4):
                 model.step(j)
@@ -1181,28 +1495,40 @@ def unplaced(code, symbols):
     return "a start that moves no place is at row 0: %d frames" % frames
 
 
-def effects_tune(title, rows, sources, timers, registers=None, repeat=0):
+def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
+                 transformations=None):
     """A tune of YMXS's form, version 5, from a few operations: `timers`
     maps a timer's letter to {row: operation}, an operation ("start",
     source, target, prescaler, count, timerReset, placeReset, deferred),
     ("retune", prescaler, count, timerReset, placeReset) or ("stop",), a
-    source numbered from 1 into `sources`, each (name, values, repeat)."""
+    source numbered from 1 into `sources`, each (name, values, repeat).
+
+    With `transformations`, each (name, entries), the form is version 7
+    (YMXS, json.md 6.7): a start has its mapping after deferred, 0 or a
+    list of parts, 0 where it has none, and ("remap", mapping) is a
+    remap."""
+    keys = ("shape", "target", "source", "prescaler", "count", "timerReset",
+            "placeReset", "deferred") + (("mapping",) if transformations else ())
+
     def timer(ops):
-        columns = {key: [-1] * rows for key in ("shape", "target", "source", "prescaler",
-                                                 "count", "timerReset", "placeReset",
-                                                 "deferred")}
+        columns = {key: [-1] * rows for key in keys}
         for at, op in ops.items():
             if op[0] == "start":
-                _, source, target, by, count, tr, pr, deferred = op
+                _, source, target, by, count, tr, pr, deferred = op[:8]
                 for key, value in (("shape", 0), ("target", target), ("source", source),
                                    ("prescaler", by), ("count", count), ("timerReset", tr),
                                    ("placeReset", pr), ("deferred", deferred)):
                     columns[key][at] = value
+                if transformations:
+                    columns["mapping"][at] = op[8] if len(op) > 8 else 0
             elif op[0] == "retune":
                 _, by, count, tr, pr = op
                 for key, value in (("shape", 1), ("prescaler", by), ("count", count),
                                    ("timerReset", tr), ("placeReset", pr)):
                     columns[key][at] = value
+            elif op[0] == "remap":
+                columns["shape"][at] = 3
+                columns["mapping"][at] = op[1]
             else:
                 columns["shape"][at] = 2
         return columns
@@ -1211,9 +1537,12 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0):
             "sources": [{"name": name, "repeat": rr, "values": values}
                         for name, values, rr in sources],
             "registers": registers or {"r7": [56] + [-1] * (rows - 1)}}
+    if transformations:
+        tune["transformations"] = [{"name": name, "entries": list(entries)}
+                                   for name, entries in transformations]
     for letter, ops in timers.items():
         tune["timer" + letter] = timer(ops)
-    return {"format": "ymxs", "version": 5, "tunes": [tune]}
+    return {"format": "ymxs", "version": 7 if transformations else 5, "tunes": [tune]}
 
 
 def deferred(code, symbols):
@@ -1275,6 +1604,342 @@ def deferred(code, symbols):
         assert ticks, "%s: no tick" % title
         played += 1
     return "deferred starts: %d tunes, every tick against the model" % played
+
+
+def tune_file(file):
+    """A tune file's fields (SPEC.md 3.3): the version, the source count,
+    the DTX3 table's offset, the transformation index's offset in version
+    10, and the source index's offset."""
+    version = struct.unpack(">H", file[4:6])[0]
+    return (version, file[9], long_at(file, 12),
+            long_at(file, 16) if version == MAPPED else None,
+            20 if version == MAPPED else 16)
+
+
+def edited(file, edits):
+    """A tune file with columns of its rows set by hand: `edits` maps a row
+    and a column to the byte of the column there. The DTX3 table is read
+    out and packed again through dtx-write at its unit, its ring and its
+    copies (DTX3 header fields at 16, 18 and 19), and the sources follow it,
+    each on a long and their index entries moved, every other byte as it
+    was (SPEC.md 3.3.1)."""
+    _, count, table_at, _, index_at = tune_file(file)
+    entries = [long_at(file, index_at + 4 * n) for n in range(count)]
+    starts = [entry & ~COUNTED for entry in entries]
+    table = file[table_at:starts[0] if count else len(file)]
+    r = subprocess.run([DTX_WRITE, "-text"], input=table, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    lines = r.stdout.decode().splitlines()
+    rows = [line.split(",") for line in lines if line and line[0].isdigit()]
+    for (row, column), byte in edits.items():
+        rows[row][column] = str(byte)
+    text = "\n".join([line for line in lines if not line or not line[0].isdigit()]
+                     + [",".join(row) for row in rows]) + "\n"
+    ring = struct.unpack(">H", table[16:18])[0]
+    r = subprocess.run([DTX_WRITE, "-v3", "-k%d" % table[18], "-m%d" % ring]
+                       + (["-copies"] if table[19] & 1 else []),
+                       input=text.encode(), capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    out = bytearray(file[:table_at]) + r.stdout
+    for n, at in enumerate(starts):
+        out += b"\0" * (-len(out) % 4)
+        rows_, columns = long_at(file, at + 4), struct.unpack(">H", file[at + 8:at + 10])[0]
+        struct.pack_into(">I", out, index_at + 4 * n, len(out) | (entries[n] & COUNTED))
+        out += file[at:at + 16 + (columns - 1) * ((rows_ + 1) & ~1) + rows_]
+    return bytes(out)
+
+
+def reformed(file, forms):
+    """A tune file with sources in the other form of SPEC.md 3.1.6: `forms`
+    maps a source's number to the column of its marker (2.1) and whether
+    it is counted. A counted source has bit 31 of its index entry set and
+    the marker cleared from the last row of that column; a marked one has
+    bit 31 clear and the marker set there, the form of 2.1.4 on
+    setEnvelope. Every other byte as it was. YMXS's writer encodes each
+    such source in the other form (3.1.6)."""
+    out = bytearray(file)
+    index_at = tune_file(file)[4]
+    for n, (column, counted) in forms.items():
+        entry = long_at(out, index_at + 4 * (n - 1))
+        at = entry & ~COUNTED
+        rows = long_at(out, at + 4)
+        last = at + 16 + column * ((rows + 1) & ~1) + rows - 1
+        assert bool(entry & COUNTED) != counted, "source %d is in that form" % n
+        assert bool(out[last] & 0x80) == counted, \
+            "source %d has %02x in the last row of column %d" % (n, out[last], column)
+        struct.pack_into(">I", out, index_at + 4 * (n - 1), at | (COUNTED if counted else 0))
+        out[last] ^= 0x80
+    return bytes(out)
+
+
+# The tunes that map a value (SPEC.md 1.10), built once a run (mapped_tunes).
+_MAPPED = []
+
+# The handlers a source ran through a transformation in, by name, since a
+# run or mapped emptied it: a lookup kind, "sq" or "one" (running).
+RAN = set()
+
+# How many tunes that map a value open the set of the lookup's core
+# (patched_code_follows_the_subtune), the fixtures after them.
+SET_MAPPED = 6
+
+
+def mapped_tunes():
+    """The tunes that map a value, each (title, tune file, what init of
+    the player with the deferred start and the lookup in reports, the
+    lookup kinds and shapes it runs), written through YMXS's form of
+    version 7 and ymxs-to-ymxr, some with columns set by hand (edited)
+    for a row YMXS has no operation for, and some with a source in the
+    form YMXS's writer leaves out (reformed).
+
+    One tune a case: a fade on setR8 through four transformations, the
+    identity and back; a fade of setVoiceA's volume; a square and a
+    source of one row, mapped and remapped; a source remapped from the
+    identity to a transformation, to another and back; a remap on an idle
+    timer and on a stopped one, each kept by a start whose mapping column
+    is unset; an 8-bit sample on setR10 through 256 entries, a counted
+    source; the coarse nibble of setToneA, the shape of setBuzzer, the
+    volume of setNoiseA and the high byte of setEnvelope; a table of 10
+    entries on setR9, below the 128 of a marked column; setR7 through a
+    transformation, whose keys have the ports' bits; a start through a
+    transformation on setToneA, and one on setVoiceA, then a row that sets
+    the target alone to setNoiseA or setBuzzer, a place's reset and a
+    remap; a counted source on setR7 remapped from the identity after a
+    row that sets the target alone; starts through a new mapping with
+    placeReset clear while the source before them ticks, of one column,
+    of a square and of several columns; a remap with timerReset, a remap
+    and a retune in one row, on a running timer, on a stopped one and on
+    a square; a place's reset on a square, a loop and a counted source
+    mapped on three effects; one transformation through the mirror of a
+    marked column and through the plain fill on one effect; remaps on
+    Timers C and D, which share a control register, each idle while the
+    other runs; a stop row with its mapping column set, which the stop
+    leaves unread (SPEC.md 1.10.3); a remap in the row that sets the
+    target column; a marked source on setEnvelope (SPEC.md 2.1.4), and
+    counted sources of two columns on setToneA and setNoiseA, each through
+    a transformation, remapped, its place reset, and remapped from the
+    identity; and a deferred start through a mapping, which the player
+    with the deferred start and the lookup in reports -1 for."""
+    if _MAPPED:
+        return _MAPPED
+    def volume(n):
+        return [k * n // 15 for k in range(16)]
+    V15, V10, V5, V0 = volume(15), volume(10), volume(5), volume(0)
+    tone, tone2 = [(k + 3) & 15 for k in range(16)], [15 - k for k in range(16)]
+    shape, shape2 = [8 + (k & 7) for k in range(16)], [15 - (k & 7) for k in range(16)]
+    sample, sample2 = [k >> 3 for k in range(256)], [31 - (k >> 3) for k in range(256)]
+    period, period2 = [(16 * k) & 255 for k in range(16)], [255 - 16 * k for k in range(16)]
+    high, high2 = [(5 * k) & 127 for k in range(16)], [(7 * k + 3) & 127 for k in range(16)]
+    ten, ten2 = [9 - k for k in range(10)], [3 * k for k in range(10)]
+    mixer, mixer2 = [k ^ 0x3F for k in range(64)], [(k + 7) & 63 for k in range(64)]
+    loop = ("loop of four", [15, 12, 9, 6], 0)
+    fall = ("fall", list(range(15, -1, -1)), None)
+    square = ("square", [15, 0], 0)
+    held = ("one row", [11], 0)
+    voice = ("voice A", [[0, 1, 15], [128, 1, 12], [0, 2, 9], [128, 2, 6]], 0)
+    toned = ("tone A", [[0, 1], [128, 2], [64, 3], [32, 4]], 0)
+    buzz = ("buzzer", [[0, 2, 8], [128, 3, 10], [0, 5, 12], [64, 8, 14]], 0)
+    noise = ("noise A", [[3, 15], [7, 11], [11, 8], [15, 4]], 0)
+    envelope = ("envelope", [[0, 2], [128, 3], [0, 5], [64, 8]], 0)
+    wave = ("sample", [0, 40, 90, 140, 200, 255, 180, 110, 60, 20], 0)
+    tens = ("ten keys", [9, 5, 2, 7, 0], 0)
+    mix = ("mixer", [56, 48, 62, 7], 0)
+    quick = (50, 100)
+
+    def start(source, target, mapping, rate=quick, tr=1, pr=1, deferred=0):
+        return ("start", source, target, rate[0], rate[1], tr, pr, deferred, mapping)
+
+    def remap(mapping):
+        return ("remap", mapping)
+
+    cases = [
+        ("a fade on setR8", [loop], [("V15", V15), ("V10", V10), ("V5", V5), ("V0", V0)],
+         {"A": {0: start(1, 8, [1]), 4: remap([2]), 8: remap([3]), 12: remap([4]),
+                16: remap(0), 20: remap([1])}}, None, {"lk"}),
+        ("a fade of setVoiceA's volume", [voice], [("V15", V15), ("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 17, [0, 0, 1]), 6: remap([0, 0, 2]), 12: remap([0, 0, 3]),
+                18: remap(0), 20: remap([0, 0, 1])}}, None, {"lv"}),
+        ("a mapped square and its remap", [square], [("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 8, [1]), 6: remap([2]), 12: remap(0), 18: remap([1])}},
+         None, {"sq"}),
+        ("a mapped source of one row and its remap", [held], [("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 9, [1]), 6: remap([2]), 12: remap(0), 18: remap([1])}},
+         None, {"one"}),
+        ("a source remapped from the identity to T, to T' and back", [loop],
+         [("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 10, 0), 4: remap([1]), 8: remap([2]), 12: remap(0),
+                16: remap([1])}}, None, {"lk"}),
+        ("a remap on an idle timer and on a stopped one, each kept by a start",
+         [loop], [("V5", V5), ("V10", V10)],
+         {"A": {0: remap([1]), 4: start(1, 8, [1]), 10: ("stop",), 12: remap([2]),
+                14: start(1, 8, [2])}}, None, {"lk"}),
+        ("an 8-bit sample on setR10 through 256 entries", [wave],
+         [("sample", sample), ("sample again", sample2)],
+         {"B": {0: start(1, 10, [1]), 8: remap([2]), 16: remap([1])}}, None, {"lc"}),
+        ("the coarse nibble of setToneA", [toned], [("tone", tone), ("tone again", tone2)],
+         {"A": {0: start(1, 14, [0, 1]), 6: remap([0, 2]), 9: ("retune", 50, 100, 0, 1),
+                12: remap(0), 18: remap([0, 1])}}, None, {"lt"}),
+        ("the shape of setBuzzer", [buzz], [("shape", shape), ("shape again", shape2)],
+         {"C": {0: start(1, 21, [0, 0, 1]), 6: remap([0, 0, 2]), 12: remap(0),
+                18: remap([0, 0, 1])}}, None, {"lb"}),
+        ("the volume of setNoiseA", [noise], [("V10", V10), ("V5", V5)],
+         {"D": {0: start(1, 22, [0, 1]), 6: remap([0, 2]), 12: remap(0),
+                18: remap([0, 1])}}, None, {"ln"}),
+        ("the high byte of setEnvelope", [envelope],
+         [("period", period), ("period again", period2)],
+         {"B": {0: start(1, 20, [0, 1]), 6: remap([0, 2]), 9: ("retune", 64, 120, 0, 1),
+                12: remap(0), 18: remap([0, 1]), 21: ("retune", 64, 120, 0, 1)}},
+         None, {"le"}),
+        ("a table of 10 entries on setR9", [tens], [("ten", ten), ("ten again", ten2)],
+         {"A": {0: start(1, 9, [1]), 8: remap([2]), 16: remap([1])}}, None, {"lk"}),
+        ("setR7 through a transformation", [mix], [("mixer", mixer), ("mixer again", mixer2)],
+         {"A": {0: start(1, 7, [1]), 8: remap([2]), 11: ("retune", 50, 100, 0, 1),
+                14: remap(0), 18: remap([1])}}, None, {"lc"}),
+        ("a start through T on setToneA, the target alone to setNoiseA, a place's"
+         " reset and a remap", [toned, noise], [("tone", tone), ("tone again", tone2),
+                                                 ("V10", V10)],
+         {"A": {0: start(1, 14, [0, 1]), 6: ("retune", 50, 100, 0, 1), 10: remap([0, 2]),
+                14: start(2, 22, [0, 3])}}, {(3, 14): 0x80 | 22}, {"lt", "ln"}),
+        ("a start through T on setVoiceA, the target alone to setBuzzer, a place's"
+         " reset and a remap", [voice, buzz], [("V15", V15), ("V5", V5), ("shape", shape)],
+         {"A": {0: start(1, 17, [0, 0, 1]), 6: ("retune", 50, 100, 0, 1),
+                10: remap([0, 0, 2]), 14: start(2, 21, [0, 0, 3])}},
+         {(3, 14): 0x80 | 21}, {"lv", "lb"}),
+        ("a counted source on setR7 remapped from the identity after the target alone",
+         [mix], [("mixer", mixer)],
+         {"A": {0: start(1, 7, 0), 6: remap([1]), 10: remap(0), 14: remap([1])}},
+         {(3, 14): 0x80 | 0}, {"lc"}),
+        ("starts through a new mapping with placeReset clear while a source ticks",
+         [loop, fall], [("V15", V15), ("V5", V5), ("V10", V10)],
+         {"A": {0: start(1, 8, [1]), 5: start(2, 8, [2], tr=0, pr=0),
+                12: start(1, 8, [3], tr=0, pr=0), 18: start(2, 8, [1], tr=0, pr=0)}},
+         None, {"lk"}),
+        ("a remap and a retune with timerReset on a running timer", [loop],
+         [("V15", V15), ("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 8, [1]), 6: remap([2]), 12: remap([3])}},
+         {(6, 16): 0xC4, (6, 17): 100, (12, 16): 0xC4, (12, 17): 120}, {"lk"}),
+        ("a remap and a retune with timerReset on a stopped timer, kept by a start",
+         [fall], [("V15", V15), ("V10", V10)],
+         {"B": {0: start(1, 9, [1]), 8: remap([2]), 14: start(1, 9, [2])}},
+         {(8, 24): 0xC4, (8, 25): 100}, {"lk"}),
+        ("a place's reset on a mapped square, loop and counted source, three effects",
+         [square, loop, ("whole bytes", [200, 150, 100, 50, 25], 0)],
+         [("V10", V10), ("V5", V5), ("sample", sample)],
+         {"A": {0: start(1, 8, [1]), 4: ("retune", 50, 100, 0, 1), 9: remap([2]),
+                13: ("retune", 50, 90, 0, 1)},
+          "B": {0: start(2, 9, [2]), 6: ("retune", 50, 110, 0, 1), 12: remap([1]),
+                18: ("retune", 50, 110, 0, 1)},
+          "D": {0: start(3, 0, [3]), 6: ("retune", 64, 100, 0, 1),
+                15: ("retune", 64, 100, 0, 1)}}, None, {"sq", "lk", "lc"}),
+        ("one transformation through the mirror and through the plain fill",
+         [loop, noise], [("V10", V10)],
+         {"A": {0: start(1, 8, [1]), 6: start(2, 22, [0, 1], tr=0), 12: start(1, 8, [1], tr=0),
+                18: start(2, 22, [0, 1], tr=0)}}, None, {"lk", "ln"}),
+        ("squares and a loop started through a new mapping with placeReset clear",
+         [square, ("square two", [13, 2], 0), loop], [("V15", V15), ("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 8, [1]), 5: start(2, 8, [2], tr=0, pr=0),
+                11: start(3, 8, [3], tr=0, pr=0), 17: start(1, 8, [2], tr=0, pr=0)}},
+         None, {"sq", "lk"}),
+        ("starts with placeReset clear while a source of several columns runs",
+         [voice, buzz, toned], [("V15", V15), ("shape", shape), ("tone", tone)],
+         {"A": {0: start(1, 17, [0, 0, 1]), 6: start(2, 21, [0, 0, 2], tr=0, pr=0),
+                12: start(3, 14, [0, 3], tr=0, pr=0), 18: start(1, 17, [0, 0, 1], tr=0, pr=0)}},
+         None, {"lv", "lb", "lt"}),
+        ("remaps on Timers C and D, which share a control register, each idle while"
+         " the other runs", [loop], [("V10", V10), ("V5", V5)],
+         {"D": {0: start(1, 9, [1]), 8: ("stop",), 10: remap([2]), 12: start(1, 9, [2]),
+                16: remap([1])},
+          "C": {2: remap([2]), 6: start(1, 10, [2]), 14: remap(0)}}, None, {"lk"}),
+        ("a remap and a retune with timerReset on a running square", [square],
+         [("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 8, [1]), 6: remap([2]), 12: remap(0)}},
+         {(6, 16): 0xC4, (6, 17): 100, (12, 16): 0xC4, (12, 17): 90}, {"sq"}),
+        ("a stop row with the mapping column set, then a start with it unset", [loop],
+         [("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 8, [1]), 8: ("stop",), 12: start(1, 8, [1]), 20: remap([2])}},
+         {(8, 30): 0x80 | 2}, {"lk"}),
+        ("a remap in the row that sets the target to setNoiseA", [toned, noise],
+         [("tone", tone), ("tone again", tone2)],
+         {"A": {0: start(1, 14, [0, 1]), 6: remap([0, 2]), 12: start(2, 22, [0, 2])}},
+         {(6, 14): 0x80 | 22}, {"lt", "ln"}),
+        ("a marked source on setEnvelope through T, a remap, a place's reset and a remap"
+         " from the identity", [envelope], [("high", high), ("high again", high2)],
+         {"B": {0: start(1, 20, [0, 1]), 6: remap([0, 2]), 9: ("retune", 64, 120, 0, 1),
+                12: remap(0), 15: ("retune", 64, 120, 0, 1), 18: remap([0, 1]),
+                21: ("retune", 64, 120, 0, 1)}}, None, {"lt"}, {1: (1, False)}),
+        ("counted sources of two columns on setToneA and setNoiseA through T, a remap, a"
+         " place's reset and a remap from the identity", [toned, noise],
+         [("tone", tone), ("tone again", tone2), ("V10", V10), ("V5", V5)],
+         {"A": {0: start(1, 14, [0, 1]), 6: remap([0, 2]), 9: ("retune", 50, 100, 0, 1),
+                12: remap(0), 18: remap([0, 1])},
+          "D": {0: start(2, 22, [0, 3]), 6: remap([0, 4]), 9: ("retune", 50, 100, 0, 1),
+                12: remap(0), 15: ("retune", 50, 100, 0, 1), 18: remap([0, 3]),
+                21: ("retune", 50, 100, 0, 1)}}, None, {"le", "lf"}, {1: (1, True), 2: (0, True)}),
+        ("a deferred start through a mapping", [loop, fall], [("V15", V15), ("V5", V5)],
+         {"A": {0: start(1, 8, [1]), 4: start(2, 8, [2], deferred=1)}}, None, set()),
+    ]
+    for title, sources, transformations, timers, edits, kinds, *forms in cases:
+        tune = effects_tune(title, 24, sources, timers, transformations=transformations)
+        at, version = built(re.sub(r"[^a-z0-9]+", "-", title.lower()), tune)
+        assert version == MAPPED, "%s: ymxs-to-ymxr wrote version %d" % (title, version)
+        if edits or forms:
+            with open(at, "rb") as f:
+                file = f.read()
+            if edits:
+                file = edited(file, edits)
+            if forms:
+                file = reformed(file, forms[0])
+            with open(at, "wb") as f:
+                f.write(file)
+        _MAPPED.append((title, at, -1 if not kinds else 0, kinds))
+    return _MAPPED
+
+
+def mapped(code, symbols):
+    """The tunes that map a value (mapped_tunes), each played tick by tick
+    against the model and frame by frame against the reader's record
+    (SPEC.md 7), on the player with the lookup in, through the lookup kinds
+    and shapes mapped_tunes lists for it. Over the tunes a tick falls
+    inside each of the three boundaries of the lookup (inside). On a player
+    without it, init reports -1 for each (BINARIES.md 1.5), and check plays
+    the first on the player with it; the run with -map plays the rest
+    there."""
+    tunes = mapped_tunes()
+    if "ymxr_look" not in symbols:
+        work = tempfile.mkdtemp()
+        for title, at, _, _ in tunes:
+            with open(at, "rb") as f:
+                bound = bind(f.read(), work)
+            assert Machine(code, symbols, bound).call("init", a0=FILE, a1=WORK + 0x100) \
+                & 0xFFFFFFFF == 0xFFFFFFFF, "%s: init of a player without the lookup took it" % title
+        tunes = tunes[:1]
+    played, reported = 0, 0
+    inner = {"page": 0, "window": 0, "square": 0}
+    for title, at, init, kinds in tunes:
+        ticked = []
+        RAN.clear()
+        result = check(at, code, symbols, kit=True, perf=PERF, ticked=ticked)
+        if init:
+            assert result[0] == 0, "%s: the tune played" % title
+            reported += 1
+            continue
+        assert ticked, "%s: no tick" % title
+        assert kinds <= RAN, "%s: a source ran through a transformation in %s, and in none of %s" % (
+            title, sorted(RAN), sorted(kinds - RAN))
+        for kind in result[6]:
+            if kind in inner:
+                inner[kind] += 1
+        played += 1
+    if "ymxr_look" not in symbols:
+        return ("tunes that map a value: init reports -1 for each of %d, and the first plays"
+                " on the player with the lookup in, every tick against the model and every"
+                " frame against the reader's record" % len(mapped_tunes()))
+    assert all(inner.values()), "a tick fell inside the boundaries of the lookup %s times" % inner
+    return ("tunes that map a value: %d tunes, every tick against the model and every"
+            " frame against the reader's record, a tick inside a remap's page switch at %d"
+            " rows, in a start's window at %d and between a square's mask and level at %d,"
+            " and %d that defers a start, for which init reports -1" % (
+                played, inner["page"], inner["window"], inner["square"], reported))
 
 
 def deferred_sizes():
@@ -1432,7 +2097,7 @@ def voices(code, symbols):
                    "count": column(starts, 90), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
     at, version = built("voices", tune)
-    assert version == TUNE_VERSIONS[0], \
+    assert version == WRITTEN, \
         "a tune with a source of several columns is version 7 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
     return ("a target of three registers and one of two: %d frames, %d ticks"
@@ -1469,7 +2134,7 @@ def envelope(code, symbols):
                    "count": column(starts, 120), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
     at, version = built("envelope", tune)
-    assert version == TUNE_VERSIONS[0], \
+    assert version == WRITTEN, \
         "a source on setEnvelope is counted, in a tune of version 7 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
     return ("the envelope period a counted source of two columns: %d frames, %d ticks"
@@ -1532,7 +2197,7 @@ def wholebyte(code, symbols):
                    "count": column(starts, 100), "timerReset": column(starts, 1),
                    "placeReset": column(starts, 1)}}]}
     at, version = built("wholebyte", tune)
-    assert version == TUNE_VERSIONS[0], \
+    assert version == WRITTEN, \
         "a tune with a counted source is version 7 (SPEC.md 3.3.5)"
     frames, ticks = check(at, code, symbols)[:2]
     return ("a column that fills its byte: %d frames, %d ticks"
@@ -1541,15 +2206,166 @@ def wholebyte(code, symbols):
 
 def handler_at(m, symbols, name, i):
     """Effect i's handler of the shape `name` ("tick", "sq", "one", "cnt",
-    "two", "three" or "env"): the instance its vector points into, bank 0
-    or bank 1 (68k/YMXR.S, BANK), and bank 0's where the vector names
-    neither."""
+    "two", "three" or "env"), or its lookup instance of the kind `name`
+    ("lk", "lc", "lt", "ln", "lb", "lv", "le" or "lf"): the instance its
+    vector points into, bank 0 or bank 1 (68k/YMXR.S, BANK), and bank 0's
+    where the vector names neither."""
     at = CODE + symbols["ymxr_%s%d" % (name, i)]
     if "ymxr_bank1" not in symbols:
         # a player without the deferred start has bank 0 alone
         return at
     bank = symbols["ymxr_bank1"] - symbols["ymxr_tick0"]
     return at + bank if m.long(TIMER[i]["vector"]) == at + bank else at
+
+
+def lookup_kind(model, i):
+    """The lookup kind of the handler that steps effect i's source through
+    a transformation (68k/YMXR.S, ymxr_kinds): a counted source of one
+    column (lc); two columns with the last value written last, on
+    setToneX and setEnvelope, marked (lt) or counted (le), or first, on
+    setNoiseX, marked (ln) or counted (lf); three with it last (lb), on
+    setBuzzer, or in the middle (lv), on setVoiceX; and one column
+    otherwise (lk). Its target is the one it was started on."""
+    using = model.fx[i]["using"]
+    columns = model.wide(i)
+    first = using in (22, 23, 24)
+    if model.counted(i):
+        return ("lf" if first else "le") if columns else "lc"
+    if columns == 2:
+        return "ln" if first else "lt"
+    if columns == 3:
+        return "lb" if using == 21 else "lv"
+    return "lk"
+
+
+def page_of(m, symbols, at, name):
+    """The page a lookup instance at `at` of the kind `name` reads: its
+    page read's displacement word, from the word's address, with the key
+    at 0 (68k/YMXR.S, LKEY)."""
+    word = at + symbols[name.upper() + "_KEY"] - 1
+    high = m.byte(word)
+    return word + ((high << 8) - (0x10000 if high & 0x80 else 0))
+
+
+def pairs(m, symbols):
+    """Every lookup instance's key write and page read, as init left them:
+    the key's write is move.b d16(pc),(abs).l, $13FA, or (abs).l,(abs).l,
+    $13F9, with -abs, and the read after it move.b d16(pc),$FFFF8802.w,
+    $11FA and $8802, whose displacement's low byte is the key write's
+    destination. Unicorn has no prefetch, so this reads the order of the
+    two, which the real-ST program measures (68k/test/st). The count of
+    instances."""
+    count = 0
+    for name, at in symbols.items():
+        one = re.match(r"ymxr_(l[kctnbvef])[0-3]b?$", name)
+        if not one:
+            continue
+        key = CODE + at + symbols[one.group(1).upper() + "_KEY"]
+        read = key - 3
+        write = read - (8 if PCREL else 10)
+        assert m.word(write) == (0x13FA if PCREL else 0x13F9), \
+            "%s writes its key with %04x" % (name, m.word(write))
+        assert (m.word(read), m.word(read + 4)) == (0x11FA, 0x8802), \
+            "%s reads its page with %04x %04x" % (name, m.word(read), m.word(read + 4))
+        assert m.long(read - 4) == key, \
+            "%s writes its key at %x, and the page read's key is at %x" % (
+                name, m.long(read - 4), key)
+        count += 1
+    return count
+
+
+def running(m, symbols, model, i, said, ticked=False):
+    """The handler effect i's running source is read through, against the
+    model: a square's two levels and the one its immediate is at, a source
+    of one row's level, and otherwise the place, the rows left of a
+    counted source, and through a transformation the lookup instance and
+    the page its key indexes; then the handler's first register, and the
+    vector. With ticked these are read after a tick, which leaves the
+    register and the vector as they are, and those two are left out. said
+    opens each line it reports. The handler of a source that runs through
+    a transformation is added to RAN."""
+    fx = model.fx[i]
+    if model.square(i):
+        name = "sq"
+        at = handler_at(m, symbols, "sq", i)
+        assert m.byte(at + SQ_VAL) == model.value(i), \
+            "%seffect %d's square is at %02x, not %02x" % (
+                said, i, m.byte(at + SQ_VAL), model.value(i))
+        # the two rows' difference, which moves the immediate between them
+        mask = model.value(i, 0) ^ model.value(i, 1)
+        assert m.byte(at + SQ_MASK) == mask, \
+            "%seffect %d's square moves by %02x, not %02x" % (
+                said, i, m.byte(at + SQ_MASK), mask)
+        sel = SQ_SEL
+    elif model.onerow(i):
+        name = "one"
+        at = handler_at(m, symbols, "one", i)
+        assert m.byte(at + ONE_VAL) == model.value(i), \
+            "%seffect %d's one row is %02x, not %02x" % (
+                said, i, m.byte(at + ONE_VAL), model.value(i))
+        sel = ONE_SEL
+    else:
+        # every handler that steps a place has it at TICK_PTR and its first
+        # register at TICK_SEL (68k/YMXR.S, the assertions after HANDLEQU)
+        if fx["run"]:
+            name = lookup_kind(model, i)
+        elif model.counted(i):
+            name = "env" if model.wide(i) else "cnt"
+        else:
+            name = {0: "tick", 2: "two", 3: "three"}[model.wide(i)]
+        at = handler_at(m, symbols, name, i)
+        place = model.place_address(i)
+        assert m.place(at, TICK_PTR) == place, \
+            "%seffect %d's place is %x, not %x" % (said, i, m.place(at, TICK_PTR), place)
+        if model.counted(i):
+            left = symbols[name.upper() + "_LEFT"] if fx["run"] else (
+                TWC_LEFT if model.wide(i) else TICKC_LEFT)
+            assert m.word(at + left) == model.left(i), \
+                "%seffect %d has %d rows left, not %d" % (
+                    said, i, m.word(at + left), model.left(i))
+        if fx["run"]:
+            pages(m, symbols, model, i, at, name, said)
+        sel = TICK_SEL
+    if fx["run"]:
+        RAN.add(name)
+    if ticked:
+        return
+    first = TARGETS[fx["using"]][0][0]
+    assert m.byte(at + sel) == first, \
+        "%seffect %d's handler selects R%d first, not R%d" % (said, i, m.byte(at + sel), first)
+    assert m.long(TIMER[i]["vector"]) == at, \
+        "%seffect %d's vector is at %x, not at its handler at %x" % (
+            said, i, m.long(TIMER[i]["vector"]), at)
+
+
+def pages(m, symbols, model, i, at, name, said):
+    """The page effect i's lookup instance at `at` reads: one of the
+    effect's two pages in the instance's bank (68k/YMXR.S, ymxr_pages),
+    with the entries of the transformation the effect runs through as the
+    model reads a key: the E entries from 0, plain; for a marked column,
+    the mirror, the first E' at 0 and again at 128 with bit 7 set, E' the
+    lesser of E and 128; for setR7, the first 64 at 192 with bits 7 and 6
+    set (SPEC.md rule 2(f))."""
+    fx = model.fx[i]
+    base = page_of(m, symbols, at, name)
+    bank = "b" if "ymxr_bank1" in symbols and at >= CODE + symbols["ymxr_bank1"] else ""
+    first = CODE + symbols["ymxr_pg%d%s" % (i, bank)]
+    assert base in (first, first + 256), \
+        "%seffect %d's %s instance reads %x, outside its pages at %x" % (said, i, name, base, first)
+    entries = model.tune.transformations[fx["run"] - 1]
+    page = bytes(m.mu.mem_read(base, 256))
+    fill = model.fill(i)
+    if fill == "plain":
+        want = dict(enumerate(entries))
+    elif fill == "mirror":
+        half = entries[:128]
+        want = dict(enumerate(half))
+        want.update({128 + k: e | 0x80 for k, e in enumerate(half)})
+    else:
+        want = {192 + k: e | 0xC0 for k, e in enumerate(entries[:64])}
+    wrong = [k for k, e in sorted(want.items()) if page[k] != e]
+    assert not wrong, "%seffect %d's page has %02x at %d, not %02x of transformation %d (%s)" % (
+        said, i, page[wrong[0]], wrong[0], want[wrong[0]], fx["run"], fill)
 
 
 def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
@@ -1569,42 +2385,59 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     version = struct.unpack(">H", file[4:6])[0]
     if version not in TUNE_VERSIONS:
         # the binder and the reader reject the file; the player, which never
-        # sees it, rejects a bound tune whose version word is moved
+        # sees it, rejects a bound tune whose version word is moved past the
+        # versions it reads
         assert bind(file, work) is None, "the binder took a tune file of version %d" % version
         if kit:
             assert trace(file, work, 1) == [], "the reader reports something of version %d" % version
-        bound = bind(file[:4] + struct.pack(">H", TUNE_VERSIONS[0]) + file[6:], work)
+        # bound at 9, the version of a table of 30 columns
+        bound = bind(file[:4] + struct.pack(">H", WRITTEN) + file[6:], work)
         assert bound is not None, "the file is not a tune of the version it records"
         assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) == 0, \
             "init rejected the bound tune before its version was moved"
-        moved = bound[:4] + struct.pack(">H", BOUND_VERSIONS[-1] + 1) + bound[6:]
+        past = max(bound_versions(symbols)) + 1
+        moved = bound[:4] + struct.pack(">H", past) + bound[6:]
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
-            "init took a bound tune of version %d" % (BOUND_VERSIONS[-1] + 1)
-        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0)), 0, None
+            "init took a bound tune of version %d" % past
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0)), [], None
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
-    assert tune.version in BOUND_VERSIONS, "the binder wrote version %d" % tune.version
-    if tune.effects & 0x10 and "ymxr_bank1" not in symbols:
-        # A row defers a start, and init of a player without the deferred
-        # start reports -1 (doc/BINARIES.md 1.5 step 2), so the tune plays
-        # on the player assembled with it.
+    assert tune.version == version, "the binder wrote version %d of a tune file of %d" % (
+        tune.version, version)
+    defer, lookup = needs(tune.effects)
+    have = ("ymxr_bank1" in symbols, "ymxr_look" in symbols)
+    if (defer and not have[0]) or (lookup and not have[1]):
+        # A row defers a start or maps a value, and init of a player
+        # without the deferred start or the lookup reports -1 (doc/
+        # BINARIES.md 1.5 steps 1 and 2), so the tune plays on the player
+        # assembled with it.
         assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
             & 0xFFFFFFFF == 0xFFFFFFFF, \
-            "init of a player without the deferred start took a tune that defers one"
-        code, symbols = deferring(DEFINES)
+            "init of a player without the switch a tune of effects %s needs took it" % (
+                format(tune.effects, "06b"))
+        code, symbols = build(switched(DEFINES, defer or have[0], lookup or have[1]))
+    if defer and lookup:
+        # The player with the deferred start and the lookup in reports -1
+        # for a tune that defers a start and maps a value (68k/YMXR.S,
+        # YMXR_init): a mapped deferred start is left to a later version of
+        # the player.
+        assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
+            & 0xFFFFFFFF == 0xFFFFFFFF, \
+            "init took a tune that defers a start and maps a value"
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0)), [], None
     m = Machine(code, symbols, bound)
     if cycles:
-        # The image is the bound tune's last part (doc/BINARIES.md 1.2),
-        # so it runs from the field at 16 to the end: the cycles the
-        # counter reads there are the reader's, since the tables below it
-        # are data.
+        # The image is the bound tune's last part, or the last before the
+        # transformation block (doc/BINARIES.md 1.2), so it runs from the
+        # field at 16 to there: the cycles the counter reads there are the
+        # reader's, since the tables below it are data.
         # The frame procedure's steps 1 to 3, the effects, are from
         # ymxr_frame to ymxr_regs, and steps 4 to 8, the register columns,
         # from there to ymxr_played: the two parts a dense frame procedure
         # would replace (dense).
-        cycles.attach(m, (FILE + tune.image_at, FILE + len(bound)),
+        cycles.attach(m, (FILE + tune.image_at, FILE + tune.image_end),
                       *(decoder_of(file, bound, tune, cycles.module)
                         if parts else ()),
                       regions=None if perf else {
@@ -1616,6 +2449,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     # the frame procedure as init patched it: a constant column's read is
     # an immediate (68k/YMXR.S, ymxr_put)
     patched = bytes(m.mu.mem_read(CODE, len(code)))
+    if "ymxr_look" in symbols:
+        pairs(m, symbols)
     # Timer C's nibble is the host's 200 Hz clock, kept unless effect 3 runs
     nibble = 0 if tune.effects & 8 else 0x50
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "init moved Timer C's nibble"
@@ -1660,6 +2495,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                  "sources": [{"rows": [c[r] for r in range(r_) for c in columns],
                               "repeat": rr}
                              for _, r_, rr, columns in tune.sources[1:]]}
+        if tune.version == MAPPED:
+            # each transformation's entries, transformation 1 first (7.2)
+            first["transformations"] = tune.transformations
         assert entries[0] == first, "the reader's first line is %s, the tune header is %s" % (entries[0], first)
         entries = entries[1:]
     cost = []
@@ -1749,82 +2587,15 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                         f, i, timers.pending[i] or timers.count[i], ticks)
             elif fx["source"] == 0 and tune.effects & 1 << i:
                 assert timers.mode[i] == 0, "frame %d: effect %d's timer runs with no source" % (f, i)
-            place = model.place_address(i)
-            if place is not None and fx["running"]:
-                if model.counted(i) and model.wide(i):
-                    # the counted handler of several columns: the place of
-                    # the column it writes first, that column's register,
-                    # and the rows it has left (68k/YMXR.S, TICKW counted)
-                    at = handler_at(m, symbols, "env", i)
-                    assert m.place(at, TWC_PTR1) == place, \
-                        "frame %d: effect %d's place is %x, not %x" % (
-                            f, i, m.place(at, TWC_PTR1), place)
-                    assert m.byte(at + TWC_SEL1) == TARGETS[fx["using"]][0][0], \
-                        "frame %d: effect %d's counted handler selects R%d first, not R%d" % (
-                            f, i, m.byte(at + TWC_SEL1), TARGETS[fx["using"]][0][0])
-                    assert m.word(at + TWC_LEFT) == model.left(i), \
-                        "frame %d: effect %d has %d rows left, not %d" % (
-                            f, i, m.word(at + TWC_LEFT), model.left(i))
-                    assert m.long(TIMER[i]["vector"]) == at, \
-                        "frame %d: effect %d's vector is not its counted handler's" % (f, i)
-                elif model.counted(i):
-                    # the counted handler: its place, the register it
-                    # selects and the rows it has left (68k/YMXR.S, TICKC)
-                    at = handler_at(m, symbols, "cnt", i)
-                    assert m.place(at, TICKC_PTR) == place, \
-                        "frame %d: effect %d's place is %x, not %x" % (
-                            f, i, m.place(at, TICKC_PTR), place)
-                    assert m.byte(at + TICKC_SEL) == fx["using"], \
-                        "frame %d: effect %d's counted handler selects R%d, not R%d" % (
-                            f, i, m.byte(at + TICKC_SEL), fx["using"])
-                    assert m.word(at + TICKC_LEFT) == model.left(i), \
-                        "frame %d: effect %d has %d rows left, not %d" % (
-                            f, i, m.word(at + TICKC_LEFT), model.left(i))
-                    assert m.long(TIMER[i]["vector"]) == at, \
-                        "frame %d: effect %d's vector is not its counted handler's" % (f, i)
-                elif model.square(i):
-                    at = handler_at(m, symbols, "sq", i)
-                    assert m.byte(at + SQ_VAL) == model.value(i), \
-                        "frame %d: effect %d's square is at %02x, not %02x" % (
-                            f, i, m.byte(at + SQ_VAL), model.value(i))
-                    assert m.byte(at + SQ_SEL) == fx["using"], \
-                        "frame %d: effect %d's square selects R%d, not R%d" % (
-                            f, i, m.byte(at + SQ_SEL), fx["using"])
-                    assert m.long(TIMER[i]["vector"]) == at, \
-                        "frame %d: effect %d's vector is not its square's" % (f, i)
-                elif model.onerow(i):
-                    at = handler_at(m, symbols, "one", i)
-                    assert m.byte(at + ONE_VAL) == model.value(i), \
-                        "frame %d: effect %d's one row is %02x, not %02x" % (
-                            f, i, m.byte(at + ONE_VAL), model.value(i))
-                    assert m.byte(at + ONE_SEL) == fx["using"], \
-                        "frame %d: effect %d's one row selects R%d, not R%d" % (
-                            f, i, m.byte(at + ONE_SEL), fx["using"])
-                    assert m.long(TIMER[i]["vector"]) == at, \
-                        "frame %d: effect %d's vector is not its one row's" % (f, i)
-                elif model.wide(i):
-                    # a handler of several registers: the place of the
-                    # column it writes first, and that column's register
-                    # (68k/YMXR.S, TICKW)
-                    columns = model.wide(i)
-                    at = handler_at(m, symbols, "two" if columns == 2 else "three", i)
-                    sel, ptr = TW_SEL1[columns - 2], TW_PTR1[columns - 2]
-                    assert m.place(at, ptr) == place, \
-                        "frame %d: effect %d's place is %x, not %x" % (
-                            f, i, m.place(at, ptr), place)
-                    assert m.byte(at + sel) == TARGETS[fx["using"]][0][0], \
-                        "frame %d: effect %d's handler selects R%d first, not R%d" % (
-                            f, i, m.byte(at + sel), TARGETS[fx["using"]][0][0])
-                    assert m.long(TIMER[i]["vector"]) == at, \
-                        "frame %d: effect %d's vector is not its columns' handler" % (f, i)
-                else:
-                    at = handler_at(m, symbols, "tick", i)
-                    assert m.place(at, TICK_PTR) == place, "frame %d: effect %d's place is %x, not %x" % (f, i, m.place(at, TICK_PTR), place)
-                    assert m.byte(at + TICK_SEL) == fx["using"], "frame %d: effect %d's handler selects R%d, not R%d" % (f, i, m.byte(at + TICK_SEL), fx["using"])
+            if model.place_address(i) is not None and fx["running"]:
+                running(m, symbols, model, i, "frame %d: " % f)
         for i in timers.due(clocks):
             fx = model.fx[i]
             assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, i)
             read = (fx["source"], fx["place"])
+            # a tick through a transformation, whose kind the counts keep
+            # apart from the identity's
+            mapping = fx["run"]
             want, then = model.tick(i)
             if cycles:
                 cycles._settle(None)
@@ -1842,6 +2613,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     kind = ("counted wide " if model.wide(i) else "counted ") + then
                 elif model.wide(i):
                     kind = "wide " + then
+                if mapping:
+                    kind = "mapped " + kind
                 if bin(tune.effects & 0x0F).count("1") == 1:
                     kind += " alone"        # init took the level's drop out
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
@@ -1851,39 +2624,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             if ticked is not None:
                 ticked.append((f, i) + read + (list(m.psg),))
             timers.apply(m.mfp)
-            if model.counted(i):
-                if then != "stop":
-                    wide = model.wide(i)
-                    at = handler_at(m, symbols, "env" if wide else "cnt", i)
-                    ptr, left = (TWC_PTR1, TWC_LEFT) if wide else (TICKC_PTR, TICKC_LEFT)
-                    assert m.place(at, ptr) == model.place_address(i), \
-                        "frame %d: after a tick effect %d's place is off" % (f, i)
-                    assert m.word(at + left) == model.left(i), \
-                        "frame %d: after a tick effect %d has %d rows left, not %d" % (
-                            f, i, m.word(at + left), model.left(i))
-                else:
-                    assert timers.mode[i] == 0, \
-                        "frame %d: effect %d ran out and its timer runs on" % (f, i)
-            elif model.square(i):
-                at = handler_at(m, symbols, "sq", i)
-                assert m.byte(at + SQ_VAL) == model.value(i), \
-                    "frame %d: after a tick effect %d's square is at %02x, not %02x" % (
-                        f, i, m.byte(at + SQ_VAL), model.value(i))
-            elif model.onerow(i):
-                at = handler_at(m, symbols, "one", i)
-                assert m.byte(at + ONE_VAL) == model.value(i), \
-                    "frame %d: after a tick effect %d's one row is %02x, not %02x" % (
-                        f, i, m.byte(at + ONE_VAL), model.value(i))
-            elif then == "stop":
-                assert timers.mode[i] == 0, "frame %d: effect %d ran out and its timer runs on" % (f, i)
-            elif model.wide(i):
-                columns = model.wide(i)
-                at = handler_at(m, symbols, "two" if columns == 2 else "three", i)
-                assert m.place(at, TW_PTR1[columns - 2]) == model.place_address(i), \
-                    "frame %d: after a tick effect %d's place is off" % (f, i)
+            if then == "stop" and not model.square(i) and not model.onerow(i):
+                assert timers.mode[i] == 0, \
+                    "frame %d: effect %d ran out and its timer runs on" % (f, i)
             else:
-                at = handler_at(m, symbols, "tick", i)
-                assert m.place(at, TICK_PTR) == model.place_address(i), "frame %d: after a tick effect %d's place is off" % (f, i)
+                running(m, symbols, model, i, "frame %d: after a tick " % f, ticked=True)
     boundaries = inside(code, symbols, bound, tune, workspace)
     m.call("stop", a0=workspace)
     timers.apply(m.mfp)
@@ -3259,6 +4004,165 @@ def heads_are(got, effects):
     return all(one in want for one, want in zip(got, want_heads(effects)))
 
 
+# The mapping column's three sites of an effect on the player with the
+# lookup in (68k/YMXR.S, EFFECT): the or at the head, or.b d16(a1),d1 for a
+# live column and or.b #v,d1 for a constant one, and the start's read and
+# the remap's, move.b d16(a1),d1 and move.b #v,d1. A table of 30 columns,
+# versions 7 to 9, reads each as the constant 0 (ymxr_col).
+MAP_SITES = (("q", (0x8229, 0x0001)), ("c", (0x1229, 0x123C)), ("m", (0x1229, 0x123C)))
+
+
+def mapping_sites(m, symbols):
+    """Each effect's three mapping sites as init left them, each its
+    opcode and its operand, effect 0 first; an empty list on a player
+    without the lookup."""
+    if "ymxr_look" not in symbols:
+        return []
+    return [[(m.word(CODE + symbols["%s_%d" % (site, 30 + i)]),
+              m.word(CODE + symbols["%s_%d" % (site, 30 + i)] + 2))
+             for site, _ in MAP_SITES] for i in range(4)]
+
+
+def sites_are(got, version):
+    """Whether each mapping site is one init writes for a tune of this
+    version: a read of the column or its immediate, and the immediate 0 for
+    a table of 30 columns."""
+    for sites in got:
+        for (site, ops), (op, operand) in zip(MAP_SITES, sites):
+            if op not in ops or (version != MAPPED and (op, operand) != (ops[1], 0)):
+                return False
+    return True
+
+
+# The kit's tune that defers a start, which opens a set and an SNDH file
+# of a run with -defer (opening).
+DEFERRING = os.path.join(ROOT, "doc", "conformance", "tunes", "deferred.ymxr")
+
+
+def opening(defines):
+    """The tunes an SNDH file of the rig opens with: the tool selects the
+    deferred start and the lookup by the effects bytes of the subtunes
+    (BINARIES.md 2.1), so on a run with -defer the kit's tune that defers
+    a start comes first, and on one with -map the first tune that maps a
+    value (mapped_tunes), and the file is on the core of the run's
+    switches."""
+    out = []
+    if DEFER_ON in defines:
+        out.append(DEFERRING)
+    if MAP_ON in defines:
+        out.append(mapped_tunes()[0][1])
+    return out
+
+
+def asked(defines):
+    """The bits of the flags word (BINARIES.md 2.3) the run's switches set:
+    0 the raster monitor, 1 the lean tick, 2 the row read through the
+    program counter."""
+    return ((1 if "-dYMXR_PERF=1" in defines else 0)
+            | (2 if "-dYMXR_AEOI=1" in defines else 0)
+            | (0 if "-dYMXR_PCREL=0" in defines else 4))
+
+
+def flagged(flags):
+    """The defines of the core whose flags word reads `flags` (BINARIES.md
+    2.3), as main assembles the player with them."""
+    return ((["-dYMXR_PERF=1"] if flags & 1 else [])
+            + ([] if flags & 4 else ["-dYMXR_PCREL=0"])
+            + (["-dYMXR_NEST=0", "-dYMXR_AEOI=1"] if flags & 2 else [])
+            + ([DEFER_ON] if flags & 8 else []) + ([MAP_ON] if flags & 16 else []))
+
+
+def core_name(flags):
+    """The name of the core whose flags word reads `flags` (BINARIES.md
+    2.1)."""
+    return "YMXR_sndh%s%s%s%s%s.bin" % (
+        "-perf" if flags & 1 else "", "-lean" if flags & 2 else "",
+        "" if flags & 4 else "-abs", "-defer" if flags & 8 else "",
+        "-map" if flags & 16 else "")
+
+
+# The end of the line of BINARIES.md 2.10 for tunes past the reach of a
+# displacement.
+PAST_THE_REACH = b"a tick that reads a row through the program counter reaches 32767"
+
+
+def sndh_of(files, defines, work):
+    """An SNDH file of tune files, subtune 1 up in their order, as the
+    tools write one (BINARIES.md 3): bin/ymxr-multi writes a multi file of
+    several, and bin/ymxr-sndh the SNDH file around the core with the
+    run's -perf and -lean, -pcrel or -abs as the run reads a row, and the
+    deferred start and the lookup as the subtunes select them (2.1). None
+    where the tool reports the tunes past the reach of a displacement
+    (2.10)."""
+    if len(files) > 1:
+        paths = []
+        for n, file in enumerate(files):
+            paths.append(os.path.join(work, "%d.ymxr" % (n + 1)))
+            with open(paths[-1], "wb") as f:
+                f.write(file)
+        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-multi"), "-silent"] + paths,
+                           capture_output=True)
+        assert r.returncode == 0, r.stderr.decode()
+        file = r.stdout
+    else:
+        file = files[0]
+    bits = asked(defines)
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent"]
+                       + (["-perf"] if bits & 1 else []) + (["-lean"] if bits & 2 else [])
+                       + (["-pcrel"] if bits & 4 else ["-abs"]),
+                       input=file, capture_output=True)
+    if r.returncode == 1 and PAST_THE_REACH in r.stderr:
+        return None
+    assert r.returncode == 0, r.stderr.decode()
+    return r.stdout
+
+
+def from_core(made, defines):
+    """An SNDH file as a machine loads it, the core's first byte at CODE
+    (BINARIES.md 3.1): the bytes from there to the file's end, the core the
+    rig assembles with the switches of its flags word (2.3) and the
+    symbols, that word, the end of the subtune table, and the first byte
+    of each subtune's bound tune with the byte past it, the last one's
+    being where the images begin.
+
+    The core is that assembly byte for byte, the fields at 28 and 32 that
+    the tool patches aside; its flags word reads the run's switches, and
+    the deferred start and the lookup where the effects byte of a subtune
+    sets bit 4 and bit 5 (2.1); the subtune table is at even(L), L the
+    core's bytes."""
+    at = struct.unpack(">h", made[2:4])[0] + 2
+    body = made[at:]
+    assert len(body) <= WORK - CODE, \
+        "the SNDH file is %d bytes from its core, and the code's memory %d" % (
+            len(body), WORK - CODE)
+    flags = struct.unpack(">H", body[22:24])[0]
+    table = long_at(body, 28)
+    count = struct.unpack(">H", body[table:table + 2])[0]
+    starts = [long_at(body, table + 2 + 4 * i) for i in range(count)]
+    images = min(one + struct.unpack(">i", body[one + 16:one + 20])[0] for one in starts)
+    effects = 0
+    for one in starts:
+        effects |= body[one + 8]
+    want = asked(defines) | (effects & 0x30) >> 1
+    assert flags == want, \
+        "ymxr-sndh wrote %s, flags %d, and the run and the subtunes select %s" % (
+            core_name(flags), flags, core_name(want))
+    code, symbols = build(flagged(flags), "YMXR_sndh.S")
+    assert body[:28] == code[:28] and body[36:len(code)] == code[36:], \
+        "%s in the SNDH file is not the one assembled, its two patched longs aside" % (
+            core_name(flags))
+    assert table == (len(code) + 1) & ~1, \
+        "the subtune table is at %d, and the core is %d bytes" % (table, len(code))
+    return (body, code, symbols, flags, table + 2 + 4 * count,
+            list(zip(starts, starts[1:] + [images])))
+
+
+def that_map(count):
+    """The clause of a set's line that counts its subtunes that map a
+    value."""
+    return ", %d that map%s a value" % (count, "s" if count == 1 else "")
+
+
 def patched_code_follows_the_subtune(defines, tunes):
     """Init leaves the player's code a function of the subtune and not of
     the subtune before it.
@@ -3266,109 +4170,104 @@ def patched_code_follows_the_subtune(defines, tunes):
     A set shares one loaded player, and init patches it: the effect heads,
     the shape word of every tick, the row displacements, the advance's
     address. A word written on one path and left alone on another reads
-    the subtune before it. So every subtune is inited alone on a fresh
-    image, and then after every other, all at one address, and the code
-    and the subtune's bound tune must read the same both ways. The
-    workspace is outside both and is not compared, and so are the other
-    subtunes' bound tunes: each is bound alone here, with a separate image,
-    which DTX's init writes the ring's size into where its table has copies
-    (DTX, abi.md 2), and the subtune after it reads the image it is bound
-    with alone.
+    the subtune before it. So the set goes into one SNDH file through the
+    tools (sndh_of), every subtune is inited alone on a fresh copy of the
+    file, and then after every other, and the core with the subtune table
+    and the subtune's bound tune must read the same both ways. The images
+    and the workspace are outside both and are not compared, and so are
+    the other subtunes' bound tunes: DTX's init writes the ring's size
+    into an image where its table has copies (DTX, abi.md 2), and the
+    subtunes of a shape share one image (BINARIES.md 1.4).
 
-    A set of which a subtune defers a start is on the core with the
-    deferred start in, as the tools select it (doc/BINARIES.md 2.1).
+    The tool selects the core with the deferred start in for a set of
+    which a subtune defers a start, and the one with the lookup in for a
+    set of which a subtune maps a value (BINARIES.md 2.1); a set of a run
+    with -defer or -map opens with such a tune (opening). A subtune that
+    does both is left out, since the core with both reports -1 for it
+    (68k/YMXR.S, YMXR_init), and so is a subtune at a rate other than the
+    first's, since an SNDH file records one rate (BINARIES.md 3.3).
     """
     work = tempfile.mkdtemp()
-    bounds = []
+    first = opening(defines)
+    files = []
+    rate, others = None, 0
     # The set is the tunes at the head of the list, and a few are enough:
     # the pairs below are the square of the set, and a run over the corpus
     # would otherwise convert every dump of it for a set of four.
-    for ym in tunes[:SET_READS]:
+    for ym in (first + [one for one in tunes if one not in first])[:SET_READS]:
         try:
             file, _ = convert(ym, work)
         except AnotherFormat:
             continue
         bound = bind(file, work)
-        if bound is not None:
-            bounds.append((os.path.basename(ym), bound))
-        if len(bounds) == SET_TUNES:
+        if bound is None or bound[8] & 0x30 == 0x30:
+            continue
+        rate = rate or file[6:8]
+        if file[6:8] != rate:
+            others += 1
+            continue
+        files.append((os.path.basename(ym), file))
+        if len(files) == SET_TUNES:
             break
-    if any(bound[8] & 0x10 for _, bound in bounds):
-        defines = [d for d in defines if d != "-dYMXR_DEFER=1"] + ["-dYMXR_DEFER=1"]
-    code, symbols = assemble("YMXR_sndh.S", defines=defines)
-    # A tick reads its row through a signed word displacement, so a
-    # subtune whose rows are past the reach is left
-    # out: these are bound one by one, so each has an image in it, where
-    # a set's subtunes share one image and are together
-    # (doc/BINARIES.md 2).
+    made = sndh_of([file for _, file in files], defines, work)
+    # A tick of the core that reads a row through the program counter
+    # reaches 32,767 bytes, which the tool measures from the core's first
+    # byte plus its field at 26, and the tool reports a set whose bound
+    # tunes end further off (BINARIES.md 2.1, 2.10): each subtune then
+    # joins the set where the set with it is within the reach.
     left = 0
-    if PCREL:
-        fits, at = [], 0
-        for name, bound in bounds:
-            at = (at + 3) & ~3
-            if FILE + at + len(bound) - (CODE + symbols["ymxr_tick0"]) <= 32767:
-                fits.append((name, bound))
-                at += len(bound)
-        left = len(bounds) - len(fits)
-        bounds = fits
-    if len(bounds) < 2:
+    if made is None:
+        fits = []
+        for one in files:
+            tried = sndh_of([file for _, file in fits + [one]], defines, work)
+            if tried is not None:
+                fits.append(one)
+                made = tried
+        left = len(files) - len(fits)
+        files = fits
+    if len(files) < 2:
         return "one subtune: no pair to init one after the other"
-    offsets, blob = [], b""
-    for _, bound in bounds:
-        at = (len(blob) + 3) & ~3
-        blob += b"\0" * (at - len(blob)) + bound
-        offsets.append(at)
-    table = (FILE + len(blob) + 3) & ~3
-    code = bytearray(code)
-    code[28:32] = struct.pack(">I", table - CODE)
-    code[32:36] = struct.pack(">I", WORK - CODE)
-    loaded = blob + b"\0" * (table - FILE - len(blob)) \
-        + struct.pack(">H", len(bounds)) \
-        + b"".join(struct.pack(">I", FILE - CODE + o) for o in offsets)
+    body, code, symbols, flags, shared, spans = from_core(made, defines)
 
     def image(m):
-        return (bytes(m.mu.mem_read(CODE, len(code))),
-                bytes(m.mu.mem_read(FILE, len(loaded))))
+        return bytes(m.mu.mem_read(CODE, len(body)))
 
     alone = []
-    for i in range(len(bounds)):
-        m = Machine(bytes(code), symbols, loaded)
+    for i in range(len(files)):
+        m = Machine(body, symbols, b"")
         m.call("core-init", d0=i + 1)
         alone.append(image(m))
     pairs = 0
-    for a in range(len(bounds)):
-        for b in range(len(bounds)):
+    for a in range(len(files)):
+        for b in range(len(files)):
             if a == b:
                 continue
-            m = Machine(bytes(code), symbols, loaded)
+            m = Machine(body, symbols, b"")
             m.call("core-init", d0=a + 1)
             m.call("core-init", d0=b + 1)
             got = image(m)
-            mine = slice(offsets[b], offsets[b] + len(bounds[b][1]))
-            got = (got[0], got[1][mine])
-            was = (alone[b][0], alone[b][1][mine])
-            for region, name, base in ((0, "the code", CODE),
-                                       (1, "the tune", FILE + offsets[b])):
-                if got[region] != was[region]:
-                    where = [i for i in range(len(got[region]))
-                             if got[region][i] != was[region][i]]
+            for name, lo, hi in (("the code", 0, shared), ("the tune", spans[b][0], spans[b][1])):
+                if got[lo:hi] != alone[b][lo:hi]:
+                    where = [i for i in range(lo, hi) if got[i] != alone[b][i]]
                     near = {}
                     for sym, at in symbols.items():
                         if not sym.startswith(".") and at <= where[0]:
                             near[at] = sym
-                    label = near[max(near)] if near and region == 0 else "?"
+                    label = near[max(near)] if near and lo == 0 else "?"
                     raise AssertionError(
                         "%s after %s then %s differs from %s alone at %d byte(s), "
                         "the first at %s+%d ($%X): %02X where %02X" % (
-                            name, bounds[a][0], bounds[b][0], bounds[b][0], len(where),
-                            label, where[0] - max(near) if near else where[0],
-                            base + where[0], got[region][where[0]],
-                            was[region][where[0]]))
+                            name, files[a][0], files[b][0], files[b][0], len(where),
+                            label, where[0] - (max(near) if near and lo == 0 else lo),
+                            CODE + where[0], got[where[0]], alone[b][where[0]]))
             pairs += 1
-    return "%d subtunes in one set: the code after any one then another is the " \
-        "code after the other alone, %d ordered pairs%s" % (
-            len(bounds), pairs,
-            "" if left == 0 else "; %d past the displacement's reach left out" % left)
+    return "%d subtunes in one SNDH file of ymxr-sndh on %s%s: the code after any one" \
+        " then another is the code after the other alone, %d ordered pairs%s%s" % (
+            len(files), core_name(flags),
+            that_map(sum(1 for _, file in files if file[8] & 0x20)) if flags & 16 else "",
+            pairs,
+            "" if left == 0 else "; %d past the displacement's reach left out" % left,
+            "" if others == 0 else "; %d at a rate other than the first's left out" % others)
 
 
 def core(defines, ym):
@@ -3380,32 +4279,29 @@ def core(defines, ym):
     the MFP raising an interrupt and the 68000 acknowledging it leaves the
     MFP with no vector to place on the bus, and the 68000 runs exception 24
     rather than the timer's handler. The tick that acknowledge belonged to is
-    the one the write cancelled, so the handler returns. A tune whose
-    effects byte sets bit 4 is on the core with the deferred start in, as
-    the tools select it (BINARIES.md 2.1)."""
+    the one the write cancelled, so the handler returns. The tune is the
+    last subtune of an SNDH file of the tools (sndh_of), after the tunes the
+    run's switches open a file with (opening), so the file is on the core
+    with the deferred start in where a subtune sets bit 4 or the run is
+    with -defer, and on the core with the lookup in where one sets bit 5 or
+    the run is with -map (BINARIES.md 2.1). On the core with the lookup
+    in, init leaves the mapping sites read as the tune's table has them,
+    and every lookup instance's key write before its page read (pairs).
+    Returns the core's name, its bytes and the instances read."""
     work = tempfile.mkdtemp()
-    file, _ = convert(ym, work)
-    bound = bind(file, work)
-    assert bound is not None, "the binder rejected " + os.path.basename(ym)
-    if bound[8] & 0x10:
-        defines = [d for d in defines if d != "-dYMXR_DEFER=1"] + ["-dYMXR_DEFER=1"]
-    code, symbols = assemble("YMXR_sndh.S", defines=defines)
-    # The core reads its subtune table and its workspace as offsets from
-    # its first byte, which the tool patches (BINARIES.md 3). The table
-    # is after the bound tune here, one entry, and the workspace at
-    # WORK.
-    table = (FILE + len(bound) + 1) & ~1
-    code = bytearray(code)
-    code[28:32] = struct.pack(">I", table - CODE)
-    code[32:36] = struct.pack(">I", WORK - CODE)
-    loaded = bound + b"\0" * (table - FILE - len(bound)) \
-        + struct.pack(">HI", 1, FILE - CODE)
-    m = Machine(bytes(code), symbols, loaded)
+    files = [convert(one, work)[0] for one in opening(defines) if one != ym]
+    files.append(convert(ym, work)[0])
+    made = sndh_of(files, defines, work)
+    assert made is not None, \
+        "ymxr-sndh reports %s past the reach of a displacement" % os.path.basename(ym)
+    body, code, symbols, flags, _, spans = from_core(made, defines)
+    bound = body[spans[-1][0]:spans[-1][1]]
+    m = Machine(body, symbols, b"")
     host = 0x00ABCDE0
     m.mu.mem_write(SPURIOUS, struct.pack(">I", host))
     # The core keeps every register, so its entries report through the
     # state byte rather than through d0: bit 0 is while a tune plays.
-    m.call("core-init", d0=1)
+    m.call("core-init", d0=len(files))
     assert m.byte(CODE + symbols["sndh_state"]) & 1, \
         "the core's init rejected " + os.path.basename(ym)
     at = m.long(SPURIOUS)
@@ -3418,13 +4314,19 @@ def core(defines, ym):
             ["%04X" % h for h in heads(m, symbols)],
             ["/".join("%04X" % o for o in h) for h in want_heads(bound[8])],
             format(bound[8], "04b"))
+    version = struct.unpack(">H", bound[4:6])[0]
+    assert sites_are(mapping_sites(m, symbols), version), \
+        "init left the mapping sites at %s for a tune of version %d" % (
+            [["%04X %04X" % one for one in sites] for sites in mapping_sites(m, symbols)],
+            version)
+    instances = pairs(m, symbols) if "ymxr_look" in symbols else 0
     m.call("core-exit")
     assert not m.byte(CODE + symbols["sndh_state"]) & 1, "the core's exit left the tune playing"
     assert masked(m.psg) == masked(HUSHED), \
         "exit wrote %s, not the chip state a tune starts from" % masked(m.psg)
     assert m.long(SPURIOUS) == host, "exit left $60 at %08x, not the host's %08x" % (
         m.long(SPURIOUS), host)
-    return len(code)
+    return core_name(flags), len(code), instances
 
 
 def main():
@@ -3445,8 +4347,6 @@ def main():
     kit = "-kit" in sys.argv
     global PCREL, FILE
     PCREL = "-abs" not in sys.argv
-    if not PCREL:
-        FILE = ABS_FILE
     perf = PERF
     wide = next((a for a in sys.argv[1:] if a.startswith("-corpus")), None)
     capped = next((a for a in sys.argv[1:] if a.startswith("-frames")), None)
@@ -3505,16 +4405,20 @@ def main():
     if LEAN:
         defines += ["-dYMXR_NEST=0", "-dYMXR_AEOI=1"]
     if DEFER:
-        defines += ["-dYMXR_DEFER=1"]
+        defines += [DEFER_ON]
+    if MAP:
+        defines += [MAP_ON]
     DEFINES[:] = defines
-    code, symbols = assemble(defines=defines)
-    global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL, ONE_SEL, ONE_VAL, TW_SEL1, TW_PTR1
+    code, symbols = build(defines)
+    FILE = placed(len(code))
+    global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL, SQ_MASK, ONE_SEL, ONE_VAL, TW_SEL1, TW_PTR1
     global TICKC_SEL, TICKC_PTR, TICKC_LEFT
     global TWC_SEL1, TWC_PTR1, TWC_LEFT
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
     SQ_SEL = equate("SQ_SEL", symbols)
     SQ_VAL = equate("SQ_VAL", symbols)
+    SQ_MASK = equate("SQ_MASK", symbols)
     ONE_SEL = equate("ONE_SEL", symbols)
     ONE_VAL = equate("ONE_VAL", symbols)
     TW_SEL1 = (equate("TW2_SEL1", symbols), equate("TW3_SEL1", symbols))
@@ -3525,10 +4429,11 @@ def main():
     TWC_PTR1 = equate("TWC_PTR1", symbols)
     TWC_LEFT = equate("TWC_LEFT", symbols)
     TICKC_LEFT = equate("TICKC_LEFT", symbols)
-    print("the player: %d bytes%s%s%s" % (len(code),
-                                         ", the raster monitor in" if perf else "",
-                                         ", the lean tick" if LEAN else "",
-                                         ", the deferred start in" if DEFER else ""))
+    print("the player: %d bytes%s%s%s%s, the tune at $%X" % (
+        len(code), ", the raster monitor in" if perf else "",
+        ", the lean tick" if LEAN else "",
+        ", the deferred start in" if DEFER else "",
+        ", the lookup in" if MAP else "", FILE))
     # The checks below read one tune of the list, and a dump of another
     # format is outside a run (convert): the first the converter reads
     # represents them, and the run reports the rest as it reaches them.
@@ -3542,11 +4447,20 @@ def main():
         first = one
         break
     if first is not None:
-        print("the SNDH core: %d bytes, $60 kept and put back"
-              % core(defines, first))
+        print("the SNDH core of ymxr-sndh, %s: %d bytes, $60 kept and put back"
+              % core(defines, first)[:2])
+        lookup = mapped_tunes()
+        print("the SNDH core with the lookup in, %s: %d bytes, $60 kept and put back, the"
+              " mapping sites as the table has them, %d lookup instances each with its"
+              " key's write before its page read" % core(defines, lookup[0][1]))
         print("    %s" % patched_code_follows_the_subtune(defines, tunes))
+        # the fixtures after a mapped tune of each lookup kind, on the core
+        # with the lookup in
+        print("    %s" % patched_code_follows_the_subtune(
+            defines, [at for _, at, _, kinds in lookup if kinds][:SET_MAPPED] + tunes))
         print("    %s" % unplaced(code, symbols))
         print("    %s" % deferred(*deferring(defines)))
+        print("    %s" % mapped(code, symbols))
         print("    %s" % deferred_sizes())
         print("    %s" % absolute_sizes())
         print("    %s" % halves(code, symbols))
@@ -3556,7 +4470,7 @@ def main():
         if PCREL:
             print("    %s" % outofreach(code, symbols))
     if real or stub:
-        code, symbols = assemble("YMXR_sndh.S", defines=defines)
+        code, symbols = build(defines, "YMXR_sndh.S")
     cycles_of = None
     if count or parts:
         sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))
@@ -3595,7 +4509,7 @@ def main():
                 general.setdefault(kind, set()).update(spent)
             line = "%-45s %6d frames, %6d ticks" % (os.path.basename(ym), frames, ticks)
             if boundaries:
-                line += ", a tick at %d boundaries of the frame" % boundaries
+                line += ", a tick at %d boundaries of the frame" % len(boundaries)
             if refills_of:
                 measured[os.path.basename(ym)[:-3].replace("  ", " ")] = refills_of
             if kit:
@@ -4162,6 +5076,7 @@ class CyclesOn:
 
     def attach(self, m, image=(0, 0), decoder=(0, 0), heads=(), regions=None):
         self.counter = self.module.Cycles(m)
+        m.counter = self.counter
         self.range = image
         self.inner = decoder
         self.hits = {at: 0 for at in heads}
