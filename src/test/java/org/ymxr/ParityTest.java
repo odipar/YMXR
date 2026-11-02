@@ -98,13 +98,18 @@ final class ParityTest {
 
     /** The same call in both trees, which must come to the same bytes. */
     private static byte[] both(String tool, byte[] in, String... flags) throws Exception {
+        return same(tool, in, flags).out();
+    }
+
+    /** The same call in both trees, and the run of the Java tree. */
+    private static Ran same(String tool, byte[] in, String... flags) throws Exception {
         Ran java = ran(Path.of("bin"), tool, in, flags);
         Ran go = ran(built(), tool, in, flags);
         assertEquals(java.exit(), go.exit(), tool + " exits the same: " + java.said()
                 + " | " + go.said());
         assertArrayEquals(java.out(), go.out(), tool + " writes the same bytes");
         assertEquals(steady(java.said()), steady(go.said()), tool + " reports the same");
-        return java.out();
+        return java;
     }
 
     private static Path built() {
@@ -158,6 +163,39 @@ final class ParityTest {
                 Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
         both("ymxr-sndh", tune, "-perf", "-lean", "-abs");
         both("ymxr-prg", sndh, "-silent");
+    }
+
+    /** Sources of two and of three values a row: one tune file, SNDH file
+     *  and program in both trees. */
+    @Test
+    void aSourceOfSeveralValuesARowConvertsTheSameInBothTrees() throws Exception {
+        byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.several()))
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] tune = both("ymxs-to-ymxr", structure, "-silent");
+        assertTrue(tune.length > 0, "the structure converts");
+        both("ymxr-trace", tune);
+        both("ymxs-to-sndh", structure, "-silent");
+        both("ymxs-to-prg", structure, "-silent");
+    }
+
+    /** A fade, whose start is through a transformation, a remap to the
+     *  identity, and a start through a transformation after the rows that
+     *  padding adds: the writer reports the row of the structure of each,
+     *  exit 1, in both trees (SPEC.md 6.5). */
+    @Test
+    void aMappingIsTheSameErrorInBothTrees() throws Exception {
+        assertUnread(YmxsTest.fade(), 0);
+        assertUnread(YmxsTest.remapped(), 1);
+        assertUnread(YmxsTest.mappedAfterPadding(), 3);
+    }
+
+    private static void assertUnread(org.ymxs.YMXS.Tune tune, int row) throws Exception {
+        byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
+                .getBytes(StandardCharsets.UTF_8);
+        Ran java = same("ymxs-to-ymxr", structure, "-silent");
+        assertEquals(1, java.exit(), java.said());
+        assertEquals("ymxs-to-ymxr: row " + row + ": an effect this version does not read\n",
+                java.said());
     }
 
     /** A tune file with starts outside rule 3(a): one verdict and one exit

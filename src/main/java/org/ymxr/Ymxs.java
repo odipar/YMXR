@@ -89,7 +89,7 @@ final class Ymxs {
         List<Tune.Written> set;
         try {
             for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
-                Schema.Made one = Schema.of(Padding.toUnit(tune, packing.unit(), report).tune());
+                Schema.Made one = Schema.of(Padding.toUnit(tune, packing.unit(), report));
                 made.add(one);
                 // without copies: the set's choice packs with them through
                 // the ring it chooses
@@ -115,7 +115,7 @@ final class Ymxs {
         Schema.Made made;
         Tune.Written written;
         try {
-            made = Schema.of(Padding.toUnit(tune, packing.unit(), report).tune());
+            made = Schema.of(Padding.toUnit(tune, packing.unit(), report));
             // The writer's faults of the encoding are reported here as the
             // schema's are: a structure the columns or the header cannot
             // carry is the tune's, and the tool names it and exits 1.

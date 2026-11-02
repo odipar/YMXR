@@ -13,7 +13,9 @@
 #
 # HATARI and TOS name the emulator and a TOS image. The emulator is asked
 # for its modelled YM mixing, through which a voice whose volume a timer
-# moves is heard.
+# moves is heard. Both floppy drives are empty, so a disk the emulator's
+# configuration lists is left out; it quits with no confirmation and
+# opens a dialog only for a fatal message.
 set -e
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 HATARI=${HATARI:-hatari}
@@ -27,6 +29,7 @@ vbls=$2
 out=$3
 set -- --tos "$TOS" --machine st --cpuclock 8 --cpu-exact on \
     --compatible on --memsize 4 --sound 44100 --ym-mixing model \
+    --disk-a "" --disk-b "" --confirm-quit off --alert-level fatal \
     --log-level fatal
 if [ -n "$vbls" ]; then
     set -- "$@" --run-vbls "$vbls"
@@ -35,7 +38,7 @@ if [ -n "$out" ]; then
     set -- "$@" --fast-forward on --avirecord --avi-vcodec png \
         --png-level 1 --avi-file "$work/run.avi"
 fi
-(cd "$work" && "$HATARI" "$@" TUNE.PRG >/dev/null 2>&1) || true
+(cd "$work" && "$HATARI" "$@" TUNE.PRG </dev/null >/dev/null 2>&1) || true
 if [ -n "$out" ]; then
     # The name's stem, not the path's: a name with no dot in a directory
     # whose path has one would otherwise put the PNG above the run's

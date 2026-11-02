@@ -35,6 +35,16 @@ VBLS = 400
 TOS = os.environ.get('TOS', str(Path.home() / 'hatari-2.6.1_macos/tos-2.06.rom'))
 TUNES = 12
 
+
+def headless():
+    """The environment of the run: SDL's dummy video and audio drivers where
+    SDL_VIDEODRIVER and SDL_AUDIODRIVER are unset, so Hatari runs headless
+    and silent."""
+    env = dict(os.environ)
+    env.setdefault('SDL_VIDEODRIVER', 'dummy')
+    env.setdefault('SDL_AUDIODRIVER', 'dummy')
+    return env
+
 # Hatari reads a one-character argument as that character and a longer one
 # as an ST scancode, so a digit goes in as itself and a key with no
 # character goes in as the scancode BINARIES.md 4.6 names:
@@ -87,10 +97,12 @@ def main() -> int:
          '--cpu-exact', 'on', '--compatible', 'on', '--memsize', '4',
          '--sound', 'off', '--log-level', 'fatal', '--alert-level', 'fatal',
          '--confirm-quit', 'off', '--fast-boot', 'on', '--run-vbls', str(VBLS),
+         '--disk-a', '', '--disk-b', '',
          '--cmd-fifo', str(fifo),
          '--trace', 'psg_write', '--trace-file', str(trace),
          str(work / 'TUNE.PRG')],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        env=headless(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL)
 
     def press(*keys):
         with fifo.open('w') as to:

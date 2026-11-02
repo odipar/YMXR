@@ -67,6 +67,14 @@ if [ -n "$said" ]; then
     exit 2
 fi
 
+# The Go tree's tests run the schema on a start through a transformation,
+# a remap and a start through a mapping of identity parts; JSON cannot
+# encode the last, so ParityTest cannot send it through a tool.
+if ! (cd go && go test ./...); then
+    echo "suite: go test fails in go" >&2
+    exit 1
+fi
+
 log=target/suite.log
 status=target/suite.status
 mkdir -p target

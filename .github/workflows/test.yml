@@ -66,9 +66,9 @@ jobs:
       - run: go version && node --version && rmac | sed -n '7p' && "$DTX_WRITE" -help | head -1
       # A skipped test is a check that did not run, and a run that skips
       # one is green and asleep. bin/suite (doc/tools.md 19.6) requires
-      # what the skipping tests need, reads gofmt -l go beside them, runs
-      # the suite and ends with 1 where the count is above 0; a caller
-      # runs the same script here.
+      # what the skipping tests need, reads gofmt -l go and runs go test
+      # beside them, runs the suite and ends with 1 where the count is
+      # above 0; a caller runs the same script here.
       - name: the suite, and no skip
         run: bin/suite
       # performance.md's sentences over the whole set are read back by a
@@ -125,3 +125,8 @@ jobs:
           python3 68k/test/emu/test_ymxr.py -hatari
           python3 68k/test/emu/test_ymxr.py -clock
           python3 68k/test/emu/test_ymxr.py -cost
+      - name: the patched displacement read under Hatari
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: python3 68k/test/emu/test_ymxr.py -xpatch
