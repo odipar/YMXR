@@ -576,9 +576,9 @@ final class ConformanceTest {
                 "TASK.md 3's bytes of the header against README.md 3's");
         int effects = Columns.MAPPED - Columns.MAPPING;
         int each = (Columns.MAPPING - Columns.EFFECT) / effects;
-        assertEquals(List.of(Columns.C - 1, Columns.MAPPED - 1, Tune.VERSION),
-                numbers(spec, "Read the current row, columns 0 to (\\d+), and 0 to (\\d+) in"
-                        + " version (\\d+)"), "SPEC.md 4.2 step 2's columns of a row");
+        assertEquals(List.of(Columns.C - 1, Columns.MAPPING, Columns.MAPPED - 1, Tune.VERSION),
+                numbers(spec, "Read the current row, columns 0 to (\\d+), and (\\d+) to (\\d+)"
+                        + " in version (\\d+)"), "SPEC.md 4.2 step 2's columns of a row");
         Matcher step = Pattern.compile("perform 4\\.3 on its (\\w+) columns, and (\\w+) in"
                 + " version (\\d+)").matcher(spec);
         assertTrue(step.find(), "SPEC.md 4.2 step 3 counts no columns of an effect");
@@ -586,10 +586,10 @@ final class ConformanceTest {
                 List.of(ConsistencyTest.spelled(step.group(1)),
                         ConsistencyTest.spelled(step.group(2)), Integer.parseInt(step.group(3))),
                 "SPEC.md 4.2 step 3's columns of an effect");
-        assertEquals(List.of(Columns.EFFECT, each, Columns.EFFECT + each - 1, each, Tune.VERSION,
-                Columns.MAPPING), numbers(spec, "columns (\\d+) \\+ (\\d+)i to (\\d+) \\+"
-                + " (\\d+)i, in version (\\d+) its mapping column M, column (\\d+) \\+ i"),
-                "SPEC.md 4.3's columns of effect i");
+        assertEquals(List.of(Columns.EFFECT, each, Columns.EFFECT + each - 1, each,
+                Columns.MAPPING, Tune.VERSION), numbers(spec, "columns (\\d+) \\+ (\\d+)i to"
+                + " (\\d+) \\+ (\\d+)i, its mapping column M, column (\\d+) \\+ i in version"
+                + " (\\d+)"), "SPEC.md 4.3's columns of effect i");
         List<String> mapped = new ArrayList<>();
         for (Fixture f : FIXTURES) {
             byte[] file = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));

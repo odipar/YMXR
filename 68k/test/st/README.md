@@ -145,3 +145,12 @@ the file. The rest is the iterations less the other two counts.
 An interrupt lands against the loop at a phase that moves with the
 program's layout, the TOS and its boot, and between runs of one program,
 so E at 3 to 5 and P at 3 read a range.
+
+## The run kept
+
+`results/XPATCH.TXT` has the lines of two runs of `test_ymxr.py
+-xpatch`, under Hatari 2.6.1 on an ST at 8 MHz, cycle-exact, under TOS
+2.06, the file as the program wrote it, and each case's line of both
+runs reads as the table above. The patched read of the cores with the
+lookup (BINARIES.md 2.1) is checked against Hatari's 68000 alone, since
+the program has yet to run on a real ST.

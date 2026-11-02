@@ -16,6 +16,10 @@ below, and the percentages are sums and ratios of their rows. DTX 0.4.0's
 DTX2 files from the columns as text at its default ring, 960 bytes, the
 ring of every `.ymx` file below.
 
+Every effect of a dump runs through the identity, so the converter writes
+every tune of the corpus with the thirty columns of version 9 (SPEC.md
+3.3.5), and the columns counted below are those thirty.
+
 ---
 
 ## Everything fits

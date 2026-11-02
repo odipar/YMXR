@@ -201,10 +201,11 @@ leaves a register an effect runs on unset, R13 excepted.
 **5.1 An effect.** An **effect** is a source connected to a target on one
 timer, at the rate of its prescaler and count (YMXS, SPEC.md 1.7). Four
 columns encode it: the target column, the source column, the control
-column and the count column (SPEC.md 1.8, 1.9). The **effect rate** is
-the rate of the timer (2.2), set by the control column and the count
-column of the row that starts or retunes the effect, and unchanged by a
-row that leaves those columns unset.
+column and the count column (SPEC.md 1.8, 1.9); in version 10 a fifth,
+the mapping column (SPEC.md 1.10). The **effect rate** is the rate of the
+timer (2.2), set by the control column and the count column of the row
+that starts or retunes the effect, and unchanged by a row that leaves
+those columns unset.
 
 **5.2 Square wave and SID voice.** A **square wave** is a source of two
 rows, a level and 0, repeating to row 0. A **SID voice** is a square wave
@@ -227,3 +228,13 @@ buzzer (tools.md), the kinds of 5.2 to 5.4, and the converter drops a
 sinus SID, a fourth kind of the dumps, with a note (tools.md). The format
 encodes a source as a table (SPEC.md 2.2), and the kind is outside the
 format: a player reads the table alone.
+
+**5.6 Fade.** A **fade** moves a voice's volume through transformations, a
+remap a frame (YMXS, SPEC.md 3.6.5). A start runs a source on `setVoiceA`
+through the identity, the identity and `V15`, and on each frame after it a
+remap sets the effect's mapping column to the number of the next of `V14`
+to `V0`, `Vn` the transformation whose entry k is k times n divided by 15,
+for the 16 keys of a volume, 0 to 15. The volume of each row of the source
+is a key, and the volume written is the entry of that key (SPEC.md 1.10,
+2.1.5, 3.4), so a writer writes a tune with a fade as version 10 (SPEC.md
+3.3.5).

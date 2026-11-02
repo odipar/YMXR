@@ -18,8 +18,8 @@ DTX's advance is 45 to 53 per cent of an average call and 46 to 86 per
 cent of the costliest frame: 3,716 of Turrican - world 4-3's 4,362 and
 2,924 of Synergy Credits' 5,086. A refill parses at most one ST4
 operation a unit at about 190 to 260 cycles each, and its window is the
-schema's thirty columns, fifteen units at unit 2, so fifteen operations
-bound a tune's costliest frame.
+thirty columns of a table of version 9, fifteen units at unit 2, so
+fifteen operations bound the costliest frame of a tune of that version.
 
 The frame procedure is the rest, 501 to 1,092. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset: a
@@ -165,17 +165,18 @@ per unit at 190 to 260 cycles each, and every step above leaves it as it
 was. ST4 has since made that pass (research.md, "A penalty a block,
 against the costliest frame").
 
-The window is 30 units at unit 1 and 15 at unit 2, and a refill of Turrican
-2 - world completed 1 parsed fifteen operations, the bound at unit 2. The
-heaviest refill of the eleven tunes cost 3,826 cycles at unit 2, 57 per
-cent of R4.5's 6,656-cycle budget, against 4,754 at unit 1 and 71 per cent
-when the play call was measured again (#171). A tune packed at unit 1 only
-because its row count or its repeat row was odd, so the row count sets the
-unit: `low`, a tune of ST4's research, packs at unit 2 with one row fewer,
-and its worst refill falls from 15 to 9. A penalty a block in ST4 (`st4
--p8`) also helps at unit 1, from 15 to 12 for two per cent more bytes, and
-does little at unit 2; it stays a flag of ST4, since a default in DTX means
-changing three packers.
+The window is 30 units at unit 1 and 15 at unit 2 in a table of version
+9, and a refill of Turrican 2 - world completed 1 parsed fifteen
+operations, the bound at unit 2. The heaviest refill of the eleven tunes
+cost 3,826 cycles at unit 2, 57 per cent of R4.5's 6,656-cycle budget,
+against 4,754 at unit 1 and 71 per cent when the play call was measured
+again (#171). A tune packed at unit 1 only because its row count or its
+repeat row was odd, so the row count sets the unit: `low`, a tune of
+ST4's research, packs at unit 2 with one row fewer, and its worst refill
+falls from 15 to 9. A penalty a block in ST4 (`st4 -p8`) also helps at
+unit 1, from 15 to 12 for two per cent more bytes, and does little at
+unit 2; it stays a flag of ST4, since a default in DTX means changing
+three packers.
 
 SPEC.md 6, rule 6 follows: a writer adds unset rows at the repeat row until
 the tune divides by the unit, and then writes a loop of fewer than 64 rows

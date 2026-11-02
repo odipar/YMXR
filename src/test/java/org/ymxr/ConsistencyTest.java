@@ -1059,6 +1059,66 @@ final class ConsistencyTest {
     }
 
     /**
+     * writing.md's columns of version 10 against the tree: the column
+     * counts and the mapping columns of 3.1 and 4.1, the columns of 4.3,
+     * and the bounds of a key in 5.7. The guide read thirty columns alone
+     * after the trees wrote thirty-four.
+     */
+    @Test
+    void theWritersGuideReadsTheMappingColumns() throws IOException {
+        String guide = read(WRITING);
+        Matcher counts = wrapped("(\\w+) columns, and ([\\w-]+) in version (\\d+) \\(SPEC\\.md"
+                + " 1\\)").matcher(guide);
+        assertTrue(counts.find(), "writing.md 3.1 has no column count");
+        assertEquals(Columns.C, count(counts.group(1).toLowerCase()), "3.1, the columns");
+        assertEquals(Columns.MAPPED, count(counts.group(2)), "3.1, the columns of version 10");
+        assertEquals(Tune.VERSION, Integer.parseInt(counts.group(3)), "3.1, the version");
+        Matcher mapping = wrapped("and (\\d+) to (\\d+) are the mapping columns of the (\\w+)"
+                + " effects").matcher(guide);
+        assertTrue(mapping.find(), "writing.md 3.1 has no mapping columns");
+        assertEquals(Columns.MAPPING, Integer.parseInt(mapping.group(1)), "3.1, the first");
+        assertEquals(Columns.MAPPED - 1, Integer.parseInt(mapping.group(2)), "3.1, the last");
+        assertEquals(Columns.MAPPED - Columns.MAPPING, spelled(mapping.group(3)),
+                "3.1, the effects");
+        Matcher fifth = wrapped("the mapping column, column (\\d+) \\+ i of effect i")
+                .matcher(guide);
+        assertTrue(fifth.find(), "writing.md 4.1 has no mapping column");
+        assertEquals(Columns.MAPPING, Integer.parseInt(fifth.group(1)), "4.1, the mapping column");
+        Matcher one = wrapped("sets columns (\\d+) to (\\d+) and leaves (\\d+) to (\\d+) unset for"
+                + " its whole length; in version (\\d+) it leaves (\\d+) to (\\d+) unset as well,"
+                + " and sets column (\\d+)").matcher(guide);
+        assertTrue(one.find(), "writing.md 4.3 has no columns of one effect");
+        assertEquals(List.of(Columns.EFFECT, Columns.EFFECT + 3, Columns.EFFECT + 4,
+                             Columns.C - 1, Tune.VERSION, Columns.MAPPING + 1,
+                             Columns.MAPPED - 1, Columns.MAPPING), groupsOf(one),
+                "4.3, the columns of effect 0 alone");
+        Matcher marked = wrapped("so a key is 0 to (\\d+) and bit 7 is the marker").matcher(guide);
+        assertTrue(marked.find(), "writing.md 5.7 has no key beside the marker");
+        assertEquals(Sources.MARK - 1, Integer.parseInt(marked.group(1)), "5.7, a marked key");
+        Matcher whole = wrapped("is a whole byte, so a key there is 0 to (\\d+)").matcher(guide);
+        assertTrue(whole.find(), "writing.md 5.7 has no key of a whole byte");
+        assertEquals(Columns.MOST_ENTRIES - 1, Integer.parseInt(whole.group(1)),
+                "5.7, a key of a whole byte");
+        Matcher counted = wrapped("is written counted where a key is (\\d+) or more")
+                .matcher(guide);
+        assertTrue(counted.find(), "writing.md 5.7 has no counted key");
+        assertEquals(Sources.MARK, Integer.parseInt(counted.group(1)), "5.7, a counted key");
+        Matcher mixer = wrapped("the row of key k is k \\+ (\\d+), the two port directions set, and"
+                + " a key is 0 to (\\d+)").matcher(guide);
+        assertTrue(mixer.find(), "writing.md 5.7 has no key on setR7");
+        assertEquals(Columns.PORTS, Integer.parseInt(mixer.group(1)), "5.7, the port directions");
+        assertEquals(Columns.MOST_MIXER_KEY, Integer.parseInt(mixer.group(2)),
+                "5.7, a key on setR7");
+        Matcher version = wrapped("sets a mapping column to a transformation, (\\d+) to (\\d+),"
+                + " makes the file version (\\d+)").matcher(guide);
+        assertTrue(version.find(), "writing.md 5.7 has no version of a mapping");
+        assertEquals(1, Integer.parseInt(version.group(1)), "5.7, the first transformation");
+        assertEquals(Columns.MOST_TRANSFORMATIONS, Integer.parseInt(version.group(2)),
+                "5.7, the last transformation");
+        assertEquals(Tune.VERSION, Integer.parseInt(version.group(3)), "5.7, the version");
+    }
+
+    /**
      * plan.md against requirements.md and performance.md: the budget, the
      * shares of the heaviest refill of #171, the costliest frame against the
      * budget, an operation's cost, the square's tick, the window, and the
@@ -1251,6 +1311,81 @@ final class ConsistencyTest {
             rows++;
         }
         assertTrue(rows >= 4, "SPEC.md 4.8's table read as " + rows + " rows");
+    }
+
+    /** Each group of a match, as a number. */
+    private static List<Integer> groupsOf(Matcher found) {
+        List<Integer> out = new ArrayList<>();
+        for (int g = 1; g <= found.groupCount(); g++) {
+            out.add(Integer.parseInt(found.group(g)));
+        }
+        return out;
+    }
+
+    /**
+     * The figures of SPEC.md's mapping clauses against the tree: the
+     * column of the last value in 2.1, the mapping column of 1.8.1, the
+     * columns of 4.2 and 4.3, the keys of rule 2(h), the effects used of
+     * 7.2, and the example of 3.3.5 against the kit's circus, whose first
+     * bytes it quotes. The example read version 7 after the writer wrote 9.
+     */
+    @Test
+    void theMappingFiguresOfTheSpecificationAreTheTrees() throws IOException {
+        String spec = read(SPEC);
+        int at = spec.indexOf("| target | procedure | columns | the marker's column |"
+                + " the column of the last value |");
+        assertTrue(at >= 0, "SPEC.md 2.1 has no column of the last value");
+        Matcher target = Pattern.compile("^\\| [^|]+ \\| [^|]+ \\| (\\d) \\| [^|]+ \\| (\\d)[^|]* \\|$",
+                Pattern.MULTILINE).matcher(spec.substring(at, spec.indexOf("\n\n", at)));
+        int rows = 0;
+        while (target.find()) {
+            assertEquals(Integer.parseInt(target.group(1)) - 1, Integer.parseInt(target.group(2)),
+                    "SPEC.md 2.1: the last value is the last column of a source, " + target.group());
+            rows++;
+        }
+        assertEquals(6, rows, "SPEC.md 2.1's targets read as " + rows + " rows");
+        Matcher fifth = wrapped("In version (\\d+) column (\\d+) \\+ i is a fifth, the effect's"
+                + " mapping column").matcher(spec);
+        assertTrue(fifth.find(), "SPEC.md 1.8.1 has no mapping column");
+        assertEquals(List.of(Tune.VERSION, Columns.MAPPING), groupsOf(fifth), "1.8.1");
+        Matcher row = wrapped("Read the current row, columns 0 to (\\d+), and (\\d+) to (\\d+) in"
+                + " version (\\d+)\\.").matcher(spec);
+        assertTrue(row.find(), "SPEC.md 4.2 has no columns of a row");
+        assertEquals(List.of(Columns.C - 1, Columns.MAPPING, Columns.MAPPED - 1, Tune.VERSION),
+                groupsOf(row), "4.2 step 2, the columns a frame reads");
+        Matcher effect = wrapped("its mapping column M, column (\\d+) \\+ i in version (\\d+) and"
+                + " unset in every row of versions (\\d+) to (\\d+),").matcher(spec);
+        assertTrue(effect.find(), "SPEC.md 4.3 has no mapping column");
+        assertEquals(List.of(Columns.MAPPING, Tune.VERSION, Tune.OLDEST, Tune.UNMAPPED),
+                groupsOf(effect), "4.3, the mapping column of each version");
+        Matcher keys = wrapped("the key in bits 6 to 0 of the marker's column of a marked source,"
+                + " 0 to (\\d+); k \\+ (\\d+) for key k on `setR7` \\(rule 2\\(f\\)\\); the key, 0"
+                + " to (\\d+), in every other column\\. A key of (\\d+) or more").matcher(spec);
+        assertTrue(keys.find(), "SPEC.md rule 2(h) has no keys");
+        assertEquals(List.of(Sources.MARK - 1, Columns.PORTS, Columns.MOST_ENTRIES - 1,
+                Sources.MARK), groupsOf(keys), "rule 2(h), the keys of each column");
+        Matcher effects = wrapped("the byte at 8 as a decimal integer, 0 to (\\d+), and (\\d+) to"
+                + " (\\d+) in version (\\d+), where bits 7 and 6 are 0").matcher(spec);
+        assertTrue(effects.find(), "SPEC.md 7.2 has no range of the effects used");
+        assertEquals(List.of(Columns.MAPS - 1, Columns.MAPS, 2 * Columns.MAPS - 1, Tune.VERSION),
+                groupsOf(effects), "7.2, the effects used");
+        Matcher example = wrapped("begins `([0-9A-F ]+)`: the (\\d+) bytes of the name at (\\d+),"
+                + " and the DTX3 table at (\\d+)\\.").matcher(spec);
+        assertTrue(example.find(), "SPEC.md 3.3.5 has no example of a tune file");
+        java.util.HexFormat hex = java.util.HexFormat.of();
+        byte[] said = hex.parseHex(example.group(1).replaceAll("\\s+", ""));
+        byte[] circus = Files.readAllBytes(Path.of("doc/conformance/tunes/circus.ymxr"));
+        assertEquals(hex.formatHex(java.util.Arrays.copyOf(circus, said.length)),
+                hex.formatHex(said), "3.3.5, the first bytes of the kit's circus");
+        assertEquals(Tune.UNMAPPED, Tune.getWord(said, 4), "3.3.5, the version a writer writes");
+        int name = Tune.getWord(circus, Tune.NAME_AT);
+        int end = name;
+        while (circus[end] != 0) {
+            end++;
+        }
+        assertEquals(List.of(end + 1 - name, name, Tune.getLong(circus, Tune.TABLE_AT)),
+                List.of(Integer.parseInt(example.group(2)), Integer.parseInt(example.group(3)),
+                        Integer.parseInt(example.group(4))), "3.3.5, the name and the table");
     }
 
     @Test
