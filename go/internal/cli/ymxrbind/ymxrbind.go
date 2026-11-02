@@ -60,20 +60,30 @@ func bound_(said *report.Report, tune, bound []byte) {
 	}
 	state := ymxr.GetLong(bound, sndh.StateAt)
 	image := ymxr.GetLong(bound, sndh.ImageAt)
-	// The image is before the DTX1 source tables, so where there is a
-	// source the first one's offset ends the image, and where there is
-	// none the file does.
+	// The DTX1 source tables follow the index and the image follows them,
+	// so the sources run from the first one's offset to the image, and the
+	// image ends at the transformation block where the tune has one and at
+	// the file's end otherwise (BINARIES.md 1.3).
 	sources := len(file.Sources)
+	block := 0
+	if file.Version == ymxr.Version {
+		block = ymxr.GetLong(bound, sndh.BoundTransformationsAt)
+	}
 	ends := len(bound)
-	if sources > 0 {
-		ends = ymxr.GetLong(bound, sndh.BoundIndexAt)
+	if block > 0 {
+		ends = block
 	}
 	said.Say("bound: DTX's reader for the table in place of the table")
 	said.Row("the reader's image", fmt.Sprintf("at %d, %s", image,
 		report.Count(ends-image, "byte", "bytes")))
 	if sources > 0 {
+		first := ymxr.GetLong(bound, sndh.BoundIndex(file.Version)) &^ ymxr.Counted
 		said.Row("the source tables", fmt.Sprintf("%d of %s", sources,
-			report.Count(len(bound)-ends, "byte", "bytes")))
+			report.Count(image-first, "byte", "bytes")))
+	}
+	if block > 0 {
+		said.Row("the transformations", fmt.Sprintf("at %d, %d of %s", block,
+			len(file.Transformations), report.Count(len(bound)-block, "byte", "bytes")))
 	}
 	said.Row("the state block", report.Count(state, "byte", "bytes")+
 		", which the host finds the workspace for")

@@ -694,7 +694,9 @@ transformation T (3.3.1).
 
 Note: each offset of the index counts from O, so the index and the
 transformations are one block a tool copies to another offset with the
-long at 16 alone changed.
+long at 16 alone changed. A bound tune written alone has the block byte
+for byte after its image, and its offset in the long at 24 (BINARIES.md
+1.3); an SNDH file has it after the images (BINARIES.md 3.1).
 
 ---
 

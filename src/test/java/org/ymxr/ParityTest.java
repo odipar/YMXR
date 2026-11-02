@@ -241,27 +241,114 @@ final class ParityTest {
         }
     }
 
-    /** The fade through the binder, which writes bound tunes of version 9
-     *  and reports a line for a tune file of version 10: ymxr-bind and
-     *  ymxr-sndh on its tune file, ymxs-to-sndh and ymxs-to-prg on the
-     *  structure, exit 1 in both trees. */
+    /** The fade through the binder, which writes a bound tune of version
+     *  10 (BINARIES.md 1.2): ymxr-bind with its report, ymxr-layout of the
+     *  bound tune, and a set of the fade and a dump through ymxr-multi and
+     *  ymxr-layout, the same in both trees; and the SNDH writer, whose
+     *  cores read bound tunes to version 9, reporting the core's version
+     *  line for ymxr-sndh on the tune file and on the set, and
+     *  ymxs-to-sndh and ymxs-to-prg on the structure, exit 1 in both
+     *  trees. */
     @Test
-    void theFadeIsTheBindersLineInBothTrees() throws Exception {
+    void theFadeBindsTheSameInBothTrees() throws Exception {
         byte[] structure = json(YmxsTest.fade());
         byte[] tune = both("ymxs-to-ymxr", structure, "-silent");
-        String line = "the binder writes bound tunes to version 9, and this tune file is"
-                + " version 10";
-        Ran bind = same("ymxr-bind", tune, "-silent");
-        assertEquals(1, bind.exit(), bind.said());
-        assertEquals("ymxr-bind: " + line + "\n", bind.said());
-        Ran sndh = same("ymxr-sndh", tune, "-silent");
-        assertEquals(1, sndh.exit(), sndh.said());
-        assertEquals("ymxr-sndh: subtune 1: " + line + "\n", sndh.said());
+        Ran bind = same("ymxr-bind", tune);
+        byte[] bound = bind.out();
+        assertEquals(Tune.VERSION, Tune.getWord(bound, 4), "the bound tune's version");
+        int block = Tune.getLong(bound, Bound.TRANSFORMATIONS_AT);
+        assertTrue(steady(bind.said()).contains("  the transformations    at " + block + ", "
+                + Tune.getWord(bound, block) + " of "
+                + Report.count(bound.length - block, "byte", "bytes") + "\n"), bind.said());
+        assertEquals(block, Tune.getLong(bound, Bound.IMAGE_AT) + imageBytes(bind.said()),
+                "the image ends at the transformation block");
+        String record = new String(both("ymxr-layout", bound), StandardCharsets.US_ASCII);
+        assertTrue(record.contains(",\"transformations\":" + block + "}\n")
+                && record.contains("{\"part\":\"transformations\",\"at\":" + block + ","),
+                record);
+        byte[] dump = both("ym-to-ymxr", Files.readAllBytes(dumps().get(0)), "-silent");
+        byte[] multi = multiOf(List.of(tune, dump));
+        assertEquals(Tune.VERSION, Tune.getWord(multi, 4), "a set with the fade");
+        both("ymxr-layout", multi);
+        String line = "the core reads bound tunes to version 9, and this binds at 10";
+        for (byte[] in : List.of(tune, multi)) {
+            Ran sndh = same("ymxr-sndh", in, "-silent");
+            assertEquals(1, sndh.exit(), sndh.said());
+            assertEquals("ymxr-sndh: " + line + "\n", sndh.said());
+        }
         for (String tool : List.of("ymxs-to-sndh", "ymxs-to-prg")) {
             Ran ran = same(tool, structure, "-silent");
             assertEquals(1, ran.exit(), ran.said());
-            assertTrue(ran.said().endsWith(tool + ": subtune 1: " + line + "\n"), ran.said());
+            assertTrue(ran.said().endsWith(tool + ": " + line + "\n"), ran.said());
         }
+    }
+
+    /** The fade with every offset of its transformation index 0, inside
+     *  the index, which the reader reads (SPEC.md 3.3.4): the binder
+     *  copies the block to the index's end (BINARIES.md 1.1), the same
+     *  bound tune in both trees; and that bound tune with -8 in the field
+     *  at 24, which ymxr-layout reads as a signed number (BINARIES.md
+     *  1.2), the same record in both trees. */
+    @Test
+    void aBlockWhoseTransformationsOverlapItsIndexBindsTheSameInBothTrees()
+            throws Exception {
+        byte[] tune = both("ymxs-to-ymxr", json(YmxsTest.fade()), "-silent");
+        int at = Tune.getLong(tune, Tune.TRANSFORMATIONS_AT);
+        int index = 2 + 4 * Tune.getWord(tune, at);
+        for (int i = 2; i < index; i += 4) {
+            Tune.putLong(tune, at + i, 0);
+        }
+        Ran bind = same("ymxr-bind", tune);
+        assertEquals(0, bind.exit(), bind.said());
+        byte[] bound = bind.out();
+        int block = Tune.getLong(bound, Bound.TRANSFORMATIONS_AT);
+        assertArrayEquals(Arrays.copyOfRange(tune, at, at + index),
+                Arrays.copyOfRange(bound, block, block + index), "the index in the block");
+        Tune.putLong(bound, Bound.TRANSFORMATIONS_AT, -8);
+        String record = new String(both("ymxr-layout", bound), StandardCharsets.US_ASCII);
+        assertTrue(record.contains(",\"transformations\":-8}\n")
+                && !record.contains("{\"part\":\"transformations\""), record);
+    }
+
+    /** The bytes of {@code the reader's image} in a report of ymxr-bind. */
+    private static int imageBytes(String said) {
+        Matcher row = Pattern.compile("(?m)^  the reader's image +at \\d+, (\\d+) bytes$")
+                .matcher(said);
+        assertTrue(row.find(), said);
+        return Integer.parseInt(row.group(1));
+    }
+
+    /** ymxr-bind's report on two tunes with sources, four-timers and DBA
+     *  2, the image from its offset to the bound tune's end and the
+     *  sources from source 1 to the image, and ymxr-layout of the bound
+     *  tune of the kit's counted tune, whose source 1 has bit 31 set in
+     *  its index entry: the same in both trees. */
+    @Test
+    void theBindersReportAndTheCountedSourcesReadTheSameInBothTrees() throws Exception {
+        byte[] fourTimers = Files.readAllBytes(Path.of("doc/conformance/tunes/four-timers.ymxr"));
+        String said = steady(same("ymxr-bind", fourTimers).said());
+        assertTrue(said.contains("  the reader's image     at 184, 2876 bytes\n")
+                && said.contains("  the source tables      5 of 140 bytes\n"), said);
+        byte[] dba = both("ym-to-ymxr", Files.readAllBytes(Path.of("ym/test/DBA 2.ym")),
+                "-silent");
+        for (byte[] tune : List.of(fourTimers, dba)) {
+            Ran bind = same("ymxr-bind", tune);
+            byte[] bound = bind.out();
+            int image = Tune.getLong(bound, Bound.IMAGE_AT);
+            assertEquals(bound.length - image, imageBytes(bind.said()), bind.said());
+            int sources = TuneFile.read(tune).sources().size();
+            assertTrue(sources > 0, "a tune with sources");
+            assertTrue(steady(bind.said()).contains("  the source tables      " + sources
+                    + " of " + Report.count(image - Tune.getLong(bound, Bound.INDEX_AT),
+                            "byte", "bytes") + "\n"), bind.said());
+        }
+        byte[] counted = both("ymxr-bind",
+                Files.readAllBytes(Path.of("doc/conformance/tunes/counted.ymxr")), "-silent");
+        int first = Tune.getLong(counted, Bound.INDEX_AT);
+        assertTrue(first < 0, "source 1 of counted.ymxr is counted");
+        String record = new String(both("ymxr-layout", counted), StandardCharsets.US_ASCII);
+        assertTrue(record.contains("{\"part\":\"source\",\"number\":1,\"at\":"
+                + (first & ~Tune.COUNTED) + "}\n") && !record.contains("\"at\":-"), record);
     }
 
     /** The YMXS checkout whose conformance kit the case below reads, at
@@ -352,8 +439,8 @@ final class ParityTest {
      * line, and each check of the mapping columns the same lines; a multi
      * file of it, and of it and a dump, version 10, its tables packed
      * again with the same report, and read by the record, the check and
-     * the layout as one line or one record; and the binder's line, which
-     * ymxr-bind and ymxr-sndh report for it.
+     * the layout as one line or one record; and the SNDH writer's line of
+     * the core's version, which ymxr-sndh reports for it.
      */
     @Test
     void aMappedTuneFileReadsTheSameInBothTrees() throws Exception {
@@ -389,13 +476,10 @@ final class ParityTest {
         assertEquals(1, same("ymxr-check", multi).exit(),
                 "a multi file is neither a dump nor a tune file");
         both("ymxr-layout", multi);
-        String line = "the binder writes bound tunes to version 9, and this tune file is"
-                + " version 10";
-        assertEquals("ymxr-bind: " + line + "\n", same("ymxr-bind", mapped, "-silent").said());
-        assertEquals("ymxr-sndh: subtune 1: " + line + "\n",
-                same("ymxr-sndh", mapped, "-silent").said());
-        assertEquals("ymxr-sndh: subtune 2: " + line + "\n",
-                same("ymxr-sndh", multi, "-silent").said());
+        both("ymxr-bind", mapped);
+        String line = "the core reads bound tunes to version 9, and this binds at 10";
+        assertEquals("ymxr-sndh: " + line + "\n", same("ymxr-sndh", mapped, "-silent").said());
+        assertEquals("ymxr-sndh: " + line + "\n", same("ymxr-sndh", multi, "-silent").said());
     }
 
     @Test

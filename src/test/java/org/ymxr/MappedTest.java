@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
  * A tune file of version 10 (SPEC.md 1.10, 3.3, 3.4): the thirty-four
  * columns of {@link BuiltTunes#mapped} packed into a file and read back
  * field by field, its record, the lines of the reader for a file written
- * wrong, the lines of the check, and the tools that bind a tune file,
- * which report a line for version 10.
+ * wrong, the lines of the check, and the SNDH writer, which reports the
+ * version line of a core that reads bound tunes to version 9.
  */
 final class MappedTest {
 
@@ -316,15 +316,11 @@ final class MappedTest {
     }
 
     @Test
-    void theBinderReportsALineForVersionTen() {
-        String line = "the binder writes bound tunes to version 9, and this tune file is"
-                + " version 10";
-        assertEquals(line, Bound.UNBOUND);
+    void theSndhWriterReportsTheVersionOfTheCoreForVersionTen() {
+        String line = "the core reads bound tunes to version 9, and this binds at 10";
+        assertEquals(Tune.VERSION, Tune.getWord(Bound.of(file()), 4));
+        assertEquals(2, Bound.of(List.of(BuiltTunes.deferred().file(), file())).tunes().size());
         assertEquals(line, assertThrows(IllegalArgumentException.class,
-                () -> Bound.of(file())).getMessage());
-        assertEquals(line, assertThrows(IllegalArgumentException.class,
-                () -> Bound.of(List.of(BuiltTunes.deferred().file(), file()))).getMessage());
-        assertEquals("subtune 2: " + line, assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(List.of(BuiltTunes.deferred().file(), file()),
                         new Sndh.Options("Mapped", null, null, false, false))).getMessage());
     }

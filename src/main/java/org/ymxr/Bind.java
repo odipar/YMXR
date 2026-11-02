@@ -58,17 +58,27 @@ final class Bind {
         }
         int state = Tune.getLong(bound, Bound.STATE_AT);
         int image = Tune.getLong(bound, Bound.IMAGE_AT);
-        // The image is before the DTX1 source tables, so where there
-        // is a source the first one's offset ends the image, and where
-        // there is none the file does.
-        int sources = TuneFile.read(tune).sources().size();
-        int ends = sources > 0 ? Tune.getLong(bound, Bound.INDEX_AT) : bound.length;
+        // The DTX1 source tables follow the index and the image follows
+        // them, so the sources run from the first one's offset to the
+        // image, and the image ends at the transformation block where the
+        // tune has one and at the file's end otherwise (BINARIES.md 1.3).
+        TuneFile file = TuneFile.read(tune);
+        int sources = file.sources().size();
+        int block = file.version() == Tune.VERSION
+                ? Tune.getLong(bound, Bound.TRANSFORMATIONS_AT) : 0;
+        int ends = block > 0 ? block : bound.length;
         report.say("bound: DTX's reader for the table in place of the table");
         report.row("the reader's image", "at " + image + ", "
                 + Report.count(ends - image, "byte", "bytes"));
         if (sources > 0) {
+            int first = Tune.getLong(bound, Bound.indexAt(file.version())) & ~Tune.COUNTED;
             report.row("the source tables", sources + " of "
-                    + Report.count(bound.length - ends, "byte", "bytes"));
+                    + Report.count(image - first, "byte", "bytes"));
+        }
+        if (block > 0) {
+            report.row("the transformations", "at " + block + ", "
+                    + file.transformations().size() + " of "
+                    + Report.count(bound.length - block, "byte", "bytes"));
         }
         report.row("the state block", Report.count(state, "byte", "bytes")
                 + ", which the host finds the workspace for");
