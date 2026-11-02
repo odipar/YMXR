@@ -175,8 +175,8 @@ func TuneFiles(t *tool.Tool, multi ymxs.Multi, packing Packing,
 	made := make([]schema.Made, len(multi.Tunes))
 	written := make([]ymxr.Written, len(multi.Tunes))
 	for i, tune := range multi.Tunes {
-		padded, _ := ymxr.PadToUnit(tune, packing.Unit, said)
-		one, err := schema.Of(padded)
+		padded, frames := ymxr.PadToUnit(tune, packing.Unit, said)
+		one, err := schema.Padded(padded, frames)
 		if err != nil {
 			t.Wrong(tool.Wrong, err.Error())
 		}
@@ -210,8 +210,8 @@ func TuneFiles(t *tool.Tool, multi ymxs.Multi, packing Packing,
 // packed.
 func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	said *report.Report) []byte {
-	padded, _ := ymxr.PadToUnit(tune, packing.Unit, said)
-	made, err := schema.Of(padded)
+	padded, frames := ymxr.PadToUnit(tune, packing.Unit, said)
+	made, err := schema.Padded(padded, frames)
 	if err != nil {
 		t.Wrong(tool.Wrong, err.Error())
 	}

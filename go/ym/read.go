@@ -232,11 +232,13 @@ func Of(song Song, sources *ymxr.Sources, repeat int, said *report.Report) ymxs.
 					if err != nil {
 						panic(err)
 					}
-					effects[timer] = ymxs.StartOne{Target: ymxs.Setting(register),
-						Source: source(made, sources, number[i]),
+					effects[timer] = ymxs.Start{
+						Connection: ymxs.OneConnection{Target: ymxs.Setting(register),
+							Source: source(made, sources, number[i])},
 						Timing: ymxs.Timing{Prescaler: prescaler,
 							Count:      slot[i].Count,
-							TimerReset: stopped, PlaceReset: !unmoved}}
+							TimerReset: stopped, PlaceReset: !unmoved},
+						Mapping: ymxs.Mapping{}}
 					running[i] = slot[i]
 					runningNumber[i] = number[i]
 					lastKind[i] = slot[i].Kind

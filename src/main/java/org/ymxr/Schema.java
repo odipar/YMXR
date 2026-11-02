@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.ymxs.Chip;
 import org.ymxs.Tunes;
 import org.ymxs.YMXS.Effect;
@@ -15,6 +16,7 @@ import org.ymxs.YMXS.Source;
 import org.ymxs.YMXS.Start;
 import org.ymxs.YMXS.Stop;
 import org.ymxs.YMXS.Timer;
+import org.ymxs.YMXS.Timing;
 
 /**
  * A YMXS tune as this schema's columns (doc/ymxs.md): the structure YMXS
@@ -44,23 +46,36 @@ final class Schema {
     private Schema() {
     }
 
-    /** {@code tune} as columns and sources.
+    /** {@code tune} as columns and sources, the line of an error numbering
+     *  a row of the tune. */
+    static Made of(org.ymxs.YMXS.Tune tune) {
+        return of(new Padding.Padded(tune, IntStream.range(0, Tunes.rows(tune).size())
+                .toArray()));
+    }
+
+    /** A tune that {@link Padding#toUnit} padded, as columns and sources:
+     *  the frames of {@code padded} are, for each row of the tune, the row
+     *  of the structure it comes from, or -1 for a row the padding added,
+     *  and the line of an error numbers that row (SPEC.md 6.5).
      *
      * @throws IllegalArgumentException where the structure is one this
-     *     format cannot encode: a count of 256, a source value past seven
-     *     bits, more sources than the source column numbers, or a source
-     *     of more rows than a table has
+     *     format cannot encode: more sources than the source column
+     *     numbers, a count outside 0 to 255, a remap or a start through a
+     *     transformation, a target past 24, a source on two targets that
+     *     mark different columns, or a source value past seven bits in its
+     *     marker's column or past eight bits in another column
      */
-    static Made of(org.ymxs.YMXS.Tune tune) {
+    static Made of(Padding.Padded padded) {
+        org.ymxs.YMXS.Tune tune = padded.tune();
         List<Row> rows = Tunes.rows(tune);
-        int frames = rows.size();
-        int repeat = tune.table().repeat().orElse(frames);
+        int size = rows.size();
+        int repeat = tune.table().repeat().orElse(size);
         List<Source> sources = Tunes.sources(tune);
         if (sources.size() > Sources.MOST) {
             throw new IllegalArgumentException("the tune runs " + sources.size()
                     + " sources, and a source column numbers " + Sources.MOST);
         }
-        byte[][] column = new byte[Columns.C][frames];
+        byte[][] column = new byte[Columns.C][size];
         int[] target = new int[4];
         int[] select = new int[4];
         // Whether the timer is known to be counting: a start sets it where
@@ -69,7 +84,7 @@ final class Schema {
         int[] count = new int[4];
         Arrays.fill(target, -1);
         int used = 0;
-        for (int f = 0; f < frames; f++) {
+        for (int f = 0; f < size; f++) {
             // After the wrap the player keeps what the last row left, so
             // the row the tune repeats to writes its targets again.
             if (f == repeat) {
@@ -81,7 +96,7 @@ final class Schema {
             for (Map.Entry<Timer, Effect> one : Tunes.effects(row).entrySet()) {
                 int i = effect(one.getKey());
                 used |= effect(out, i, one.getValue(), sources, target, select, count,
-                        counting, f);
+                        counting, padded.frames()[f]);
             }
             for (int c = 0; c < Columns.C; c++) {
                 column[c][f] = out[c];
@@ -110,7 +125,8 @@ final class Schema {
     }
 
     /** One row's operation on one effect, as its four columns; the bit of
-     *  the effects word where the row starts one. */
+     *  the effects word where the row starts one. {@code at} is the row of
+     *  the structure, for the line of an error. */
     private static int effect(byte[] out, int i, Effect effect, List<Source> sources,
                               int[] target, int[] select, int[] count, boolean[] counting,
                               int at) {
@@ -124,16 +140,21 @@ final class Schema {
                 return 0;
             }
             case Start start -> {
-                int reaches = Tunes.number(Tunes.target(start));
+                if (!Tunes.isIdentity(start.mapping())) {
+                    throw unread(at);
+                }
+                int reaches = Tunes.number(Tunes.target(start.connection()));
                 if (reaches != target[i]) {
                     out[t] = (byte) (0x80 | reaches);
                     target[i] = reaches;
                 }
-                out[t + 1] = (byte) (0x80 | (sources.indexOf(Tunes.source(start)) + 1));
-                int now = select(Tunes.prescaler(start));
-                int rate = counted(Tunes.count(start), at);
-                int resets = resets(Tunes.timerReset(start), Tunes.placeReset(start));
-                boolean deferred = Tunes.deferred(start);
+                out[t + 1] = (byte) (0x80
+                        | (sources.indexOf(Tunes.source(start.connection())) + 1));
+                Timing timing = start.timing();
+                int now = select(timing.prescaler());
+                int rate = counted(timing.count(), at);
+                int resets = resets(timing.timerReset(), timing.placeReset());
+                boolean deferred = start.deferred();
                 // A start on a timer already counting, at the rate it
                 // counts, sets no rate column: step 2 resolves the source
                 // and the ticks read it from here on, at the rate the
@@ -150,7 +171,8 @@ final class Schema {
                 }
                 select[i] = now;
                 count[i] = rate;
-                counting[i] = Tunes.rows(Tunes.source(start)).repeat().isPresent();
+                counting[i] = Tunes.rows(Tunes.source(start.connection())).repeat()
+                        .isPresent();
                 if (deferred) {
                     // Until the tick that performs it, the timer counts at the
                     // rate of the effect before it, apart from the rate a row
@@ -164,7 +186,8 @@ final class Schema {
             }
             case Retune retune -> {
                 int now = select(retune.timing().prescaler());
-                int resets = resets(Tunes.timerReset(retune), Tunes.placeReset(retune));
+                int resets = resets(retune.timing().timerReset(),
+                        retune.timing().placeReset());
                 int rate = counted(retune.timing().count(), at);
                 // A count of 0 is the value the MFP counts 256 for, and the
                 // count column reserves 0 for the row that does not set it,
@@ -182,9 +205,15 @@ final class Schema {
                 count[i] = rate;
                 return 0;
             }
-            default -> throw new IllegalArgumentException("row " + at
-                    + ": an effect this version does not read");
+            default -> throw unread(at);
         }
+    }
+
+    /** The line of an operation this version leaves to a later one: a
+     *  remap, and a start through a mapping other than the identity. */
+    private static IllegalArgumentException unread(int at) {
+        return new IllegalArgumentException("row " + at
+                + ": an effect this version does not read");
     }
 
     /** The count column, which is the timer's data register (SPEC.md 1.9).
@@ -265,20 +294,21 @@ final class Schema {
                 if (!(one instanceof Start start)) {
                     continue;
                 }
-                int n = sources.indexOf(Tunes.source(start));
-                int number = Tunes.number(Tunes.target(start));
+                Source source = Tunes.source(start.connection());
+                int n = sources.indexOf(source);
+                int number = Tunes.number(Tunes.target(start.connection()));
                 if (number >= Columns.MARKER.length) {
-                    throw new IllegalArgumentException("the source " + Tunes.name(
-                            Tunes.source(start)) + " runs on " + Tunes.name(
-                            Tunes.target(start)) + ", a target this version leaves"
-                            + " to a later one (SPEC.md section 8)");
+                    throw new IllegalArgumentException("the source " + Tunes.name(source)
+                            + " runs on " + Tunes.name(Tunes.target(start.connection()))
+                            + ", a target this version leaves to a later one"
+                            + " (SPEC.md section 8)");
                 }
                 // -1: the target's register fills its byte, so the rows carry
                 // no marker and a player counts them (SPEC.md 3.1).
                 int at = Columns.MARKER[number];
                 if (marker[n] != UNSTARTED && marker[n] != at) {
-                    throw new IllegalArgumentException("the source " + Tunes.name(
-                            Tunes.source(start)) + " runs on targets that mark column "
+                    throw new IllegalArgumentException("the source " + Tunes.name(source)
+                            + " runs on targets that mark column "
                             + marker[n] + " and column " + at + ", and a source has one"
                             + " marker column (SPEC.md rule 2(d))");
                 }

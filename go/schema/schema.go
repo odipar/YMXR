@@ -37,15 +37,30 @@ type Made struct {
 	Rate    int
 }
 
-// Of is the tune as columns and sources.
-//
-// The error names a structure this format cannot encode: a count of 256, a
-// source value past seven bits, more sources than the source column
-// numbers, or a source of more rows than a table has.
+// Of is the tune as columns and sources, the line of an error numbering a
+// row of the tune.
 func Of(tune ymxs.Tune) (Made, error) {
+	frames := make([]int, len(ymxs.Rows(tune)))
+	for i := range frames {
+		frames[i] = i
+	}
+	return Padded(tune, frames)
+}
+
+// Padded is a tune that ymxr.PadToUnit padded, as columns and sources:
+// frames is, for each row of the tune, the row of the structure it comes
+// from, or -1 for a row the padding added, and the line of an error
+// numbers that row (SPEC.md 6.5).
+//
+// The error names a structure this format cannot encode: more sources than
+// the source column numbers, a count outside 0 to 255, a remap or a start
+// through a transformation, a target past 24, a source on two targets that
+// mark different columns, or a source value past seven bits in its
+// marker's column or past eight bits in another column.
+func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	rows := ymxs.Rows(tune)
-	frames := len(rows)
-	repeat := frames
+	size := len(rows)
+	repeat := size
 	at, repeats := tune.Table.Repeat()
 	if repeats {
 		repeat = at
@@ -57,7 +72,7 @@ func Of(tune ymxs.Tune) (Made, error) {
 	}
 	column := make([][]byte, ymxr.C)
 	for c := range column {
-		column[c] = make([]byte, frames)
+		column[c] = make([]byte, size)
 	}
 	var target, selects, count [4]int
 	// Whether the timer is known to be counting: a start sets it where the
@@ -67,7 +82,7 @@ func Of(tune ymxs.Tune) (Made, error) {
 		target[i] = -1
 	}
 	used := 0
-	for f := 0; f < frames; f++ {
+	for f := 0; f < size; f++ {
 		// After the wrap the player keeps what the last row left, so the
 		// row the tune repeats to writes its targets again.
 		if f == repeat {
@@ -83,7 +98,7 @@ func Of(tune ymxs.Tune) (Made, error) {
 				return Made{}, err
 			}
 			runs, err := effect(out, i, one.Effect, sources, &target, &selects, &count,
-				&counting, f)
+				&counting, frames[f])
 			if err != nil {
 				return Made{}, err
 			}
@@ -124,7 +139,11 @@ func registers(row ymxs.Row, out []byte) {
 }
 
 // effect writes one row's operation on one effect, as its four columns,
-// and the bit of the effects word where the row starts one.
+// and the bit of the effects word where the row starts one. at is the row
+// of the structure, for the line of an error.
+//
+// The error of a remap, and of a start through a transformation, is the
+// line of an effect this version does not read (SPEC.md 6.5).
 func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 	target, selects, count *[4]int, counting *[4]bool, at int) (int, error) {
 	t := ymxr.Effect + 4*i
@@ -136,13 +155,16 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		counting[i] = false
 		return 0, nil
 	case ymxs.Start:
-		reaches := ymxs.TargetNumber(ymxs.StartTarget(e))
+		if !ymxs.IsIdentity(e.Mapping) {
+			return 0, unread(at)
+		}
+		reaches := ymxs.TargetNumber(ymxs.ConnectionTarget(e.Connection))
 		if reaches != target[i] {
 			out[t] = byte(0x80 | reaches)
 			target[i] = reaches
 		}
-		out[t+1] = byte(0x80 | (indexOf(sources, ymxs.StartSource(e)) + 1))
-		timing := ymxs.StartTiming(e)
+		out[t+1] = byte(0x80 | (indexOf(sources, ymxs.ConnectionSource(e.Connection)) + 1))
+		timing := e.Timing
 		now, err := selectOf(timing.Prescaler)
 		if err != nil {
 			return 0, err
@@ -152,7 +174,7 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			return 0, err
 		}
 		reset := resets(timing.TimerReset, timing.PlaceReset)
-		deferred := ymxs.StartDeferred(e)
+		deferred := e.Deferred
 		// A start on a timer already counting, at the rate it counts,
 		// sets no rate column: step 2 resolves the source and the ticks
 		// read it from here on, at the rate the control register already
@@ -172,7 +194,7 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		}
 		selects[i] = now
 		count[i] = rate
-		_, counting[i] = ymxs.SourceRows(ymxs.StartSource(e)).Repeat()
+		_, counting[i] = ymxs.SourceRows(ymxs.ConnectionSource(e.Connection)).Repeat()
 		if deferred {
 			// Until the tick that performs it, the timer counts at the
 			// rate of the effect before it, apart from the rate a row
@@ -211,7 +233,13 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		count[i] = rate
 		return 0, nil
 	}
-	return 0, fmt.Errorf("row %d: an effect this version does not read", at)
+	return 0, unread(at)
+}
+
+// unread is the line of an effect this version does not read, for row at
+// (SPEC.md 6.5).
+func unread(at int) error {
+	return fmt.Errorf("row %d: an effect this version does not read", at)
 }
 
 // counted is the count column, which is the timer's data register
@@ -287,8 +315,8 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) ([]int, []int, error) {
 			if !is {
 				continue
 			}
-			source := ymxs.StartSource(start)
-			runs := ymxs.StartTarget(start)
+			source := ymxs.ConnectionSource(start.Connection)
+			runs := ymxs.ConnectionTarget(start.Connection)
 			n := indexOf(sources, source)
 			number := ymxs.TargetNumber(runs)
 			if number >= len(ymxr.Marker) {

@@ -332,13 +332,14 @@ json.md) and checks the structure: an error of the form or of the
 structure (YMXS, doc/tools.md 4) is written as the lines of the check
 joined, exit 1. Each tune is then padded (4.4) and encoded (ymxs.md);
 a structure this format leaves unencoded is an error, exit 1, with the
-row where it arises:
+row of the structure where it arises, numbered before the padding:
 
 | condition | line |
 |---|---|
 | the tune starts more than 127 sources | `the tune runs N sources, and a source column numbers 127` |
 | row N has a count outside 0 to 255 | `row N: a count of C, and the count column reaches 0 to 255` |
 | row N performs an operation outside `Start`, `Retune` and `Stop` | `row N: an effect this version does not read` |
+| row N performs a `Start` whose mapping has a transformation as a part | `row N: an effect this version does not read` |
 | a source runs on a target past 24 | `the source <source> runs on <target>, a target this version leaves to a later one (SPEC.md section 8)` |
 | a source runs on two targets whose markers are in different columns | `the source <source> runs on targets that mark column A and column B, and a source has one marker column (SPEC.md rule 2(d))` |
 | a marked source has a value past 127 in its marker's column | `the source <source> has the value V in row R of column C, and bit 7 of the marker's column is the marker` |
@@ -963,7 +964,7 @@ and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
 needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.12.0`
-and YMXS `0.6.0` in the local Maven repository, `mvn install` in each
+and YMXS `0.7.0` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it so
 that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
@@ -976,7 +977,7 @@ it: a caller starts it from the Actions tab or by `gh workflow run test.yml`.
 ./cmd/...`, with the seventeen 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go
-v0.6.0`, which a build fetches.
+v0.7.0`, which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and
 requires the same exit code, the same bytes on standard output and, with
@@ -1005,11 +1006,11 @@ off the path or the Java tree is unbuilt.
 the script requires go on the path, python3 with unicorn in it, rmac on the
 path or at `RMAC`, DTX's packer on the path or at `DTX_WRITE`, and a built
 DTX checkout at `DTX_REPO`, exit 2 where one of them is absent; it reads
-`gofmt -l go` beside them and ends with 2 where a file would be rewritten.
-After the run it reads the count of skipped tests, exit 1 and the lines that
-report it where the count is above 0. `pom.xml` requires one release of DTX,
-and the message names it: another release of that packer is another set of
-bytes.
+`gofmt -l go` beside them and ends with 2 where a file would be rewritten,
+and runs `go test ./...` in `go`, exit 1 where a Go test fails. After the
+run it reads the count of skipped tests, exit 1 and the lines that report it
+where the count is above 0. `pom.xml` requires one release of DTX, and the
+message names it: another release of that packer is another set of bytes.
 
 ---
 

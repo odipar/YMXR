@@ -1041,13 +1041,15 @@ down, 256 where C is 0 (1.9.1), the arithmetic exact (YMXS, SPEC.md
 
 A writer reports a structure outside what this version encodes as one
 line, in place of a tune file: NAME a source's name, TARGET a target's
-name, and each capital letter a decimal figure defined in its row.
+name, and each capital letter a decimal figure defined in its row. A row
+N is a row of the structure, numbered before the padding of 6.3.
 
 | condition | reported as |
 |---|---|
 | the structure has N sources, above 127 (2.2.2) | `the tune runs N sources, and a source column numbers 127` |
 | row N sets a count C outside 0 to 255 (1.9.1) | `row N: a count of C, and the count column reaches 0 to 255` |
 | row N performs an operation other than a start, a retune and a stop | `row N: an effect this version does not read` |
+| row N performs a start whose mapping has a transformation as a part (YMXS, SPEC.md 3.6.3) | `row N: an effect this version does not read` |
 | source NAME runs on TARGET, a target past 24 (2.1) | `the source NAME runs on TARGET, a target this version leaves to a later one (SPEC.md section 8)` |
 | source NAME runs on two targets whose markers are columns A and B, A other than B (rule 2(d)) | `the source NAME runs on targets that mark column A and column B, and a source has one marker column (SPEC.md rule 2(d))` |
 | a marked source NAME has the value V, above 127, in row R of column C, its marker's column (3.2.1) | `the source NAME has the value V in row R of column C, and bit 7 of the marker's column is the marker` |

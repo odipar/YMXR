@@ -91,7 +91,7 @@ func Of(song ym.Song, args []string, said *report.Report) (Converted, error) {
 	flagsRead(said, args, unit, ring, repeat, once, copies, seconds)
 	sources := ymxr.Drums(song.Drums, song.Attributes&ym.Drums4Bit != 0)
 	padded, frames := ymxr.PadToUnit(ym.Of(song, sources, repeat, said), unit, said)
-	made, err := schema.Of(padded)
+	made, err := schema.Padded(padded, frames)
 	if err != nil {
 		return Converted{}, err
 	}

@@ -97,7 +97,7 @@ public final class YmToYmxr {
         Sources sources = new Sources(song);
         Padding.Padded padded = Padding.toUnit(Ym.read(song, sources, repeat, report), unit,
                 report);
-        Schema.Made made = Schema.of(padded.tune());
+        Schema.Made made = Schema.of(padded);
         Columns columns = made.columns();
         found(report, sources, columns);
         Tune.Written written = Tune.write(columns, made.sources(), song.playerHz(), unit, ring,
