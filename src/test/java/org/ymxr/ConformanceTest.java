@@ -2,6 +2,7 @@ package org.ymxr;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -13,14 +14,40 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.ymxs.Chip;
+import org.ymxs.Tunes;
+import org.ymxs.YMXS.Effect;
+import org.ymxs.YMXS.Mapping;
+import org.ymxs.YMXS.OneConnection;
+import org.ymxs.YMXS.Pair;
+import org.ymxs.YMXS.Part;
+import org.ymxs.YMXS.Register;
+import org.ymxs.YMXS.Remap;
+import org.ymxs.YMXS.Retune;
+import org.ymxs.YMXS.Row;
+import org.ymxs.YMXS.SetTone;
+import org.ymxs.YMXS.Single;
+import org.ymxs.YMXS.Start;
+import org.ymxs.YMXS.Timer;
+import org.ymxs.YMXS.Timing;
+import org.ymxs.YMXS.Transformation;
+import org.ymxs.YMXS.Two;
+import org.ymxs.YMXS.TwoConnection;
+import org.ymxs.YMXS.Voice;
 
 /**
  * The converter writes the conformance kit: every tune under
@@ -123,6 +150,24 @@ final class ConformanceTest {
                     + " Timer C: a fall after a loop, a source with the place at its number,"
                     + " bit 5 at 0, a deferred start a stop drops, and one on a stopped"
                     + " timer"),
+            Fixture.built("mapped", "`ConformanceTest.mapped`", () -> schema(mapped()),
+                    "version 10 at 50 Hz, a YMXS structure written through the schema:"
+                    + " on Timer A a fade, a loop on `setR8` started through V15 and"
+                    + " remapped every second row to V12, V9, V6, V3, V0 and the identity;"
+                    + " on Timer B a square on `setR9` through V10, a fall through V5 that"
+                    + " plays once, a deferred start of the square through V10 while the"
+                    + " fall runs, a remap to V12 while that start is pending, which remaps"
+                    + " the fall, and a start that leaves the mapping column unset and runs"
+                    + " through V12, the kept mapping;"
+                    + " on Timer C a remap on the idle timer before its first start, a start"
+                    + " on `setToneC` that leaves the column unset and runs through it, the"
+                    + " coarse nibble mapped, and after the repeat row a remap to the"
+                    + " identity; on Timer D a counted source on `setR10` whose keys reach"
+                    + " 255, through a transformation of 256 entries, remapped to another"
+                    + " and, after the repeat row, back to the first; the repeat row starts"
+                    + " Timers A, B and C again, each through its first mapping, and"
+                    + " retunes Timer D, whose entry reports the mapping kept through the"
+                    + " wrap"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
@@ -139,6 +184,151 @@ final class ConformanceTest {
         } catch (IOException failed) {
             throw new IllegalStateException(failed);
         }
+    }
+
+    /** A YMXS structure as {@code ymxs-to-ymxr} writes it: padded to the
+     *  writer's unit, its columns made by the schema (doc/ymxs.md), and
+     *  packed through the ring the writer chooses, the tune's title its
+     *  name (tools.md 7). */
+    static Tune.Written schema(org.ymxs.YMXS.Tune tune) {
+        Report report = new Report();
+        Schema.Made made = Schema.of(Padding.toUnit(tune, YmToYmxr.UNIT, report));
+        return Tune.write(made.columns(), made.sources(), made.rate(), YmToYmxr.UNIT,
+                Tune.CHOOSE, Tune.packers(), report, tune.title());
+    }
+
+    /** The transformation Vn of the sixteen keys of a volume: entry k is k
+     *  times n divided by 15 (YMXS, SPEC.md 3.6.5). */
+    private static Transformation volume(int n) {
+        List<Integer> entries = new ArrayList<>();
+        for (int k = 0; k < 16; k++) {
+            entries.add(k * n / 15);
+        }
+        return new Transformation("V" + n, entries);
+    }
+
+    /** A transformation of 256 entries, a key a byte: entry k is k divided
+     *  by 17, a volume of 0 to 15, and 15 less that where {@code down}. */
+    private static Transformation steps(boolean down) {
+        List<Integer> entries = new ArrayList<>();
+        for (int k = 0; k < 256; k++) {
+            entries.add(down ? 15 - k / 17 : k / 17);
+        }
+        return new Transformation(down ? "steps down" : "steps", entries);
+    }
+
+    /** A start of {@code source} on {@code register} with both resets. */
+    private static Start start(Register register, Single source, int by, int count,
+                               Mapping mapping) {
+        return new Start(new OneConnection(Tunes.setting(register), source),
+                new Timing(Chip.prescaler(by), count, true, true), false, mapping);
+    }
+
+    /** Rows of {@link #mapped}: the start of the fall on Timer B, the
+     *  remap of Timer B while the deferred start of the square is pending,
+     *  the start of the square that leaves the mapping column unset, and
+     *  the repeat row. */
+    static final int FALL = 6;
+    static final int PENDING = 10;
+    static final int UNSET = 20;
+    static final int REPEAT = 32;
+
+    /**
+     * The kit's tune of version 10 (SPEC.md 1.10, 3.4): 48 rows at 50 Hz
+     * repeating to row 32, every effect mapped, written by the schema as
+     * {@code ymxs-to-ymxr} writes it.
+     *
+     * <p>Timer A, a loop of four rows on {@code setR8} started through V15,
+     * then a remap every second row to V12, V9, V6, V3 and V0, and one to
+     * the identity: a fade. Timer B, a square on {@code setR9} through V10;
+     * at row 6 a start of a fall through V5, which plays once, its last row
+     * read by a tick after row 10's frame and before row 20's; at row 8 a
+     * deferred start of the square through V10, pending until that tick;
+     * at row 10 a remap to V12 while the start is pending, which remaps the
+     * fall and leaves the pending start's mapping as it is (YMXS, SPEC.md
+     * 3.5.5); at row 20 a start of the square through V12, the kept
+     * mapping, which leaves the mapping column unset. Timer C, idle, a
+     * remap at row 2 through a transformation of the coarse nibble; at row
+     * 4 a start on {@code setToneC} through that mapping, which leaves the
+     * column unset; a stop at row 20. Timer D, a ramp on {@code setR10} of
+     * keys 0 to 255 through a transformation of 256 entries, so the source
+     * is counted (3.1.6), and at row 16 a remap to a second of 256. Row 32
+     * starts Timers A, B and C again and retunes Timer D, so the ramp's
+     * entry there reports the mapping the wrap keeps (SPEC.md 4.5). Rows 33
+     * to 47 repeat the fade, remap the square, the tone to the identity and
+     * the ramp to the first of 256, and stop Timer C.
+     */
+    static org.ymxs.YMXS.Tune mapped() {
+        Single pulse = Tunes.repeating("pulse", List.of(15, 12, 9, 6), 0);
+        Single square = Tunes.repeating("square 15", List.of(15, 0), 0);
+        List<Integer> falling = new ArrayList<>();
+        List<Integer> keys = new ArrayList<>();
+        for (int r = 0; r < 16; r++) {
+            falling.add(15 - r);
+            keys.add(r * 17);
+        }
+        Single fall = Tunes.once("fall", falling);
+        Single ramp = Tunes.repeating("ramp", keys, 0);
+        Pair arpeggio = new Pair("arpeggio", Tunes.repeating(
+                List.of(new Two(0x00, 2), new Two(0x80, 1), new Two(0x40, 1)), 0));
+        List<Integer> raised = new ArrayList<>();
+        for (int k = 0; k < 16; k++) {
+            raised.add(Math.min(k + 1, 15));
+        }
+        Mapping up = Tunes.mapping(Tunes.IDENTITY, new Transformation("coarse up", raised));
+        Start tone = new Start(new TwoConnection(new SetTone(Voice.C), arpeggio),
+                new Timing(Chip.prescaler(200), 100, true, true), false, up);
+        Start fading = start(Register.R8, pulse, 50, 100, Tunes.mapping(volume(15)));
+        Start loud = start(Register.R9, square, 50, 140, Tunes.mapping(volume(10)));
+        Start sweep = start(Register.R10, ramp, 200, 192, Tunes.mapping(steps(false)));
+        List<Map<Timer, Effect>> effects = new ArrayList<>();
+        for (int r = 0; r < 48; r++) {
+            effects.add(new EnumMap<>(Timer.class));
+        }
+        int[] fade = {12, 9, 6, 3, 0};
+        for (int pass : new int[] {0, 30}) {
+            for (int s = 0; s < fade.length; s++) {
+                effects.get(pass + 4 + 2 * s).put(Timer.A,
+                        new Remap(Tunes.mapping(volume(fade[s]))));
+            }
+            effects.get(pass + 14).put(Timer.A, new Remap(Tunes.NO_PARTS));
+        }
+        for (int r : new int[] {0, REPEAT}) {
+            effects.get(r).put(Timer.A, fading);
+            effects.get(r).put(Timer.B, loud);
+        }
+        effects.get(0).put(Timer.D, sweep);
+        effects.get(2).put(Timer.C, new Remap(up));
+        effects.get(4).put(Timer.C, tone);
+        effects.get(FALL).put(Timer.B, start(Register.R9, fall, 200, 150,
+                Tunes.mapping(volume(5))));
+        effects.get(8).put(Timer.B, new Start(new OneConnection(Tunes.setting(Register.R9),
+                square), new Timing(Chip.prescaler(50), 140, false, true), true,
+                Tunes.mapping(volume(10))));
+        effects.get(PENDING).put(Timer.B, new Remap(Tunes.mapping(volume(12))));
+        effects.get(UNSET).put(Timer.B, start(Register.R9, square, 50, 140,
+                Tunes.mapping(volume(12))));
+        effects.get(16).put(Timer.D, new Remap(Tunes.mapping(steps(true))));
+        effects.get(20).put(Timer.C, Tunes.STOP);
+        effects.get(REPEAT).put(Timer.C, tone);
+        effects.get(REPEAT).put(Timer.D,
+                new Retune(new Timing(Chip.prescaler(200), 160, false, false)));
+        effects.get(36).put(Timer.B, new Remap(Tunes.mapping(volume(12))));
+        effects.get(38).put(Timer.C, new Remap(Tunes.NO_PARTS));
+        effects.get(40).put(Timer.D, new Remap(Tunes.mapping(steps(false))));
+        effects.get(44).put(Timer.B, new Remap(Tunes.mapping(volume(5))));
+        effects.get(44).put(Timer.C, Tunes.STOP);
+        // the tones of the three voices on, voice C's period the one the
+        // arpeggio's first row writes
+        Map<Register, Integer> first = Map.of(Register.R0, 0x1C, Register.R1, 1,
+                Register.R2, 0x7D, Register.R3, 1, Register.R4, 0x00, Register.R5, 2,
+                Register.R7, 0x38);
+        List<Row> rows = new ArrayList<>();
+        for (int r = 0; r < effects.size(); r++) {
+            rows.add(new Row(r == 0 ? first : Map.of(), effects.get(r)));
+        }
+        return new org.ymxs.YMXS.Tune("mapped", "", "ConformanceTest", 50,
+                Tunes.repeating(rows, REPEAT));
     }
 
     /** The tune of a fixture: converted from its dump, or built. */
@@ -165,11 +355,11 @@ final class ConformanceTest {
         return Trace.record(tune, -1);
     }
 
-    /** The tune's table as a DTX0 file: the sixteen-byte header carrying R
-     *  and RR (SPEC.md 3.1), then row 0 to R minus one, each its thirty
-     *  columns in order (DTX, SPEC.md 2.1); what a reader reads the table
-     *  from, since the DTX2 table's packing is DTX's and not this
-     *  specification's. Empty for a file of another version. */
+    /** The tune's table as a DTX0 file: the sixteen-byte header with R, C
+     *  and RR (SPEC.md 3.1), then row 0 to R minus one, each its C columns
+     *  in order, 30 or 34 by version (DTX, SPEC.md 2.1); what a reader
+     *  reads the table from, since the DTX3 table's packing is DTX's and
+     *  not this specification's. Empty for a file of another version. */
     static byte[] rows(byte[] tune) {
         try {
             return org.dtx.Dtx0.write(TuneFile.read(tune).table());
@@ -306,12 +496,21 @@ final class ConformanceTest {
         return out;
     }
 
+    /** README.md 1 against the kit, each count of its tunes and the count
+     *  of the entries; TASK.md's lines of each tune; and README.md's
+     *  version word of {@code wrong-version}. */
     @Test
     void theReadmeCountsTheKit() throws IOException {
-        String readme = Files.readString(KIT.resolve("README.md"));
+        String text = Files.readString(KIT.resolve("README.md"));
+        String readme = text.substring(0, text.indexOf("**2."));
         Matcher tunes = Pattern.compile("(\\d+) tunes").matcher(readme);
-        assertTrue(tunes.find(), "README.md does not count the tunes");
-        assertEquals(FIXTURES.size(), Integer.parseInt(tunes.group(1)), "README.md's tune count");
+        int counts = 0;
+        while (tunes.find()) {
+            assertEquals(FIXTURES.size(), Integer.parseInt(tunes.group(1)),
+                    "README.md 1's tune count");
+            counts++;
+        }
+        assertTrue(counts > 0, "README.md 1 does not count the tunes");
         long entries = 0;
         String task = Files.readString(KIT.resolve("TASK.md"));
         for (Fixture f : FIXTURES) {
@@ -326,10 +525,239 @@ final class ConformanceTest {
         Matcher count = Pattern.compile("([\\d,]+) entries").matcher(readme);
         assertTrue(count.find(), "README.md does not count the entries");
         assertEquals(entries, Long.parseLong(count.group(1).replace(",", "")), "README.md's entry count");
-        Matcher version = Pattern.compile("version word \\$([0-9A-Fa-f]{4})").matcher(readme);
+        Matcher version = Pattern.compile("version word \\$([0-9A-Fa-f]{4})").matcher(text);
         assertTrue(version.find(), "README.md has no version word for wrong-version");
         assertEquals(Tune.getWord(Files.readAllBytes(TUNES.resolve("wrong-version.ymxr")), 4),
                 Integer.parseInt(version.group(1), 16), "README.md's version word for wrong-version");
+    }
+
+    /**
+     * The rows file as TASK.md 3 and README.md 3 lay it out, the offset
+     * and the bytes of R, C and RR, the bytes of the header, W and the
+     * column count by version, against every rows file of the kit; the
+     * columns of a row and of an effect in SPEC.md 4.2 and 4.3; and the
+     * kit's tune of version 10 as README.md 3 and 6, SOURCES.md and SPEC.md
+     * 7.6 name it, its version and its rate read from the file.
+     */
+    @Test
+    void theDocumentsReadTheColumnsAndTheVersionOfEachTune() throws IOException {
+        String text = Files.readString(KIT.resolve("TASK.md"));
+        String task = text.replaceAll("\\s+", " ");
+        String readme = flat(KIT.resolve("README.md"));
+        String sources = Files.readString(KIT.resolve("SOURCES.md"));
+        String spec = flat(KIT.resolve("../SPEC.md"));
+        assertEquals(List.of(Columns.C, Tune.OLDEST, Tune.UNMAPPED, Columns.MAPPED, Tune.VERSION),
+                numbers(task, "(\\d+) columns in a tune file of versions (\\d+) to (\\d+), and"
+                        + " (\\d+) in one of version (\\d+)"), "TASK.md 3's columns by version");
+        List<Integer> layout = numbers(readme, "a (\\d+)-byte header, `R` at bytes (\\d+) to"
+                + " (\\d+), `C` at (\\d+) and (\\d+), (\\d+) for a tune of version (\\d+) and"
+                + " (\\d+) for one of version (\\d+), `RR` at (\\d+) to (\\d+) and `W` ="
+                + " (\\d+) at (\\d+), then `R` rows of `C` bytes");
+        assertEquals(13, layout.size(), "README.md 3's rows file");
+        assertEquals(List.of(Columns.C, Tune.UNMAPPED, Columns.MAPPED, Tune.VERSION),
+                layout.subList(5, 9), "README.md 3's columns by version");
+        int header = layout.get(0);
+        // a field's name, then its offset and its bytes
+        Map<String, List<Integer>> fields = new TreeMap<>(Map.of(
+                "R", List.of(layout.get(1), layout.get(2) - layout.get(1) + 1),
+                "C", List.of(layout.get(3), layout.get(4) - layout.get(3) + 1),
+                "RR", List.of(layout.get(9), layout.get(10) - layout.get(9) + 1)));
+        Map<String, List<Integer>> listed = new TreeMap<>();
+        Matcher field = Pattern.compile("^\\| (\\d+) \\| (\\d+) \\| `(R|C|RR)`,",
+                Pattern.MULTILINE).matcher(text);
+        while (field.find()) {
+            listed.put(field.group(3), List.of(Integer.parseInt(field.group(1)),
+                    Integer.parseInt(field.group(2))));
+        }
+        assertEquals(fields, listed, "TASK.md 3's fields against README.md 3's");
+        assertEquals(List.of(header, header), List.of(
+                numbers(task, "is the tune's table: a (\\d+)-byte header").get(0),
+                numbers(text, "(?m)^\\| (\\d+) \\| `C` times `R` \\| the rows \\|$").get(0)),
+                "TASK.md 3's bytes of the header against README.md 3's");
+        int effects = Columns.MAPPED - Columns.MAPPING;
+        int each = (Columns.MAPPING - Columns.EFFECT) / effects;
+        assertEquals(List.of(Columns.C - 1, Columns.MAPPED - 1, Tune.VERSION),
+                numbers(spec, "Read the current row, columns 0 to (\\d+), and 0 to (\\d+) in"
+                        + " version (\\d+)"), "SPEC.md 4.2 step 2's columns of a row");
+        Matcher step = Pattern.compile("perform 4\\.3 on its (\\w+) columns, and (\\w+) in"
+                + " version (\\d+)").matcher(spec);
+        assertTrue(step.find(), "SPEC.md 4.2 step 3 counts no columns of an effect");
+        assertEquals(List.of(each, each + 1, Tune.VERSION),
+                List.of(ConsistencyTest.spelled(step.group(1)),
+                        ConsistencyTest.spelled(step.group(2)), Integer.parseInt(step.group(3))),
+                "SPEC.md 4.2 step 3's columns of an effect");
+        assertEquals(List.of(Columns.EFFECT, each, Columns.EFFECT + each - 1, each, Tune.VERSION,
+                Columns.MAPPING), numbers(spec, "columns (\\d+) \\+ (\\d+)i to (\\d+) \\+"
+                + " (\\d+)i, in version (\\d+) its mapping column M, column (\\d+) \\+ i"),
+                "SPEC.md 4.3's columns of effect i");
+        List<String> mapped = new ArrayList<>();
+        for (Fixture f : FIXTURES) {
+            byte[] file = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));
+            int version = Tune.getWord(file, 4);
+            if (!Tune.reads(version)) {
+                continue;
+            }
+            byte[] rows = Files.readAllBytes(TUNES.resolve(f.name() + ".rows"));
+            org.dtx.Table table = TuneFile.read(file).table();
+            Map<String, Integer> values = Map.of("R", table.rows(), "C", table.columns(),
+                    "RR", table.repeat());
+            for (Map.Entry<String, List<Integer>> one : fields.entrySet()) {
+                assertEquals((long) values.getOrDefault(one.getKey(), -1), big(rows,
+                        one.getValue().get(0), one.getValue().get(1)), f.name() + ".rows' "
+                        + one.getKey());
+            }
+            assertEquals(layout.get(11), rows[layout.get(12)] & 0xFF, f.name() + ".rows' W");
+            assertEquals(header + table.columns() * table.rows(), rows.length,
+                    f.name() + ".rows' bytes");
+            assertEquals(version == Tune.VERSION ? Columns.MAPPED : Columns.C, table.columns(),
+                    f.name() + "'s column count");
+            if (version != Tune.VERSION) {
+                continue;
+            }
+            mapped.add(f.name());
+            String name = Pattern.quote(f.name());
+            List<Integer> written = List.of(version, Tune.getWord(file, Tune.FRAME_RATE_AT));
+            assertEquals(List.of(version), numbers(readme, "`" + name + "` as a YMXS structure"
+                    + " that the schema of `ymxs-to-ymxr` writes at version (\\d+)"),
+                    "README.md 3's version of " + f.name());
+            assertEquals(written, numbers(readme, "\\| `" + name + "` \\| version (\\d+) at"
+                    + " (\\d+) Hz"), "README.md 6's version and rate of " + f.name());
+            assertEquals(written, numbers(sources, "\\| `" + name + "` \\|[^\\n]*\\| version"
+                    + " (\\d+) at (\\d+) Hz"), "SOURCES.md's version and rate of " + f.name());
+            assertEquals(List.of(version), numbers(spec, "`" + name + "\\.ymxr`, a tune of"
+                    + " version (\\d+)"), "SPEC.md 7.6's version of " + f.name());
+        }
+        assertEquals(1, mapped.size(), "the kit's tunes of version " + Tune.VERSION + ": " + mapped);
+    }
+
+    /**
+     * The figures of the kit's tune of version 10 in its rows of README.md
+     * 6 and SOURCES.md, against {@link #mapped}: the transformations Timers
+     * A and B run through before the repeat row, in row order; the rows
+     * between two remaps of the fade; the largest key of the ramp; and the
+     * entries of its transformation.
+     */
+    @Test
+    void theDocumentsReadTheFiguresOfTheMappedTune() throws IOException {
+        List<Row> rows = Tunes.rows(mapped());
+        List<String> through = new ArrayList<>();
+        List<Integer> fade = new ArrayList<>();
+        for (Timer timer : List.of(Timer.A, Timer.B)) {
+            for (int r = 0; r < REPEAT; r++) {
+                Effect e = rows.get(r).effects().get(timer);
+                Mapping mapping = e == null ? null : Tunes.mapping(e);
+                if (mapping == null) {
+                    continue;
+                }
+                if (timer == Timer.A && e instanceof Remap) {
+                    fade.add(r);
+                }
+                for (Part part : mapping.parts()) {
+                    if (part instanceof Transformation t && t.name().matches("V\\d+")) {
+                        through.add(t.name());
+                    }
+                }
+            }
+        }
+        Set<Integer> gaps = new TreeSet<>();
+        for (int i = 1; i < fade.size(); i++) {
+            gaps.add(fade.get(i) - fade.get(i - 1));
+        }
+        assertEquals(1, gaps.size(), "the rows between the remaps of the fade: " + fade);
+        String every = List.of("first", "second", "third", "fourth")
+                .get(gaps.iterator().next() - 1);
+        if (!(rows.get(0).effects().get(Timer.D) instanceof Start ramp)
+                || !(ramp.mapping().parts().get(0) instanceof Transformation steps)) {
+            throw new AssertionError("row 0 starts no source on Timer D through a transformation");
+        }
+        int keys = Collections.max(Tunes.values(Tunes.source(ramp.connection())));
+        for (Path at : List.of(KIT.resolve("README.md"), KIT.resolve("SOURCES.md"))) {
+            Matcher row = Pattern.compile("(?m)^\\| `mapped` \\|.*$").matcher(Files.readString(at));
+            assertTrue(row.find(), at + " has no row for mapped");
+            List<String> named = new ArrayList<>();
+            Matcher name = Pattern.compile("\\bV\\d+\\b").matcher(row.group());
+            while (name.find()) {
+                named.add(name.group());
+            }
+            assertEquals(through, named, at + "'s transformations of Timers A and B");
+            assertTrue(row.group().contains("remapped every " + every + " row"),
+                    at + " lacks \"remapped every " + every + " row\"");
+            assertEquals(List.of(keys), numbers(row.group(), "keys reach (\\d+)"),
+                    at + "'s largest key of the ramp");
+            assertEquals(List.of(steps.entries().size()), numbers(row.group(),
+                    "a transformation of (\\d+) entries"), at + "'s entries of the ramp's mapping");
+        }
+    }
+
+    /** The whole number of {@code bytes} bytes at {@code at}, most
+     *  significant byte first. */
+    private static long big(byte[] file, int at, int bytes) {
+        long out = 0;
+        for (int i = 0; i < bytes; i++) {
+            out = out << 8 | file[at + i] & 0xFF;
+        }
+        return out;
+    }
+
+    /** A document's text with each run of white space one space, so a
+     *  pattern matches a sentence across a line break. */
+    private static String flat(Path at) throws IOException {
+        return Files.readString(at).replaceAll("\\s+", " ");
+    }
+
+    /** The groups of the first match of {@code pattern} in {@code text},
+     *  each a whole number, or an empty list where the pattern does not
+     *  match. */
+    private static List<Integer> numbers(String text, String pattern) {
+        Matcher m = Pattern.compile(pattern).matcher(text);
+        List<Integer> out = new ArrayList<>();
+        if (m.find()) {
+            for (int g = 1; g <= m.groupCount(); g++) {
+                out.add(Integer.parseInt(m.group(g)));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * A tick reads the last row of the fall {@link #mapped} starts on Timer
+     * B at row {@link #FALL} after the frame of row {@link #PENDING} and
+     * before that of row {@link #UNSET}: the remap of row PENDING comes
+     * while the deferred start between the two is pending, as SOURCES.md
+     * has it, and the tick that performs that start comes before the start
+     * of row UNSET, which leaves the mapping column unset and runs through
+     * the kept mapping. The record follows from the rows alone, and a
+     * player of the kit performs the remap on the running fall.
+     */
+    @Test
+    void theMappedTuneRemapsWhileAStartIsPending() {
+        List<Row> rows = Tunes.rows(mapped());
+        if (!(rows.get(FALL).effects().get(Timer.B) instanceof Start fall)) {
+            throw new AssertionError("row " + FALL + " starts no source on Timer B");
+        }
+        Timing rate = fall.timing();
+        long ticks = (long) Tunes.size(Tunes.rows(Tunes.source(fall.connection())))
+                * Chip.divides(rate.prescaler()) * Chip.ticks(rate.count());
+        assertTrue(rate.timerReset() && ticks * mapped().rate()
+                > (long) (PENDING - FALL) * Chip.CLOCK, "the fall ends before row " + PENDING);
+        assertTrue(ticks * mapped().rate() < (long) (UNSET - FALL) * Chip.CLOCK,
+                "the fall ends after row " + UNSET);
+        List<Effect> between = new ArrayList<>();
+        for (int r = FALL + 1; r < PENDING; r++) {
+            Effect e = rows.get(r).effects().get(Timer.B);
+            if (e != null) {
+                between.add(e);
+            }
+        }
+        assertTrue(between.size() == 1 && between.get(0) instanceof Start s && s.deferred(),
+                "Timer B between rows " + FALL + " and " + PENDING + ": " + between);
+        assertTrue(rows.get(PENDING).effects().get(Timer.B) instanceof Remap,
+                "row " + PENDING + " remaps Timer B");
+        for (int r = PENDING + 1; r < UNSET; r++) {
+            assertNull(rows.get(r).effects().get(Timer.B), "row " + r + " on Timer B");
+        }
+        assertTrue(rows.get(UNSET).effects().get(Timer.B) instanceof Start start
+                && !start.deferred(), "row " + UNSET + " starts Timer B at its frame");
     }
 
     @Test

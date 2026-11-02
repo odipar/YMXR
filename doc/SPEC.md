@@ -742,8 +742,10 @@ One call of the player, in order:
 
 1. Where the tune has ended (4.6): report -1 and end, every register and
    timer left as it is.
-2. Read the current row, columns 0 to 29.
-3. For each effect 0 to 3 in order, perform 4.3 on its four columns.
+2. Read the current row, columns 0 to 29, and 0 to 33 in version 10
+   (1.10).
+3. For each effect 0 to 3 in order, perform 4.3 on its four columns, and
+   five in version 10 (4.3.1).
 4. Write the register columns (4.4).
 5. Where the row is row R - 1 of a tune whose RR is R, the tune has
    ended (4.6); otherwise the current row is the row after it: n + 1 for
@@ -759,11 +761,11 @@ two steps of 4.2, between two steps of 4.3, between 4.3 and 4.4, and
 between two register writes of 4.4. A tick between two operations uses
 the updated effects before it and the previous values of those after it.
 Three operations run whole against a tick: the two bytes of a register
-write (4.4), the write of the target, the place and the loop row at a
-start (4.3 step 3), and the write of a select (4.3 step 5), which on a
-control register two timers share is a read, a change and a write back.
-A stop is two writes (2.3.3), and a tick latched before the stop falls
-between them.
+write (4.4), the write of the target, the place, the loop row and, in
+version 10, the mapping at a start (4.3 step 3), and the write of a
+select (4.3 step 5), which on a control register two timers share is a
+read, a change and a write back. A stop is two writes (2.3.3), and a
+tick latched before the stop falls between them.
 
 Note: a player that reads the row of the next frame at the end of a
 call, after step 4, leaves the writes of every frame at one offset from
@@ -772,8 +774,8 @@ the host's clock; row 0 is then read at 4.1 step 5.
 ### 4.3 An effect's columns
 
 For effect i, its target column T, source column S, control column K and
-count column N, columns 14 + 4i to 17 + 4i, and its timer (2.3), in
-order:
+count column N, columns 14 + 4i to 17 + 4i, in version 10 its mapping
+column M, column 30 + i (4.3.1), and its timer (2.3), in order:
 
 1. Where K is set with bit 6 at 1 and bit 3 at 0: stop the timer
    (2.3.3).
@@ -800,12 +802,27 @@ order:
 6. Where K is set with bit 5 at 1, and S is unset or set to 0: the place
    is row 0 of the source last started on the timer.
 
-A start writes the tick's target, place and loop row as one operation
-against a tick (4.2.1). With T, S and K unset and N at 0, the effect
-continues unchanged.
+A start writes the tick's target, place, loop row and, in version 10,
+mapping as one operation against a tick (4.2.1). With T, S and K unset, N
+at 0 and, in version 10, M unset, the effect continues unchanged.
 
 Note: step 4 before step 5 loads the count before the select starts a
 stopped timer (YMXS, SPEC.md 3.4.1 and 8.5).
+
+**4.3.1** In version 10, M is read with S (1.10.2):
+
+- Where S is set to 0, a stop: M is unread, and the kept mapping keeps its
+  value (1.10.3).
+- Where S is set to 1 to 127, a start: where M is set, the kept mapping is
+  bits 6 to 0 of M at step 3. Source s starts through the kept mapping
+  after this step: at step 3, in the one operation of 4.2.1, or for a
+  start that becomes pending, at the tick that performs it (1.10.3).
+- Where S is unset and M is set, a remap: after step 3 and before step 4,
+  the kept mapping is bits 6 to 0 of M, and each tick of the timer writes
+  through it until the tick that performs a start pending on the timer:
+  that start runs through the kept mapping after its row (1.10.3).
+
+Where M is unset, the kept mapping keeps its value.
 
 ### 4.4 The register columns
 
@@ -1384,8 +1401,9 @@ sets columns 14 to 17 to `$8D`, `$81`, `$E5` and `$3C`, a start of source
 
 [conformance/README.md](conformance/README.md) defines the test of a
 reader: the record of each tune of the kit over the unnamed F of 7.4,
-the empty record of `wrong-version.ymxr` included, each with the sha256
-and the length `MANIFEST.txt` lists.
+that of `mapped.ymxr`, a tune of version 10, and the empty record of
+`wrong-version.ymxr` included, each with the sha256 and the length
+`MANIFEST.txt` lists.
 
 ---
 

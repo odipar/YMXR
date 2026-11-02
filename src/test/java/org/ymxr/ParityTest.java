@@ -217,6 +217,24 @@ final class ParityTest {
     }
 
     /**
+     * The kit's tune of version 10 (doc/conformance/README.md 6): its
+     * structure through {@code ymxs-to-ymxr} in both trees is the kit's
+     * file byte for byte, and the record of both trees is the reference
+     * MANIFEST.txt lists.
+     */
+    @Test
+    void theKitsMappedTuneConvertsAndReadsTheSameInBothTrees() throws Exception {
+        byte[] kit = Files.readAllBytes(ConformanceTest.TUNES.resolve("mapped.ymxr"));
+        assertArrayEquals(kit, both("ymxs-to-ymxr", json(ConformanceTest.mapped()), "-silent"),
+                "the kit's mapped.ymxr");
+        assertEquals(Tune.VERSION, Tune.getWord(kit, 4), "the version of mapped.ymxr");
+        byte[] record = both("ymxr-trace", kit, "-silent");
+        String line = ConformanceTest.sha256(record) + "  " + record.length + "  mapped.jsonl\n";
+        assertTrue(Files.readString(ConformanceTest.KIT.resolve("MANIFEST.txt")).contains(line),
+                "the record of mapped.ymxr is the reference");
+    }
+
+    /**
      * A rate at the repeat row that the last row leaves otherwise (SPEC.md
      * rule 4(e)): the retune at the repeat row at count 100 with the last
      * row at 90, then the same with the select, a timer the last row stops,
