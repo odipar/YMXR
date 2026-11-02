@@ -209,6 +209,58 @@ final class ParityTest {
                 new String(both("ymxr-check", tune), StandardCharsets.UTF_8));
     }
 
+    /**
+     * A tune file of version 10 (SPEC.md 1.10, 3.4): one record and one
+     * check in both trees; each file a reader reports written wrong one
+     * line, and each check of the mapping columns the same lines; a multi
+     * file of it, and of it and a dump, version 10, its tables packed
+     * again with the same report, and read by the record, the check and
+     * the layout as one line or one record; and the binder's line, which
+     * ymxr-bind and ymxr-sndh report for it.
+     */
+    @Test
+    void aMappedTuneFileReadsTheSameInBothTrees() throws Exception {
+        byte[] mapped = BuiltTunes.mapped().file();
+        String record = new String(both("ymxr-trace", mapped), StandardCharsets.US_ASCII);
+        assertTrue(record.contains("\"transformations\":[[") && record.contains("\"mapping\":"),
+                record);
+        both("ymxr-trace", mapped, "-r200");
+        assertEquals("standard input: every start follows rule 3\n",
+                new String(both("ymxr-check", mapped), StandardCharsets.UTF_8));
+        for (java.util.Map.Entry<String, byte[]> one : MappedTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+            assertEquals("standard input:\n  the tune file does not read: " + one.getKey()
+                    + "\n", new String(both("ymxr-check", one.getValue()),
+                    StandardCharsets.UTF_8));
+        }
+        for (java.util.Map.Entry<List<String>, byte[]> one
+                : MappedTest.unchecked().entrySet()) {
+            assertEquals("standard input:\n  " + String.join("\n  ", one.getKey()) + "\n",
+                    new String(both("ymxr-check", one.getValue()), StandardCharsets.UTF_8));
+            both("ymxr-trace", one.getValue());
+        }
+        byte[] dump = both("ym-to-ymxr", Files.readAllBytes(dumps().get(0)), "-silent");
+        assertEquals(Tune.VERSION, Tune.getWord(multiOf(List.of(mapped)), 4), "a set of one");
+        byte[] multi = multiOf(List.of(dump, mapped));
+        assertEquals(Tune.VERSION, Tune.getWord(multi, 4), "a set with a mapped tune");
+        multiOf(List.of(dump, mapped), "-m480");
+        assertEquals(Tune.UNMAPPED, Tune.getWord(multiOf(List.of(dump, dump)), 4));
+        assertEquals(1, same("ymxr-trace", multi).exit(), "a record is of one tune file");
+        assertEquals(1, same("ymxr-check", multi).exit(),
+                "a multi file is neither a dump nor a tune file");
+        both("ymxr-layout", multi);
+        String line = "the binder writes bound tunes to version 9, and this tune file is"
+                + " version 10";
+        assertEquals("ymxr-bind: " + line + "\n", same("ymxr-bind", mapped, "-silent").said());
+        assertEquals("ymxr-sndh: subtune 1: " + line + "\n",
+                same("ymxr-sndh", mapped, "-silent").said());
+        assertEquals("ymxr-sndh: subtune 2: " + line + "\n",
+                same("ymxr-sndh", multi, "-silent").said());
+    }
+
     @Test
     void everyDumpBindsAndCombinesTheSameInBothTrees() throws Exception {
         for (Path dump : dumps()) {
@@ -610,11 +662,14 @@ final class ParityTest {
     }
 
     /**
-     * A tune file whose table is outside it, and one whose table is
-     * another variant, read in both trees. SPEC.md 3.3.4 has a line for
-     * each; the Java tree took the bytes through the offset before any
-     * check, so a file written wrong ended in the exception the copy threw
-     * where the Go tree reported the line.
+     * A tune file whose table is outside it, one whose table offset has
+     * bit 31 set, and one whose table is another variant, read in both
+     * trees. SPEC.md 3.3.4 has a line for each; the Java tree took the
+     * bytes through the offset before any check, so a file written wrong
+     * ended in the exception the copy threw where the Go tree reported the
+     * line, and it read the offset at 12 signed, so its line wrote the
+     * offset negative. {@link #aMappedTuneFileReadsTheSameInBothTrees}
+     * reads a file cut inside its source index.
      */
     @Test
     void aFileWrittenWrongIsOneLineInBothTrees() throws Exception {
@@ -623,9 +678,11 @@ final class ParityTest {
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);
         byte[] far = file.clone();
         Tune.putLong(far, Tune.TABLE_AT, file.length + 8);
+        byte[] high = file.clone();
+        Tune.putLong(high, Tune.TABLE_AT, 0x80000000 | tableAt);
         byte[] variant = file.clone();
         variant[tableAt + 3] = 1;
-        for (byte[] wrong : List.of(far, variant)) {
+        for (byte[] wrong : List.of(far, high, variant)) {
             Ran java = ran(Path.of("bin"), "ymxr-trace", wrong, "-silent");
             Ran go = ran(built(), "ymxr-trace", wrong, "-silent");
             assertEquals(1, java.exit(), "the reader reports it: " + java.said());

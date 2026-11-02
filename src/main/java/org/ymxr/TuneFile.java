@@ -8,11 +8,12 @@ import org.dtx.Table;
 
 /**
  * A tune file read back: its header fields, its DTX3 table as the bytes
- * in the file and as the table unpacked out of them, and its
- * sources. What a reader reports (R2.4).
+ * in the file and as the table unpacked out of them, its sources, and the
+ * transformations of version 10, transformation n at n - 1 and entry k
+ * of each the value of key k. What a reader reports (R2.4).
  */
 record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table table,
-                List<Table> sources, List<Boolean> counted) {
+                List<Table> sources, List<Boolean> counted, List<byte[]> transformations) {
 
     static TuneFile read(byte[] file) {
         if (file.length < Tune.INDEX_AT || !Arrays.equals(Arrays.copyOf(file, 4), Tune.MAGIC)) {
@@ -31,19 +32,35 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
             throw new IllegalArgumentException("version " + version + " is not "
                     + Tune.READS);
         }
+        int effects = file[Tune.EFFECTS_AT] & 0xFF;
+        // SPEC.md 3.3: bit 5 of the effects used is 1 in version 10 and 0
+        // in every other version.
+        boolean maps = (effects & Columns.MAPS) != 0;
+        if (maps != (version == Tune.VERSION)) {
+            throw new IllegalArgumentException("version " + version + " with bit 5 of the"
+                    + " effects used " + (maps ? "set" : "clear"));
+        }
+        List<byte[]> transformations = version == Tune.VERSION
+                ? transformations(file) : List.of();
+        int index = Tune.indexAt(version);
         int count = file[Tune.COUNT_AT] & 0xFF;
-        int tableAt = Tune.getLong(file, Tune.TABLE_AT);
-        int end = count == 0 ? file.length
-                : Tune.getLong(file, Tune.INDEX_AT) & ~Tune.COUNTED;
         // SPEC.md 3.3.4: each offset of the header is read against the
         // file's length before a byte is read through it, so a file cut
         // short or written wrong is a line rather than an exception the
-        // reader's caller sees.
-        if (tableAt < 0 || end > file.length || tableAt > end) {
+        // reader's caller sees. The source index comes first, since the
+        // table ends at its first entry.
+        if (index + 4 * count > file.length) {
+            throw new IllegalArgumentException("the source index at " + index
+                    + " is outside the file");
+        }
+        long tableAt = Tune.getLong(file, Tune.TABLE_AT) & 0xFFFFFFFFL;
+        int end = count == 0 ? file.length
+                : Tune.getLong(file, index) & ~Tune.COUNTED;
+        if (end > file.length || tableAt > end) {
             throw new IllegalArgumentException("the table is at " + tableAt + " to "
                     + end + ", and the file has " + file.length + " bytes");
         }
-        byte[] dtx3 = Arrays.copyOfRange(file, tableAt, end);
+        byte[] dtx3 = Arrays.copyOfRange(file, (int) tableAt, end);
         int variant = dtx3.length > 3 ? dtx3[3] & 0xFF : 0;
         if (variant != Dtx.DTX3) {
             throw new IllegalArgumentException("the table is DTX" + variant
@@ -53,20 +70,21 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
         // payload's map is a byte a column, so a table of another C reads
         // as no payload at all (DTX, SPEC.md 2.4).
         Dtx.Header shape = Dtx.header(dtx3);
-        if (shape.columns() != Columns.C || shape.width() != 1) {
+        int columns = Tune.columns(version);
+        if (shape.columns() != columns || shape.width() != 1) {
             throw new IllegalArgumentException("the table is " + shape.columns()
                     + " columns of " + shape.width() + " bytes, and a tune's table is "
-                    + Columns.C + " of one (SPEC.md 3.3.3)");
+                    + columns + " of one (SPEC.md 3.3.3)");
         }
         Table table = Dtx.read(dtx3);
         List<Table> sources = new ArrayList<>();
         List<Boolean> counted = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            int entry = Tune.getLong(file, Tune.INDEX_AT + 4 * i);
+            int entry = Tune.getLong(file, index + 4 * i);
             int at = entry & ~Tune.COUNTED;
             counted.add((entry & Tune.COUNTED) != 0);
             int to = i + 1 < count
-                    ? Tune.getLong(file, Tune.INDEX_AT + 4 * (i + 1)) & ~Tune.COUNTED
+                    ? Tune.getLong(file, index + 4 * (i + 1)) & ~Tune.COUNTED
                     : file.length;
             if (at < 0 || to > file.length || at > to) {
                 throw new IllegalArgumentException("source " + (i + 1) + " is at " + at
@@ -86,7 +104,56 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
             }
             sources.add(source);
         }
-        return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT),
-                file[Tune.EFFECTS_AT] & 0xFF, dtx3, table, sources, counted);
+        return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT), effects, dtx3,
+                table, sources, counted, transformations);
+    }
+
+    /**
+     * The transformations of a file of version 10 (SPEC.md 3.4), read in
+     * the order of SPEC.md 3.3.4: the header's long at 16, the index's
+     * place and its T, then each transformation's place and its E, in
+     * ascending n. Each offset is read unsigned, and against the file's
+     * length before a byte is read through it.
+     */
+    private static List<byte[]> transformations(byte[] file) {
+        // the header of version 10 has the long at 16 before the source
+        // index
+        if (file.length < Tune.TRANSFORMATIONS_AT + 4) {
+            throw new IllegalArgumentException("not a YMXR file");
+        }
+        long at = Tune.getLong(file, Tune.TRANSFORMATIONS_AT) & 0xFFFFFFFFL;
+        if (at + 2 > file.length) {
+            throw new IllegalArgumentException("the transformation index at " + at
+                    + " is outside the file");
+        }
+        int t = Tune.getWord(file, (int) at);
+        if (t < 1 || t > Columns.MOST_TRANSFORMATIONS) {
+            throw new IllegalArgumentException("the file has " + t + " transformations, and a"
+                    + " version " + Tune.VERSION + " file has 1 to "
+                    + Columns.MOST_TRANSFORMATIONS);
+        }
+        if (at + 2 + 4L * t > file.length) {
+            throw new IllegalArgumentException("the transformation index at " + at
+                    + " is outside the file");
+        }
+        List<byte[]> tables = new ArrayList<>();
+        for (int n = 1; n <= t; n++) {
+            long table = at + (Tune.getLong(file, (int) at + 2 + 4 * (n - 1)) & 0xFFFFFFFFL);
+            if (table + 2 > file.length) {
+                throw new IllegalArgumentException("transformation " + n + " at " + table
+                        + " is outside the file");
+            }
+            int e = Tune.getWord(file, (int) table);
+            if (e < 1 || e > Columns.MOST_ENTRIES) {
+                throw new IllegalArgumentException("transformation " + n + " has " + e
+                        + " entries, and a transformation has 1 to " + Columns.MOST_ENTRIES);
+            }
+            if (table + 2 + e > file.length) {
+                throw new IllegalArgumentException("transformation " + n + " at " + table
+                        + " is outside the file");
+            }
+            tables.add(Arrays.copyOfRange(file, (int) table + 2, (int) table + 2 + e));
+        }
+        return List.copyOf(tables);
     }
 }

@@ -52,7 +52,13 @@ final class MultiTest {
         List<byte[]> tunes = two();
         byte[] file = Multi.of(tunes, List.of("one", "two"));
         assertEquals("YMXM", new String(file, 0, 4, UTF_8), "the four bytes it opens with");
-        assertEquals(Tune.VERSION, Tune.getWord(file, 4), "the version of the tune files in it");
+        assertEquals(Tune.UNMAPPED, Tune.getWord(file, 4), "the version of the tune files in it");
+        // with a tune file of version 10 in it, a multi file is version 10
+        byte[] mapped = Multi.of(List.of(tunes.get(0), BuiltTunes.mapped().file()),
+                List.of("one", "mapped"));
+        assertEquals(Tune.VERSION, Tune.getWord(mapped, 4), "a set with a mapped tune");
+        assertArrayEquals(BuiltTunes.mapped().file(), Multi.read(mapped).tunes().get(1),
+                "the version 10 tune file read back");
         assertEquals(2, Tune.getWord(file, Multi.COUNT_AT), "the tune count");
         for (int i = 0; i < 2; i++) {
             int at = Tune.getLong(file, Multi.INDEX_AT + 8 * i);

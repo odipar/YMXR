@@ -241,7 +241,7 @@ final class ConversionTest {
                 List.of(), new Report()).written().file();
         assertEquals(1, TuneFile.read(file).sources().get(0).width(),
                 "the converter writes a source of one byte");
-        int at = Tune.getLong(file, Tune.INDEX_AT);
+        int at = Tune.getLong(file, Tune.indexAt(Tune.getWord(file, 4)));
         // the DTX header has W at byte 14 and C at bytes 8 and 9
         byte[] wide = file.clone();
         wide[at + 14] = 2;
@@ -263,10 +263,11 @@ final class ConversionTest {
                 Files.readAllBytes(Path.of("ym/test/Synergy Credits.ym")),
                 List.of(), new Report()).written().file();
         int tableAt = Tune.getLong(file, Tune.TABLE_AT);
+        int index = Tune.indexAt(Tune.getWord(file, 4));
         byte[] far = file.clone();
         Tune.putLong(far, Tune.TABLE_AT, file.length + 8);
         assertEquals("the table is at " + (file.length + 8) + " to "
-                        + Tune.getLong(file, Tune.INDEX_AT) + ", and the file has "
+                        + Tune.getLong(file, index) + ", and the file has "
                         + file.length + " bytes",
                 assertThrows(IllegalArgumentException.class,
                         () -> TuneFile.read(far)).getMessage(),
@@ -276,11 +277,11 @@ final class ConversionTest {
         int count = file[Tune.COUNT_AT] & 0xFF;
         assertTrue(count > 1, "the tune has sources to move: " + count);
         byte[] source = file.clone();
-        Tune.putLong(source, Tune.INDEX_AT + 4 * (count - 1), file.length + 4);
+        Tune.putLong(source, index + 4 * (count - 1), file.length + 4);
         // source N - 1 ends where source N begins, so the line is its
         // alone: the reader reports the first condition in the order of
         // SPEC.md 3.3.4's table
-        int before = Tune.getLong(file, Tune.INDEX_AT + 4 * (count - 2));
+        int before = Tune.getLong(file, index + 4 * (count - 2));
         assertEquals("source " + (count - 1) + " is at " + before + " to "
                         + (file.length + 4) + ", and the file has " + file.length
                         + " bytes",

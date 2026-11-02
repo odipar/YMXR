@@ -147,7 +147,8 @@ final class SetRings {
             TuneFile one = TuneFile.read(file);
             read.add(one);
             int live = Dtx3.payload(one.dtx3()).live();
-            packs += live * (ring == Tune.CHOOSE ? Tune.rings(live).size() : packers.size());
+            packs += live * (ring == Tune.CHOOSE ? Tune.rings(live, one.table().columns()).size()
+                    : packers.size());
         }
         Tune.Watched watched = new Tune.Watched(report, packs);
         Packer first = watched.around(packers.get(0));
@@ -175,11 +176,11 @@ final class SetRings {
             byte[] packed;
             if (ring == Tune.CHOOSE) {
                 plain = Tune.candidates(column, table.rows(), table.repeat(), unit,
-                        Tune.rings(tableLive), first, report);
+                        Tune.rings(tableLive, column.length), first, report);
                 // the table through the set's ring is put in its place below
                 packed = plain.values().iterator().next().table();
             } else {
-                int at = Tune.ringOf(ring, tableLive);
+                int at = Tune.ringOf(ring, tableLive, column.length);
                 if (at != ring) {
                     report.note("the ring is " + Report.count(at, "byte", "bytes")
                             + ": a multiple of the period within the player's reach");

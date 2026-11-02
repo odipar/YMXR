@@ -3,6 +3,7 @@
 package sndh
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/odipar/dtx/go/dtx"
@@ -13,18 +14,18 @@ import (
 
 // A bound tune: a tune file's tables bound with DTX's reader into what the
 // player reads. doc/BINARIES.md is the contract. The layout is the tune
-// file's under its magic and version, with the image DTX packages the DTX2
+// file's under its magic and version, with the image DTX packages the DTX3
 // table with where the file has the table, and the bytes of the state
 // block the image's reader needs recorded in the header, so that a host
 // allocates them without reading the image.
 //
 //	offset  bytes  what it is
 //	0       4      YMXB
-//	4       2      the version, $0003
+//	4       2      the version, the tune file's, $0007 to $0009
 //	6       2      the frame rate, in Hz
-//	8       1      effects used, bits 3 to 0
+//	8       1      effects used, the tune file's
 //	9       1      S, the source count, 0 to 127
-//	10      2      zero
+//	10      2      bytes 10 and 11 of the tune file, which a player skips
 //	12      4      the state block's bytes the image's reader needs
 //	16      4      where the image begins, signed
 //	20      4      where this tune's table is, from the image's first byte
@@ -37,11 +38,14 @@ import (
 // BoundMagic is the four bytes a bound tune opens with.
 var BoundMagic = []byte{'Y', 'M', 'X', 'B'}
 
+// Unbound is the line for a tune file of version 10: a bound tune has the
+// version of its tune file, and the binder writes versions 7 to 9
+// (BINARIES.md 1).
+var Unbound = fmt.Sprintf("the binder writes bound tunes to version %d, and this tune"+
+	" file is version %d", ymxr.Unmapped, ymxr.Version)
+
 // Where a bound tune's fields are.
 const (
-	// BoundVersion is the version of a bound tune, its tune file's
-	// (SPEC.md 3.3.5).
-	BoundVersion = ymxr.Version
 	StateAt      = 12
 	ImageAt      = 16
 	BoundTableAt = 20
@@ -85,7 +89,7 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 	image := make([]int, len(tuneFiles))
 	table := make([]int, len(tuneFiles))
 	for i, file := range tuneFiles {
-		read, err := ymxr.Read(file)
+		read, err := unmapped(file)
 		if err != nil {
 			return Set{}, err
 		}
@@ -159,7 +163,7 @@ func shape(dtx3 []byte) (string, error) {
 // put in, the index recomputed, then the image, then the file's DTX1
 // tables as they are.
 func Bound(tuneFile []byte) ([]byte, error) {
-	read, err := ymxr.Read(tuneFile)
+	read, err := unmapped(tuneFile)
 	if err != nil {
 		return nil, err
 	}
@@ -171,22 +175,36 @@ func Bound(tuneFile []byte) ([]byte, error) {
 		ymxr.GetLong(image, FormatAt+FormatStateAt))
 }
 
+// unmapped is the tune file read, where its version is 7 to 9, and
+// Unbound for version 10.
+func unmapped(tuneFile []byte) (ymxr.File, error) {
+	read, err := ymxr.Read(tuneFile)
+	if err != nil {
+		return ymxr.File{}, err
+	}
+	if read.Version == ymxr.Version {
+		return ymxr.File{}, errors.New(Unbound)
+	}
+	return read, nil
+}
+
 // build is the bound tune: the header, the state block's bytes, the
 // table's place in the image it is in, the source index, then the
 // image where the tune has one and the file's DTX1 tables. A nil image is
 // a tune of a set, whose ImageAt the caller patches.
 func build(tuneFile, image []byte, table, state int) ([]byte, error) {
-	read, err := ymxr.Read(tuneFile)
+	read, err := unmapped(tuneFile)
 	if err != nil {
 		return nil, err
 	}
 	count := len(read.Sources)
+	index := ymxr.IndexAt(read.Version)
 	tables := make([][]byte, count)
 	for i := 0; i < count; i++ {
-		at := ymxr.GetLong(tuneFile, ymxr.IndexAt+4*i) &^ ymxr.Counted
+		at := ymxr.GetLong(tuneFile, index+4*i) &^ ymxr.Counted
 		to := len(tuneFile)
 		if i+1 < count {
-			to = ymxr.GetLong(tuneFile, ymxr.IndexAt+4*(i+1)) &^ ymxr.Counted
+			to = ymxr.GetLong(tuneFile, index+4*(i+1)) &^ ymxr.Counted
 		}
 		tables[i] = tuneFile[at:to]
 	}

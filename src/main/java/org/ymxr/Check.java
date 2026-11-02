@@ -21,9 +21,9 @@ import org.ymxs.ym.Lha;
  * {@code ym/test}, and {@code bin/ymxr-check} on any dumps, the corpus
  * among them.
  *
- * <p>A tune file is read against rule 3 of SPEC.md 6 instead ({@link
- * #places}): a writer other than this repository's can leave bit 5 of a
- * start at 0 where the place is outside the source it starts.
+ * <p>A tune file is read as SPEC.md 6.4 defines instead ({@link
+ * #places}): its source and mapping columns against rule 2(b), and the
+ * mapping column of a stop against rule 3(c).
  */
 final class Check {
 
@@ -210,22 +210,38 @@ final class Check {
      * each, the rows of that source being unknown. A start that leaves bit
      * 5 of the control column at 0 leaves the place at its number modulo
      * the row count of the source it starts (SPEC.md 1.8.4), so every
-     * other start reads a row of its source.
+     * other start reads a row of its source. In version 10, beside each, a
+     * row whose mapping column numbers a transformation past the file's,
+     * and a stop that sets the mapping column, which a player leaves
+     * unread (SPEC.md 1.10, 6.4).
      */
     static List<String> places(TuneFile file) {
         Table table = file.table();
+        int transformations = file.transformations().size();
         List<String> said = new ArrayList<>();
         for (int r = 0; r < table.rows(); r++) {
             for (int i = 0; i < 4; i++) {
                 int source = table.column(Columns.EFFECT + 4 * i + 1)[r] & 0xFF;
-                if ((source & 0x80) == 0 || (source & 0x7F) == 0) {
-                    continue;
-                }
-                source &= 0x7F;
-                if (source > file.sources().size()) {
-                    said.add(r + ": effect " + i + " starts source " + source
+                if ((source & 0x80) != 0 && (source & 0x7F) > file.sources().size()) {
+                    said.add(r + ": effect " + i + " starts source " + (source & 0x7F)
                             + ", and the file has " + Report.count(file.sources().size(),
                             "source", "sources"));
+                }
+                if (table.columns() <= Columns.MAPPING + i) {
+                    continue;
+                }
+                int mapping = table.column(Columns.MAPPING + i)[r] & 0xFF;
+                if ((mapping & 0x80) == 0) {
+                    continue;
+                }
+                if (source == 0x80) {
+                    said.add(r + ": effect " + i + " stops and sets its mapping column, and a"
+                            + " stop leaves the mapping as it is");
+                } else if ((mapping & 0x7F) > transformations) {
+                    said.add(r + ": effect " + i + " maps through transformation "
+                            + (mapping & 0x7F) + ", and the file has "
+                            + Report.count(transformations, "transformation",
+                            "transformations"));
                 }
             }
         }
@@ -297,9 +313,8 @@ final class Check {
      * standard output saying whether the tune it converts to replays to
      * that dump, and the wrong frames under it where it does not. The
      * flags are the converter's, and an exit of 1 marks a dump that does not
-     * replay. A tune file on standard input is read against rule 3 of
-     * SPEC.md 6 ({@link #places}), and exit 1 marks one with a start
-     * outside it.
+     * replay. A tune file on standard input is read as SPEC.md 6.4
+     * defines ({@link #places}), and exit 1 marks one with a line of it.
      *
      * <p>A corpus is read by naming files and directories instead:
      * {@code ymxr-check corpus/} reads every {@code .ym} and {@code .ymxr}

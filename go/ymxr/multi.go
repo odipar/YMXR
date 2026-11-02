@@ -34,13 +34,19 @@ type MultiRead struct {
 	Names []string
 }
 
-// IsMulti is whether the file opens as a multi file.
-// multiVersion is the version of a multi file, its tune files' (SPEC.md
-// 3.3.5).
-func multiVersion(tunes [][]byte) int {
-	return Version
+// BindsAt is the version a set of these tune files binds at, and the
+// version of a multi file of them: 10 where one of them is version 10, and
+// 9 otherwise (tools.md 11.1).
+func BindsAt(tunes [][]byte) int {
+	for _, tune := range tunes {
+		if len(tune) >= HeaderLength && GetWord(tune, 4) == Version {
+			return Version
+		}
+	}
+	return Unmapped
 }
 
+// IsMulti is whether the file opens as a multi file.
 func IsMulti(file []byte) bool {
 	return len(file) >= MultiIndexAt && string(file[:4]) == string(MultiMagic)
 }
@@ -73,7 +79,7 @@ func Multi(tunes [][]byte, names []string) ([]byte, error) {
 	}
 	file := make([]byte, bytes)
 	copy(file, MultiMagic)
-	PutWord(file, 4, multiVersion(tunes))
+	PutWord(file, 4, BindsAt(tunes))
 	PutWord(file, MultiCountAt, len(tunes))
 	name := MultiIndexAt + entry*len(tunes)
 	for i, tune := range tunes {

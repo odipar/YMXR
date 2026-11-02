@@ -186,7 +186,7 @@ final class PlayerTest {
         Matcher version = Pattern.compile("\\$([0-9A-Fa-f]+)")
                 .matcher(row(said, "the version").getKey());
         assertTrue(version.find(), "the version row has no version");
-        assertEquals(Bound.VERSION, Integer.parseInt(version.group(1), 16),
+        assertEquals(Tune.UNMAPPED, Integer.parseInt(version.group(1), 16),
                 "BINARIES.md 1 has another version than the binder writes");
     }
 
@@ -246,7 +246,9 @@ final class PlayerTest {
         assertTrue(e.size() > 20, "the player's equates read as " + e.size());
         assertEquals(java.nio.ByteBuffer.wrap(Bound.MAGIC).getInt(), e.get("YMXR_MAGIC"),
                 "the player's magic is the bound tune's");
-        assertEquals(Bound.VERSION, e.get("YMXR_VERSION"),
+        // the player without the lookup reads to the version of a tune
+        // that maps no value
+        assertEquals(Tune.UNMAPPED, e.get("YMXR_VERSION"),
                 "the version the player reads (SPEC.md 3.3.5)");
         assertEquals(Columns.C, e.get("YMXR_COLUMNS"));
         assertEquals(Tune.FRAME_RATE_AT, e.get("TF_RATE"));
@@ -308,11 +310,16 @@ final class PlayerTest {
 
     @Test
     void theTuneFileIsLaidOutAsTheSpecificationDefines() {
-        // SPEC.md 3.3: the version, where the DTX3 table's offset is
-        // and where the source index begins
-        assertEquals(0x0009, Tune.VERSION);
+        // SPEC.md 3.3: the versions, where the DTX3 table's offset is,
+        // where the source index begins, and in version 10 the long of
+        // the transformation index before it
+        assertEquals(0x0009, Tune.UNMAPPED);
+        assertEquals(0x000A, Tune.VERSION);
         assertEquals(12, Tune.TABLE_AT);
         assertEquals(16, Tune.INDEX_AT);
+        assertEquals(16, Tune.indexAt(Tune.UNMAPPED));
+        assertEquals(16, Tune.TRANSFORMATIONS_AT);
+        assertEquals(20, Tune.indexAt(Tune.VERSION));
         // the bound tune keeps the header to offset 12 and puts the state
         // block's bytes, the image's place and this tune's table in it
         // before the index
@@ -325,7 +332,8 @@ final class PlayerTest {
         TuneFile tune = TuneFile.read(file);
         byte[] bound = Bound.of(file);
         assertArrayEquals(Bound.MAGIC, Arrays.copyOf(bound, 4));
-        assertEquals(Bound.VERSION, Tune.getWord(bound, 4));
+        assertEquals(Tune.getWord(file, 4), Tune.getWord(bound, 4),
+                "a bound tune has its tune file's version");
         // the header in the file, from the frame rate to the count
         assertArrayEquals(Arrays.copyOfRange(file, Tune.FRAME_RATE_AT, Tune.TABLE_AT),
                 Arrays.copyOfRange(bound, Tune.FRAME_RATE_AT, Tune.TABLE_AT));
@@ -359,17 +367,27 @@ final class PlayerTest {
     @Test
     void theRingIsAMultipleOfThePeriodWithinReach() {
         // the ring asked for, a multiple of 30 already
-        assertEquals(960, Tune.ringOf(960, Columns.C));
+        assertEquals(960, Tune.ringOf(960, Columns.C, Columns.C));
         // the nearest multiple of 30
-        assertEquals(90, Tune.ringOf(100, Columns.C));
+        assertEquals(90, Tune.ringOf(100, Columns.C, Columns.C));
         // two periods at least
-        assertEquals(60, Tune.ringOf(30, Columns.C));
+        assertEquals(60, Tune.ringOf(30, Columns.C, Columns.C));
         // the widest ring the player reads at thirty live columns: slot 29
         // is 29 rings past slot 0, through a 16-bit displacement
-        assertEquals(1110, Tune.ringOf(4000, Columns.C));
+        assertEquals(1110, Tune.ringOf(4000, Columns.C, Columns.C));
         // and at thirteen, slot 12 twelve rings on
-        assertEquals(2730, Tune.ringOf(4000, 13));
+        assertEquals(2730, Tune.ringOf(4000, 13, Columns.C));
         // at one live column, DTX3's bound
-        assertEquals(32490, Tune.ringOf(40000, 1));
+        assertEquals(32490, Tune.ringOf(40000, 1, Columns.C));
+        // a table of thirty-four columns: multiples of 34, two periods at
+        // least, and at thirty-four live columns slot 33 is 33 rings past
+        // slot 0
+        assertEquals(952, Tune.ringOf(960, Columns.MAPPED, Columns.MAPPED));
+        assertEquals(68, Tune.ringOf(30, Columns.MAPPED, Columns.MAPPED));
+        assertEquals(986, Tune.ringOf(4000, Columns.MAPPED, Columns.MAPPED));
+        // the rings the writer chooses among
+        assertArrayEquals(new int[] {60, 120, 240, 480, 960, 1920}, Tune.ringsOf(Columns.C));
+        assertArrayEquals(new int[] {68, 136, 272, 544, 1088, 2176},
+                Tune.ringsOf(Columns.MAPPED));
     }
 }

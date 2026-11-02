@@ -11,7 +11,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | term | what it is | defined in |
 |---|---|---|
 | bound tune | A tune file's tables bound with DTX's reader into the layout the player reads: a header, the source index, the image and the DTX1 tables. | BINARIES.md 1 |
-| `C` | The column count of a table, 1 to 256 (DTX, SPEC.md 1); at most 128 in a tune's table (R3.4), 30 here, and 1 to 3 in a source's, one a register of its target. | requirements.md R1.1, R3.4 |
+| `C` | The column count of a table, 1 to 256 (DTX, SPEC.md 1); at most 128 in a tune's table (R3.4), 30 here and 34 in version 10, and 1 to 3 in a source's, one a register of its target. | requirements.md R1.1, R3.4 |
 | claim | The operation a player performs on a timer at init, for each effect the effects used byte marks: it stops the timer, writes its vector, clears its pending bit, and sets its enable bit and its mask bit. | terminology.md, 2. The timers |
 | column | One field of a row, `W` bytes wide: one byte in a tune's table. | requirements.md R1.1 |
 | conformance kit | The tune files under `doc/conformance/tunes`, each with its table unpacked beside it and, in `MANIFEST.txt`, the size and the digest of the tune file, of the unpacked table and of the record a reader produces; a reader is tested against it. | README.md |
@@ -22,7 +22,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | DAC | The YM2149's ladder of output levels, close to logarithmic: 16 for a volume register, 32 for the envelope. | terminology.md, 1. The sound chip |
 | digidrum | A sample run on a voice's volume register: a source of many rows that plays once, at the rate of the recording. | terminology.md, 5. Effects |
 | DTX | The table format, a separate repository: `R` rows and `C` columns, every value `W` bytes, in one of three variants. The format built on it defines what each column means. | README.md |
-| effect | A source connected to a target on one timer, at the rate of its prescaler and count (YMXS, SPEC.md 1.7). Four columns encode it: the target column, the source column, the control column and the count column. | YMXS, SPEC.md 1.7; SPEC.md 1.8, 1.9 |
+| effect | A source connected to a target on one timer, at the rate of its prescaler and count (YMXS, SPEC.md 1.7). Four columns encode it: the target column, the source column, the control column and the count column; in version 10 a fifth, the mapping column. | YMXS, SPEC.md 1.7; SPEC.md 1.8, 1.9, 1.10 |
 | effect rate | The ticks a second of an effect's timer: 2,457,600 divided by the prescaler and by the count, 0 counting 256. The control column and the count column encode it. | SPEC.md 1.9 |
 | effects used | A byte of the tune file, bits 3 to 0: bit i is 1 where a row starts effect i. A player claims the timers of those effects at init, before the first row is written. | SPEC.md 3.3 |
 | envelope generator | The YM2149's counter walking one of sixteen shapes at the envelope period. | terminology.md, 1. The sound chip |
@@ -71,7 +71,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | SNDH file | Three branch entries, SNDH's tags, then the SNDH core, a table of subtunes, the images, the bound tunes and the workspace of a set. | BINARIES.md 3 |
 | source | A table a timer advances one row a tick, its target writing each row (YMXS, SPEC.md 3.2). Here a DTX1 table of one to three columns of one byte, a column a register of its target, repeating at `RR` and ending on its marker or its row count; the source column of an effect selects one by number, 1 to 127. | YMXS, SPEC.md 3.2; SPEC.md 2.2, 3.1 |
 | source column | Column 14 + 4i + 1 of effect i: bit 7 the set bit, bits 6 to 0 the source number, 1 to 127, or 0, the stop. | SPEC.md 1.8 |
-| source index | One index entry a source, in source-number order, from byte 16 of the tune file. | SPEC.md 3.1 |
+| source index | One index entry a source, in source-number order, from byte 16 of the tune file, and from byte 20 in version 10. | SPEC.md 3.1 |
 | square wave | A source of two rows, a level and 0, repeating to row 0. | terminology.md, 5. Effects |
 | state block | The bytes DTX's reader keeps for a table while it reads it, sized by the image's format block; the host allocates them at the end of the workspace. | BINARIES.md 1 |
 | stop | A source column set to 0: the player writes select 0 to the timer's control register and clears its pending bit. | SPEC.md 1.8 |
@@ -92,7 +92,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | ubiquitous language | The terms of this glossary, used with one meaning in every document, comment and name. | requirements.md R0.6 |
 | unit | `k`, the bytes ST4 packs at once, 1, 2 or 4, one for every live column of a DTX3 table (DTX, SPEC.md 2.4): 2 by default. `R` and `RR` divide by it (SPEC.md 6, rule 6). | tools.md |
 | unset row | A row of the tune's table that leaves every column unset: a frame that reads it leaves every register as it is and every timer running (SPEC.md 6, rule 6). | terminology.md, 3. Tables, rows and procedures |
-| version | The word at offset 4 of a tune file, a multi file and a bound tune: $0009, a tune whose table is DTX3 and whose control columns may defer a start (SPEC.md 3.3.5). A reader reads that one, $0008 and $0007, and reports $0003 to $0006, whose table is DTX2. | SPEC.md 3.3 |
+| version | The word at offset 4 of a tune file, a multi file and a bound tune: $0009, a tune whose table is DTX3 and whose control columns may defer a start, and in a tune file and a multi file $000A, a tune that maps a value (SPEC.md 3.3.5). A reader reads those two, $0008 and $0007, and reports $0003 to $0006, whose table is DTX2. | SPEC.md 3.3 |
 | voice | One of the YM2149's three outputs, A, B and C, each with a volume and a mixing setting. | terminology.md, 1. The sound chip |
 | volume | R8, R9 or R10: bits 3 to 0 the level of a voice, and bit 4 set selects the level of the envelope instead. | terminology.md, 1. The sound chip |
 | `W` | The bytes of every value of a table: 1, 2 or 4; one in a tune's table and in a source's. | requirements.md R1.1 |

@@ -52,8 +52,8 @@ final class ConformanceTest {
         }
     }
 
-    /** The version word in {@code wrong-version}: one past the version the
-     *  reader reads (SPEC.md 3.3.5). */
+    /** The version word in {@code wrong-version}: one past the highest
+     *  version the reader reads (SPEC.md 3.3.5). */
     static final int WRONG_VERSION = Tune.VERSION + 1;
 
     /** SOURCES.md's rows, one a tune. */
@@ -279,7 +279,7 @@ final class ConformanceTest {
         int most = 0;
         for (Fixture f : FIXTURES) {
             byte[] file = Files.readAllBytes(TUNES.resolve(f.name() + ".ymxr"));
-            if (Tune.getWord(file, 4) != Tune.VERSION) {
+            if (!Tune.reads(Tune.getWord(file, 4))) {
                 continue;
             }
             for (List<Integer> row : targets(file)) {

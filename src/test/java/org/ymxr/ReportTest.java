@@ -119,6 +119,26 @@ final class ReportTest {
     }
 
     @Test
+    void theTableOfAMappedTuneIsReportedAtItsThirtyFourColumns() {
+        // the packing report reads the column count off the table, so a
+        // table of version 10 has a row for each of its mapping columns
+        Caught c = caught(true);
+        Tune.Written written = BuiltTunes.mapped(c.report());
+        String said = c.said();
+        assertTrue(said.contains("the table: " + Columns.MAPPED + " columns of 48 rows, "
+                + Columns.MAPPED * 48 + " bytes"), said);
+        assertTrue(said.contains("packed " + Columns.MAPPED * 48 + " bytes into "
+                + written.table().length + " "), said);
+        for (int i = 0; i < 4; i++) {
+            assertTrue(said.contains("  effect " + i + " mapping "), "no row for the mapping"
+                    + " of effect " + i + " in " + said);
+        }
+        assertEquals("effect 0 mapping", Tune.name(Columns.MAPPING));
+        assertEquals("effect 3 mapping", Tune.name(Columns.MAPPED - 1));
+        assertEquals("effect 3 timer count", Tune.name(Columns.C - 1));
+    }
+
+    @Test
     void theConverterReadsTheSilentFlagAndWritesTheSameFileEitherWay() throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Chambers of Shaolin 5 -"
                 + " you blew it!.ym"));

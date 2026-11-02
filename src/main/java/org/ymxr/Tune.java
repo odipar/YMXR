@@ -22,32 +22,46 @@ import org.dtx.Table;
  * <pre>
  *  offset  bytes  what it is
  *  0       4      YMXR
- *  4       2      the version, $0007
+ *  4       2      the version, $0009, or $000A where a row maps a value
  *  6       2      the frame rate, in Hz
- *  8       1      effects used, bits 3 to 0
+ *  8       1      effects used: bits 3 to 0 the effects, bit 4 a deferred
+ *                 start, bit 5 the mapping columns
  *  9       1      S, the source count, 0 to 127
  *  10      2      where the name begins, or zero where the tune has none
  *  12      4      where the DTX3 table begins
- *  16      4S     the source index: where source 1 to S's DTX1 table begins
+ *  16      4      version 10: where the transformation index begins
+ *  16, 20  4S     the source index, at 16 and at 20 in version 10: where
+ *                 source 1 to S's DTX1 table begins
  *          ..     the name, its bytes and a zero, where there is one
+ *          ..     version 10: the transformation index, on a long, a word
+ *                 T and T longs, each where a transformation begins
+ *                 counted from the index's first byte; then the T
+ *                 transformations, each on a long, a word E and E entries
  *          ..     the DTX3 table, on a long
  *          ..     the DTX1 tables, each on a long
  * </pre>
  *
- * Every offset counts from the file's first byte. The name reads as the
- * dump or the YMXS file titles the tune, in UTF-8 and ended by a zero
- * byte. It lies between the index and the table, so its offset fits the
- * word that records it however large the tables are.
+ * Every offset but the T offsets of the transformation index counts from
+ * the file's first byte. The name reads as the dump or the YMXS file
+ * titles the tune, in UTF-8 and ended by a zero byte. It lies between the
+ * source index and the tables, so its offset fits the word at 10.
  */
 final class Tune {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
 
-    /** The version a writer writes (SPEC.md 3.3.5): its table is DTX3,
-     *  which a player of an earlier version reads wrongly, bit 3 of a
-     *  control column marks a deferred start, and the place of one with
-     *  bit 5 at 0 continues the count of the rows (4.8). */
-    static final int VERSION = 0x0009;
+    /** The highest version a reader reads, and the one a writer writes
+     *  where a row maps a value (SPEC.md 3.3.5): the table has the four
+     *  mapping columns, and the long at 16 is the transformation index's
+     *  offset. */
+    static final int VERSION = 0x000A;
+
+    /** The version a writer writes where no row maps a value (SPEC.md
+     *  3.3.5): its table is DTX3, which a player of an earlier version
+     *  reads wrongly, bit 3 of a control column marks a deferred start,
+     *  and the place of one with bit 5 at 0 continues the count of the
+     *  rows (4.8). */
+    static final int UNMAPPED = 0x0009;
 
     /** The first version with a deferred start: a file of version 8 reads
      *  as version 9 (SPEC.md 3.3.5). */
@@ -58,11 +72,31 @@ final class Tune {
     static final int OLDEST = 0x0007;
 
     /** The versions a reader reads, as its report names them. */
-    static final String READS = OLDEST + ", " + DEFERRED + " or " + VERSION;
+    static final String READS = OLDEST + ", " + DEFERRED + ", " + UNMAPPED + " or " + VERSION;
 
     /** Whether a reader reads a file of that version. */
     static boolean reads(int version) {
         return version >= OLDEST && version <= VERSION;
+    }
+
+    /** The version a writer writes for a table of {@code columns} columns:
+     *  10 for the thirty-four of a tune that maps a value, and 9 for
+     *  thirty. */
+    static int version(int columns) {
+        return columns == Columns.MAPPED ? VERSION : UNMAPPED;
+    }
+
+    /** The column count of a table of that version: 34 in version 10, and
+     *  30 in 7 to 9 (SPEC.md 3.3.3). */
+    static int columns(int version) {
+        return version == VERSION ? Columns.MAPPED : Columns.C;
+    }
+
+    /** Where the source index begins in a file of that version: at 16, and
+     *  at 20 in version 10, after the transformation index's offset
+     *  (SPEC.md 3.3). */
+    static int indexAt(int version) {
+        return version == VERSION ? TRANSFORMATIONS_AT + 4 : INDEX_AT;
     }
 
     /** The first and the last version whose table is DTX2, which a reader
@@ -85,7 +119,14 @@ final class Tune {
     static final int COUNT_AT = 9;
     static final int NAME_AT = 10;
     static final int TABLE_AT = 12;
+
+    /** Where the source index begins in versions 7 to 9, and the bytes of
+     *  their header. */
     static final int INDEX_AT = 16;
+
+    /** Where the long is in version 10 that is the transformation index's
+     *  offset (SPEC.md 3.3). */
+    static final int TRANSFORMATIONS_AT = 16;
 
     /** The most bytes a name reaches, its zero aside. A longer one is cut
      *  to this: the player reads a name onto a screen of forty columns and
@@ -93,12 +134,20 @@ final class Tune {
     static final int MOST_NAME = 255;
 
     /** What a writer's ring reads where none is named: the writer chooses
-     *  one of {@link #RINGS} (SPEC.md 3.3.3). */
+     *  one of {@link #ringsOf} (SPEC.md 3.3.3). */
     static final int CHOOSE = 0;
 
-    /** The rings a writer chooses among: two periods of thirty rows and
-     *  each double of that, up to what the player reaches. */
-    static final int[] RINGS = {60, 120, 240, 480, 960, 1920};
+    /** The rings a writer chooses among for a table of {@code columns}
+     *  columns: two periods of that many rows and each double of that, to
+     *  64 periods; 60 to 1,920 for thirty columns, and 68 to 2,176 for
+     *  thirty-four. */
+    static int[] ringsOf(int columns) {
+        int[] rings = new int[6];
+        for (int i = 0; i < rings.length; i++) {
+            rings[i] = 2 * columns << i;
+        }
+        return rings;
+    }
 
     /** The furthest the player reads a column from the row pointer: a
      *  16-bit displacement. */
@@ -157,16 +206,16 @@ final class Tune {
      *  live column is packed by every packer named, the smallest kept:
      *  with copies from the literal stream and without, the smaller kept,
      *  where `-copies` names both. The table packs at a period of `C`
-     *  rows, the smallest DTX allows, since a refill decodes a period's
-     *  rows of one column at once and a refill costs a period; the ring is
-     *  a multiple of `C` for that. The writer packs the table with the
-     *  first packer through each of {@link #RINGS} the player reaches and
-     *  keeps the one whose bytes and state block come to the least; with a
-     *  second packer, it packs with every packer through the two that came
-     *  to the least and keeps the one of those two that comes to the less.
-     *  A ring named is the multiple of `C` nearest it within that reach. A
-     *  loop longer than the ring is replayed at its exact rows by DTX's
-     *  reader. */
+     *  rows, `C` its column count, the smallest DTX allows, since a refill
+     *  decodes a period's rows of one column at once and a refill costs a
+     *  period; the ring is a multiple of `C` for that. The writer packs the
+     *  table with the first packer through each of {@link #ringsOf} the
+     *  player reaches and keeps the one whose bytes and state block come to
+     *  the least; with a second packer, it packs with every packer through
+     *  the two that came to the least and keeps the one of those two that
+     *  comes to the less. A ring named is the multiple of `C` nearest it
+     *  within that reach. A loop longer than the ring is replayed at its
+     *  exact rows by DTX's reader. */
     static Written write(Columns columns, Sources sources, int frameRate, int unit, int ring,
                          Report report) {
         return write(columns, sources, frameRate, unit, ring, packers(), report, "");
@@ -213,9 +262,9 @@ final class Tune {
         int live = live(columns.column);
         List<Integer> rings = new ArrayList<>();
         if (ring == CHOOSE) {
-            rings = rings(live);
+            rings = rings(live, columns.count());
         } else {
-            int at = ringOf(ring, live);
+            int at = ringOf(ring, live, columns.count());
             if (at != ring) {
                 report.note("the ring is " + Report.count(at, "byte", "bytes")
                         + ": a multiple of the period within the player's reach");
@@ -280,9 +329,17 @@ final class Tune {
             sourceBytes += tables[i].length;
         }
         byte[] named = named(name);
-        int after = INDEX_AT + 4 * tables.length;
+        int version = version(columns.count());
+        int index = indexAt(version);
+        int after = index + 4 * tables.length;
         int nameAt = named.length == 0 ? 0 : after;
         int here = align(after + named.length);
+        // Version 10: the transformation index and the transformations
+        // after the name, before the DTX3 table, so that table ends where
+        // source 1 begins as in version 9 (SPEC.md 3.4).
+        byte[] block = version == VERSION ? transformations(columns.transformations) : new byte[0];
+        int blockAt = here;
+        here = align(here + block.length);
         int tableAt = here;
         here = align(here + table.length);
         int[] sourceAt = new int[tables.length];
@@ -292,15 +349,19 @@ final class Tune {
         }
         byte[] file = new byte[here];
         System.arraycopy(MAGIC, 0, file, 0, 4);
-        putWord(file, 4, VERSION);
+        putWord(file, 4, version);
         putWord(file, FRAME_RATE_AT, frameRate);
         file[EFFECTS_AT] = (byte) columns.effects;
         file[COUNT_AT] = (byte) tables.length;
         putWord(file, NAME_AT, nameAt);
         putLong(file, TABLE_AT, tableAt);
+        if (version == VERSION) {
+            putLong(file, TRANSFORMATIONS_AT, blockAt);
+            System.arraycopy(block, 0, file, blockAt, block.length);
+        }
         System.arraycopy(named, 0, file, nameAt, named.length);
         for (int i = 0; i < tables.length; i++) {
-            putLong(file, INDEX_AT + 4 * i,
+            putLong(file, index + 4 * i,
                     sourceAt[i] | (all.get(i).counted() ? COUNTED : 0));
         }
         System.arraycopy(table, 0, file, tableAt, table.length);
@@ -309,6 +370,28 @@ final class Tune {
         }
         return new Written(file, repeat < frames ? repeat : frames, table, frames, unit,
                 tables.length, sourceRows, sourceBytes, plain);
+    }
+
+    /** The transformation index and the transformations (SPEC.md 3.4): a
+     *  word T and T longs, each where transformation n begins counted
+     *  from the index's first byte, then each transformation on a long, a
+     *  word E and its E entries. The index begins on a long, so the block
+     *  is laid out from 0. */
+    static byte[] transformations(List<byte[]> tables) {
+        int here = align(2 + 4 * tables.size());
+        int[] at = new int[tables.size()];
+        for (int n = 0; n < tables.size(); n++) {
+            at[n] = here;
+            here = align(here + 2 + tables.get(n).length);
+        }
+        byte[] block = new byte[here];
+        putWord(block, 0, tables.size());
+        for (int n = 0; n < tables.size(); n++) {
+            putLong(block, 2 + 4 * n, at[n]);
+            putWord(block, at[n], tables.get(n).length);
+            System.arraycopy(tables.get(n), 0, block, at[n] + 2, tables.get(n).length);
+        }
+        return block;
     }
 
     /** The table packed with `packer` through each of `rings`, by ring. A
@@ -335,11 +418,12 @@ final class Tune {
         return plain;
     }
 
-    /** The rings the writer chooses among for a table of `live` live
-     *  columns: each of {@link #RINGS} the player reaches. */
-    static List<Integer> rings(int live) {
+    /** The rings the writer chooses among for a table of `columns`
+     *  columns, `live` of them live: each of {@link #ringsOf} the player
+     *  reaches. */
+    static List<Integer> rings(int live, int columns) {
         List<Integer> rings = new ArrayList<>();
-        for (int one : RINGS) {
+        for (int one : ringsOf(columns)) {
             if (one <= reach(live)) {
                 rings.add(one);
             }
@@ -350,19 +434,21 @@ final class Tune {
     /** The tune file with `table` in place of its DTX3 table, every other
      *  part as it is: the source tables after it move by what the table's
      *  length moves them, and the index records where each now begins
-     *  (SPEC.md 3.3). */
+     *  (SPEC.md 3.3). The transformation index and the transformations
+     *  are before the DTX3 table, where they were. */
     static byte[] withTable(byte[] file, byte[] table) {
         int tableAt = getLong(file, TABLE_AT);
         int count = file[COUNT_AT] & 0xFF;
-        int from = count == 0 ? file.length : getLong(file, INDEX_AT) & ~COUNTED;
+        int index = indexAt(getWord(file, 4));
+        int from = count == 0 ? file.length : getLong(file, index) & ~COUNTED;
         int to = align(tableAt + table.length);
         byte[] out = new byte[to + file.length - from];
         System.arraycopy(file, 0, out, 0, tableAt);
         System.arraycopy(table, 0, out, tableAt, table.length);
         System.arraycopy(file, from, out, to, file.length - from);
         for (int i = 0; i < count; i++) {
-            int entry = getLong(out, INDEX_AT + 4 * i);
-            putLong(out, INDEX_AT + 4 * i, ((entry & ~COUNTED) + to - from)
+            int entry = getLong(out, index + 4 * i);
+            putLong(out, index + 4 * i, ((entry & ~COUNTED) + to - from)
                     | (entry & COUNTED));
         }
         return out;
@@ -493,13 +579,14 @@ final class Tune {
         }
         byte[] table = written.table();
         int frames = written.frames();
+        int columns = Dtx.header(table).columns();
         Dtx3.Payload payload = Dtx3.payload(table);
-        report.say("the table: " + Report.count(Columns.C, "column", "columns") + " of "
+        report.say("the table: " + Report.count(columns, "column", "columns") + " of "
                 + Report.count(frames, "row", "rows") + ", "
-                + Report.count((long) Columns.C * frames, "byte", "bytes") + ", packed at unit "
+                + Report.count((long) columns * frames, "byte", "bytes") + ", packed at unit "
                 + written.unit() + " through a ring of " + payload.ring() + chose
                 + ", " + Report.count(payload.live(), "live column", "live columns"));
-        for (int c = 0; c < Columns.C; c++) {
+        for (int c = 0; c < columns; c++) {
             if (!payload.live(c)) {
                 report.row(name(c), String.format(Locale.ROOT, "%7d -> constant %d",
                         frames, payload.constants()[c]));
@@ -512,7 +599,7 @@ final class Tune {
         report.say("the sources: " + Report.count(written.sources(), "table", "tables") + " of "
                 + Report.count(written.sourceRows(), "row", "rows") + ", "
                 + Report.count(written.sourceBytes(), "byte", "bytes"));
-        int raw = Columns.C * frames;
+        int raw = columns * frames;
         report.say(String.format(Locale.ROOT, "packed %s into %d (%.1f%%), the state block %s,"
                         + " the file %s",
                 Report.count(raw, "byte", "bytes"), table.length, 100.0 * table.length / raw,
@@ -520,11 +607,15 @@ final class Tune {
                 Report.count(written.file().length, "byte", "bytes")));
     }
 
-    /** What a column is, for a reported row: a register by its number, and
-     *  an effect column by its effect and its part of it. */
+    /** What a column is, for a reported row: a register by its number, an
+     *  effect column by its effect and its part of it, and a mapping column
+     *  by its effect. */
     static String name(int c) {
         if (c < Columns.EFFECT) {
             return "R" + c;
+        }
+        if (c >= Columns.MAPPING) {
+            return "effect " + (c - Columns.MAPPING) + " mapping";
         }
         int effect = (c - Columns.EFFECT) / 4;
         return "effect " + effect + " " + switch ((c - Columns.EFFECT) % 4) {
@@ -535,12 +626,12 @@ final class Tune {
         };
     }
 
-    /** The ring the table packs through: the multiple of `C` nearest `ring`,
-     *  at least two periods and at most what the player reaches with
-     *  `live` live columns. */
-    static int ringOf(int ring, int live) {
-        int nearest = Math.round((float) ring / Columns.C) * Columns.C;
-        return Math.max(2 * Columns.C, Math.min(reach(live) / Columns.C * Columns.C, nearest));
+    /** The ring a table of `columns` columns packs through: the multiple
+     *  of `columns` nearest `ring`, at least two periods and at most what
+     *  the player reaches with `live` live columns. */
+    static int ringOf(int ring, int live, int columns) {
+        int nearest = Math.round((float) ring / columns) * columns;
+        return Math.max(2 * columns, Math.min(reach(live) / columns * columns, nearest));
     }
 
     static int align(int at) {

@@ -58,7 +58,9 @@ final class BinariesTest {
         assertEquals(0, core.length & 1, "the core is even-sized");
         assertArrayEquals(Sndh.CORE_MAGIC, Arrays.copyOfRange(core, 12, 16));
         assertEquals(1, Tune.getWord(core, 16));
-        assertEquals(Bound.VERSION, Tune.getWord(core, 18),
+        // a core without the lookup reads to the version of a tune that
+        // maps no value (SPEC.md 3.3.5)
+        assertEquals(Tune.UNMAPPED, Tune.getWord(core, 18),
                 "the bound tune version the core reads");
         assertEquals(PlayerTest.equates((flags & Sndh.CORE_DEFER) != 0).get("YMXR_FIXED"),
                 Tune.getWord(core, 20),
@@ -112,7 +114,7 @@ final class BinariesTest {
             boolean defer = (setting & Sndh.CORE_DEFER) != 0;
             byte[] core = Binaries.core(monitor, lean, pcrel, defer);
             assertCore(core, setting);
-            Sndh.checkCore(core, monitor, lean, pcrel, defer, Bound.VERSION);
+            Sndh.checkCore(core, monitor, lean, pcrel, defer, Sndh.binds(List.of()));
             named.add(Binaries.binary(monitor, lean, pcrel, defer).name());
         }
         assertEquals(16, named.size(), "the sixteen settings are sixteen binaries: " + named);
@@ -797,7 +799,7 @@ final class BinariesTest {
             assertTrue(said(wrong).contains("flags at " + Sndh.CORE_FLAGS_AT)
                     && said(wrong).contains("needs bit 1 set"), said(wrong));
             Sndh.checkCore(Binaries.core(options.monitor(), true, false), options.monitor(),
-                    true, Bound.VERSION);
+                    true, Sndh.binds(files));
         }
     }
 
