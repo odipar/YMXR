@@ -400,7 +400,7 @@ func sourceTables(sources []ymxs.Source, marker, target []int) ([]ymxr.Source, e
 // kind names what a source of this shape sounds, for a report: the format
 // names no kind, and a tune's use of the shape settles it (SPEC.md 2.2).
 func kind(source ymxs.Source) int {
-	table := ymxs.SourceTable(source)
+	table := ymxs.SourceRows(source)
 	_, repeats := table.Repeat()
 	if !repeats {
 		return ymxr.Drum

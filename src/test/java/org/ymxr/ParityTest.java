@@ -165,6 +165,19 @@ final class ParityTest {
         both("ymxr-prg", sndh, "-silent");
     }
 
+    /** Sources of two and of three values a row: one tune file, SNDH file
+     *  and program in both trees. */
+    @Test
+    void aSourceOfSeveralValuesARowConvertsTheSameInBothTrees() throws Exception {
+        byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.several()))
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] tune = both("ymxs-to-ymxr", structure, "-silent");
+        assertTrue(tune.length > 0, "the structure converts");
+        both("ymxr-trace", tune);
+        both("ymxs-to-sndh", structure, "-silent");
+        both("ymxs-to-prg", structure, "-silent");
+    }
+
     /** A fade, whose start is through a transformation, a remap to the
      *  identity, and a start through a transformation after the rows that
      *  padding adds: the writer reports the row of the structure of each,

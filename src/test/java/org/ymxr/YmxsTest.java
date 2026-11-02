@@ -238,6 +238,25 @@ final class YmxsTest {
         return built(rows, 0);
     }
 
+    /** A sweep of the envelope period on timer A, two values a row, and a
+     *  voice on timer B, three. */
+    static Tune several() {
+        org.ymxs.YMXS.Pair sweep = new org.ymxs.YMXS.Pair("period",
+                Tunes.repeating(List.of(new org.ymxs.YMXS.Two(0, 200),
+                        new org.ymxs.YMXS.Two(255, 255)), 0));
+        org.ymxs.YMXS.Triple voice = new org.ymxs.YMXS.Triple("a voice",
+                Tunes.repeating(List.of(new org.ymxs.YMXS.Three(64, 2, 15),
+                        new org.ymxs.YMXS.Three(128, 1, 12)), 0));
+        Timing stopped = new Timing(Chip.prescaler(4), 100, true, true);
+        Map<Timer, Effect> both = new EnumMap<>(Timer.class);
+        both.put(Timer.A, new Start(new org.ymxs.YMXS.TwoConnection(
+                new org.ymxs.YMXS.SetEnvelope(), sweep), stopped, false, Tunes.NO_PARTS));
+        both.put(Timer.B, new Start(new org.ymxs.YMXS.ThreeConnection(
+                new org.ymxs.YMXS.SetVoice(org.ymxs.YMXS.Voice.A), voice), stopped, false,
+                Tunes.NO_PARTS));
+        return built(List.of(new Row(Map.of(), both), new Row(Map.of(), Map.of())), 0);
+    }
+
     /** The line the writer reports for {@code tune}. */
     private static String reported(Tune tune) {
         return String.valueOf(assertThrows(IllegalArgumentException.class,
