@@ -108,6 +108,19 @@ DTX_WRITE = os.environ.get("DTX_WRITE", "dtx-write")
 DTX_REPO = os.environ.get("DTX_REPO", os.path.join(ROOT, "..", "DTX"))
 HATARI = os.environ.get("HATARI", "hatari")
 TOS = os.environ.get("TOS", os.path.expanduser("~/hatari-2.6.1_macos/tos-2.06.rom"))
+# Each Hatari run passes HATARI_FLAGS. Fast boot: TOS 2.06 skips its test
+# of the 4 MB of memory, which with fast boot off in the emulator's
+# configuration outlasts the VBLs a run allows before the program starts.
+# Both floppy drives off: TOS addresses no disk. Quit with no confirmation,
+# and a dialog only for a fatal message, the lowest level Hatari reads.
+# Where SDL_VIDEODRIVER and SDL_AUDIODRIVER are unset, a run is headless
+# and silent, with SDL's dummy video and audio drivers; its input is
+# closed, and a time limit ends a run that waits on a dialog.
+HATARI_FLAGS = ["--fast-boot", "on", "--drive-a", "off", "--drive-b", "off",
+                "--confirm-quit", "off", "--alert-level", "fatal"]
+HATARI_ENV = dict(os.environ)
+HATARI_ENV.setdefault("SDL_VIDEODRIVER", "dummy")
+HATARI_ENV.setdefault("SDL_AUDIODRIVER", "dummy")
 # The rows the program is asked to play before it stops (bin/ymxr-prg -r).
 STUB_FRAMES = 2000
 
@@ -2279,10 +2292,12 @@ def under_hatari(work, name, vbls, trace_kinds="psg_write,video_vbl"):
     trace = os.path.join(work, name + ".trace")
     r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                        *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
                         "--disable-video", "1", "--run-vbls", str(vbls),
                         "--log-level", "fatal", "--trace", trace_kinds,
-                        "--trace-file", trace, name], cwd=work, capture_output=True)
+                        "--trace-file", trace, name], cwd=work, env=HATARI_ENV,
+                       stdin=subprocess.DEVNULL, capture_output=True, timeout=900)
     said = re.search(r"YMXR at \$([0-9A-F]{8})", r.stdout.decode(errors="replace"))
     assert said, "%s printed no address: %s" % (
         name, r.stdout.decode(errors="replace")[-300:])
@@ -2453,10 +2468,11 @@ def clock_run(work, vbls, script=None):
     out = os.path.join(work, "out.txt")
     subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                     "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                    *HATARI_FLAGS,
                     "--sound", "off", "--conout", "2", "--fast-forward", "on",
                     "--disable-video", "1", "--run-vbls", str(vbls),
                     "--log-level", "fatal"] + (["--parse", script] if script else [])
-                   + ["CLOCK.PRG"], cwd=work, stdin=subprocess.DEVNULL,
+                   + ["CLOCK.PRG"], cwd=work, env=HATARI_ENV, stdin=subprocess.DEVNULL,
                    stdout=open(out, "wb"), stderr=subprocess.STDOUT, timeout=600)
     return open(out, errors="replace").read()
 
@@ -2563,15 +2579,19 @@ def cost_program(file, work, name, flags):
 
 
 def cost_run(work, vbls, kinds):
-    """COST.PRG under Hatari for `vbls` VBLs, as ym/cost.sh runs it: what
-    the program printed, and the trace of `kinds`."""
+    """COST.PRG under Hatari for `vbls` VBLs, as ym/cost.sh runs it but with
+    both floppy drives off, which starts the program sooner and fits more
+    calls into the run: what the program printed, and the trace of
+    `kinds`."""
     r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                        *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
                         "--disable-video", "1", "--run-vbls", str(vbls),
                         "--log-level", "fatal", "--trace", kinds,
                         "--trace-file", "trace.txt", "COST.PRG"],
-                       cwd=work, stdin=subprocess.DEVNULL, capture_output=True, timeout=900)
+                       cwd=work, env=HATARI_ENV, stdin=subprocess.DEVNULL, capture_output=True,
+                       timeout=900)
     return r.stdout.decode(errors="replace"), os.path.join(work, "trace.txt")
 
 
@@ -2698,9 +2718,9 @@ def monitor_runs():
 # The real-ST program for the patched displacement read: its source, its
 # builder and the README.md whose table -xpatch reads a run against.
 XPATCH_DIR = os.path.join(ROOT, "68k", "test", "st")
-# The VBLs a run of it plays under Hatari: TOS 2.06 counts the 4 MB of
-# memory before its desktop starts the program, and the program's six
-# cases, at five levels each, and its key wait come after that.
+# The VBLs a run of it plays under Hatari: TOS boots and its desktop starts
+# the program, and the program's six cases, at five levels each, and its
+# key wait come after that.
 XPATCH_VBLS = 8000
 XPATCH_CASES = "ZAHEIP"
 # A case's line: its letter and level, the counts N, O and X, and the form
@@ -2722,7 +2742,7 @@ def xpatch_levels(said):
 
 def xpatch_count(said):
     """A count of README.md's table as its least and its most, or None for
-    the rest: 0, 50,000, 11 to 31."""
+    the rest: 0, 50,000, 1 to 99."""
     if said == "the rest":
         return None
     m = re.fullmatch(r"([\d,]+)(?: to ([\d,]+))?", said)
@@ -2782,9 +2802,10 @@ def xpatch():
         console = os.path.join(work, "console%d.txt" % run)
         subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                        *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
                         "--disable-video", "1", "--run-vbls", str(XPATCH_VBLS),
-                        "--log-level", "fatal", "XPATCH.PRG"], cwd=work,
+                        "--log-level", "fatal", "XPATCH.PRG"], cwd=work, env=HATARI_ENV,
                        stdin=subprocess.DEVNULL, stdout=open(console, "wb"),
                        stderr=subprocess.STDOUT, timeout=600)
         shown = open(console, "rb").read()
@@ -2887,11 +2908,13 @@ def hatari(ym, code, symbols, perf=False):
     trace = os.path.join(work, "trace.txt")
     r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                        *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
                         "--disable-video", "1", "--run-vbls", str(STUB_FRAMES + 400),
                         "--log-level", "fatal", "--trace", "psg_write,video_vbl,mfp_write",
                         "--trace-file", trace, "YMXR.PRG"],
-                       cwd=work, capture_output=True)
+                       cwd=work, env=HATARI_ENV, stdin=subprocess.DEVNULL,
+                       capture_output=True, timeout=900)
     said = re.search(r"YMXR at \$([0-9A-F]{8})", r.stdout.decode(errors="replace"))
     assert said, "the program did not print its address: " + r.stdout.decode(errors="replace")[-300:]
     sndh_at = int(said.group(1), 16)

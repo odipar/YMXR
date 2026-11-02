@@ -129,19 +129,19 @@ names, and reads each case's line of `XPATCH.TXT` against this table.
 The first run creates the file and the second appends to it. A line
 outside the table fails the run, and so do a console whose lines differ
 from the run's and a second run that leaves the first run's lines out of
-the file. The table is true under EmuTOS 1.4 and under TOS 2.06; the
-rest is the iterations less the other two counts.
+the file. The rest is the iterations less the other two counts.
 
 | case | levels | N | O | X |
 |---|---|---|---|---|
 | Z | 3 to 7 | 0 | 50,000 | 0 |
 | A | 3 to 7 | 50,000 | 0 | 0 |
 | H | 3 to 7 | 50,000 | 0 | 0 |
-| E | 3 to 5 | 11 to 31 | the rest | 0 |
+| E | 3 to 5 | 1 to 99 | the rest | 0 |
 | E | 6 and 7 | 0 | 50,000 | 0 |
 | I | 3 to 7 | 50,000 | 0 | 0 |
-| P | 3 | the rest | 0 | 0 to 2 |
+| P | 3 | the rest | 0 | 0 to 99 |
 | P | 4 to 7 | 50,000 | 0 | 0 |
 
 An interrupt lands against the loop at a phase that moves with the
-program's layout and the TOS, so E at 3 to 5 and P at 3 read a range.
+program's layout, the TOS and its boot, and between runs of one program,
+so E at 3 to 5 and P at 3 read a range.

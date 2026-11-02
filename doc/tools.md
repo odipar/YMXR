@@ -775,13 +775,13 @@ ending `.ymxs` or `.json` is the structure; a second is the error `<a>
 and <b> both name a structure; a multi's tunes are its subtunes`, exit
 2.
 
-**16.3 `ym/hatari.sh WORK [VBLS] [out.wav]`** runs `TUNE.PRG` under
-`WORK` with `--tos $TOS --machine st --cpuclock 8 --cpu-exact on
---compatible on --memsize 4 --sound 44100 --ym-mixing model --log-level
-fatal`, `--run-vbls VBLS` where VBLS is present, and with a third name
-`--fast-forward on --avirecord --avi-vcodec png --png-level 1 --avi-file
-WORK/run.avi`, the AVI then read out as 16.1 defines. Both play scripts
-end in it.
+**16.3 `ym/hatari.sh WORK [VBLS] [out.wav]`** runs `TUNE.PRG` under `WORK`
+with `--tos $TOS --machine st --cpuclock 8 --cpu-exact on --compatible on
+--memsize 4 --sound 44100 --ym-mixing model --disk-a "" --disk-b ""
+--confirm-quit off --alert-level fatal --log-level fatal`, `--run-vbls VBLS`
+where VBLS is present, and with a third name `--fast-forward on --avirecord
+--avi-vcodec png --png-level 1 --avi-file WORK/run.avi`, the AVI then read
+out as 16.1 defines. Both play scripts end in it.
 
 **16.4 `ym/cost.sh [-lean] [-silent] tune.ymxr [more ...]`** measures the
 play call (performance.md): for each tune file an SNDH file on the
@@ -869,7 +869,7 @@ as it is. A tune that fails is named and the run continues.
 | `-hatari` | each tune, at 50 Hz alone, through `ymxr-sndh -vbl` and `ymxr-prg` with 2,000 rows, run under Hatari, the trace of every chip write cut into frames at the VBL and read against the model; `-vbl` names the VBL as the clock the program plays from (BINARIES.md 4.3), which the frames are cut at; a run that names no tune plays the conformance kit's `voices`, `counted`, `envelope-counted` and `deferred` after the fixtures, since no dump converts to a target of several registers, a counted source or a deferred start. A tune whose effects byte sets bit 4 plays on the core with the deferred start in, the installer's timer writes counted from the tick that runs it |
 | `-stub` | each tune, at 50 Hz alone, through `ymxr-sndh` and then `ymxr-prg` twice, 600 rows each: one program playing from Timer C, which the file's clock tag names, and one from the VBL, which `-vbl` names. Both run under Hatari, and the writes the frame procedure makes are one stream in one order under either clock, over the same frames but for the phase of the first row and the last. A tick's writes are counted apart: an effect's handler writes the chip from its timer, which the two clocks interleave among the rows differently. Then the same tune at 60 Hz, a rate no multiple of the operating system's clock: the tool arms 240 ticks a second (BINARIES.md 4.10), and the gaps between the in-service bit the stub's handler clears read that period on Hatari's MFP, 4.167 ms, against the 5 ms of the 200 Hz clock |
 | `-clock` | the stub's Timer C handler under Hatari's profiler: `Circus Attractions 2` in a program at 50 Hz and at 60 Hz, a row every third tick and every fourth, 1,000 VBLs each; each run measures the handler's cycles a tick and the routine around the play call's a row, which performance.md's section on the program's clock reads within a cycle, and the two runs together solve for a tick without a row, which it reads as one of two figures |
-| `-cost` | the raster monitor's runs of performance.md, as `ym/cost.sh` makes them: `Synergy Credits` and `Turrican - world 4-3` on the monitor's core over the VBLs the section against YMX names, the first calls, as many as the section counts, on average, at the 99th in a hundred and at most against the table's YMXR rows, and `Synergy Credits` packed at unit 1 over the same run against its figure at most, an average within 2 cycles and a single call within 64: a tick's entry and `rte` fall inside a call or outside it by where the tick lands, which moves with the operating system `TOS` names; then `DBA 2` on the plain core, played from the VBL, the least cycles from the VBL to the frame procedure's first chip write over the frames the raster monitor's paragraph names, which that paragraph reads within one of the shifter's bus slots, 4 cycles: the least moves with the phase the VBL lands at |
+| `-cost` | the raster monitor's runs of performance.md, as `ym/cost.sh` builds them, run with both floppy drives off: `Synergy Credits` and `Turrican - world 4-3` on the monitor's core over the VBLs the section against YMX names, the first calls, as many as the section counts, on average, at the 99th in a hundred and at most against the table's YMXR rows, and `Synergy Credits` packed at unit 1 over the same run against its figure at most, an average within 2 cycles and a single call within 64: a tick's entry and `rte` fall inside a call or outside it by where the tick lands, which moves with the operating system `TOS` names; then `DBA 2` on the plain core, played from the VBL, the least cycles from the VBL to the frame procedure's first chip write over the frames the raster monitor's paragraph names, which that paragraph reads within one of the shifter's bus slots, 4 cycles: the least moves with the phase the VBL lands at |
 | `-xpatch` | the real-ST program of `68k/test/st`, built by its `build.py` and run twice in one folder under Hatari on an ST at 8 MHz, cycle-exact, under the TOS image `TOS` names, the first run creating `XPATCH.TXT` and the second appending to it: each case's line of the file, a case at a level with its counts N, O and X, against the table of `68k/test/st/README.md`, a run's first line and a case's line as that file quotes them, and each run's console lines against that run's lines in the file |
 | `-perf` | the player assembled with the raster monitor, against the model |
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
@@ -878,15 +878,15 @@ as it is. A tune that fails is named and the run continues.
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
 program of twelve subtunes, each writing the number it is to R0, starts
-Hatari with a command fifo and a trace of the chip writes, and presses the
-keys of BINARIES.md 4.6 step 4 through the fifo: RIGHT and DOWN step on,
-LEFT and UP step back, both wrap, two digits typed inside the pause reach
-subtune 12, and a digit no second can grow starts at once. The trace records
-which subtune plays, and each check reads the chip's writes. Hatari ends the
-run itself at a VBL count, with no dialog to answer, and a run that outlives
-it is killed. `--keep` leaves the work directory, and `HATARI` and `TOS`
-name the emulator and a TOS image as 16.3 reads them; a missing one is exit
-2, a key that lands on another subtune exit 1.
+Hatari headless with a command fifo and a trace of the chip writes, and
+presses the keys of BINARIES.md 4.6 step 4 through the fifo: RIGHT and DOWN
+step on, LEFT and UP step back, both wrap, two digits typed inside the pause
+reach subtune 12, and a digit no second can grow starts at once. The trace
+records which subtune plays, and each check reads the chip's writes. Hatari
+ends the run itself at a VBL count, with no dialog to answer, and a run that
+outlives it is killed. `--keep` leaves the work directory, and `HATARI` and
+`TOS` name the emulator and a TOS image as 16.3 reads them; a missing one is
+exit 2, a key that lands on another subtune exit 1.
 
 `YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs three things
 on every build: the two built tunes at `-frames24` on each of the sixteen
@@ -900,6 +900,15 @@ which reads the absolute build's tables. The workflow then runs `-stub`,
 `-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari 2.6.1, built from
 its tag, and the PAL image of EmuTOS 1.4, which boots the ST at the 50 Hz
 the two modes require; a caller runs them under TOS 2.06, which `TOS` names.
+Each mode starts Hatari with `--fast-boot on`: TOS 2.06 then skips its test
+of the memory, which with fast boot off in the emulator's configuration
+outlasts the VBLs a run allows before the program starts. Both floppy drives
+are off (`--drive-a off --drive-b off`), so TOS addresses no disk; Hatari
+quits with no confirmation (`--confirm-quit off`) and opens a dialog only
+for a fatal message (`--alert-level fatal`). Where `SDL_VIDEODRIVER` and
+`SDL_AUDIODRIVER` are unset, Hatari runs headless and silent, with SDL's
+dummy video and audio drivers. Its input is closed, and a time limit ends a
+run that waits on a dialog.
 
 ---
 
