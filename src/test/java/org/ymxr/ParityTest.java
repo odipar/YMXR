@@ -216,6 +216,31 @@ final class ParityTest {
         assertArrayEquals(new byte[column.length], column, "effect 1's mapping column");
     }
 
+    /**
+     * A rate at the repeat row that the last row leaves otherwise (SPEC.md
+     * rule 4(e)): the retune at the repeat row at count 100 with the last
+     * row at 90, then the same with the select, a timer the last row stops,
+     * a start pending across the wrap, a deferred start on the last row,
+     * and rates that agree across it. One tune file and one record in both
+     * trees; in the record of the first, the frame that reads the repeat
+     * row a second time records count 100.
+     */
+    @Test
+    void aRateAtTheRepeatRowConvertsTheSameInBothTrees() throws Exception {
+        byte[] tune = both("ymxs-to-ymxr", json(YmxsTest.repeatCount()), "-silent");
+        String[] record = new String(both("ymxr-trace", tune), StandardCharsets.US_ASCII)
+                .split("\n");
+        // padded to unit 2: an unset row before row 1, so the repeat row
+        // is row 2 of four, read again at frame 4, line 5 of the record
+        assertEquals(7, record.length, String.join("\n", record));
+        assertTrue(record[5].contains("\"select\":1,\"count\":100,"), record[5]);
+        for (org.ymxs.YMXS.Tune one : List.of(YmxsTest.repeatSelect(),
+                YmxsTest.repeatCounting(), YmxsTest.repeatPending(),
+                YmxsTest.repeatDeferred(), YmxsTest.repeatAgrees())) {
+            both("ymxr-trace", both("ymxs-to-ymxr", json(one)));
+        }
+    }
+
     /** The fade through the binder, which writes bound tunes of version 9
      *  and reports a line for a tune file of version 10: ymxr-bind and
      *  ymxr-sndh on its tune file, ymxs-to-sndh and ymxs-to-prg on the

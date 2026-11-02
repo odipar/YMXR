@@ -103,8 +103,10 @@ final class Schema {
         int used = 0;
         for (int f = 0; f < size; f++) {
             // After the wrap the player keeps what the last row left, so
-            // the row the tune repeats to writes its targets again, and the
-            // mapping of each effect a row maps through a transformation.
+            // the row the tune repeats to writes its targets again, the
+            // mapping of each effect a row maps through a transformation,
+            // and each value of the rate whose value after the last row
+            // differs from its value before the repeat row (rule 4(e)).
             if (f == repeat) {
                 kept.wrap();
             }
@@ -164,6 +166,70 @@ final class Schema {
     private static final int OPEN = -1;
 
     /**
+     * The rate the rows leave each effect (rule 4(e)): the kept select and
+     * count, each OPEN where the rows leave it open, after a deferred start
+     * or at the repeat row, and whether the timer is known to be counting.
+     */
+    private static final class Rate {
+
+        final int[] select = new int[4];
+        final int[] count = new int[4];
+        /** Whether the timer is known to be counting: a start sets it
+         *  where the source it runs repeats, and a stop clears it. */
+        final boolean[] counting = new boolean[4];
+
+        /**
+         * {@code effect} on effect {@code i}. A start or a retune sets the
+         * select and the count to its rate, and a start sets the flag where
+         * its source repeats. Until the tick that performs a deferred start
+         * the timer counts at the rate of the effect before it, apart from
+         * the rate a row keeps, so a deferred start opens the select and
+         * the count and clears the flag: the next row that sets a rate sets
+         * both columns (4.8). A stop clears the flag. Each value after the
+         * operation follows from the operation alone, so the values after
+         * the last row are the same whether the repeat row opens them or
+         * not.
+         */
+        void keep(int i, Effect effect) {
+            switch (effect) {
+                case Start start -> {
+                    boolean deferred = start.deferred();
+                    select[i] = deferred ? OPEN : select(start.timing().prescaler());
+                    count[i] = deferred ? OPEN : start.timing().count();
+                    counting[i] = !deferred
+                            && Tunes.rows(Tunes.source(start.connection())).repeat().isPresent();
+                }
+                case Retune retune -> {
+                    select[i] = select(retune.timing().prescaler());
+                    count[i] = retune.timing().count();
+                }
+                case Stop ignored -> counting[i] = false;
+                case Remap ignored -> {
+                }
+            }
+        }
+
+        /** The repeat row: the select and the count, each open where its
+         *  value before the repeat row differs from its value after the
+         *  last row, {@code last}, and the flag cleared where it differs
+         *  from the flag there. A value equal to it keeps its value: the
+         *  second pass starts from that value, as the first does. */
+        void wrap(Rate last) {
+            for (int i = 0; i < 4; i++) {
+                if (select[i] != last.select[i]) {
+                    select[i] = OPEN;
+                }
+                if (count[i] != last.count[i]) {
+                    count[i] = OPEN;
+                }
+                if (counting[i] != last.counting[i]) {
+                    counting[i] = false;
+                }
+            }
+        }
+    }
+
+    /**
      * What a player keeps of each effect, as the rows set it (R4.6): the
      * kept target, select, count and mapping, OPEN where the rows leave
      * it open, and beside them what the writer reads off the rows to
@@ -172,11 +238,12 @@ final class Schema {
     private static final class Kept {
 
         final int[] target = new int[4];
-        final int[] select = new int[4];
-        final int[] count = new int[4];
-        /** Whether the timer is known to be counting: a start sets it
-         *  where the source it runs repeats, and a stop clears it. */
-        final boolean[] counting = new boolean[4];
+        /** The kept select, count and counting flag, as the rows read so
+         *  far leave them. */
+        final Rate rate = new Rate();
+        /** The same three after the last row, which the repeat row reads
+         *  (rule 4(e)). */
+        final Rate last = new Rate();
         /** The kept mapping (SPEC.md 1.10.3), 0 at the first row. */
         final int[] mapping = new int[4];
         /** The mapping the running effect writes through, where the rows
@@ -208,6 +275,7 @@ final class Schema {
             for (Row row : rows) {
                 for (Map.Entry<Timer, Effect> one : Tunes.effects(row).entrySet()) {
                     int i = effect(one.getKey());
+                    last.keep(i, one.getValue());
                     if (one.getValue() instanceof Start start) {
                         if (runs[i] == null) {
                             runs[i] = Tunes.target(start.connection());
@@ -234,11 +302,14 @@ final class Schema {
         }
 
         /** The repeat row: the player keeps what the last row left, so
-         *  the first pass leaves open the target of each effect, and the
-         *  mapping of each effect a row maps through a transformation. An
-         *  effect through the identity alone keeps 0 through the wrap. */
+         *  the first pass leaves open the target of each effect, the
+         *  mapping of each effect a row maps through a transformation, and
+         *  each value of the rate whose value after the last row differs
+         *  from its value before the repeat row. An effect through the
+         *  identity alone keeps 0 through the wrap. */
         void wrap() {
             Arrays.fill(target, OPEN);
+            rate.wrap(last);
             for (int i = 0; i < 4; i++) {
                 if (maps[i]) {
                     mapping[i] = OPEN;
@@ -275,9 +346,9 @@ final class Schema {
                               Kept kept, int at) {
         int t = Columns.EFFECT + 4 * i;
         int[] target = kept.target;
-        int[] select = kept.select;
-        int[] count = kept.count;
-        boolean[] counting = kept.counting;
+        int[] select = kept.rate.select;
+        int[] count = kept.rate.count;
+        boolean[] counting = kept.rate.counting;
         switch (effect) {
             case Stop ignored -> {
                 // The set bit with no source under it: the timer stops,
@@ -285,7 +356,7 @@ final class Schema {
                 // column unset (SPEC.md 1.8, rule 3(c)). The stop drops a
                 // pending start, and the next start keeps the kept mapping.
                 out[t + 1] = (byte) 0x80;
-                counting[i] = false;
+                kept.rate.keep(i, effect);
                 kept.pending[i] = NONE;
                 kept.running[i] = kept.mapping[i];
                 return 0;
@@ -348,19 +419,10 @@ final class Schema {
                             | marked(rate) | now);
                     out[t + 3] = (byte) rate;
                 }
-                select[i] = now;
-                count[i] = rate;
-                counting[i] = Tunes.rows(Tunes.source(start.connection())).repeat()
-                        .isPresent();
+                kept.rate.keep(i, effect);
                 if (deferred) {
-                    // Until the tick that performs it, the timer counts at the
-                    // rate of the effect before it, apart from the rate a row
-                    // keeps: the next row that sets a rate sets both columns
-                    // (4.8). The effect before it runs through its mapping
-                    // until that tick, which the rows leave open.
-                    select[i] = OPEN;
-                    count[i] = OPEN;
-                    counting[i] = false;
+                    // The effect before it runs through its mapping until
+                    // the tick that performs it, which the rows leave open.
                     kept.running[i] = kept.running[i] == m ? m : OPEN;
                     kept.pending[i] = m;
                 } else {
@@ -386,8 +448,7 @@ final class Schema {
                 if (rate != count[i]) {
                     out[t + 3] = (byte) rate;
                 }
-                select[i] = now;
-                count[i] = rate;
+                kept.rate.keep(i, effect);
                 return 0;
             }
         }
