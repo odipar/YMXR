@@ -119,16 +119,17 @@ func TestASetOf30And34ColumnsBindsIntoTwoImages(t *testing.T) {
 	}
 }
 
-// mappingCore is the plain core with its field at 18 at 10, as a core
-// that reads the bound tune of version 10 has it.
+// mappingCore is the plain core with the lookup in, whose field at 18 is
+// 10.
 func mappingCore(t *testing.T) []byte {
 	t.Helper()
-	core, err := binaries.Read(binaries.Named(false, false, true, false))
+	core, err := binaries.Read(binaries.Named(false, false, true, false, true))
 	if err != nil {
 		t.Fatal(err)
 	}
-	core = append([]byte(nil), core...)
-	ymxr.PutWord(core, 18, ymxr.Version)
+	if v := ymxr.GetWord(core, 18); v != ymxr.Version {
+		t.Fatalf("the core with the lookup reads bound tunes to version %d", v)
+	}
 	return core
 }
 
@@ -181,15 +182,106 @@ func TestAnSndhFilePlacesEachBlockAfterTheImages(t *testing.T) {
 	}
 }
 
+// flagsOf is the flags word of the core under an SNDH file.
+func flagsOf(file []byte) int {
+	return ymxr.GetWord(file, (ymxr.GetWord(file, 2)+3)&^1+sndh.CoreFlagsAt)
+}
+
+func TestASetThatMapsAValueIsOnTheCoreWithTheLookupIn(t *testing.T) {
+	nine, ten := files(t)
+	file, err := sndh.Of([][]byte{nine, ten}, sndh.Options{Title: "set"})
+	if err != nil {
+		t.Fatalf("an SNDH file with version 10 reads %v", err)
+	}
+	if flags := flagsOf(file); flags != 4|16 {
+		t.Fatalf("the core under a set that maps a value reads flags %d", flags)
+	}
+	file, err = sndh.Of([][]byte{nine}, sndh.Options{Title: "set"})
+	if err != nil {
+		t.Fatalf("an SNDH file of version 9 reads %v", err)
+	}
+	if flags := flagsOf(file); flags != 4 {
+		t.Fatalf("the core under a set of version 9 reads flags %d", flags)
+	}
+}
+
 func TestACoreThatReadsTo9ReportsTheVersionLine(t *testing.T) {
 	nine, ten := files(t)
-	line := "the core reads bound tunes to version 9, and this binds at 10"
-	if _, err := sndh.Of([][]byte{nine, ten}, sndh.Options{Title: "set"}); err == nil ||
-		err.Error() != line {
-		t.Fatalf("an SNDH file with version 10 reads %v, and the line is %q", err, line)
+	plain, err := binaries.Read(binaries.Core)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := sndh.Of([][]byte{nine}, sndh.Options{Title: "set"}); err != nil {
-		t.Fatalf("an SNDH file of version 9 reads %v", err)
+	line := "the core reads bound tunes to version 9, and this binds at 10"
+	_, err = sndh.With(plain, [][]byte{nine, ten}, sndh.Options{Title: "set"})
+	if err == nil || err.Error() != line {
+		t.Fatalf("an SNDH file with version 10 on the plain core reads %v, and the line"+
+			" is %q", err, line)
+	}
+}
+
+func TestACoreWithoutBit4ReportsTheLineOfTheLookup(t *testing.T) {
+	_, ten := files(t)
+	core := append([]byte(nil), mappingCore(t)...)
+	ymxr.PutWord(core, sndh.CoreFlagsAt, 4)
+	line := "the core's flags at 22 read 4, and a subtune that maps a value needs bit" +
+		" 4 set"
+	if _, err := sndh.With(core, [][]byte{ten}, sndh.Options{Title: "set"}); err == nil ||
+		err.Error() != line {
+		t.Fatalf("a core with bit 4 clear reads %v, and the line is %q", err, line)
+	}
+}
+
+func TestTheReachCountsFromTheFirstHandler(t *testing.T) {
+	_, ten := files(t)
+	set, err := sndh.Bind([][]byte{ten})
+	if err != nil {
+		t.Fatal(err)
+	}
+	core := mappingCore(t)
+	handlers := ymxr.GetWord(core, 26)
+	end := (len(core)+1)&^1 + 2 + 4 + len(set.Tunes[0])
+	if handlers == 0 || sndh.TunesEnd(core, set, nil) != end-handlers {
+		t.Fatalf("the tunes end %d from the core's first byte and %d from the field at"+
+			" 26, %d", end, sndh.TunesEnd(core, set, nil), handlers)
+	}
+	// the core padded so that the tune ends a byte past the reach from
+	// its first handler
+	padded := append(append([]byte(nil), core...),
+		make([]byte, 32767-sndh.TunesEnd(core, set, nil)+2)...)
+	line := fmt.Sprintf("the tunes end %d bytes past the core's first handler, at %d,"+
+		" and a tick that reads a row through the program counter reaches 32767",
+		sndh.TunesEnd(padded, set, nil), handlers)
+	if _, err := sndh.With(padded, [][]byte{ten}, sndh.Options{Title: "far",
+		Ticks: sndh.Pcrel}); err == nil || err.Error() != line {
+		t.Fatalf("a set past the reach reads %v, and the line is %q", err, line)
+	}
+}
+
+func TestTheCoresAreNamedByTheFiveSwitches(t *testing.T) {
+	all := binaries.All()
+	if len(all) != 33 || all[32] != binaries.Stub {
+		t.Fatalf("the binaries are %d, the last %s", len(all), all[len(all)-1])
+	}
+	i := 0
+	for _, mapped := range []bool{false, true} {
+		for _, deferred := range []bool{false, true} {
+			for _, pcrel := range []bool{true, false} {
+				for _, lean := range []bool{false, true} {
+					for _, monitor := range []bool{false, true} {
+						if name := binaries.Named(monitor, lean, pcrel, deferred,
+							mapped); name != all[i] {
+							t.Fatalf("binary %d is %s, and the switches name %s", i,
+								all[i], name)
+						}
+						i++
+					}
+				}
+			}
+		}
+	}
+	name := binaries.Named(true, true, false, true, true)
+	if name != "YMXR_sndh-perf-lean-abs-defer-map.bin" {
+		t.Fatalf("the five switches name %s", name)
 	}
 }
 

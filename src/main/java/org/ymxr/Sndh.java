@@ -28,9 +28,9 @@ import org.ymxs.tool.Tool;
  *  16      2      the descriptor's version, 1
  *  18      2      the bound tune's version the core reads
  *  20      2      YMXR_FIXED, the workspace's bytes before the state block
- *  22      2      flags: bits 0 to 3, the four switches below
+ *  22      2      flags: bits 0 to 4, the five switches below
  *  24      2      where the core's state byte is
- *  26      2      zero
+ *  26      2      where the handlers begin, the reach measured from there
  *  28      4      the subtune table's offset, patched here
  *  32      4      the workspace's offset, patched here
  * </pre>
@@ -51,6 +51,7 @@ final class Sndh {
     static final int CORE_FIXED_AT = 20;
     static final int CORE_FLAGS_AT = 22;
     static final int CORE_STATE_AT = 24;
+    static final int CORE_HANDLERS_AT = 26;
     static final int CORE_TABLE_AT = 28;
     static final int CORE_WORK_AT = 32;
     static final int CORE_DESCRIPTOR = 36;
@@ -75,8 +76,14 @@ final class Sndh {
      *  effects byte sets bit 4 requires (SPEC.md 3.3). */
     static final int CORE_DEFER = 8;
 
+    /** The core's flag bit 4: the lookup assembled in (the player's
+     *  YMXR_MAP=1), which a tune whose effects byte sets bit 5 requires
+     *  (SPEC.md 1.10, 3.3). The core reads bound tunes to version 10. */
+    static final int CORE_MAP = 16;
+
     /** What a displacement reaches, the bytes from the core's first byte
-     *  a bound tune of a file built on the core above ends within. */
+     *  plus its field at 26 a bound tune of a file built on the core above
+     *  ends within. */
     static final int PCREL_REACH = 32767;
 
     /** The word of a bra.w, before its displacement. */
@@ -149,7 +156,8 @@ final class Sndh {
      * select it, ticks that read a row through the program counter where
      * they select that, the core of any two or three where they select
      * them, and the plain core where none. The deferred start is in the
-     * core where a subtune defers a start.
+     * core where a subtune defers a start, and the lookup where a subtune
+     * maps a value.
      *
      * @throws IllegalArgumentException where a tune file is not one this
      *     reads, the bound tunes are not of the version the core reads,
@@ -184,6 +192,7 @@ final class Sndh {
         int rate = 0;
         int claimed = 0;
         boolean defers = false;
+        boolean maps = false;
         for (int i = 0; i < n; i++) {
             TuneFile tune;
             try {
@@ -208,6 +217,7 @@ final class Sndh {
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
             defers |= (tune.effects() & Columns.DEFERS) != 0;
+            maps |= (tune.effects() & Columns.MAPS) != 0;
         }
         // The tunes are bound as a set, so those that agree on what an
         // image fixes once share one and the reader's code appears once for
@@ -230,24 +240,31 @@ final class Sndh {
             pcrel = (Tune.getWord(core, CORE_FLAGS_AT) & CORE_PCREL) != 0;
         }
         if (core == null) {
-            core = Binaries.core(options.monitor(), options.lean(), pcrel, defers);
+            core = Binaries.core(options.monitor(), options.lean(), pcrel, defers, maps);
             if (pcrel && options.ticks() == Ticks.CHOSEN
                     && tunesEnd(core, set, tags) > PCREL_REACH) {
                 pcrel = false;
-                core = Binaries.core(options.monitor(), options.lean(), false, defers);
+                core = Binaries.core(options.monitor(), options.lean(), false, defers, maps);
             }
         }
-        checkCore(core, options.monitor(), options.lean(), pcrel, defers, binds(tuneFiles));
+        checkCore(core, options.monitor(), options.lean(), pcrel, defers, maps,
+                binds(tuneFiles));
         if (pcrel) {
             // A tick of this core reads its row through a displacement
             // from the instruction that reads it, which reaches
             // PCREL_REACH bytes, so every row of every subtune is
             // within that of the handlers (BINARIES.md 5.5).
             int last = tunesEnd(core, set, tags);
-            if (last > PCREL_REACH) {
+            int handlers = Tune.getWord(core, CORE_HANDLERS_AT);
+            if (last > PCREL_REACH && handlers == 0) {
                 throw new IllegalArgumentException("the tunes end " + last + " bytes past the"
                         + " core's first byte, and a tick that reads a row through the program"
                         + " counter reaches " + PCREL_REACH);
+            }
+            if (last > PCREL_REACH) {
+                throw new IllegalArgumentException("the tunes end " + last + " bytes past the"
+                        + " core's first handler, at " + handlers + ", and a tick that reads a"
+                        + " row through the program counter reaches " + PCREL_REACH);
             }
         }
         int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
@@ -255,9 +272,11 @@ final class Sndh {
     }
 
     /** Where the last bound tune of a file on this core ends, counted from
-     *  the core's first byte (BINARIES.md 3.1): the handlers are inside
-     *  the core, so a displacement is read against this, and the bytes of
-     *  the core are the margin it spends. */
+     *  the core's first byte plus its field at 26 (BINARIES.md 2.1, 3.1):
+     *  a displacement is read against the handlers, which begin there, so
+     *  the bytes of the core from there are the margin it spends. The
+     *  field is 0 in a core without the lookup, whose count is from its
+     *  first byte. */
     static int tunesEnd(byte[] core, Bound.Set set, byte[] tags) {
         int at = even(core.length) + 2 + 4 * set.tunes().size();
         int end = at;
@@ -265,7 +284,7 @@ final class Sndh {
             end = at + tune.length;
             at = even(end);
         }
-        return end;
+        return end - Tune.getWord(core, CORE_HANDLERS_AT);
     }
 
     /** The version a set of these tune files binds at, and the version of
@@ -291,8 +310,9 @@ final class Sndh {
      *     another descriptor version, reads bound tunes below the version
      *     {@code binds} names, has no raster monitor in
      *     where {@code monitor} selects one, its ticks are not the
-     *     lean ones where {@code lean} does, or it has no deferred start
-     *     in where {@code defers}
+     *     lean ones where {@code lean} does, it has no deferred start
+     *     in where {@code defers}, or it has no lookup in where
+     *     {@code maps}
      */
     static void checkCore(byte[] core, boolean monitor, boolean lean, int binds) {
         checkCore(core, monitor, lean, false, binds);
@@ -305,6 +325,11 @@ final class Sndh {
 
     static void checkCore(byte[] core, boolean monitor, boolean lean, boolean pcrel,
                           boolean defers, int binds) {
+        checkCore(core, monitor, lean, pcrel, defers, false, binds);
+    }
+
+    static void checkCore(byte[] core, boolean monitor, boolean lean, boolean pcrel,
+                          boolean defers, boolean maps, int binds) {
         if (core.length < CORE_DESCRIPTOR || !Arrays.equals(CORE_MAGIC,
                 Arrays.copyOfRange(core, CORE_MAGIC_AT, CORE_MAGIC_AT + 4))) {
             throw new IllegalArgumentException("not an SNDH core: no YMXS at " + CORE_MAGIC_AT);
@@ -336,6 +361,10 @@ final class Sndh {
         if (defers && (flags & CORE_DEFER) == 0) {
             throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
                     + flags + ", and a subtune that defers a start needs bit 3 set");
+        }
+        if (maps && (flags & CORE_MAP) == 0) {
+            throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
+                    + flags + ", and a subtune that maps a value needs bit 4 set");
         }
     }
 
@@ -681,8 +710,9 @@ final class Sndh {
         boolean lean = (flags & CORE_LEAN) != 0;
         boolean pcrel = (flags & CORE_PCREL) != 0;
         boolean defer = (flags & CORE_DEFER) != 0;
-        Binaries.Binary binary = Binaries.binary(monitor, lean, pcrel, defer);
-        int core = Binaries.core(monitor, lean, pcrel, defer).length;
+        boolean map = (flags & CORE_MAP) != 0;
+        Binaries.Binary binary = Binaries.binary(monitor, lean, pcrel, defer, map);
+        int core = Binaries.core(monitor, lean, pcrel, defer, map).length;
         report.say("the core: " + binary.name() + ", " + Report.count(core, "byte", "bytes"));
         List<String> switches = new ArrayList<>();
         if (monitor) {
@@ -702,6 +732,9 @@ final class Sndh {
         }
         if (defer) {
             switches.add("the deferred start in: a subtune defers a start");
+        }
+        if (map) {
+            switches.add("the lookup in: a subtune maps a value");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));

@@ -84,7 +84,8 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	flags := ymxr.GetWord(file, at+sndh.CoreFlagsAt)
 	monitor, lean := flags&1 != 0, flags&2 != 0
 	pcrel, deferred := flags&4 != 0, flags&8 != 0
-	carried := binaries.Named(monitor, lean, pcrel, deferred)
+	mapped := flags&16 != 0
+	carried := binaries.Named(monitor, lean, pcrel, deferred, mapped)
 	core, err := binaries.Read(carried)
 	if err != nil {
 		return
@@ -110,6 +111,9 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	}
 	if deferred {
 		switches = append(switches, "the deferred start in: a subtune defers a start")
+	}
+	if mapped {
+		switches = append(switches, "the lookup in: a subtune maps a value")
 	}
 	if len(switches) == 0 {
 		said.Row("the switches", "none, the plain core")

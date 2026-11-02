@@ -22,10 +22,10 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * The seventeen binaries as the build assembled them, and what the tools
- * make of them: each of the sixteen cores' descriptors and the stub's as
- * BINARIES.md defines them, an SNDH file from the kit's tunes read back
- * tag by tag and part by part, and a program around it.
+ * The thirty-three binaries as the build assembled them, and what the
+ * tools make of them: each of the thirty-two cores' descriptors and the
+ * stub's as BINARIES.md defines them, an SNDH file from the kit's tunes
+ * read back tag by tag and part by part, and a program around it.
  */
 final class BinariesTest {
 
@@ -51,22 +51,37 @@ final class BinariesTest {
     }
 
     /** One core's descriptor: YMXS at 12, the two versions, YMXR_FIXED,
-     *  the flags word at 22, a zero word at 26, the state byte in
-     *  the core, the two offsets it is written with unpatched, and three
-     *  entries that reach even addresses in the core. */
+     *  the flags word at 22, where the handlers begin at 26, the state
+     *  byte in the core, the two offsets it is written with unpatched, and
+     *  three entries that reach even addresses in the core. The switches
+     *  are those of {@code flags}. */
     private static void assertCore(byte[] core, int flags) throws IOException {
+        boolean defer = (flags & Sndh.CORE_DEFER) != 0;
+        boolean map = (flags & Sndh.CORE_MAP) != 0;
         assertEquals(0, core.length & 1, "the core is even-sized");
         assertArrayEquals(Sndh.CORE_MAGIC, Arrays.copyOfRange(core, 12, 16));
         assertEquals(1, Tune.getWord(core, 16));
         // a core without the lookup reads to the version of a tune that
-        // maps no value (SPEC.md 3.3.5)
-        assertEquals(Tune.UNMAPPED, Tune.getWord(core, 18),
+        // maps no value, and a core with it to the version of one that
+        // does (SPEC.md 3.3.5)
+        assertEquals(map ? Tune.VERSION : Tune.UNMAPPED, Tune.getWord(core, 18),
                 "the bound tune version the core reads");
-        assertEquals(PlayerTest.equates((flags & Sndh.CORE_DEFER) != 0).get("YMXR_FIXED"),
+        assertEquals(PlayerTest.equates(defer, map).get("YMXR_VERSION"), Tune.getWord(core, 18),
+                "the version the player reads");
+        assertEquals(PlayerTest.equates(defer, map).get("YMXR_FIXED"),
                 Tune.getWord(core, 20),
                 "the workspace's fixed bytes are the player's");
         assertEquals(flags, Tune.getWord(core, 22), "the flags word");
-        assertEquals(0, Tune.getWord(core, 26));
+        // where the handlers begin: the first handler of a core with the
+        // lookup in, past the descriptor and the init it reaches, and 0 in
+        // a core without it, whose reach counts from its first byte
+        int handlers = Tune.getWord(core, Sndh.CORE_HANDLERS_AT);
+        if (map) {
+            assertTrue(handlers > reaches(core, 0) && handlers < core.length
+                    && (handlers & 1) == 0, "the handlers begin at " + handlers);
+        } else {
+            assertEquals(0, handlers, "the field at 26 of a core without the lookup");
+        }
         int state = Tune.getWord(core, 24);
         assertTrue(state >= Sndh.CORE_DESCRIPTOR && state < core.length,
                 "the state byte is at " + state);
@@ -102,23 +117,72 @@ final class BinariesTest {
     }
 
     @Test
-    void eachOfTheFourSwitchesSixteenSettingsIsACoreWhoseFlagsReadItBack() throws IOException {
+    void eachOfTheFiveSwitchesThirtyTwoSettingsIsACoreWhoseFlagsReadItBack()
+            throws IOException {
         // The tool selects a core by the switches passed and checks it against
-        // the flags word (Sndh.checkCore), so each of the sixteen settings
+        // the flags word (Sndh.checkCore), so each of the thirty-two settings
         // needs a separate core whose word reads the setting back.
         Set<String> named = new LinkedHashSet<>();
-        for (int setting = 0; setting < 16; setting++) {
+        for (int setting = 0; setting < 32; setting++) {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
             boolean lean = (setting & Sndh.CORE_LEAN) != 0;
             boolean pcrel = (setting & Sndh.CORE_PCREL) != 0;
             boolean defer = (setting & Sndh.CORE_DEFER) != 0;
-            byte[] core = Binaries.core(monitor, lean, pcrel, defer);
+            boolean map = (setting & Sndh.CORE_MAP) != 0;
+            byte[] core = Binaries.core(monitor, lean, pcrel, defer, map);
             assertCore(core, setting);
-            Sndh.checkCore(core, monitor, lean, pcrel, defer, Sndh.binds(List.of()));
-            named.add(Binaries.binary(monitor, lean, pcrel, defer).name());
+            Sndh.checkCore(core, monitor, lean, pcrel, defer, map,
+                    map ? Tune.VERSION : Sndh.binds(List.of()));
+            named.add(Binaries.binary(monitor, lean, pcrel, defer, map).name());
+            if (!map) {
+                assertArrayEquals(core, Binaries.core(monitor, lean, pcrel, defer),
+                        "the four switches name the core without the lookup");
+                // a core without the lookup reads bound tunes to version 9,
+                // which the version line reports before its flags
+                IllegalArgumentException old = assertThrows(IllegalArgumentException.class,
+                        () -> Sndh.checkCore(core, monitor, lean, pcrel, defer, true,
+                                Tune.VERSION));
+                assertEquals("the core reads bound tunes to version 9, and this binds at 10",
+                        old.getMessage());
+            }
         }
-        assertEquals(16, named.size(), "the sixteen settings are sixteen binaries: " + named);
-        assertEquals(17, Binaries.all().size(), "the sixteen cores and the stub");
+        assertEquals(32, named.size(), "the thirty-two settings are thirty-two binaries: "
+                + named);
+        assertEquals(33, Binaries.all().size(), "the thirty-two cores and the stub");
+        List<String> order = new ArrayList<>();
+        for (Binaries.Binary binary : Binaries.all()) {
+            order.add(binary.name());
+        }
+        assertEquals(named, new LinkedHashSet<>(order.subList(0, 32)), "the cores");
+        for (int i = 0; i < 32; i++) {
+            assertEquals(i >= 16, order.get(i).endsWith("-map.bin"),
+                    "the sixteen without the lookup first, then the sixteen with it: " + order);
+        }
+        assertEquals(List.of("-dYMXR_PERF=1", "-dYMXR_NEST=0", "-dYMXR_AEOI=1",
+                "-dYMXR_PCREL=0", "-dYMXR_DEFER=1", "-dYMXR_MAP=1"),
+                Binaries.binary(true, true, false, true, true).defines());
+        assertEquals("YMXR_sndh-perf-lean-abs-defer-map.bin",
+                Binaries.binary(true, true, false, true, true).name());
+    }
+
+    /** A core with the lookup in whose flags word has bit 4 cleared, which
+     *  the check reports after the version, which it reads (BINARIES.md
+     *  2.10). */
+    @Test
+    void aCoreWhoseFlagsLackTheLookupIsRejectedForATuneThatMapsAValue() throws IOException {
+        byte[] core = Binaries.core(false, false, true, false, true).clone();
+        Tune.putWord(core, Sndh.CORE_FLAGS_AT, Sndh.CORE_PCREL);
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.checkCore(core, false, false, true, false, true, Tune.VERSION));
+        assertEquals("the core's flags at 22 read 4, and a subtune that maps a value needs bit"
+                + " 4 set", wrong.getMessage());
+        IllegalArgumentException of = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(core, List.of(fade()), new Sndh.Options("Fade", null, null, false,
+                        false)));
+        assertEquals(wrong.getMessage(), of.getMessage());
+        assertEquals(reported(Files.readString(Path.of("doc", "BINARIES.md")),
+                "the core's flags at 22 read F, and a subtune that maps").replace("F", "4"),
+                wrong.getMessage());
     }
 
     @Test
@@ -156,7 +220,7 @@ final class BinariesTest {
     }
 
     /**
-     * The five under {@code go/binaries/data} are the five the classes
+     * The binaries under {@code go/binaries/data} are the ones the classes
      * carry. A Go module fetched by its import path contains the files a
      * commit has in it, so a Go executable embeds those, and a
      * stale one would put another core under a tune.
@@ -173,8 +237,8 @@ final class BinariesTest {
         }
     }
 
-    /** The Go tree lists the seventeen by name, which release/publish.sh
-     *  reads, and its list is the build's. */
+    /** The Go tree lists the thirty-three by name, which release/publish.sh
+     *  reads, and its list is the build's, in the build's order. */
     @Test
     void theGoTreeListsTheBinariesTheBuildWrites() throws IOException {
         String go = Files.readString(Path.of("go/binaries/binaries.go"));
@@ -183,11 +247,24 @@ final class BinariesTest {
         while (name.find()) {
             listed.add(name.group());
         }
-        Set<String> written = new LinkedHashSet<>();
+        List<String> written = new ArrayList<>();
         for (Binaries.Binary binary : Binaries.all()) {
             written.add(binary.name());
         }
-        assertEquals(written, listed, "go/binaries/binaries.go lists another set of binaries");
+        assertEquals(new LinkedHashSet<>(written), listed,
+                "go/binaries/binaries.go lists another set of binaries");
+        // the list All returns, its two constants by the names they are
+        int at = go.indexOf("var all = []string{");
+        assertTrue(at >= 0, "go/binaries/binaries.go has no list of all");
+        String all = go.substring(at, go.indexOf('}', at))
+                .replace("Core,", "\"" + Binaries.CORE.name() + "\",")
+                .replace("Stub,", "\"" + Binaries.STUB.name() + "\",");
+        List<String> order = new ArrayList<>();
+        Matcher one = Pattern.compile("\"(YMXR_[A-Za-z0-9_-]*\\.bin)\"").matcher(all);
+        while (one.find()) {
+            order.add(one.group(1));
+        }
+        assertEquals(written, order, "go/binaries/binaries.go lists them in another order");
     }
 
     @Test
@@ -341,19 +418,37 @@ final class BinariesTest {
             imageAt[i] = next;
             next += set.images().get(i).length;
         }
+        // the transformation blocks of the subtunes of version 10 after
+        // the images, each on a long, in subtune order (BINARIES.md 3.1)
+        int[] blockAt = new int[files.size()];
+        for (int i = 0; i < files.size(); i++) {
+            byte[] block = set.blocks().get(i);
+            if (block.length > 0) {
+                next = Tune.align(next);
+                blockAt[i] = next;
+                assertArrayEquals(block, Arrays.copyOfRange(sndh, header + next,
+                        header + next + block.length),
+                        "subtune " + (i + 1) + "'s transformation block");
+                next += block.length;
+            }
+        }
         next = Sndh.even(next);
         for (int i = 0; i < files.size(); i++) {
             byte[] bound = set.tunes().get(i).clone();
             // The tune reaches its image from its first byte, which the
-            // combine put in and the set left at zero.
+            // combine put in and the set left at zero, and in version 10
+            // its transformation block the same way.
             Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - tuneAt[i]);
+            if (blockAt[i] > 0) {
+                Tune.putLong(bound, Bound.TRANSFORMATIONS_AT, blockAt[i] - tuneAt[i]);
+            }
             assertArrayEquals(bound, Arrays.copyOfRange(sndh, header + tuneAt[i],
                     header + tuneAt[i] + bound.length),
                     "subtune " + (i + 1) + " is its bound tune");
             assertEquals("YMXB", ascii(sndh, header + tuneAt[i], 4));
             state = Math.max(state, Tune.getLong(bound, Bound.STATE_AT));
         }
-        assertEquals(next, workAt, "the workspace follows the last image");
+        assertEquals(next, workAt, "the workspace follows the last image or block");
         int workspace = Tune.align(Tune.getWord(core, Sndh.CORE_FIXED_AT) + state) + 2;
         assertEquals(header + workAt + workspace, sndh.length,
                 "the workspace is last, two bytes more than the state needs");
@@ -709,6 +804,131 @@ final class BinariesTest {
                         + " reads them");
     }
 
+    /**
+     * The core under a file whose subtunes map a value has the lookup in
+     * (BINARIES.md 2.1): a core without it reads bound tunes to version 9,
+     * and its init reports -1 for a tune of version 10. A file uses the
+     * larger core only where a subtune's effects byte sets bit 5, and the
+     * core with the deferred start and the lookup in where a subtune sets
+     * bit 4 and one sets bit 5. A core without the lookup named by the
+     * caller reports the version it reads before its flags (2.10).
+     */
+    @Test
+    void aFileWithASubtuneThatMapsAValueUsesTheCoreWithTheLookupIn() throws IOException {
+        byte[] fade = fade();
+        byte[] both = BuiltTunes.mapped().file();
+        int switches = Columns.MAPS | Columns.DEFERS;
+        assertEquals(Columns.MAPS, fade[Tune.EFFECTS_AT] & switches);
+        assertEquals(switches, both[Tune.EFFECTS_AT] & switches);
+        List<List<byte[]>> sets = List.of(List.of(tune("chambers")),
+                List.of(tune("chambers"), fade), List.of(tune("deferred"), fade), List.of(both));
+        for (int setting = 0; setting < 8; setting++) {
+            boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
+            boolean lean = (setting & Sndh.CORE_LEAN) != 0;
+            boolean pcrel = (setting & Sndh.CORE_PCREL) != 0;
+            Sndh.Options options = new Sndh.Options("Mapped", null, null, monitor, lean,
+                    pcrel ? Sndh.Ticks.PCREL : Sndh.Ticks.ABSOLUTE);
+            for (List<byte[]> files : sets) {
+                int effects = 0;
+                for (byte[] file : files) {
+                    effects |= file[Tune.EFFECTS_AT];
+                }
+                boolean defer = (effects & Columns.DEFERS) != 0;
+                boolean map = (effects & Columns.MAPS) != 0;
+                byte[] sndh = Sndh.of(files, options);
+                assertEquals(setting | (defer ? Sndh.CORE_DEFER : 0) | (map ? Sndh.CORE_MAP : 0),
+                        Tune.getWord(sndh, Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
+                        "bit 4 of the file's flags where a subtune maps a value");
+                assertCombined(Binaries.core(monitor, lean, pcrel, defer, map), sndh, files,
+                        tags(sndh));
+            }
+            for (boolean defer : new boolean[] {false, true}) {
+                byte[] without = Binaries.core(monitor, lean, pcrel, defer);
+                IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                        () -> Sndh.of(without, List.of(both), options));
+                assertEquals("the core reads bound tunes to version 9, and this binds at 10",
+                        wrong.getMessage());
+            }
+        }
+        String binaries = String.join(" ", Files.readString(Path.of("doc/BINARIES.md"))
+                .split("\\s+"));
+        Matcher larger = Pattern.compile("`YMXR_sndh-map\\.bin` is ([\\d,]+) bytes larger than"
+                + " `YMXR_sndh\\.bin`").matcher(binaries);
+        assertTrue(larger.find(), "BINARIES.md 2.1 has no size of the lookup");
+        assertEquals(Integer.parseInt(larger.group(1).replace(",", "")),
+                Binaries.core(false, false, true, false, true).length
+                        - Binaries.core(false, false, true).length,
+                "the bytes the lookup adds to the plain core, as BINARIES.md 2.1 reads them");
+        Matcher words = Pattern.compile("`YMXR_sndh-map\\.bin` reads (\\d+), and"
+                + " `YMXR_sndh-defer-map\\.bin` (\\d+)").matcher(binaries);
+        assertTrue(words.find(), "BINARIES.md 2.1 has no flags word of the lookup");
+        assertEquals(Integer.parseInt(words.group(1)), Tune.getWord(
+                Binaries.core(false, false, true, false, true), Sndh.CORE_FLAGS_AT));
+        assertEquals(Integer.parseInt(words.group(2)), Tune.getWord(
+                Binaries.core(false, false, true, true, true), Sndh.CORE_FLAGS_AT));
+    }
+
+    /**
+     * A tick of a core with the lookup in reads its row through a
+     * displacement from its handler, and the handlers begin at the field at
+     * 26, so the tool measures the reach from there (BINARIES.md 2.1): a
+     * mapped source of 20,000 rows ends within it from there and past it
+     * from the core's first byte, and one of 30,000 rows ends past it, so
+     * that file is on the core that reads an address, and -pcrel reports
+     * the line that names the first handler.
+     */
+    @Test
+    void aFileOnTheCoreWithTheLookupIsMeasuredFromItsFirstHandler() throws IOException {
+        byte[] core = Binaries.core(false, false, true, false, true);
+        int handlers = Tune.getWord(core, Sndh.CORE_HANDLERS_AT);
+        Bound.Set set = Bound.of(List.of(fade()));
+        int end = Sndh.even(core.length) + 2 + 4 + set.tunes().get(0).length;
+        assertEquals(end - handlers, Sndh.tunesEnd(core, set, new byte[0]),
+                "the tunes end counted from the first handler");
+        byte[] plain = Binaries.core();
+        assertEquals(Sndh.even(plain.length) + 2 + 4 + set.tunes().get(0).length,
+                Sndh.tunesEnd(plain, set, new byte[0]), "and from the first byte, at 0");
+        Sndh.Options chosen = new Sndh.Options("Long", null, null, false, false);
+        Sndh.Options asked = new Sndh.Options("Long", null, null, false, false,
+                Sndh.Ticks.PCREL);
+        List<byte[]> within = List.of(longMapped(20000));
+        Bound.Set near = Bound.of(within);
+        assertTrue(Sndh.tunesEnd(core, near, new byte[0]) + handlers > Sndh.PCREL_REACH
+                && Sndh.tunesEnd(core, near, new byte[0]) <= Sndh.PCREL_REACH,
+                "20,000 rows end past the reach from the first byte and within it from"
+                        + " the first handler");
+        byte[] sndh = Sndh.of(within, chosen);
+        assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(sndh,
+                Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
+                "the core that reads a row through the program counter");
+        assertCombined(core, sndh, within, tags(sndh));
+        List<byte[]> past = List.of(longMapped(30000));
+        sndh = Sndh.of(past, chosen);
+        assertEquals(Sndh.CORE_MAP, Tune.getWord(sndh,
+                Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
+                "the core that reads an address");
+        assertCombined(Binaries.core(false, false, false, false, true), sndh, past, tags(sndh));
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(past, asked));
+        int last = Sndh.tunesEnd(core, Bound.of(past), new byte[0]);
+        assertEquals("the tunes end " + last + " bytes past the core's first handler, at "
+                + handlers + ", and a tick that reads a row through the program counter"
+                + " reaches " + Sndh.PCREL_REACH, wrong.getMessage());
+        assertEquals(reported(Files.readString(Path.of("doc", "BINARIES.md")),
+                "the tunes end B bytes past the core's first handler")
+                .replace("B", String.valueOf(last)).replace("F", String.valueOf(handlers)),
+                wrong.getMessage());
+    }
+
+    /** The fade of YMXS (YmxsTest), its tune file as ymxs-to-ymxr writes
+     *  it: a square on `setR8` through four transformations, version 10. */
+    static byte[] fade() {
+        org.ymxs.YMXS.Tune tune = YmxsTest.fade();
+        Schema.Made made = Schema.of(Padding.toUnit(tune, YmToYmxr.UNIT, new Report()));
+        return Tune.write(made.columns(), made.sources(), made.rate(), YmToYmxr.UNIT,
+                BuiltTunes.RING, new Report(), tune.title()).file();
+    }
+
     @Test
     void aFileWhoseTunesEndPastTheReachIsRefusedWhereTheDisplacementWasAskedFor()
             throws IOException {
@@ -772,6 +992,29 @@ final class BinariesTest {
         Sources sources = new Sources(List.of(Sources.Source.of(Effects.SID, 0, source, rows)));
         return Tune.write(new Columns(c, 0, 0b0001), sources, 50, YmToYmxr.UNIT,
                 BuiltTunes.RING, new Report()).file();
+    }
+
+    /** The same source through transformation 1 of the sixteen of
+     *  {@link BuiltTunes#fade}, a tune file of version 10. */
+    static byte[] longMapped(int rows) {
+        byte[][] c = new byte[Columns.MAPPED][8];
+        c[7][0] = (byte) (0x80 | 0x3E);                  // voice A's tone alone
+        c[0][0] = 0x40;
+        c[1][0] = (byte) (0x80 | 1);
+        int e0 = Columns.EFFECT;
+        c[e0][0] = (byte) (0x80 | 8);                    // setR8
+        c[e0 + 1][0] = (byte) (0x80 | 1);
+        c[e0 + 2][0] = (byte) (0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET | 5);
+        c[e0 + 3][0] = 100;
+        c[Columns.MAPPING][0] = (byte) (0x80 | 1);       // through transformation 1
+        byte[] source = new byte[rows];
+        for (int i = 0; i < rows; i++) {
+            source[i] = (byte) (i % 16);
+        }
+        source[rows - 1] = (byte) (0x80 | 12);           // the marker
+        Sources sources = new Sources(List.of(Sources.Source.of(Effects.SID, 0, source, rows)));
+        return Tune.write(new Columns(c, 0, Columns.MAPS | 0b0001, BuiltTunes.fade()), sources,
+                50, YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
     }
 
     @Test

@@ -35,21 +35,23 @@ final class PlayerTest {
     private static final Path BINARIES = Path.of("doc/BINARIES.md");
 
     /** Every {@code NAME equ VALUE} in the player, decimal or hex, as it
-     *  is assembled without the deferred start. */
+     *  is assembled without the deferred start and the lookup. */
     static Map<String, Integer> equates() throws IOException {
-        return equates(false);
+        return equates(false, false);
     }
 
     /**
      * Every {@code NAME equ VALUE} in the player, decimal or hex, as it is
      * assembled with {@code YMXR_DEFER} at 1 where {@code defer} and at 0
-     * where not: {@code YMXR_PCREL} is at 1 unless a host defines it, so
-     * the branch of a block on either switch that the assembly skips is
-     * left out (68k/YMXR.S). A block on another condition is read on both
-     * branches.
+     * where not, and {@code YMXR_MAP} at 1 where {@code map} and at 0 where
+     * not: {@code YMXR_PCREL} is at 1 unless a host defines it, so the
+     * branch of a block on any of the three switches that the assembly
+     * skips is left out (68k/YMXR.S). A block on another condition is read
+     * on both branches.
      */
-    static Map<String, Integer> equates(boolean defer) throws IOException {
-        Map<String, Integer> switches = Map.of("YMXR_PCREL", 1, "YMXR_DEFER", defer ? 1 : 0);
+    static Map<String, Integer> equates(boolean defer, boolean map) throws IOException {
+        Map<String, Integer> switches = Map.of("YMXR_PCREL", 1, "YMXR_DEFER", defer ? 1 : 0,
+                "YMXR_MAP", map ? 1 : 0);
         Map<String, Integer> out = new HashMap<>();
         Pattern equate = Pattern.compile("^(\\w+)\\s+equ\\s+(\\$?[0-9A-Fa-f]+)");
         Pattern on = Pattern.compile("^\\.if\\s+(\\w+)(?:=(\\d+))?\\s*(?:;.*)?$");
@@ -168,12 +170,15 @@ final class PlayerTest {
      * The bound tune's layout as BINARIES.md 1 defines it, against the
      * player's equates and the binder's constants. A host reads a bound
      * tune by that table, so a field that moves in one of the three moves
-     * in all three or the three disagree.
+     * in all three or the three disagree. In version 10 the transformation
+     * block's long is at 24, which the player with the lookup in reads as
+     * {@code TF_TRANS}, and the source index follows it.
      */
     @Test
     void theBoundTuneIsLaidOutAsBinariesDefines() throws IOException {
         Map<String, Integer> said = layout(Files.readString(BINARIES), "1. The bound tune");
         Map<String, Integer> e = equates();
+        Map<String, Integer> mapped = equates(false, true);
         assertEquals(0, row(said, "`YMXB`").getValue(), "the magic comes first");
         assertEquals(e.get("TF_VERSION"), row(said, "the version").getValue());
         assertEquals(e.get("TF_RATE"), row(said, "the frame rate").getValue());
@@ -183,11 +188,25 @@ final class PlayerTest {
         assertEquals(Bound.IMAGE_AT, row(said, "where the image begins").getValue());
         assertEquals(Bound.TABLE_AT, row(said, "where this tune's table is").getValue());
         assertEquals(Bound.INDEX_AT, row(said, "the source index").getValue());
+        assertEquals(e.get("TF_INDEX"), row(said, "the source index").getValue());
+        int block = row(said, "in version 10, where the transformation block begins").getValue();
+        assertEquals(Bound.TRANSFORMATIONS_AT, block);
+        assertEquals(mapped.get("TF_TRANS"), block, "the player's long of the block");
+        assertEquals(Objects.requireNonNull(mapped.get("TF_TRANS")) + 4,
+                row(said, "in version 10, the source index").getValue(),
+                "the index follows the block's long");
+        assertEquals(Bound.indexAt(Tune.VERSION),
+                row(said, "in version 10, the source index").getValue());
+        assertEquals(e.get("TF_INDEX"), mapped.get("TF_INDEX"),
+                "the player reads the index 4 bytes past TF_INDEX in version 10");
         Matcher version = Pattern.compile("\\$([0-9A-Fa-f]+)")
                 .matcher(row(said, "the version").getKey());
         assertTrue(version.find(), "the version row has no version");
         assertEquals(Tune.UNMAPPED, Integer.parseInt(version.group(1), 16),
                 "BINARIES.md 1 has another version than the binder writes");
+        assertTrue(version.find(), "the version row has no version of a tune that maps");
+        assertEquals(Tune.VERSION, Integer.parseInt(version.group(1), 16),
+                "BINARIES.md 1 has another version of a tune that maps a value");
     }
 
     /**
@@ -208,12 +227,57 @@ final class PlayerTest {
         assertEquals(Sndh.CORE_STATE_AT, row(said, "where the core's state byte").getValue());
         assertEquals(Sndh.CORE_TABLE_AT, row(said, "the subtune table").getValue());
         assertEquals(Sndh.CORE_WORK_AT, row(said, "the workspace").getValue());
-        Map<String, Integer> bits = flags(binaries, "2. The SNDH core", 4);
+        assertEquals(Sndh.CORE_HANDLERS_AT, row(said, "where the handlers begin").getValue());
+        Map<String, Integer> bits = flags(binaries, "2. The SNDH core", 5);
         assertEquals(Sndh.CORE_MONITOR, 1 << row(bits, "the player's raster monitor").getValue());
         assertEquals(Sndh.CORE_LEAN, 1 << row(bits, "the lean tick").getValue());
         assertEquals(Sndh.CORE_PCREL,
                 1 << row(bits, "the row read through the program counter").getValue());
         assertEquals(Sndh.CORE_DEFER, 1 << row(bits, "the deferred start").getValue());
+        assertEquals(Sndh.CORE_MAP, 1 << row(bits, "the lookup").getValue());
+    }
+
+    /**
+     * The figures of BINARIES.md 2.2 against the player's equates: the
+     * version a core reads, 9 and 10 with the lookup in, and
+     * {@code YMXR_FIXED} without the two switches, with the deferred start,
+     * with the lookup and with both; and the least and the most of these in
+     * 5.2.
+     */
+    @Test
+    void theCoresFiguresAreThePlayers() throws IOException {
+        String binaries = Files.readString(BINARIES);
+        Map<String, Integer> said = layout(binaries, "2. The SNDH core");
+        List<Integer> reads = figures(row(said, "the highest bound tune version").getKey());
+        assertEquals(List.of(equates(false, false).get("YMXR_VERSION"),
+                equates(false, true).get("YMXR_VERSION")), reads, "2.2's versions");
+        assertEquals(List.of(Tune.UNMAPPED, Tune.VERSION), reads);
+        List<Integer> fixed = new java.util.ArrayList<>();
+        for (boolean[] one : new boolean[][] {{false, false}, {true, false}, {false, true},
+                {true, true}}) {
+            fixed.add(equates(one[0], one[1]).get("YMXR_FIXED"));
+        }
+        assertEquals(fixed, figures(row(said, "`YMXR_FIXED`").getKey()),
+                "2.2's workspace without the two switches, with each and with both");
+        Matcher host = Pattern.compile("`YMXR_FIXED` bytes, ([\\d,]+) to ([\\d,]+) by the"
+                + " player's switches").matcher(binaries.replaceAll("\\s+", " "));
+        assertTrue(host.find(), "BINARIES.md 5.2 has no workspace");
+        assertEquals(List.of(java.util.Collections.min(fixed), java.util.Collections.max(fixed)),
+                List.of(Integer.parseInt(host.group(1).replace(",", "")),
+                        Integer.parseInt(host.group(2).replace(",", ""))),
+                "5.2's least and most workspace");
+    }
+
+    /** The figures of a text, in order, each read with its commas, and
+     *  a section cited in parentheses left out. */
+    private static List<Integer> figures(String text) {
+        List<Integer> out = new java.util.ArrayList<>();
+        Matcher figure = Pattern.compile("\\d[\\d,]*\\d|\\d")
+                .matcher(text.replaceAll("\\([^)]*\\)", ""));
+        while (figure.find()) {
+            out.add(Integer.parseInt(figure.group().replace(",", "")));
+        }
+        return out;
     }
 
     /**
@@ -247,10 +311,27 @@ final class PlayerTest {
         assertEquals(java.nio.ByteBuffer.wrap(Bound.MAGIC).getInt(), e.get("YMXR_MAGIC"),
                 "the player's magic is the bound tune's");
         // the player without the lookup reads to the version of a tune
-        // that maps no value
-        assertEquals(Tune.UNMAPPED, e.get("YMXR_VERSION"),
-                "the version the player reads (SPEC.md 3.3.5)");
-        assertEquals(Columns.C, e.get("YMXR_COLUMNS"));
+        // that maps no value, a table of thirty columns, and the index at
+        // 24; with it, to version 10, thirty-four columns, the block's long
+        // at 24 and the index after it (BINARIES.md 1.2, SPEC.md 3.3.5)
+        for (boolean defer : new boolean[] {false, true}) {
+            Map<String, Integer> plain = equates(defer, false);
+            Map<String, Integer> mapped = equates(defer, true);
+            assertEquals(Tune.UNMAPPED, plain.get("YMXR_VERSION"),
+                    "the version the player reads (SPEC.md 3.3.5)");
+            assertEquals(Columns.C, plain.get("YMXR_COLUMNS"));
+            assertEquals(Bound.indexAt(Tune.UNMAPPED), plain.get("TF_INDEX"));
+            assertTrue(!plain.containsKey("TF_TRANS"), "TF_TRANS without the lookup");
+            assertEquals(Tune.VERSION, mapped.get("YMXR_VERSION"),
+                    "the version the player with the lookup reads");
+            assertEquals(Columns.MAPPED, mapped.get("YMXR_COLUMNS"));
+            assertEquals(Bound.TRANSFORMATIONS_AT, mapped.get("TF_TRANS"));
+            assertEquals(Bound.indexAt(Tune.VERSION),
+                    Objects.requireNonNull(mapped.get("TF_TRANS")) + 4,
+                    "the index of version 10 follows the block's long");
+            assertEquals(Bound.indexAt(Tune.UNMAPPED), mapped.get("TF_INDEX"),
+                    "versions 7 to 9 on the player with the lookup");
+        }
         assertEquals(Tune.FRAME_RATE_AT, e.get("TF_RATE"));
         assertEquals(Tune.EFFECTS_AT, e.get("TF_EFFECTS"));
         assertEquals(Tune.COUNT_AT, e.get("TF_SOURCES"));

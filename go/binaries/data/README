@@ -1,5 +1,5 @@
-The seventeen 68000 binaries a standalone build contains: the sixteen
-cores and the program stub.
+The thirty-three 68000 binaries a standalone build contains: the
+thirty-two cores and the program stub.
 
 The Maven build writes them here, as it writes them into the classes the
 jar is made of, and they are committed: a Go module fetched by its import

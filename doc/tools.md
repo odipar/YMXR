@@ -601,21 +601,24 @@ end-of-interrupt write (performance.md); `-pcrel` the core whose ticks
 read a row through the program counter and `-abs` the core whose ticks
 read an absolute address (BINARIES.md 5.5); and two or three together
 the core that is those. Where neither `-pcrel` nor `-abs` is passed the
-tool reads the file's last bound tune against the core's first byte:
-within 32,767 bytes it writes the core that reads through the program
-counter, and further off the core that reads an address. Where the
-effects byte of a subtune sets bit 4 the core has the deferred start in,
-and where none does the core is without it (BINARIES.md 2.1). The clock
-tag names Timer C, or the VBL where `-vbl` or `-perf` is passed: the
-raster monitor paints one frame of calls, which reads against the raster
-where the tick comes from the VBL (BINARIES.md 3.2, performance.md).
-`-tc` names Timer C over `-perf`, and `-vbl` and `-tc` together are
-`-vbl and -tc name two clocks`, exit 2. A set that claims Timer C names
-the VBL, and `-tc` with such a set is the error of 12.2. The title is
-`-tTITLE`, else the first name, `(untitled)` where a tune file was read
-or the name is blank; the composer `-cCOMPOSER`, or absent. In the tags
-(BINARIES.md 3) each text is reduced to its characters $20 to $7E; the
-report of 12.4 prints the text as passed.
+tool reads the file's last bound tune against the core's first byte plus
+its field at 26, where its handlers begin (BINARIES.md 2.2): within
+32,767 bytes it writes the core that reads through the program counter,
+and further off the core that reads an address. Where the effects byte
+of a subtune sets bit 4 the core has the deferred start in, and where
+none does the core is without it; where the effects byte of a subtune
+sets bit 5 the core has the lookup in, and where none does the core is
+without it (BINARIES.md 2.1). The clock tag names Timer C, or the VBL
+where `-vbl` or `-perf` is passed: the raster monitor paints one frame
+of calls, which reads against the raster where the tick comes from the
+VBL (BINARIES.md 3.2, performance.md). `-tc` names Timer C over `-perf`,
+and `-vbl` and `-tc` together are `-vbl and -tc name two clocks`,
+exit 2. A set that claims Timer C names the VBL, and `-tc` with such a
+set is the error of 12.2. The title is `-tTITLE`, else the first name,
+`(untitled)` where a tune file was read or the name is blank; the
+composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md 3) each text
+is reduced to its characters $20 to $7E; the report of 12.4 prints the
+text as passed.
 
 **12.2 Errors**, each exit 1:
 
@@ -630,7 +633,8 @@ report of 12.4 prints the text as passed.
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
 | Timer C is asked for and the claims byte of the set has it | `the set claims Timer C and the clock asked for is Timer C: the player's handler has that timer` |
 | the core's descriptor fails its check (12.3) | the line of 12.3 |
-| `-pcrel` was passed and the last bound tune ends B bytes past the core's first byte, B above 32,767; the tool that was passed neither switch writes the other core instead (12.1) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
+| `-pcrel` was passed, the core's field at 26 is 0, and the last bound tune ends B bytes past the core's first byte, B above 32,767; the tool that was passed neither switch writes the other core instead (12.1) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
+| `-pcrel` was passed, the core's field at 26 is F, above 0, and the last bound tune ends B bytes past the core's first byte plus F, B above 32,767; the tool that was passed neither switch writes the other core instead (12.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
 
 **12.3 The core's descriptor** (BINARIES.md 2) is checked before the
 combine: `not an SNDH core: no YMXS at 12`; `the core's descriptor is
@@ -638,8 +642,8 @@ version V, and this writes 1`; `the core reads bound tunes to version V, and
 this binds at W`, W the version the tune binds at; `the core's flags at 22
 read F, and the raster monitor asked for needs bit 0 set`; `... the lean
 tick asked for needs bit 1 set`, `... the row read through the program
-counter asked for needs bit 2 set`, or `... a subtune that defers a start
-needs bit 3 set`.
+counter asked for needs bit 2 set`, `... a subtune that defers a start
+needs bit 3 set`, or `... a subtune that maps a value needs bit 4 set`.
 
 **12.4 The report:** the heading `the core: <file>, B bytes` with the
 row `the switches`, of `-perf, the raster monitor in` and `-lean, ticks
@@ -648,8 +652,9 @@ where those were passed, and then one of `ticks that read a row through
 the program counter`, `-abs, ticks that read a row through an absolute
 address` where that was passed, and `ticks that read a row through an
 absolute address: the tunes end past the 32767 bytes a displacement
-reaches` where the tool chose it (12.1), and `the deferred start in: a
-subtune defers a start` where the core has it, joined by `; `; the
+reaches` where the tool chose it (12.1), `the deferred start in: a
+subtune defers a start` where the core has it, and `the lookup in: a
+subtune maps a value` where the core has it, joined by `; `; the
 heading `the tags: TITL <title>`, then `, COMM <composer>` where
 present, `, <clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N
 names` for several subtunes; a row a subtune, its name or `the tune`, `B
@@ -811,14 +816,15 @@ the background colour, and `ym/cost.py` on the trace, one line a tune. An
 option outside the two is `ym/cost.sh does not read <option>`, exit 2.
 
 **16.5 `Binaries DIR... [-aRMAC] [-sSOURCES]`**, class
-`org.ymxr.Binaries`, assembles the sixteen cores and the stub with `rmac
--m68000 -fr -i68k <defines> -o` into each directory named, one line each
-`%-34s %5d bytes`; the assembler is `rmac` on the path or `-aRMAC`, the
-sources `68k` or `-sSOURCES`. A failure is `binaries: no <file>
-assembled from <source> with an assembler at <rmac>: <message>. The
-build needs rmac, and -Drmac=PATH names another.`, exit 1; a call with
-another flag or zero directories prints the usage, exit 2. The Maven
-build runs it into `target/classes/org/ymxr/68k` and `go/binaries/data`.
+`org.ymxr.Binaries`, assembles the thirty-two cores and the stub with
+`rmac -m68000 -fr -i68k <defines> -o` into each directory named, one
+line each `%-38s %5d bytes`; the assembler is `rmac` on the path or
+`-aRMAC`, the sources `68k` or `-sSOURCES`. A failure is `binaries: no
+<file> assembled from <source> with an assembler at <rmac>: <message>.
+The build needs rmac, and -Drmac=PATH names another.`, exit 1; a call
+with another flag or zero directories prints the usage, exit 2. The
+Maven build runs it into `target/classes/org/ymxr/68k` and
+`go/binaries/data`.
 
 **16.6 `bin/ymxr-set [options] tune.ym [more.ym ...]`** writes a TOS
 program of the dumps named on standard output, a subtune each in the
@@ -894,6 +900,7 @@ as it is. A tune that fails is named and the run continues.
 | `-perf` | the player assembled with the raster monitor, against the model |
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
 | `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
+| `-map` | every tune on the player assembled with `YMXR_MAP=1`, against the model; without it, a tune whose effects byte sets bit 5 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it; with `-defer`, a tune whose effects byte sets bits 4 and 5 reports -1 at its init (BINARIES.md 2.1) |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
@@ -909,26 +916,26 @@ outlives it is killed. `--keep` leaves the work directory, and `HATARI` and
 exit 2, a key that lands on another subtune exit 1.
 
 `YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs three things
-on every build: the two built tunes at `-frames24` on each of the sixteen
-cores of 12.1, `-abs`, `-lean`, `-perf` and `-defer` alone and together and
-the plain core; the conformance kit at `-frames24` under `-kit`; and
-`-refill` over `Turrican 2 - world completed 1` whole, which reads the
-tune's row of performance.md and a refill of a tune with a source. The
-workflow runs `-refill` over the eleven fixtures whole as a step after the
-suite, which reads the sentences over the set, and `-cycles -abs` over them,
-which reads the absolute build's tables. The workflow then runs `-stub`,
-`-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari 2.6.1, built from
-its tag, and the PAL image of EmuTOS 1.4, which boots the ST at the 50 Hz
-the two modes require; a caller runs them under TOS 2.06, which `TOS` names.
-Each mode starts Hatari with `--fast-boot on`: TOS 2.06 then skips its test
-of the memory, which with fast boot off in the emulator's configuration
-outlasts the VBLs a run allows before the program starts. Both floppy drives
-are off (`--drive-a off --drive-b off`), so TOS addresses no disk; Hatari
-quits with no confirmation (`--confirm-quit off`) and opens a dialog only
-for a fatal message (`--alert-level fatal`). Where `SDL_VIDEODRIVER` and
-`SDL_AUDIODRIVER` are unset, Hatari runs headless and silent, with SDL's
-dummy video and audio drivers. Its input is closed, and a time limit ends a
-run that waits on a dialog.
+on every build: the two built tunes at `-frames24` on each of the
+thirty-two cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map`
+alone and together and the plain core; the conformance kit at `-frames24`
+under `-kit`; and `-refill` over `Turrican 2 - world completed 1` whole,
+which reads the tune's row of performance.md and a refill of a tune with a
+source. The workflow runs `-refill` over the eleven fixtures whole as a step
+after the suite, which reads the sentences over the set, and `-cycles -abs`
+over them, which reads the absolute build's tables. The workflow then runs
+`-stub`, `-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari 2.6.1,
+built from its tag, and the PAL image of EmuTOS 1.4, which boots the ST at
+the 50 Hz the two modes require; a caller runs them under TOS 2.06, which
+`TOS` names. Each mode starts Hatari with `--fast-boot on`: TOS 2.06 then
+skips its test of the memory, which with fast boot off in the emulator's
+configuration outlasts the VBLs a run allows before the program starts. Both
+floppy drives are off (`--drive-a off --drive-b off`), so TOS addresses no
+disk; Hatari quits with no confirmation (`--confirm-quit off`) and opens a
+dialog only for a fatal message (`--alert-level fatal`). Where
+`SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` are unset, Hatari runs headless and
+silent, with SDL's dummy video and audio drivers. Its input is closed, and a
+time limit ends a run that waits on a dialog.
 
 ---
 
@@ -1005,7 +1012,7 @@ push starts it: a caller starts it from the Actions tab or by `gh workflow run
 test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
-./cmd/...`, with the seventeen 68000 binaries and DTX's forty images
+./cmd/...`, with the thirty-three 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go
 v0.7.0`, which a build fetches.
@@ -1057,7 +1064,7 @@ and for `wasm` the WebAssembly module of 20.5 and its scripts in
 `ymxr-tools-wasm-v<version>.zip`. The version is the argument, or the first
 `<version>` of `pom.xml`. `TARGETS`, a space-separated list, limits the seven;
 `OUT` replaces `dist`. A target outside the seven is `publish: <target> is not
-a platform this builds`, exit 1. The seventeen binaries it requires under
+a platform this builds`, exit 1. The thirty-three binaries it requires under
 `go/binaries/data` are the ones `go/binaries/binaries.go` names, so the two
 lists agree: a missing one is `publish: <path> is not built: run mvn
 process-classes` and a Go file naming none is `publish:
@@ -1095,12 +1102,14 @@ before writing a file of it; the zips of executables leave it out, and
 YMXS's releases ship it. The tools write the same bytes, report and exit
 code as the executables; `WasmTest` runs the calls of a page that writes
 a file, every dump's structure through `ymxs-to-ymxr`, `ymxs-to-sndh` and
-`ymxs-to-prg`, the other nine on one dump, the two that read named files,
-and `ymxs-check` over every dump's structure, a structure it warns of and
-text outside the form, under Node against the executables, YMXS's among
-them. A message of the system, the one for a missing file among them, is
-the WASI runtime's, which writes `No such file or directory` where macOS
-and Linux write `no such file or directory`.
+`ymxs-to-prg`, the other nine on one dump, a structure that maps a value
+through the tools that put a core with the lookup in under it, the two
+that read named files, and `ymxs-check` over every dump's structure, a
+structure it warns of and text outside the form, under Node against the
+executables, YMXS's among them. A message of the system, the one for a
+missing file among them, is the WASI runtime's, which writes
+`No such file or directory` where macOS and Linux write
+`no such file or directory`.
 
 **20.6 The scripts.** Four scripts in `wasm/` run the module:
 
@@ -1129,7 +1138,7 @@ and call the tools.
 
 | variable | names | read by |
 |---|---|---|
-| `YMXR_68K` | a directory of the seventeen binaries in place of the embedded ones | the Go tools |
+| `YMXR_68K` | a directory of the thirty-three binaries in place of the embedded ones | the Go tools |
 | `YMXR_FLAGS` | flags added to the rig's conversions | `test_ymxr.py` |
 | `YMXR_TICKS` | set, each frame whose tick count differs from the rates' by more than 1 is printed | `test_ymxr.py -hatari` |
 | `COMMIT` | the source commit recorded, `HEAD` by default | `release/manifest.sh` |

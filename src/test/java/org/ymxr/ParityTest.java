@@ -244,11 +244,11 @@ final class ParityTest {
     /** The fade through the binder, which writes a bound tune of version
      *  10 (BINARIES.md 1.2): ymxr-bind with its report, ymxr-layout of the
      *  bound tune, and a set of the fade and a dump through ymxr-multi and
-     *  ymxr-layout, the same in both trees; and the SNDH writer, whose
-     *  cores read bound tunes to version 9, reporting the core's version
-     *  line for ymxr-sndh on the tune file and on the set, and
-     *  ymxs-to-sndh and ymxs-to-prg on the structure, exit 1 in both
-     *  trees. */
+     *  ymxr-layout, the same in both trees; and the SNDH writer, which puts
+     *  the core with the lookup in under the fade and under the set, whose
+     *  two tables are in two images (BINARIES.md 2.1, 1.4): ymxr-sndh with
+     *  its report, ymxr-prg and ymxr-layout of each file, and ymxs-to-sndh
+     *  and ymxs-to-prg on the structure, the same in both trees. */
     @Test
     void theFadeBindsTheSameInBothTrees() throws Exception {
         byte[] structure = json(YmxsTest.fade());
@@ -270,17 +270,52 @@ final class ParityTest {
         byte[] multi = multiOf(List.of(tune, dump));
         assertEquals(Tune.VERSION, Tune.getWord(multi, 4), "a set with the fade");
         both("ymxr-layout", multi);
-        String line = "the core reads bound tunes to version 9, and this binds at 10";
         for (byte[] in : List.of(tune, multi)) {
-            Ran sndh = same("ymxr-sndh", in, "-silent");
-            assertEquals(1, sndh.exit(), sndh.said());
-            assertEquals("ymxr-sndh: " + line + "\n", sndh.said());
+            Ran made = same("ymxr-sndh", in);
+            assertEquals(0, made.exit(), made.said());
+            byte[] sndh = made.out();
+            assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(sndh,
+                    Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
+            String said = steady(made.said());
+            assertTrue(said.contains("; the lookup in: a subtune maps a value\n")
+                    && said.contains("the images: " + (in == tune ? "1 image" : "2 images")
+                    + " of "), said);
+            both("ymxr-prg", sndh);
+            String layout = new String(both("ymxr-layout", sndh), StandardCharsets.US_ASCII);
+            assertTrue(layout.contains("\"version\":10,") && layout.contains("\"binds\":10,"),
+                    layout);
         }
         for (String tool : List.of("ymxs-to-sndh", "ymxs-to-prg")) {
-            Ran ran = same(tool, structure, "-silent");
-            assertEquals(1, ran.exit(), ran.said());
-            assertTrue(ran.said().endsWith(tool + ": " + line + "\n"), ran.said());
+            Ran ran = same(tool, structure);
+            assertEquals(0, ran.exit(), ran.said());
         }
+    }
+
+    /**
+     * A tick of a core with the lookup in reads its row from its handlers,
+     * which begin at the core's field at 26 (BINARIES.md 2.1): a mapped
+     * source of 20,000 rows is on the core that reads a row through the
+     * program counter, and one of 30,000 on the core that reads an address,
+     * and -pcrel reports the line that names the first handler, the same in
+     * both trees.
+     */
+    @Test
+    void aMappedFileIsMeasuredFromTheFirstHandlerInBothTrees() throws Exception {
+        byte[] within = both("ymxr-sndh", BinariesTest.longMapped(20000), "-silent");
+        assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(within,
+                Sndh.even(Tune.getWord(within, 2) + 2) + Sndh.CORE_FLAGS_AT));
+        byte[] far = BinariesTest.longMapped(30000);
+        Ran chosen = same("ymxr-sndh", far);
+        assertTrue(steady(chosen.said()).contains("ticks that read a row through an absolute"
+                + " address: the tunes end past the 32767 bytes a displacement reaches; the"
+                + " lookup in: a subtune maps a value\n"), chosen.said());
+        assertEquals(Sndh.CORE_MAP, Tune.getWord(chosen.out(),
+                Sndh.even(Tune.getWord(chosen.out(), 2) + 2) + Sndh.CORE_FLAGS_AT));
+        Ran asked = same("ymxr-sndh", far, "-pcrel", "-silent");
+        assertEquals(1, asked.exit(), asked.said());
+        assertTrue(asked.said().matches("ymxr-sndh: the tunes end \\d+ bytes past the core's"
+                + " first handler, at \\d+, and a tick that reads a row through the program"
+                + " counter reaches 32767\n"), asked.said());
     }
 
     /** The fade with every offset of its transformation index 0, inside
@@ -439,8 +474,10 @@ final class ParityTest {
      * line, and each check of the mapping columns the same lines; a multi
      * file of it, and of it and a dump, version 10, its tables packed
      * again with the same report, and read by the record, the check and
-     * the layout as one line or one record; and the SNDH writer's line of
-     * the core's version, which ymxr-sndh reports for it.
+     * the layout as one line or one record; and an SNDH file of it and of
+     * the set on the core with the deferred start and the lookup in, also
+     * with the raster monitor, whose core ends past 32,767 bytes and whose
+     * handlers begin within them (BINARIES.md 2.1), and a program of each.
      */
     @Test
     void aMappedTuneFileReadsTheSameInBothTrees() throws Exception {
@@ -477,9 +514,17 @@ final class ParityTest {
                 "a multi file is neither a dump nor a tune file");
         both("ymxr-layout", multi);
         both("ymxr-bind", mapped);
-        String line = "the core reads bound tunes to version 9, and this binds at 10";
-        assertEquals("ymxr-sndh: " + line + "\n", same("ymxr-sndh", mapped, "-silent").said());
-        assertEquals("ymxr-sndh: " + line + "\n", same("ymxr-sndh", multi, "-silent").said());
+        for (byte[] in : List.of(mapped, multi)) {
+            byte[] sndh = both("ymxr-sndh", in);
+            assertEquals(Sndh.CORE_PCREL | Sndh.CORE_DEFER | Sndh.CORE_MAP, Tune.getWord(sndh,
+                    Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
+            both("ymxr-prg", sndh, "-silent");
+            byte[] watched = both("ymxr-sndh", in, "-perf");
+            assertEquals(Sndh.CORE_MONITOR | Sndh.CORE_PCREL | Sndh.CORE_DEFER | Sndh.CORE_MAP,
+                    Tune.getWord(watched,
+                            Sndh.even(Tune.getWord(watched, 2) + 2) + Sndh.CORE_FLAGS_AT));
+            both("ymxr-prg", watched, "-silent");
+        }
     }
 
     @Test

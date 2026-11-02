@@ -157,10 +157,14 @@ the images and the blocks and patches the fields.
 **1.5 What the player reads.** At init (5.1), in order:
 
 1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007 to
-   $0009 (SPEC.md 3.3.5), report -1 and stop.
+   $0009 (SPEC.md 3.3.5), or $0007 to $000A in a player assembled with
+   the lookup (2.1), report -1 and stop.
 2. The field at 16 and the field at 8; where bit 4 of the field at 8 is
    set and the player is assembled without the deferred start (2.1),
-   report -1 and stop.
+   report -1 and stop. In a player assembled with the lookup, where bit 5
+   is set and the version is other than $000A, or bits 4 and 5 are set and
+   the player is assembled with the deferred start too, report -1 and
+   stop.
 3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
@@ -179,9 +183,10 @@ The player skips fields 6, 10 and 12. The host supplies the frame clock
 ## 2. The SNDH core
 
 **2.1** The core is position-independent code: the player under three
-entries, with the procedures of 2.7 to 2.9. Sixteen cores are assembled
-from one source, one for each setting of the player's four switches; a
-tool selects one by name and checks its flags word (2.3, 2.10).
+entries, with the procedures of 2.7 to 2.9. Thirty-two cores are
+assembled from one source, one for each setting of the player's five
+switches; a tool selects one by name and checks its flags word (2.3,
+2.10).
 
 | core | switches | flags word |
 |---|---|---|
@@ -200,15 +205,34 @@ plus 8: `YMXR_sndh-defer.bin` reads 12. Init of a core without it
 reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
 core with it is 4,402 bytes larger.
 
+Each of the sixteen has a twin with `-map` before `.bin`, assembled with
+the lookup in, `YMXR_MAP=1` (SPEC.md 1.10), whose flags word is the
+sixteen's plus 16: `YMXR_sndh-map.bin` reads 20, and
+`YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to version
+10 and every other core to version 9 (2.2), so init of a core without it
+reports -1 for a tune of version 10, whose effects byte sets bit 5
+(SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,750 bytes larger than
+`YMXR_sndh.bin`. Init of a core with both the deferred start and the
+lookup in reports -1 for a tune whose effects byte sets bits 4 and 5.
+The field at 26 of a core with the lookup in is the offset of its first
+handler: every byte from there to the core's end is a handler, an
+installer or padding. The padding puts the displacement word of each
+lookup handler's page read a multiple of 256 bytes from its page, and
+with the deferred start in the second bank of handlers a multiple of 256
+bytes from the first. The pages of 256 bytes its ticks read and the
+frame's routines come before the first handler.
+
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
 through the program counter for a file whose last bound tune ends within
-32,767 bytes of the core's first byte, and the core that reads an
-absolute address for a file whose tunes end further off (5.5). A caller
-that names the third reads back that core, or the line of 2.10 where the
-file's tunes end past the reach. The tool selects a core with the
-deferred start in where the effects byte of a subtune sets bit 4, and
-one without it where none does.
+32,767 bytes of the core's first byte plus its field at 26, 0 in a core
+without the lookup, and the core that reads an absolute address for a
+file whose tunes end further off (5.5). A caller that names the third
+reads back that core, or the line of 2.10 where the file's tunes end
+past the reach. The tool selects a core with the deferred start in where
+the effects byte of a subtune sets bit 4, and one without it where none
+does; and a core with the lookup in where the effects byte of a subtune
+sets bit 5, and one without it where none does.
 
 **2.2 Layout**, from the core's first byte:
 
@@ -219,11 +243,11 @@ one without it where none does.
 | 8 | 4 | `bra.w` to play (2.9) |
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
-| 18 | 2 | the highest bound tune version this core reads, 9 |
-| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, or 2,312 with the deferred start in |
+| 18 | 2 | the highest bound tune version this core reads: 9, and 10 with the lookup in (2.1) |
+| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, 2,312 with the deferred start in, 2,172 with the lookup in, and 2,348 with both |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
-| 26 | 2 | zero |
+| 26 | 2 | where the handlers begin, from which a tool measures the reach (2.1): the offset of the first handler in a core with the lookup in, and 0 in every other core |
 | 28 | 4 | the subtune table's offset (2.5): assembled 0, patched by the tool |
 | 32 | 4 | the workspace's offset (2.6): assembled 0, patched by the tool |
 
@@ -236,8 +260,9 @@ core's first byte and are even.
 |---|---|---|
 | 0 | the player's raster monitor (`YMXR_PERF=1`): play and each tick handler write the background colour register as performance.md defines | a screen on which those writes are read |
 | 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires with `YMXR_NEST=0`; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
-| 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte, which the tool that writes it reads (2.10, 5.5) |
+| 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte plus its field at 26 (2.1), which the tool that writes it reads (2.10, 5.5) |
 | 3 | the deferred start (`YMXR_DEFER=1`, performance.md): the frame arms the start of SPEC.md 4.8, and the tick that reads the running source's last row performs it | this core under a tune whose effects byte sets bit 4, which init of a core with bit 3 clear reports -1 for (1.5) |
+| 4 | the lookup (`YMXR_MAP=1`, SPEC.md 1.10): the player reads bound tunes to version 10, and a tick of a source through a transformation writes the transformation's entry for the source's key | this core under a tune whose effects byte sets bit 5, a tune of version 10, which init of a core with bit 4 clear reports -1 for (1.5) |
 
 **2.4 The state byte**, at the offset in the field at 24: bit 0 is
 set from init's step 8 to exit's step 1, while a tune plays; bit 1 is set
@@ -318,8 +343,10 @@ file (3) and reports the first condition met:
 | the raster monitor is selected and bit 0 of the flags word F is clear | `the core's flags at 22 read F, and the raster monitor asked for needs bit 0 set` |
 | the lean tick is selected and bit 1 of the flags word F is clear | `the core's flags at 22 read F, and the lean tick asked for needs bit 1 set` |
 | the row read through the program counter is selected and bit 2 of the flags word F is clear | `the core's flags at 22 read F, and the row read through the program counter asked for needs bit 2 set` |
-| that row is selected and the file's last bound tune ends B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
 | the effects byte of a subtune sets bit 4 and bit 3 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that defers a start needs bit 3 set` |
+| the effects byte of a subtune sets bit 5 and bit 4 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that maps a value needs bit 4 set` |
+| the row read through the program counter is selected, the core's field at 26 is 0, and the file's last bound tune ends B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
+| the row read through the program counter is selected, the core's field at 26 is F, above 0, and the file's last bound tune ends B bytes past the core's first byte plus F, B above 32,767 (2.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
 
 ---
 
@@ -626,8 +653,8 @@ A call clobbers `d0` to `d5` and `a0` to `a5` and keeps `d6`, `d7` and
 `a6`. Init reads row 0; each play writes the row the call before it read
 and then reads the next.
 
-**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,136 or
-2,312 with the deferred start in (2.2), then the bound tune's field at 12
+**5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,136 to
+2,348 by the player's switches (2.2), then the bound tune's field at 12
 bytes, on a long. Before init the host keeps, and after stop restores,
 what the player writes (5.3): of each timer in the claims byte, the
 vector, the nibble of the control register, the enable bit and the mask
