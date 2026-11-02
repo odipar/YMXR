@@ -2182,25 +2182,32 @@ def widekept(code, symbols):
         ("A counted source of two columns after the general handler", None,
          ("sweep", [[0, 2], [128, 3], [0, 5], [64, 8], [0, 13], [192, 21]]), (10, 20),
          {"r7": 0x3E, "r8": 0x10, "r13": 10}))
+    global MOST_FRAMES
+    # the five tunes are 300 frames in all, read whole under -frames as
+    # well, since the boundaries come at rows 6 to 24
+    most, MOST_FRAMES = MOST_FRAMES, None
     frames = ticks = 0
-    for title, first, then, targets, registers in kinds:
-        first = first or ("eight volumes", [k + 4 for k in range(8)])
-        tune = {"format": "ymxs", "version": 4, "tunes": [{
-            "title": title, "composer": "", "writer": "68k/test/emu/test_ymxr.py",
-            "rate": 50, "rows": rows, "repeat": 0,
-            "sources": [{"name": name, "repeat": 0, "values": values}
-                        for name, values in (first, then)],
-            "registers": {r: [v] + [-1] * (rows - 1) for r, v in registers.items()},
-            "timerA": {"shape": column(lambda k: 0),
-                       "target": column(lambda k: targets[k % 2]),
-                       "source": column(lambda k: 1 + k % 2),
-                       "prescaler": column(lambda k: 50), "count": column(lambda k: 80),
-                       "timerReset": column(lambda k: 1 if k == 0 else 0),
-                       "placeReset": column(lambda k: 1 if k == 0 else 0)}}]}
-        at = built("widekept", tune)[0]
-        played = check(at, code, symbols)
-        assert len(played[6]) == 4, "%s: a tick at %d boundaries, not 4" % (title, len(played[6]))
-        frames, ticks = frames + played[0], ticks + played[1]
+    try:
+        for title, first, then, targets, registers in kinds:
+            first = first or ("eight volumes", [k + 4 for k in range(8)])
+            tune = {"format": "ymxs", "version": 4, "tunes": [{
+                "title": title, "composer": "", "writer": "68k/test/emu/test_ymxr.py",
+                "rate": 50, "rows": rows, "repeat": 0,
+                "sources": [{"name": name, "repeat": 0, "values": values}
+                            for name, values in (first, then)],
+                "registers": {r: [v] + [-1] * (rows - 1) for r, v in registers.items()},
+                "timerA": {"shape": column(lambda k: 0),
+                           "target": column(lambda k: targets[k % 2]),
+                           "source": column(lambda k: 1 + k % 2),
+                           "prescaler": column(lambda k: 50), "count": column(lambda k: 80),
+                           "timerReset": column(lambda k: 1 if k == 0 else 0),
+                           "placeReset": column(lambda k: 1 if k == 0 else 0)}}]}
+            at = built("widekept", tune)[0]
+            played = check(at, code, symbols)
+            assert len(played[6]) == 4, "%s: a tick at %d boundaries, not 4" % (title, len(played[6]))
+            frames, ticks = frames + played[0], ticks + played[1]
+    finally:
+        MOST_FRAMES = most
     return ("a start of several columns or of a counted source at the running row, a tick"
             " where its window opens and one where it closes: %d tunes, %d frames, %d ticks"
             % (len(kinds), frames, ticks))
