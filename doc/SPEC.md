@@ -319,6 +319,12 @@ part the identity, and 0 the identity in every part (YMXS, SPEC.md 3.1.1,
 3.6.3). A table of versions 7 to 9 ends at column 29, and each of its
 effects runs through the identity.
 
+The last value is the one value of `setR0` to `setR13`, the volume of
+`setVoiceX` and `setNoiseX`, the shape of `setBuzzer`, the coarse nibble
+of `setToneX` and the high byte of `setEnvelope` (2.1). A start, or a
+remap on a timer of the tune, through a mapping with a transformation for
+another value is an error of the writer (6.5).
+
 **1.10.2** A row that sets the mapping column of an effect and sets its
 source column to 1 to 127, a start, starts the source through that
 mapping (YMXS, SPEC.md 3.6.3); a start that leaves the mapping column
@@ -512,6 +518,12 @@ a register that reads every bit of its byte: a source of one
 column on a target of 2.1.2, and a source of two columns on `setEnvelope`
 (2.1.3). Versions 5 and 6 marked these two in the version word, and
 version 7 encodes both (3.3.5).
+
+A writer also writes a source of one column counted where every start of
+it maps it through a transformation (1.10.1) and a row of it is a key of
+128 or more (YMXS, SPEC.md 3.6.5), so each key is a whole byte; through
+the identity such a row is an error of the structure (YMXS, SPEC.md
+3.2.2).
 
 ### 3.2 The rows
 
@@ -990,11 +1002,12 @@ that register's column unset** (YMXS rule 1).
 **Rule 2: a row sets columns of the effects the tune records, with
 numbers the maps assign.**
 
-- 2(a) A row leaves the target, control and count columns of an effect
-  whose bit of the effects used (3.3) is 0 unset, and its source column
-  unset or set to 0, a stop (YMXS rule 6(a)); a player leaves the
+- 2(a) A row leaves the target, control, count and mapping columns of an
+  effect whose bit of the effects used (3.3) is 0 unset, and its source
+  column unset or set to 0, a stop (YMXS rule 6(a)); a player leaves the
   columns of such an effect unread (4.2), and a reader records the stop
-  (7.3).
+  (7.3). A writer leaves out a remap on the timer of such an effect, a
+  timer outside the tune (YMXS, SPEC.md 1.10, 4.3).
 - 2(b) A source column is 0 or 1 to S, S the source count (3.3); a
   target column is a target this version encodes, 0 to 24 (2.1); a
   mapping column is 0 to T, T the transformation count (3.4). A source of
@@ -1017,7 +1030,38 @@ numbers the maps assign.**
   directions of the two I/O ports (1.4.2): a tick writes the row whole,
   so a writer sets the two bits where a row's write reads them from the
   player. The structure's value for such a row is the mixer's six bits,
-  0 to 63 (YMXS, SPEC.md 5.1).
+  0 to 63 (YMXS, SPEC.md 5.1). A source a start on `setR7` maps through
+  a transformation has its keys (YMXS, SPEC.md 3.6.5) in bits 5 to 0 of
+  its rows: the row of key k is k + 192, the key with the two bits, and a
+  key of 64 or more is an error of the writer (6.5). A source on `setR7`
+  and on `setR0`, `setR2`, `setR4`, `setR11` or `setR12` is an error of
+  the writer (6.5): a tick on that target writes the two bits of each row
+  to its register.
+- 2(g) A start whose mapping column is unset runs through the kept
+  mapping (1.10.3), through the wrap (4.5). A writer reads the rows in
+  order with three values an effect: the kept mapping and the *running*
+  mapping, each a mapping number of 1.10.1 or *open*, which differs from
+  every number, 0 at row 0; and the *pending* mapping, the mapping of a
+  deferred start, a number, *open* or *none*, which differs from both,
+  none at row 0. It writes the mapping column with the set bit and the
+  number of the operation's mapping (1.10.1):
+  - a start writes it where its mapping differs from the kept mapping,
+    which is then the start's mapping. A start with `deferred` clear
+    makes the running mapping the start's and the pending mapping none; a
+    deferred start makes the pending mapping the start's, and leaves the
+    running mapping as it is where that is the start's mapping and opens
+    it otherwise.
+  - a remap on a timer of the tune, idle or running, writes it with the
+    source column unset where its mapping differs from the running
+    mapping, and is left out otherwise. A remap written makes the kept
+    mapping the remap's, and the running mapping the remap's where the
+    pending mapping is none or the remap's, and open otherwise.
+  - a stop leaves it unset (rule 3(c)), makes the pending mapping none
+    and the running mapping the kept mapping.
+  - the repeat row opens the three values of each effect a start or a
+    remap on a timer of the tune maps through a transformation, so the
+    first start or remap at or after the repeat row writes the column.
+    Every other effect keeps 0, and its mapping column is 0 in every row.
 
 **Rule 3: a start sets bit 5 of the control column where the structure
 sets `placeReset`, and bit 6 where the timer is stopped** (YMXS rules 3
@@ -1059,7 +1103,9 @@ to 255, or leaves the count unset (1.9.1).
 **Rule 6: the row count and the repeat row divide by the unit the table
 packs at.** R divides by k, and RR where below R divides by k (DTX's
 R5.6 and R5.11). A writer whose table divides by k packs it as it is;
-otherwise it lengthens the table by 6.3.
+otherwise it lengthens the table by 6.3. A writer adds the rows of 6.3 to
+the structure, an unset row as an empty row, and encodes the padded rows
+in order by rules 1 to 5, so a loop written again is encoded again.
 
 ### 6.3 The padding
 
@@ -1163,12 +1209,14 @@ N is a row of the structure, numbered before the padding of 6.3.
 | condition | reported as |
 |---|---|
 | the structure has N sources, above 127 (2.2.2) | `the tune runs N sources, and a source column numbers 127` |
+| the structure has N transformations, above 127, and a start, or a remap on a timer of the tune, maps through a transformation (1.10.1, 3.3.5) | `the tune maps through N transformations, and a mapping column numbers 127` |
 | row N sets a count C outside 0 to 255 (1.9.1) | `row N: a count of C, and the count column reaches 0 to 255` |
-| row N performs an operation other than a start, a retune and a stop | `row N: an effect this version does not read` |
-| row N performs a start whose mapping has a transformation as a part (YMXS, SPEC.md 3.6.3) | `row N: an effect this version does not read` |
+| row N performs a start, or a remap on a timer of the tune, whose mapping has a transformation as a part before the last, part J (1.10.1); I the first such part; TARGET the start's target, and for a remap the target of the last start on its timer before row N, or of the first start on it where none comes before | `row N: the mapping maps value I of TARGET, and a mapping column maps its value J alone` |
 | source NAME runs on TARGET, a target past 24 (2.1) | `the source NAME runs on TARGET, a target this version leaves to a later one (SPEC.md section 8)` |
 | source NAME runs on two targets whose markers are columns A and B, A other than B (rule 2(d)) | `the source NAME runs on targets that mark column A and column B, and a source has one marker column (SPEC.md rule 2(d))` |
+| source NAME runs on `setR7` and on TARGET, `setR0`, `setR2`, `setR4`, `setR11` or `setR12` (2.1.2, rule 2(f)) | `the source NAME runs on setR7 and on TARGET, and every row of a source on setR7 has bits 7 and 6 set (SPEC.md rule 2(f))` |
 | a marked source NAME has the value V, above 127, in row R of column C, its marker's column (3.2.1) | `the source NAME has the value V in row R of column C, and bit 7 of the marker's column is the marker` |
+| source NAME, which a start on `setR7` maps through a transformation, has the key K, above 63, in row R (rule 2(f)) | `the source NAME has the key K in row R on setR7, and a key on setR7 is 0 to 63` |
 | source NAME has the value V, above 255, in row R of column C (3.2.1) | `the source NAME has the value V in row R of column C, and a column is one byte` |
 | the rate is H, outside 1 to 65,535, the word at 6 (3.3) | `a frame rate of H, and the frame rate is a word, 1 to 65535` |
 

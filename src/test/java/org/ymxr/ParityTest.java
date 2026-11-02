@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
  * dropped.
  *
  * <p>Skipped where Go is not installed, or where the Java tools have not
- * been built.
+ * been built; the case of the YMXS kit where the YMXS checkout is absent.
  */
 final class ParityTest {
 
@@ -178,24 +178,136 @@ final class ParityTest {
         both("ymxs-to-prg", structure, "-silent");
     }
 
-    /** A fade, whose start is through a transformation, a remap to the
-     *  identity, and a start through a transformation after the rows that
-     *  padding adds: the writer reports the row of the structure of each,
-     *  exit 1, in both trees (SPEC.md 6.5). */
-    @Test
-    void aMappingIsTheSameErrorInBothTrees() throws Exception {
-        assertUnread(YmxsTest.fade(), 0);
-        assertUnread(YmxsTest.remapped(), 1);
-        assertUnread(YmxsTest.mappedAfterPadding(), 3);
+    /** {@code tune} as JSON, the input of the tools that read a structure. */
+    private static byte[] json(org.ymxs.YMXS.Tune tune) {
+        return org.ymxs.Text.write(org.ymxs.Tunes.multi(tune)).getBytes(StandardCharsets.UTF_8);
     }
 
-    private static void assertUnread(org.ymxs.YMXS.Tune tune, int row) throws Exception {
+    /**
+     * Mappings through the structure (SPEC.md 1.10, rule 2(g)): the fade,
+     * a remap to the identity, a start through a transformation after the
+     * rows padding adds, the counted source on `setR10` of keys of 128 or
+     * more, and an effect through the identity alone beside one that maps.
+     * One tune file, version 10 where a row maps a value and 9 otherwise,
+     * one record and one check in both trees, and one report.
+     */
+    @Test
+    void aMappedTuneConvertsTheSameInBothTrees() throws Exception {
+        java.util.Map<org.ymxs.YMXS.Tune, Integer> tunes = new java.util.LinkedHashMap<>();
+        tunes.put(YmxsTest.fade(), Tune.VERSION);
+        tunes.put(YmxsTest.remapped(), Tune.UNMAPPED);
+        tunes.put(YmxsTest.mappedAfterPadding(), Tune.VERSION);
+        tunes.put(YmxsTest.sampled(), Tune.VERSION);
+        tunes.put(YmxsTest.identityBeside(), Tune.VERSION);
+        tunes.put(YmxsTest.outsideThrough(128, false), Tune.UNMAPPED);
+        for (java.util.Map.Entry<org.ymxs.YMXS.Tune, Integer> one : tunes.entrySet()) {
+            byte[] tune = both("ymxs-to-ymxr", json(one.getKey()));
+            assertEquals((int) one.getValue(), Tune.getWord(tune, 4), "the version");
+            both("ymxr-trace", tune);
+            assertEquals("standard input: every start follows rule 3\n",
+                    new String(both("ymxr-check", tune), StandardCharsets.UTF_8));
+        }
+        byte[] sampled = both("ymxs-to-ymxr", json(YmxsTest.sampled()), "-silent");
+        assertTrue(TuneFile.read(sampled).counted().get(0), "the sample is counted");
+        // DECISIONS: the mapping column of the effect through the identity
+        // is 0 in every row of the file both trees write
+        byte[] beside = both("ymxs-to-ymxr", json(YmxsTest.identityBeside()), "-silent");
+        byte[] column = TuneFile.read(beside).table().column(Columns.MAPPING + 1);
+        assertArrayEquals(new byte[column.length], column, "effect 1's mapping column");
+    }
+
+    /** The fade through the binder, which writes bound tunes of version 9
+     *  and reports a line for a tune file of version 10: ymxr-bind and
+     *  ymxr-sndh on its tune file, ymxs-to-sndh and ymxs-to-prg on the
+     *  structure, exit 1 in both trees. */
+    @Test
+    void theFadeIsTheBindersLineInBothTrees() throws Exception {
+        byte[] structure = json(YmxsTest.fade());
+        byte[] tune = both("ymxs-to-ymxr", structure, "-silent");
+        String line = "the binder writes bound tunes to version 9, and this tune file is"
+                + " version 10";
+        Ran bind = same("ymxr-bind", tune, "-silent");
+        assertEquals(1, bind.exit(), bind.said());
+        assertEquals("ymxr-bind: " + line + "\n", bind.said());
+        Ran sndh = same("ymxr-sndh", tune, "-silent");
+        assertEquals(1, sndh.exit(), sndh.said());
+        assertEquals("ymxr-sndh: subtune 1: " + line + "\n", sndh.said());
+        for (String tool : List.of("ymxs-to-sndh", "ymxs-to-prg")) {
+            Ran ran = same(tool, structure, "-silent");
+            assertEquals(1, ran.exit(), ran.said());
+            assertTrue(ran.said().endsWith(tool + ": subtune 1: " + line + "\n"), ran.said());
+        }
+    }
+
+    /** The YMXS checkout whose conformance kit the case below reads, at
+     *  the release pom.xml requires: YMXS_REPO, ../YMXS by default. */
+    private static Path ymxsRepo() {
+        String named = System.getenv("YMXS_REPO");
+        return Path.of(named == null || named.isEmpty() ? "../YMXS" : named);
+    }
+
+    /**
+     * Every tune of the YMXS conformance kit (YMXS, doc/conformance/tunes)
+     * through ymxs-to-ymxr in both trees: one tune file, or one line and
+     * one exit, and of each tune file one record and one check. The kit's
+     * transformations.json maps three values on `setVoiceB`, the line of
+     * SPEC.md 6.5.
+     */
+    @Test
+    void everyTuneOfTheYmxsKitConvertsTheSameInBothTrees() throws Exception {
+        Path kit = ymxsRepo().resolve("doc/conformance/tunes");
+        Assumptions.assumeTrue(Files.isDirectory(kit),
+                "no YMXS kit at " + kit + ": YMXS_REPO names the checkout");
+        List<Path> tunes;
+        try (Stream<Path> at = Files.list(kit)) {
+            tunes = at.filter(one -> one.toString().endsWith(".json")).sorted().toList();
+        }
+        assertTrue(!tunes.isEmpty(), "the kit has tunes");
+        int written = 0;
+        for (Path one : tunes) {
+            Ran java = same("ymxs-to-ymxr", Files.readAllBytes(one), "-silent");
+            if (java.exit() == 0) {
+                both("ymxr-trace", java.out());
+                both("ymxr-check", java.out());
+                written++;
+            }
+        }
+        assertTrue(written > 0, "a tune of the kit converts");
+        Ran mapped = same("ymxs-to-ymxr", Files.readAllBytes(kit.resolve("transformations.json")),
+                "-silent");
+        assertEquals(1, mapped.exit(), mapped.said());
+        assertTrue(mapped.said().endsWith("ymxs-to-ymxr: row 2: the mapping maps value 0 of"
+                + " setVoiceB, and a mapping column maps its value 2 alone\n"), mapped.said());
+    }
+
+    /** A mapping this version leaves unencoded: the writer reports its
+     *  line, with the row of the structure, exit 1, in both trees (SPEC.md
+     *  6.5). */
+    @Test
+    void aMappingThisFormatCannotEncodeIsTheSameErrorInBothTrees() throws Exception {
+        assertWrong(YmxsTest.remappedThrough(128), "the tune maps through 128"
+                + " transformations, and a mapping column numbers 127");
+        assertWrong(YmxsTest.outsideThrough(127, true), "the tune maps through 128"
+                + " transformations, and a mapping column numbers 127");
+        assertWrong(YmxsTest.chordRemapped(), "row 2: the mapping maps value 0 of setVoiceB,"
+                + " and a mapping column maps its value 2 alone");
+        assertWrong(YmxsTest.wrongAfterPadding(), "row 3: the mapping maps value 0 of"
+                + " setNoiseA, and a mapping column maps its value 1 alone");
+        assertWrong(YmxsTest.wideMixer(), "the source wide has the key 64 in row 1 on setR7,"
+                + " and a key on setR7 is 0 to 63");
+        for (boolean[] one : new boolean[][] {{true, true}, {false, true}, {true, false}}) {
+            assertWrong(YmxsTest.mixerAndTone(one[0], one[1]), "the source gate runs on setR7"
+                    + " and on setR0, and every row of a source on setR7 has bits 7 and 6 set"
+                    + " (SPEC.md rule 2(f))");
+        }
+    }
+
+    private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
                 .getBytes(StandardCharsets.UTF_8);
         Ran java = same("ymxs-to-ymxr", structure, "-silent");
         assertEquals(1, java.exit(), java.said());
-        assertEquals("ymxs-to-ymxr: row " + row + ": an effect this version does not read\n",
-                java.said());
+        assertTrue(java.said().endsWith("ymxs-to-ymxr: " + line + "\n"), java.said());
     }
 
     /** A tune file with starts outside rule 3(a): one verdict and one exit

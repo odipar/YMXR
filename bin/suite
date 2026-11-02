@@ -58,6 +58,17 @@ if [ ! -f "$repo/68k/test/emu/test_dtx.py" ] \
     exit 2
 fi
 
+# ParityTest runs the tunes of YMXS's conformance kit through both trees,
+# out of the YMXS checkout at YMXS_REPO.
+ymxs=$(sed -n '/<artifactId>ymxs<\/artifactId>/,/<\/version>/s|.*<version>\(.*\)</version>.*|\1|p' \
+    pom.xml | head -1)
+kit=${YMXS_REPO:-../YMXS}/doc/conformance/tunes
+if [ ! -d "$kit" ]; then
+    echo "suite: ParityTest runs the YMXS kit at $kit, which is absent;"\
+         "YMXS_REPO names a checkout of YMXS $ymxs" >&2
+    exit 2
+fi
+
 # ParityTest reads the Go tree against the Java one in what the tools
 # write and leaves its shape alone, so a file the formatter would rewrite
 # drifts unread.

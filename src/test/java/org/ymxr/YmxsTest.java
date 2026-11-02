@@ -2,6 +2,7 @@ package org.ymxr;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -263,27 +264,515 @@ final class YmxsTest {
                 () -> Schema.of(tune)).getMessage());
     }
 
-    /** A start through a transformation is left to a later version of
-     *  this format: the writer reports its row (SPEC.md 6.5). */
-    @Test
-    void aStartThroughATransformationIsAnError() {
-        assertEquals("row 0: an effect this version does not read", reported(fade()));
+    /** The tune file of {@code tune}, padded and named as
+     *  {@code ymxs-to-ymxr} pads and names it. */
+    private static byte[] file(Tune tune) {
+        Schema.Made made = Schema.of(Padding.toUnit(tune, YmToYmxr.UNIT, new Report()));
+        return org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
+                YmToYmxr.UNIT, BuiltTunes.RING, new Report(), tune.title()).file();
     }
 
-    /** A remap is an operation this version leaves to a later one, the
-     *  remap to the identity among them (SPEC.md 6.5). */
-    @Test
-    void aRemapIsAnError() {
-        assertEquals("row 1: an effect this version does not read", reported(remapped()));
+    /** The mapping column of effect {@code i}. */
+    private static byte[] mapping(Schema.Made made, int i) {
+        return made.columns().column[Columns.MAPPING + i];
     }
 
+    /** A transformation of {@code size} entries, entry k at k divided by
+     *  {@code by}: one distinct from the identity, under its name. */
+    private static Transformation divided(String name, int size, int by) {
+        List<Integer> entries = new ArrayList<>();
+        for (int k = 0; k < size; k++) {
+            entries.add(k / by);
+        }
+        return new Transformation(name, entries);
+    }
+
+    /** A row of one operation on each of two timers. */
+    private static Row row(Timer one, Effect first, Timer two, Effect second) {
+        Map<Timer, Effect> effects = new EnumMap<>(Timer.class);
+        effects.put(one, first);
+        effects.put(two, second);
+        return new Row(Map.of(), effects);
+    }
+
+    private static final Timing STOPPED = new Timing(Chip.prescaler(4), 100, true, true);
+
+    /** A remap to the identity on a tune that maps no value is left out,
+     *  and so is one on a timer outside the tune: the file is version 9,
+     *  byte for byte the file of the tune without them (SPEC.md 3.3.5,
+     *  rule 2(g)). */
+    @Test
+    void aTuneThroughTheIdentityWithRemapsWritesTheFileOfVersionNine() {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        Start start = start(Register.R8, loud, STOPPED, false);
+        Tune with = built(List.of(row(Map.of(), Timer.A, start),
+                row(Timer.A, new Remap(Tunes.NO_PARTS), Timer.D,
+                        new Remap(Tunes.mapping(Tunes.IDENTITY))),
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(Tunes.IDENTITY))),
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, true)),
+                row(Map.of(), Timer.A, new Remap(Tunes.NO_PARTS))), 1);
+        Tune without = built(List.of(row(Map.of(), Timer.A, start), Tunes.EMPTY, Tunes.EMPTY,
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, true)),
+                Tunes.EMPTY), 1);
+        byte[] file = file(with);
+        assertEquals(org.ymxr.Tune.UNMAPPED, org.ymxr.Tune.getWord(file, 4));
+        assertEquals(Columns.C, Schema.of(with).columns().count(), "thirty columns");
+        assertArrayEquals(file(without), file, "the file of the tune without the remaps");
+    }
+
+    /** The YMXS kit's transformations.json remaps Timer D, a timer outside
+     *  the tune, at row 0: a tune whose only transformation is on such a
+     *  remap writes version 9 (rule 2(a)). */
+    @Test
+    void aTransformationOnARemapOutsideTheTuneWritesVersionNine() {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        Tune tune = built(List.of(row(Timer.A, start(Register.R8, loud, STOPPED, false),
+                Timer.D, new Remap(Tunes.mapping(volume(5)))), Tunes.EMPTY), 0);
+        Schema.Made made = Schema.of(tune);
+        assertEquals(Columns.C, made.columns().count());
+        assertEquals(List.of(), made.columns().transformations);
+        assertEquals(1, made.columns().effects, "effect 0 alone, and bit 5 clear");
+        assertEquals(org.ymxr.Tune.UNMAPPED, org.ymxr.Tune.getWord(file(tune), 4));
+    }
+
+    /** The fade of {@link #fade} through the structure: version 10, its
+     *  four mapping columns, bit 5 of the effects used, the long at 16 the
+     *  offset of the transformation index, the source index at 20, and the
+     *  four transformations in the order YMXS numbers them (SPEC.md 1.10,
+     *  3.3, 3.4). */
+    @Test
+    void theFadeWritesVersionTen() {
+        Schema.Made made = Schema.of(fade());
+        assertEquals(Columns.MAPPED, made.columns().count());
+        assertArrayEquals(new byte[] {(byte) 0x81, (byte) 0x82, (byte) 0x83, (byte) 0x84, 0},
+                mapping(made, 0), "the start through V15, then a remap a row");
+        for (int i = 1; i < 4; i++) {
+            assertArrayEquals(new byte[5], mapping(made, i),
+                    "effect " + i + " runs through the identity");
+        }
+        // a remap sets the mapping column with the source column unset
+        for (int r = 1; r < 4; r++) {
+            assertEquals(0, made.columns().column[Columns.EFFECT + 1][r], "row " + r);
+        }
+        byte[] file = file(fade());
+        assertEquals(org.ymxr.Tune.VERSION, org.ymxr.Tune.getWord(file, 4));
+        assertEquals(Columns.MAPS | 1, file[org.ymxr.Tune.EFFECTS_AT] & 0xFF);
+        int index = org.ymxr.Tune.getLong(file, org.ymxr.Tune.TRANSFORMATIONS_AT);
+        assertEquals(org.ymxr.Tune.align(org.ymxr.Tune.indexAt(org.ymxr.Tune.VERSION) + 4
+                + "built".length() + 1), index, "the index after the source index at 20 and"
+                + " the name");
+        assertEquals(org.ymxr.Tune.indexAt(org.ymxr.Tune.VERSION) + 4,
+                org.ymxr.Tune.getWord(file, org.ymxr.Tune.NAME_AT), "one source at 20");
+        TuneFile read = TuneFile.read(file);
+        assertEquals(Columns.MAPPED, read.table().columns());
+        assertEquals(4, read.transformations().size());
+        int n = 0;
+        for (int most : new int[] {15, 10, 5, 0}) {
+            byte[] entries = new byte[16];
+            for (int k = 0; k < 16; k++) {
+                entries[k] = (byte) (k * most / 15);
+            }
+            assertArrayEquals(entries, read.transformations().get(n++), "V" + most);
+        }
+    }
+
+    /** The mapping of each remap row of the fade's record is the number
+     *  YMXS, SPEC.md 7.4 records for the last part of the remap's
+     *  mapping. */
+    @Test
+    void theRecordOfARemapRowIsTheNumberOfItsLastPart() {
+        Tune fade = fade();
+        List<Transformation> list = Tunes.transformations(fade);
+        String[] lines = new String(Trace.record(file(fade), -1),
+                java.nio.charset.StandardCharsets.US_ASCII).split("\n");
+        java.util.regex.Pattern kept = java.util.regex.Pattern.compile(
+                "\"0\":\\{[^}]*\"mapping\":(\\d+)\\}");
+        int read = 0;
+        for (int r = 0; r < Tunes.rows(fade).size(); r++) {
+            if (!(Tunes.rows(fade).get(r).effects().get(Timer.A) instanceof Remap remap)) {
+                continue;
+            }
+            java.util.regex.Matcher m = kept.matcher(lines[r + 1]);
+            assertTrue(m.find(), lines[r + 1]);
+            List<org.ymxs.YMXS.Part> parts = remap.mapping().parts();
+            assertEquals(Tunes.number(list, parts.get(parts.size() - 1)),
+                    Integer.parseInt(m.group(1)), "row " + r);
+            read++;
+        }
+        assertEquals(3, read, "the three remaps of the fade");
+    }
+
+    /** A start whose mapping is the kept mapping leaves the column unset,
+     *  and a start of another mapping sets it (rule 2(g)). */
+    @Test
+    void aStartThatKeepsTheMappingLeavesTheColumnUnset() {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        Single soft = Tunes.repeating("square 6", List.of(6, 0), 0);
+        Mapping v10 = Tunes.mapping(volume(10));
+        Timing kept = new Timing(Chip.prescaler(4), 100, false, false);
+        Tune tune = built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false, v10)),
+                row(Map.of(), Timer.A, start(Register.R8, soft, kept, false, v10)),
+                new Row(Map.of(), Map.of(Timer.A, Tunes.STOP)),
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false, v10)),
+                row(Map.of(), Timer.A, start(Register.R8, soft, kept, false)),
+                Tunes.EMPTY), 5);
+        assertArrayEquals(new byte[] {(byte) 0x81, 0, 0, 0, (byte) 0x80, 0},
+                mapping(Schema.of(tune), 0));
+    }
+
+    /** A remap sets the mapping column with the source column unset, and
+     *  is left out where the effect runs through its mapping already. On
+     *  an idle timer of the tune it is written, and the next start keeps
+     *  it (rule 2(g)). */
+    @Test
+    void aRemapSetsTheMappingColumnWithTheSourceColumnUnset() {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        Transformation v10 = volume(10);
+        Tune tune = built(List.of(
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(v10))),
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false,
+                        Tunes.mapping(v10))),
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(v10))),
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(volume(5)))),
+                row(Map.of(), Timer.A, new Remap(Tunes.NO_PARTS)),
+                Tunes.EMPTY), 5);
+        Schema.Made made = Schema.of(tune);
+        assertArrayEquals(new byte[] {(byte) 0x81, 0, 0, (byte) 0x82, (byte) 0x80, 0},
+                mapping(made, 0), "the idle timer's remap, kept by the start; a remap"
+                + " through the running mapping left out");
+        int source = Columns.EFFECT + 1;
+        assertEquals(0, made.columns().column[source][0], "the remap on the idle timer");
+        assertEquals((byte) 0x81, made.columns().column[source][1], "the start");
+        assertEquals(0, made.columns().column[source][3], "a remap");
+    }
+
+    /**
+     * After a deferred start the kept mapping is the pending start's, and
+     * the running effect may run through another until the tick that
+     * performs it: a remap equal to the kept mapping is written. A start
+     * after a remap while a start is pending keeps the remap's mapping,
+     * which the next tick does not change (SPEC.md 1.10.3).
+     */
+    @Test
+    void aRemapEqualToTheKeptMappingAfterADeferredStartIsWritten() {
+        Single loop = Tunes.repeating("loop", List.of(15, 12, 9, 6), 0);
+        Single fall = Tunes.once("fall", List.of(15, 10, 5, 0));
+        Transformation one = volume(10);
+        Transformation two = volume(5);
+        Timing defer = new Timing(Chip.prescaler(4), 100, false, true);
+        Timing kept = new Timing(Chip.prescaler(4), 100, false, false);
+        Tune tune = built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, loop, STOPPED, false,
+                        Tunes.mapping(one))),
+                row(Map.of(), Timer.A, start(Register.R8, fall, defer, true, Tunes.mapping(two))),
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(two))),
+                row(Map.of(), Timer.A, start(Register.R8, loop, defer, true, Tunes.mapping(one))),
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(two))),
+                row(Map.of(), Timer.A, start(Register.R8, loop, kept, false,
+                        Tunes.mapping(two))),
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(two))),
+                Tunes.EMPTY), 7);
+        assertArrayEquals(new byte[] {(byte) 0x81, (byte) 0x82, (byte) 0x82, (byte) 0x81,
+                (byte) 0x82, 0, 0, 0}, mapping(Schema.of(tune), 0));
+    }
+
+    /** The repeat row: the player keeps the mapping the last row left, so
+     *  the first start at or after the repeat row writes the mapping
+     *  column of an effect a row maps through a transformation (rule
+     *  2(g)). */
+    @Test
+    void theRepeatRowWritesTheMappingColumn() {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        Mapping v10 = Tunes.mapping(volume(10));
+        Tune tune = built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false, v10)),
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false, v10)),
+                row(Map.of(), Timer.A, new Remap(Tunes.mapping(volume(5)))),
+                Tunes.EMPTY), 1);
+        assertArrayEquals(new byte[] {(byte) 0x81, (byte) 0x81, (byte) 0x82, 0},
+                mapping(Schema.of(tune), 0));
+    }
+
+    /** A tune of version 10 that repeats to row 2: effect 0 through V10 and
+     *  V5, and beside it effect 1 through the identity alone, with starts
+     *  and remaps to the identity before and after the repeat row. */
+    static Tune identityBeside() {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        Single soft = Tunes.repeating("square 6", List.of(6, 0), 0);
+        Timing kept = new Timing(Chip.prescaler(4), 100, false, false);
+        return built(List.of(
+                row(Timer.A, start(Register.R8, loud, STOPPED, false, Tunes.mapping(volume(10))),
+                        Timer.D, start(Register.R9, soft, STOPPED, false)),
+                row(Timer.A, new Remap(Tunes.mapping(volume(5))), Timer.D,
+                        new Remap(Tunes.NO_PARTS)),
+                row(Timer.A, start(Register.R8, loud, STOPPED, false, Tunes.mapping(volume(10))),
+                        Timer.D, start(Register.R9, loud, kept, false)),
+                row(Map.of(), Timer.D, new Remap(Tunes.mapping(Tunes.IDENTITY))),
+                row(Map.of(), Timer.D, start(Register.R9, soft, kept, true)),
+                row(Map.of(), Timer.D, new Remap(Tunes.NO_PARTS)),
+                row(Map.of(), Timer.D, start(Register.R9, soft, STOPPED, false,
+                        Tunes.mapping(Tunes.IDENTITY)))), 2);
+    }
+
+    /**
+     * A tune of version 10 that repeats, with an effect through the
+     * identity alone: its starts and its remaps to the identity before and
+     * after the repeat row leave its mapping column unset, so the column
+     * is 0 in every row and packs constant (rule 2(g)).
+     */
+    @Test
+    void anEffectThroughTheIdentityKeepsAConstantColumn() {
+        Tune tune = identityBeside();
+        Schema.Made made = Schema.of(tune);
+        assertEquals(Columns.MAPPED, made.columns().count(), "effect 0 maps, version 10");
+        assertArrayEquals(new byte[7], mapping(made, 1), "effect 1's column is 0");
+        assertEquals((byte) 0x81, mapping(made, 0)[2], "effect 0's start at the repeat row");
+        byte[] file = file(tune);
+        org.dtx.Table table = TuneFile.read(file).table();
+        byte[] column = table.column(Columns.MAPPING + 1);
+        assertArrayEquals(new byte[column.length], column, "read back as 0 in every row");
+    }
+
+    /** A square started, then a remap a row through each of {@code count}
+     *  transformations. */
+    static Tune remappedThrough(int count) {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        List<Row> rows = new ArrayList<>();
+        rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false)));
+        for (int n = 0; n < count; n++) {
+            rows.add(row(Map.of(), Timer.A, new Remap(Tunes.mapping(divided("t" + n, 16, 1)))));
+        }
+        return built(rows, 0);
+    }
+
+    /** More than 127 transformations: the mapping column numbers 127
+     *  (SPEC.md 6.5). */
+    @Test
+    void moreTransformationsThanTheMappingColumnNumbersIsAnError() {
+        assertEquals("the tune maps through 128 transformations, and a mapping column"
+                + " numbers 127", reported(remappedThrough(128)));
+        assertEquals(127, Schema.of(remappedThrough(127)).columns().transformations.size());
+    }
+
+    /** A square started, then a remap a row on Timer D, a timer outside
+     *  the tune, through each of {@code count} transformations, and where
+     *  {@code last} is set a remap of the square through one more. */
+    static Tune outsideThrough(int count, boolean last) {
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        List<Row> rows = new ArrayList<>();
+        rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false)));
+        for (int n = 0; n < count; n++) {
+            rows.add(row(Map.of(), Timer.D, new Remap(Tunes.mapping(divided("t" + n, 16, 1)))));
+        }
+        if (last) {
+            rows.add(row(Map.of(), Timer.A, new Remap(Tunes.mapping(divided("last", 16, 1)))));
+        }
+        return built(rows, 0);
+    }
+
+    /** A writer leaves out a remap on a timer outside the tune, and its
+     *  transformations with it: 128 of them write version 9 (SPEC.md
+     *  3.3.5, rule 2(a)). A remap on a timer of the tune through one more
+     *  makes a file of 128 transformations, the line of SPEC.md 6.5. */
+    @Test
+    void transformationsOutsideTheTuneAreLeftOut() {
+        Schema.Made made = Schema.of(outsideThrough(128, false));
+        assertEquals(Columns.C, made.columns().count());
+        assertEquals(List.of(), made.columns().transformations);
+        assertEquals(org.ymxr.Tune.UNMAPPED,
+                org.ymxr.Tune.getWord(file(outsideThrough(128, false)), 4));
+        List<Row> without = new ArrayList<>(Tunes.rows(outsideThrough(0, false)));
+        for (int n = 0; n < 128; n++) {
+            without.add(Tunes.EMPTY);
+        }
+        assertArrayEquals(file(built(without, 0)), file(outsideThrough(128, false)),
+                "the file of the tune without the remaps");
+        assertEquals("the tune maps through 128 transformations, and a mapping column"
+                + " numbers 127", reported(outsideThrough(127, true)));
+    }
+
+    /** The chord of the YMXS kit's transformations.json on `setVoiceB`. */
+    private static org.ymxs.YMXS.ThreeConnection chord() {
+        org.ymxs.YMXS.Triple chord = new org.ymxs.YMXS.Triple("chord", Tunes.repeating(
+                List.of(new org.ymxs.YMXS.Three(28, 1, 15),
+                        new org.ymxs.YMXS.Three(214, 0, 12)), 0));
+        return new org.ymxs.YMXS.ThreeConnection(
+                new org.ymxs.YMXS.SetVoice(org.ymxs.YMXS.Voice.B), chord);
+    }
+
+    /** Rows 0 to 2 of the YMXS kit's transformations.json on Timers A and
+     *  B: a square through V15, the chord on `setVoiceB` through V10 for
+     *  its volume, and at row 2 a remap of the chord's three values; then
+     *  the repeat row, which stops both. */
+    static Tune chordRemapped() {
+        Single loud = Tunes.repeating("square 15", List.of(15, 0), 0);
+        Mapping all = Tunes.mapping(divided("half", 256, 2), divided("half", 16, 2),
+                divided("ramp", 16, 1));
+        return built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false,
+                        Tunes.mapping(volume(15)))),
+                row(Map.of(), Timer.B, new Start(chord(), STOPPED, false,
+                        Tunes.mapping(Tunes.IDENTITY, Tunes.IDENTITY, volume(10)))),
+                row(Map.of(), Timer.B, new Remap(all)),
+                row(Timer.A, Tunes.STOP, Timer.B, Tunes.STOP)), 3);
+    }
+
+    /** A mapping column maps the last value of a row alone: a start
+     *  through a transformation for another value is an error with its
+     *  row, and so is a remap of three values on `setVoiceB`, as the YMXS
+     *  kit's transformations.json has at Timer B row 2 (SPEC.md 1.10.1,
+     *  6.5). */
+    @Test
+    void aMappingOfAValueOtherThanTheLastIsAnError() {
+        assertEquals("row 2: the mapping maps value 0 of setVoiceB, and a mapping column maps"
+                + " its value 2 alone", reported(chordRemapped()));
+        Tune started = built(List.of(row(Map.of(), Timer.B, new Start(chord(), STOPPED, false,
+                Tunes.mapping(Tunes.IDENTITY, divided("half", 16, 2), volume(10))))), 0);
+        assertEquals("row 0: the mapping maps value 1 of setVoiceB, and a mapping column maps"
+                + " its value 2 alone", reported(started));
+        // the volume alone is mapped
+        Tune fine = built(List.of(row(Map.of(), Timer.B, new Start(chord(), STOPPED, false,
+                Tunes.mapping(Tunes.IDENTITY, Tunes.IDENTITY, volume(10))))), 0);
+        assertArrayEquals(new byte[] {(byte) 0x81}, mapping(Schema.of(fine), 2));
+    }
+
+    /** The row of a line is the row of the structure, numbered before the
+     *  padding (SPEC.md 6.5). */
     @Test
     void theRowOfAnErrorIsTheRowOfTheStructure() {
-        Padding.Padded padded = Padding.toUnit(mappedAfterPadding(), 2, new Report());
+        Padding.Padded padded = Padding.toUnit(wrongAfterPadding(), 2, new Report());
         assertTrue(Tunes.rows(padded.tune()).size() > 5, "the tune is padded to the unit");
-        assertEquals("row 3: an effect this version does not read", String.valueOf(
-                assertThrows(IllegalArgumentException.class, () -> Schema.of(padded))
-                        .getMessage()));
+        assertEquals("row 3: the mapping maps value 0 of setNoiseA, and a mapping column maps"
+                + " its value 1 alone", String.valueOf(assertThrows(
+                IllegalArgumentException.class, () -> Schema.of(padded)).getMessage()));
+    }
+
+    /** {@link #mappedAfterPadding} with the start at row 3 on `setNoiseA`
+     *  through a transformation of the noise period, its first value. */
+    static Tune wrongAfterPadding() {
+        org.ymxs.YMXS.Pair hiss = new org.ymxs.YMXS.Pair("hiss", Tunes.repeating(
+                List.of(new org.ymxs.YMXS.Two(31, 12), new org.ymxs.YMXS.Two(1, 0)), 0));
+        Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
+        List<Row> rows = new ArrayList<>();
+        rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false)));
+        rows.add(Tunes.EMPTY);
+        rows.add(Tunes.EMPTY);
+        rows.add(row(Map.of(), Timer.A, new Start(new org.ymxs.YMXS.TwoConnection(
+                new org.ymxs.YMXS.SetNoise(org.ymxs.YMXS.Voice.A), hiss), STOPPED, false,
+                Tunes.mapping(divided("half", 32, 2), Tunes.IDENTITY))));
+        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP)));
+        return built(rows, 1);
+    }
+
+    /** The sample of the YMXS kit's transformations.json on `setR10`,
+     *  Timer C, through a transformation of 256 entries from eight bits to
+     *  four, entry k at k divided by 16, in place of the kit's `8 bits to
+     *  4`. */
+    static Tune sampled() {
+        Single sample = Tunes.repeating("sample", List.of(128, 200, 255, 200, 128, 56, 0, 56),
+                0);
+        return built(List.of(row(Map.of(), Timer.C, start(Register.R10, sample,
+                new Timing(Chip.prescaler(4), 192, true, true), false,
+                Tunes.mapping(divided("8 bits to 4", 256, 16))))), 0);
+    }
+
+    /** A source on `setR7` through a transformation, with a key of 64. */
+    static Tune wideMixer() {
+        Single wide = Tunes.repeating("wide", List.of(63, 64), 0);
+        return built(List.of(row(Map.of(), Timer.A, start(Register.R7, wide, STOPPED, false,
+                Tunes.mapping(divided("wide", 128, 2))))), 0);
+    }
+
+    /**
+     * A source on `setR10`, a target of one register whose column is the
+     * marker's, with keys of 128 or more through a transformation of 256
+     * entries: written counted, every row a whole byte and bit 31 of its
+     * index entry set (SPEC.md 3.1.6). Through the identity such a value
+     * is an error of the structure (YMXS, SPEC.md 3.2.2). On `setToneA`,
+     * where the marker's column is the mapped column, a key of 128 or
+     * more is the marker line.
+     */
+    @Test
+    void aKeyOf128OrMoreOnSetR10ThroughATransformationIsCounted() {
+        Single sample = Tunes.repeating("sample", List.of(128, 200, 255, 200, 128, 56, 0, 56),
+                0);
+        Timing timing = new Timing(Chip.prescaler(4), 192, true, true);
+        Mapping four = Tunes.mapping(divided("8 bits to 4", 256, 16));
+        TuneFile read = TuneFile.read(file(sampled()));
+        assertEquals(org.ymxr.Tune.VERSION, read.version());
+        assertTrue(read.counted().get(0), "bit 31 of the index entry");
+        assertArrayEquals(new byte[] {(byte) 128, (byte) 200, (byte) 255, (byte) 200,
+                (byte) 128, 56, 0, 56}, read.sources().get(0).column(0), "the keys, no marker");
+        // keys below 128 keep the marker
+        Single low = Tunes.repeating("low", List.of(100, 50), 0);
+        TuneFile marked = TuneFile.read(file(built(List.of(row(Map.of(), Timer.C,
+                start(Register.R10, low, timing, false, four))), 0)));
+        assertEquals(List.of(false), marked.counted());
+        assertEquals((byte) (0x80 | 50), marked.sources().get(0).column(0)[1], "the marker");
+        // a start of the source through the identity: an error of the
+        // structure, which YMXS's check reports before the writer reads it
+        Tune both = built(List.of(row(Map.of(), Timer.C, start(Register.R10, sample, timing,
+                false, four)), row(Map.of(), Timer.A, start(Register.R10, sample, timing,
+                false))), 0);
+        assertFalse(org.ymxs.Check.of(both).isEmpty(), "the value 128 through the identity");
+        org.ymxs.YMXS.Pair tone = new org.ymxs.YMXS.Pair("tone", Tunes.repeating(
+                List.of(new org.ymxs.YMXS.Two(0, 200), new org.ymxs.YMXS.Two(0, 1)), 0));
+        Tune toned = built(List.of(row(Map.of(), Timer.A, new Start(
+                new org.ymxs.YMXS.TwoConnection(new org.ymxs.YMXS.SetTone(
+                        org.ymxs.YMXS.Voice.A), tone), timing, false,
+                Tunes.mapping(Tunes.IDENTITY, divided("high", 256, 16))))), 0);
+        assertEquals("the source tone has the value 200 in row 0 of column 1, and bit 7 of"
+                + " the marker's column is the marker", reported(toned));
+    }
+
+    /**
+     * A source on `setR7` through a transformation: its rows keep rule
+     * 2(f)'s two port directions, key k the row k + 192, and a key of 64
+     * or more is an error (SPEC.md 6.5).
+     */
+    /** A source on `setR7` on Timer A and on `setR0` on Timer B, in the
+     *  order {@code mixerFirst} sets, the start on `setR7` through a
+     *  transformation of 64 entries where {@code mapped} is set. */
+    static Tune mixerAndTone(boolean mixerFirst, boolean mapped) {
+        Single gate = Tunes.repeating("gate", List.of(56, 57), 0);
+        Start mixer = start(Register.R7, gate, STOPPED, false,
+                mapped ? Tunes.mapping(divided("gated", 64, 1)) : Tunes.NO_PARTS);
+        Start tone = start(Register.R0, gate, STOPPED, false);
+        return built(List.of(row(Map.of(), Timer.A, mixerFirst ? mixer : tone),
+                row(Map.of(), Timer.B, mixerFirst ? tone : mixer)), 0);
+    }
+
+    /** Every row of a source on `setR7` has bits 7 and 6 set, and a tick
+     *  on `setR0` writes the row whole to R0: a source on both is an error
+     *  of the writer, through a transformation or the identity, in either
+     *  order (SPEC.md rule 2(f), 6.5). */
+    @Test
+    void aSourceOnTheMixerAndOnAnotherTargetIsAnError() {
+        String line = "the source gate runs on setR7 and on setR0, and every row of a source"
+                + " on setR7 has bits 7 and 6 set (SPEC.md rule 2(f))";
+        for (boolean mixerFirst : new boolean[] {true, false}) {
+            for (boolean mapped : new boolean[] {true, false}) {
+                Tune tune = mixerAndTone(mixerFirst, mapped);
+                assertEquals(List.of(), org.ymxs.Check.of(tune), "a structure YMXS passes");
+                assertEquals(line, reported(tune), "setR7 first " + mixerFirst
+                        + ", through a transformation " + mapped);
+            }
+        }
+    }
+
+    @Test
+    void aSourceOnTheMixerThroughATransformationKeepsThePortDirections() {
+        Single gate = Tunes.repeating("gate", List.of(56, 57), 0);
+        Mapping gated = Tunes.mapping(divided("gated", 64, 1));
+        TuneFile read = TuneFile.read(file(built(List.of(row(Map.of(), Timer.A,
+                start(Register.R7, gate, STOPPED, false, gated))), 0)));
+        assertEquals(org.ymxr.Tune.VERSION, read.version());
+        assertTrue(read.counted().get(0), "a source on setR7 is counted");
+        assertArrayEquals(new byte[] {(byte) (56 + 192), (byte) (57 + 192)},
+                read.sources().get(0).column(0), "key k is k + 192");
+        assertEquals("the source wide has the key 64 in row 1 on setR7, and a key on setR7 is"
+                + " 0 to 63", reported(wideMixer()));
     }
 
     /** A start through a mapping of one part, the identity, writes the

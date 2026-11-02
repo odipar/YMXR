@@ -78,6 +78,11 @@ final class Columns {
     /** The target whose register is R7, the mixer (SPEC.md 2.1). */
     static final int MIXER_TARGET = 7;
 
+    /** The most a key can be on `setR7` through a transformation: bits 5
+     *  to 0 of a row, below the port directions, so a tick reads key k as
+     *  k + 192 (rule 2(f)). */
+    static final int MOST_MIXER_KEY = ~PORTS & 0xFF;
+
     /** A column that fills its byte, and the column and bit beside it that
      *  keep its 0 a value (SPEC.md 1.1). */
     static final int[] BESIDE_COLUMN = {1, -1, 3, -1, 5, -1, -1, -1, -1, -1, -1, 13, 13};

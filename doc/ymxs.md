@@ -28,7 +28,8 @@ after the vectors.
 
 **Encoding.** `Schema` converts the structure into the columns of SPEC.md
 1: set bits, bits marking zero values in full-byte columns, effect
-columns, source markers or counts, and timer assignments.
+columns, mapping columns, source markers or counts, and timer
+assignments.
 
 ## What each column is written from
 
@@ -40,7 +41,13 @@ columns, source markers or counts, and timer assignments.
 | `deferred` of a `Start` | bit 3 of the control column, which the start sets (1.9, 4.8) |
 | `Retune` | control if the select changes, a reset is set or the count changes to 0; count if changed |
 | `Stop` | the source column at `$80`, the rate columns left unset (1.8) |
+| the `mapping` of a `Start` | the mapping column, the number of its last part, where it differs from the kept mapping (1.10; SPEC.md 6, rule 2(g)) |
+| `Remap` on a timer of the tune | the mapping column with the source column unset, where the effect may run through another mapping (1.10; SPEC.md 6, rule 2(g)) |
+| `Remap` on a timer outside the tune | every column left unset (SPEC.md 6, rule 2(a)) |
+| the tune's transformations | numbered 1 upward in the order of YMXS, SPEC.md 1.9, in a tune file of version 10 where a row sets a mapping column to one (3.3.5, 3.4) |
 | a source | a column a register of its target (3.1.3), repeating at its repeat row: bit 7 of the marker's column set on the last row (3.2), or, where that register reads its whole byte, rows a player counts and bit 31 of the index entry (3.1.6) |
+| a source of one column every `Start` maps through a transformation, with a key of 128 or more | rows a player counts and bit 31 of the index entry (3.1.6) |
+| a source a `Start` on `setR7` maps through a transformation | each key k as k + 192, the two port directions set (SPEC.md 6, rule 2(f)) |
 | Timer A, D, B, C | effects 0, 1, 2, 3 (2.3) |
 | the tune's sources | numbered 1 upward in the order a row first starts each (3.1) |
 
@@ -53,7 +60,9 @@ leaves the control column unset. For a start, the schema counts the timer
 as running only where its previous source repeats and no row stopped it.
 
 The player's kept values run through the wrap, so the repeat row writes
-its targets again.
+its targets again, and the first start or remap at or after it writes
+the mapping of each effect a row maps through a transformation (SPEC.md
+6, rule 2(g)).
 
 ## The place's reset
 
@@ -87,12 +96,14 @@ row or the source and exits 1.
 | the structure | why |
 |---|---|
 | more than 127 sources | the source column numbers 1 to 127 (1.8) |
+| more than 127 transformations, and a start, or a remap on a timer of the tune, through one | the mapping column numbers 1 to 127 (1.10) |
 | a count past 255 | the count column is the timer's data register, a byte (1.9) |
-| an operation other than a start, a retune and a stop | a remap (YMXS, SPEC.md 3.6.3) is left to a later version of this format (SPEC.md 6.5) |
-| a start through a transformation | a transformation (YMXS, SPEC.md 3.6.1) is left to a later version of this format (SPEC.md 6.5) |
+| a start, or a remap on a timer of the tune, through a transformation for a value other than the last of its target | the mapping column maps the last value alone (1.10) |
 | a target past 24 | 25 to 127 are left to a later version (2.1, section 8) |
 | a source on two targets whose markers are in different columns | a source has one marker column (SPEC.md 6, rule 2(d)) |
+| a source on `setR7` and on `setR0`, `setR2`, `setR4`, `setR11` or `setR12` | every row of a source on `setR7` has the two port directions, bits 7 and 6 (SPEC.md 6, rule 2(f)) |
 | a value past 127 in the marker's column of a marked source | bit 7 of that column is the marker (3.2) |
+| a key past 63 of a source a start on `setR7` maps through a transformation | bits 7 and 6 of each row are the two port directions (SPEC.md 6, rule 2(f)) |
 | a value past 255 | a column of a source is one byte (3.1.3) |
 
 ## The tools
