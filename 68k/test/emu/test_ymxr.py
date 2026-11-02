@@ -1304,6 +1304,19 @@ class Timers:
 INSIDE_FRAMES = 2000
 
 
+def widens(tune, r, i):
+    """Whether row r starts on effect i, through ymxr_widestart, a source
+    of several columns or a counted source, of more than one row, with the
+    timer running on, and leaves the source column of each effect before
+    it unset."""
+    t = EFFECT + 4 * i
+    s = r[t + 1] & 0x7F if r[t + 1] & 0x80 else 0
+    return bool(s) and tune.sources[s][1] > 1 \
+        and (len(tune.sources[s][3]) > 1 or tune.counted[s]) \
+        and r[t + 2] & 0xC0 != 0xC0 \
+        and not any(r[EFFECT + 4 * j + 1] & 0x80 for j in range(i))
+
+
 def reaches(model, i, kind):
     """Whether effect i's step reaches the boundary `kind` of inside on
     the row the next frame plays: the page switch, a remap of a running
@@ -1312,11 +1325,23 @@ def reaches(model, i, kind):
     source that steps a place; and a square's level, a remap of a running
     square. Each with the timer's reset clear, so the timer runs there and
     a tick can be due. The head and the end of the steps are reached on
-    every row."""
+    every row. The two of a start through ymxr_widestart, where its window
+    at level 7 opens and where it closes, are reached on a row that starts
+    through the identity a source of several columns or a counted source,
+    of more than one row, with the timer running on, and leaves the source
+    column of each effect before it unset, so the frame reaches the
+    routine first in that effect's step."""
     if kind is None:
         return True
     r = model.tune.rows[model.row]
     t = EFFECT + 4 * i
+    if kind in ("wide", "wide end"):
+        # a start through a transformation runs ymxr_lstart in its place
+        if model.tune.version == MAPPED:
+            m = r[C + i]
+            if m & 0x7F if m & 0x80 else model.fx[i]["mapping"]:
+                return False
+        return widens(model.tune, r, i)
     fx = model.fx[i]
     m = r[C + i]
     if r[t + 2] & 0x80 and r[t + 2] & 0x40:
@@ -1359,6 +1384,14 @@ def inside(code, symbols, bound, tune, workspace):
     boundaries a tick was fired at, each its kind below, or None for a
     head and the end of the steps.
 
+    A start through ymxr_widestart, of a source of several columns or of a
+    counted source, opens a window at level 7 before it reads the place of
+    the source the timer runs, and two boundaries are read there: where the
+    window opens, where the tick writes what a tick at the head of the step
+    writes and the start reads the place that tick stepped (1.8.4); and
+    inside it, where a tick due is served at the window's end and writes
+    the new source at the place the start read.
+
     A tune that maps a value on the player with the lookup in has three
     boundaries inside an effect's step besides (68k/YMXR.S): at the page
     switch of a remap between two transformations, before its one write,
@@ -1371,6 +1404,8 @@ def inside(code, symbols, bound, tune, workspace):
     """
     if not tune.effects:
         return []
+    wide = CODE + next(a for a in range(symbols["ymxr_widestart"], len(code), 2)
+                       if code[a:a + 6] == b"\x40\xe7\x00\x7c\x07\x00")
     at = []
     for i in range(4):
         if tune.effects & 1 << i:
@@ -1381,6 +1416,9 @@ def inside(code, symbols, bound, tune, workspace):
                 at.append((i, i, CODE + symbols["ymxr_rpage"], "page"))
                 at.append((i, i + 1, CODE + symbols["ymxr_lwindow"], "window"))
                 at.append((i, i + 1, CODE + symbols["ymxr_rlevel"], "square"))
+            if any(widens(tune, r, i) for r in tune.rows):
+                at.append((i, i, wide, "wide"))
+                at.append((i, i + 1, wide + 6, "wide end"))
             at.append((i, i, CODE + symbols["ymxr_tick%d_over" % i], None))
             at.append((i, 4, CODE + symbols["ymxr_tick3_done"], None))
     m = Machine(code, symbols, bound)
@@ -1416,7 +1454,7 @@ def inside(code, symbols, bound, tune, workspace):
                    until=None if kind is None else
                    (lambda mu: mu.reg_read(UC_M68K_REG_A3) == record))
             level = (m.mu.reg_read(UC_M68K_REG_SR) >> 8) & 7
-            if kind in ("window", "square"):
+            if kind in ("window", "square", "wide end"):
                 assert level == 7, \
                     "frame %d: effect %d's %s boundary is at level %d, not inside its window" % (
                         f, i, kind, level)
@@ -2102,6 +2140,70 @@ def voices(code, symbols):
     frames, ticks = check(at, code, symbols)[:2]
     return ("a target of three registers and one of two: %d frames, %d ticks"
             % (frames, ticks))
+
+
+def widekept(code, symbols):
+    """A start through ymxr_widestart, of a source of several columns or of
+    a counted source, with bits 5 and 6 of the control column at 0 and the
+    timer running on: the place keeps its row number modulo R of the new
+    source (SPEC.md 1.8.4). inside() fires a tick where the routine opens
+    its level-7 window and one where the window closes. The first reads
+    the source that runs before the start, and the start reads the place
+    that tick stepped; a start that reads the place before the window
+    starts the new source a row behind. The second reads the new source at
+    the place the start read; where the vector is aimed after the window,
+    that tick runs the handler before the start, and the new source plays
+    a row behind again.
+
+    Five tunes on Timer A, each starting two sources in turn at rows 0, 6,
+    12, 18 and 24. In the first both are of two columns on setToneA; in
+    the other four the first is a source of one column on R10, which the
+    general handler runs, and the second is of a kind the routine starts:
+    two columns on setToneA, three on setVoiceA, a counted column on R0
+    and a counted two on setEnvelope. Each tune fires a tick at four
+    boundaries: the two of the window, the head of effect 0's step and the
+    point after the last step.
+    """
+    rows = 30
+    starts = (0, 6, 12, 18, 24)
+    def column(at):
+        return [at(starts.index(r)) if r in starts else -1 for r in range(rows)]
+    tones = [[16 * k + 2, 2] for k in range(6)]
+    kinds = (
+        ("Two sources of two columns", ("eight tones", [[16 * k + 1, 1] for k in range(8)]),
+         ("six tones", tones), (14, 14), {"r7": 0x3E, "r8": 15}),
+        ("A source of two columns after the general handler", None,
+         ("six tones", tones), (10, 14), {"r7": 0x3E, "r8": 15}),
+        ("A source of three columns after the general handler", None,
+         ("voice A", [[0, 1, 15], [128, 1, 12], [0, 2, 9], [128, 2, 6], [0, 1, 11],
+                      [64, 1, 14]]), (10, 17), {"r7": 0x3E}),
+        ("A counted source after the general handler", None,
+         ("sweep", [200, 220, 240, 255, 240, 220]), (10, 0), {"r7": 0x3E, "r1": 1, "r8": 12}),
+        ("A counted source of two columns after the general handler", None,
+         ("sweep", [[0, 2], [128, 3], [0, 5], [64, 8], [0, 13], [192, 21]]), (10, 20),
+         {"r7": 0x3E, "r8": 0x10, "r13": 10}))
+    frames = ticks = 0
+    for title, first, then, targets, registers in kinds:
+        first = first or ("eight volumes", [k + 4 for k in range(8)])
+        tune = {"format": "ymxs", "version": 4, "tunes": [{
+            "title": title, "composer": "", "writer": "68k/test/emu/test_ymxr.py",
+            "rate": 50, "rows": rows, "repeat": 0,
+            "sources": [{"name": name, "repeat": 0, "values": values}
+                        for name, values in (first, then)],
+            "registers": {r: [v] + [-1] * (rows - 1) for r, v in registers.items()},
+            "timerA": {"shape": column(lambda k: 0),
+                       "target": column(lambda k: targets[k % 2]),
+                       "source": column(lambda k: 1 + k % 2),
+                       "prescaler": column(lambda k: 50), "count": column(lambda k: 80),
+                       "timerReset": column(lambda k: 1 if k == 0 else 0),
+                       "placeReset": column(lambda k: 1 if k == 0 else 0)}}]}
+        at = built("widekept", tune)[0]
+        played = check(at, code, symbols)
+        assert len(played[6]) == 4, "%s: a tick at %d boundaries, not 4" % (title, len(played[6]))
+        frames, ticks = frames + played[0], ticks + played[1]
+    return ("a start of several columns or of a counted source at the running row, a tick"
+            " where its window opens and one where it closes: %d tunes, %d frames, %d ticks"
+            % (len(kinds), frames, ticks))
 
 
 def envelope(code, symbols):
@@ -4465,6 +4567,7 @@ def main():
         print("    %s" % absolute_sizes())
         print("    %s" % halves(code, symbols))
         print("    %s" % voices(code, symbols))
+        print("    %s" % widekept(code, symbols))
         print("    %s" % envelope(code, symbols))
         print("    %s" % wholebyte(code, symbols))
         if PCREL:

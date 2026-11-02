@@ -621,13 +621,11 @@ q\{ct}:         bra.w   \{tick}_done
 ; A start of a source of several columns (SPEC.md 3.1.3), in the routine
 ; every effect shares: the effect alone is here, since the branch
 ; above has a byte's displacement and the routine is further off than
-; that. The routine leaves
-; the handler its columns pick, or the general handler's shape where the
-; source is one row.
+; that. The routine aims the vector at the handler its columns pick, and
+; returns Z where the source is one row.
 \{tick}_widen:  moveq   #(\fx-WS_FX)/FX_SIZE,d4
                 bsr.w   ymxr_widestart
                 beq.w   \{tick}_one
-                move.l  a5,\vector.w
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 
@@ -3383,12 +3381,17 @@ ymxr_widereset:
 ; the handler its columns pick, and a register, a place and a loop cell a
 ; column written into it. d4 the effect, d0 the source's cell as init
 ; tagged it, d1 the source's number times eight, d2 the row's control
-; byte, a4 the source's first row. a5 the handler to aim at, and Z where
-; the source is one row, which the general handler's shape runs.
+; byte, a4 the source's first row. a5 the new handler, and Z where the
+; source is one row, which the general handler's shape runs.
 ;
 ; The writes are behind level 7, as the general handler's three do: a
 ; tick between a select and a place writes one column's row to another
-; column's register, and one between two places reads two rows.
+; column's register, and one between two places reads two rows. The
+; window opens before the read of the place the row does not reset, since
+; a tick between the read and the writes steps it (SPEC.md 1.8.4), and
+; closes once the vector is aimed at the new handler: a tick due inside
+; the window fires where it closes and runs the new handler from the
+; place read. The installer aims an armed start's vector (4.8).
 ymxr_widestart:
                 addq.l  #1,d0                   ; -1: a source of one row, at
                 beq.w   .one                    ; any columns
@@ -3421,6 +3424,11 @@ ymxr_widestart:
                 lea     ymxr_two0(pc),a5
 .handler:       adda.w  d0,a5                   ; this effect's handler
                 move.l  d5,d0                   ; the loop cell
+; R, which a pending start and a place's reset read; then level 7 from the
+; place's read to the vector's write.
+                move.l  DT_ROWS-DT_PAYLOAD(a4),FX_ROWS(a3)
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; a deferred start: the bank and
                 beq.s   .running                ; the row the arming chose (4.8)
@@ -3464,9 +3472,8 @@ ymxr_widestart:
                 bsr.w   ymxr_rem
                 move.l  (sp)+,d4
 ; A register, a place and a loop cell a column, out of the target's row
-; of the map; and R, which a pending start and a place's reset read.
-.at:            move.l  DT_ROWS-DT_PAYLOAD(a4),FX_ROWS(a3)
-                cmp.w   #1,d4                   ; a source whose column fills
+; of the map.
+.at:            cmp.w   #1,d4                   ; a source whose column fills
                 beq.w   .countedaim             ; its byte
                 cmp.w   #4,d4                   ; a counted source of two
                 beq.w   .envaim                 ; columns
@@ -3476,8 +3483,6 @@ ymxr_widestart:
                 lsl.w   #3,d5                   ; registers begin at 14 (SPEC.md
                 lea     ymxr_wide(pc),a2        ; 2.1): eight bytes a target in
                 adda.w  d5,a2                   ; the map, two a column
-                move.w  sr,-(sp)
-                ori.w   #$0700,sr
                 cmp.w   #3,d4
                 beq.s   .slots
                 WSLOT   TW2_SEL1,TW2_PTR1,TW2_CELLS,FX_FIRST,0
@@ -3492,7 +3497,18 @@ ymxr_widestart:
                 WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+CELL_SIZE,FX_FIRST2,2
                 WSLOT   TW3_SEL3,TW3_PTR3,TW3_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
                 move.b  #3,FX_SHAPE(a3)
-.aimed:         move.w  (sp)+,sr
+; The vector, at level 7: a tick due in the window fires once it points
+; at the new handler.
+.aimed:
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)           ; an armed start (4.8)
+                bne.s   .level
+                .endif
+                lea     ymxr_timers(pc),a2
+                lsl.w   #3,d6                   ; the effect's, eight bytes a
+                movea.w (a2,d6.w),a2            ; timer
+                move.l  a5,(a2)
+.level:         move.w  (sp)+,sr
                 lea     YM_SELECT.w,a2          ; the chip's select register,
                 move.l  (sp)+,d6                ; which the frame reads it in
                 moveq   #1,d0                   ; a source of several columns:
@@ -3527,8 +3543,6 @@ ymxr_widestart:
                 move.w  -2(a2,d1.w),d5          ; R less RR, the rows of a pass
                 move.l  a4,d1                   ; through the loop
                 add.l   d3,d1                   ; the row the place is at
-                move.w  sr,-(sp)
-                ori.w   #$0700,sr
                 move.b  FX_TARGET(a3),TICKC_SEL(a5)
                 .if     YMXR_PCREL
                 sub.l   a5,d1                   ; the displacement from the
@@ -3563,8 +3577,6 @@ ymxr_widestart:
                 lsl.w   #3,d5                   ; registers begin at 14
                 lea     ymxr_wide(pc),a2
                 adda.w  d5,a2
-                move.w  sr,-(sp)
-                ori.w   #$0700,sr
                 WSLOT   TWC_SEL1,TWC_PTR1,TWC_CELLS,FX_FIRST,0
                 WSLOT   TWC_SEL2,TWC_PTR2,TWC_CELLS+CELL_SIZE,FX_FIRST2,2
                 move.w  2(sp),d4                ; R, under the level pushed
@@ -3578,12 +3590,8 @@ ymxr_widestart:
                 sub.w   d5,d4
 .envonce:       move.w  d4,TWC_RELD(a5)
                 move.b  #5,FX_SHAPE(a3)
-                move.w  (sp)+,sr
-                addq.l  #2,sp                   ; R, off the stack
-                lea     YM_SELECT.w,a2
-                move.l  (sp)+,d6
-                moveq   #1,d0
-                rts
+                move.w  (sp)+,(sp)              ; the level pushed, over R
+                bra.w   .aimed
 
 ; A row number modulo R (SPEC.md 1.8.4): d3 the number, d4 R; d5
 ; scratch. A number below R is one compare. At R or above, one divu: its

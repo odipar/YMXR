@@ -203,7 +203,7 @@ Each of the eight has a twin with `-defer` before `.bin`, assembled with
 the deferred start in, `YMXR_DEFER=1`, whose flags word is the eight's
 plus 8: `YMXR_sndh-defer.bin` reads 12. Init of a core without it
 reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
-core with it is 4,402 bytes larger.
+core with it is 4,408 bytes larger.
 
 Each of the sixteen has a twin with `-map` before `.bin`, assembled with
 the lookup in, `YMXR_MAP=1` (SPEC.md 1.10), whose flags word is the

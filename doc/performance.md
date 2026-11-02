@@ -440,9 +440,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,416 bytes, 896 of them the counted shapes' eight
+The player is 8,392 bytes, 896 of them the counted shapes' eight
 instances, four of one column and four of two; where a tick reads an
-absolute address, 8,086 bytes and 952, instances of 138 bytes against the
+absolute address, 8,062 bytes and 952, instances of 138 bytes against the
 marked shape's 122.
 
 ## A tick through an absolute address
@@ -510,7 +510,7 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 8,086 bytes against 8,416. Two figures
+assembles this build, which is 8,062 bytes against 8,392. Two figures
 move against each other: a place is a word where it was a long, which
 shortens a timer's handlers by 40 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
@@ -588,8 +588,8 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,818
-bytes against 8,416, and 12,636 against 8,086 where a tick reads an
+The second bank, the installers and the stubs make the player 12,800
+bytes against 8,392, and 12,618 against 8,062 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.
