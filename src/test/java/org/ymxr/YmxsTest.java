@@ -871,6 +871,279 @@ final class YmxsTest {
         assertEquals(90, column[count][4] & 0xFF, "and its count");
     }
 
+    private static final Single LOUD = Tunes.repeating("square 12", List.of(12, 0), 0);
+    private static final Single SOFT = Tunes.repeating("square 6", List.of(6, 0), 0);
+
+    /** A rate of the divisor {@code by} and {@code count}, both resets
+     *  clear. */
+    private static Timing rate(int by, int count) {
+        return new Timing(Chip.prescaler(by), count, false, false);
+    }
+
+    /** Three rows that repeat to row 1: a start at the divisor 4 and count
+     *  100, a retune to the same rate, then a retune to {@code by} and
+     *  {@code count}, the rate after the last row. */
+    private static Tune retunedAtTheRepeatRow(int by, int count) {
+        return built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, LOUD, STOPPED, false)),
+                row(Map.of(), Timer.A, new Retune(rate(4, 100))),
+                row(Map.of(), Timer.A, new Retune(rate(by, count)))), 1);
+    }
+
+    /** The tune of the defect: the retune at the repeat row is at the
+     *  count the first pass has there, 100, and the last row retunes to
+     *  90, so the second pass reaches the repeat row at 90. */
+    static Tune repeatCount() {
+        return retunedAtTheRepeatRow(4, 90);
+    }
+
+    /** The same with the select: the last row retunes to the divisor 10
+     *  at count 100. */
+    static Tune repeatSelect() {
+        return retunedAtTheRepeatRow(10, 100);
+    }
+
+    /** A start at the repeat row at the rate the timer counts at in the
+     *  first pass, both resets clear, and a stop on the last row, so the
+     *  timer is stopped where the second pass reaches the repeat row. */
+    static Tune repeatCounting() {
+        return built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, LOUD, STOPPED, false)),
+                row(Map.of(), Timer.A, start(Register.R8, SOFT, rate(4, 100), false)),
+                new Row(Map.of(), Map.of(Timer.A, Tunes.STOP))), 1);
+    }
+
+    /** The same start at the repeat row, and on the last row a deferred
+     *  start at count 90, pending across the wrap behind a source of
+     *  eight rows: until the tick that performs it the rate is open. */
+    static Tune repeatPending() {
+        Single eight = Tunes.repeating("eight", List.of(9, 8, 7, 6, 5, 4, 3, 2), 0);
+        return built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, LOUD, STOPPED, false)),
+                row(Map.of(), Timer.A, start(Register.R8, eight, rate(4, 100), false)),
+                row(Map.of(), Timer.A, start(Register.R8, SOFT, rate(4, 90), true))), 1);
+    }
+
+    /** A retune at the repeat row at count 100, a retune to 90, and on the
+     *  last row a deferred start at 100: the record keeps 100 across the
+     *  wrap, and until the tick that performs the start the timer counts
+     *  at 90. */
+    static Tune repeatDeferred() {
+        return built(List.of(
+                row(Map.of(), Timer.A, start(Register.R8, LOUD, STOPPED, false)),
+                row(Map.of(), Timer.A, new Retune(rate(4, 100))),
+                row(Map.of(), Timer.A, new Retune(rate(4, 90))),
+                row(Map.of(), Timer.A, start(Register.R8, SOFT, rate(4, 100), true))), 1);
+    }
+
+    /** A retune and a start at the repeat row at the rate the first pass
+     *  has there, both resets clear, and a last row that leaves both
+     *  timers at that rate, a source that repeats on each: the second pass
+     *  reaches the repeat row as the first does. */
+    static Tune repeatAgrees() {
+        return built(List.of(
+                row(Timer.A, start(Register.R8, LOUD, STOPPED, false),
+                        Timer.D, start(Register.R9, SOFT,
+                                new Timing(Chip.prescaler(4), 60, true, true), false)),
+                row(Timer.A, new Retune(rate(4, 100)),
+                        Timer.D, start(Register.R9, LOUD, rate(4, 60), false)),
+                row(Timer.A, new Retune(rate(10, 90)),
+                        Timer.D, start(Register.R9, SOFT, rate(4, 100), false)),
+                row(Timer.A, new Retune(rate(4, 100)),
+                        Timer.D, start(Register.R9, LOUD, rate(4, 60), false))), 1);
+    }
+
+    /**
+     * The record of {@code tune} over one pass and one loop (SPEC.md 7.4)
+     * against the rates of its rows, and its table against rules 4(b) and
+     * 4(d). At the frame of each start and retune of the structure, the
+     * kept select and count of its effect are the operation's (YMXS,
+     * SPEC.md 7.4); a start that leaves the control column unset follows a
+     * start of a repeating source with bit 3 at 0 and no stop between; and
+     * the first start or retune after a deferred start sets both rate
+     * columns. Returns the starts and retunes of the repeat row read a
+     * second time.
+     */
+    private static int assertTheRatesOfTheStructure(Tune tune) {
+        Padding.Padded padded = Padding.toUnit(tune, YmToYmxr.UNIT, new Report());
+        byte[] file = file(tune);
+        String[] lines = new String(Trace.record(file, -1),
+                java.nio.charset.StandardCharsets.US_ASCII).split("\n");
+        org.dtx.Table table = TuneFile.read(file).table();
+        List<org.ymxs.YMXS.Source> sources = Tunes.sources(tune);
+        java.util.regex.Pattern entry = java.util.regex.Pattern.compile(
+                "\"(\\d)\":\\{\"target\":\\d+,\"source\":\\d+,\"select\":(\\d+),\"count\":(\\d+)");
+        int rows = padded.frames().length;
+        int repeat = padded.tune().table().repeat().orElseThrow();
+        int[] select = new int[4];
+        int[] count = new int[4];
+        boolean[] counting = new boolean[4];
+        boolean[] deferred = new boolean[4];
+        int again = 0;
+        for (int k = 0; k + 1 < lines.length; k++) {
+            int t = k < rows ? k : repeat + (k - rows) % (rows - repeat);
+            java.util.regex.Matcher m = entry.matcher(lines[k + 1]);
+            while (m.find()) {
+                int i = Integer.parseInt(m.group(1));
+                select[i] = Integer.parseInt(m.group(2));
+                count[i] = Integer.parseInt(m.group(3));
+            }
+            for (int i = 0; i < 4; i++) {
+                int source = table.column(Columns.EFFECT + 4 * i + 1)[t] & 0xFF;
+                int control = table.column(Columns.EFFECT + 4 * i + 2)[t] & 0xFF;
+                if (source == 0x80) {
+                    counting[i] = false;
+                } else if (source > 0x80) {
+                    boolean repeats = Tunes.rows(sources.get(source - 0x81)).repeat()
+                            .isPresent();
+                    if ((control & 0x80) == 0) {
+                        assertTrue(counting[i], "frame " + k + ": effect " + i + " starts with"
+                                + " the control column unset on a stopped timer");
+                    }
+                    counting[i] = (control & 0x80) == 0 ? counting[i] && repeats
+                            : (control & Columns.DEFERRED) == 0 && repeats;
+                }
+            }
+            int s = padded.frames()[t];
+            if (s < 0) {
+                continue;
+            }
+            for (Map.Entry<Timer, Effect> one : Tunes.effects(Tunes.rows(tune).get(s))
+                    .entrySet()) {
+                Timing timing = one.getValue() instanceof Start start ? start.timing()
+                        : one.getValue() instanceof Retune retune ? retune.timing() : null;
+                if (timing == null) {
+                    continue;
+                }
+                int i = 0;
+                while (Schema.timer(i) != one.getKey()) {
+                    i++;
+                }
+                String at = "frame " + k + ", row " + s + " of the structure, effect " + i;
+                if (deferred[i]) {
+                    int control = table.column(Columns.EFFECT + 4 * i + 2)[t] & 0xFF;
+                    int written = table.column(Columns.EFFECT + 4 * i + 3)[t] & 0xFF;
+                    assertTrue((control & 0x80) != 0
+                            && (written != 0 || (control & Columns.COUNT_VALUE) != 0),
+                            at + ": the first start or retune after a deferred start sets"
+                            + " both rate columns");
+                }
+                deferred[i] = one.getValue() instanceof Start start && start.deferred();
+                assertEquals(Chip.divides(timing.prescaler()), Columns.PRESCALER[select[i]],
+                        at + ": the kept select");
+                assertEquals(timing.count(), count[i], at + ": the kept count");
+                if (k >= rows && t == repeat) {
+                    again++;
+                }
+            }
+        }
+        return again;
+    }
+
+    /** The repeat row of {@code tune}, a row of the columns
+     *  {@code Schema.of} writes without the padding of SPEC.md 6.3. */
+    private static int repeatRow(Tune tune) {
+        return tune.table().repeat().orElseThrow();
+    }
+
+    /**
+     * The retune at the repeat row is at the count the timer counts at in
+     * the first pass, and the last row leaves another, so the repeat row
+     * writes the count column, and the second pass records the count of
+     * the structure (rule 4(e)). The select agrees across the wrap, and
+     * the control column stays unset.
+     */
+    @Test
+    void theRepeatRowWritesACountTheLastRowLeavesOtherwise() {
+        Tune tune = repeatCount();
+        byte[][] column = Schema.of(tune).columns().column;
+        int r = repeatRow(tune);
+        assertEquals(100, column[Columns.EFFECT + 3][r] & 0xFF, "the count column");
+        assertEquals(0, column[Columns.EFFECT + 2][r], "the control column");
+        assertEquals(1, assertTheRatesOfTheStructure(tune),
+                "the retune at the repeat row, read a second time");
+    }
+
+    /** The select the last row leaves differs from the select before the
+     *  repeat row, and the count agrees: the repeat row writes the control
+     *  column alone (rule 4(e)). */
+    @Test
+    void theRepeatRowWritesASelectTheLastRowLeavesOtherwise() {
+        Tune tune = repeatSelect();
+        byte[][] column = Schema.of(tune).columns().column;
+        int r = repeatRow(tune);
+        assertEquals(0x80 | 1, column[Columns.EFFECT + 2][r] & 0xFF, "the control column");
+        assertEquals(0, column[Columns.EFFECT + 3][r], "the count column");
+        assertEquals(1, assertTheRatesOfTheStructure(tune));
+    }
+
+    /** The timer counts before the repeat row and is stopped after the
+     *  last row: the start at the repeat row writes both rate columns, so
+     *  the select it writes starts the timer in the second pass (SPEC.md
+     *  4.3 step 5, rule 4(e)). */
+    @Test
+    void theRepeatRowStartsATimerTheLastRowStops() {
+        Tune tune = repeatCounting();
+        byte[][] column = Schema.of(tune).columns().column;
+        int r = repeatRow(tune);
+        assertEquals(0x80 | 1, column[Columns.EFFECT + 2][r] & 0xFF, "the control column");
+        assertEquals(100, column[Columns.EFFECT + 3][r] & 0xFF, "the count column");
+        assertEquals(0x82, column[Columns.EFFECT + 1][r] & 0xFF, "the source");
+        assertEquals(1, assertTheRatesOfTheStructure(tune));
+    }
+
+    /** A deferred start on the last row leaves the rate open across the
+     *  wrap, so the start at the repeat row writes both rate columns
+     *  (rule 4(d), 4(e)). */
+    @Test
+    void aStartPendingAcrossTheWrapOpensTheRate() {
+        Tune tune = repeatPending();
+        byte[][] column = Schema.of(tune).columns().column;
+        int r = repeatRow(tune);
+        assertEquals(0x80 | 1, column[Columns.EFFECT + 2][r] & 0xFF, "the control column");
+        assertEquals(100, column[Columns.EFFECT + 3][r] & 0xFF, "the count column");
+        assertEquals(1, assertTheRatesOfTheStructure(tune));
+    }
+
+    /**
+     * A deferred start on the last row leaves the rate open across the
+     * wrap, so the retune at the repeat row sets both rate columns (rule
+     * 4(d), 4(e)). The record keeps 100 at the repeat row before the fix
+     * and after it; 9f66c42 left both columns unset there, and the timer
+     * counted at 90 in the second pass until the tick that performs the
+     * start.
+     */
+    @Test
+    void theFirstRetuneAfterADeferredStartAcrossTheWrapSetsBothColumns() {
+        Tune tune = repeatDeferred();
+        byte[][] column = Schema.of(tune).columns().column;
+        int r = repeatRow(tune);
+        assertEquals(0x80 | 1, column[Columns.EFFECT + 2][r] & 0xFF, "the control column");
+        assertEquals(100, column[Columns.EFFECT + 3][r] & 0xFF, "the count column");
+        assertEquals(1, assertTheRatesOfTheStructure(tune));
+    }
+
+    /**
+     * Where the last row leaves the select, the count and the counting
+     * flag of each effect as they are before the repeat row, the repeat
+     * row leaves its rate columns unset as in the first pass, and the
+     * file is byte for byte the one 9f66c42 wrote.
+     */
+    @Test
+    void aRateThatAgreesAcrossTheWrapIsLeftUnset() throws Exception {
+        Tune tune = repeatAgrees();
+        byte[][] column = Schema.of(tune).columns().column;
+        int r = repeatRow(tune);
+        for (int c : new int[] {Columns.EFFECT + 2, Columns.EFFECT + 3, Columns.EFFECT + 6,
+                Columns.EFFECT + 7}) {
+            assertEquals(0, column[c][r], "column " + c + " of the repeat row");
+        }
+        assertEquals(2, assertTheRatesOfTheStructure(tune));
+        byte[] sha = java.security.MessageDigest.getInstance("SHA-256").digest(file(tune));
+        assertEquals("4fa48464fa3a207452cd3b37b8845004ab5f68c645527357c2ea64fe46f1238b",
+                java.util.HexFormat.of().formatHex(sha));
+    }
+
     @Test
     void aRegisterOfZeroSetsTheBitBesideIt() {
         List<Row> rows = List.of(new Row(Map.of(Register.R0, 0, Register.R11, 0), Map.of()),

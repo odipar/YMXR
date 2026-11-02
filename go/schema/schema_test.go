@@ -2,6 +2,8 @@ package schema_test
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -692,5 +694,257 @@ func TestASourceOnSetR7AndOnAnotherTargetIsALine(t *testing.T) {
 				t.Fatalf("the source reports %q, and the line is %q", said, want)
 			}
 		}
+	}
+}
+
+// rate is a rate of the divisor by and count, both resets clear.
+func rate(t *testing.T, by, count int) ymxs.Timing {
+	t.Helper()
+	prescaler, err := ymxs.PrescalerBy(by)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ymxs.Timing{Prescaler: prescaler, Count: count}
+}
+
+// startAt is a start of the source on the register at the timing, through
+// the identity, deferred or at its row.
+func startAt(t *testing.T, register ymxs.Register, source ymxs.Single, timing ymxs.Timing,
+	deferred bool) ymxs.Start {
+	t.Helper()
+	start, err := ymxs.Starting(ymxs.Setting(register), source, timing, deferred,
+		ymxs.Mapping{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return start
+}
+
+// retunedAtTheRepeatRow is three rows that repeat to row 1: a start at the
+// divisor 4 and count 100, a retune to the same rate, then a retune to the
+// divisor by and count, the rate after the last row.
+func retunedAtTheRepeatRow(t *testing.T, by, count int) ymxs.Tune {
+	return tune([]ymxs.Row{
+		on(ymxs.TimerA, struck(t, ymxs.R8, square, ymxs.Mapping{})),
+		on(ymxs.TimerA, ymxs.Retune{Timing: rate(t, 4, 100)}),
+		on(ymxs.TimerA, ymxs.Retune{Timing: rate(t, by, count)}),
+	}, 1)
+}
+
+// both is a row of one operation on each of Timers A and D.
+func both(a, d ymxs.Effect) ymxs.Row {
+	return ymxs.Row{Effects: map[ymxs.Timer]ymxs.Effect{ymxs.TimerA: a, ymxs.TimerD: d}}
+}
+
+// ratesOfTheStructure reads the record of the tune over one pass and one
+// loop (SPEC.md 7.4) against the rates of its rows, and its table against
+// rules 4(b) and 4(d). At the frame of each start and retune of the
+// structure, the kept select and count of its effect are the operation's
+// (YMXS, SPEC.md 7.4); a start that leaves the control column unset follows
+// a start of a repeating source with bit 3 at 0 and no stop between; and
+// the first start or retune after a deferred start sets both rate columns.
+// It returns the starts and retunes of the repeat row read a second time.
+func ratesOfTheStructure(t *testing.T, one ymxs.Tune) int {
+	t.Helper()
+	tuneFile := file(t, made(t, one))
+	read, err := ymxr.Read(tuneFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(string(trace.Record(tuneFile, -1)), "\n"),
+		"\n")
+	entry := regexp.MustCompile(`"(\d)":\{"target":\d+,"source":\d+,"select":(\d+),` +
+		`"count":(\d+)`)
+	rows := ymxs.Rows(one)
+	repeat, _ := one.Table.Repeat()
+	sources := ymxs.Sources(one)
+	var selects, count [4]int
+	var counting, deferred [4]bool
+	again := 0
+	for k := 0; k+1 < len(lines); k++ {
+		r := k
+		if k >= len(rows) {
+			r = repeat + (k-len(rows))%(len(rows)-repeat)
+		}
+		for _, found := range entry.FindAllStringSubmatch(lines[k+1], -1) {
+			i, _ := strconv.Atoi(found[1])
+			selects[i], _ = strconv.Atoi(found[2])
+			count[i], _ = strconv.Atoi(found[3])
+		}
+		for i := 0; i < 4; i++ {
+			source := int(read.Table.Column(ymxr.Effect + 4*i + 1)[r])
+			control := int(read.Table.Column(ymxr.Effect + 4*i + 2)[r])
+			if source == 0x80 {
+				counting[i] = false
+			} else if source > 0x80 {
+				_, repeats := ymxs.SourceRows(sources[source-0x81]).Repeat()
+				if control&0x80 == 0 {
+					if !counting[i] {
+						t.Fatalf("frame %d: effect %d starts with the control column unset"+
+							" on a stopped timer", k, i)
+					}
+					counting[i] = counting[i] && repeats
+				} else {
+					counting[i] = control&ymxr.Deferred == 0 && repeats
+				}
+			}
+		}
+		for _, op := range ymxs.Effects(rows[r]) {
+			var timing ymxs.Timing
+			starts := false
+			switch e := op.Effect.(type) {
+			case ymxs.Start:
+				timing = e.Timing
+				starts = e.Deferred
+			case ymxs.Retune:
+				timing = e.Timing
+			default:
+				continue
+			}
+			i := 0
+			for schema.Timer(i) != op.Timer {
+				i++
+			}
+			if deferred[i] {
+				control := read.Table.Column(ymxr.Effect + 4*i + 2)[r]
+				written := read.Table.Column(ymxr.Effect + 4*i + 3)[r]
+				if control&0x80 == 0 || written == 0 && control&ymxr.CountValue == 0 {
+					t.Fatalf("frame %d, row %d, effect %d: the first start or retune after a"+
+						" deferred start sets the rate columns %#x and %#x", k, r, i, control,
+						written)
+				}
+			}
+			deferred[i] = starts
+			if ymxr.Prescaler[selects[i]] != ymxs.Divides(timing.Prescaler) ||
+				count[i] != timing.Count {
+				t.Fatalf("frame %d, row %d, effect %d: the kept select %d and count %d, and"+
+					" the structure's divisor %d and count %d", k, r, i, selects[i], count[i],
+					ymxs.Divides(timing.Prescaler), timing.Count)
+			}
+			if k >= len(rows) && r == repeat {
+				again++
+			}
+		}
+	}
+	return again
+}
+
+// rateColumns is the control and count columns of effect i at row r.
+func rateColumns(one schema.Made, i, r int) []byte {
+	return []byte{one.Columns.Column[ymxr.Effect+4*i+2][r],
+		one.Columns.Column[ymxr.Effect+4*i+3][r]}
+}
+
+// The retune at the repeat row is at the count the timer counts at in the
+// first pass, and the last row leaves another: the repeat row writes the
+// count column, and the second pass records the count of the structure.
+// The select agrees across the wrap, and the control column stays unset
+// (SPEC.md rule 4(e)).
+func TestTheRepeatRowWritesACountTheLastRowLeavesOtherwise(t *testing.T) {
+	one := retunedAtTheRepeatRow(t, 4, 90)
+	expect(t, "the rate columns of the repeat row", rateColumns(made(t, one), 0, 1),
+		[]byte{0, 100})
+	if again := ratesOfTheStructure(t, one); again != 1 {
+		t.Fatalf("the repeat row read a second time has %d retunes", again)
+	}
+}
+
+// The select the last row leaves differs from the select before the repeat
+// row, and the count agrees: the repeat row writes the control column alone
+// (SPEC.md rule 4(e)).
+func TestTheRepeatRowWritesASelectTheLastRowLeavesOtherwise(t *testing.T) {
+	one := retunedAtTheRepeatRow(t, 10, 100)
+	expect(t, "the rate columns of the repeat row", rateColumns(made(t, one), 0, 1),
+		[]byte{0x81, 0})
+	if again := ratesOfTheStructure(t, one); again != 1 {
+		t.Fatalf("the repeat row read a second time has %d retunes", again)
+	}
+}
+
+// The timer counts before the repeat row and is stopped after the last row:
+// the start at the repeat row writes both rate columns, so the select it
+// writes starts the timer in the second pass (SPEC.md 4.3 step 5, rule
+// 4(e)).
+func TestTheRepeatRowStartsATimerTheLastRowStops(t *testing.T) {
+	one := tune([]ymxs.Row{
+		on(ymxs.TimerA, struck(t, ymxs.R8, square, ymxs.Mapping{})),
+		on(ymxs.TimerA, startAt(t, ymxs.R8, other, rate(t, 4, 100), false)),
+		on(ymxs.TimerA, ymxs.Stop{}),
+	}, 1)
+	expect(t, "the rate columns of the repeat row", rateColumns(made(t, one), 0, 1),
+		[]byte{0x81, 100})
+	if again := ratesOfTheStructure(t, one); again != 1 {
+		t.Fatalf("the repeat row read a second time has %d starts", again)
+	}
+}
+
+// A deferred start on the last row leaves the rate open across the wrap, so
+// the start at the repeat row writes both rate columns (SPEC.md rule 4(d),
+// 4(e)).
+func TestAStartPendingAcrossTheWrapOpensTheRate(t *testing.T) {
+	eight := ymxs.RepeatingSource("eight", []int{9, 8, 7, 6, 5, 4, 3, 2}, 0)
+	one := tune([]ymxs.Row{
+		on(ymxs.TimerA, struck(t, ymxs.R8, square, ymxs.Mapping{})),
+		on(ymxs.TimerA, startAt(t, ymxs.R8, eight, rate(t, 4, 100), false)),
+		on(ymxs.TimerA, startAt(t, ymxs.R8, other, rate(t, 4, 90), true)),
+	}, 1)
+	expect(t, "the rate columns of the repeat row", rateColumns(made(t, one), 0, 1),
+		[]byte{0x81, 100})
+	if again := ratesOfTheStructure(t, one); again != 1 {
+		t.Fatalf("the repeat row read a second time has %d starts", again)
+	}
+}
+
+// A deferred start on the last row leaves the rate open across the wrap, so
+// the retune at the repeat row sets both rate columns (SPEC.md rule 4(d),
+// 4(e)). The record keeps 100 at the repeat row before the fix and after
+// it; 9f66c42 left both columns unset there, and the timer counted at 90 in
+// the second pass until the tick that performs the start.
+func TestTheFirstRetuneAfterADeferredStartAcrossTheWrapSetsBothColumns(t *testing.T) {
+	one := tune([]ymxs.Row{
+		on(ymxs.TimerA, struck(t, ymxs.R8, square, ymxs.Mapping{})),
+		on(ymxs.TimerA, ymxs.Retune{Timing: rate(t, 4, 100)}),
+		on(ymxs.TimerA, ymxs.Retune{Timing: rate(t, 4, 90)}),
+		on(ymxs.TimerA, startAt(t, ymxs.R8, other, rate(t, 4, 100), true)),
+	}, 1)
+	expect(t, "the rate columns of the repeat row", rateColumns(made(t, one), 0, 1),
+		[]byte{0x81, 100})
+	if again := ratesOfTheStructure(t, one); again != 1 {
+		t.Fatalf("the repeat row read a second time has %d retunes", again)
+	}
+}
+
+// Where the last row leaves the select, the count and the counting flag of
+// each effect as they are before the repeat row, the repeat row leaves its
+// rate columns unset as in the first pass, and the tune file is byte for
+// byte the one 9f66c42 wrote.
+func TestARateThatAgreesAcrossTheWrapIsLeftUnset(t *testing.T) {
+	first, err := ymxs.PrescalerBy(4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := tune([]ymxs.Row{
+		both(struck(t, ymxs.R8, square, ymxs.Mapping{}), startAt(t, ymxs.R9, other,
+			ymxs.Timing{Prescaler: first, Count: 60, TimerReset: true, PlaceReset: true},
+			false)),
+		both(ymxs.Retune{Timing: rate(t, 4, 100)}, startAt(t, ymxs.R9, square,
+			rate(t, 4, 60), false)),
+		both(ymxs.Retune{Timing: rate(t, 10, 90)}, startAt(t, ymxs.R9, other,
+			rate(t, 4, 100), false)),
+		both(ymxs.Retune{Timing: rate(t, 4, 100)}, startAt(t, ymxs.R9, square,
+			rate(t, 4, 60), false)),
+	}, 1)
+	columns := made(t, one)
+	for i := 0; i < 2; i++ {
+		expect(t, fmt.Sprintf("the rate columns of effect %d at the repeat row", i),
+			rateColumns(columns, i, 1), []byte{0, 0})
+	}
+	if again := ratesOfTheStructure(t, one); again != 2 {
+		t.Fatalf("the repeat row read a second time has %d operations", again)
+	}
+	sum := sha256.Sum256(file(t, columns))
+	if got := hex.EncodeToString(sum[:]); got !=
+		"229eebd5b3a0e8040525fc4d79cef42044ed9fc0993eae5375d19ef6548fb197" {
+		t.Fatalf("the tune file has the sha256 %s", got)
 	}
 }

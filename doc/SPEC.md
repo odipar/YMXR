@@ -1014,9 +1014,11 @@ numbers the maps assign.**
   C columns runs on a target of C registers (2.1.2).
 - 2(c) A start whose target column is unset runs on the kept target, the
   last target column set on the effect in frame order, through the wrap
-  (4.5). A writer sets the target column on the first start of an
-  effect in the first pass, and on the first start at or after the
-  repeat row.
+  (4.5). A writer reads the rows in order with the kept target of each
+  effect, a target number or *open*, which differs from every number,
+  open at row 0 and at the repeat row. It sets the target column on a
+  start whose target differs from the kept target, which is then the
+  start's target.
 - 2(d) A target of two registers names one column for the marker (2.1),
   so a source of two columns runs on the tone targets, on the noise
   targets or on `setEnvelope`, and on one of the three alone.
@@ -1095,6 +1097,39 @@ while the effect runs** (YMXS rule 5).
   the tick that performs it the timer counts at the rate of the effect
   before it, so the next row that sets a rate column of the effect sets
   both.
+- 4(e) A writer reads the rows in order with three values an effect: the
+  kept select and the kept count, each a value of 1.9 or *open*, which
+  differs from every value, 0 at row 0; and whether the timer is
+  *counting*, false at row 0. A control column it writes has the set
+  bit, bit 6 the operation's `timerReset`, bit 5 its `placeReset`, bit 3
+  a start's `deferred`, bit 4 where the row writes a count of 0 (rule 5),
+  and bits 2 to 0 the operation's select; a count column it writes is the
+  operation's count.
+  - a start writes both columns where it sets `timerReset` or
+    `placeReset`, where it is deferred, where the timer is not counting,
+    or where its select differs from the kept select or its count from
+    the kept count, and leaves both unset otherwise. A start with
+    `deferred` clear then makes the kept select and count the start's,
+    and counting true where its source repeats and false where it plays
+    once; a deferred start opens the kept select and count and makes
+    counting false (4(d)).
+  - a retune writes the count column where its count differs from the
+    kept count, and the control column where it sets `timerReset` or
+    `placeReset`, where its select differs from the kept select, or where
+    it writes a count of 0. It then makes the kept select and count the
+    retune's, and leaves counting as it is.
+  - a stop leaves both columns unset (rule 3(c)) and makes counting
+    false.
+  - the repeat row opens the kept select where its value before the
+    repeat row differs from its value after row R - 1, opens the kept
+    count on the same condition, and makes counting false where its value
+    before the repeat row differs from its value after row R - 1. A value
+    equal to its value after row R - 1 is left as it is: the second pass
+    starts from that value, as the first does. The value after row R - 1
+    is the one the last operation of rows 0 to R - 1 that sets it leaves:
+    for the kept select and count the last start or retune, for counting
+    the last start or stop; where no row sets it, it is its value at row
+    0.
 
 **Rule 5: a row that sets a count of 0 sets bit 4 of the control column
 with it.** A row that leaves the control column unset sets a count of 1
@@ -1105,7 +1140,9 @@ packs at.** R divides by k, and RR where below R divides by k (DTX's
 R5.6 and R5.11). A writer whose table divides by k packs it as it is;
 otherwise it lengthens the table by 6.3. A writer adds the rows of 6.3 to
 the structure, an unset row as an empty row, and encodes the padded rows
-in order by rules 1 to 5, so a loop written again is encoded again.
+in order by rules 1 to 5, so a loop written again is encoded again; the
+repeat row and row R - 1 of rules 2(c), 2(g) and 4(e) are those of the
+padded rows.
 
 ### 6.3 The padding
 

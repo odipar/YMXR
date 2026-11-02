@@ -91,22 +91,26 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	for c := range column {
 		column[c] = make([]byte, size)
 	}
-	var target, selects, count [4]int
-	// Whether the timer is known to be counting: a start sets it where the
-	// source it runs repeats, and a stop clears it.
-	var counting [4]bool
+	var target [4]int
 	for i := range target {
 		target[i] = -1
 	}
+	// kept is the rate the rows read so far leave each effect, and last the
+	// rate after the last row, which the repeat row reads (rule 4(e)).
+	var kept rates
+	last := ratesAfter(rows)
 	used := 0
 	for f := 0; f < size; f++ {
 		// After the wrap the player keeps what the last row left, so the
-		// row the tune repeats to writes its targets again, and the
-		// mapping of each effect a row maps through a transformation.
+		// row the tune repeats to writes its targets again, the mapping of
+		// each effect a row maps through a transformation, and each value
+		// of the rate whose value after the last row differs from its value
+		// before the repeat row (rule 4(e)).
 		if f == repeat {
 			for i := range target {
 				target[i] = -1
 			}
+			kept.wrap(last)
 			maps.wrap()
 		}
 		out := make([]byte, ymxr.Mapped)
@@ -116,8 +120,8 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 			if err != nil {
 				return Made{}, err
 			}
-			runs, err := effect(out, i, one.Effect, sources, &target, &selects, &count,
-				&counting, &maps, frames[f])
+			runs, err := effect(out, i, one.Effect, sources, &target, &kept, &maps,
+				frames[f])
 			if err != nil {
 				return Made{}, err
 			}
@@ -185,8 +189,7 @@ func registers(row ymxs.Row, out []byte) {
 // its mapping column, and the bit of the effects word where the row starts
 // one. at is the row of the structure, for the line of an error.
 func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
-	target, selects, count *[4]int, counting *[4]bool, maps *mappings,
-	at int) (int, error) {
+	target *[4]int, kept *rates, maps *mappings, at int) (int, error) {
 	t := ymxr.Effect + 4*i
 	switch e := one.(type) {
 	case ymxs.Stop:
@@ -194,7 +197,7 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		// row leaves the rate columns and the mapping column unset (SPEC.md
 		// 1.8, rule 3(c)).
 		out[t+1] = byte(0x80)
-		counting[i] = false
+		kept.keep(i, one)
 		maps.stop(i)
 		return 0, nil
 	case ymxs.Start:
@@ -229,8 +232,8 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		// stops it at its marker (section 5) and no row says when. A
 		// deferred start sets the control column, whose bit 3 marks it
 		// (1.9).
-		if reset != 0 || now != selects[i] || rate != count[i] || !counting[i] ||
-			deferred {
+		if reset != 0 || now != kept.selects[i] || rate != kept.count[i] ||
+			!kept.counting[i] || deferred {
 			mark := 0
 			if deferred {
 				mark = ymxr.Deferred
@@ -238,16 +241,8 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			out[t+2] = byte(0x80 | reset | mark | marked(rate) | now)
 			out[t+3] = byte(rate)
 		}
-		selects[i] = now
-		count[i] = rate
-		_, counting[i] = ymxs.SourceRows(ymxs.ConnectionSource(e.Connection)).Repeat()
+		kept.keep(i, one)
 		if deferred {
-			// Until the tick that performs it, the timer counts at the
-			// rate of the effect before it, apart from the rate a row
-			// keeps: the next row that sets a rate sets both columns (4.8).
-			selects[i] = -1
-			count[i] = -1
-			counting[i] = false
 			return 1<<i | ymxr.Defers, nil
 		}
 		return 1 << i, nil
@@ -266,22 +261,91 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		// the control column marks it (SPEC.md 1.9). The row then sets the
 		// control column whether the select moved or not.
 		mark := 0
-		if rate != count[i] {
+		if rate != kept.count[i] {
 			mark = marked(rate)
 		}
-		if now != selects[i] || reset != 0 || mark != 0 {
+		if now != kept.selects[i] || reset != 0 || mark != 0 {
 			out[t+2] = byte(0x80 | reset | mark | now)
 		}
-		if rate != count[i] {
+		if rate != kept.count[i] {
 			out[t+3] = byte(rate)
 		}
-		selects[i] = now
-		count[i] = rate
+		kept.keep(i, one)
 		return 0, nil
 	case ymxs.Remap:
 		return 0, maps.remap(out, i, e.Mapping, at)
 	}
 	panic(fmt.Sprintf("no effect %T", one))
+}
+
+// rates is the rate the rows leave each effect (SPEC.md 6, rule 4(e)): the
+// kept select and count, each open where the rows leave it open, after a
+// deferred start or at the repeat row, and whether the timer is known to be
+// counting.
+type rates struct {
+	selects, count [4]int
+
+	// counting is whether the timer is known to be counting: a start sets
+	// it where the source it runs repeats, and a stop clears it.
+	counting [4]bool
+}
+
+// keep is the operation on effect i. A start or a retune sets the select
+// and the count to its rate, and a start sets the flag where its source
+// repeats. Until the tick that performs a deferred start the timer counts
+// at the rate of the effect before it, apart from the rate a row keeps, so
+// a deferred start opens the select and the count and clears the flag: the
+// next row that sets a rate sets both columns (4.8). A stop clears the
+// flag. Each value after the operation follows from the operation alone,
+// so the values after the last row are the same whether the repeat row
+// opens them or not.
+func (r *rates) keep(i int, one ymxs.Effect) {
+	switch e := one.(type) {
+	case ymxs.Start:
+		r.selects[i], r.count[i], r.counting[i] = open, open, false
+		if !e.Deferred {
+			r.selects[i], _ = selectOf(e.Timing.Prescaler)
+			r.count[i] = e.Timing.Count
+			_, r.counting[i] = ymxs.SourceRows(ymxs.ConnectionSource(e.Connection)).Repeat()
+		}
+	case ymxs.Retune:
+		r.selects[i], _ = selectOf(e.Timing.Prescaler)
+		r.count[i] = e.Timing.Count
+	case ymxs.Stop:
+		r.counting[i] = false
+	}
+}
+
+// wrap is the repeat row: the select and the count, each open where its
+// value before the repeat row differs from its value after the last row,
+// last, and the flag cleared where it differs from the flag there. A value
+// equal to it keeps its value: the second pass starts from that value, as
+// the first does.
+func (r *rates) wrap(last rates) {
+	for i := range r.selects {
+		if r.selects[i] != last.selects[i] {
+			r.selects[i] = open
+		}
+		if r.count[i] != last.count[i] {
+			r.count[i] = open
+		}
+		if r.counting[i] != last.counting[i] {
+			r.counting[i] = false
+		}
+	}
+}
+
+// ratesAfter is the rate the rows leave each effect after the last row.
+func ratesAfter(rows []ymxs.Row) rates {
+	var out rates
+	for _, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			if i, err := effectOf(one.Timer); err == nil {
+				out.keep(i, one.Effect)
+			}
+		}
+	}
+	return out
 }
 
 // mappings is the mapping of each effect as the rows set it (SPEC.md 6,

@@ -62,7 +62,14 @@ as running only where its previous source repeats and no row stopped it.
 The player's kept values run through the wrap, so the repeat row writes
 its targets again, and the first start or remap at or after it writes
 the mapping of each effect a row maps through a transformation (SPEC.md
-6, rule 2(g)).
+6, rule 2(g)). The kept select, the kept count and whether the timer
+counts run through the wrap as well. Before it reads the rows, the
+schema reads the value of each of the three after the last row. At the
+repeat row each value other than its value after the last row is
+unknown, so the first start or retune at or after the repeat row that
+compares against it writes its rate columns; a value equal to its value
+after the last row is kept, since the second pass starts from it as the
+first does (SPEC.md 6, rule 4(e)).
 
 ## The place's reset
 
