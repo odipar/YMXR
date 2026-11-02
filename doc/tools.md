@@ -870,6 +870,7 @@ as it is. A tune that fails is named and the run continues.
 | `-stub` | each tune, at 50 Hz alone, through `ymxr-sndh` and then `ymxr-prg` twice, 600 rows each: one program playing from Timer C, which the file's clock tag names, and one from the VBL, which `-vbl` names. Both run under Hatari, and the writes the frame procedure makes are one stream in one order under either clock, over the same frames but for the phase of the first row and the last. A tick's writes are counted apart: an effect's handler writes the chip from its timer, which the two clocks interleave among the rows differently. Then the same tune at 60 Hz, a rate no multiple of the operating system's clock: the tool arms 240 ticks a second (BINARIES.md 4.10), and the gaps between the in-service bit the stub's handler clears read that period on Hatari's MFP, 4.167 ms, against the 5 ms of the 200 Hz clock |
 | `-clock` | the stub's Timer C handler under Hatari's profiler: `Circus Attractions 2` in a program at 50 Hz and at 60 Hz, a row every third tick and every fourth, 1,000 VBLs each; each run measures the handler's cycles a tick and the routine around the play call's a row, which performance.md's section on the program's clock reads within a cycle, and the two runs together solve for a tick without a row, which it reads as one of two figures |
 | `-cost` | the raster monitor's runs of performance.md, as `ym/cost.sh` makes them: `Synergy Credits` and `Turrican - world 4-3` on the monitor's core over the VBLs the section against YMX names, the first calls, as many as the section counts, on average, at the 99th in a hundred and at most against the table's YMXR rows, and `Synergy Credits` packed at unit 1 over the same run against its figure at most, an average within 2 cycles and a single call within 64: a tick's entry and `rte` fall inside a call or outside it by where the tick lands, which moves with the operating system `TOS` names; then `DBA 2` on the plain core, played from the VBL, the least cycles from the VBL to the frame procedure's first chip write over the frames the raster monitor's paragraph names, which that paragraph reads within one of the shifter's bus slots, 4 cycles: the least moves with the phase the VBL lands at |
+| `-xpatch` | the real-ST program of `68k/test/st`, built by its `build.py` and run twice in one folder under Hatari on an ST at 8 MHz, cycle-exact, under the TOS image `TOS` names, the first run creating `XPATCH.TXT` and the second appending to it: each case's line of the file, a case at a level with its counts N, O and X, against the table of `68k/test/st/README.md`, a run's first line and a case's line as that file quotes them, and each run's console lines against that run's lines in the file |
 | `-perf` | the player assembled with the raster monitor, against the model |
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
 | `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
@@ -894,11 +895,11 @@ the plain core; the conformance kit at `-frames24` under `-kit`; and
 `-refill` over `Turrican 2 - world completed 1` whole, which reads the
 tune's row of performance.md and a refill of a tune with a source. The
 workflow runs `-refill` over the eleven fixtures whole as a step after the
-suite, which reads the sentences over the set, and `-cycles -abs` over
-them, which reads the absolute build's tables. The workflow then runs
-`-stub`, `-hatari`, `-clock` and `-cost` under Hatari 2.6.1, built from its
-tag, and the PAL image of EmuTOS 1.4, which boots the ST at the 50 Hz the
-two modes require; a caller runs them under TOS 2.06, which `TOS` names.
+suite, which reads the sentences over the set, and `-cycles -abs` over them,
+which reads the absolute build's tables. The workflow then runs `-stub`,
+`-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari 2.6.1, built from
+its tag, and the PAL image of EmuTOS 1.4, which boots the ST at the 50 Hz
+the two modes require; a caller runs them under TOS 2.06, which `TOS` names.
 
 ---
 
@@ -970,8 +971,9 @@ runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it so
 that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
 whole, which reads performance.md's sentences over the set, `-cycles -abs`
 over the fixtures, which reads the absolute build's tables, and then `-stub`,
-`-hatari`, `-clock` and `-cost` under Hatari and EmuTOS (17). No push starts
-it: a caller starts it from the Actions tab or by `gh workflow run test.yml`.
+`-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari and EmuTOS (17). No
+push starts it: a caller starts it from the Actions tab or by `gh workflow run
+test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the seventeen 68000 binaries and DTX's forty images

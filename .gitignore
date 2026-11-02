@@ -80,3 +80,6 @@ __pycache__/
 
 # the WebAssembly module, where a build beside its scripts writes it
 /wasm/ymxr.wasm
+
+# the real-ST program, which its builder writes beside its source
+/68k/test/st/XPATCH.PRG

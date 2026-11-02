@@ -50,6 +50,10 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        absolute address (68k/YMXR.S): the
                                        same model, and it joins the switches
                                        above
+       test_ymxr.py -xpatch            the real-ST program of 68k/test/st
+                                       under Hatari: each case's line of
+                                       the XPATCH.TXT it writes against
+                                       the table of its README.md
 
 The fixtures under ym/test are chosen for the shapes a tune has, one of
 each; -corpus reads the corpus instead, which no fixture was chosen for. A
@@ -77,7 +81,8 @@ Needs rmac (RMAC, or on the path), DTX's dtx-write (DTX_WRITE, or on the
 path) to read the table back, unicorn (pip install unicorn), and the
 converter, the binder and the two combiners under bin/. DTX's rig, at
 DTX_REPO/68k/test/emu, counts the cycles where it is found; hatari
-(HATARI) with a TOS image (TOS) plays the tune on a real MFP.
+(HATARI) with a TOS image (TOS) plays the tune on a real MFP, and runs the
+real-ST program under -xpatch.
 """
 import copy
 import json, os
@@ -2690,6 +2695,151 @@ def monitor_runs():
     return "the raster monitor's runs as performance.md reads them: " + "; ".join(read)
 
 
+# The real-ST program for the patched displacement read: its source, its
+# builder and the README.md whose table -xpatch reads a run against.
+XPATCH_DIR = os.path.join(ROOT, "68k", "test", "st")
+# The VBLs a run of it plays under Hatari: TOS 2.06 counts the 4 MB of
+# memory before its desktop starts the program, and the program's six
+# cases, at five levels each, and its key wait come after that.
+XPATCH_VBLS = 8000
+XPATCH_CASES = "ZAHEIP"
+# A case's line: its letter and level, the counts N, O and X, and the form
+# of its store.
+XPATCH_LINE = re.compile(r"([ZAHEIP])([0-7]) N=(\d{5}) O=(\d{5}) X=(\d{5}) \S.*")
+
+
+def xpatch_levels(said):
+    """The levels a cell of README.md's table names: 3, 6 and 7, 3 to 7."""
+    m = re.fullmatch(r"(\d) to (\d)", said)
+    if m:
+        return list(range(int(m.group(1)), int(m.group(2)) + 1))
+    m = re.fullmatch(r"(\d) and (\d)", said)
+    if m:
+        return [int(m.group(1)), int(m.group(2))]
+    assert re.fullmatch(r"\d", said), "README.md's table names the levels %r" % said
+    return [int(said)]
+
+
+def xpatch_count(said):
+    """A count of README.md's table as its least and its most, or None for
+    the rest: 0, 50,000, 11 to 31."""
+    if said == "the rest":
+        return None
+    m = re.fullmatch(r"([\d,]+)(?: to ([\d,]+))?", said)
+    assert m, "README.md's table counts %r" % said
+    least = int(m.group(1).replace(",", ""))
+    return least, int((m.group(2) or m.group(1)).replace(",", ""))
+
+
+def xpatch_table():
+    """README.md's iterations of a case, and its counts under Hatari: a
+    case and a level to the least and the most of N, O and X, and which of
+    the three is the rest, the iterations less the other two."""
+    text = open(os.path.join(XPATCH_DIR, "README.md")).read()
+    m = re.search(r"of any other byte \(X\) over ([\d,]+) iterations", " ".join(text.split()))
+    assert m, "README.md names no iterations of a case"
+    iterations = int(m.group(1).replace(",", ""))
+    at = text.find("## The counts under Hatari")
+    assert at >= 0, "README.md has no counts under Hatari"
+    table = {}
+    for row in re.finditer(r"^\| ([A-Z]) \| ([^|]+) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$",
+                           text[at:], re.M):
+        counts = [xpatch_count(cell.strip()) for cell in row.groups()[2:]]
+        rest = [i for i, count in enumerate(counts) if count is None]
+        assert len(rest) <= 1, "README.md's %s row has two rests" % row.group(1)
+        if rest:
+            least = sum(count[0] for count in counts if count is not None)
+            most = sum(count[1] for count in counts if count is not None)
+            counts[rest[0]] = (iterations - most, iterations - least)
+        for level in xpatch_levels(row.group(2).strip()):
+            assert (row.group(1), level) not in table, \
+                "README.md's table counts %s%d twice" % (row.group(1), level)
+            table[row.group(1), level] = (counts, rest[0] if rest else None)
+    every = [(case, level) for case in XPATCH_CASES for level in range(3, 8)]
+    assert sorted(table) == sorted(every), \
+        "README.md's table counts %s" % " ".join("%s%d" % key for key in sorted(table))
+    return text, iterations, table
+
+
+def xpatch():
+    """The real-ST program of 68k/test/st under Hatari (-xpatch): built by
+    its builder, run twice in one folder cycle-exact on an ST at 8 MHz
+    under the TOS image TOS names, and each case's line of the XPATCH.TXT
+    it writes read against the table of its README.md. The first run
+    creates the file and the second appends its lines to it. The lines of
+    a run open with the iterations, the machine and the TOS, and a line of
+    each case follows at the level TOS leaves, 3, and at 4 to 7, Z to P;
+    the console shows the run's lines, in the same order. README.md quotes
+    the first line and a case's line as the program writes them."""
+    text, iterations, table = xpatch_table()
+    work = tempfile.mkdtemp(prefix="xpatch")
+    program = os.path.join(work, "XPATCH.PRG")
+    built = subprocess.run([sys.executable, os.path.join(XPATCH_DIR, "build.py"), program],
+                           capture_output=True)
+    assert built.returncode == 0, built.stdout.decode() + built.stderr.decode()
+    before = b""
+    for run in (1, 2):
+        console = os.path.join(work, "console%d.txt" % run)
+        subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+                        "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
+                        "--sound", "off", "--conout", "2", "--fast-forward", "on",
+                        "--disable-video", "1", "--run-vbls", str(XPATCH_VBLS),
+                        "--log-level", "fatal", "XPATCH.PRG"], cwd=work,
+                       stdin=subprocess.DEVNULL, stdout=open(console, "wb"),
+                       stderr=subprocess.STDOUT, timeout=600)
+        shown = open(console, "rb").read()
+        written = os.path.join(work, "XPATCH.TXT")
+        assert os.path.isfile(written), \
+            "XPATCH.TXT is absent after XPATCH.PRG ran under %s for %d VBLs; the console ends:\n%s" % (
+                TOS, XPATCH_VBLS, shown[-600:].decode("latin-1"))
+        whole = open(written, "rb").read()
+        assert whole.startswith(before), \
+            "run %d of XPATCH.PRG left XPATCH.TXT without the lines of run 1 at its head" % run
+        assert len(whole) > len(before), "run %d of XPATCH.PRG added 0 bytes to XPATCH.TXT" % run
+        kept, before = whole[len(before):], whole
+        assert kept in shown, "the console's lines differ from XPATCH.TXT's under %s:\n%s" % (
+            TOS, kept.decode("latin-1"))
+        lines = kept.decode("latin-1").split("\r\n")
+        assert lines[-1] == "", "XPATCH.TXT ends in a line without CR and LF"
+        lines = lines[:-1]
+        opens = "XPATCH, %d iterations a case" % iterations
+        assert lines[0] == opens, "run %d's lines in XPATCH.TXT open with %r, and README.md" \
+            " reads %r" % (run, lines[0], opens)
+        assert lines[1] == "_MCH $00000000 ST, _CPU 0", \
+            "XPATCH.TXT reads Hatari's ST as %r" % lines[1]
+        assert re.fullmatch(r"(EmuTOS, )?TOS \d\.\d\d( in the header)?", lines[2]), \
+            "XPATCH.TXT reads the TOS as %r" % lines[2]
+        cases = [XPATCH_LINE.fullmatch(line) for line in lines[3:]]
+        assert all(cases), "XPATCH.TXT has the lines %r" % lines[3:]
+        ran = [(m.group(1), int(m.group(2))) for m in cases]
+        every = [(case, level) for case in XPATCH_CASES for level in range(3, 8)]
+        assert ran == every, "XPATCH.TXT has the cases %s" % " ".join("%s%d" % key for key in ran)
+        assert "`%s`" % lines[0] in text, "README.md quotes another first line than %r" % lines[0]
+        forms = {m.group(1): m.group(0).split(" ", 4)[4] for m in cases}
+        quoted = [XPATCH_LINE.fullmatch(line.strip()) for line in text.split("\n")
+                  if re.fullmatch(r" +[ZAHEIP][0-7] N=.*", line)]
+        assert quoted and all(m and m.group(0).split(" ", 4)[4] == forms[m.group(1)]
+                              for m in quoted), \
+            "README.md quotes a case's line in another form than %r" % forms
+        departs, ranged = [], []
+        for m in cases:
+            key = (m.group(1), int(m.group(2)))
+            counts, rest = table[key]
+            got = [int(m.group(i)) for i in (3, 4, 5)]
+            if sum(got) != iterations or not all(least <= n <= most
+                                                 for n, (least, most) in zip(got, counts)):
+                departs.append("%s, and README.md's table reads %s" % (m.group(0), ", ".join(
+                    "%s=%d" % (what, least) if least == most else
+                    "%s=%d to %d" % (what, least, most)
+                    for what, (least, most) in zip("NOX", counts))))
+            ranged += ["%s%d %s=%d" % (key + ("NOX"[i], got[i])) for i, (least, most)
+                       in enumerate(counts) if least != most and i != rest]
+        assert not departs, "under %s:\n%s" % (TOS, "\n".join(departs))
+    return ("XPATCH.PRG of %d bytes under %s, %s: the %d lines read as README.md's table, %s"
+            % (os.path.getsize(program), os.path.basename(TOS), lines[2], len(cases),
+               ", ".join(ranged)))
+
+
 def hatari(ym, code, symbols, perf=False):
     """The tune in an SNDH file in a program under Hatari: the frames the
     trace records, checked against the model, and the ticks counted. code
@@ -3260,6 +3410,9 @@ def main():
         return
     if "-cost" in sys.argv:
         print(monitor_runs())
+        return
+    if "-xpatch" in sys.argv:
+        print(xpatch())
         return
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     count = "-cycles" in sys.argv
