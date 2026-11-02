@@ -4,10 +4,11 @@ Implement a YMXR reader from the specification.
 
 **1. The documents.** `SPEC.md` in this directory defines the format;
 `YMXS-SPEC.md` beside it defines what a tune is, what each register
-reaches, how a rate is reckoned, and what a frame and a tick do with a
-row. A citation `(YMXS, SPEC.md 3.4)` in `SPEC.md` is clause 3.4 of
-`YMXS-SPEC.md`. Read both. Implement the reader of `SPEC.md` 7 for the
-`.ymxr` files under `tunes/`.
+reaches, how a rate is reckoned, what a transformation and a mapping
+are, and what a frame and a tick do with a row. A citation
+`(YMXS, SPEC.md 3.4)` in `SPEC.md` is clause 3.4 of `YMXS-SPEC.md`.
+Read both. Implement the reader of `SPEC.md` 7 for the `.ymxr` files
+under `tunes/`.
 
 The record is `SPEC.md` 7's, which reports the columns of a tune file;
 `YMXS-SPEC.md` 7 defines the record of a separate reader, of the
@@ -33,26 +34,30 @@ each line. In Python that is `json.dumps(entry, separators=(",", ":"))`
 over dicts filled in that order, `sort_keys` left at its default.
 
 **3. The rows file.** `<file.rows>` is the tune's table: a 16-byte
-header, then row 0 to `R` - 1, each its thirty columns in order, one
-byte a column, the rows adjoining.
+header, then row 0 to `R` - 1, each its `C` columns in order, one byte a
+column, the rows adjoining: 30 columns in a tune file of versions 7 to
+9, and 34 in one of version 10 (`SPEC.md` 1).
 
 | offset | bytes | what it is |
 |---|---|---|
 | 4 | 4 | `R`, the row count, most significant byte first |
+| 8 | 2 | `C`, the column count, most significant byte first |
 | 10 | 4 | `RR`, the row the table repeats to, most significant byte first; `R` where the tune plays once |
-| 16 | 30`R` | the rows |
+| 16 | `C` times `R` | the rows |
 
 Read the table from it. The frame rate, the effects used, the source
-index and the sources' tables are in the tune file as `SPEC.md` 3 lays
-it out. The DTX3 table in the tune file packs the same rows in a form
-another format defines; the rows file replaces it.
+index, the sources' tables and, in version 10, the transformations are
+in the tune file as `SPEC.md` 3 lays it out. The DTX3 table in the tune
+file packs the same rows in a form another format defines; the rows file
+replaces it.
 
 **4. The tunes.** Each is a `.ymxr` beside its `.rows`; the tunes differ
 in what they reach. Every tune names the targets `SPEC.md` 2.1 assigns,
-0 to 24, selects 1 to 7 and sources 0 to `S`, 0 the stop (`SPEC.md`
-1.8), and satisfies `SPEC.md` 6 but for two conditions in one tune: a
-source with bit 7 set on rows before its last, and a row that sets the
-column of a register an effect starts on at that row, each of which 6.4
+0 to 24, selects 1 to 7, sources 0 to `S`, 0 the stop (`SPEC.md` 1.8),
+and in version 10 mappings 0 to `T`, 0 the identity (`SPEC.md` 1.10),
+and satisfies `SPEC.md` 6 but for two conditions in one tune: a source
+with bit 7 set on rows before its last, and a row that sets the column
+of a register an effect starts on at that row, each of which 6.4
 reports; what a reader does with a file outside those is outside this
 task.
 
@@ -73,6 +78,7 @@ task.
 | `envelope-counted.ymxr` | 129 |
 | `counted.ymxr` | 81 |
 | `deferred.ymxr` | 97 |
+| `mapped.ymxr` | 65 |
 | `wrong-version.ymxr` | 0 |
 
 The count is the first line and `R` + `R` - `RR` frames for a tune that

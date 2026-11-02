@@ -1,12 +1,12 @@
 # The conformance kit
 
-**1.** The kit is 16 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
+**1.** The kit is 17 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
 beside its `.rows` (3), and a reference record of each (SPEC.md 7):
-18,880 entries over the 16 tunes, one line each, the first line of each
-record among them. The kit tests the two documents,
-[SPEC.md](../SPEC.md) and YMXS's `doc/SPEC.md`: an implementer who has
-read them alone writes a reader (2), and a record equal to the reference
-byte for byte shows that the documents define it.
+18,945 entries, one line each, the first line of each record among them.
+The kit tests the two documents, [SPEC.md](../SPEC.md) and YMXS's
+`doc/SPEC.md`: an implementer who has read them alone writes a reader
+(2), and a record equal to the reference byte for byte shows that the
+documents define it.
 
 **2. What the kit tests.** The reader of SPEC.md 7 and requirements.md
 R2.4 reads a tune file and reports one entry a frame, each write
@@ -20,19 +20,21 @@ tests a reader; the rig (7) tests the player against the same record.
 |---|---|
 | `TASK.md` | the task an implementer receives, with the line count of each tune |
 | `tunes/X.ymxr` | the tune file of tune `X` |
-| `tunes/X.rows` | the tune's table as DTX0 (DTX, SPEC.md 2.1): a 16-byte header, `R` at bytes 4 to 7, `C` = 30 at 8 and 9, `RR` at 10 to 13 and `W` = 1 at 14, then `R` rows of 30 bytes; empty for `wrong-version` |
+| `tunes/X.rows` | the tune's table as DTX0 (DTX, SPEC.md 2.1): a 16-byte header, `R` at bytes 4 to 7, `C` at 8 and 9, 30 for a tune of version 9 and 34 for one of version 10, `RR` at 10 to 13 and `W` = 1 at 14, then `R` rows of `C` bytes; empty for `wrong-version` |
 | `X.jsonl` | the reference record of tune `X`, outside the kit: `MANIFEST.txt` records its sha256 and bytes |
 | `MANIFEST.txt` | `# sha256  bytes  file`, then a line each for `tunes/X.ymxr`, `tunes/X.rows` and `X.jsonl` of every tune |
 | `SOURCES.md` | a row a tune: its name, the dump or builder it comes from, the dump's title and author, the converter's flags, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
 
 The converter makes nine tunes from eight dumps under `ym/test`: six of
-published music, by Jochen Hippel, Mad Max and Scavenger as their headers
-record, one of them converted twice (`circus`, `plays-once`), and two
-built (`preempt`, `retune`). Code builds `four-timers`, `voices`,
-`envelope`, `counted`, `envelope-counted` and `deferred`, and
-`wrong-version` is `chambers` with the version word $000B. The published
-music belongs to its composers, and the repository's LICENSE excludes it:
-a copy of the kit has the tunes for the exercise alone.
+published music, by Jochen Hippel, Mad Max and Scavenger as their
+headers record, one of them converted twice (`circus`, `plays-once`),
+and two built (`preempt`, `retune`). Code builds `four-timers`,
+`voices`, `envelope`, `counted`, `envelope-counted` and `deferred` as
+columns, and `mapped` as a YMXS structure that the schema of
+`ymxs-to-ymxr` writes at version 10; `wrong-version` is `chambers` with
+the version word $000B. The published music belongs to its composers,
+and the repository's LICENSE excludes it: a copy of the kit has the
+tunes for the exercise alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of the format,
@@ -405,6 +407,7 @@ Two places changed for entries that left output as it is:
 | `counted` | a counted source on each of the six targets whose register reads every bit of its byte - `setR0` and `setR4` on Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and `setR2` on Timer C - each with rows whose bit 7 is set, where a source the marker ends reads that bit as its end; an index entry whose bit 31 is 1 and whose bits 30 to 0 are the offset (SPEC.md 3.1.1); a square on R8 in the same file, which the marker ends, so a player reads the end of a source from its index entry rather than from the version word; a counted source of one row, one that plays once and stops its timer at its count, one repeating to a row above 0; a target set while an effect runs and read at the next start; a row that sets R12 as it stops the effect running on it |
 | `envelope-counted` | a counted source of two columns on `setEnvelope`, whose two registers read every bit of their byte, so its rows are whole bytes and a tick counts them; the high byte runs past 127, where a marked source of that target stops, and reaches 255, an envelope period of 65,323; one source repeating to a row above 0 and one that plays once and stops its timer at its count, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `deferred` | deferred starts, bit 3 of the control column (SPEC.md 4.8), on Timer A and on Timer C, and bit 4 of the effects used: a fall after a loop, a source with the place at its number, bit 5 at 0, a deferred start a stop drops, and one on a stopped timer |
+| `mapped` | version 10 at 50 Hz, its four mapping columns (SPEC.md 1.10) and its transformations (SPEC.md 3.4) written by the schema from a YMXS structure: on Timer A a fade, a loop on `setR8` started through V15 and remapped every second row to V12, V9, V6, V3, V0 and the identity; on Timer B a square on `setR9` through V10, a fall through V5 that plays once, a deferred start of the square through V10 while the fall runs, a remap to V12 while that start is pending, and a start that leaves the mapping column unset and runs through V12, the kept mapping; on Timer C a remap on the idle timer before its first start, a start on `setToneC` that leaves the mapping column unset and runs through it, the coarse nibble mapped, and after the repeat row a remap to the identity; on Timer D a counted source on `setR10` whose keys reach 255, through a transformation of 256 entries, remapped to another and, after the repeat row, back to the first; the repeat row starts Timers A, B and C again, each through its first mapping, and retunes Timer D, whose entry reports the mapping kept through the wrap (SPEC.md 4.5) |
 | `wrong-version` | the version word $000B: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
@@ -420,7 +423,10 @@ full.
    or `MANIFEST.generated.txt`.
 2. The reference is the record of `bin/ymxr-trace` (SPEC.md 7).
 3. `68k/test/emu/test_ymxr.py -kit` plays every tune but `wrong-version`
-   on the 68000 player and requires the player's frames, the rig's model
-   of section 4 and the reference to agree.
+   and `mapped` on the 68000 player and requires the player's frames, the
+   rig's model of section 4 and the reference to agree. `mapped` defers a
+   start and maps a value, and init of a core with the deferred start and
+   the lookup reports -1 for such a tune (BINARIES.md 2.1), so the rig
+   leaves it out with a line.
 4. `ConformanceTest` replays every tune converted from a dump against the
    dump through `ymxr-check` at its options.

@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.ToLongFunction;
 import java.util.regex.Matcher;
@@ -963,7 +964,7 @@ final class ConsistencyTest {
             "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen",
             "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty");
 
-    private static int spelled(String word) {
+    static int spelled(String word) {
         int at = SPELLED.indexOf(word);
         assertTrue(at >= 0, () -> "no count spelled " + word);
         return at;
@@ -1021,29 +1022,35 @@ final class ConsistencyTest {
             files = at.filter(one -> one.toString().endsWith(".ymxr")).sorted().toList();
         }
         Matcher tunes = wrapped("`doc/conformance/tunes/` has (\\w+) tune files: (\\w+) a reader"
-                + " reads, of version (\\d), and `wrong-version\\.ymxr`, version"
-                + " `\\$([0-9A-F]{4})`").matcher(guide);
+                + " reads, (\\w+) of version (\\d+) and (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr`,"
+                + " and `wrong-version\\.ymxr`, version `\\$([0-9A-F]{4})`").matcher(guide);
         assertTrue(tunes.find(), "writing.md has no count of the kit's tune files");
         assertEquals(files.size(), spelled(tunes.group(1)), "the kit's tune files");
-        TreeSet<Integer> versions = new TreeSet<>();
+        TreeMap<Integer, List<String>> versions = new TreeMap<>();
         int read = 0;
         for (Path one : files) {
             byte[] file = Files.readAllBytes(one);
             int version = (file[4] & 0xFF) << 8 | file[5] & 0xFF;
-            if (one.getFileName().toString().equals("wrong-version.ymxr")) {
-                assertEquals(Integer.parseInt(tunes.group(4), 16), version,
+            String name = one.getFileName().toString();
+            if (name.equals("wrong-version.ymxr")) {
+                assertEquals(Integer.parseInt(tunes.group(8), 16), version,
                         "wrong-version.ymxr's version");
                 assertTrue(!Tune.reads(version), "wrong-version.ymxr is one a reader"
                         + " reads");
             } else {
-                versions.add(version);
+                versions.computeIfAbsent(version, v -> new ArrayList<>()).add(name);
                 read++;
             }
         }
         assertEquals(read, spelled(tunes.group(2)), "the kit's tune files a reader reads");
-        assertEquals(List.of(Integer.parseInt(tunes.group(3)), Integer.parseInt(tunes.group(3))),
-                List.of(versions.first(), versions.last()),
-                "the version of the kit's tune files");
+        assertEquals(List.of(Integer.parseInt(tunes.group(4)), Integer.parseInt(tunes.group(6))),
+                List.copyOf(versions.keySet()), "the versions of the kit's tune files");
+        assertEquals(versions.firstEntry().getValue().size(), spelled(tunes.group(3)),
+                "the kit's tune files of version " + tunes.group(4));
+        assertEquals(versions.lastEntry().getValue().size(), spelled(tunes.group(5)),
+                "the kit's tune files of version " + tunes.group(6));
+        assertEquals(List.of(tunes.group(7) + ".ymxr"), versions.lastEntry().getValue(),
+                "the kit's tune file of version " + tunes.group(6));
         String manifest = read(Path.of("doc/conformance/MANIFEST.txt"));
         for (Path one : files) {
             assertTrue(manifest.contains(" tunes/" + one.getFileName() + "\n"),

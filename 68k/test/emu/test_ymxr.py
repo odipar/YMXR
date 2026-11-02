@@ -4516,6 +4516,14 @@ def main():
                 "%s: the binder bound a tune of another version" % os.path.basename(one)
             print("%-45s the binder and the reader reject it"
                   % os.path.basename(one))
+        # Init of a core with the deferred start and the lookup reports -1
+        # for a tune whose effects byte sets bits 4 and 5 (BINARIES.md 2.1),
+        # so the run leaves such a tune out with a line.
+        both = [one for one in tunes if open(one, "rb").read(9)[8] & 0x30 == 0x30]
+        tunes = [one for one in tunes if one not in both]
+        for one in both:
+            print("%-45s defers a start and maps a value, left out: init reports -1 for it"
+                  % os.path.basename(one))
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():
