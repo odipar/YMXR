@@ -57,9 +57,12 @@ jobs:
           mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/DTX" install -DskipTests
           mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/YMXS" install -DskipTests
           # RigCallsTest reads the packer DTX_WRITE names, and counts a
-          # tune on the rig of the checkout DTX_REPO names (doc/tools.md).
+          # tune on the rig of the checkout DTX_REPO names; ParityTest runs
+          # the conformance kit of the checkout YMXS_REPO names
+          # (doc/tools.md).
           echo "DTX_WRITE=$RUNNER_TEMP/DTX/bin/dtx-write" >> "$GITHUB_ENV"
           echo "DTX_REPO=$RUNNER_TEMP/DTX" >> "$GITHUB_ENV"
+          echo "YMXS_REPO=$RUNNER_TEMP/YMXS" >> "$GITHUB_ENV"
       # ParityTest runs the two trees against one another and skips where
       # go is absent, and WasmTest where node is, so a runner without either
       # is green and asleep.

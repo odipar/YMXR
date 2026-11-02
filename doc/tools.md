@@ -339,13 +339,19 @@ row of the structure where it arises, numbered before the padding:
 | condition | line |
 |---|---|
 | the tune starts more than 127 sources | `the tune runs N sources, and a source column numbers 127` |
+| the tune has more than 127 transformations, and a `Start`, or a `Remap` on a timer of the tune, maps through one | `the tune maps through N transformations, and a mapping column numbers 127` |
 | row N has a count outside 0 to 255 | `row N: a count of C, and the count column reaches 0 to 255` |
-| row N performs an operation outside `Start`, `Retune` and `Stop` | `row N: an effect this version does not read` |
-| row N performs a `Start` whose mapping has a transformation as a part | `row N: an effect this version does not read` |
+| row N performs a `Start`, or a `Remap` on a timer of the tune, whose mapping has a transformation for value I, before the last value J of the target | `row N: the mapping maps value I of <target>, and a mapping column maps its value J alone` |
 | a source runs on a target past 24 | `the source <source> runs on <target>, a target this version leaves to a later one (SPEC.md section 8)` |
 | a source runs on two targets whose markers are in different columns | `the source <source> runs on targets that mark column A and column B, and a source has one marker column (SPEC.md rule 2(d))` |
+| a source runs on `setR7` and on `setR0`, `setR2`, `setR4`, `setR11` or `setR12` | `the source <source> runs on setR7 and on <target>, and every row of a source on setR7 has bits 7 and 6 set (SPEC.md rule 2(f))` |
 | a marked source has a value past 127 in its marker's column | `the source <source> has the value V in row R of column C, and bit 7 of the marker's column is the marker` |
+| a source a `Start` on `setR7` maps through a transformation has a key past 63 | `the source <source> has the key K in row R on setR7, and a key on setR7 is 0 to 63` |
 | a source has a value past 255 | `the source <source> has the value V in row R of column C, and a column is one byte` |
+
+A tune whose rows set a mapping column to a transformation is a tune file
+of version 10, and every other tune one of version 9 (SPEC.md 3.3.5;
+SPEC.md 6, rule 2(g)).
 
 **7.2 The warnings.** After the check and before the report, each
 finding of YMXS's check of the writing rules (YMXS, SPEC.md 6.3) is a
@@ -1025,13 +1031,15 @@ off the path or the Java tree is unbuilt.
 **19.6 The whole suite.** `bin/suite [maven argument ...]` runs the suite of
 19.2 on the caller's machine. A skipped test is a check that did not run, so
 the script requires go on the path, python3 with unicorn in it, rmac on the
-path or at `RMAC`, DTX's packer on the path or at `DTX_WRITE`, and a built
-DTX checkout at `DTX_REPO`, exit 2 where one of them is absent; it reads
-`gofmt -l go` beside them and ends with 2 where a file would be rewritten,
-and runs `go test ./...` in `go`, exit 1 where a Go test fails. After the
-run it reads the count of skipped tests, exit 1 and the lines that report it
-where the count is above 0. `pom.xml` requires one release of DTX, and the
-message names it: another release of that packer is another set of bytes.
+path or at `RMAC`, DTX's packer on the path or at `DTX_WRITE`, a built DTX
+checkout at `DTX_REPO`, and a YMXS checkout at `YMXS_REPO`, whose
+conformance kit ParityTest runs through both trees, exit 2 where one of them
+is absent; it reads `gofmt -l go` beside them and ends with 2 where a file
+would be rewritten, and runs `go test ./...` in `go`, exit 1 where a Go test
+fails. After the run it reads the count of skipped tests, exit 1 and the
+lines that report it where the count is above 0. `pom.xml` requires one
+release of DTX and one of YMXS, and the messages name them: another release
+of DTX's packer is another set of bytes.
 
 ---
 
@@ -1126,6 +1134,7 @@ and call the tools.
 | `RMAC` | the assembler, `rmac` by default | `test_ymxr.py` |
 | `DTX_WRITE` | DTX's `dtx-write`, `dtx-write` by default | `test_ymxr.py`, `ym/convert.py` |
 | `DTX_REPO` | the DTX checkout, `../DTX` by default | `test_ymxr.py -cycles`, `RigCallsTest`, `bin/suite` |
+| `YMXS_REPO` | the YMXS checkout, `../YMXS` by default | `ParityTest`, `bin/suite` |
 | `DTX_RING`, `DTX_COPIES`, `JOBS` | 18.1 | `ym/convert.py` |
 | `HATARI`, `TOS` | the emulator, `hatari`, and a TOS image, `~/hatari-2.6.1_macos/tos-2.06.rom` | `ym/hatari.sh`, `ym/cost.sh`, `test_ymxr.py` |
 | `VBLS` | the frames a run plays | `ym/cost.sh` |

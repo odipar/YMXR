@@ -59,6 +59,11 @@ const Ports = 0xC0
 // MixerTarget is the target whose register is R7, the mixer (SPEC.md 2.1).
 const MixerTarget = 7
 
+// MostMixerKey is the most a key can be on setR7 through a transformation:
+// bits 5 to 0 of a row, below the port directions, so a tick reads key k as
+// k + 192 (rule 2(f)).
+const MostMixerKey = 0xFF &^ Ports
+
 // Marker is the column of a source's row the marker is in, a target
 // (SPEC.md 2.1): the column whose register reads seven bits or fewer, and
 // -1 where every column writes a register that reads all eight, which is
