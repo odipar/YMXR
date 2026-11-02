@@ -103,11 +103,13 @@ versions 4 and 5 wrote the marked form in its place, the marker in bit 7
 of R12's column (SPEC.md 2.1.3, 2.1.4). Targets 25 upward are left
 to a later version (SPEC.md 2.1, R6.2).
 
-**5.4** A writer writes version 9 (SPEC.md 3.3.5): its table is DTX3,
-which a player of version 6 or before reads wrongly, bit 3 of a control
-column is a deferred start, which a player of version 7 reads as 0, and
-version 9 encodes every source of 5.1 to 5.3. Versions 3 to 6 had a DTX2
-table.
+**5.4** A writer writes version 9, or 10 where a row maps a value
+(SPEC.md 3.3.5): its table is DTX3, which a player of version 6 or before
+reads wrongly, bit 3 of a control column is a deferred start, which a
+player of version 7 reads as 0, and version 9 encodes every source of 5.1
+to 5.3. Version 10 adds a mapping column an effect and the
+transformations they number (SPEC.md 1.10, 3.4). Versions 3 to 6 had a
+DTX2 table.
 
 **5.5** The shape of a source sets its sound (SPEC.md 2.2):
 
@@ -131,8 +133,8 @@ column is packed with ST4. Three of its settings reach a player:
 | setting | what it requires |
 |---|---|
 | the unit K | `R` and `RR` divide by K, DTX's `k` (DTX R8.9); rule 6 of SPEC.md 6 lengthens a tune until they do |
-| the ring | the bytes a live column unpacks through: a multiple of thirty, at least 60, and at most 32,767 divided by the live columns less one |
-| the period | thirty rows, the column count |
+| the ring | the bytes a live column unpacks through: a multiple of thirty, at least 60, and at most 32,767 divided by the live columns less one; in version 10 a multiple of thirty-four, at least 68 |
+| the period | thirty rows, the column count; thirty-four in version 10 |
 
 **6.2** The ring sets the size of the state block a host allocates, a ring a
 live column and a fixed part; a smaller ring packs to more bytes
@@ -148,8 +150,8 @@ state block stays within the largest (tools.md 4.7).
 
 A reader rejects a file with a condition of SPEC.md 3.3.4, reports the
 first (SPEC.md 7) and produces zero entries. Among them: a version other
-than 7, 8 and 9, versions 3 to 6 among them, whose table is DTX2, and a
-source other than one, two or three columns of one byte.
+than 7, 8, 9 and 10, versions 3 to 6 among them, whose table is DTX2, and
+a source other than one, two or three columns of one byte.
 
 ---
 
@@ -170,7 +172,7 @@ and reports the frame and the register that differ; `-hatari` plays it on
 a real MFP (tools.md 17.1).
 
 **8.3** `doc/conformance/tunes/` has sixteen tune files: fifteen a
-reader reads, of version 9, and `wrong-version.ymxr`, version `$000A`,
+reader reads, of version 9, and `wrong-version.ymxr`, version `$000B`,
 which a reader rejects (7); `MANIFEST.txt` lists the sha256 and
 the size of the record of each, the rejected one's empty.
 

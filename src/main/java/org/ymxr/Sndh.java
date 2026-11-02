@@ -203,6 +203,10 @@ final class Sndh {
                         + tune.frameRate() + " Hz and subtune 1 at " + rate + ": an SNDH file"
                         + " records one rate");
             }
+            if (tune.version() == Tune.VERSION) {
+                throw new IllegalArgumentException("subtune " + (i + 1) + ": "
+                        + Bound.UNBOUND);
+            }
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
@@ -267,6 +271,18 @@ final class Sndh {
         return end;
     }
 
+    /** The version a set of these tune files binds at, and the version of
+     *  a multi file of them: 10 where one of them is version 10, and 9
+     *  otherwise (tools.md 11.1). */
+    static int binds(List<byte[]> tuneFiles) {
+        for (byte[] tune : tuneFiles) {
+            if (tune.length >= Tune.INDEX_AT && Tune.getWord(tune, 4) == Tune.VERSION) {
+                return Tune.VERSION;
+            }
+        }
+        return Tune.UNMAPPED;
+    }
+
     /**
      * The core's descriptor checked against what this writes, and its flags
      * against the switches requested: the flags word records whether the
@@ -281,10 +297,6 @@ final class Sndh {
      *     lean ones where {@code lean} does, or it has no deferred start
      *     in where {@code defers}
      */
-    static int binds(List<byte[]> tuneFiles) {
-        return Bound.VERSION;
-    }
-
     static void checkCore(byte[] core, boolean monitor, boolean lean, int binds) {
         checkCore(core, monitor, lean, false, binds);
     }

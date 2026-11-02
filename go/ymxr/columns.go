@@ -1,10 +1,30 @@
-// Package ymxr is the format: the thirty columns of a tune, the sources
-// its effects run, the tune file those are written to, and the multi file
-// several tune files travel in.
+// Package ymxr is the format: the columns of a tune, the sources its
+// effects run, the transformations they map through, the tune file those
+// are written to, and the multi file several tune files travel in.
 package ymxr
 
-// C is the column count, and a row's bytes (SPEC.md 1).
+// C is the column count of versions 7 to 9, and a row's bytes (SPEC.md 1).
 const C = 30
+
+// MappingColumn is the mapping column of effect 0; column 30 + i is effect
+// i's (SPEC.md 1.10).
+const MappingColumn = 30
+
+// Mapped is the column count of version 10, whose rows set the mapping
+// columns (SPEC.md 3.3.5).
+const Mapped = 34
+
+// Maps is bit 5 of the effects used: the tune has the mapping columns, and
+// a row maps a value (SPEC.md 3.3).
+const Maps = 0x20
+
+// MostTransformations is the most transformations a tune file has: a
+// mapping column numbers 1 to 127 (SPEC.md 1.10).
+const MostTransformations = 127
+
+// MostEntries is the most entries of a transformation, one for each key of
+// a byte (SPEC.md 3.4).
+const MostEntries = 256
 
 // Effect is the first effect's target column; four columns an effect.
 const Effect = 14
@@ -63,9 +83,10 @@ const MFP = 2457600
 // Prescaler is the number each select divides that clock by (SPEC.md 1.9).
 var Prescaler = [8]int{0, 4, 10, 16, 50, 64, 100, 200}
 
-// Columns is a tune's thirty columns, one byte a column a frame: the
-// columns themselves, the row the tune repeats to, and the effects the
-// tune runs.
+// Columns is a tune's columns, one byte a column a frame (SPEC.md 1),
+// thirty or thirty-four: the columns themselves, the row the tune repeats
+// to, the effects the tune runs, and the transformations the mapping
+// columns number (SPEC.md 1.10, 3.4).
 //
 // Schema writes them from a YMXS structure, which the ym package reads a
 // dump into (doc/ymxs.md).
@@ -76,8 +97,14 @@ type Columns struct {
 	// Repeat is the row the tune repeats to, R where it does not.
 	Repeat int
 
-	// Effects is bits 3 to 0: the effects the tune ever runs.
+	// Effects is the effects used: bits 3 to 0 the effects the tune ever
+	// runs, bit 4 a deferred start, bit 5 the mapping columns (SPEC.md
+	// 3.3).
 	Effects int
+
+	// Transformations is transformation n at n - 1: entry k of each is the
+	// value of key k (SPEC.md 3.4). Empty in a tune of C columns.
+	Transformations [][]byte
 }
 
 // Duration is the frames a source of that many rows runs for at a rate,
@@ -94,11 +121,14 @@ func Duration(rows, selects, count, frameRate int) int {
 	return int((scaled + MFP - 1) / MFP)
 }
 
-// Name is a column's name in a report: a register by its number,
-// and an effect column by its effect and its part of it.
+// Name is a column's name in a report: a register by its number, and an
+// effect column by its effect and its part of it.
 func Name(c int) string {
 	if c < Effect {
 		return "R" + itoa(c)
+	}
+	if c >= MappingColumn {
+		return "effect " + itoa(c-MappingColumn) + " mapping"
 	}
 	effect := (c - Effect) / 4
 	part := ""

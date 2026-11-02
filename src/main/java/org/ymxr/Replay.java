@@ -23,11 +23,14 @@ final class Replay {
     /** What one effect runs after a row: source 0 where it runs no source.
      *  {@code set} marks the row that set one of its columns, {@code timer}
      *  that the row's control column had bit 6, {@code place} bit 5 and
-     *  {@code deferred} bit 3. */
+     *  {@code deferred} bit 3. {@code mapping} is the kept mapping, the
+     *  number the last start or remap set the mapping column to, 0 the
+     *  identity and at the first frame (SPEC.md 1.10.3). */
     record Effect(int target, int source, int select, int count, boolean started,
-                  boolean set, boolean timer, boolean place, boolean deferred) {
+                  boolean set, boolean timer, boolean place, boolean deferred,
+                  int mapping) {
         static final Effect NONE = new Effect(0, 0, 0, 0, false, false, false, false,
-                false);
+                false, 0);
     }
 
     final int[] registers = new int[14];
@@ -50,8 +53,8 @@ final class Replay {
 
     /** One frame: the next row, as section 4 writes it. */
     void step() {
-        byte[] r = new byte[Columns.C];
-        for (int c = 0; c < Columns.C; c++) {
+        byte[] r = new byte[table.columns()];
+        for (int c = 0; c < r.length; c++) {
             r[c] = table.column(c)[row];
         }
         row++;
@@ -93,9 +96,20 @@ final class Replay {
                 place = (r[t + 2] & 0x20) != 0;
                 deferred = (r[t + 2] & Columns.DEFERRED) != 0;
             }
-            boolean set = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0;
+            // A start or a remap that sets the mapping column sets the kept
+            // mapping, and a remap leaves the source as it is. A stop reads
+            // the source column alone, so a stop that sets the mapping
+            // column is a line of the check (SPEC.md 1.10, 6.4).
+            int mapping = was.mapping();
+            boolean mapped = r.length > Columns.MAPPING + i
+                    && (r[Columns.MAPPING + i] & 0x80) != 0;
+            boolean stop = (r[t + 1] & 0xFF) == 0x80;
+            if (mapped && !stop) {
+                mapping = r[Columns.MAPPING + i] & 0x7F;
+            }
+            boolean set = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0 || mapped;
             effect[i] = new Effect(target, source, select, count, started, set, timer, place,
-                    deferred);
+                    deferred, mapping);
         }
         envelopeWritten = false;
         Arrays.fill(written, -1);

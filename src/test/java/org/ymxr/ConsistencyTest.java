@@ -715,7 +715,7 @@ final class ConsistencyTest {
     /** The words the section against YMX spells a count with. */
     private static final Map<String, Integer> COUNT = Map.of(
             "three", 3, "twelve", 12, "fifteen", 15, "seventeen", 17, "twenty-one", 21,
-            "twenty-four", 24, "thirty", 30);
+            "twenty-four", 24, "thirty", 30, "thirty-four", 34);
 
     /** A ratio spelled as a part: an eighth less is one part in eight. */
     private static final Map<String, Integer> PART = Map.of(
@@ -981,29 +981,39 @@ final class ConsistencyTest {
     @Test
     void theWritersGuideReadsTheFormatAndTheKit() throws IOException {
         String guide = read(WRITING);
-        Matcher reads = wrapped("a version other than (\\d), (\\d) and (\\d), versions (\\d) to"
-                + " (\\d) among them, whose table is DTX2").matcher(guide);
+        Matcher reads = wrapped("a version other than (\\d+), (\\d+), (\\d+) and (\\d+), versions"
+                + " (\\d+) to (\\d+) among them, whose table is DTX2").matcher(guide);
         assertTrue(reads.find(), "writing.md names no version a reader reads");
         assertEquals(Tune.OLDEST, Integer.parseInt(reads.group(1)), "the oldest version read");
         assertEquals(Tune.DEFERRED, Integer.parseInt(reads.group(2)),
                 "the first version with a deferred start");
-        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(3)), "the version read");
-        assertEquals(Tune.VERSION_DTX2, Integer.parseInt(reads.group(4)),
+        assertEquals(Tune.UNMAPPED, Integer.parseInt(reads.group(3)),
+                "the version of a tune that maps no value");
+        assertEquals(Tune.VERSION, Integer.parseInt(reads.group(4)), "the highest version read");
+        assertEquals(Tune.VERSION_DTX2, Integer.parseInt(reads.group(5)),
                 "the first version of a DTX2 table");
-        assertEquals(Tune.VERSION_DTX2_LAST, Integer.parseInt(reads.group(5)),
+        assertEquals(Tune.VERSION_DTX2_LAST, Integer.parseInt(reads.group(6)),
                 "the last version of a DTX2 table");
-        Matcher writes = wrapped("A writer writes version (\\d) \\(SPEC\\.md 3\\.3\\.5\\)")
-                .matcher(guide);
+        Matcher writes = wrapped("A writer writes version (\\d+), or (\\d+) where a row maps a"
+                + " value \\(SPEC\\.md 3\\.3\\.5\\)").matcher(guide);
         assertTrue(writes.find(), "writing.md names no version a writer writes");
-        assertEquals(Tune.VERSION, Integer.parseInt(writes.group(1)), "the version written");
+        assertEquals(Tune.UNMAPPED, Integer.parseInt(writes.group(1)), "the version written");
+        assertEquals(Tune.VERSION, Integer.parseInt(writes.group(2)),
+                "the version written where a row maps a value");
 
         Matcher ring = wrapped("the bytes a live column unpacks through: a multiple of (\\w+),"
-                + " at least (\\d+), and at most ([\\d,]+) divided by the live columns less one")
+                + " at least (\\d+), and at most ([\\d,]+) divided by the live columns less"
+                + " one; in version (\\d+) a multiple of ([\\w-]+), at least (\\d+)")
                 .matcher(guide);
         assertTrue(ring.find(), "writing.md has no ring");
         assertEquals(Columns.C, count(ring.group(1)), "the ring's multiple, the period");
-        assertEquals(Tune.ringOf(0, Columns.C), Integer.parseInt(ring.group(2)), "the least ring");
+        assertEquals(Tune.ringOf(0, Columns.C, Columns.C), Integer.parseInt(ring.group(2)),
+                "the least ring");
         assertEquals(Tune.REACH, number(ring.group(3)), "the reach a ring is bounded by");
+        assertEquals(Tune.VERSION, Integer.parseInt(ring.group(4)), "the version of 34 columns");
+        assertEquals(Columns.MAPPED, count(ring.group(5)), "the period of version 10");
+        assertEquals(Tune.ringOf(0, Columns.MAPPED, Columns.MAPPED),
+                Integer.parseInt(ring.group(6)), "the least ring of version 10");
 
         Path kit = Path.of("doc/conformance/tunes");
         List<Path> files;
@@ -1023,7 +1033,7 @@ final class ConsistencyTest {
             if (one.getFileName().toString().equals("wrong-version.ymxr")) {
                 assertEquals(Integer.parseInt(tunes.group(4), 16), version,
                         "wrong-version.ymxr's version");
-                assertTrue(version != Tune.VERSION, "wrong-version.ymxr is one a reader"
+                assertTrue(!Tune.reads(version), "wrong-version.ymxr is one a reader"
                         + " reads");
             } else {
                 versions.add(version);
@@ -1640,5 +1650,43 @@ final class ConsistencyTest {
             }
         }
         assertTrue(wrong.isEmpty(), String.join("\n", wrong));
+    }
+
+    /** A list of figures in prose, `60, 120 and 240`, as numbers. */
+    private static List<Long> figures(String list) {
+        return Stream.of(list.split(",\\s+|\\s+and\\s+")).map(ConsistencyTest::number).toList();
+    }
+
+    /** The rings of a table of that many columns, as numbers. */
+    private static List<Long> rings(int columns) {
+        return java.util.Arrays.stream(Tune.ringsOf(columns)).asLongStream().boxed().toList();
+    }
+
+    @Test
+    void theRingsAndTheReachInProseAreTheWriters() throws IOException {
+        String figure = "\\d{1,3}(?:,\\d{3})*";
+        String list = "(" + figure + "(?:, " + figure + ")* and " + figure + ")";
+        Matcher tools = wrapped("each ring the player reaches of " + list + " bytes, or of "
+                + list + " for a table of (\\d+) columns").matcher(read(TOOLS));
+        assertTrue(tools.find(), "tools.md 4.2 lists no rings");
+        assertEquals(rings(Columns.C), figures(tools.group(1)), "tools.md 4.2, thirty columns");
+        assertEquals(rings(Columns.MAPPED), figures(tools.group(2)),
+                "tools.md 4.2, thirty-four columns");
+        assertEquals(Columns.MAPPED, Integer.parseInt(tools.group(3)));
+        Matcher spec = wrapped("through each of " + list + " bytes the player reaches, and of "
+                + list + " for a table of (\\d+) columns").matcher(read(SPEC));
+        assertTrue(spec.find(), "SPEC.md 3.3.3 lists no rings");
+        assertEquals(rings(Columns.C), figures(spec.group(1)), "SPEC.md 3.3.3, thirty columns");
+        assertEquals(rings(Columns.MAPPED), figures(spec.group(2)),
+                "SPEC.md 3.3.3, thirty-four columns");
+        assertEquals(Columns.MAPPED, Integer.parseInt(spec.group(3)));
+        Matcher reach = wrapped("(" + figure + ") at (\\d+) live columns, the most a tune of"
+                + " version 9 has, (" + figure + ") at (\\d+) in version 10").matcher(read(TOOLS));
+        assertTrue(reach.find(), "tools.md 4.2 names no reach");
+        assertEquals(Tune.reach(Columns.C), number(reach.group(1)), "the reach at thirty");
+        assertEquals(Columns.C, Integer.parseInt(reach.group(2)));
+        assertEquals(Tune.reach(Columns.MAPPED), number(reach.group(3)),
+                "the reach at thirty-four");
+        assertEquals(Columns.MAPPED, Integer.parseInt(reach.group(4)));
     }
 }

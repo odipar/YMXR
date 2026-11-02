@@ -1,11 +1,12 @@
 package org.ymxr;
 
-import java.util.Arrays;
+import java.util.List;
 
 /**
- * The thirty columns of a tune, one byte a column a frame (SPEC.md 1):
- * the columns themselves, the row the tune repeats to, and the effects the
- * tune runs.
+ * The columns of a tune, one byte a column a frame (SPEC.md 1), thirty or
+ * thirty-four: the columns themselves, the row the tune repeats to, the
+ * effects the tune runs, and the transformations the mapping columns
+ * number (SPEC.md 1.10, 3.4).
  *
  * <p>{@link Schema} writes them from a YMXS structure, which {@link Ym}
  * reads a dump into (doc/ymxs.md). What is here beside the columns is
@@ -15,8 +16,24 @@ import java.util.Arrays;
  */
 final class Columns {
 
-    /** The column count, and a row's bytes. */
+    /** The column count of versions 7 to 9, and a row's bytes there. */
     static final int C = 30;
+
+    /** The mapping column of effect 0; column 30 + i is effect i's
+     *  (SPEC.md 1.10). */
+    static final int MAPPING = 30;
+
+    /** The column count of version 10, whose rows set the mapping
+     *  columns (SPEC.md 3.3.5). */
+    static final int MAPPED = 34;
+
+    /** The most transformations a tune file has: a mapping column numbers
+     *  1 to 127 (SPEC.md 1.10). */
+    static final int MOST_TRANSFORMATIONS = 127;
+
+    /** The most entries of a transformation, one for each key of a byte
+     *  (SPEC.md 3.4). */
+    static final int MOST_ENTRIES = 256;
 
     /** The first effect's target column; four columns an effect. */
     static final int EFFECT = 14;
@@ -27,6 +44,9 @@ final class Columns {
     static final int DEFERRED = 0x08;
     /** Bit 4 of the effects used: a row defers a start (SPEC.md 3.3). */
     static final int DEFERS = 0x10;
+    /** Bit 5 of the effects used: the tune has the mapping columns, and a
+     *  row maps a value (SPEC.md 3.3). */
+    static final int MAPS = 0x20;
 
     /** Bit 4 of a control column: the count column beside it is 0, and
      *  that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9). */
@@ -72,16 +92,34 @@ final class Columns {
     /** The row the tune repeats to, `R` where it does not. */
     final int repeat;
 
-    /** Bits 3 to 0: the effects the tune ever runs. */
+    /** The effects used: bits 3 to 0 the effects the tune ever runs, bit
+     *  4 a deferred start, bit 5 the mapping columns (SPEC.md 3.3). */
     final int effects;
+
+    /** The transformations, transformation n at n - 1: entry k of each is
+     *  the value of key k (SPEC.md 3.4). Empty in a tune of thirty
+     *  columns. */
+    final List<byte[]> transformations;
 
     /** Columns passed whole, {@code column[c][frame]}, for a tune built
      *  rather than converted: the row it repeats to, or the frame count
-     *  where it plays once, and the effects it runs. */
+     *  where it plays once, and the effects it runs, with no
+     *  transformation. */
     Columns(byte[][] column, int repeat, int effects) {
+        this(column, repeat, effects, List.of());
+    }
+
+    /** The same, with the transformations the mapping columns number. */
+    Columns(byte[][] column, int repeat, int effects, List<byte[]> transformations) {
         this.column = column;
         this.repeat = repeat;
         this.effects = effects;
+        this.transformations = List.copyOf(transformations);
+    }
+
+    /** The column count, 30 or 34, and a row's bytes. */
+    int count() {
+        return column.length;
     }
 
     /** R0 to R13 of one frame with the dump's flag bits masked off, and -1

@@ -26,7 +26,9 @@ import (
 
 // Effect records one effect's run after a row: source 0 where it runs no
 // source. Set is true where the row set one of its columns, Timer that the
-// row's control column had bit 6, Place bit 5 and Deferred bit 3.
+// row's control column had bit 6, Place bit 5 and Deferred bit 3. Mapping
+// is the kept mapping, the number the last start or remap set the mapping
+// column to, 0 the identity and at the first frame (SPEC.md 1.10.3).
 type Effect struct {
 	Target   int
 	Source   int
@@ -37,6 +39,7 @@ type Effect struct {
 	Timer    bool
 	Place    bool
 	Deferred bool
+	Mapping  int
 }
 
 // Replay is the model over one table.
@@ -71,8 +74,9 @@ func (m *Replay) Rows() int {
 
 // Step reads one frame: the next row, as section 4 writes it.
 func (m *Replay) Step() {
-	var r [ymxr.C]byte
-	for c := 0; c < ymxr.C; c++ {
+	columns := m.table.Columns()
+	r := make([]byte, columns)
+	for c := 0; c < columns; c++ {
 		r[c] = m.table.Column(c)[m.row]
 	}
 	m.row++
@@ -116,10 +120,19 @@ func (m *Replay) Step() {
 			place = r[t+2]&0x20 != 0
 			deferred = r[t+2]&ymxr.Deferred != 0
 		}
-		set := (r[t]|r[t+1]|r[t+2])&0x80 != 0 || r[t+3] != 0
+		// A start or a remap that sets the mapping column sets the kept
+		// mapping, and a remap leaves the source as it is. A stop reads the
+		// source column alone, so a stop that sets the mapping column is a
+		// line of the check (SPEC.md 1.10, 6.4).
+		mapping := was.Mapping
+		mapped := columns == ymxr.Mapped && r[ymxr.MappingColumn+i]&0x80 != 0
+		if mapped && r[t+1] != 0x80 {
+			mapping = int(r[ymxr.MappingColumn+i]) & 0x7F
+		}
+		set := (r[t]|r[t+1]|r[t+2])&0x80 != 0 || r[t+3] != 0 || mapped
 		m.Effect[i] = Effect{Target: target, Source: source, Select: selects,
 			Count: count, Started: started, Set: set, Timer: timer, Place: place,
-			Deferred: deferred}
+			Deferred: deferred, Mapping: mapping}
 	}
 	m.EnvelopeWritten = false
 	for i := range m.Written {

@@ -160,7 +160,7 @@ func OfFiles(files [][]byte, packers []dtx.Packer, ring int,
 		}
 		read[i], payloads[i] = one, payload
 		if ring == Choose {
-			packs += payload.Live() * len(RingsOf(payload.Live()))
+			packs += payload.Live() * len(RingsOf(payload.Live(), one.Table.Columns()))
 		} else {
 			packs += payload.Live() * len(packers)
 		}
@@ -188,15 +188,15 @@ func OfFiles(files [][]byte, packers []dtx.Packer, ring int,
 		var packed []byte
 		if ring == Choose {
 			var err error
-			plain, err = Candidates(column, table.Rows(), table.Repeat(), unit, RingsOf(live),
-				first, said)
+			plain, err = Candidates(column, table.Rows(), table.Repeat(), unit,
+				RingsOf(live, len(column)), first, said)
 			if err != nil {
 				return nil, err
 			}
 			// the table through the set's ring is put in its place below
 			packed = plain[sortedRings(plain)[0]].Table
 		} else {
-			at := RingOf(ring, live)
+			at := RingOf(ring, live, len(column))
 			if at != ring {
 				said.Note("the ring is " + report.Count(at, "byte", "bytes") +
 					": a multiple of the period within the player's reach")

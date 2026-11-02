@@ -165,23 +165,24 @@ the tune files it reads again, through `-mN` and `-copies[S]` (11.1).
 (DTX, SPEC.md 2.4), 2 by default.
 
 **4.2 `-mN`.** N is the ring in bytes. Without `-m` the writer chooses one:
-it packs the table through each of 60, 120, 240, 480, 960 and 1,920 bytes
-the player reaches and keeps the one whose table and state block come to the
-least. Under `-copies` that pass is without copies, and the writer then
+it packs the table through each ring the player reaches of 60, 120, 240,
+480, 960 and 1,920 bytes, or of 68, 136, 272, 544, 1,088 and 2,176 for a
+table of 34 columns, and keeps the one whose table and state block come to
+the least. Under `-copies` that pass is without copies, and the writer then
 packs with copies where they pay through the two that came to the least and
 keeps the one of the two that comes to the less. A ring the packager finds
-no period for at unit K is left out (DTX, abi.md 4), and the tool notes
-`a ring of A has no period at unit K`. With `-mN` the table packs through
-the multiple of 30 nearest N, at least 60 and at most the largest the player
-reaches; where that differs from N the tool notes
-`the ring is A bytes: a multiple of the period within the player's reach`, A
-the ring used. The tunes of a set have their rings chosen for the set
-instead (4.7).
+no period for at unit K is left out (DTX, abi.md 4), and the tool notes `a
+ring of A has no period at unit K`. With `-mN` the table packs through the
+multiple of C nearest N, C the column count, 30 or 34, at least 2C and at
+most the largest the player reaches; where that differs from N the tool
+notes `the ring is A bytes: a multiple of the period within the player's
+reach`, A the ring used. The tunes of a set have their rings chosen for the
+set instead (4.7).
 
-Note: the player reaches slot L less 1's ring through a 16-bit
-displacement from slot 0's, L the live columns, so the largest ring is
-32,767 divided by L less 1: 1,129 at 30 live columns, the most a tune has,
-and 32,512, DTX3's bound, at 2 or fewer.
+Note: the player reaches slot L less 1's ring through a 16-bit displacement
+from slot 0's, L the live columns, so the largest ring is 32,767 divided by
+L less 1: 1,129 at 30 live columns, the most a tune of version 9 has, 992 at
+34 in version 10, and 32,512, DTX3's bound, at 2 or fewer.
 
 **4.3 `-copies[S]`.** Each live column packs with copies from its
 literal stream and without, and the smaller is kept; a payload with one
@@ -209,20 +210,21 @@ K the unit, an *unset row* a row with every column unset:
    - otherwise: append K minus R modulo K unset rows. Note
      `padded: N unset rows at row R, so the table packs at unit K`.
 
-The period of the DTX3 table is 30 rows.
+The period of the DTX3 table is C rows, its column count, 30 or 34.
 
 **4.5 The packing report.** A tool that writes a tune file reports, per
-tune: the heading `the table: 30 columns of R rows, B bytes, packed at unit
-K through a ring of A`, B = 30 R, then `, the one the writer chose` where
-`-m` is absent, or `, the one the writer chose for the set` where 4.7 chose
-it, then `, L live columns`; a row a column, named `R0` to `R13` and `effect
-i target`, `effect i source`, `effect i timer control`, `effect i timer
-count` for i 0 to 3, the value `%7d -> constant V` for a constant column, V
-its value, and `%7d -> %6d bytes  (%5.1f%%)` for a live one, two spaces
-before the parenthesis, of the rows in, the bytes of its slot's streams and
-their ratio; the heading `the sources: N tables of R rows, B bytes`; and the
+tune: the heading `the table: C columns of R rows, B bytes, packed at unit K
+through a ring of A`, C 30, and 34 in version 10, B = C R, then `, the one
+the writer chose` where `-m` is absent, or `, the one the writer chose for
+the set` where 4.7 chose it, then `, L live columns`; a row a column, named
+`R0` to `R13` and `effect i target`, `effect i source`, `effect i timer
+control`, `effect i timer count` for i 0 to 3, and `effect i mapping` in
+version 10, the value `%7d -> constant V` for a constant column, V its
+value, and `%7d -> %6d bytes  (%5.1f%%)` for a live one, two spaces before
+the parenthesis, of the rows in, the bytes of its slot's streams and their
+ratio; the heading `the sources: N tables of R rows, B bytes`; and the
 heading `packed X bytes into Y (Z%), the state block S bytes, the file F
-bytes`, X = 30 R, Y the DTX3 table, S the state block its reader needs (DTX,
+bytes`, X = C R, Y the DTX3 table, S the state block its reader needs (DTX,
 abi.md 3), F the tune file.
 
 **4.6 The name** of a tune file (SPEC.md 3.3) is the text the tool's
@@ -454,19 +456,24 @@ follows rule 3, 1 where any dump fails, any tune file has a line of 8.7,
 or standard input is neither, and 2 where a directory fails to list or,
 in the Go tree, a named file fails to stat (19.5).
 
-**8.7 A tune file** is read as SPEC.md 3.3 defines, and its starts against
-rule 3 of SPEC.md 6: its verdict is `<name>: every start follows rule 3`,
-or `<name>:` and a line under it for each start that names a source past
-the file's, in row order, whose rows are unknown. A start that leaves bit
-5 of the control column at 0 leaves the place at its number modulo the row
+**8.7 A tune file** is read as SPEC.md 3.3 defines, and its rows as SPEC.md
+6.4 defines: its verdict is `<name>: every start follows rule 3`, or
+`<name>:` and a line under it for each start that names a source past the
+file's, in row order, whose rows are unknown. A start that leaves bit 5 of
+the control column at 0 leaves the place at its number modulo the row
 count of the source it starts (SPEC.md 1.8.4), so every other start reads
-a row of its source. A tune file that fails to read is the line `the tune
-file does not read: <message>`, the message a line of SPEC.md 3.3.4. The
-line, `r` the row, `i` the effect and `S` the source:
+a row of its source. In version 10 a line is also each row whose mapping
+column numbers a transformation past the file's, and each stop that sets
+the mapping column (SPEC.md 6.4). A tune file that fails to read is the
+line `the tune file does not read: <message>`, the message a line of
+SPEC.md 3.3.4. The lines, `r` the row, `i` the effect, `S` the source and
+`N` the transformation:
 
 | line | condition |
 |---|---|
 | `r: effect i starts source S, and the file has K sources` | S is past the file's source count (SPEC.md 8.5) |
+| `r: effect i stops and sets its mapping column, and a stop leaves the mapping as it is` | row r stops effect i and sets its mapping column (SPEC.md 6, rule 3(c)) |
+| `r: effect i maps through transformation N, and the file has T transformations` | otherwise, N is past the file's transformation count T (SPEC.md 6, rule 2(b)) |
 
 ---
 
@@ -478,12 +485,12 @@ default R + R - RR frames for a tune that repeats and R + 1 for one that
 plays once, the entry `{"result":-1}` ending the record where the tune
 ends before ROWS frames (SPEC.md 7).
 
-**9.2 The report** is the heading `the tune file: B bytes` and the rows
-`the table`, `R rows of 30 columns, repeating at row RR`; `the frame
-rate`, `H Hz`; `the sources`, `S`; `the rows to record`, `one pass and
-the loop once` or ROWS. For a file the reader rejects the heading is `the
-tune file: B bytes, which this reader does not read: <message>`. The
-summary line is `ymxr-trace: B bytes of rows`.
+**9.2 The report** is the heading `the tune file: B bytes` and the rows `the
+table`, `R rows of C columns, repeating at row RR`, C 30 or 34; `the frame
+rate`, `H Hz`; `the sources`, `S`; `the rows to record`, `one pass and the
+loop once` or ROWS. For a file the reader rejects the heading is `the tune
+file: B bytes, which this reader does not read: <message>`. The summary line
+is `ymxr-trace: B bytes of rows`.
 
 **9.3 Errors.** A multi file is `this is a multi file of several tunes,
 and a record is of one tune`, exit 1. A file the reader rejects (SPEC.md
@@ -532,7 +539,9 @@ the tune file's. The summary line is `ymxr-bind: B bytes`.
 
 **10.3 Errors.** A multi file is `this is a multi file of several tunes,
 and a bound tune is one tune: ymxr-sndh reads a multi file`, exit 1; a
-file the reader rejects is its message, exit 1.
+file the reader rejects is its message, exit 1; a tune file of version 10
+is `the binder writes bound tunes to version 9, and this tune file is
+version 10`, exit 1.
 
 ---
 
@@ -540,7 +549,8 @@ file the reader rejects is its message, exit 1.
 
 **11.1** The arguments name tune files, one subtune each in the order named,
 `-nNAME` flags, the i-th naming the i-th file, and the packer's `-mN` and
-`-copies[S]` (4.2, 4.3); the output is the multi file (BINARIES.md 0). Each
+`-copies[S]` (4.2, 4.3); the output is the multi file (BINARIES.md 0),
+version 10 where a tune file of it is version 10, and 9 otherwise. Each
 table is unpacked and packed again at the unit its tune file packs at:
 through the rings chosen for the set (4.7) where `-m` is absent, and through
 the ring `-mN` names as 4.2 reads it otherwise. Every other part of a tune
@@ -561,13 +571,12 @@ then the set's heading of 4.7. The summary lines are
 **11.4 Reading a multi file.** A file of 8 bytes or more beginning `YMXM` is
 read as a multi file (BINARIES.md 0), and a tool that reads one rejects,
 with the line, exit 1: a version word of 3 to 6, `version V has DTX2
-tables, and this reads 7, 8 or 9: write the tunes again with ym-to-ymxr or
-ymxs-to-ymxr`; any other version word but 7, 8 and 9, `version V is not 7,
-8 or 9`; a count
-outside 1 to 99, `N tunes, and a multi file has 1 to 99`; an index past the
-file's end, `the entries of N tunes end past the file's B bytes`; an entry
-outside the file, `tune N is at A for B bytes, and the file has F`, A its
-offset.
+tables, and this reads 7, 8, 9 or 10: write the tunes again with ym-to-ymxr
+or ymxs-to-ymxr`; any other version word but 7, 8, 9 and 10, `version V is
+not 7, 8, 9 or 10`; a count outside 1 to 99, `N tunes, and a multi file
+has 1 to 99`; an index past the file's end, `the entries of N tunes end
+past the file's B bytes`; an entry outside the file, `tune N is at A for B
+bytes, and the file has F`, A its offset.
 
 ---
 
@@ -606,6 +615,7 @@ report of 12.4 prints the text as passed.
 | zero tune files | `no tune files: an SNDH file has one subtune at least` |
 | more than 99 | `N tune files: the '##' tag's two digits count at most 99 subtunes` |
 | subtune N fails to read | `subtune N: <message>` |
+| subtune N is version 10 | `subtune N: the binder writes bound tunes to version 9, and this tune file is version 10` |
 | subtune 1 has a rate of 0 | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | subtune N has a rate other than subtune 1's | `subtune N plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |

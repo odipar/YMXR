@@ -11,21 +11,21 @@ import org.jspecify.annotations.Nullable;
  * A bound tune: a tune file's tables bound with DTX's reader into what the
  * player reads. doc/BINARIES.md is the contract. The layout is the tune
  * file's ({@link Tune}) under its magic and version, with the image DTX
- * packages the DTX2 table with where the file has the table, and the bytes
+ * packages the DTX3 table with where the file has the table, and the bytes
  * of the state block the image's reader needs recorded in the header, so
  * that a host allocates them without reading the image.
  *
  * <pre>
  *  offset  bytes  what it is
  *  0       4      YMXB
- *  4       2      the version, $0003
+ *  4       2      the version, the tune file's, $0007 to $0009
  *  6       2      the frame rate, in Hz
- *  8       1      effects used, bits 3 to 0
+ *  8       1      effects used, the tune file's
  *  9       1      S, the source count, 0 to 127
- *  10      2      zero
+ *  10      2      bytes 10 and 11 of the tune file, which a player skips
  *  12      4      the state block's bytes the image's reader needs
  *  16      4      where the image begins, signed
- *  20      4      where this tune's table stands, from the image's first byte
+ *  20      4      where this tune's table is, from the image's first byte
  *  24      4S     the source index: where source 1 to S's DTX1 table begins
  *          ..     the DTX1 tables, each on a long
  *          ..     the image, on a long
@@ -36,8 +36,12 @@ import org.jspecify.annotations.Nullable;
 final class Bound {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'B'};
-    /** The version of a bound tune, its tune file's (SPEC.md 3.3.5). */
-    static final int VERSION = Tune.VERSION;
+
+    /** The line for a tune file of version 10: a bound tune has the
+     *  version of its tune file, and the binder writes versions 7 to 9
+     *  (BINARIES.md 1). */
+    static final String UNBOUND = "the binder writes bound tunes to version "
+            + Tune.UNMAPPED + ", and this tune file is version " + Tune.VERSION;
     static final int STATE_AT = 12;
     static final int IMAGE_AT = 16;
     static final int TABLE_AT = 20;
@@ -80,7 +84,7 @@ final class Bound {
         int[] image = new int[tuneFiles.size()];
         int[] table = new int[tuneFiles.size()];
         for (int i = 0; i < tuneFiles.size(); i++) {
-            String key = shape(TuneFile.read(tuneFiles.get(i)).dtx3());
+            String key = shape(unmapped(TuneFile.read(tuneFiles.get(i))).dtx3());
             int at = keys.indexOf(key);
             if (at < 0) {
                 at = keys.size();
@@ -134,10 +138,21 @@ final class Bound {
      *  put in, the index recomputed, then the image, then the file's DTX1
      *  tables as they are. */
     static byte[] of(byte[] tuneFile) {
-        byte[] image = Packager.image(TuneFile.read(tuneFile).dtx3());
+        byte[] image = Packager.image(unmapped(TuneFile.read(tuneFile)).dtx3());
         return build(tuneFile, image,
                 Tune.getLong(image, FORMAT_AT + FORMAT_TABLE_AT),
                 Tune.getLong(image, FORMAT_AT + FORMAT_STATE_AT));
+    }
+
+    /** The tune file read, where its version is 7 to 9.
+     *
+     *  @throws IllegalArgumentException with {@link #UNBOUND} for version
+     *      10 */
+    private static TuneFile unmapped(TuneFile tune) {
+        if (tune.version() == Tune.VERSION) {
+            throw new IllegalArgumentException(UNBOUND);
+        }
+        return tune;
     }
 
     /**
@@ -150,13 +165,14 @@ final class Bound {
      */
     private static byte[] build(byte[] tuneFile, byte @Nullable [] image, int table,
                                 int state) {
-        TuneFile tune = TuneFile.read(tuneFile);
+        TuneFile tune = unmapped(TuneFile.read(tuneFile));
+        int index = Tune.indexAt(tune.version());
         int count = tune.sources().size();
         byte[][] tables = new byte[count][];
         for (int i = 0; i < count; i++) {
-            int at = Tune.getLong(tuneFile, Tune.INDEX_AT + 4 * i) & ~Tune.COUNTED;
+            int at = Tune.getLong(tuneFile, index + 4 * i) & ~Tune.COUNTED;
             int to = i + 1 < count
-                    ? Tune.getLong(tuneFile, Tune.INDEX_AT + 4 * (i + 1)) & ~Tune.COUNTED
+                    ? Tune.getLong(tuneFile, index + 4 * (i + 1)) & ~Tune.COUNTED
                     : tuneFile.length;
             tables[i] = Arrays.copyOfRange(tuneFile, at, to);
         }

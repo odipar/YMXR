@@ -15,32 +15,48 @@ import (
 )
 
 // A tune file (SPEC.md 3.3): a tune's fixed values, the tune's table as a
-// DTX3 file, and one DTX1 table a source. The file contains the tune's
-// tables and no code; a tool binds them with DTX's reader into what the
-// player reads (doc/BINARIES.md).
+// DTX3 file, one DTX1 table a source, and in version 10 the
+// transformations the mapping columns number. The file contains the
+// tune's tables and no code; a tool binds them with DTX's reader into
+// what the player reads (doc/BINARIES.md).
 //
 //	offset  bytes  what it is
 //	0       4      YMXR
-//	4       2      the version, $0007
+//	4       2      the version, $0009, or $000A where a row maps a value
 //	6       2      the frame rate, in Hz
-//	8       1      effects used, bits 3 to 0
+//	8       1      effects used: bits 3 to 0 the effects, bit 4 a
+//	               deferred start, bit 5 the mapping columns
 //	9       1      S, the source count, 0 to 127
 //	10      2      where the name begins, or zero where the tune has none
 //	12      4      where the DTX3 table begins
-//	16      4S     the source index: where source 1 to S's DTX1 table begins
+//	16      4S     versions 7 to 9: the source index, where source 1 to
+//	               S's DTX1 table begins
+//	16      4      version 10: where the transformation index begins
+//	20      4S     version 10: the source index
+//	        ..     the name, its bytes and a zero, where there is one
+//	        ..     version 10: the transformation index, on a long: T,
+//	               a word, then T longs, where transformation 1 to T
+//	               begins from the index's first byte
+//	        ..     version 10: transformation 1 to T, each on a long: E,
+//	               a word, then E bytes, entry k the value of key k
 //	        ..     the DTX3 table, on a long
 //	        ..     the DTX1 tables, each on a long
 //
-// Every offset counts from the file's first byte.
+// Every other offset counts from the file's first byte.
 
 // Magic is the four bytes a tune file opens with.
 var Magic = []byte{'Y', 'M', 'X', 'R'}
 
-// Version is the version a writer writes (SPEC.md 3.3.5): its table is
-// DTX3, which a player of an earlier version reads wrongly, bit 3 of a
-// control column marks a deferred start, and the place of one with bit 5
-// at 0 continues the count of the rows (4.8).
-const Version = 0x0009
+// Version is the highest version a reader reads, the version a writer
+// writes where a row maps a value (SPEC.md 3.3.5): its table has Mapped
+// columns, and the file has the transformations they number.
+const Version = 0x000A
+
+// Unmapped is the version a writer writes where no row maps a value
+// (SPEC.md 3.3.5): its table is DTX3, which a player of an earlier version
+// reads wrongly, bit 3 of a control column marks a deferred start, and the
+// place of one with bit 5 at 0 continues the count of the rows (4.8).
+const Unmapped = 0x0009
 
 // VersionDeferred is the first version with a deferred start: a file of
 // version 8 reads as version 9 (SPEC.md 3.3.5).
@@ -51,7 +67,7 @@ const VersionDeferred = 0x0008
 const Oldest = 0x0007
 
 // Reads is the versions a reader reads, as its report names them.
-var Reads = fmt.Sprintf("%d, %d or %d", Oldest, VersionDeferred, Version)
+var Reads = fmt.Sprintf("%d, %d, %d or %d", Oldest, VersionDeferred, Unmapped, Version)
 
 // ReadsVersion is whether a reader reads a file of that version.
 func ReadsVersion(version int) bool {
@@ -70,6 +86,16 @@ const (
 // whole bytes and a player counts them (SPEC.md 3.1).
 const Counted = 1 << 31
 
+// IndexAt is where the source index begins in a file of that version: at
+// 16, and at 20 in version 10, after the transformation index's offset
+// (SPEC.md 3.3).
+func IndexAt(version int) int {
+	if version == Version {
+		return TransformationsAt + 4
+	}
+	return HeaderLength
+}
+
 // Where each header field is.
 const (
 	FrameRateAt = 6
@@ -85,16 +111,31 @@ const (
 	// MostName is the most bytes a name reaches, its zero aside.
 	MostName = 255
 	TableAt  = 12
-	IndexAt  = 16
+
+	// HeaderLength is the bytes of the fields every version has, which a
+	// tune file is at least.
+	HeaderLength = 16
+
+	// TransformationsAt is the long of version 10: where the
+	// transformation index begins.
+	TransformationsAt = 16
 )
 
 // Choose, as a writer's ring, has the writer choose one of Rings (SPEC.md
 // 3.3.3): no ring is named.
 const Choose = 0
 
-// Rings are the rings a writer chooses among: two periods of thirty rows
-// and each double of that, up to what the player reaches.
-var Rings = []int{60, 120, 240, 480, 960, 1920}
+// Rings is the rings a writer chooses among for a table of that many
+// columns: two periods of that many rows and each double of that, 60 to
+// 1,920 for C columns and 68 to 2,176 for Mapped, up to what the player
+// reaches.
+func Rings(columns int) []int {
+	rings := make([]int, 6)
+	for i := range rings {
+		rings[i] = 2 * columns << i
+	}
+	return rings
+}
 
 // Reach is the furthest the player reads a column from the row pointer: a
 // 16-bit displacement.
@@ -157,15 +198,19 @@ type Written struct {
 // column is its value, and each live column is packed by every packer
 // named, the smallest kept: with copies from the literal stream and
 // without, the smaller kept, where -copies names both. The table packs at a
-// period of C rows, the smallest DTX allows, since a refill decodes a
-// period's rows of one column at once and a refill costs a period; the
-// ring is a multiple of C for that. The writer packs the table with the
-// first packer through each of Rings the player reaches and keeps the one
-// whose bytes and state block come to the least; with a second packer, it
-// packs with every packer through the two that came to the least and keeps
-// the one of those two that comes to the less. A ring named is the multiple
-// of C nearest it within that reach. A loop longer than the ring is
-// replayed at its exact rows by DTX's reader.
+// period of its column count's rows, the smallest DTX allows, since a
+// refill decodes a period's rows of one column at once and a refill costs
+// a period; the ring is a multiple of the column count for that. The
+// writer packs the table with the first packer through each of Rings the
+// player reaches and keeps the one whose bytes and state block come to the
+// least; with a second packer, it packs with every packer through the two
+// that came to the least and keeps the one of those two that comes to the
+// less. A ring named is the multiple of the column count nearest it within
+// that reach. A loop longer than the ring is replayed at its exact rows by
+// DTX's reader.
+//
+// The file is version 10 where the table has Mapped columns, with the
+// transformations after the name, and version 9 otherwise.
 func Write(columns Columns, sources *Sources, frameRate, unit, ring int,
 	said *report.Report) (Written, error) {
 	return WriteNamed(columns, sources, frameRate, unit, ring, Plain(), said, "")
@@ -209,7 +254,7 @@ func namedBytes(name string) []byte {
 // records none. A file written before the name reads as none, since the
 // word was zero there.
 func TuneName(file []byte) string {
-	if len(file) < IndexAt {
+	if len(file) < HeaderLength {
 		return ""
 	}
 	at := GetWord(file, NameAt)
@@ -262,11 +307,12 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 		unit = 1
 	}
 	live := Live(columns.Column)
+	columnCount := len(columns.Column)
 	var rings []int
 	if ring == Choose {
-		rings = RingsOf(live)
+		rings = RingsOf(live, columnCount)
 	} else {
-		at := RingOf(ring, live)
+		at := RingOf(ring, live, columnCount)
 		if at != ring {
 			said.Note("the ring is " + report.Count(at, "byte", "bytes") +
 				": a multiple of the period within the player's reach")
@@ -350,12 +396,23 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 		sourceBytes += len(tables[i])
 	}
 	named := namedBytes(name)
-	after := IndexAt + 4*len(tables)
+	version := Unmapped
+	if columnCount == Mapped {
+		version = Version
+	}
+	index := IndexAt(version)
+	after := index + 4*len(tables)
 	nameAt := 0
 	if len(named) != 0 {
 		nameAt = after
 	}
 	here := Align(after + len(named))
+	transformationsAt := here
+	var block []byte
+	if version == Version {
+		block = transformationBlock(columns.Transformations)
+		here = Align(here + len(block))
+	}
 	tableAt := here
 	here = Align(here + len(table))
 	sourceAt := make([]int, len(tables))
@@ -365,19 +422,23 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 	}
 	file := make([]byte, here)
 	copy(file, Magic)
-	PutWord(file, 4, Version)
+	PutWord(file, 4, version)
 	PutWord(file, FrameRateAt, frameRate)
 	file[EffectsAt] = byte(columns.Effects)
 	file[CountAt] = byte(len(tables))
 	PutWord(file, NameAt, nameAt)
 	PutLong(file, TableAt, tableAt)
+	if version == Version {
+		PutLong(file, TransformationsAt, transformationsAt)
+		copy(file[transformationsAt:], block)
+	}
 	copy(file[nameAt:], named)
 	for i := range tables {
 		entry := sourceAt[i]
 		if all[i].Counted {
 			entry |= Counted
 		}
-		PutLong(file, IndexAt+4*i, entry)
+		PutLong(file, index+4*i, entry)
 	}
 	copy(file[tableAt:], table)
 	for i := range tables {
@@ -389,6 +450,27 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 	return Written{File: file, Repeat: repeat, Table: table, Frames: frames, Unit: unit,
 		Sources: len(tables), SourceRows: sourceRows, SourceBytes: sourceBytes,
 		Plain: plain}, nil
+}
+
+// transformationBlock is the transformation index and the transformations
+// after it, as a version 10 file has them from the index's first byte: T,
+// a word, then T longs, each where its transformation begins from that
+// byte, then each transformation on a long, E, a word, and its E entries.
+func transformationBlock(tables [][]byte) []byte {
+	at := make([]int, len(tables))
+	here := Align(2 + 4*len(tables))
+	for n, table := range tables {
+		at[n] = here
+		here = Align(here + 2 + len(table))
+	}
+	block := make([]byte, here)
+	PutWord(block, 0, len(tables))
+	for n, table := range tables {
+		PutLong(block, 2+4*n, at[n])
+		PutWord(block, at[n], len(table))
+		copy(block[at[n]+2:], table)
+	}
+	return block
 }
 
 // Candidates is the table packed with packer through each of rings, by
@@ -417,11 +499,11 @@ func Candidates(column [][]byte, frames, repeat, unit int, rings []int, packer d
 	return plain, nil
 }
 
-// RingsOf is the rings the writer chooses among for a table of live live
-// columns: each of Rings the player reaches.
-func RingsOf(live int) []int {
+// RingsOf is the rings the writer chooses among for a table of that many
+// columns, live of them live: each of Rings the player reaches.
+func RingsOf(live, columns int) []int {
 	var rings []int
-	for _, one := range Rings {
+	for _, one := range Rings(columns) {
 		if one <= ReachOf(live) {
 			rings = append(rings, one)
 		}
@@ -446,9 +528,10 @@ func sortedRings(plain map[int]Packed) []int {
 func WithTable(file, table []byte) []byte {
 	tableAt := GetLong(file, TableAt)
 	count := int(file[CountAt])
+	index := IndexAt(GetWord(file, 4))
 	from := len(file)
 	if count > 0 {
-		from = GetLong(file, IndexAt) &^ Counted
+		from = GetLong(file, index) &^ Counted
 	}
 	to := Align(tableAt + len(table))
 	out := make([]byte, to+len(file)-from)
@@ -456,8 +539,8 @@ func WithTable(file, table []byte) []byte {
 	copy(out[tableAt:], table)
 	copy(out[to:], file[from:])
 	for i := 0; i < count; i++ {
-		entry := GetLong(out, IndexAt+4*i)
-		PutLong(out, IndexAt+4*i, (entry&^Counted)+to-from|entry&Counted)
+		entry := GetLong(out, index+4*i)
+		PutLong(out, index+4*i, (entry&^Counted)+to-from|entry&Counted)
 	}
 	return out
 }
@@ -545,6 +628,7 @@ func packed(said *report.Report, written Written, chose string) error {
 	if err != nil {
 		return err
 	}
+	columns := header.Columns
 	payload, err := dtx.ReadPayload3(table, header)
 	if err != nil {
 		return err
@@ -554,10 +638,10 @@ func packed(said *report.Report, written Written, chose string) error {
 		return err
 	}
 	said.Say(fmt.Sprintf("the table: %s of %s, %s, packed at unit %d through a ring of %d%s, %s",
-		report.Count(C, "column", "columns"), report.Count(frames, "row", "rows"),
-		report.Count(C*frames, "byte", "bytes"), written.Unit, payload.Ring, chose,
+		report.Count(columns, "column", "columns"), report.Count(frames, "row", "rows"),
+		report.Count(columns*frames, "byte", "bytes"), written.Unit, payload.Ring, chose,
 		report.Count(payload.Live(), "live column", "live columns")))
-	for c := 0; c < C; c++ {
+	for c := 0; c < columns; c++ {
 		if !payload.IsLive(c) {
 			said.Row(Name(c), fmt.Sprintf("%7d -> constant %d", frames, payload.Constants[c]))
 			continue
@@ -570,7 +654,7 @@ func packed(said *report.Report, written Written, chose string) error {
 		report.Count(written.Sources, "table", "tables"),
 		report.Count(written.SourceRows, "row", "rows"),
 		report.Count(written.SourceBytes, "byte", "bytes")))
-	raw := C * frames
+	raw := columns * frames
 	said.Say(fmt.Sprintf("packed %s into %d (%s%%), the state block %s, the file %s",
 		report.Count(raw, "byte", "bytes"), len(table),
 		report.Fixed(100.0*float64(len(table))/float64(raw), 1),
@@ -579,16 +663,16 @@ func packed(said *report.Report, written Written, chose string) error {
 	return nil
 }
 
-// RingOf is the ring the table packs through: the multiple of C nearest
-// the one asked for, at least two periods and at most what the player
-// reaches with live live columns.
-func RingOf(ring, live int) int {
-	nearest := int((float64(ring)/C)+0.5) * C
-	if most := ReachOf(live) / C * C; nearest > most {
+// RingOf is the ring a table of that many columns packs through: the
+// multiple of the column count nearest the one asked for, at least two
+// periods and at most what the player reaches with live live columns.
+func RingOf(ring, live, columns int) int {
+	nearest := int((float64(ring)/float64(columns))+0.5) * columns
+	if most := ReachOf(live) / columns * columns; nearest > most {
 		nearest = most
 	}
-	if nearest < 2*C {
-		nearest = 2 * C
+	if nearest < 2*columns {
+		nearest = 2 * columns
 	}
 	return nearest
 }
@@ -621,21 +705,23 @@ func GetLong(b []byte, at int) int {
 }
 
 // File is a tune file read back: its header fields, its DTX3 table as the
-// bytes in the file and as the table unpacked out of them, and its
-// sources. What a reader reports (R2.4).
+// bytes in the file and as the table unpacked out of them, its sources,
+// and the entries of its transformations, none below version 10. What a
+// reader reports (R2.4).
 type File struct {
-	Version   int
-	FrameRate int
-	Effects   int
-	Dtx3      []byte
-	Table     *dtx.Table
-	Sources   []*dtx.Table
-	Counted   []bool
+	Version         int
+	FrameRate       int
+	Effects         int
+	Dtx3            []byte
+	Table           *dtx.Table
+	Sources         []*dtx.Table
+	Counted         []bool
+	Transformations [][]byte
 }
 
 // Read is the tune file in those bytes.
 func Read(file []byte) (File, error) {
-	if len(file) < IndexAt || string(file[:4]) != string(Magic) {
+	if len(file) < HeaderLength || string(file[:4]) != string(Magic) {
 		return File{}, errors.New("not a YMXR file")
 	}
 	version := GetWord(file, 4)
@@ -649,11 +735,22 @@ func Read(file []byte) (File, error) {
 	if !ReadsVersion(version) {
 		return File{}, fmt.Errorf("version %d is not %s", version, Reads)
 	}
+	effects := int(file[EffectsAt])
+	transformations, err := readTransformations(file, version, effects)
+	if err != nil {
+		return File{}, err
+	}
+	index := IndexAt(version)
 	count := int(file[CountAt])
+	// SPEC.md 3.3.4: the source index is read against the file's length
+	// before the table, which ends at its first entry
+	if index+4*count > len(file) {
+		return File{}, fmt.Errorf("the source index at %d is outside the file", index)
+	}
 	tableAt := GetLong(file, TableAt)
 	end := len(file)
 	if count != 0 {
-		end = GetLong(file, IndexAt) &^ Counted
+		end = GetLong(file, index) &^ Counted
 	}
 	if tableAt < 0 || end > len(file) || tableAt > end {
 		return File{}, fmt.Errorf("the table is at %d to %d, and the file has %d"+
@@ -675,9 +772,13 @@ func Read(file []byte) (File, error) {
 	if err != nil {
 		return File{}, err
 	}
-	if shape.Columns != C || shape.Width != 1 {
+	columns := C
+	if version == Version {
+		columns = Mapped
+	}
+	if shape.Columns != columns || shape.Width != 1 {
 		return File{}, fmt.Errorf("the table is %d columns of %d bytes, and a tune's"+
-			" table is %d of one (SPEC.md 3.3.3)", shape.Columns, shape.Width, C)
+			" table is %d of one (SPEC.md 3.3.3)", shape.Columns, shape.Width, columns)
 	}
 	table, err := dtx.Read(dtx3)
 	if err != nil {
@@ -686,12 +787,12 @@ func Read(file []byte) (File, error) {
 	var sources []*dtx.Table
 	var counted []bool
 	for i := 0; i < count; i++ {
-		entry := GetLong(file, IndexAt+4*i)
+		entry := GetLong(file, index+4*i)
 		at := entry &^ Counted
 		counted = append(counted, entry&Counted != 0)
 		to := len(file)
 		if i+1 < count {
-			to = GetLong(file, IndexAt+4*(i+1)) &^ Counted
+			to = GetLong(file, index+4*(i+1)) &^ Counted
 		}
 		if at < 0 || to > len(file) || at > to {
 			return File{}, fmt.Errorf("source %d is at %d to %d, and the file has"+
@@ -714,6 +815,62 @@ func Read(file []byte) (File, error) {
 		sources = append(sources, source)
 	}
 	return File{Version: version, FrameRate: GetWord(file, FrameRateAt),
-		Effects: int(file[EffectsAt]), Dtx3: dtx3, Table: table, Sources: sources,
-		Counted: counted}, nil
+		Effects: effects, Dtx3: dtx3, Table: table, Sources: sources,
+		Counted: counted, Transformations: transformations}, nil
+}
+
+// readTransformations is the transformations of a file of that version
+// and effects used (SPEC.md 3.4), none below version 10, read in the order
+// of SPEC.md 3.3.4: bit 5 of the effects used against the version, the
+// header's long at 16, the index's place and its T, then each
+// transformation's place and its E, in ascending n. Each offset is read
+// unsigned, and against the file's length before a byte is read through
+// it.
+func readTransformations(file []byte, version, effects int) ([][]byte, error) {
+	// SPEC.md 3.3: bit 5 of the effects used is 1 in version 10 and 0 in
+	// every other, so a reader of the bit and a reader of the version read
+	// one table shape.
+	if maps := effects&Maps != 0; maps != (version == Version) {
+		bit := "clear"
+		if maps {
+			bit = "set"
+		}
+		return nil, fmt.Errorf("version %d with bit 5 of the effects used %s", version, bit)
+	}
+	if version != Version {
+		return nil, nil
+	}
+	// the header of version 10 has the long at 16 before the source index
+	if len(file) < TransformationsAt+4 {
+		return nil, errors.New("not a YMXR file")
+	}
+	at := GetLong(file, TransformationsAt)
+	if at+2 > len(file) {
+		return nil, fmt.Errorf("the transformation index at %d is outside the file", at)
+	}
+	count := GetWord(file, at)
+	if count < 1 || count > MostTransformations {
+		return nil, fmt.Errorf("the file has %d transformations, and a version %d file"+
+			" has 1 to %d", count, Version, MostTransformations)
+	}
+	if at+2+4*count > len(file) {
+		return nil, fmt.Errorf("the transformation index at %d is outside the file", at)
+	}
+	tables := make([][]byte, count)
+	for n := 1; n <= count; n++ {
+		table := at + GetLong(file, at+2+4*(n-1))
+		if table+2 > len(file) {
+			return nil, fmt.Errorf("transformation %d at %d is outside the file", n, table)
+		}
+		entries := GetWord(file, table)
+		if entries < 1 || entries > MostEntries {
+			return nil, fmt.Errorf("transformation %d has %d entries, and a"+
+				" transformation has 1 to %d", n, entries, MostEntries)
+		}
+		if table+2+entries > len(file) {
+			return nil, fmt.Errorf("transformation %d at %d is outside the file", n, table)
+		}
+		tables[n-1] = append([]byte(nil), file[table+2:table+2+entries]...)
+	}
+	return tables, nil
 }

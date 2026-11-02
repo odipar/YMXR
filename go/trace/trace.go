@@ -20,7 +20,9 @@ func Calls(table *dtx.Table) int {
 	return rows + 1
 }
 
-// Header is the record's first line: the tune's fixed values.
+// Header is the record's first line: the tune's fixed values, and in
+// version 10 the entries of each transformation after the sources
+// (SPEC.md 7.2).
 func Header(tune ymxr.File) string {
 	var line bytes.Buffer
 	fmt.Fprintf(&line, "{\"rate\":%d,\"effects\":%d,\"sources\":[", tune.FrameRate,
@@ -41,12 +43,31 @@ func Header(tune ymxr.File) string {
 		}
 		fmt.Fprintf(&line, "],\"repeat\":%d}", s.Repeat())
 	}
-	line.WriteString("]}\n")
+	line.WriteByte(']')
+	if tune.Version == ymxr.Version {
+		line.WriteString(",\"transformations\":[")
+		for n, entries := range tune.Transformations {
+			if n > 0 {
+				line.WriteByte(',')
+			}
+			line.WriteByte('[')
+			for k, entry := range entries {
+				if k > 0 {
+					line.WriteByte(',')
+				}
+				fmt.Fprintf(&line, "%d", entry)
+			}
+			line.WriteByte(']')
+		}
+		line.WriteByte(']')
+	}
+	line.WriteString("}\n")
 	return line.String()
 }
 
 // Trace is the record: the first line, then that many entries of the tune,
-// one a line; a frame reporting -1 ends it.
+// one a line; a frame reporting -1 ends it. An effect of a version 10
+// record reports its kept mapping (SPEC.md 7.3).
 func Trace(tune ymxr.File, calls int) []byte {
 	var out bytes.Buffer
 	out.WriteString(Header(tune))
@@ -80,8 +101,12 @@ func Trace(tune ymxr.File, calls int) []byte {
 				out.WriteByte(',')
 			}
 			fmt.Fprintf(&out, "\"%d\":{\"target\":%d,\"source\":%d,\"select\":%d,"+
-				"\"count\":%d,\"timer\":%t,\"place\":%t,\"deferred\":%t}", i, e.Target,
+				"\"count\":%d,\"timer\":%t,\"place\":%t,\"deferred\":%t", i, e.Target,
 				e.Source, e.Select, e.Count, e.Timer, e.Place, e.Deferred)
+			if tune.Version == ymxr.Version {
+				fmt.Fprintf(&out, ",\"mapping\":%d", e.Mapping)
+			}
+			out.WriteByte('}')
 			first = false
 		}
 		out.WriteString("}}\n")

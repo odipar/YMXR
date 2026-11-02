@@ -26,9 +26,6 @@ final class Multi {
     /** The four bytes a multi file opens with. */
     static final byte[] MAGIC = {'Y', 'M', 'X', 'M'};
 
-    /** The version of a multi file, its tune files' (SPEC.md 3.3.5). */
-    static final int VERSION = Tune.VERSION;
-
     static final int COUNT_AT = 6;
     static final int INDEX_AT = 8;
 
@@ -84,6 +81,8 @@ final class Multi {
         }
         byte[] file = new byte[bytes];
         System.arraycopy(MAGIC, 0, file, 0, 4);
+        // the version of the set: 10 where a tune file of it is version
+        // 10, and 9 otherwise (tools.md 11.1)
         Tune.putWord(file, 4, Sndh.binds(tunes));
         Tune.putWord(file, COUNT_AT, tunes.size());
         int name = INDEX_AT + ENTRY * tunes.size();

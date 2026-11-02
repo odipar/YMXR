@@ -26,7 +26,9 @@ final class Trace {
         return repeat < rows ? rows + rows - repeat : rows + 1;
     }
 
-    /** The record's first line: the tune's fixed values. */
+    /** The record's first line: the tune's fixed values, and in version
+     *  10 the entries of each transformation after the sources (SPEC.md
+     *  7.2). */
     static String header(TuneFile tune) {
         StringBuilder line = new StringBuilder("{\"rate\":").append(tune.frameRate())
                 .append(",\"effects\":").append(tune.effects()).append(",\"sources\":[");
@@ -41,13 +43,28 @@ final class Trace {
             }
             line.append("],\"repeat\":").append(s.repeat()).append('}');
         }
-        return line.append("]}\n").toString();
+        line.append(']');
+        if (tune.version() == Tune.VERSION) {
+            line.append(",\"transformations\":[");
+            for (int n = 0; n < tune.transformations().size(); n++) {
+                byte[] entries = tune.transformations().get(n);
+                line.append(n == 0 ? "" : ",").append('[');
+                for (int k = 0; k < entries.length; k++) {
+                    line.append(k == 0 ? "" : ",").append(entries[k] & 0xFF);
+                }
+                line.append(']');
+            }
+            line.append(']');
+        }
+        return line.append("}\n").toString();
     }
 
     /** The record: the first line, then {@code calls} entries of the tune,
-     *  one a line, to {@code out}; a frame reporting -1 ends it. */
+     *  one a line, to {@code out}; a frame reporting -1 ends it. An effect
+     *  of a version 10 record reports its kept mapping (SPEC.md 7.3). */
     static void trace(TuneFile tune, int calls, PrintStream out) {
         out.print(header(tune));
+        boolean mapped = tune.version() == Tune.VERSION;
         Table table = tune.table();
         Replay model = new Replay(table);
         for (int call = 0; call < calls; call++) {
@@ -77,7 +94,11 @@ final class Trace {
                         .append(",\"select\":").append(e.select()).append(",\"count\":")
                         .append(e.count()).append(",\"timer\":").append(e.timer())
                         .append(",\"place\":").append(e.place())
-                        .append(",\"deferred\":").append(e.deferred()).append('}');
+                        .append(",\"deferred\":").append(e.deferred());
+                if (mapped) {
+                    line.append(",\"mapping\":").append(e.mapping());
+                }
+                line.append('}');
                 first = false;
             }
             line.append("}}\n");

@@ -411,8 +411,8 @@ final class YmxsTest {
         Schema.Made made = Schema.of(built(counted, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
                 YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
-        assertEquals(org.ymxr.Tune.VERSION, org.ymxr.Tune.getWord(file, 4),
-                "a tune with a counted source is version " + org.ymxr.Tune.VERSION);
+        assertEquals(org.ymxr.Tune.UNMAPPED, org.ymxr.Tune.getWord(file, 4),
+                "a tune with a counted source is version " + org.ymxr.Tune.UNMAPPED);
         TuneFile read = TuneFile.read(file);
         assertEquals(200, read.sources().get(0).column(0)[0] & 0xFF,
                 "the row is the value, with no marker in bit 7");
@@ -435,9 +435,9 @@ final class YmxsTest {
         Schema.Made made = Schema.of(built(rows, 0));
         byte[] file = org.ymxr.Tune.write(made.columns(), made.sources(), made.rate(),
                 YmToYmxr.UNIT, BuiltTunes.RING, new Report()).file();
-        assertEquals(org.ymxr.Tune.VERSION, org.ymxr.Tune.getWord(file, 4),
+        assertEquals(org.ymxr.Tune.UNMAPPED, org.ymxr.Tune.getWord(file, 4),
                 "a tune with a counted source of several columns is version "
-                        + org.ymxr.Tune.VERSION);
+                        + org.ymxr.Tune.UNMAPPED);
         TuneFile read = TuneFile.read(file);
         assertTrue(read.counted().get(0), "bit 31 of the index entry marks it counted");
         assertEquals(200, read.sources().get(0).column(1)[0] & 0xFF,

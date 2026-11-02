@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -182,5 +183,38 @@ final class SetRingsTest {
         assertEquals(Tune.name(tune.file()), Tune.name(moved), "the name is as it was");
         assertEquals(Tune.getLong(tune.file(), Tune.TABLE_AT), Tune.getLong(moved, Tune.TABLE_AT),
                 "the table is where it was");
+    }
+    /** A set of a tune of version 10 and one of version 9: each table
+     *  packs again through a multiple of its column count, and in the file
+     *  of version 10 the table moves after the transformations, which stay
+     *  where they were. */
+    @Test
+    void aMappedTuneOfASetPacksThroughAMultipleOfItsColumns() {
+        List<byte[]> files = List.of(BuiltTunes.mapped().file(), BuiltTunes.deferred().file());
+        for (int ring : new int[] {Tune.CHOOSE, 480}) {
+            List<Tune.Written> set = SetRings.ofFiles(files, Tune.packers(), ring,
+                    new Report());
+            int[] columns = {Columns.MAPPED, Columns.C};
+            for (int i = 0; i < 2; i++) {
+                assertEquals(0, Dtx3.payload(set.get(i).table()).ring() % columns[i],
+                        "tune " + (i + 1) + " through a ring of " + ring);
+                TuneFile before = TuneFile.read(files.get(i));
+                TuneFile after = TuneFile.read(set.get(i).file());
+                assertEquals(before.version(), after.version());
+                assertEquals(before.table(), after.table(), "the rows of tune " + (i + 1));
+                assertEquals(before.sources(), after.sources());
+                assertEquals(before.transformations().size(),
+                        after.transformations().size());
+            }
+            byte[] mapped = files.get(0);
+            int index = Tune.getLong(mapped, Tune.TRANSFORMATIONS_AT);
+            int tableAt = Tune.getLong(mapped, Tune.TABLE_AT);
+            byte[] moved = set.get(0).file();
+            assertArrayEquals(Arrays.copyOfRange(mapped, 0, Tune.indexAt(Tune.VERSION)),
+                    Arrays.copyOfRange(moved, 0, Tune.indexAt(Tune.VERSION)), "the header");
+            assertArrayEquals(Arrays.copyOfRange(mapped, index, tableAt),
+                    Arrays.copyOfRange(moved, index, tableAt),
+                    "the transformations, where they were");
+        }
     }
 }

@@ -455,6 +455,98 @@ final class BuiltTunes {
         return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, new Report());
     }
 
+    /** The transformations of {@link #mapped}: transformation n is V(16 -
+     *  n) of YMXS, SPEC.md 3.6.5, entry k of the sixteen keys of a volume
+     *  k times 16 - n divided by 15, so 1 is V15 and 16 is V0. */
+    static List<byte[]> fade() {
+        List<byte[]> fade = new java.util.ArrayList<>();
+        for (int n = 1; n <= 16; n++) {
+            byte[] entries = new byte[16];
+            for (int k = 0; k < 16; k++) {
+                entries[k] = (byte) (k * (16 - n) / 15);
+            }
+            fade.add(entries);
+        }
+        return fade;
+    }
+
+    /**
+     * Mappings, the four columns of version 10 (SPEC.md 1.10, 3.4), through
+     * the sixteen transformations of {@link #fade}. On Timer A a loop on
+     * `setR8` starts through V15, then a remap a row through each
+     * transformation in turn to V0, a start of another source leaves the
+     * mapping column unset and runs through V0, and a remap goes back to
+     * the identity. On Timer C, idle, a remap to transformation 3; a start
+     * that leaves the mapping column unset and runs through it; a deferred
+     * start through transformation 1, a remap to transformation 2 while it
+     * is pending, and a start that leaves the column unset and runs through
+     * 2; then a remap and a retune in one row. Every value of a source is a
+     * key below 16.
+     */
+    static Tune.Written mapped() {
+        return mapped(new Report());
+    }
+
+    /** The same, its packing reported to {@code report}. */
+    static Tune.Written mapped(Report report) {
+        int frames = 48;
+        byte[][] c = new byte[Columns.MAPPED][frames];
+        // the mixer with the tones of voices A and B alone, their periods;
+        // R8 and R9 are the two effects', which every row leaves unset
+        c[7][0] = (byte) (0x80 | 0x3C);
+        c[0][0] = 0x60;
+        c[1][0] = (byte) (0x80 | 1);
+        c[2][0] = 0x40;
+        c[3][0] = (byte) (0x80 | 1);
+        int start = 0x80 | Columns.TIMER_RESET | Columns.PLACE_RESET;
+        int defer = 0x80 | Columns.DEFERRED;
+        int e0 = Columns.EFFECT;
+        int e3 = Columns.EFFECT + 12;
+        int m0 = Columns.MAPPING;
+        int m3 = Columns.MAPPING + 3;
+        c[e0][0] = (byte) (0x80 | 8);                    // setR8 on Timer A
+        c[e0 + 1][0] = (byte) (0x80 | 1);
+        c[e0 + 2][0] = (byte) (start | 7);
+        c[e0 + 3][0] = (byte) 200;
+        c[m0][0] = (byte) (0x80 | 1);                    // through V15
+        for (int r = 1; r < 16; r++) {
+            c[m0][r] = (byte) (0x80 | (r + 1));          // a remap a row, to V0
+        }
+        c[e0 + 1][20] = (byte) (0x80 | 2);               // the mapping kept, V0
+        c[e0 + 2][20] = (byte) (start | 4);
+        c[e0 + 3][20] = 100;
+        c[m0][36] = (byte) 0x80;                         // back to the identity
+        c[m3][0] = (byte) (0x80 | 3);                    // a remap on the idle timer
+        c[e3][2] = (byte) (0x80 | 9);                    // setR9 on Timer C, through 3
+        c[e3 + 1][2] = (byte) (0x80 | 1);
+        c[e3 + 2][2] = (byte) (start | 7);
+        c[e3 + 3][2] = (byte) 180;
+        c[e3 + 1][6] = (byte) (0x80 | 3);                // deferred, through 1
+        c[e3 + 2][6] = (byte) (defer | Columns.PLACE_RESET | 7);
+        c[e3 + 3][6] = (byte) 120;
+        c[m3][6] = (byte) (0x80 | 1);
+        c[m3][7] = (byte) (0x80 | 2);                    // a remap while it is pending
+        c[e3 + 1][12] = (byte) (0x80 | 1);               // the mapping kept, 2
+        c[e3 + 2][12] = (byte) (start | 7);
+        c[e3 + 3][12] = (byte) 180;
+        c[m3][24] = (byte) (0x80 | 4);                   // a remap and a retune
+        c[e3 + 2][24] = (byte) (0x80 | 5);
+        c[e3 + 3][24] = 90;
+        byte[][] loop = {{15, 12, 9, (byte) (0x80 | 6)}};
+        byte[][] fall = new byte[1][16];
+        for (int r = 0; r < 16; r++) {
+            fall[0][r] = (byte) (15 - r);
+        }
+        fall[0][15] |= (byte) 0x80;
+        byte[][] three = {{10, 5, (byte) (0x80 | 1)}};
+        Sources sources = new Sources(List.of(
+                new Sources.Source(Effects.SID, 0, loop, 0),
+                new Sources.Source(Effects.DRUM, 0, fall, fall[0].length),
+                new Sources.Source(Effects.SID, 0, three, 0)));
+        Columns columns = new Columns(c, 0, Columns.MAPS | Columns.DEFERS | 0b1001, fade());
+        return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, report);
+    }
+
     /**
      * The six targets whose register reads every bit of its byte (SPEC.md
      * 2.1.2), each running a counted source, so the kit has a tune of

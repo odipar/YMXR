@@ -191,6 +191,9 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 			return nil, fmt.Errorf("subtune %d plays at %d Hz and subtune 1 at %d: an"+
 				" SNDH file records one rate", i+1, tune.FrameRate, rate)
 		}
+		if tune.Version == ymxr.Version {
+			return nil, fmt.Errorf("subtune %d: %s", i+1, Unbound)
+		}
 		if tune.Table.Repeat() >= tune.Table.Rows() {
 			frames[i] = tune.Table.Rows()
 		}
@@ -273,15 +276,16 @@ func TunesEnd(core []byte, set Set, tags []byte) int {
 	return end
 }
 
+// Binds is the version the tune files bind at: 10 where one of them is
+// version 10, and 9 otherwise (SPEC.md 3.3.5).
+func Binds(tuneFiles [][]byte) int {
+	return ymxr.BindsAt(tuneFiles)
+}
+
 // CheckCore reads the core's descriptor against what this writes, and its
 // flags against the switches requested: the flags word records whether the
 // raster monitor is in and whether the ticks are the lean ones, and the
 // file the core was read from does not.
-// Binds is the version the tune files bind at (SPEC.md 3.3.5).
-func Binds(tuneFiles [][]byte) int {
-	return BoundVersion
-}
-
 func CheckCore(core []byte, monitor, lean bool, binds int) error {
 	return checkCore(core, monitor, lean, false, false, binds)
 }

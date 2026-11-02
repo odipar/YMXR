@@ -2,14 +2,15 @@
 
 YMXR encodes YMXS tune data (YMXS, SPEC.md 1) as DTX tables for
 playback on the Atari ST's YM2149 and MC68901, in a tune file of version
-8 (3.3.5). This document defines
+9, or 10 for a tune that maps a value (3.3.5). This document defines
 columns (1), target, source and timer maps (2), file layout (3), frames
 (4), ticks (5), writer rules and checks (6), reader output (7), and later
 versions (8).
 
 A tune's table is a DTX table (DTX, SPEC.md 1) of one width (R1.1), a
-byte, the width of a register: 30 columns of the 128 R3.4 allows, each one
-byte, so a row is 30 bytes. YMXS, SPEC.md 2 to 6 define what each
+byte, the width of a register: 34 columns of the 128 R3.4 allows, each one
+byte, so a row is 34 bytes, in version 10, and columns 0 to 29, a row of
+30 bytes, in versions 7 to 9. YMXS, SPEC.md 2 to 6 define what each
 register reaches, what a target, a source and a rate are, what a frame
 and a tick do with them, and the rules of the structure; this document
 defines the encoding of each and cites the rest.
@@ -39,18 +40,21 @@ R0 to R13. [BINARIES.md](BINARIES.md) 1 defines the bound tune a player
 reads, and [tools.md](tools.md) 15 the player's three calls.
 
 **Terms.** A *frame* is one call of the player (4.2); a *tick* one
-interrupt of a timer (5.1); a *row* one entry of a table. The *MFP* is
-the MC68901. An *effect* is one of the four groups of columns 14 to 29
-(1.8), and *effect i* runs on the timer 2.3 assigns it. A *start* is a
-row setting an effect's source column to 1 to 127, a *stop* a row setting
-it to 0 (1.8.3). The *kept* target, select and count of an effect are the
-values the player keeps of the last row that set each (R4.6). The *place*
-of a timer is the row of its source the next tick reads (YMXS, SPEC.md
-3.4.2). A *recording* is the frames a writer produces a tune from: each
-frame the values of R0 to R12, R13 present or absent, and a flag on
-effect 0 and on effect 1, present or absent (6.4). Section 3.2 defines
-the *marker*, 3.1 the *source index* and an *index entry*, 6.3 an *unset
-row*, and 2.3 *stopping*, *claiming* and *releasing* a timer.
+interrupt of a timer (5.1); a *row* one entry of a table. The *MFP* is the
+MC68901. An *effect* is one of the four groups of columns 14 to 29 (1.8),
+with column 30 + i in version 10 (1.10), and *effect i* runs on the timer
+2.3 assigns it. A *start* is a row setting an effect's source column to 1
+to 127, a *stop* a row setting it to 0 (1.8.3). The *kept* target, select
+and count of an effect are the values the player keeps of the last row
+that set each (R4.6), and 1.10.3 defines the kept mapping. A
+*transformation*, a *key*, the *identity* and a *mapping* are as YMXS
+defines them (YMXS, SPEC.md 3.6). The *place* of a timer is the row of its
+source the next tick reads (YMXS, SPEC.md 3.4.2). A *recording* is the
+frames a writer produces a tune from: each frame the values of R0 to R12,
+R13 present or absent, and a flag on effect 0 and on effect 1, present or
+absent (6.4). Section 3.2 defines the *marker*, 3.1 the *source index* and
+an *index entry*, 6.3 an *unset row*, and 2.3 *stopping*, *claiming* and
+*releasing* a timer.
 
 ---
 
@@ -58,9 +62,10 @@ row*, and 2.3 *stopping*, *claiming* and *releasing* a timer.
 
 Columns 0 to 13 reach R0 to R13, one a register, in the chip's numbering;
 columns 14 to 29 are the four effects, four columns each, effect i at
-columns 14 + 4i to 17 + 4i. A writer writes 0 to a bit this section
-leaves unassigned, a player leaves it unread, and a later version assigns
-it (R6.2, section 8).
+columns 14 + 4i to 17 + 4i; in version 10, columns 30 to 33 are the
+mappings of the four effects, effect i's at column 30 + i (1.10). A writer
+writes 0 to a bit this section leaves unassigned, a player leaves it
+unread, and a later version assigns it (R6.2, section 8).
 
 | column | what it reaches |
 |---|---|
@@ -85,6 +90,10 @@ it (R6.2, section 8).
 | 18 to 21 | effect 1, the four above in the same order, on Timer D |
 | 22 to 25 | effect 2, the same, on Timer B |
 | 26 to 29 | effect 3, the same, on Timer C |
+| 30 | effect 0 mapping, in version 10 (1.10) |
+| 31 | effect 1 mapping |
+| 32 | effect 2 mapping |
+| 33 | effect 3 mapping |
 
 ### 1.1 The set bit
 
@@ -299,6 +308,38 @@ source column (1.8.3). YMXS, SPEC.md 3.3.5 and 3.4.1 define what a select
 or a count written to a running or a stopped timer does; 4.3 fixes the
 order of the two writes.
 
+### 1.10 Mapping
+
+**1.10.1** In a tune file of version 10, column 30 + i is the mapping
+column of effect i: bit 7 the set bit, bits 6 to 0 the number of a
+transformation, 1 to T, T the transformations of the file (3.4), or 0 for
+the identity (YMXS, SPEC.md 3.6.2). Number n is the mapping whose part for
+the last value the effect's target reads is transformation n, every other
+part the identity, and 0 the identity in every part (YMXS, SPEC.md 3.1.1,
+3.6.3). A table of versions 7 to 9 ends at column 29, and each of its
+effects runs through the identity.
+
+**1.10.2** A row that sets the mapping column of an effect and sets its
+source column to 1 to 127, a start, starts the source through that
+mapping (YMXS, SPEC.md 3.6.3); a start that leaves the mapping column
+unset starts it through the kept mapping. A row that sets the mapping
+column and leaves the source column unset is a *remap*: the effect keeps
+its source, its place and its rate, and runs through that mapping (YMXS,
+SPEC.md 4.3); a remap on a stopped timer sets the mapping the next start
+keeps. A remap that sets the control or the count column as well is a
+remap, then a retune.
+
+**1.10.3** The *kept mapping* of an effect is the number the last start or
+remap on it set its mapping column to; it is 0 until a row sets it, and a
+start that leaves the column unset leaves it as it is. A deferred start
+runs, from the tick that performs it (4.8), through the kept mapping after
+its row; a remap while it is pending sets the kept mapping and the mapping
+of the running source, and leaves the pending start's as it is (YMXS,
+SPEC.md 3.5.5). A stop reads the source column alone: a row that sets the
+source column to 0 leaves the mapping column unread and the kept mapping
+as it is, and a writer leaves the mapping column of a stop unset (rule
+3(c)).
+
 ---
 
 ## 2. The maps
@@ -419,16 +460,17 @@ at the spurious interrupt exception, vector `$60`; a host provides an
 ## 3. Outside the table
 
 A tune records these once (R5.6): the version, the frame rate, the
-effects used, the name, the source index and the sources. Section 3.3
-defines the bytes of each.
+effects used, the name, the source index and the sources, and in version
+10 the transformations. Section 3.3 defines the bytes of each, and 3.4
+those of the transformations.
 
 ### 3.1 The source index
 
 **3.1.1** The source index is S index entries, S the source count, 0 to
-127: index entry n, 1 to S, is 4 bytes at 16 + 4(n - 1), bits 30 to 0
-the offset of the DTX1 table of source n, whichever the version, and bit
-31 the mark of a counted source (3.1.6). The index begins at source 1:
-source 0 is the stop (1.8.3).
+127: index entry n, 1 to S, is 4 bytes at I + 4(n - 1), I 16, and 20 in
+version 10 (3.3), bits 30 to 0 the offset of the DTX1 table of source n,
+whichever the version, and bit 31 the mark of a counted source (3.1.6).
+The index begins at source 1: source 0 is the stop (1.8.3).
 
 **3.1.2** A source's table is a DTX1 file (DTX, SPEC.md 1 and 2.2):
 
@@ -495,25 +537,27 @@ a value.
 | offset | bytes | meaning |
 |---|---|---|
 | 0 | 4 | `YMXR` |
-| 4 | 2 | the version, `$0009` (3.3.5) |
+| 4 | 2 | the version, `$0009`, or `$000A` for a tune that maps a value (3.3.5) |
 | 6 | 2 | the frame rate, frames a second, 1 to 65,535 |
-| 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bit 4 is 1 where a row defers a start (4.8); bits 7 to 5 are 0 |
+| 8 | 1 | the effects used: bit i, 0 to 3, is 1 where a row starts effect i; bit 4 is 1 where a row defers a start (4.8); bit 5 is 1 in version 10 and 0 in every other version (1.10); bits 7 and 6 are 0 |
 | 9 | 1 | S, the source count, 0 to 127 |
 | 10 | 2 | the offset of the name, or 0 for a tune with an empty name |
 | 12 | 4 | the offset of the DTX3 table |
-| 16 | 4S | the source index: index entry 1 to S, bit 31 of each the mark of a counted source (3.1.1) |
-| 16 + 4S | 2 to 256 | the name, where the word at 10 is other than 0: its UTF-8 bytes, 1 to 255, and a zero byte |
+| 16 | 4 | in version 10, O, the offset of the transformation index (3.4) |
+| I | 4S | the source index, I 16, and 20 in version 10: index entry 1 to S, bit 31 of each the mark of a counted source (3.1.1) |
+| I + 4S | 2 to 256 | the name, where the word at 10 is other than 0: its UTF-8 bytes, 1 to 255, and a zero byte |
+| on a long | | in version 10, the transformation index and the transformations (3.4) |
 | on a long | | the DTX3 table (3.3.3) |
 | on a long each | | the DTX1 tables of sources 1 to S, in that order (3.1.2) |
 
 **3.3.1** Each table begins on a long: the DTX3 table at the first offset
-on a long at or after the end of the name, or of the index where the name
-is empty, and each DTX1 table at the first on a long at or after the end
-of the table before it. Each byte between the end of one of those and the
-start of the next is 0. The DTX3 table ends where the table of source 1
-begins, or at the file's end where S is 0. A tune file is data alone; a
-tool binds it with a reader of DTX3 into the bound tune a player reads
-(BINARIES.md 1).
+on a long at or after the end of transformation T in version 10 (3.4), and
+otherwise of the name, or of the index where the name is empty, and each
+DTX1 table at the first on a long at or after the end of the table before
+it. Each byte between the end of one of those and the start of the next
+is 0. The DTX3 table ends where the table of source 1 begins, or at the
+file's end where S is 0. A tune file is data alone; a tool binds it with a
+reader of DTX3 into the bound tune a player reads (BINARIES.md 1).
 
 **3.3.2** The name is for display. A writer drops each character below
 space, drops leading and trailing spaces, cuts the UTF-8 at a character
@@ -523,18 +567,20 @@ or past the file's end, and otherwise the bytes from the word's offset to
 the first zero byte or the file's end.
 
 **3.3.3** The DTX3 table is the tune's table as a complete DTX file (DTX,
-SPEC.md 1 and 2.4), header and payload: R rows, 1 upward, C = 30, W = 1,
-RR the repeat row or R for a tune that plays once. A constant column is
-its value in the payload, and a reader unpacks each live column at the
-payload's unit k, 1, 2 or 4, with copies where bit 0 of the payload's
-flags byte is 1 (DTX, SPEC.md 2.4); R and RR divide by k (rule 6). The
-ring N is at most 32,767 divided by L less 1, where L is the table's live
-columns and is 2 or more, and one DTX's packager binds (DTX, abi.md 4).
+SPEC.md 1 and 2.4), header and payload: R rows, 1 upward, C = 30, and 34
+in version 10 (1.10), W = 1, RR the repeat row or R for a tune that plays
+once. A constant column is its value in the payload, and a reader unpacks
+each live column at the payload's unit k, 1, 2 or 4, with copies where
+bit 0 of the payload's flags byte is 1 (DTX, SPEC.md 2.4); R and RR
+divide by k (rule 6). The ring N is at most 32,767 divided by L less 1,
+where L is the table's live columns and is 2 or more, and one DTX's
+packager binds (DTX, abi.md 4).
 
 Note: a player reaches slot L less 1's ring through a 16-bit displacement
 from slot 0's, L less 1 rings on. The reference writer packs through a ring
-that is a multiple of 30 bytes, 60 upward: through each of 60, 120, 240,
-480, 960 and 1,920 bytes the player reaches, keeping the one whose table and
+that is a multiple of C bytes, 2C upward: through each of 60, 120, 240,
+480, 960 and 1,920 bytes the player reaches, and of 68, 136, 272, 544,
+1,088 and 2,176 for a table of 34 columns, keeping the one whose table and
 state block come to the least. With copies asked for, it packs with them
 where they pack a live column smaller through the two of those that came to
 the least, and keeps the one of the two that comes to the less (tools.md
@@ -544,39 +590,58 @@ set (tools.md 4.7).
 
 **3.3.4** Errors of the file. A reader reads a file free of the
 conditions below and reports the first one present as its line, in the
-order of the table and, for a condition that reads a source number N, in
-ascending N: V the version, X a DTX variant, N a source number, A
-and B where a table is, F the file's bytes, C a column count and W a
-width. The record of such a file is empty (7.4), and a reader that
-reports a condition reads no further field. A name offset other than 16 +
-4S is a field a reader follows (3.3.2).
+order of the table and, for the conditions that read a transformation or
+a source number N, those of each N in ascending N: V the version, X a
+DTX variant, N a transformation or a source number, O where the
+transformation index is, T the word at O, E the word at the offset of
+transformation N, I where the source index is, 16, and 20 in version 10,
+S the source count, A and B where a table is, F the file's bytes, C a
+column count, K the column count of the version, 30, and 34 in version
+10, and W a width. The offset at 12 and each offset of 3.4 are read as a
+number 0 to 4,294,967,295. The record of such a file is empty (7.4), and
+a reader that reports a condition reads no further field. A name offset
+other than I + 4S is a field a reader follows (3.3.2).
 
 | condition | reported as |
 |---|---|
 | the file's bytes 0 to 3 are `YMXM`, a multi file (BINARIES.md 0) | `this is a multi file of several tunes, and a record is of one tune` |
 | the file is shorter than 16 bytes, or its bytes 0 to 3 are other than `YMXR` | `not a YMXR file` |
-| the version is 3, 4, 5 or 6, a tune file whose table is DTX2 (3.3.5) | `version V has a DTX2 table, and this reads 7, 8 or 9: write the tune again with ym-to-ymxr or ymxs-to-ymxr` |
-| the version is other than 3 to 9 (3.3.5) | `version V is not 7, 8 or 9` |
+| the version is 3, 4, 5 or 6, a tune file whose table is DTX2 (3.3.5) | `version V has a DTX2 table, and this reads 7, 8, 9 or 10: write the tune again with ym-to-ymxr or ymxs-to-ymxr` |
+| the version is other than 3 to 10 (3.3.5) | `version V is not 7, 8, 9 or 10` |
+| the version is 10 and bit 5 of the effects used is 0 (3.3) | `version V with bit 5 of the effects used clear` |
+| the version is 7, 8 or 9 and bit 5 of the effects used is 1 (3.3) | `version V with bit 5 of the effects used set` |
+| the version is 10 and the file is shorter than 20 bytes | `not a YMXR file` |
+| the word T at O ends outside the file (3.4.2) | `the transformation index at O is outside the file` |
+| T is 0 or above 127 (3.4.1) | `the file has T transformations, and a version 10 file has 1 to 127` |
+| the T offsets after T end outside the file (3.4.2) | `the transformation index at O is outside the file` |
+| the word E of transformation N, at A, ends outside the file (3.4.2) | `transformation N at A is outside the file` |
+| E is 0 or above 256 (3.4.1) | `transformation N has E entries, and a transformation has 1 to 256` |
+| the E entries of transformation N, at A, end outside the file (3.4.2) | `transformation N at A is outside the file` |
+| the source index, 4S bytes at I, ends outside the file (3.3) | `the source index at I is outside the file` |
 | the table begins or ends outside the file | `the table is at A to B, and the file has F bytes` |
 | the table is a DTX variant other than 3 (3.3.3), its header read as DTX defines it (DTX, SPEC.md 2.4) | `the table is DTX X, and a tune's table is DTX3 (SPEC.md 3.3.3)` |
-| the table is other than 30 columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is 30 of one (SPEC.md 3.3.3)` |
+| the table is other than K columns of one byte (3.3.3) | `the table is C columns of W bytes, and a tune's table is K of one (SPEC.md 3.3.3)` |
 | source N begins or ends outside the file | `source N is at A to B, and the file has F bytes` |
 | source N has C other than 1, 2 or 3, or W other than 1 (3.1.3) | `source N is C columns of W bytes, and a source is one, two or three columns of one (SPEC.md 3.1)` |
 
-**3.3.5** The version. A writer writes version 9: its table is DTX3, which
-a player of version 6 or before reads wrongly, and bit 3 of a control
-column is a deferred start (1.9.2), which a player of version 7 reads as
-0, whose place with bit 5 at 0 continues the count of the rows the running
-source played (4.8). A player of this version reads 9, 8 and 7. A tune
-file of version 8 reads as version 9: version 8 placed a deferred start
-with bit 5 at 0 at R - 1 of the running source, its last row, modulo R of
-the source started. A tune file of version 7 has bit 3 at 0 in every
-control column, and a start with bit 5 at 0 in it names a source of the
-row count of the one last started, where the modulo of 1.8.4 leaves the
-place as it is. Versions 3 to 6 are tune files
-whose table is DTX2, and a reader of this version reports them (3.3.4);
-the tools write such a tune again from the dump or the structure it was
-converted from.
+**3.3.5** The version. A writer writes version 10 where a row sets a
+mapping column to a transformation, 1 to 127 (1.10), and version 9
+otherwise. Version 10 is version 9 with the four mapping columns, bit 5 of
+the effects used, the long at 16, the source index at 20 and the
+transformations (3.4), and a reader of an earlier version reports it
+(3.3.4). Version 9: its table is DTX3, which a player of version 6 or
+before reads wrongly, and bit 3 of a control column is a deferred start
+(1.9.2), which a player of version 7 reads as 0, whose place with bit 5 at
+0 continues the count of the rows the running source played (4.8). A
+reader of this version reads 10, 9, 8 and 7, and a player 9, 8 and 7
+(4.1). A tune file of version 8 reads as version 9: version 8 placed a
+deferred start with bit 5 at 0 at R - 1 of the running source, its last
+row, modulo R of the source started. A tune file of version 7 has bit 3 at
+0 in every control column, and a start with bit 5 at 0 in it names a
+source of the row count of the one last started, where the modulo of 1.8.4
+leaves the place as it is. Versions 3 to 6 are tune files whose table is
+DTX2, and a reader of this version reports them (3.3.4); the tools write
+such a tune again from the dump or the structure it was converted from.
 
 Note: versions 3 to 6 told apart a tune's sources, from one column each to
 a counted source of several columns, so that a player of an older version
@@ -586,6 +651,38 @@ read every tune that version encoded. A DTX3 table needs a player of 7 or
 Note: a tune at 50 Hz with the effects used 0, S 0 and the name `Circus
 Attractions #2` begins `594D5852 0007 0032 00 00 0010 00000028`: the 22
 bytes of the name at 16, and the DTX3 table at 40.
+
+### 3.4 The transformations
+
+**3.4.1** A tune file of version 10 has T transformations, 1 to 127,
+transformation n the one a mapping column numbers n (1.10), in the order
+YMXS numbers them (YMXS, SPEC.md 1.9). Transformation n is E entries, 1
+to 256, each a byte: entry k is the value written where the key is k
+(YMXS, SPEC.md 3.6.1).
+
+**3.4.2** The long at 16 is O, the offset of the transformation index: a
+word T at O, then T longs, the offset of each transformation counted
+from O. Transformation n is a word E at P, O plus its offset, 0 to
+8,589,934,590, then its E entries:
+
+| offset | bytes | meaning |
+|---|---|---|
+| O | 2 | T, the transformation count, 1 to 127 |
+| O + 2 | 4T | P - O of transformation 1 to T, in that order |
+| P | 2 | E, the entries of the transformation, 1 to 256 |
+| P + 2 | E | its entries, entry k at P + 2 + k |
+
+**3.4.3** The transformation index begins at the first offset on a long
+at or after the end of the name, or of the source index where the name is
+empty, transformation 1 at the first on a long at or after the end of the
+index, and each transformation after it at the first on a long at or
+after the end of the one before. Each byte between the end of one of
+those and the start of the next is 0, and the DTX3 table follows
+transformation T (3.3.1).
+
+Note: each offset of the index counts from O, so the index and the
+transformations are one block a tool copies to another offset with the
+long at 16 alone changed.
 
 ---
 
@@ -601,17 +698,17 @@ The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
 1. Read the version; for a version other than 7, 8 and 9 (3.3.5), report
-   -1 and leave every register and every timer as it is. A reader
-   reports the line of 3.3.4 in place of that, and its record is empty
-   (7.4).
+   -1 and leave every register and every timer as it is. A reader reads
+   version 10 as well, and for another version reports the line of 3.3.4
+   in place of that, and its record is empty (7.4).
 2. Read R and RR of the tune's table and the effects used.
 3. Resolve each source of the source index: its first row, and its loop
    row, row RR where it repeats and the end where it plays once (3.1.4).
-4. Set the kept target, source, select and count of each effect to 0,
-   and the place of each timer to 0, the row number a start that moves
-   no place keeps (1.8.4), with no start pending (4.8); a tick before
-   the first start on a timer writes the register of the target this
-   leaves (5.2.1).
+4. Set the kept target, source, select, count and mapping of each effect
+   to 0, and the place of each timer to 0, the row number a start that
+   moves no place keeps (1.8.4), with no start pending (4.8); a tick
+   before the first start on a timer writes the register of the target
+   this leaves (5.2.1).
 5. Read row 0, the current row.
 6. At interrupt level 7, for each effect i the effects used names, 0 to
    3 in order, claim its timer (2.3.3).
@@ -723,9 +820,9 @@ Note: on a 68000 the two bytes of a write are one `movep.w`.
 
 When RR is below R, the frame after row R - 1 reads row RR and performs
 it as any row. The wrap preserves timers, places, pending starts and the
-kept target, source, select and count of each effect (4.1 step 4; YMXS,
-SPEC.md 4.5). YMXS, SPEC.md 6 rules 1(d) and 6(a) define the repeat row's
-operations on a running timer.
+kept target, source, select, count and mapping of each effect (4.1 step
+4; YMXS, SPEC.md 4.5). YMXS, SPEC.md 6 rules 1(d) and 6(a) define the
+repeat row's operations on a running timer.
 
 ### 4.6 The end
 
@@ -859,11 +956,13 @@ register a tick writes as it is: a start writes that register (4.3 step
 
 ### 6.1 The rules and the player
 
-A player assumes the six rules below and writes each column as the row
-has it, so a tune that breaks a rule plays as its columns read. A check
-reads rules 1 and 6 (6.4); rules 2 to 5 bind the writer alone. Rule 1
-encodes rule 1 of the structure, rule 3 its rules 3 and 4, and rule 4 its
-rule 5 (YMXS, SPEC.md 6); its rules 2 and 6 are satisfied in the
+A player assumes the six rules below and writes each column as the row has
+it, so a tune that breaks a rule plays as its columns read. A check reads
+rules 1 and 6 beside a recording, and in a tune file read alone the source
+and mapping columns against rule 2(b) and the mapping column of a stop
+against rule 3(c) (6.4); the rest of rules 2 to 5 bind the writer alone.
+Rule 1 encodes rule 1 of the structure, rule 3 its rules 3 and 4, and rule
+4 its rule 5 (YMXS, SPEC.md 6); its rules 2 and 6 are satisfied in the
 structure a writer encodes; rules 2, 5 and 6 here are this format's. A
 structure outside what this version encodes is an error of the writer
 (6.5).
@@ -897,8 +996,9 @@ numbers the maps assign.**
   columns of such an effect unread (4.2), and a reader records the stop
   (7.3).
 - 2(b) A source column is 0 or 1 to S, S the source count (3.3); a
-  target column is a target this version encodes, 0 to 24 (2.1). A source
-  of C columns runs on a target of C registers (2.1.2).
+  target column is a target this version encodes, 0 to 24 (2.1); a
+  mapping column is 0 to T, T the transformation count (3.4). A source of
+  C columns runs on a target of C registers (2.1.2).
 - 2(c) A start whose target column is unset runs on the kept target, the
   last target column set on the effect in frame order, through the wrap
   (4.5). A writer sets the target column on the first start of an
@@ -931,7 +1031,8 @@ and 4).
   rows leave open whether a source has run out at the start row, bit 6
   at either value is correct: a stopped timer starts on the select
   either way (4.3 step 5).
-- 3(c) A stop leaves the control column and the count column unset.
+- 3(c) A stop leaves the control column, the count column and the
+  mapping column unset.
 
 **Rule 4: a row sets a rate column on the start row of its effect or
 while the effect runs** (YMXS rule 5).
@@ -1037,6 +1138,21 @@ down, 256 where C is 0 (1.9.1), the arithmetic exact (YMXS, SPEC.md
 | after the row, Rn is V in the model and W in the recording's frame, n 0 to 12, V other than W, Rn outside the registers the model's effects run on; for R7, W has bits v and v + 3 set for each voice v, 0 to 2, whose volume register the model's effects run a source produced from a digidrum on | `F: Rn is V, not W` |
 | the row writes R13 as V and the recording's frame has R13 as W, V other than W; or one of the two has R13 written and the other leaves it | `F: R13 written V, the dump writes W`, with `not written` for a row that leaves R13 and `does not write` for a frame that leaves it |
 
+A check of a tune file read alone reads the source and mapping columns of
+every row against rule 2(b), and the mapping column of a stop against rule
+3(c), and reports each condition below as its line, the rows in order
+and, within a row, the effects in ascending order and the conditions of
+an effect in table order: r the row, i the effect, N the number the
+column has, S the source count and T the transformation count, 0 below
+version 10 (3.4); `1 source` for S of 1 and `1 transformation` for T of
+1.
+
+| condition | reported as |
+|---|---|
+| row r sets the source column of effect i to N, above S (rule 2(b)) | `r: effect i starts source N, and the file has S sources` |
+| in version 10, row r sets the source column of effect i to 0, a stop, and sets its mapping column (rule 3(c)) | `r: effect i stops and sets its mapping column, and a stop leaves the mapping as it is` |
+| otherwise, in version 10, row r sets the mapping column of effect i to N, above T (rule 2(b)) | `r: effect i maps through transformation N, and the file has T transformations` |
+
 ### 6.5 Errors of a writer
 
 A writer reports a structure outside what this version encodes as one
@@ -1074,20 +1190,25 @@ byte 10, ending every line (YMXS, SPEC.md 7.2).
 ### 7.2 The first line
 
 `{"rate":H,"effects":E,"sources":[...]}`: `rate` the frame rate H (3.3);
-`effects` the effects used E as a decimal integer, 0 to 31; `sources`
-the sources in index order, source 1 first, each
-`{"rows":[...],"repeat":RR}` with `rows` one list of C times R integers,
-0 to 255: the C columns of row 0, then those of row 1, and so on, column
-0 of a row first, each column read at the stride 3.1.2 lays the table
-at; and `repeat` its RR as its DTX1 header has it, an
-integer, RR equal to R included (3.1.4); `[]` where S is 0. Note: the
-record of the structure writes `null` there for a source that plays once
-(YMXS, SPEC.md 7.3). `rows` is every row of the table as the table has
-it: the marker of a source that has one, a row with bit 7 set before the
-last (3.2.1, 6.4), and the bytes of a counted source and of a marked one
-alike, bit 31 of an index entry absent from the record (3.1.1). A row
-reads in the order of its columns rather than the order a tick writes
-them, which puts the marker's column last (2.1.1).
+`effects` the effects used E as a decimal integer, 0 to 31, and 32 to 63
+in version 10; `sources` the sources in index order, source 1 first, each
+`{"rows":[...],"repeat":RR}` with `rows` one list of C times R integers, 0
+to 255: the C columns of row 0, then those of row 1, and so on, column 0
+of a row first, each column read at the stride 3.1.2 lays the table at;
+and `repeat` its RR as its DTX1 header has it, an integer, RR equal to R
+included (3.1.4); `[]` where S is 0. Note: the record of the structure
+writes `null` there for a source that plays once (YMXS, SPEC.md 7.3).
+`rows` is every row of the table as the table has it: the marker of a
+source that has one, a row with bit 7 set before the last (3.2.1, 6.4),
+and the bytes of a counted source and of a marked one alike, bit 31 of an
+index entry absent from the record (3.1.1). A row reads in the order of
+its columns rather than the order a tick writes them, which puts the
+marker's column last (2.1.1).
+
+In version 10 the line is
+`{"rate":H,"effects":E,"sources":[...],"transformations":[...]}`, with
+`transformations` the transformations in index order, transformation 1
+first, each a list of its E entries, 0 to 255, entry 0 first (3.4).
 
 ### 7.3 A frame's entry
 
@@ -1107,12 +1228,17 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   effect runs on is included where the row sets its column (6.1). Note:
   rule 1(a) keeps a writer clear of such a row, and a reader reports the
   one it reads.
-- `e` is the effects whose target, source, control or count column the row
-  sets (1.1.3), regardless of the effects used byte (4.2); keyed by number
-  as text, `"0"` to `"3"`, in ascending order; `{}` for a row that leaves
-  every effect column unset. Each is
+- `e` is the effects whose target, source, control or count column, or
+  in version 10 mapping column, the row sets (1.1.3), regardless of the
+  effects used byte (4.2); keyed by number as text, `"0"` to `"3"`, in
+  ascending order; `{}` for a row that leaves every effect column unset.
+  Each is
 
       {"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b,"deferred":b}
+
+  and in version 10
+
+      {"target":t,"source":s,"select":p,"count":c,"timer":b,"place":b,"deferred":b,"mapping":m}
 
   where each of `target`, `source`, `select` and `count` is the value kept
   for the effect (4.3), which a row that leaves its column unset leaves as
@@ -1126,7 +1252,8 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`:
   a stop; `timer`, `place` and `deferred`, each `true` or `false`: where
   the row sets the control column, `timer` is its bit 6, `place` its bit
   5 and `deferred` its bit 3 (1.9.2), and where the row leaves that column
-  unset, all three are `false`.
+  unset, all three are `false`; `mapping`, 0 to 127, the kept mapping
+  after the row (1.10.3).
 
 For the first frame after the end (4.6), `{"result":-1}`, where the
 record ends.
@@ -1190,5 +1317,5 @@ R.
 
 **8.5** The unassigned bits and values: select 0 of a control column
 (1.9.2), bits 5 and 4 of a coarse column (1.2.2), bits 6 and 5 of
-columns 6, 8, 9 and 10, bit 6 of column 7, bit 4 of column 13, and a
-source column above S (3.3).
+columns 6, 8, 9 and 10, bit 6 of column 7, bit 4 of column 13, a source
+column above S (3.3), and a mapping column above T (3.4).

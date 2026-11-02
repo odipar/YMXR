@@ -222,20 +222,36 @@ func min(a, b int) int {
 // a line each, the rows of that source being unknown. A start that leaves
 // bit 5 of the control column at 0 leaves the place at its number modulo
 // the row count of the source it starts (SPEC.md 1.8.4), so every other
-// start reads a row of its source.
+// start reads a row of its source. In version 10, beside each, a row whose
+// mapping column numbers a transformation past the file's, and a stop that
+// sets the mapping column, which a player leaves unread (SPEC.md 1.10,
+// 6.4).
 func Places(file ymxr.File) []string {
 	var lines []string
+	mapped := file.Table.Columns() == ymxr.Mapped
 	for r := 0; r < file.Table.Rows(); r++ {
 		for i := 0; i < 4; i++ {
 			source := int(file.Table.Column(ymxr.Effect + 4*i + 1)[r])
-			if source&0x80 == 0 || source&0x7F == 0 {
+			if source&0x80 != 0 && source&0x7F > len(file.Sources) {
+				lines = append(lines, fmt.Sprintf("%d: effect %d starts source %d", r, i,
+					source&0x7F)+", and the file has "+
+					report.Count(len(file.Sources), "source", "sources"))
+			}
+			if !mapped {
 				continue
 			}
-			source &= 0x7F
-			if source > len(file.Sources) {
-				lines = append(lines, fmt.Sprintf("%d: effect %d starts source %d", r, i,
-					source)+", and the file has "+
-					report.Count(len(file.Sources), "source", "sources"))
+			mapping := int(file.Table.Column(ymxr.MappingColumn + i)[r])
+			if mapping&0x80 == 0 {
+				continue
+			}
+			if source == 0x80 {
+				lines = append(lines, fmt.Sprintf("%d: effect %d stops and sets its mapping"+
+					" column, and a stop leaves the mapping as it is", r, i))
+			} else if mapping&0x7F > len(file.Transformations) {
+				lines = append(lines, fmt.Sprintf("%d: effect %d maps through transformation"+
+					" %d", r, i, mapping&0x7F)+", and the file has "+
+					report.Count(len(file.Transformations), "transformation",
+						"transformations"))
 			}
 		}
 	}
