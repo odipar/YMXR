@@ -107,8 +107,9 @@ from unicorn import (Uc, UcError, UC_ARCH_M68K, UC_MODE_BIG_ENDIAN,
                      UC_HOOK_MEM_WRITE, UC_HOOK_MEM_READ, UC_HOOK_CODE)
 from unicorn.m68k_const import (UC_CPU_M68K_M68000, UC_M68K_REG_D0,
                                 UC_M68K_REG_D1, UC_M68K_REG_D2, UC_M68K_REG_D3,
-                                UC_M68K_REG_D6, UC_M68K_REG_D7, UC_M68K_REG_A0,
-                                UC_M68K_REG_A1, UC_M68K_REG_A3, UC_M68K_REG_A6,
+                                UC_M68K_REG_D5, UC_M68K_REG_D6, UC_M68K_REG_D7,
+                                UC_M68K_REG_A0, UC_M68K_REG_A1, UC_M68K_REG_A2,
+                                UC_M68K_REG_A3, UC_M68K_REG_A6,
                                 UC_M68K_REG_A7,
                                 UC_M68K_REG_PC, UC_M68K_REG_SR)
 
@@ -410,8 +411,8 @@ MOST_FRAMES = None
 # tunes, in their order, by the names -only reads: the SNDH cores, the two
 # sets of subtunes, and one each of the functions below.
 CHECKS = ("cores", "sets", "unplaced", "deferred", "mapped", "deferred_sizes",
-          "absolute_sizes", "halves", "voices", "widekept", "envelope", "wholebyte",
-          "outofreach")
+          "mapped_sizes", "absolute_sizes", "halves", "voices", "widekept", "envelope",
+          "wholebyte", "outofreach")
 
 
 def spread(most):
@@ -1744,6 +1745,61 @@ def reformed(file, forms):
     return bytes(out)
 
 
+# The tunes that map no value whose frames the section on a remap at the
+# frame counts on the core with the lookup in against the core without it,
+# built once a run (v9_tunes); and the rows of its table, each the path the
+# tunes name a row's step by, the head of an effect first.
+_V9 = []
+V9_PATHS = (("the head of each effect the tune runs, a frame", None),
+            ("a start at row 0", "start"),
+            ("a start at the running source's row, after a source that steps a place",
+             "start kept"),
+            ("a start of a counted source or of one of several columns", "wide start"),
+            ("a square's start at row 0", "square start"),
+            ("a square's start at the running source's row, after a source that steps a"
+             " place", "square start kept"),
+            ("a place's reset", "reset"),
+            ("a square's place reset", "square reset"),
+            ("a counted source's place reset", "counted reset"),
+            ("a place's reset of a source of several columns", "wide reset"))
+
+
+def v9_tunes():
+    """Tunes that map no value, each (title, tune file, the path of each
+    row that starts a source or resets its place, by row), on effect A
+    alone: a source of one column and a square, each started at row 0
+    and at the running source's row, after a source that steps a place,
+    and its place reset; and a source of several columns and a counted
+    source, each started and its place reset (V9_PATHS)."""
+    if _V9:
+        return _V9
+    loop = ("loop of four", [15, 12, 9, 6], 0)
+    square = ("square", [15, 0], 0)
+    toned = ("tone A", [[0, 1], [128, 2], [64, 3], [32, 4]], 0)
+    whole = ("whole bytes", [200, 150, 100, 50, 25], 0)
+    reset = ("retune", 50, 100, 0, 1)
+
+    def start(source, target, reset=1):
+        return ("start", source, target, 50, 100, reset, reset, 0)
+    cases = [
+        ("a loop and a square, started and their places reset", [loop, square],
+         {0: (start(1, 8), "start"), 4: (reset, "reset"), 8: (start(1, 8, 0), "start kept"),
+          12: (start(2, 8, 0), "square start kept"), 16: (reset, "square reset"),
+          20: (start(2, 8), "square start")}),
+        ("a source of several columns, started and its place reset", [toned],
+         {0: (start(1, 14), "wide start"), 9: (reset, "wide reset"),
+          15: (reset, "wide reset")}),
+        ("a counted source, started and its place reset", [whole],
+         {0: (start(1, 0), "wide start"), 6: (reset, "counted reset"),
+          15: (reset, "counted reset")})]
+    for title, sources, rows in cases:
+        tune = effects_tune(title, 24, sources, {"A": {r: op for r, (op, _) in rows.items()}})
+        at, version = built(re.sub(r"[^a-z0-9]+", "-", title.lower()), tune)
+        assert version == WRITTEN, "%s: ymxs-to-ymxr wrote version %d" % (title, version)
+        _V9.append((title, at, {r: path for r, (_, path) in rows.items()}))
+    return _V9
+
+
 # The tunes that map a value (SPEC.md 1.10), built once a run (mapped_tunes).
 _MAPPED = []
 
@@ -1790,8 +1846,15 @@ def mapped_tunes():
     target column; a marked source on setEnvelope (SPEC.md 2.1.4), and
     counted sources of two columns on setToneA and setNoiseA, each through
     a transformation, remapped, its place reset, and remapped from the
-    identity; and a deferred start through a mapping, which the player
-    with the deferred start and the lookup in reports -1 for."""
+    identity; sources through a transformation that play once on seven
+    lookup kinds, every kind but the counted one of two columns with the
+    last value first, on two effects, with sources that loop on five, the
+    counted one of one column and the four marked ones of several
+    columns, and the seven that play once on one effect; four counted
+    sources through 256 entries, each remapped in one row to another 256
+    (doc/performance.md, The cost of 34 columns); and a deferred start
+    through a mapping, which the player with the deferred start and the
+    lookup in reports -1 for."""
     if _MAPPED:
         return _MAPPED
     def volume(n):
@@ -1816,7 +1879,11 @@ def mapped_tunes():
     wave = ("sample", [0, 40, 90, 140, 200, 255, 180, 110, 60, 20], 0)
     tens = ("ten keys", [9, 5, 2, 7, 0], 0)
     mix = ("mixer", [56, 48, 62, 7], 0)
+    whole = ("whole bytes", [200, 150, 100, 50, 25], 0)
     quick = (50, 100)
+
+    def once(source):
+        return (source[0] + " once", source[1], None)
 
     def start(source, target, mapping, rate=quick, tr=1, pr=1, deferred=0):
         return ("start", source, target, rate[0], rate[1], tr, pr, deferred, mapping)
@@ -1947,6 +2014,28 @@ def mapped_tunes():
           "D": {0: start(2, 22, [0, 3]), 6: remap([0, 4]), 9: ("retune", 50, 100, 0, 1),
                 12: remap(0), 15: ("retune", 50, 100, 0, 1), 18: remap([0, 3]),
                 21: ("retune", 50, 100, 0, 1)}}, None, {"le", "lf"}, {1: (1, True), 2: (0, True)}),
+        ("sources that play once on seven lookup kinds and loop on five, two effects",
+         [fall, once(voice), once(buzz), once(toned), once(noise), once(envelope),
+          once(whole), voice, buzz, toned, noise, wave],
+         [("sample", sample), ("V15", V15), ("shape", shape), ("tone", tone), ("V10", V10),
+          ("period", period)],
+         {"A": {0: start(1, 8, [1]), 4: start(2, 17, [0, 0, 2]), 8: start(3, 21, [0, 0, 3]),
+                12: start(4, 14, [0, 4]), 16: start(5, 22, [0, 5]), 20: start(6, 20, [0, 6])},
+          "B": {0: start(7, 0, [1]), 4: start(8, 18, [0, 0, 2]), 9: start(9, 21, [0, 0, 3]),
+                13: start(10, 15, [0, 4]), 17: start(11, 23, [0, 5]), 21: start(12, 10, [1])}},
+         None, {"lk", "lv", "lb", "lt", "ln", "le", "lc"}),
+        ("sources that play once on seven lookup kinds, one effect",
+         [fall, once(voice), once(buzz), once(toned), once(noise), once(envelope), once(whole)],
+         [("V15", V15), ("shape", shape), ("tone", tone), ("V10", V10), ("period", period),
+          ("sample", sample)],
+         {"A": {0: start(1, 8, [1]), 3: start(2, 17, [0, 0, 1]), 6: start(3, 21, [0, 0, 2]),
+                9: start(4, 14, [0, 3]), 12: start(5, 22, [0, 4]), 15: start(6, 20, [0, 5]),
+                18: start(7, 0, [6])}},
+         None, {"lk", "lv", "lb", "lt", "ln", "le", "lc"}),
+        ("four sources through 256 entries remapped in one row", [whole],
+         [("sample", sample), ("sample again", sample2)],
+         {letter: {0: start(1, target, [1]), 8: remap([2]), 16: remap([1])}
+          for letter, target in (("A", 0), ("B", 2), ("C", 4), ("D", 11))}, None, {"lc"}),
         ("a deferred start through a mapping", [loop, fall], [("V15", V15), ("V5", V5)],
          {"A": {0: start(1, 8, [1]), 4: start(2, 8, [2], deferred=1)}}, None, set()),
     ]
@@ -2044,6 +2133,30 @@ def deferred_sizes():
             shapes and shapes.groups(), counted)
     return ("the deferred start: the player %d bytes against %d, every size performance.md"
             " reads" % (len(built[(True, True)][0]), len(built[(True, False)][0])))
+
+
+def mapped_sizes():
+    """performance.md's sizes of the player with the lookup in (A deferred
+    start), against the eight builds of three switches: the row read
+    through the program counter or through an absolute address, the
+    deferred start in or out, and the lookup in or out."""
+    sizes = {(pcrel, defer, look): len(build(([] if pcrel else ["-dYMXR_PCREL=0"])
+                                             + ([DEFER_ON] if defer else [])
+                                             + ([MAP_ON] if look else []))[0])
+             for pcrel in (True, False) for defer in (False, True) for look in (True, False)}
+    said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read()
+                    .split("## A deferred start")[1].split())
+    m = re.search(r"The lookup in, `YMXR_MAP=1`, makes the player ([\d,]+) bytes against"
+                  r" ([\d,]+), and ([\d,]+) against ([\d,]+) where a tick reads an absolute"
+                  r" address; with the deferred start in as well, ([\d,]+) against ([\d,]+),"
+                  r" and ([\d,]+) against ([\d,]+)\.", said)
+    counted = tuple(sizes[(pcrel, defer, look)] for defer in (False, True)
+                    for pcrel in (True, False) for look in (True, False))
+    assert m and tuple(int(x.replace(",", "")) for x in m.groups()) == counted, \
+        "performance.md reads the players with the lookup as %s, and they assemble to %s" % (
+            m and m.groups(), counted)
+    return ("the lookup: the player %d bytes against %d, every size performance.md reads"
+            % (sizes[(True, False, True)], sizes[(True, False, False)]))
 
 
 def absolute_sizes():
@@ -2386,6 +2499,88 @@ def lookup_kind(model, i):
     return "lk"
 
 
+def lookup_regions(symbols):
+    """The routines a start through a transformation and a remap call on
+    the player with the lookup in (68k/YMXR.S), as the cycle counter's
+    regions: the page's choice (ymxr_page), the transformation's address
+    and an entry (ymxr_tab, ymxr_entry), the copy into a page
+    (ymxr_fill), the move between the identity's handler and a lookup
+    instance (ymxr_move) and the switch, the page byte's one write at
+    ymxr_rpage; and the place's reset of a source of several columns
+    (ymxr_widereset), which reads the kind the source runs. The routine
+    of a start or a remap whole is counted from its call to its return
+    (check), since ymxr_rem, which ymxr_lstart calls, is a routine of
+    the identity's start as well."""
+    at = {name: CODE + symbols[name] for name in (
+        "ymxr_page", "ymxr_tab", "ymxr_fill", "ymxr_runrow",
+        "ymxr_move", "ymxr_rpage", "ymxr_widereset", "ymxr_widestart")}
+    return {"page": (at["ymxr_page"], at["ymxr_tab"]),
+            "table": (at["ymxr_tab"], at["ymxr_fill"]),
+            "copy": (at["ymxr_fill"], at["ymxr_runrow"]),
+            "move": (at["ymxr_move"], at["ymxr_page"]),
+            "switch": (at["ymxr_rpage"], at["ymxr_rpage"] + 4),
+            "reset": (at["ymxr_widereset"], at["ymxr_widestart"])}
+
+
+def routine_calls(code, symbols):
+    """The address after each bsr.w of the player that calls ymxr_lstart
+    or ymxr_remap, where the routine returns."""
+    called = {symbols["ymxr_lstart"], symbols["ymxr_remap"]}
+    return [at + 4 for at in range(0, len(code) - 3, 2)
+            if code[at:at + 2] == b"\x61\x00"
+            and at + 2 + struct.unpack(">h", code[at + 2:at + 4])[0] in called]
+
+
+def shape_of(model, i):
+    """The handler effect i's source runs on, by its shape: "square",
+    "one", or the lookup kind of a source that steps a place
+    (lookup_kind), and None where no source runs."""
+    fx = model.fx[i]
+    if not fx["running"] or fx["source"] == 0:
+        return None
+    if model.square(i):
+        return "square"
+    if model.onerow(i):
+        return "one"
+    return lookup_kind(model, i)
+
+
+def lookup_events(model, before, row):
+    """The starts through a transformation and the remaps a row makes, out
+    of the model before it (before, each effect's shape_of and running
+    mapping) and after it, each (effect, what, shape): a start, "start" at
+    row 0 where the row sets bit 5 and "start, the place kept" where it
+    leaves it clear, the shape the source started on; and a remap (SPEC.md
+    1.10.2), "stopped" on a timer stopped at the row, "same" where the
+    running mapping is the new one, "switch" between two transformations,
+    "from the identity" and "to the identity", the shape the running
+    source has."""
+    events = []
+    for i in range(4):
+        t = EFFECT + 4 * i
+        mapping = row[C + i] if len(row) > C else 0
+        fx = model.fx[i]
+        shape, ran = before[i]
+        if row[t + 1] & 0x80:
+            if row[t + 1] & 0x7F and fx["running"] and fx["run"] and not fx["pending"]:
+                kept = row[t + 2] & 0xA0 != 0xA0
+                events.append((i, "start, the place kept" if kept else "start",
+                               shape_of(model, i)))
+        elif mapping & 0x80:
+            if shape is None:
+                what = "stopped"
+            elif fx["run"] == ran:
+                what = "same"
+            elif not fx["run"]:
+                what = "to the identity"
+            elif not ran:
+                what = "from the identity"
+            else:
+                what = "switch"
+            events.append((i, what, shape))
+    return events
+
+
 def page_of(m, symbols, at, name):
     """The page a lookup instance at `at` of the kind `name` reads: its
     page read's displacement word, from the word's address, with the key
@@ -2548,7 +2743,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init took a bound tune of version %d" % past
-        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0)), [], None
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0), [], 0), [], None
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
@@ -2574,7 +2769,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
             & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init took a tune that defers a start and maps a value"
-        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0)), [], None
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0), [], 0), [], None
     m = Machine(code, symbols, bound)
     if cycles:
         # The image is the bound tune's last part, or the last before the
@@ -2585,12 +2780,45 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         # ymxr_frame to ymxr_regs, and steps 4 to 8, the register columns,
         # from there to ymxr_played: the two parts a dense frame procedure
         # would replace (dense).
+        regions = None if perf else {
+            "effects": (CODE + symbols["ymxr_frame"], CODE + symbols["ymxr_regs"]),
+            "registers": (CODE + symbols["ymxr_regs"], CODE + symbols["ymxr_played"])}
+        if regions and "ymxr_look" in symbols:
+            regions.update(lookup_regions(symbols))
         cycles.attach(m, (FILE + tune.image_at, FILE + tune.image_end),
                       *(decoder_of(file, bound, tune, cycles.module)
-                        if parts else ()),
-                      regions=None if perf else {
-                          "effects": (CODE + symbols["ymxr_frame"], CODE + symbols["ymxr_regs"]),
-                          "registers": (CODE + symbols["ymxr_regs"], CODE + symbols["ymxr_played"])})
+                        if parts else ()), regions=regions)
+    # each copy into a page, as (its fill kind, E), a frame's copies kept
+    # beside its starts and remaps (lookup_events)
+    copies = []
+    if cycles and not perf and "ymxr_look" in symbols:
+        def copied(mu, address, size, data):
+            table = mu.reg_read(UC_M68K_REG_A2)
+            copies.append((mu.reg_read(UC_M68K_REG_D5) & 0xFF,
+                           struct.unpack(">H", bytes(mu.mem_read(table, 2)))[0]))
+        m.mu.hook_add(UC_HOOK_CODE, copied, begin=CODE + symbols["ymxr_fill"],
+                      end=CODE + symbols["ymxr_fill"])
+    # each start through a transformation and each remap, from the call of
+    # ymxr_lstart or ymxr_remap to its return: the cycles counted at the
+    # routine's first instruction, the bsr settled, and at the instruction
+    # after each bsr.w that calls it, its rts settled (routine_calls)
+    routine = {"cycles": 0, "at": None}
+    looking = ()
+    if cycles and "copy" in cycles.regions:
+        looking = tuple(lookup_regions(symbols)) + ("routine",)
+        def entered(mu, address, size, data):
+            routine["at"] = cycles.counter.cycles
+
+        def returned(mu, address, size, data):
+            if routine["at"] is not None:
+                routine["cycles"] += cycles.counter.cycles - routine["at"]
+                routine["at"] = None
+        for name in ("ymxr_lstart", "ymxr_remap"):
+            m.mu.hook_add(UC_HOOK_CODE, entered, begin=CODE + symbols[name],
+                          end=CODE + symbols[name])
+        for at in routine_calls(code, symbols):
+            m.mu.hook_add(UC_HOOK_CODE, returned, begin=CODE + at, end=CODE + at)
+    lookups = []
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
@@ -2657,6 +2885,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         if cycles:
             cycles._settle(None)
         spent_before = dict(cycles.spent) if cycles else {}
+        spent_before["routine"] = routine["cycles"]
+        copies.clear()
         before = cycles.cycles if cycles else 0
         image_before = cycles.image if cycles else 0
         decoder_before = cycles.decoder if cycles else 0
@@ -2696,7 +2926,15 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             assert yellow == len(m.psg), \
                 "frame %d: the yellow mark falls on chip write %d of %d, not after the last" % (
                     f, yellow, len(m.psg))
+        if looking:
+            shapes = [(shape_of(model, i), model.fx[i]["run"]) for i in range(4)]
+            row = model.tune.rows[model.row]
         want = model.frame()
+        if looking:
+            spent = dict(cycles.spent, routine=routine["cycles"])
+            lookups.append((lookup_events(model, shapes, row),
+                            {name: spent[name] - spent_before[name] for name in looking},
+                            list(copies)))
         if cycles and cycles.regions:
             steps.append((cycles.spent["effects"] - spent_before["effects"],
                           cycles.spent["registers"] - spent_before["registers"],
@@ -2759,6 +2997,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                 elif model.counted(i):
                     # a counted handler, of one column or of several
                     kind = ("counted wide " if model.wide(i) else "counted ") + then
+                elif model.wide(i) == 3:
+                    kind = "three " + then
                 elif model.wide(i):
                     kind = "wide " + then
                 if mapping:
@@ -2786,15 +3026,17 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "stop moved Timer C's nibble"
     return (frames, ticks, cost, tick_cost, tick_cycles,
             (costliest[0], tune.R, tune.RR, advance, steps, tune.effects, patched,
-             (len(bound), long_at(bound, 12))),
-            boundaries, refill_parts(refills_of, file, tune))
+             (len(bound), long_at(bound, 12)), lookups, len(tune.rows[0])),
+            boundaries, refill_parts(refills_of, file, bound, tune))
 
 
-def refill_parts(rows, file, tune):
+def refill_parts(rows, file, bound, tune):
     """parts_of a run's frames, with what the table's payload marks: a
     DTX3 table at the tune file's field at 12, its flags at 19 past it
     (DTX's SPEC.md 2.4), bit 1 a loop longer than the ring, replayed, and
-    L, the live columns, at 20; and the loop's rows."""
+    L, the live columns, at 20; the loop's rows; and the period, P, the
+    turns a refill comes round in, and the unit, k, which the bound tune's
+    image has in its format block at 16, at +14 and +18 (DTX, abi.md 1)."""
     if not rows:
         return None
     parts = parts_of(rows)
@@ -2802,7 +3044,17 @@ def refill_parts(rows, file, tune):
     parts["replayed"] = bool(file[table + 19] & 2)
     parts["live"] = struct.unpack(">H", file[table + 20:table + 22])[0]
     parts["loop"] = tune.R - tune.RR
+    parts["period"], parts["unit"] = image_period(bound)
     return parts
+
+
+def image_period(bound):
+    """P and k of a bound tune's image, out of its format block, 16 bytes
+    into the image (DTX, abi.md 1): the period the packager set, the
+    column count or above, and the unit. The image is at the field at 16
+    (BINARIES.md 1.1)."""
+    block = long_at(bound, 16) + 16
+    return struct.unpack(">H", bound[block + 14:block + 16])[0], bound[block + 18]
 
 
 WRITE = re.compile(r"ym write data reg=0x([0-9a-f]+) val=0x([0-9a-f]+) .* pc=([0-9a-f]+)")
@@ -2821,11 +3073,6 @@ CPU_CLOCK = 8021247.0
 ROM = 0xE00000
 
 
-# The turns of a period: the column count, the slots one each and the
-# rest idle (tools.md 4).
-PERIOD = 30
-
-
 # The words performance.md spells a small count with, so the rig reads the
 # sentence back as it is.
 WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
@@ -2835,7 +3082,8 @@ WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
          20: "twenty", 21: "twenty-one", 22: "twenty-two", 23: "twenty-three",
          24: "twenty-four", 25: "twenty-five", 26: "twenty-six",
          27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine",
-         30: "thirty"}
+         30: "thirty", 31: "thirty-one", 32: "thirty-two", 33: "thirty-three",
+         34: "thirty-four"}
 
 
 def footprint_read(footprints):
@@ -2960,9 +3208,10 @@ def counted_read(code, symbols, cycles_of, general):
     wide_size = symbols["ymxr_env1"] - symbols["ymxr_env0"]
     marked_size = symbols["ymxr_two1"] - symbols["ymxr_two0"]
     shapes = 4 * (symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]) + 4 * wide_size
-    if DEFER:
-        # the section's sizes are the player without the deferred start,
-        # and deferred_sizes reads the other build's
+    if DEFER or MAP:
+        # the section's sizes are the player without the deferred start
+        # and the lookup, and deferred_sizes and mapped_sizes read the
+        # other builds'
         pass
     elif PCREL:
         sizes = re.search(r"(\d+) bytes an instance against (\d+)", said)
@@ -2971,7 +3220,7 @@ def counted_read(code, symbols, cycles_of, general):
     else:
         sizes = re.search(r"instances of (\d+) bytes against the marked shape's (\d+)", said)
         player = re.search(r"where a tick reads an absolute address, ([\d,]+) bytes and ([\d,]+),", said)
-    if DEFER:
+    if DEFER or MAP:
         pass
     elif not sizes or (int(sizes.group(1)), int(sizes.group(2))) != (wide_size, marked_size):
         stale.append("performance.md reads the handlers' instances as %s, and the player"
@@ -2995,6 +3244,497 @@ def counted_read(code, symbols, cycles_of, general):
     return stale
 
 
+# The rows of performance.md's table of a tick through a transformation,
+# each the kinds of tick it reads (check). A kind with " alone" is of a
+# tune running one effect, and init writes two nops in place of the
+# level's drop in the general lookup instance alone on such a tune
+# (68k/YMXR.S, LK_SR), so the row of every other kind reads both.
+def _mapped_rows():
+    rows = [("a row written, the place stepped", ("mapped on",)),
+            ("the marker, the place to row `RR`", ("mapped loop", "mapped loop alone")),
+            ("the marker, the timer stopped", ("mapped stop", "mapped stop alone")),
+            ("a row written, the tune running one effect", ("mapped on alone",))]
+    for shape, kind, paths in (
+            ("counted", "counted", ("a row written", "the end, the place to row `RR`",
+                                    "the end, the timer stopped")),
+            ("two columns", "wide", ("a row written", "the marker, the places to row `RR`",
+                                     "the marker, the timer stopped")),
+            ("three columns", "three", ("a row written", "the marker, the places to row `RR`",
+                                        "the marker, the timer stopped")),
+            ("two counted columns", "counted wide", ("a row written",
+                                                     "the end, the places to row `RR`",
+                                                     "the end, the timer stopped"))):
+        for path, then in zip(paths, ("on", "loop", "stop")):
+            rows.append(("%s, %s" % (shape, path),
+                         ("mapped %s %s" % (kind, then), "mapped %s %s alone" % (kind, then))))
+    return tuple(rows)
+
+
+MAPPED_TICKS = _mapped_rows()
+
+# The rows of the table of a remap at the frame, each what lookup_events
+# names the row's step, and its columns' shapes.
+MAPPED_STEPS = (("a start at row 0", "start"),
+                ("a remap between two transformations", "switch"),
+                ("a remap from the identity", "from the identity"),
+                ("a remap to the identity", "to the identity"))
+MAPPED_SHAPES = ("lk", "square", "one")
+
+# The two reads the table of a row's read compares with the key's write,
+# each with the marker's branch: the table's address into a0 and an
+# indexed read, and an indexed read through the program counter, the
+# registers each uses saved and put back. The table is the word before
+# the code, and the branch falls through to the next instruction.
+LEA_READ = ("t:      dc.w    0\n"
+            "        move.w  d0,-(sp)\n        move.l  a0,-(sp)\n        clr.w   d0\n"
+            "        move.b  t(pc),d0\n        lea     t(pc),a0\n"
+            "        move.b  (a0,d0.w),$FFFF8802.w\n        bmi.s   e\n"
+            "        movea.l (sp)+,a0\n        move.w  (sp)+,d0\ne:\n")
+PC_READ = ("t:      dc.w    0\n"
+           "        move.w  d0,-(sp)\n        clr.w   d0\n        move.b  t(pc),d0\n"
+           "        move.b  t(pc,d0.w),$FFFF8802.w\n        bmi.s   e\n"
+           "        move.w  (sp)+,d0\ne:\n")
+
+# The kit's tunes whose ticks through the identity the ticks through a
+# transformation are read against, beside the fixtures' and the identity's
+# ticks of the tunes that map a value: the shapes of several columns and the
+# counted ones, each to its loop and its stop.
+IDENTITY_TUNES = ENVELOPE_TUNES + (COUNTED_TUNE, "voices.ymxr")
+
+# The tune of mapped_tunes whose costliest call the cost of 34 columns
+# names.
+FOUR_REMAPS = "four sources through 256 entries remapped in one row"
+
+
+def instructions(module, code, at, n, to=None):
+    """The cycles and the bytes of n instructions of code from at, counted
+    as the rig counts the player's, a branch among them falling through to
+    the next instruction, or branching to `to`."""
+    start, total = at, 0
+    for _ in range(n):
+        words = struct.unpack(">5H", (code[at:at + 10] + bytes(10))[:10])
+        after = (to or at + 2) if words[0] >> 12 == 6 else None
+        cycles, size = module.cycles_of(words, 0, None, at, after, None)
+        total += cycles
+        at += 2 * size
+    return total, at - start
+
+
+def span(values, comma=","):
+    """A set of cycle counts as performance.md writes it: one figure, or
+    the least to the most, a figure of 1,000 or more with its comma in
+    prose and without it in a table (comma "")."""
+    low, high = format(min(values), comma), format(max(values), comma)
+    return low if low == high else "%s to %s" % (low, high)
+
+
+def mapped_read(code, symbols, cycles_of, general, plays):
+    """performance.md's sections on a tick through a transformation, a
+    remap at the frame and the cost of 34 columns, against the rig on the
+    player with the lookup in: the tunes that map a value (mapped_tunes)
+    played on the cycle counter, their ticks by kind against the column of
+    the table for the build assembled, and each against the identity's
+    tick of its shape; and on the player as it is, the row's read, the
+    routines of a start and a remap by what the row makes and the shape
+    the source runs (lookup_events), the pages, the copies and the
+    switch, each tune's costliest call with those routines and without
+    them, its period and its unit, and the fixtures' play call on this
+    core against the table of The play call (plays). general is every
+    tick the fixtures counted, by kind."""
+    text = open(os.path.join(ROOT, "doc", "performance.md")).read()
+    stale = []
+
+    def section(heading, then):
+        if heading not in text or then not in text:
+            stale.append("performance.md has no section %s before %s" % (heading, then))
+            return ""
+        return text[text.index(heading):text.index(then)]
+    ticks_at = section("## A tick through a transformation", "## A remap at the frame")
+    frame_at = section("## A remap at the frame", "## The cost of 34 columns")
+    cost_at = section("## The cost of 34 columns", "## A counted tick of two columns")
+
+    def reads(said, claim, *want):
+        """One sentence against the figures measured, a figure of 1,000
+        or more with its comma."""
+        m = re.search(claim, " ".join(said.split()))
+        if not m:
+            stale.append("performance.md has no \"%s\"" % claim)
+            return
+        if tuple(g.replace(",", "") for g in m.groups()) != \
+                tuple(str(w).replace(",", "") for w in want):
+            stale.append("performance.md reads %s where the rig counts %s"
+                         % (m.groups(), tuple(str(w) for w in want)))
+
+    played, widths = [], set()
+    for title, at, init, kinds in mapped_tunes():
+        if init:
+            continue
+        result = check(at, code, symbols, CyclesOn(cycles_of))
+        with open(at, "rb") as f:
+            bound = bind(f.read(), None)
+        played.append((title, result[2], result[3], result[5][8], image_period(bound)))
+        widths.add(result[5][9])
+    ticked = {}
+    for _, _, tick_cost, _, _ in played:
+        for kind, spent in tick_cost.items():
+            ticked.setdefault(kind, set()).update(spent)
+    identity = {kind: set(spent) for kind, spent in general.items()}
+    kit = os.path.join(ROOT, "doc", "conformance", "tunes")
+    for name in IDENTITY_TUNES:
+        for kind, spent in check(os.path.join(kit, name), code, symbols,
+                                 CyclesOn(cycles_of))[3].items():
+            identity.setdefault(kind, set()).update(spent)
+    for kind, spent in ticked.items():
+        if not kind.startswith("mapped "):
+            identity.setdefault(kind, set()).update(spent)
+
+    # the ticks, a column a build: as it is, lean, and absolute
+    column = {(True, False): 1, (True, True): 2, (False, False): 3}.get((PCREL, LEAN))
+    read = set()
+    for row, kinds in MAPPED_TICKS:
+        m = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \|$" % re.escape(row), ticks_at, re.M)
+        spent = set()
+        for kind in kinds:
+            spent |= ticked.get(kind, set())
+            read.add(kind)
+        if not m or not spent or column is None:
+            stale.append("performance.md's ticks through a transformation read %s for %s, and"
+                         " the rig counts %s" % (m and m.groups(), row, sorted(spent)))
+        elif spent != {int(m.group(column))}:
+            stale.append("performance.md reads the tick %s through a transformation as %s,"
+                         " and the rig counts %s" % (row, m.group(column), sorted(spent)))
+    unread = sorted(kind for kind in ticked if kind.startswith("mapped ") and kind not in read
+                    and not kind.startswith(("mapped square", "mapped one")))
+    if unread:
+        stale.append("performance.md has no row for the ticks %s" % unread)
+    # each against the identity's tick of its shape
+    more = re.search(r"Each figure is the tick of the identity's handler of that shape and (\d+)"
+                     r" cycles, and (\d+) on the path that loops",
+                     " ".join(ticks_at.split()))
+    paired = Counter()
+    for kind, spent in sorted(ticked.items()):
+        base = kind[len("mapped "):]
+        if not kind.startswith("mapped ") or base not in identity \
+                or base.startswith(("square", "one")):
+            continue
+        loops = " loop" in kind
+        want = more and int(more.group(2 if loops else 1))
+        if len(spent) != 1 or len(identity[base]) != 1 or \
+                next(iter(spent)) - next(iter(identity[base])) != want:
+            stale.append("the tick %s is %s through a transformation and %s through the identity,"
+                         " not %s more" % (base, sorted(spent), sorted(identity[base]), want))
+        paired["loop" if loops else "stop" if " stop" in kind else "on"] += 1
+    if not more or set(paired) != {"on", "loop", "stop"}:
+        stale.append("performance.md's ticks through a transformation are read against the"
+                     " identity's on %s" % dict(paired))
+    # the 24 in its parts, on the builds that read the row through the
+    # program counter and through an absolute address: the key's write,
+    # the page read, and the identity's read of the row it replaces
+    parts = {}
+    for pcrel in (True, False):
+        built_ = build([d for d in DEFINES if d != "-dYMXR_PCREL=0"]
+                       + ([] if pcrel else ["-dYMXR_PCREL=0"]))
+        key = instructions(cycles_of, built_[0], built_[1]["ymxr_lk0_ptr"], 1)
+        page = instructions(cycles_of, built_[0], built_[1]["ymxr_lk0_ptr"] + key[1], 1)[0]
+        parts[pcrel] = (key[0], page, instructions(cycles_of, built_[0],
+                                                   built_[1]["ymxr_tick0_row"] + 6, 1)[0])
+    if more and any(key + page - read != int(more.group(1)) for key, page, read in parts.values()):
+        stale.append("the key's write, the page read and the identity's read are %s, not %s more"
+                     % (parts, more.group(1)))
+    key, page, read = parts[False]
+    reads(ticks_at, r"on the absolute build the key's write is (\d+) cycles, and the page read"
+                    r" through the program counter, (\d+), is (\d+) less than the identity's"
+                    r" read of an absolute address, (\d+)\.", key, page, read - page, read)
+    reads(ticks_at, r"As it is and lean, the (\d+) is the key's write", parts[True][0])
+    if parts[True][1] != parts[True][2]:
+        stale.append("the page read and the identity's read through the program counter are %s"
+                     % (parts[True],))
+    reads(ticks_at, r"Every lookup kind, on the (\w+) builds the rig counts",
+          WORDS[len({(True, False), (True, True), (False, False)})])
+    for kind in ("square", "square alone", "one", "one alone"):
+        if "mapped " + kind in ticked and ticked["mapped " + kind] != identity.get(kind):
+            stale.append("a %s through a transformation ticks at %s, and through the identity at"
+                         " %s" % (kind, sorted(ticked["mapped " + kind]), identity.get(kind)))
+    def one(kind, within=ticked):
+        spent = within.get(kind, set())
+        return next(iter(spent)) if len(spent) == 1 else None
+    reads(ticks_at, r"The counted instance of one column costs (\d+) cycles a row more than the"
+                    r" general one", (one("mapped counted on") or 0) - (one("mapped on") or 0))
+    rate = re.search(r"A source of ([\d,]+) rows a second through a transformation costs ([\d,]+)"
+                     r" cycles a frame more at (\d+) Hz", " ".join(ticks_at.split()))
+    if not rate or one("on", identity) is None or one("mapped on") is None:
+        stale.append("performance.md has no cost of a source a second through a transformation")
+    else:
+        rows, hz = int(rate.group(1).replace(",", "")), int(rate.group(3))
+        reads(ticks_at, r"A source of ([\d,]+) rows a second through a transformation costs"
+                        r" ([\d,]+) cycles a frame more at (\d+) Hz",
+              rows, int(rows / float(hz) * (one("mapped on") - one("on", identity))), hz)
+    if not PCREL or LEAN or DEFER:
+        # the row's read and the frame are the player as it is
+        return stale
+
+    # an effect's pages: the block before the table of page bytes, a page
+    # the 256 bytes a key reaches, since the key is a byte
+    block = symbols["ymxr_htab"] - symbols["ymxr_pg0"]
+    reads(ticks_at, r"one of the effect's (\w+) pages of (\d+) bytes", WORDS[block // 256], 256)
+    # the row's read: the general handler's and its lookup instance's,
+    # and the two for comparison, each with the marker's branch
+    module = cycles_of
+    through = instructions(module, code, symbols["ymxr_tick0_row"] + 6, 2)
+    looked = instructions(module, code, symbols["ymxr_lk0_ptr"], 3)
+    handler = one("on", identity)
+    reads(ticks_at, r"The key's write costs (\d+) cycles a tick", looked[0] - through[0])
+    for row, read, whole in (
+            ("through the identity", through, handler),
+            ("through a transformation", looked, one("mapped on")),
+            ("for comparison: `lea` the table", LEA_READ, None),
+            ("for comparison: an indexed read through the program counter", PC_READ, None)):
+        if whole is None:
+            snippet = assemble_text(read)[2:]
+            cycles, size = counted(module, snippet, False), len(snippet)
+            whole = handler - through[0] + cycles
+        else:
+            cycles, size = read
+        if whole != handler - through[0] + cycles:
+            stale.append("the tick %s is %s, and its read and the rest %d" % (
+                row, whole, handler - through[0] + cycles))
+        m = re.search(r"^\| %s[^|]* \| (\d+) \| (\d+) \| (\d+) \|$" % re.escape(row), ticks_at, re.M)
+        if not m or tuple(int(x) for x in m.groups()) != (cycles, size, whole):
+            stale.append("performance.md reads the row's read %s as %s, and the rig counts %s"
+                         % (row, m and m.groups(), (cycles, size, whole)))
+
+    # the frame: each row with one start or one remap of one effect, its
+    # routine from the call to the return
+    steps, pages, moves, copies, totals, switched = {}, {}, {}, {}, {}, set()
+    for _, _, _, lookups, _ in played:
+        for events, spent, filled in lookups:
+            if len(filled) == 1:
+                copies.setdefault(filled[0], set()).add(spent["copy"])
+            switches = sum(1 for _, what, shape in events
+                           if what == "switch" and shape not in ("square", "one"))
+            if switches:
+                switched.add(spent["switch"] // switches)
+            if len(events) != 1:
+                continue
+            _, what, shape = events[0]
+            page = spent["page"] + spent["table"] if spent["page"] else 0
+            steps.setdefault((what, shape), set()).add(spent["routine"] - page - spent["copy"])
+            if page:
+                pages.setdefault("filled" if filled else "found", set()).add(page)
+            if spent["move"]:
+                moves.setdefault(shape, set()).add(spent["move"])
+            totals.setdefault((what, shape, tuple(filled)), set()).add(spent["routine"])
+    for row, what in MAPPED_STEPS:
+        m = re.search(r"^\| %s \| ([^|]+?) \| ([^|]+?) \| ([^|]+?) \|$" % re.escape(row),
+                      frame_at, re.M)
+        counted_ = tuple(span(steps[(what, shape)], "") if (what, shape) in steps else None
+                         for shape in MAPPED_SHAPES)
+        if not m or m.groups() != counted_:
+            stale.append("performance.md reads %s at the frame as %s, and the rig counts %s"
+                         % (row, m and m.groups(), counted_))
+    def spans(*keys):
+        values = set()
+        for key in keys:
+            values |= steps.get(key, set())
+        return span(values) if values else None
+    others = sorted({shape for _, shape in steps if shape not in MAPPED_SHAPES + (None,)})
+    reads(frame_at, r"A start at the running source's row, with bit 5 of the control column clear,"
+                    r" reads that row as well, and on one column its remainder by R of the source"
+                    r" \(SPEC.md 1.8.4\): ([\d,]+(?: to [\d,]+)?) cycles on one column, and"
+                    r" ([\d,]+(?: to [\d,]+)?) on a square",
+          spans(("start, the place kept", "lk")), spans(("start, the place kept", "square")))
+    reads(frame_at, r"A remap on a stopped timer sets the kept mapping alone, ([\d,]+(?: to"
+                    r" [\d,]+)?) cycles", spans(("stopped", None)))
+    reads(frame_at, r"a start at row 0 is ([\d,]+(?: to [\d,]+)?) cycles on them, a remap between"
+                    r" two transformations ([\d,]+(?: to [\d,]+)?), from the identity ([\d,]+(?:"
+                    r" to [\d,]+)?) and to the identity ([\d,]+(?: to [\d,]+)?)\.",
+          *(spans(*[(what, shape) for shape in others])
+            for what in ("start", "switch", "from the identity", "to the identity")))
+    reads(frame_at, r"The page: ([\d,]+(?: to [\d,]+)?) cycles where a page of the instance has the"
+                    r" transformation, and ([\d,]+(?: to [\d,]+)?) where neither has it, the other"
+                    r" page filled", span(pages.get("found", {0})), span(pages.get("filled", {0})))
+    reads(frame_at, r"is the page byte's one write, (\d+) cycles", span(switched or {0}))
+    three = moves.get("lb", set()) | moves.get("lv", set())
+    every = set().union(*moves.values()) if moves else {0}
+    if moves.get("lk") != {min(every)} or three != {max(every)}:
+        stale.append("the moves between the identity and a transformation are %s" % moves)
+    reads(frame_at, r"from one handler to the other, ([\d,]+) cycles on one column to ([\d,]+) on"
+                    r" three", span(moves.get("lk", {0})), span(three or {0}))
+    # the copy table: a row a fill kind and a count of entries
+    kind, listed = None, set()
+    for m in re.finditer(r"^\| ([^|]+?) \| (\d+) \| ([\d,]+) \|$", frame_at, re.M):
+        kind = {"entry k at k": 0, "the same": kind}.get(
+            m.group(1), 1 if m.group(1).startswith("a marked column") else
+            2 if m.group(1).startswith("a counted source on `setR7`") else None)
+        key = (kind, int(m.group(2)))
+        listed.add(key)
+        # the mirror's second write and the ports' first, out of the copy
+        # (ymxr_fill): move.l d1,d16(a4) after a move.l to (a4)+, and lea
+        # d16(a4),a4
+        fill = code[symbols["ymxr_fill"]:symbols["ymxr_runrow"]]
+        at = re.search(r"at k \+ (\d+)", m.group(1))
+        if m.group(1) != "the same" and kind in (1, 2) and (not at or int(at.group(1)) != (
+                struct.unpack(">h", fill[fill.index(b"\x29\x41") + 2:][:2])[0] + 4 if kind == 1
+                else struct.unpack(">h", fill[fill.index(b"\x49\xec") + 2:][:2])[0])):
+            stale.append("performance.md reads the copy %s at an offset ymxr_fill does not write"
+                         % m.group(1))
+        if copies.get(key) != {int(m.group(3).replace(",", ""))}:
+            stale.append("performance.md reads the copy %s of %s entries as %s, and the rig counts"
+                         " %s" % (m.group(1), m.group(2), m.group(3), copies.get(key)))
+    if listed != set(copies):
+        stale.append("performance.md's copies are %s, and the rig counts %s"
+                     % (sorted(listed, key=str), sorted(copies)))
+    reads(frame_at, r"So the routines of a volume's remap between two transformations, a marked"
+                    r" source of one column through (\d+) entries, cost ([\d,]+(?: to [\d,]+)?)"
+                    r" cycles where the other page is filled, and ([\d,]+(?: to [\d,]+)?) where it"
+                    r" has the transformation", 16,
+          span(totals.get(("switch", "lk", ((1, 16),)), {0})),
+          span(totals.get(("switch", "lk", ()), {0})))
+    # a tune of version 9 on this core against the core without the lookup:
+    # each frame of the tunes of v9_tunes, a frame whose row starts no
+    # source and resets no place the head of each effect it runs, and
+    # every other the path its row's step runs (V9_PATHS)
+    plain = build([d for d in DEFINES if d != MAP_ON])
+    heads, paths, narrow = set(), {}, set()
+    for title, at, rows in v9_tunes():
+        looked = check(at, code, symbols, CyclesOn(cycles_of))
+        without = check(at, plain[0], plain[1], CyclesOn(cycles_of))
+        effects, R = bin(looked[5][5] & 0x0F).count("1"), looked[5][1]
+        narrow.add(looked[5][9])
+        gained = [a - b for a, b in zip(looked[2], without[2])]
+        head = {d // effects for f, d in enumerate(gained) if f % R not in rows}
+        heads |= head
+        for f, d in enumerate(gained):
+            if f % R in rows and len(head) == 1:
+                paths.setdefault(rows[f % R], set()).add(d - effects * next(iter(head)))
+    paths[None] = heads
+    for row, path in V9_PATHS:
+        m = re.search(r"^\| %s \| (-?\d+) \|$" % re.escape(row), frame_at, re.M)
+        if not m or paths.get(path) != {int(m.group(1))}:
+            stale.append("performance.md reads the path %s of a tune of version 9 as %s, and the"
+                         " rig counts %s" % (row, m and m.group(1), paths.get(path)))
+    def path(name):
+        return next(iter(paths[name])) if len(paths.get(name, ())) == 1 else None
+    fixture = next(((patched, effects) for _, _, patched, effects, _ in plays.values()
+                    if effects & 0x0F), None)
+    if fixture is None:
+        stale.append("no fixture runs an effect on the core with the lookup in")
+    else:
+        # the head's read of each mapping column, as init patched it, and
+        # the branch at the start
+        patched, effects = fixture
+        if {instructions(module, patched, symbols["q_%d" % (C + i)], 1)[0]
+                for i in range(4) if effects & 1 << i} != {path(None)}:
+            stale.append("the heads of the mapping columns of a fixture are not %s" % path(None))
+        now = symbols["ymxr_tick0_now"]
+        aimed = now + 2 + struct.unpack(">h", patched[now + 2:now + 4])[0]
+        reads(frame_at, r"a start runs the branch init aims at the start through the identity,"
+                        r" (\d+) cycles", instructions(module, patched, now, 1, to=aimed)[0])
+        if aimed != symbols["ymxr_tick0_start"] or path("start") != \
+                instructions(module, patched, now, 1, to=aimed)[0]:
+            stale.append("init aims a start of a tune that maps no value at %x, not at _start"
+                         % aimed)
+    vector = (path("start kept") or 0) - (path("start") or 0)
+    reads(frame_at, r"read the running handler through the vector, (\d+) cycles", vector)
+    if path("reset") != vector:
+        stale.append("a place's reset is %s more, and a start at the running row %d"
+                     % (path("reset"), vector))
+    record = (symbols["FX_SIZE"], plain[1]["FX_SIZE"])
+    times = (path("wide start") or 0) - (path("start") or 0)
+    reads(frame_at, r"multiplies by the size of the effect's record, (\d+) bytes where it is"
+                    r" (\d+), (\d+) cycles more", record[0], record[1], times)
+    # mulu is 38 cycles and 2 a bit set of its source (the 68000's manual)
+    if times != 2 * (bin(record[0]).count("1") - bin(record[1]).count("1")):
+        stale.append("a start of several columns is %d more than a start, not its multiply's" % times)
+    level = (path("square start") or 0) - (path("start") or 0)
+    reads(frame_at, r"A square's start writes row 0's level into the effect's record, (\d+)"
+                    r" cycles, and its place's reset then writes it in one move, (\d+) cycles less",
+          level, -(path("square reset") or 0))
+    if path("square start kept") != level + path("start kept"):
+        stale.append("a square's start at the running row is %s, not %d"
+                     % (path("square start kept"), level + path("start kept")))
+    reads(frame_at, r"counted on the build as it is over the rig's (\w+) tunes of version 9",
+          WORDS[len(v9_tunes())])
+    more_on = [got[1] - said[1] for said, got, _, _, _ in plays.values()]
+    more_at = [got[2] - said[2] for said, got, _, _, _ in plays.values()]
+    reads(frame_at, r"Over the (\w+) fixtures, the play call counts ([\d,]+) to ([\d,]+) cycles more"
+                    r" on average on this core than the table of The play call, and ([\d,]+) to"
+                    r" ([\d,]+) more at most",
+          WORDS.get(len(plays), len(plays)), min(more_on or [0]), max(more_on or [0]),
+          min(more_at or [0]), max(more_at or [0]))
+
+    # the cost of 34 columns: the columns, the period and the unit, and
+    # each tune's costliest call, with the lookup's routines and without
+    # them
+    if len(widths) != 1 or len(narrow) != 1:
+        stale.append("the tunes are of %s columns and of %s" % (sorted(widths), sorted(narrow)))
+    else:
+        wide_, narrow_ = next(iter(widths)), next(iter(narrow))
+        reads(cost_at, r"A tune of version 10 has (\d+) columns, the (\w+) of version 9 and the"
+                       r" (\w+) mapping columns", wide_, WORDS[narrow_], WORDS[wide_ - narrow_])
+    fixtures = {width for _, _, _, effects, width in plays.values() if not effects & 0x20}
+    reads(cost_at, r"The (\w+) fixtures map no value, and their tables have (\w+) columns",
+          WORDS.get(len(plays), len(plays)) if len(fixtures) == 1 else None,
+          WORDS.get(next(iter(fixtures)), fixtures) if len(fixtures) == 1 else None)
+    periods = {period for _, _, _, _, period in played}
+    if len(periods) != 1:
+        stale.append("the tunes through a transformation pack at %s" % sorted(periods))
+    else:
+        P, k = next(iter(periods))
+        reads(cost_at, r"packs at unit (\d+) and a period of ([\w-]+) rows, so a refill is"
+                       r" ([\w-]+) units of two bytes, against (\w+) at thirty columns",
+              k, WORDS.get(P, P), WORDS.get(P // k, P // k), WORDS[30 // k])
+    budget = re.search(r"A play call costs at most ([\d,]+) cycles",
+                       " ".join(open(os.path.join(ROOT, "doc", "requirements.md")).read().split()))
+    budget = int(budget.group(1).replace(",", "")) if budget else 0
+    rows = re.findall(r"^\| ([^|]+?) \| (\d+) \| (\d+) \|$", cost_at, re.M)
+    if [title for title, _, _ in rows] != [title for title, _, _, _, _ in played]:
+        stale.append("performance.md's costliest calls are of %s, and the rig plays %s"
+                     % ([title for title, _, _ in rows], [title for title, _, _, _, _ in played]))
+    over = []
+    for title, cost, _, lookups, _ in played:
+        apart = max(c - spent["routine"] for c, (_, spent, _) in zip(cost, lookups))
+        said = next(((int(most), int(less)) for named, most, less in rows if named == title), None)
+        if said != (max(cost), apart):
+            stale.append("performance.md reads the costliest call of %s as %s, and the rig counts"
+                         " %s" % (title, said, (max(cost), apart)))
+        if apart > budget:
+            stale.append("%s passes R4.5 with the routines of its starts and remaps apart, at %d"
+                         % (title, apart))
+        if max(cost) > budget:
+            over.append(title)
+    reads(cost_at, r"Of the (\d+), (\w+) pass R4\.5's ([\d,]+)", len(played),
+          WORDS.get(len(over), len(over)), budget)
+    costliest = sorted((max(cost), title) for title, cost, _, _, _ in played)
+    for title, cost, _, lookups, _ in played:
+        if title not in over:
+            continue
+        f = cost.index(max(cost))
+        events, _, filled = lookups[f]
+        starts = [shape for _, what, shape in events if what.startswith("start")]
+        if f or len(starts) < 2 or len(filled) != sum(1 for shape in starts
+                                                       if shape not in ("square", "one")):
+            stale.append("%s: its costliest frame, %d, starts %s and fills %d pages"
+                         % (title, f, starts, len(filled)))
+    if costliest[-1][1] != FOUR_REMAPS:
+        stale.append("the costliest tune through a transformation is %s" % costliest[-1][1])
+    four = next((cost[f] for title, cost, _, lookups, _ in played if title == FOUR_REMAPS
+                 for f, (events, _, filled) in enumerate(lookups)
+                 if len(filled) == 4 and all(what == "switch" for _, what, _ in events)), None)
+    # its first row's starts and copies, and its row of four remaps'
+    frames = next((lookups for title, _, _, lookups, _ in played if title == FOUR_REMAPS), [])
+    begun = frames[0] if frames else ([], {}, [])
+    remapped = next((frame for frame in frames if len(frame[2]) == 4
+                     and all(what == "switch" for _, what, _ in frame[0])), ([], {}, []))
+    shapes = {shape for _, what, shape in begun[0] if what == "start"}
+    reads(cost_at, r"The costliest starts (\w+) counted sources through (\d+) entries, and its"
+                   r" frame that remaps the (\w+) to another (\d+) entries costs ([\d,]+)",
+          WORDS.get(len(begun[0])) if shapes == {"lc"} else shapes,
+          span({e for _, e in begun[2]} or {0}), WORDS.get(len(remapped[0])),
+          span({e for _, e in remapped[2]} or {0}), four)
+    return stale
+
+
 def decoder_of(file, bound, tune, dtx):
     """Where ST4's decoder is in a bound tune's image, and the two
     parse heads inside it.
@@ -3010,8 +3750,10 @@ def decoder_of(file, bound, tune, dtx):
     # The packager reads the tune file's tail, so its image has the
     # sources' tables in it where the binder packs each as a separate
     # table: the binder's image region is the packager's image as far as
-    # the file runs, and the decoder is at its head either way.
-    have = bound[tune.image_at:]
+    # the image runs, to the end of the bound tune or to the transformation
+    # block of version 10 (BINARIES.md 1.2), and the decoder is at its head
+    # either way.
+    have = bound[tune.image_at:tune.image_end]
     over = min(len(image), len(have))
     assert image[:over] == have[:over], \
         "the packager's image is not the image the binder wrote"
@@ -3116,8 +3858,9 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
 
     if whole:
         # A run shorter than a period refills each slot once, after the
-        # seed, so its floor is read apart from the others.
-        full = {stem: one for stem, one in parts.items() if one["frames"] >= PERIOD}
+        # seed, so its floor is read apart from the others. The period is
+        # the tune's (refill_parts): 30 turns at 30 columns, and 34 at 34.
+        full = {stem: one for stem, one in parts.items() if one["frames"] >= one["period"]}
         replayed = sorted({one["outside"] for one in full.values() if one["replayed"]})
         fitting = sorted({one["outside"] for one in full.values() if not one["replayed"]})
         reads(r"The advance spends ([\d,]+) cycles a refill outside the"
@@ -4630,6 +5373,7 @@ def main():
                           ("deferred", lambda: deferred(*deferring(defines))),
                           ("mapped", lambda: mapped(code, symbols)),
                           ("deferred_sizes", deferred_sizes),
+                          ("mapped_sizes", mapped_sizes),
                           ("absolute_sizes", absolute_sizes),
                           ("halves", lambda: halves(code, symbols)),
                           ("voices", lambda: voices(code, symbols)),
@@ -4659,6 +5403,7 @@ def main():
     stale = []
     wrong = []
     measured = {}                       # the refill parts by tune, with -refill
+    plays = {}                          # the table's play call and the lookup core's, by tune
     another = []
     for ym in tunes:
         try:
@@ -4734,9 +5479,15 @@ def main():
                 # ticks cost more, which moves three of the eleven tunes, and
                 # the table of tick paths under that build's heading is
                 # what those ticks read against.
-                # The tables are the player without the deferred start,
-                # and -defer reads its play call in the section on it.
-                if PCREL and not DEFER and said != counted:
+                # The tables are the player without the deferred start
+                # and the lookup, and of the tunes that map no value:
+                # -defer reads its play call in the section on it, and
+                # -map the fixtures' in the section on a remap at the
+                # frame (plays).
+                if PCREL and MAP and not DEFER and not LEAN and said:
+                    plays[stem] = (said, counted, where[6], where[5], where[9])
+                if PCREL and not DEFER and not MAP and not where[5] & 0x20 \
+                        and said != counted:
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
                 # the table against 0.4.22: that release's call and this
@@ -4744,9 +5495,9 @@ def main():
                 against = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$"
                                     % re.escape(stem),
                                     open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
-                if PCREL and not DEFER and (not against or (int(against.group(2)),
-                                                            int(against.group(4)))
-                              != (average, max(cost))):
+                if PCREL and not DEFER and not MAP and not where[5] & 0x20 and (
+                        not against or (int(against.group(2)), int(against.group(4)))
+                        != (average, max(cost))):
                     stale.append("performance.md's table against 0.4.22 reads %s for %s, and the"
                                  " rig counts %d and %d" % (against and against.groups(), stem,
                                                             average, max(cost)))
@@ -4759,7 +5510,7 @@ def main():
                 # the lean core reads its ticks and not these. Every effect
                 # of this tune is a square, whose tick costs the same under
                 # both builds, so the three figures are under -abs too.
-                if stem == "Synergy Credits" and not LEAN and PCREL and DEFER:
+                if stem == "Synergy Credits" and not LEAN and PCREL and DEFER and not MAP:
                     # the play call of the build with the deferred start,
                     # against the build without it (A deferred start)
                     perf_said = " ".join(open(os.path.join(ROOT, "doc", "performance.md"))
@@ -4773,7 +5524,7 @@ def main():
                                      " with the deferred start in as %s, and the rig counts"
                                      " %d and %d" % (with_it and with_it.groups(), average,
                                                     max(cost)))
-                if stem == "Synergy Credits" and not LEAN and PCREL and not DEFER:
+                if stem == "Synergy Credits" and not LEAN and PCREL and not DEFER and not MAP:
                     # the costliest frame, counted from the first as 1,
                     # which the section against YMX places past its run
                     perf_said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read().split())
@@ -4832,6 +5583,8 @@ def main():
                              refills_of["heaviest"], refills_of["operations"]))
                 if refills_of["slope"]:
                     line += ", %3.0f an operation fitted" % refills_of["slope"]
+                line += ", a period of %d rows at unit %d" % (refills_of["period"],
+                                                             refills_of["unit"])
             print(line)
         except AnotherFormat as said:
             another.append(os.path.basename(ym))
@@ -4848,6 +5601,12 @@ def main():
         # a run over the eleven fixtures reads the section on a counted
         # tick of two columns against the kit's tunes of that shape
         stale += counted_read(code, symbols, cycles_of, general)
+    if costs and MAP and not args and wide is None and not kit and not DEFER \
+            and (PCREL or not LEAN):
+        # a run over the eleven fixtures on the core with the lookup in reads
+        # the sections on a tick through a transformation, a remap at the
+        # frame and the cost of 34 columns against the tunes that map a value
+        stale += mapped_read(code, symbols, cycles_of, general, plays)
     if costs and not args and wide is None and not kit and PCREL and not LEAN:
         # plan.md's shares, gates and parts over the eleven fixtures
         stale += plan_read(walker or FrameWalk(cycles_of, code, symbols), tunes, measured)
@@ -4855,7 +5614,7 @@ def main():
         # the bound tunes and their state blocks against performance.md's
         # table of them
         stale += footprint_read(footprints)
-    if savings and not args and wide is None and not kit and PCREL and not LEAN:
+    if savings and not args and wide is None and not kit and PCREL and not LEAN and not MAP:
         # a run over the eleven fixtures reads the section against YMX's
         # dense columns as the rig counts them
         stale += dense_read(savings, costs)
