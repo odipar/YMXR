@@ -107,14 +107,12 @@ performs the deferred start pending on it. [SPEC.md](doc/SPEC.md) sections
 the frames instead of writing the chips, and its record leaves the ticks
 out (section 7).
 
-Version 10 of the format adds a mapping to the tick
-([SPEC.md](doc/SPEC.md) 1.10, 2.1.5, 3.4): where an effect's mapping
-column is the number of a transformation, each row of its source has a key
-in the column of the last value its target reads, and the value written is
-the transformation's entry for that key, with the marker of a marked
-source and the two port directions of `setR7` read from the row. A reader
-reads versions 7 to 10, and a player 7 to 9 ([SPEC.md](doc/SPEC.md)
-3.3.5).
+Transformation lookups are optional. Mapping 0 writes source values
+unchanged. In version 10, an effect can instead select a lookup table
+for the last value its target writes: sample volume on a voice target,
+for example. A remap changes that lookup while the source continues
+from its current place. [SPEC.md](doc/SPEC.md) 1.10, 2.1.5 and 3.4 define
+the column, tick processing and table layout.
 
 ## The documents
 
