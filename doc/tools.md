@@ -630,6 +630,7 @@ text as passed.
 | subtune N fails to read | `subtune N: <message>` |
 | subtune 1 has a rate of 0 | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | subtune N has a rate other than subtune 1's | `subtune N plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
+| subtune N defers a start and maps a value (BINARIES.md 1.5) | `subtune N defers a start and maps a value, and init of every core reports -1 for such a tune` |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
 | Timer C is asked for and the claims byte of the set has it | `the set claims Timer C and the clock asked for is Timer C: the player's handler has that timer` |
 | the core's descriptor fails its check (12.3) | the line of 12.3 |

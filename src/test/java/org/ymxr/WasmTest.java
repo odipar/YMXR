@@ -168,8 +168,8 @@ final class WasmTest {
     /** A structure that maps a value through the tools that put a core
      *  under its tune: the module embeds the thirty-two cores, the sixteen
      *  with the lookup in among them, and reads the one each file needs as
-     *  the executable does, the largest under the tune of version 10 that
-     *  defers a start with the raster monitor in. */
+     *  the executable does, the largest under a set of a tune that defers a
+     *  start and one of version 10, with the raster monitor in. */
     @Test
     void aMappedTuneIsOnTheSameCoreAsTheExecutables() throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.fade()))
@@ -182,7 +182,9 @@ final class WasmTest {
                 Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
         both("ymxr-prg", sndh);
         both("ymxr-layout", sndh);
-        byte[] watched = both("ymxr-sndh", BuiltTunes.mapped().file(), "-perf");
+        byte[] apart = Multi.of(List.of(Files.readAllBytes(
+                ConformanceTest.TUNES.resolve("deferred.ymxr")), tune), List.of("", ""));
+        byte[] watched = both("ymxr-sndh", apart, "-perf");
         assertEquals(Sndh.even(Binaries.core(true, false, true, true, true).length),
                 Tune.getLong(watched, Sndh.even(Tune.getWord(watched, 2) + 2)
                         + Sndh.CORE_TABLE_AT),

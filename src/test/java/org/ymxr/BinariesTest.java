@@ -522,6 +522,17 @@ final class BinariesTest {
         assertEquals(32769, Sndh.seconds(Integer.MAX_VALUE, 65535));
     }
 
+    /** The kit's mapped tune defers a start and maps a value, which init of
+     *  every core reports -1 for (BINARIES.md 1.5). */
+    @Test
+    void aSubtuneThatDefersAndMapsIsRejected() throws IOException {
+        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                () -> Sndh.of(List.of(tune("mapped")),
+                        new Sndh.Options("Both", null, null, false, false)));
+        assertEquals("subtune 1 defers a start and maps a value, and init of every core"
+                + " reports -1 for such a tune", wrong.getMessage());
+    }
+
     @Test
     void aRateOfZeroIsRejected() throws IOException {
         byte[] file = tune("plays-once");
@@ -816,12 +827,11 @@ final class BinariesTest {
     @Test
     void aFileWithASubtuneThatMapsAValueUsesTheCoreWithTheLookupIn() throws IOException {
         byte[] fade = fade();
-        byte[] both = BuiltTunes.mapped().file();
         int switches = Columns.MAPS | Columns.DEFERS;
         assertEquals(Columns.MAPS, fade[Tune.EFFECTS_AT] & switches);
-        assertEquals(switches, both[Tune.EFFECTS_AT] & switches);
+        assertEquals(Columns.DEFERS, tune("deferred")[Tune.EFFECTS_AT] & switches);
         List<List<byte[]>> sets = List.of(List.of(tune("chambers")),
-                List.of(tune("chambers"), fade), List.of(tune("deferred"), fade), List.of(both));
+                List.of(tune("chambers"), fade), List.of(tune("deferred"), fade));
         for (int setting = 0; setting < 8; setting++) {
             boolean monitor = (setting & Sndh.CORE_MONITOR) != 0;
             boolean lean = (setting & Sndh.CORE_LEAN) != 0;
@@ -845,7 +855,7 @@ final class BinariesTest {
             for (boolean defer : new boolean[] {false, true}) {
                 byte[] without = Binaries.core(monitor, lean, pcrel, defer);
                 IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                        () -> Sndh.of(without, List.of(both), options));
+                        () -> Sndh.of(without, List.of(fade), options));
                 assertEquals("the core reads bound tunes to version 9, and this binds at 10",
                         wrong.getMessage());
             }
