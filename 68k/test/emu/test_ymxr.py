@@ -13,6 +13,10 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        fixtures, 40 tunes unless N sets it
        test_ymxr.py -framesN [tunes]   each tune played for N frames at most,
                                        for a short run over every shape
+       test_ymxr.py -onlyNAMES         the checks NAMES names alone, a comma
+                                       between two, after one build of the
+                                       player and with no tune played: of
+                                       the CHECKS below, in their order
        test_ymxr.py -cycles [tunes]    the play call's cost as well
        test_ymxr.py -refill [tunes]    -cycles and the advance's parts off
                                        one pass: what a refill spends
@@ -401,6 +405,13 @@ SET_TUNES = 10
 # The frames a tune is played for at most, which -frames sets. None plays
 # every tune whole, as a full run does.
 MOST_FRAMES = None
+
+# The checks a run makes after it builds the player and before it plays the
+# tunes, in their order, by the names -only reads: the SNDH cores, the two
+# sets of subtunes, and one each of the functions below.
+CHECKS = ("cores", "sets", "unplaced", "deferred", "mapped", "deferred_sizes",
+          "absolute_sizes", "halves", "voices", "widekept", "envelope", "wholebyte",
+          "outofreach")
 
 
 def spread(most):
@@ -4486,6 +4497,14 @@ def main():
     PCREL = "-abs" not in sys.argv
     perf = PERF
     wide = next((a for a in sys.argv[1:] if a.startswith("-corpus")), None)
+    picked = next((a for a in sys.argv[1:] if a.startswith("-only")), None)
+    only = None
+    if picked is not None:
+        only = picked[len("-only"):].split(",")
+        unknown = [name for name in only if name not in CHECKS]
+        if unknown:
+            raise SystemExit("-only reads the names %s and not %s"
+                             % (", ".join(CHECKS), ", ".join(unknown)))
     capped = next((a for a in sys.argv[1:] if a.startswith("-frames")), None)
     if capped is not None:
         said = capped[len("-frames"):]
@@ -4592,29 +4611,38 @@ def main():
         first = one
         break
     if first is not None:
-        print("the SNDH core of ymxr-sndh, %s: %d bytes, $60 kept and put back"
-              % core(defines, first)[:2])
-        lookup = mapped_tunes()
-        print("the SNDH core with the lookup in, %s: %d bytes, $60 kept and put back, the"
-              " mapping sites as the table has them, %d lookup instances each with its"
-              " key's write before its page read" % core(defines, lookup[0][1]))
-        print("    %s" % patched_code_follows_the_subtune(defines, tunes))
-        # the fixtures after a mapped tune of each lookup kind, on the core
-        # with the lookup in
-        print("    %s" % patched_code_follows_the_subtune(
-            defines, [at for _, at, _, kinds in lookup if kinds][:SET_MAPPED] + tunes))
-        print("    %s" % unplaced(code, symbols))
-        print("    %s" % deferred(*deferring(defines)))
-        print("    %s" % mapped(code, symbols))
-        print("    %s" % deferred_sizes())
-        print("    %s" % absolute_sizes())
-        print("    %s" % halves(code, symbols))
-        print("    %s" % voices(code, symbols))
-        print("    %s" % widekept(code, symbols))
-        print("    %s" % envelope(code, symbols))
-        print("    %s" % wholebyte(code, symbols))
-        if PCREL:
-            print("    %s" % outofreach(code, symbols))
+        def wanted(name):
+            return only is None or name in only
+        lookup = mapped_tunes() if wanted("cores") or wanted("sets") else None
+        if wanted("cores"):
+            print("the SNDH core of ymxr-sndh, %s: %d bytes, $60 kept and put back"
+                  % core(defines, first)[:2])
+            print("the SNDH core with the lookup in, %s: %d bytes, $60 kept and put back, the"
+                  " mapping sites as the table has them, %d lookup instances each with its"
+                  " key's write before its page read" % core(defines, lookup[0][1]))
+        if wanted("sets"):
+            print("    %s" % patched_code_follows_the_subtune(defines, tunes))
+            # the fixtures after a mapped tune of each lookup kind, on the
+            # core with the lookup in
+            print("    %s" % patched_code_follows_the_subtune(
+                defines, [at for _, at, _, kinds in lookup if kinds][:SET_MAPPED] + tunes))
+        for name, run in (("unplaced", lambda: unplaced(code, symbols)),
+                          ("deferred", lambda: deferred(*deferring(defines))),
+                          ("mapped", lambda: mapped(code, symbols)),
+                          ("deferred_sizes", deferred_sizes),
+                          ("absolute_sizes", absolute_sizes),
+                          ("halves", lambda: halves(code, symbols)),
+                          ("voices", lambda: voices(code, symbols)),
+                          ("widekept", lambda: widekept(code, symbols)),
+                          ("envelope", lambda: envelope(code, symbols)),
+                          ("wholebyte", lambda: wholebyte(code, symbols)),
+                          ("outofreach", lambda: outofreach(code, symbols))):
+            if wanted(name) and (PCREL or name != "outofreach"):
+                print("    %s" % run())
+    if only is not None:
+        print("%d %s whole: %s" % (len(only), "check runs" if len(only) == 1
+                                   else "checks run", ", ".join(only)))
+        return
     if real or stub:
         code, symbols = build(defines, "YMXR_sndh.S")
     cycles_of = None
