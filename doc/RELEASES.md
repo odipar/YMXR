@@ -37,6 +37,50 @@ rather than either.
 
 ## Published
 
+### 0.9.0, 2026-11-03
+
+<https://github.com/odipar/YMXR/releases/tag/v0.9.0>, built from the commit
+tagged `v0.9.0`.
+
+A tune that defers a start and maps a value plays: the cores with both the
+deferred start and the lookup in arm a deferred start through its mapping,
+where under 0.8.0 init reported -1 for such a tune and the tools reported
+the subtune. The tune format is 0.8.0's. Over the eleven dumps under
+`ym/test`, `ym-to-ymxr` writes 0.8.0's tune files, 11 of 11, `ym-to-ymxs`
+0.8.0's structures, 11 of 11, and the SNDH files come to 227,232 bytes, as
+under 0.8.0.
+
+- **A mapped deferred start** (SPEC.md 4.8, BINARIES.md 1.5). The arming
+  fills the page of the bank the timer does not run with interrupts on,
+  and aims the lookup instance there with its page byte, or writes the
+  entries of a square or a source of one row into their immediates. The
+  switch sets the mapping the running source plays through. A remap while
+  a start is pending maps the running effect alone, and a fill a tick
+  overtakes is made again into the other bank, once.
+- **The cores.** The eight with both switches are 578 bytes larger:
+  `YMXR_sndh-defer-map.bin` is 30,540 bytes, and the largest,
+  `YMXR_sndh-perf-abs-defer-map.bin`, 37,182. The other twenty-four are
+  0.8.0's byte for byte.
+- **The tools** put a subtune that defers a start and maps a value on the
+  core with both: `ymxr-sndh` writes the kit's `mapped.ymxr` as 39,464
+  bytes, where 0.8.0 reported the subtune, exit 1.
+- **The figures** (performance.md): a tick through a transformation, a
+  remap at the frame, the cost of 34 columns and the sizes of the builds
+  with the lookup, each read back by the rig. R4.5 counts the routines of
+  a start or a remap through a transformation apart, as it counts the
+  ticks.
+- **The patched read.** The runs of `test_ymxr.py -xpatch` under Hatari
+  in `68k/test/st/results` are its check, and a release requires no run
+  on a real ST.
+- **The rig** plays six tunes that defer a start and map a value, and the
+  kit's `mapped.ymxr` under `-kit`; the hand-run workflow runs `-cycles
+  -map`.
+- **The tools** contain the thirty-three binaries, and `ymxr.wasm` is
+  5,746,540 bytes, 1,280 more than 0.8.0's source builds with the same Go.
+- **The kits.** The tunes and the records are 0.8.0's.
+
+Checks: `bin/suite` green, 306 tests and 0 skipped.
+
 ### 0.8.0, 2026-11-03
 
 <https://github.com/odipar/YMXR/releases/tag/v0.8.0>, built from the commit
