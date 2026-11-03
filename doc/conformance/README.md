@@ -423,10 +423,7 @@ full.
    or `MANIFEST.generated.txt`.
 2. The reference is the record of `bin/ymxr-trace` (SPEC.md 7).
 3. `68k/test/emu/test_ymxr.py -kit` plays every tune but `wrong-version`
-   and `mapped` on the 68000 player and requires the player's frames, the
-   rig's model of section 4 and the reference to agree. `mapped` defers a
-   start and maps a value, and init of a core with the deferred start and
-   the lookup reports -1 for such a tune (BINARIES.md 2.1), so the rig
-   leaves it out with a line.
+   on the 68000 player and requires the player's frames, the rig's model
+   of section 4 and the reference to agree.
 4. `ConformanceTest` replays every tune converted from a dump against the
    dump through `ymxr-check` at its options.

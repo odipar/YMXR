@@ -316,19 +316,14 @@ final class MappedTest {
     }
 
     /** The SNDH writer puts the core with the deferred start and the
-     *  lookup in under a set of a deferred tune and a fade, and a core
-     *  without the lookup reports the version it reads (BINARIES.md 2.1,
-     *  2.10). This tune defers a start and maps a value, so a set with it
-     *  is the line of BINARIES.md 3.3. */
+     *  lookup in under a set of a deferred tune and this one, which defers
+     *  a start and maps a value, and a core without the lookup reports the
+     *  version it reads (BINARIES.md 2.1, 2.10). */
     @Test
     void theSndhWriterPutsTheCoreWithTheLookupUnderVersionTen() {
         String line = "the core reads bound tunes to version 9, and this binds at 10";
         assertEquals(Tune.VERSION, Tune.getWord(Bound.of(file()), 4));
-        assertEquals("subtune 2 defers a start and maps a value, and init of every core"
-                + " reports -1 for such a tune", assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(List.of(BuiltTunes.deferred().file(), file()),
-                        new Sndh.Options("Both", null, null, false, false))).getMessage());
-        List<byte[]> set = List.of(BuiltTunes.deferred().file(), BinariesTest.fade());
+        List<byte[]> set = List.of(BuiltTunes.deferred().file(), file());
         assertEquals(2, Bound.of(set).tunes().size());
         Sndh.Options options = new Sndh.Options("Mapped", null, null, false, false);
         byte[] sndh = Sndh.of(set, options);

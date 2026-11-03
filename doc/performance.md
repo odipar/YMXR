@@ -808,5 +808,5 @@ handler is 132 bytes against 128, and of the marked shape of two columns
 
 The lookup in, `YMXR_MAP=1`, makes the player 18,142 bytes against 8,392,
 and 19,516 against 8,062 where a tick reads an absolute address; with the
-deferred start in as well, 29,278 against 12,800, and 32,432 against
+deferred start in as well, 29,856 against 12,800, and 33,010 against
 12,618.

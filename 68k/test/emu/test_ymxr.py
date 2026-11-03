@@ -1626,16 +1626,31 @@ def deferred(code, symbols):
     shape of handler hooked and armed, in both banks; a stop, a start, a
     retune and a second deferred start before the switch; a deferred start
     on a stopped timer; the place kept modulo R; and a timer whose control
-    register two timers share."""
+    register two timers share.
+
+    The tunes that map a value play on the player with the lookup in, every
+    frame against the reader's record as well: a deferred start through a
+    mapping in both banks, of a square, of one row and of three columns,
+    each hooked on the handler of a source through a mapping; a remap of a
+    square while a start is pending; a remap before the switch, a retune
+    after it and a start that keeps the mapping of the remap (SPEC.md
+    1.10.3); remaps between the identity and a transformation while a start
+    is pending; and a pending start replaced by one through a mapping."""
     loop = ("loop of four", [15, 12, 9, 6], 0)
     fall = ("fall", list(range(15, -1, -1)), None)
     square = ("square", [15, 0], 0)
     other = ("square two", [13, 2], 0)
     held = ("one row", [11], 0)
     three = ("three rows", [10, 5, 1], 0)
+    voice = ("voice A", [[0, 1, 15], [128, 1, 12], [0, 2, 9], [128, 2, 6]], 0)
     slow, quick = (200, 200), (50, 100)
-    def start(source, target=8, rate=slow, tr=1, pr=1, deferred=0):
-        return ("start", source, target, rate[0], rate[1], tr, pr, deferred)
+    V10, V5, V0 = ([k * n // 15 for k in range(16)] for n in (10, 5, 0))
+    two_maps, three_maps = [("V10", V10), ("V5", V5)], [("V10", V10), ("V5", V5), ("V0", V0)]
+    def start(source, target=8, rate=slow, tr=1, pr=1, deferred=0, mapping=None):
+        return ("start", source, target, rate[0], rate[1], tr, pr, deferred) + (
+            () if mapping is None else (mapping,))
+    def remap(mapping):
+        return ("remap", mapping)
     cases = [
         ("a fall after a loop", [loop, fall],
          {"A": {0: start(1), 3: start(2, rate=quick, tr=0, deferred=1)}}),
@@ -1667,16 +1682,57 @@ def deferred(code, symbols):
         ("two timers, one deferred start each", [loop, fall, square],
          {"A": {0: start(1), 3: start(2, rate=quick, deferred=1)},
           "D": {0: start(3, target=9), 2: start(2, target=9, tr=0, deferred=1)}}),
+        ("a deferred start through a mapping, in both banks", [loop, three],
+         {"A": {0: start(1, rate=quick, mapping=[1]),
+                4: start(2, rate=quick, deferred=1, mapping=[2]),
+                12: start(1, rate=quick, deferred=1, mapping=[1])}}, two_maps),
+        ("deferred starts through a mapping of a square, one row and three columns",
+         [loop, square, held, voice],
+         {"A": {0: start(1, target=10, mapping=[1]),
+                3: start(2, target=10, deferred=1, mapping=[2]),
+                10: start(3, target=10, deferred=1, mapping=[1]), 11: remap([1]),
+                16: start(1, target=10, deferred=1, mapping=[2])},
+          "B": {0: start(1, target=9, mapping=[1]),
+                3: start(4, target=17, deferred=1, mapping=[0, 0, 2])}}, two_maps),
+        ("a remap of a square while a start is pending, the frames at 200 Hz", [square, held],
+         {"A": {0: start(1, target=10, mapping=[2]),
+                2: start(2, target=10, deferred=1, mapping=[1]), 3: remap([1])}},
+         two_maps, 200),
+        ("a remap before the switch, a retune after it, a start that keeps the mapping",
+         [fall, loop],
+         {"A": {0: start(1, mapping=[1]), 2: start(2, deferred=1, mapping=[2]),
+                4: remap([3]), 15: ("retune", 200, 200, 0, 1),
+                18: start(2, mapping=[3])}}, three_maps),
+        ("remaps between the identity and a transformation while a start is pending",
+         [fall, loop],
+         {"A": {0: start(1, mapping=0), 2: start(2, deferred=1, mapping=[1]),
+                4: remap([2])},
+          "D": {0: start(1, target=9, mapping=[1]),
+                2: start(2, target=9, deferred=1, mapping=[2]), 4: remap(0),
+                18: remap(0)}}, two_maps),
+        ("a pending start replaced by one through a mapping", [fall, loop, three],
+         {"A": {0: start(1, mapping=[1]), 2: start(2, deferred=1, mapping=0),
+                3: start(3, deferred=1, mapping=[2])},
+          "D": {0: start(1, target=9, mapping=0),
+                2: start(2, target=9, deferred=1, mapping=[1]),
+                3: start(3, target=9, deferred=1, mapping=[2])}}, two_maps),
     ]
-    played = 0
-    for title, sources, timers in cases:
-        tune = effects_tune(title, 24, sources, timers)
-        at = built(re.sub(r"[^a-z]+", "-", title), tune)[0]
+    played = mapped = 0
+    for title, sources, timers, *through in cases:
+        tune = effects_tune(title, 24, sources, timers,
+                            transformations=through[0] if through else None)
+        if len(through) > 1:
+            tune["tunes"][0]["rate"] = through[1]
+        at, version = built(re.sub(r"[^a-z]+", "-", title), tune)
+        assert version == MAPPED or not through, \
+            "%s: ymxs-to-ymxr wrote version %d" % (title, version)
         ticked = []
-        frames, ticks = check(at, code, symbols, ticked=ticked)[:2]
+        frames, ticks = check(at, code, symbols, kit=bool(through), ticked=ticked)[:2]
         assert ticks, "%s: no tick" % title
         played += 1
-    return "deferred starts: %d tunes, every tick against the model" % played
+        mapped += bool(through)
+    return ("deferred starts: %d tunes, every tick against the model, and the %d that map"
+            " a value every frame against the reader's record" % (played, mapped))
 
 
 def tune_file(file):
@@ -1813,9 +1869,8 @@ SET_MAPPED = 6
 
 
 def mapped_tunes():
-    """The tunes that map a value, each (title, tune file, what init of
-    the player with the deferred start and the lookup in reports, the
-    lookup kinds and shapes it runs), written through YMXS's form of
+    """The tunes that map a value, each (title, tune file, the lookup kinds
+    and shapes it runs), written through YMXS's form of
     version 7 and ymxs-to-ymxr, some with columns set by hand (edited)
     for a row YMXS has no operation for, and some with a source in the
     form YMXS's writer leaves out (reformed).
@@ -1850,11 +1905,10 @@ def mapped_tunes():
     lookup kinds, every kind but the counted one of two columns with the
     last value first, on two effects, with sources that loop on five, the
     counted one of one column and the four marked ones of several
-    columns, and the seven that play once on one effect; four counted
+    columns, and the seven that play once on one effect; and four counted
     sources through 256 entries, each remapped in one row to another 256
-    (doc/performance.md, The cost of 34 columns); and a deferred start
-    through a mapping, which the player with the deferred start and the
-    lookup in reports -1 for."""
+    (doc/performance.md, The cost of 34 columns). deferred plays the tunes
+    that defer a start through a mapping."""
     if _MAPPED:
         return _MAPPED
     def volume(n):
@@ -2036,8 +2090,6 @@ def mapped_tunes():
          [("sample", sample), ("sample again", sample2)],
          {letter: {0: start(1, target, [1]), 8: remap([2]), 16: remap([1])}
           for letter, target in (("A", 0), ("B", 2), ("C", 4), ("D", 11))}, None, {"lc"}),
-        ("a deferred start through a mapping", [loop, fall], [("V15", V15), ("V5", V5)],
-         {"A": {0: start(1, 8, [1]), 4: start(2, 8, [2], deferred=1)}}, None, set()),
     ]
     for title, sources, transformations, timers, edits, kinds, *forms in cases:
         tune = effects_tune(title, 24, sources, timers, transformations=transformations)
@@ -2052,7 +2104,7 @@ def mapped_tunes():
                 file = reformed(file, forms[0])
             with open(at, "wb") as f:
                 f.write(file)
-        _MAPPED.append((title, at, -1 if not kinds else 0, kinds))
+        _MAPPED.append((title, at, kinds))
     return _MAPPED
 
 
@@ -2068,22 +2120,18 @@ def mapped(code, symbols):
     tunes = mapped_tunes()
     if "ymxr_look" not in symbols:
         work = tempfile.mkdtemp()
-        for title, at, _, _ in tunes:
+        for title, at, _ in tunes:
             with open(at, "rb") as f:
                 bound = bind(f.read(), work)
             assert Machine(code, symbols, bound).call("init", a0=FILE, a1=WORK + 0x100) \
                 & 0xFFFFFFFF == 0xFFFFFFFF, "%s: init of a player without the lookup took it" % title
         tunes = tunes[:1]
-    played, reported = 0, 0
+    played = 0
     inner = {"page": 0, "window": 0, "square": 0}
-    for title, at, init, kinds in tunes:
+    for title, at, kinds in tunes:
         ticked = []
         RAN.clear()
         result = check(at, code, symbols, kit=True, perf=PERF, ticked=ticked)
-        if init:
-            assert result[0] == 0, "%s: the tune played" % title
-            reported += 1
-            continue
         assert ticked, "%s: no tick" % title
         assert kinds <= RAN, "%s: a source ran through a transformation in %s, and in none of %s" % (
             title, sorted(RAN), sorted(kinds - RAN))
@@ -2098,9 +2146,8 @@ def mapped(code, symbols):
     assert all(inner.values()), "a tick fell inside the boundaries of the lookup %s times" % inner
     return ("tunes that map a value: %d tunes, every tick against the model and every"
             " frame against the reader's record, a tick inside a remap's page switch at %d"
-            " rows, in a start's window at %d and between a square's mask and level at %d,"
-            " and %d that defers a start, for which init reports -1" % (
-                played, inner["page"], inner["window"], inner["square"], reported))
+            " rows, in a start's window at %d and between a square's mask and level at %d"
+            % (played, inner["page"], inner["window"], inner["square"]))
 
 
 def deferred_sizes():
@@ -2761,15 +2808,6 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             "init of a player without the switch a tune of effects %s needs took it" % (
                 format(tune.effects, "06b"))
         code, symbols = build(switched(DEFINES, defer or have[0], lookup or have[1]))
-    if defer and lookup:
-        # The player with the deferred start and the lookup in reports -1
-        # for a tune that defers a start and maps a value (68k/YMXR.S,
-        # YMXR_init): a mapped deferred start is left to a later version of
-        # the player.
-        assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
-            & 0xFFFFFFFF == 0xFFFFFFFF, \
-            "init took a tune that defers a start and maps a value"
-        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0), [], 0), [], None
     m = Machine(code, symbols, bound)
     if cycles:
         # The image is the bound tune's last part, or the last before the
@@ -3366,9 +3404,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                          % (m.groups(), tuple(str(w) for w in want)))
 
     played, widths = [], set()
-    for title, at, init, kinds in mapped_tunes():
-        if init:
-            continue
+    for title, at, kinds in mapped_tunes():
         result = check(at, code, symbols, CyclesOn(cycles_of))
         with open(at, "rb") as f:
             bound = bind(f.read(), None)
@@ -5073,10 +5109,9 @@ def patched_code_follows_the_subtune(defines, tunes):
     The tool selects the core with the deferred start in for a set of
     which a subtune defers a start, and the one with the lookup in for a
     set of which a subtune maps a value (BINARIES.md 2.1); a set of a run
-    with -defer or -map opens with such a tune (opening). A subtune that
-    does both is left out, since the core with both reports -1 for it
-    (68k/YMXR.S, YMXR_init), and so is a subtune at a rate other than the
-    first's, since an SNDH file records one rate (BINARIES.md 3.3).
+    with -defer or -map opens with such a tune (opening). A subtune at a
+    rate other than the first's is left out, since an SNDH file records one
+    rate (BINARIES.md 3.3).
     """
     work = tempfile.mkdtemp()
     first = opening(defines)
@@ -5091,7 +5126,7 @@ def patched_code_follows_the_subtune(defines, tunes):
         except AnotherFormat:
             continue
         bound = bind(file, work)
-        if bound is None or bound[8] & 0x30 == 0x30:
+        if bound is None:
             continue
         rate = rate or file[6:8]
         if file[6:8] != rate:
@@ -5278,14 +5313,6 @@ def main():
                 "%s: the binder bound a tune of another version" % os.path.basename(one)
             print("%-45s the binder and the reader reject it"
                   % os.path.basename(one))
-        # Init of a core with the deferred start and the lookup reports -1
-        # for a tune whose effects byte sets bits 4 and 5 (BINARIES.md 2.1),
-        # so the run leaves such a tune out with a line.
-        both = [one for one in tunes if open(one, "rb").read(9)[8] & 0x30 == 0x30]
-        tunes = [one for one in tunes if one not in both]
-        for one in both:
-            print("%-45s defers a start and maps a value, left out: init reports -1 for it"
-                  % os.path.basename(one))
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():
@@ -5368,7 +5395,7 @@ def main():
             # the fixtures after a mapped tune of each lookup kind, on the
             # core with the lookup in
             print("    %s" % patched_code_follows_the_subtune(
-                defines, [at for _, at, _, kinds in lookup if kinds][:SET_MAPPED] + tunes))
+                defines, [at for _, at, kinds in lookup][:SET_MAPPED] + tunes))
         for name, run in (("unplaced", lambda: unplaced(code, symbols)),
                           ("deferred", lambda: deferred(*deferring(defines))),
                           ("mapped", lambda: mapped(code, symbols)),
