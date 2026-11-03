@@ -123,9 +123,10 @@ Go tree read. Note: they change in that repository.
   abi.md 4). R3.6 leaves what a row sets to the writer, and the frame's
   cost with it.
 - **R4.5** A play call costs at most 6,656 cycles, 13 scanlines of 512,
-  the ticks counted apart; performance.md records the costliest call of
-  each tune. Note: a demo budgets for the worst frame; R4.4 bounds the
-  average.
+  with the ticks and the routines of a start or a remap through a
+  transformation counted apart (performance.md, A remap at the frame);
+  performance.md records the costliest call of each tune. Note: a demo
+  budgets for the worst frame; R4.4 bounds the average.
 - **R4.6** A player keeps every value it requires of a row it has read:
   the kept value of an effect is its target, its select and its count,
   and in version 10 its mapping (SPEC.md 1.10.3). R3.6 leaves an unset

@@ -89,6 +89,12 @@ jobs:
       # fixtures reads them back.
       - name: performance.md's absolute build over the whole set
         run: python3 68k/test/emu/test_ymxr.py -cycles -abs
+      # The player with the lookup in has the sections on a tick through a
+      # transformation, a remap at the frame and the cost of 34 columns. A
+      # run of -cycles -map over the fixtures reads them back against the
+      # tunes that map a value and the tunes of version 9 the rig writes.
+      - name: performance.md's lookup over the whole set
+        run: python3 68k/test/emu/test_ymxr.py -cycles -map
       # -stub and -hatari play the tunes on a real MFP, under Hatari. Its
       # version is pinned, built from its tag and kept between runs: the rig
       # reads Hatari's trace, whose lines 2.4.1, the version Ubuntu ships,
