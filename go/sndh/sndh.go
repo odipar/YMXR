@@ -73,9 +73,9 @@ const corePcrel = 4
 // byte sets bit 4 requires (SPEC.md 3.3).
 const coreDefer = 8
 
-// coreMap is the core's flag bit 4: the lookup assembled in (the player's
-// YMXR_MAP=1), which a tune whose effects byte sets bit 5 requires
-// (SPEC.md 1.10, 3.3). The core reads bound tunes to version 10.
+// coreMap is core flag bit 4, transformation support (YMXR_MAP=1).
+// Effects byte bit 5 requires this core, which reads bound versions 7
+// to 10 (SPEC.md 1.10, 3.3).
 const coreMap = 16
 
 // pcrelReach is the bytes from the core's first byte plus its field at 26
@@ -150,13 +150,10 @@ type Options struct {
 	Asked    Asked
 }
 
-// Of is the file, from the tune files as subtunes 1 up, around the core
-// the options' three switches and the tunes select: the raster monitor in
-// where they ask to read the run, the lean tick where the options select
-// it, ticks that read a row through the program counter where they select
-// that, the core of any two or three where they select them, and the plain
-// core where none. The deferred start is in the core where a subtune
-// defers a start, and the lookup where a subtune maps a value.
+// Of builds an SNDH file from tune files in subtune order. Options
+// select raster monitoring, lean ticks and source addressing. Any
+// subtune with deferred starts enables that support; any subtune using
+// a transformation enables lookups.
 func Of(tuneFiles [][]byte, options Options) ([]byte, error) {
 	return around(nil, tuneFiles, options)
 }
@@ -275,12 +272,11 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	return Combine(core, set, tags, workspace)
 }
 
-// TunesEnd is where the last bound tune of a file on this core ends,
-// counted from the core's first byte plus its field at 26 (BINARIES.md
-// 2.1, 3.1): a displacement is read against the handlers, which begin
-// there, so the bytes of the core from there are the margin it spends.
-// The field is 0 in a core without the lookup, whose count is from its
-// first byte.
+// TunesEnd returns the last bound tune's end relative to the first
+// handler, at the core's field 26 (BINARIES.md 2.1, 3.1).
+// Program-counter displacements are measured from there. Cores without
+// lookups have field 26 set to 0, so their reach is measured from the
+// core's first byte.
 func TunesEnd(core []byte, set Set, tags []byte) int {
 	at := even(len(core)) + 2 + 4*len(set.Tunes)
 	end := at
@@ -459,17 +455,13 @@ func seconds(frames, rate int) int {
 	return int(s)
 }
 
-// Combine is the file: the entry triple, the tag block padded even, the
-// core with its offsets patched, the subtune table, the bound tunes each
-// on an even address, and that many zero bytes of workspace. Each entry is
-// a bra.w to the same entry of the core's triple, so all three
-// displacements are the header's bytes less 2.
+// Combine writes entries, tags, patched core, subtune table, bound
+// tunes and workspace. Each entry branches to the corresponding core
+// entry. Bound tunes start at even addresses.
 //
-// The bound tunes are behind the subtune table, the images of the set
-// behind them, and the transformation blocks of the subtunes of version
-// 10 behind those. Every bound tune's ImageAt is patched to reach the image
-// with its table in it, and the BoundTransformationsAt of each of version
-// 10 to reach its block, from its first byte.
+// Shared images follow the tunes; version 10 transformation blocks
+// follow the images. Patch each tune's ImageAt and
+// BoundTransformationsAt relative to that tune (doc/BINARIES.md 3.1).
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	tunes := set.Tunes
 	header := even(12 + len(tags))
@@ -498,9 +490,10 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 		imageAt[i] = at
 		at += len(set.Images[i])
 	}
-	// Then the transformation blocks, each on a long, in subtune order: a
-	// frame reads them and a tick does not, so they are past the reach the
-	// subtunes are within (BINARIES.md 3.1).
+	// Transformation blocks follow the images, aligned to four bytes, in
+	// subtune order. Frames read these tables; ticks use prepared lookup
+	// pages, so the blocks need not fit the source-read displacement
+	// (BINARIES.md 3.1).
 	blockAt := make([]int, n)
 	for i := 0; i < n && i < len(set.Blocks); i++ {
 		if set.Blocks[i] != nil {

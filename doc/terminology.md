@@ -229,12 +229,10 @@ sinus SID, a fourth kind of the dumps, with a note (tools.md). The format
 encodes a source as a table (SPEC.md 2.2), and the kind is outside the
 format: a player reads the table alone.
 
-**5.6 Fade.** A **fade** moves a voice's volume through transformations, a
-remap a frame (YMXS, SPEC.md 3.6.5). A start runs a source on `setVoiceA`
-through the identity, the identity and `V15`, and on each frame after it a
-remap sets the effect's mapping column to the number of the next of `V14`
-to `V0`, `Vn` the transformation whose entry k is k times n divided by 15,
-for the 16 keys of a volume, 0 to 15. The volume of each row of the source
-is a key, and the volume written is the entry of that key (SPEC.md 1.10,
-2.1.5, 3.4), so a writer writes a tune with a fade as version 10 (SPEC.md
-3.3.5).
+**5.6 Fade.** A fade changes sample volume through successive lookup
+selections, without restarting the source. For keys 0 to 15, define
+`Vn[k] = floor(k * n / 15)`. On `setVoiceA`, start through
+`[identity, identity, V15]`, then remap through lower levels down to
+`V0`. Tone values remain unchanged. On `setR8`, the mapping has one part.
+Transformations are optional; identity writes source values unchanged
+([writing.md](writing.md) 5.7; SPEC.md 1.10, 2.1.5).

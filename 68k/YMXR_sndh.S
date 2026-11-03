@@ -1,54 +1,38 @@
-; YMXR_sndh.S - the SNDH core: the player under SNDH's three entries, with
-; what a host needs of the machine kept and put back. A tool combines it
-; with one bound tune or more into an SNDH file (doc/BINARIES.md) and
-; patches the two offsets in the descriptor; the core moves no tune itself.
+; YMXR_sndh.S - SNDH host for the player (doc/BINARIES.md).
+; Tools append bound tunes and patch the descriptor's table and workspace
+; offsets. Entries preserve all registers:
 ;
-;   +0   init  d0.w the subtune, 1 up; one out of range plays the first
+;   +0   init  d0.w=subtune, numbered from 1; out of range selects 1
 ;   +4   exit
-;   +8   play  one row
+;   +8   play  one tune row
 ;
-; Each keeps every register. Init keeps the four timers' vectors, control
-; and interrupt bits as it finds them, and the vector at $60; exit puts
-; back that vector and the state of the timers the tune claimed. The
-; player claims a timer only for an effect the tune runs, and the bound
-; tune's effects byte says which. A timer the tune does not run is left
-; alone, so what a host runs on it runs on through the tune. No data
-; register is kept: it reads as the live count and writes as the reload,
-; so a count written back sets a rate no one asked for, and a host that
-; needs a timer's rate back writes the value it knows.
+; Init saves timer vectors, control and interrupt bits, and vector $60.
+; Exit restores vector $60 and the timers claimed by this tune. Timers
+; outside the tune remain available to the host. Data registers read the
+; live count rather than the reload value, so a host restores reloads
+; separately when required.
 ;
-; The descriptor, from the core's first byte:
+; Descriptor offsets from the core's first byte:
 ;
 ;   +12  'YMXS'
-;   +16  the descriptor's version, 1
-;   +18  the bound tune's version this core reads
-;   +20  the workspace's bytes before the state block, YMXR_FIXED
-;   +22  flags, a word: bit 0 where the raster monitor is assembled in
-;        (the player's YMXR_PERF, doc/performance.md), bit 1 where a tick
-;        neither drops the interrupt level nor writes an end of
-;        interrupt (YMXR_NEST=0 and YMXR_AEOI=1), which a host uses only
-;        where no MFP interrupt of the host nests and the vector register
-;        is the player's, bit 2 where a tick reads its row through a
-;        displacement from the instruction that reads it (YMXR_PCREL=1),
-;        which requires the tunes within 32,767 bytes of the core, and
-;        bit 3 where the deferred start is assembled in (YMXR_DEFER=1),
-;        which a tune whose effects byte sets bit 4 requires, and bit 4
-;        where the lookup is assembled in (YMXR_MAP=1), which a tune whose
-;        effects byte sets bit 5 requires
-;   +24  where the state byte is, a word: bit 0 set while a tune plays,
-;        bit 1 once it has played its last row and does not repeat
-;   +26  where the reach is measured from: in a core with the lookup,
-;        the first handler's offset, every byte from it on a handler or
-;        an installer; 0 in a core without it, measured from its first
-;        byte
-;   +28  the subtune table, a long: a word count, then a long an entry,
-;        each the bound tune's offset. Patched by the tool.
-;   +32  the workspace, a long. Patched by the tool. The player requires
-;        its workspace on a long and an SNDH host loads the file on an
-;        even address, so the core rounds the address up to a long, and
-;        the tool allows the workspace two bytes more than the state needs.
+;   +16  descriptor version, 1
+;   +18  highest supported bound version: 9, or 10 with lookup support
+;   +20  fixed workspace bytes before DTX state, YMXR_FIXED
+;   +22  flags, a word:
+;          bit 0  raster monitor, YMXR_PERF=1
+;          bit 1  lean ticks, YMXR_NEST=0 and YMXR_AEOI=1
+;          bit 2  program-counter source reads, YMXR_PCREL=1
+;          bit 3  deferred starts, YMXR_DEFER=1; required by effects bit 4
+;          bit 4  optional lookups, YMXR_MAP=1; required by effects bit 5
+;   +24  state-byte offset: bit 0 while playing, bit 1 after a tune ends
+;   +26  source-reach origin: first handler with lookup support, else 0
+;   +28  patched subtune-table offset: word count, then one long per tune
+;   +32  patched workspace offset
 ;
-; Every offset counts from the core's first byte.
+; Lean ticks require host MFP handlers without nesting and player control
+; of the vector register. Program-counter reads require sources within
+; signed-word reach of the origin at +26. Init aligns workspace to four
+; bytes; tools reserve two extra bytes for an SNDH loaded even.
 
 sndh_core:
                 bra.w   sndh_init
@@ -59,10 +43,8 @@ sndh_core:
                 dc.w    YMXR_VERSION
                 dc.w    YMXR_FIXED
                 dc.w    YMXR_PERF|(YMXR_AEOI<<1)|(YMXR_PCREL<<2)|(YMXR_DEFER<<3)|(YMXR_MAP<<4)
-                                        ; the flags: the monitor, the tick
-                                        ; a host claims the MFP for, the row
-                                        ; read through the program counter,
-                                        ; the deferred start and the lookup
+                                        ; flags: monitor, lean, PC-relative,
+                                        ; deferred start, optional lookup
                 dc.w    sndh_state-sndh_core
                 dc.w    (ymxr_tick0-sndh_core)*YMXR_MAP ; where the reach is
                                         ; measured from

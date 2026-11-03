@@ -54,11 +54,9 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        absolute address (68k/YMXR.S): the
                                        same model, and it joins the switches
                                        above
-       test_ymxr.py -map [tunes]       the player built with YMXR_MAP=1, whose
-                                       ticks write a value through a
-                                       transformation (SPEC.md 1.10): the
-                                       same model, and it joins the switches
-                                       above
+       test_ymxr.py -map [tunes]       optional lookup support, YMXR_MAP=1,
+                                       checked against the same model;
+                                       combines with the switches above
        test_ymxr.py -xpatch            the real-ST program of 68k/test/st
                                        under Hatari: each case's line of
                                        the XPATCH.TXT it writes against
@@ -153,8 +151,9 @@ COUNTED = 1 << 31
 
 
 def bound_versions(symbols):
-    """The bound tune versions a core reads (BINARIES.md 1.5): 7 to 10 with
-    the lookup in, and 7 to 9 without it (68k/YMXR.S, YMXR_MAP)."""
+    """Supported bound versions: 7 to 10 with lookup support, 7 to 9
+    without it (BINARIES.md 1.5; YMXR_MAP).
+    """
     return (7, 8, 9, 10) if "ymxr_look" in symbols else (7, 8, 9)
 
 
@@ -170,13 +169,11 @@ PERF_BAR = 0x0770
 # assumes one, the workspace on a long, a stack, and a sentinel a call
 # returns to.
 CODE = 0x1000
-# A tick reads its row through a signed word displacement from the
-# handler, so the tune is within 32,767 bytes of the handlers, as an SNDH
-# file and a program lay it out (doc/BINARIES.md 2 and 3): past the build
-# a machine runs, where each Machine places it (placed). A run plays on
-# builds with and without the deferred start and the lookup, and an
-# address past the largest build puts the largest fixture past the reach
-# of the smallest.
+# Place each tune within signed-word reach of the assembled handlers, as
+# SNDH and PRG layouts require (doc/BINARIES.md 2, 3). Builds differ
+# with deferred and lookup support, so placed computes an address per
+# Machine; using one address for all builds can exceed a smaller core's
+# reach.
 FILE = None
 
 
@@ -255,15 +252,12 @@ LEAN_ROW = {"on": "a row written, the place stepped",
 DEFINED = {"YMXR_PERF": 1 if PERF else 0,
            "YMXR_NEST": 0 if LEAN else 1, "YMXR_AEOI": 1 if LEAN else 0}
 
-# -map runs every tune on the player with the lookup in (YMXR_MAP=1);
-# without it, check plays a tune whose effects byte sets bit 5 on that
-# player and every other tune on the player without it.
+# -map enables YMXR_MAP=1 for every tune. Otherwise check enables it
+# only for tunes with effects bit 5 set.
 MAP = "-map" in sys.argv
 
-# The switches main assembles the player with, and every build of a run,
-# by its source and its define set: a tune that defers a start plays on
-# the player with the deferred start in, and one that maps a value on the
-# player with the lookup in (check).
+# Build switches and assembled variants for this run. Deferred tunes
+# require YMXR_DEFER; version 10 tunes require YMXR_MAP (check).
 DEFINES = []
 DEFER_ON = "-dYMXR_DEFER=1"
 MAP_ON = "-dYMXR_MAP=1"
@@ -280,8 +274,9 @@ def build(defines, source="YMXR.S"):
 
 
 def switched(defines, defer=False, lookup=False):
-    """A define set with the deferred start in where defer is set and the
-    lookup in where lookup is set, each kept in where the set has it."""
+    """Add requested deferred-start and lookup defines, preserving switches
+    already present.
+    """
     out = [d for d in defines if d not in (DEFER_ON, MAP_ON)]
     if defer or DEFER_ON in defines:
         out.append(DEFER_ON)
@@ -297,8 +292,9 @@ def deferring(defines):
 
 
 def needs(effects):
-    """The switches a tune of this effects byte plays on (BINARIES.md 2.1):
-    the deferred start for bit 4, the lookup for bit 5."""
+    """Required switches from the effects byte: bit 4 for deferred starts,
+    bit 5 for lookups (BINARIES.md 2.1).
+    """
     return bool(effects & 0x10), bool(effects & 0x20)
 
 
@@ -357,10 +353,10 @@ TARGETS.update({14: [(0, 0), (1, 1)], 15: [(2, 0), (3, 1)], 16: [(4, 0), (5, 1)]
                 20: [(11, 0), (12, 1)], 21: [(11, 0), (12, 1), (13, 2)],
                 22: [(8, 1), (6, 0)], 23: [(9, 1), (6, 0)], 24: [(10, 1), (6, 0)]})
 
-# The column of a target's last value, the one value a mapping of version
-# 10 maps (SPEC.md 1.10.1): the register of setR0 to setR13, the coarse
-# nibble of setToneX, the volume of setVoiceX and setNoiseX, the high byte
-# of setEnvelope and the shape of setBuzzer (2.1).
+# Source column eligible for the optional lookup: the target's last
+# value. Sole value for setRn, the coarse nibble for setToneX, volume for
+# voice/noise, high envelope byte for setEnvelope, or shape for
+# setBuzzer (SPEC.md 1.10.1, 2.1).
 LAST_VALUE = {n: 0 for n in range(14)}
 LAST_VALUE.update({14: 1, 15: 1, 16: 1, 17: 2, 18: 2, 19: 2, 20: 1, 21: 2,
                    22: 1, 23: 1, 24: 1})
@@ -531,11 +527,11 @@ class Tune:
         # separate offset
         # (BINARIES.md 2, DTX abi.md 1).
         self.table_at = long_at(file, 20)
-        # Version 10 has the transformation block at the signed long at 24,
-        # after the image, and the source index at 28 (BINARIES.md 1.2): a
-        # word T, then T longs, each transformation's offset from the
-        # block, and at each a word E and E entries (SPEC.md 3.4.2).
-        # transformations[n - 1] is the entries of transformation n.
+        # Version 10 points to its transformation block with a signed
+        # long at 24; its source index starts at 28 (BINARIES.md 1.2).
+        # The block has word T, T relative offsets, then word E and E
+        # entries per table. Transformation n is transformations[n - 1]
+        # (SPEC.md 3.4.2).
         self.transformations = []
         index_at, end = 24, len(file)
         if self.version == MAPPED:
@@ -551,8 +547,8 @@ class Tune:
         entries = [long_at(file, index_at + 4 * i) for i in range(count)]
         index = [at & ~COUNTED for at in entries]
         self.counted = [False] + [bool(at & COUNTED) for at in entries]
-        # The image is after the sources' tables and runs to the end of
-        # the bound tune, or to the transformation block (doc/BINARIES.md
+        # The reader image follows sources and ends at the optional
+        # transformation block, or at the bound file's end (BINARIES.md
         # 1.2).
         self.image_end = end
         image = file[self.image_at:end]
@@ -599,13 +595,10 @@ class Model:
         # the row the frame plays, read by begin and used by the steps
         # and the writes below
         self.playing = None
-        # target is the one the player keeps after step 1, and using the
-        # target the running effect writes: the one kept at its start
-        # pending is the deferred start armed on the timer, None where none
-        # is (SPEC.md 4.8)
-        # mapping is the kept mapping, and run the mapping the running
-        # source writes through, each 0 for the identity and n for
-        # transformation n (SPEC.md 1.10)
+        # target is kept for later starts; using is the running target.
+        # pending is an armed deferred start or None. mapping is kept
+        # for later starts; run is used by current ticks. Mapping 0 is
+        # identity; n selects transformation n (SPEC.md 1.10, 4.8).
         self.fx = [dict(target=0, using=0, source=0, select=0, count=0, place=None,
                         running=False, pending=None, mapping=0, run=0)
                    for _ in range(4)]
@@ -632,8 +625,8 @@ class Model:
         r = self.playing
         t = EFFECT + 4 * i
         fx = self.fx[i]
-        # the mapping column of a table of version 10, 34 columns; a table
-        # of 30 leaves every effect through the identity (SPEC.md 1.10.1)
+        # Version 10 has 34 columns, including mapping columns.
+        # Thirty-column tables use identity throughout (SPEC.md 1.10.1).
         m = r[C + i] if len(r) > C else 0
         if r[t] & 0x80:
             fx["target"] = r[t] & 0x7F
@@ -645,18 +638,17 @@ class Model:
         fx["reset_place"] = False
         fx["set"] = bool((r[t] | r[t + 1] | r[t + 2] | m) & 0x80) or r[t + 3] != 0
         if not r[t + 1] & 0x80 and m & 0x80:
-            # A remap: the effect keeps its source, its place and its rate,
-            # and on a timer running a source before the row, its reset
-            # included, that source writes through the mapping from its
-            # next tick; on a stopped timer it is the mapping the next start
-            # keeps. A start pending keeps the mapping of its row (1.10.2,
+            # Remap changes kept and running mappings, preserving
+            # source, place and rate. Use timer state before any reset
+            # in this row. A stopped timer remains stopped; a pending
+            # start retains its captured mapping (SPEC.md 1.10.2,
             # 1.10.3).
             fx["mapping"] = m & 0x7F
             if fx["running"]:
                 fx["run"] = fx["mapping"]
         elif r[t + 1] & 0x7F and m & 0x80:
-            # a start sets the kept mapping; a stop leaves the mapping
-            # column unread (1.10.3)
+            # A start can replace kept mapping. A stop ignores its
+            # mapping column (SPEC.md 1.10.3).
             fx["mapping"] = m & 0x7F
         # What the reader records of the row (SPEC.md 7.3): the source the
         # last row that set the column named, the kept select and count,
@@ -708,8 +700,8 @@ class Model:
                 else:
                     fx["place"] %= R
                 fx["using"] = fx["target"]
-                # through the mapping column, or the kept mapping where the
-                # row leaves it unset (1.10.2)
+                # Use the explicit mapping or reuse kept when its column
+                # is unset (SPEC.md 1.10.2).
                 fx["run"] = fx["mapping"]
                 # The effect runs from here: a stopped timer starts on the
                 # select the row writes, bit 6 set or clear, and select 0 is
@@ -784,10 +776,10 @@ class Model:
         if last:
             pending = fx["pending"]
             if pending:
-                # the source ends at its last row, a source that repeats
-                # included, and the tick performs the pending start: the
-                # next tick reads its source at its place, through the
-                # kept mapping after its row (SPEC.md 4.8, 1.10.3)
+                # At the last source row, install a pending start even
+                # for a repeating source. The next tick reads the new
+                # source through its captured mapping; kept mapping
+                # remains unchanged (SPEC.md 4.8, 1.10.3).
                 fx.update(source=pending["source"], using=pending["using"],
                           place=pending["place"], select=pending["select"],
                           count=pending["count"], running=True, pending=None,
@@ -812,15 +804,12 @@ class Model:
                 for register, c in TARGETS[fx["using"]]]
 
     def through(self, i, c, byte):
-        """The byte a tick of effect i writes for `byte` of column c of its
-        source: the byte where the column is not the last value of the
-        target or the source runs through the identity, and otherwise the
-        entry of the transformation the key reaches (SPEC.md 1.10.1; YMXS,
-        SPEC.md 3.6.4). The key of a marked column, the marker's, is its
-        bits 6 to 0 and the marker stays in bit 7 (3.2.1); a row of a
-        counted source on setR7 is its key with bits 7 and 6 set, and the
-        tick writes the entry with both set (rule 2(f), 1.4.2); every other
-        row is its key whole."""
+        """Apply the running mapping to source byte in column c. Identity
+        and earlier target columns preserve the byte. For the target's
+        last value, select an entry by key, preserving marker bit 7 or
+        setR7 port bits 7 and 6 as applicable (SPEC.md 2.1.5). Other
+        columns use the full byte key.
+        """
         fx = self.fx[i]
         if not fx["run"] or c != LAST_VALUE[fx["using"]]:
             return byte
@@ -839,10 +828,10 @@ class Model:
         return entries[key] | keep
 
     def fill(self, i):
-        """How the page effect i's source reads through its mapping is
-        filled, as through reads a key (68k/YMXR.S, ymxr_fill): 'ports' for
-        a counted source on setR7, 'mirror' for a last value in the
-        marker's column, 'plain' for every other."""
+        """Lookup page encoding for effect i: ports for counted setR7,
+        mirror for a mapped marker column, plain otherwise (68k/YMXR.S,
+        ymxr_fill).
+        """
         fx = self.fx[i]
         counted = self.tune.counted[fx["source"]]
         if counted and fx["using"] == 7:
@@ -894,9 +883,10 @@ class Model:
         return len(columns) == 1 and R == 1 and RR == 0
 
     def value(self, i, row=None):
-        """The row a handler with its place as an immediate is at, which
-        is its place, or row `row`, through the mapping. Both such
-        handlers run a source of one column."""
+        """Value at the handler's immediate place, or explicit row, through
+        its mapping. Square and one-row handlers both use one-column
+        sources.
+        """
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return self.through(i, 0, columns[0][fx["place"] if row is None else row])
@@ -930,23 +920,17 @@ class Model:
 
 
 class Machine:
-    """The player on an emulated 68000, with the chip writes and the MFP
-    writes of every call kept.
+    """Emulated 68000 with chip and MFP writes recorded per call.
 
-    Unicorn translates a run of instructions into a block before it runs
-    any of them, so a write into the operand of the next instruction of
-    the block is read stale by that instruction: a lookup instance's tick
-    writes the key into the low byte of the displacement of the page read
-    after it (68k/YMXR.S, LKEY), and the read would index the page with
-    the key of the tick before. A write to a key byte is marked here; the
-    hook of the next instruction drops the translations at that address
-    and stops, and the run starts again at it, translated afresh. The
-    cycle counter attached to the machine (counter) settles that
-    instruction once.
+    A lookup tick modifies the next instruction's operand. Unicorn
+    translates blocks in advance, so cached code would use the previous
+    key. Mark key-byte writes, invalidate that instruction's translation
+    and restart at its address. The cycle counter records it once
+    (68k/YMXR.S, LKEY).
 
-    The tune is loaded at FILE, which each machine places past its code
-    (placed), so a model and a call that read FILE after the machine is
-    made read the address of that machine's tune."""
+    Load the bound tune at this machine's FILE address, computed beyond
+    its code by placed. Callers read FILE after construction.
+    """
 
     def __init__(self, code, symbols, tune_bytes):
         global FILE
@@ -1000,9 +984,9 @@ class Machine:
         mu.hook_add(UC_HOOK_MEM_READ, self._beam, begin=VIDEO, end=VIDEO + 1)
 
     def image(self, at, tune_bytes):
-        """The image of the bound tune loaded at `at`, where init writes:
-        to the end of the bound tune, or to the transformation block of
-        version 10, which is after it (BINARIES.md 1.2)."""
+        """Reader image in the bound tune at at, ending at the optional
+        version 10 transformation block or file end (BINARIES.md 1.2).
+        """
         if tune_bytes[:4] == b"YMXB":
             image_at = struct.unpack(">i", tune_bytes[16:20])[0]
             end = len(tune_bytes)
@@ -1342,21 +1326,17 @@ def aims(tune, r, i):
 
 
 def reaches(model, i, kind):
-    """Whether effect i's step reaches the boundary `kind` of inside on
-    the row the next frame plays: the page switch, a remap of a running
-    source that steps a place from one transformation to another; the
-    window of a start through a transformation, a start at the frame of a
-    source that steps a place; and a square's level, a remap of a running
-    square. Each with the timer's reset clear, so the timer runs there and
-    a tick can be due. The head and the end of the steps are reached on
-    every row. The two of a start through ymxr_widestart, where its window
-    at level 7 opens and where it closes, are reached on a row that starts
-    through the identity a source of several columns or a counted source,
-    of more than one row, with the timer running on, and leaves the source
-    column of each effect before it unset, so the frame reaches the
-    routine first in that effect's step. The two of the general handler's
-    start are reached on a row that starts through the identity, at the
-    frame, a source the general handler runs, with the timer running on."""
+    """Whether the next frame reaches boundary kind from inside. Lookup
+    cases are a page switch between transformations, a lookup-start
+    window and a square-level remap. Each requires a running timer
+    without reset. Effect heads and the end of effect processing occur
+    on every row.
+
+    Identity starts also expose windows in ymxr_widestart for
+    multi-column or counted sources, and in the general handler start.
+    Earlier effects must leave their source columns unset so the
+    selected effect reaches the shared routine first.
+    """
     if kind is None:
         return True
     r = model.tune.rows[model.row]
@@ -1395,41 +1375,22 @@ def reaches(model, i, kind):
 
 
 def inside(code, symbols, bound, tune, workspace):
-    """A tick inside a frame (SPEC.md 4.2.1), against the model stepped
-    that far.
+    """Inject a tick at a frame boundary and compare with the model
+    (SPEC.md 4.2.1). Before an effect step, ticks use its previous
+    values; afterward they use the updated values. Continue playback
+    around the boundary so source places advance normally. Return
+    boundary kinds, with None for effect heads and the end of effect
+    processing.
 
-    A tick falls between any two operations of a frame, and reads the
-    effects stepped before it as the row leaves them and the ones after
-    it as they were (4.2). The boundaries are the head of each effect's
-    step, where 4.3 has yet to run for it, and the point after the last
-    step, where the register writes of 4.4 begin. A tick is fired at one
-    of them on a row that moves what the effect's tick writes, which is
-    where the two readings differ: before the effect's step the tick
-    writes the source and the target the effect was running, and after it
-    the source and the target the row leaves. The tune plays on around
-    the boundary, every tick the timers are due fired after the frame as
-    a run does, so the places move as they move in a run. Returns the
-    boundaries a tick was fired at, each its kind below, or None for a
-    head and the end of the steps.
+    Start windows in ymxr_widestart and the general handler cover place
+    reads and writes. A tick before the window advances the old place
+    before the start reads it. A tick due inside the window runs
+    afterward on the new source.
 
-    A start through ymxr_widestart, of a source of several columns or of a
-    counted source, opens a window at level 7 before it reads the place of
-    the source the timer runs, and two boundaries are read there: where the
-    window opens, where the tick writes what a tick at the head of the step
-    writes and the start reads the place that tick stepped (1.8.4); and
-    inside it, where a tick due is served at the window's end and writes
-    the new source at the place the start read. A start of a source the
-    general handler runs has the same two, in its window at the frame.
-
-    A tune that maps a value on the player with the lookup in has three
-    boundaries inside an effect's step besides (68k/YMXR.S): at the page
-    switch of a remap between two transformations, before its one write,
-    where the tick reads the mapping the effect ran through; and in the
-    window at level 7 where a start through a transformation writes its
-    lookup instance, and the one where a remap writes a square's level
-    after its mask. A tick due inside a window is served where the window
-    ends, so the rig runs the call on to there and fires it, and the tick
-    reads the effect as the row leaves it.
+    Lookup cases add the atomic page-byte switch, the lookup-start
+    window and the square-level remap window. Before a page switch, a
+    tick uses the previous mapping; ticks delayed by a level-7 window
+    use the updated effect.
     """
     if not tune.effects:
         return []
@@ -1570,16 +1531,16 @@ def unplaced(code, symbols):
 
 def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
                  transformations=None):
-    """A tune of YMXS's form, version 5, from a few operations: `timers`
-    maps a timer's letter to {row: operation}, an operation ("start",
-    source, target, prescaler, count, timerReset, placeReset, deferred),
-    ("retune", prescaler, count, timerReset, placeReset) or ("stop",), a
-    source numbered from 1 into `sources`, each (name, values, repeat).
+    """Build YMXS JSON from timer operations. Each timer maps row numbers
+    to start, retune or stop tuples; sources are numbered from 1 and
+    contain name, values and repeat position.
 
-    With `transformations`, each (name, entries), the form is version 7
-    (YMXS, json.md 6.7): a start has its mapping after deferred, 0 or a
-    list of parts, 0 where it has none, and ("remap", mapping) is a
-    remap."""
+    Without transformations, emit version 5. With (name, entries)
+    tables, emit version 7: starts append a mapping after deferred, and
+    ("remap", mapping) changes it. Mapping 0 is identity; a nonempty
+    mapping lists one part per target value, 0 for identity or a table
+    number (YMXS, json.md 6.7).
+    """
     keys = ("shape", "target", "source", "prescaler", "count", "timerReset",
             "placeReset", "deferred") + (("mapping",) if transformations else ())
 
@@ -1619,23 +1580,18 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
 
 
 def deferred(code, symbols):
-    """Deferred starts (SPEC.md 4.8), each played tick by tick against the
-    model: the source running ends at its last row, a source that repeats
-    included, the tick that reads it performs the pending start, and the
-    next tick reads the new source at its place. One tune a case: every
-    shape of handler hooked and armed, in both banks; a stop, a start, a
-    retune and a second deferred start before the switch; a deferred start
-    on a stopped timer; the place kept modulo R; and a timer whose control
-    register two timers share.
+    """Check deferred starts tick by tick (SPEC.md 4.8): the last row ends
+    even a repeating source, installs the pending start, and the next
+    tick reads the new source. Cover handler shapes in both banks,
+    cancellation/replacement, stopped timers, place modulo and shared
+    timer control.
 
-    The tunes that map a value play on the player with the lookup in, every
-    frame against the reader's record as well: a deferred start through a
-    mapping in both banks, of a square, of one row and of three columns,
-    each hooked on the handler of a source through a mapping; a remap of a
-    square while a start is pending; a remap before the switch, a retune
-    after it and a start that keeps the mapping of the remap (SPEC.md
-    1.10.3); remaps between the identity and a transformation while a start
-    is pending; and a pending start replaced by one through a mapping."""
+    With lookups, also compare frame records. Check captured mappings in
+    both banks for square, one-row and multi-column sources; remaps
+    while pending; later reuse of kept; identity/lookup transitions; and
+    replacement by another mapped start. Pending retains its mapping
+    while remaps change current ticks (SPEC.md 1.10.3).
+    """
     loop = ("loop of four", [15, 12, 9, 6], 0)
     fall = ("fall", list(range(15, -1, -1)), None)
     square = ("square", [15, 0], 0)
@@ -1736,9 +1692,10 @@ def deferred(code, symbols):
 
 
 def tune_file(file):
-    """A tune file's fields (SPEC.md 3.3): the version, the source count,
-    the DTX3 table's offset, the transformation index's offset in version
-    10, and the source index's offset."""
+    """Tune-file header fields: version, source count, DTX3 offset,
+    optional version 10 transformation-index offset and source-index
+    offset (SPEC.md 3.3).
+    """
     version = struct.unpack(">H", file[4:6])[0]
     return (version, file[9], long_at(file, 12),
             long_at(file, 16) if version == MAPPED else None,
@@ -1801,10 +1758,10 @@ def reformed(file, forms):
     return bytes(out)
 
 
-# The tunes that map no value whose frames the section on a remap at the
-# frame counts on the core with the lookup in against the core without it,
-# built once a run (v9_tunes); and the rows of its table, each the path the
-# tunes name a row's step by, the head of an effect first.
+# Version 9 fixtures used to measure frame overhead with lookup support
+# against the core without it (performance.md, A remap at the frame).
+# Build once per run. Each table row identifies a measured path,
+# starting with an effect's head.
 _V9 = []
 V9_PATHS = (("the head of each effect the tune runs, a frame", None),
             ("a start at row 0", "start"),
@@ -1859,56 +1816,36 @@ def v9_tunes():
 # The tunes that map a value (SPEC.md 1.10), built once a run (mapped_tunes).
 _MAPPED = []
 
-# The handlers a source ran through a transformation in, by name, since a
-# run or mapped emptied it: a lookup kind, "sq" or "one" (running).
+# Handler names used by mapped sources: lookup kind, square or one-row.
+# Preserve these after run or mapped clears the active field (running).
 RAN = set()
 
-# How many tunes that map a value open the set of the lookup's core
-# (patched_code_follows_the_subtune), the fixtures after them.
+# Number of lookup tunes before the ordinary fixtures in
+# patched_code_follows_the_subtune.
 SET_MAPPED = 6
 
 
 def mapped_tunes():
-    """The tunes that map a value, each (title, tune file, the lookup kinds
-    and shapes it runs), written through YMXS's form of
-    version 7 and ymxs-to-ymxr, some with columns set by hand (edited)
-    for a row YMXS has no operation for, and some with a source in the
-    form YMXS's writer leaves out (reformed).
+    """Lookup fixtures as (title, tune file, handler kinds). Encode YMXS
+    version 7 through ymxs-to-ymxr. edited adds raw-column cases;
+    reformed adds source encodings omitted by the writer.
 
-    One tune a case: a fade on setR8 through four transformations, the
-    identity and back; a fade of setVoiceA's volume; a square and a
-    source of one row, mapped and remapped; a source remapped from the
-    identity to a transformation, to another and back; a remap on an idle
-    timer and on a stopped one, each kept by a start whose mapping column
-    is unset; an 8-bit sample on setR10 through 256 entries, a counted
-    source; the coarse nibble of setToneA, the shape of setBuzzer, the
-    volume of setNoiseA and the high byte of setEnvelope; a table of 10
-    entries on setR9, below the 128 of a marked column; setR7 through a
-    transformation, whose keys have the ports' bits; a start through a
-    transformation on setToneA, and one on setVoiceA, then a row that sets
-    the target alone to setNoiseA or setBuzzer, a place's reset and a
-    remap; a counted source on setR7 remapped from the identity after a
-    row that sets the target alone; starts through a new mapping with
-    placeReset clear while the source before them ticks, of one column,
-    of a square and of several columns; a remap with timerReset, a remap
-    and a retune in one row, on a running timer, on a stopped one and on
-    a square; a place's reset on a square, a loop and a counted source
-    mapped on three effects; one transformation through the mirror of a
-    marked column and through the plain fill on one effect; remaps on
-    Timers C and D, which share a control register, each idle while the
-    other runs; a stop row with its mapping column set, which the stop
-    leaves unread (SPEC.md 1.10.3); a remap in the row that sets the
-    target column; a marked source on setEnvelope (SPEC.md 2.1.4), and
-    counted sources of two columns on setToneA and setNoiseA, each through
-    a transformation, remapped, its place reset, and remapped from the
-    identity; sources through a transformation that play once on seven
-    lookup kinds, every kind but the counted one of two columns with the
-    last value first, on two effects, with sources that loop on five, the
-    counted one of one column and the four marked ones of several
-    columns, and the seven that play once on one effect; and four counted
-    sources through 256 entries, each remapped in one row to another 256
-    (doc/performance.md, The cost of 34 columns). deferred plays the tunes
-    that defer a start through a mapping."""
+    Coverage includes sample-volume fades; square and one-row
+    immediates; identity/lookup transitions; remaps on idle and stopped
+    timers; byte keys; all eligible last-value columns; short tables;
+    and setR7 port bits.
+
+    State cases cover target-only rows, place preservation/reset, remap
+    with retune/reset, shared C/D control, ignored mapping on stop, and
+    remap with a target-column change. Encoding cases cover marker
+    mirrors, plain pages, legacy marked envelopes and counted
+    multi-column sources.
+
+    Playback reaches loop and stop paths across handler kinds and
+    effects, including four counted sources remapped through full
+    byte-key tables in one frame (performance.md, The cost of 34
+    columns). deferred checks mapped deferred starts separately.
+    """
     if _MAPPED:
         return _MAPPED
     def volume(n):
@@ -2109,14 +2046,12 @@ def mapped_tunes():
 
 
 def mapped(code, symbols):
-    """The tunes that map a value (mapped_tunes), each played tick by tick
-    against the model and frame by frame against the reader's record
-    (SPEC.md 7), on the player with the lookup in, through the lookup kinds
-    and shapes mapped_tunes lists for it. Over the tunes a tick falls
-    inside each of the three boundaries of the lookup (inside). On a player
-    without it, init reports -1 for each (BINARIES.md 1.5), and check plays
-    the first on the player with it; the run with -map plays the rest
-    there."""
+    """Play mapped_tunes tick by tick against the model and frame by frame
+    against the reader record (SPEC.md 7). Check all lookup shapes and
+    inject ticks at the three lookup boundaries (inside). Without lookup
+    support, require init to reject each fixture, then play the first on
+    a supported build; -map plays all of them (BINARIES.md 1.5).
+    """
     tunes = mapped_tunes()
     if "ymxr_look" not in symbols:
         work = tempfile.mkdtemp()
@@ -2183,10 +2118,9 @@ def deferred_sizes():
 
 
 def mapped_sizes():
-    """performance.md's sizes of the player with the lookup in (A deferred
-    start), against the eight builds of three switches: the row read
-    through the program counter or through an absolute address, the
-    deferred start in or out, and the lookup in or out."""
+    """Verify performance.md player sizes across combinations of source
+    addressing, deferred starts and lookup support (A deferred start).
+    """
     sizes = {(pcrel, defer, look): len(build(([] if pcrel else ["-dYMXR_PCREL=0"])
                                              + ([DEFER_ON] if defer else [])
                                              + ([MAP_ON] if look else []))[0])
@@ -2450,11 +2384,10 @@ def envelope(code, symbols):
 
 
 def outofreach(code, symbols):
-    """A tune past the reach of a displacement: init reports -1
-    (doc/BINARIES.md 5.5). Every other run loads its tune at FILE, which
-    the handlers reach; this one is loaded far up the mapped region, so
-    the rows of its sources are past the 32,767 bytes a signed word
-    reaches."""
+    """Load sources beyond signed-word reach and require init to report -1
+    (BINARIES.md 5.5). Other tests place sources within reach of their
+    assembled handlers.
+    """
     work = tempfile.mkdtemp()
     with open(os.path.join(ROOT, "doc", "conformance", "tunes",
                            "turrican.ymxr"), "rb") as f:
@@ -2513,11 +2446,11 @@ def wholebyte(code, symbols):
 
 
 def handler_at(m, symbols, name, i):
-    """Effect i's handler of the shape `name` ("tick", "sq", "one", "cnt",
-    "two", "three" or "env"), or its lookup instance of the kind `name`
-    ("lk", "lc", "lt", "ln", "lb", "lv", "le" or "lf"): the instance its
-    vector points into, bank 0 or bank 1 (68k/YMXR.S, BANK), and bank 0's
-    where the vector names neither."""
+    """Resolve effect i's handler by shape name: tick, sq, one, cnt, two,
+    three or env; lookup kinds use lk, lc, lt, ln, lb, lv, le or lf.
+    Select the bank containing the vector, or bank 0 when neither
+    matches (68k/YMXR.S, BANK).
+    """
     at = CODE + symbols["ymxr_%s%d" % (name, i)]
     if "ymxr_bank1" not in symbols:
         # a player without the deferred start has bank 0 alone
@@ -2527,13 +2460,13 @@ def handler_at(m, symbols, name, i):
 
 
 def lookup_kind(model, i):
-    """The lookup kind of the handler that steps effect i's source through
-    a transformation (68k/YMXR.S, ymxr_kinds): a counted source of one
-    column (lc); two columns with the last value written last, on
-    setToneX and setEnvelope, marked (lt) or counted (le), or first, on
-    setNoiseX, marked (ln) or counted (lf); three with it last (lb), on
-    setBuzzer, or in the middle (lv), on setVoiceX; and one column
-    otherwise (lk). Its target is the one it was started on."""
+    """Lookup kind for the running source, using the target captured at its
+    start (68k/YMXR.S, ymxr_kinds). One-column sources use lc when
+    counted, otherwise lk. Two-column tone/envelope sources map the last
+    write, lt marked or le counted; noise maps the first write, ln
+    marked or lf counted. Three-column buzzer maps the last write, lb;
+    voice maps the middle write, lv.
+    """
     using = model.fx[i]["using"]
     columns = model.wide(i)
     first = using in (22, 23, 24)
@@ -2547,17 +2480,13 @@ def lookup_kind(model, i):
 
 
 def lookup_regions(symbols):
-    """The routines a start through a transformation and a remap call on
-    the player with the lookup in (68k/YMXR.S), as the cycle counter's
-    regions: the page's choice (ymxr_page), the transformation's address
-    and an entry (ymxr_tab, ymxr_entry), the copy into a page
-    (ymxr_fill), the move between the identity's handler and a lookup
-    instance (ymxr_move) and the switch, the page byte's one write at
-    ymxr_rpage; and the place's reset of a source of several columns
-    (ymxr_widereset), which reads the kind the source runs. The routine
-    of a start or a remap whole is counted from its call to its return
-    (check), since ymxr_rem, which ymxr_lstart calls, is a routine of
-    the identity's start as well."""
+    """Cycle-counter regions for lookup preparation: page selection
+    (ymxr_page), table/entry reads (ymxr_tab, ymxr_entry), filling
+    (ymxr_fill), identity/lookup movement (ymxr_move), atomic page
+    switch (ymxr_rpage), and multi-column place reset (ymxr_widereset).
+    Count complete start/remap routines separately from call to return
+    (check), since ymxr_rem is shared with identity starts.
+    """
     at = {name: CODE + symbols[name] for name in (
         "ymxr_page", "ymxr_tab", "ymxr_fill", "ymxr_runrow",
         "ymxr_move", "ymxr_rpage", "ymxr_widereset", "ymxr_widestart")}
@@ -2570,8 +2499,8 @@ def lookup_regions(symbols):
 
 
 def routine_calls(code, symbols):
-    """The address after each bsr.w of the player that calls ymxr_lstart
-    or ymxr_remap, where the routine returns."""
+    """Return addresses after each bsr.w calling ymxr_lstart or ymxr_remap.
+    """
     called = {symbols["ymxr_lstart"], symbols["ymxr_remap"]}
     return [at + 4 for at in range(0, len(code) - 3, 2)
             if code[at:at + 2] == b"\x61\x00"
@@ -2579,9 +2508,9 @@ def routine_calls(code, symbols):
 
 
 def shape_of(model, i):
-    """The handler effect i's source runs on, by its shape: "square",
-    "one", or the lookup kind of a source that steps a place
-    (lookup_kind), and None where no source runs."""
+    """Running handler shape for effect i: square, one, or a stepping
+    lookup kind from lookup_kind. Return None when idle.
+    """
     fx = model.fx[i]
     if not fx["running"] or fx["source"] == 0:
         return None
@@ -2593,15 +2522,12 @@ def shape_of(model, i):
 
 
 def lookup_events(model, before, row):
-    """The starts through a transformation and the remaps a row makes, out
-    of the model before it (before, each effect's shape_of and running
-    mapping) and after it, each (effect, what, shape): a start, "start" at
-    row 0 where the row sets bit 5 and "start, the place kept" where it
-    leaves it clear, the shape the source started on; and a remap (SPEC.md
-    1.10.2), "stopped" on a timer stopped at the row, "same" where the
-    running mapping is the new one, "switch" between two transformations,
-    "from the identity" and "to the identity", the shape the running
-    source has."""
+    """Classify row lookup events from the model before and after it.
+    Return (effect, operation, shape) entries. Starts distinguish
+    reset-to-zero from preserved place. Remaps distinguish stopped,
+    unchanged, table-to-table switch, from identity and to identity
+    (SPEC.md 1.10.2).
+    """
     events = []
     for i in range(4):
         t = EFFECT + 4 * i
@@ -2629,22 +2555,21 @@ def lookup_events(model, before, row):
 
 
 def page_of(m, symbols, at, name):
-    """The page a lookup instance at `at` of the kind `name` reads: its
-    page read's displacement word, from the word's address, with the key
-    at 0 (68k/YMXR.S, LKEY)."""
+    """Resolve the page read by lookup instance at, kind name, from its
+    displacement word with key 0 (68k/YMXR.S, LKEY).
+    """
     word = at + symbols[name.upper() + "_KEY"] - 1
     high = m.byte(word)
     return word + ((high << 8) - (0x10000 if high & 0x80 else 0))
 
 
 def pairs(m, symbols):
-    """Every lookup instance's key write and page read, as init left them:
-    the key's write is move.b d16(pc),(abs).l, $13FA, or (abs).l,(abs).l,
-    $13F9, with -abs, and the read after it move.b d16(pc),$FFFF8802.w,
-    $11FA and $8802, whose displacement's low byte is the key write's
-    destination. Unicorn has no prefetch, so this reads the order of the
-    two, which the real-ST program measures (68k/test/st). The count of
-    instances."""
+    """Count and validate each lookup instance's key write followed by its
+    page read. The key write targets the read's low displacement byte;
+    source addressing is program-counter or absolute according to the
+    build. Unicorn checks instruction order; the real-ST program checks
+    prefetch behavior (68k/test/st).
+    """
     count = 0
     for name, at in symbols.items():
         one = re.match(r"ymxr_(l[kctnbvef])[0-3]b?$", name)
@@ -2665,15 +2590,13 @@ def pairs(m, symbols):
 
 
 def running(m, symbols, model, i, said, ticked=False):
-    """The handler effect i's running source is read through, against the
-    model: a square's two levels and the one its immediate is at, a source
-    of one row's level, and otherwise the place, the rows left of a
-    counted source, and through a transformation the lookup instance and
-    the page its key indexes; then the handler's first register, and the
-    vector. With ticked these are read after a tick, which leaves the
-    register and the vector as they are, and those two are left out. said
-    opens each line it reports. The handler of a source that runs through
-    a transformation is added to RAN."""
+    """Compare the running handler with the model: immediate levels for
+    square/one-row sources; place and remaining count for stepping
+    sources; selected lookup instance and page; first target register
+    and vector. After a tick, omit register/vector checks because those
+    remain unchanged. Prefix diagnostics with said and record lookup
+    handlers in RAN.
+    """
     fx = model.fx[i]
     if model.square(i):
         name = "sq"
@@ -2729,13 +2652,11 @@ def running(m, symbols, model, i, said, ticked=False):
 
 
 def pages(m, symbols, model, i, at, name, said):
-    """The page effect i's lookup instance at `at` reads: one of the
-    effect's two pages in the instance's bank (68k/YMXR.S, ymxr_pages),
-    with the entries of the transformation the effect runs through as the
-    model reads a key: the E entries from 0, plain; for a marked column,
-    the mirror, the first E' at 0 and again at 128 with bit 7 set, E' the
-    lesser of E and 128; for setR7, the first 64 at 192 with bits 7 and 6
-    set (SPEC.md rule 2(f))."""
+    """Verify the running instance's page against the model transformation.
+    Plain pages copy entries from 0. Marker pages duplicate up to 128
+    entries at offset 128 with bit 7 set. setR7 pages place keys 0 to 63
+    at offset 192 with both port bits set (SPEC.md 2.1.5; rule 2(f)).
+    """
     fx = model.fx[i]
     base = page_of(m, symbols, at, name)
     bank = "b" if "ymxr_bank1" in symbols and at >= CODE + symbols["ymxr_bank1"] else ""
@@ -2799,10 +2720,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     defer, lookup = needs(tune.effects)
     have = ("ymxr_bank1" in symbols, "ymxr_look" in symbols)
     if (defer and not have[0]) or (lookup and not have[1]):
-        # A row defers a start or maps a value, and init of a player
-        # without the deferred start or the lookup reports -1 (doc/
-        # BINARIES.md 1.5 steps 1 and 2), so the tune plays on the player
-        # assembled with it.
+        # First verify that init rejects a tune when its required
+        # deferred or lookup support is absent. Then run it on the build
+        # with that support (BINARIES.md 1.5).
         assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
             & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init of a player without the switch a tune of effects %s needs took it" % (
@@ -2810,14 +2730,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         code, symbols = build(switched(DEFINES, defer or have[0], lookup or have[1]))
     m = Machine(code, symbols, bound)
     if cycles:
-        # The image is the bound tune's last part, or the last before the
-        # transformation block (doc/BINARIES.md 1.2), so it runs from the
-        # field at 16 to there: the cycles the counter reads there are the
-        # reader's, since the tables below it are data.
-        # The frame procedure's steps 1 to 3, the effects, are from
-        # ymxr_frame to ymxr_regs, and steps 4 to 8, the register columns,
-        # from there to ymxr_played: the two parts a dense frame procedure
-        # would replace (dense).
+        # The reader image starts at header offset 16 and ends at the
+        # transformation block or bound file end. Count cycles there as
+        # reader work. Count effect steps from ymxr_frame to ymxr_regs
+        # and register steps from there to ymxr_played; dense replaces
+        # those two regions.
         regions = None if perf else {
             "effects": (CODE + symbols["ymxr_frame"], CODE + symbols["ymxr_regs"]),
             "registers": (CODE + symbols["ymxr_regs"], CODE + symbols["ymxr_played"])}
@@ -2836,10 +2753,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                            struct.unpack(">H", bytes(mu.mem_read(table, 2)))[0]))
         m.mu.hook_add(UC_HOOK_CODE, copied, begin=CODE + symbols["ymxr_fill"],
                       end=CODE + symbols["ymxr_fill"])
-    # each start through a transformation and each remap, from the call of
-    # ymxr_lstart or ymxr_remap to its return: the cycles counted at the
-    # routine's first instruction, the bsr settled, and at the instruction
-    # after each bsr.w that calls it, its rts settled (routine_calls)
+    # Measure each ymxr_lstart or ymxr_remap call from entry after bsr
+    # to the instruction after its rts (routine_calls).
     routine = {"cycles": 0, "at": None}
     looking = ()
     if cycles and "copy" in cycles.regions:
@@ -3282,11 +3197,9 @@ def counted_read(code, symbols, cycles_of, general):
     return stale
 
 
-# The rows of performance.md's table of a tick through a transformation,
-# each the kinds of tick it reads (check). A kind with " alone" is of a
-# tune running one effect, and init writes two nops in place of the
-# level's drop in the general lookup instance alone on such a tune
-# (68k/YMXR.S, LK_SR), so the row of every other kind reads both.
+# Lookup tick paths measured against performance.md. The general
+# instance alone replaces interrupt-level lowering with two nops for a
+# one-effect tune; other lookup kinds use one row for both cases.
 def _mapped_rows():
     rows = [("a row written, the place stepped", ("mapped on",)),
             ("the marker, the place to row `RR`", ("mapped loop", "mapped loop alone")),
@@ -3310,8 +3223,8 @@ def _mapped_rows():
 
 MAPPED_TICKS = _mapped_rows()
 
-# The rows of the table of a remap at the frame, each what lookup_events
-# names the row's step, and its columns' shapes.
+# Measured remap-frame paths and source shapes, using lookup_events
+# labels.
 MAPPED_STEPS = (("a start at row 0", "start"),
                 ("a remap between two transformations", "switch"),
                 ("a remap from the identity", "from the identity"),
@@ -3333,10 +3246,9 @@ PC_READ = ("t:      dc.w    0\n"
            "        move.b  t(pc,d0.w),$FFFF8802.w\n        bmi.s   e\n"
            "        move.w  (sp)+,d0\ne:\n")
 
-# The kit's tunes whose ticks through the identity the ticks through a
-# transformation are read against, beside the fixtures' and the identity's
-# ticks of the tunes that map a value: the shapes of several columns and the
-# counted ones, each to its loop and its stop.
+# Identity-tick fixtures for comparison with lookup ticks: multi-column
+# and counted shapes, covering loops and stops, plus ordinary fixtures
+# and identity paths in mapped tunes.
 IDENTITY_TUNES = ENVELOPE_TUNES + (COUNTED_TUNE, "voices.ymxr")
 
 # The tune of mapped_tunes whose costliest call the cost of 34 columns
@@ -3367,18 +3279,13 @@ def span(values, comma=","):
 
 
 def mapped_read(code, symbols, cycles_of, general, plays):
-    """performance.md's sections on a tick through a transformation, a
-    remap at the frame and the cost of 34 columns, against the rig on the
-    player with the lookup in: the tunes that map a value (mapped_tunes)
-    played on the cycle counter, their ticks by kind against the column of
-    the table for the build assembled, and each against the identity's
-    tick of its shape; and on the player as it is, the row's read, the
-    routines of a start and a remap by what the row makes and the shape
-    the source runs (lookup_events), the pages, the copies and the
-    switch, each tune's costliest call with those routines and without
-    them, its period and its unit, and the fixtures' play call on this
-    core against the table of The play call (plays). general is every
-    tick the fixtures counted, by kind."""
+    """Verify the lookup sections of performance.md on the selected build:
+    tick costs by kind against identity equivalents, frame start/remap
+    routines, page selection, copying and switching. Also check each
+    tune's worst frame with and without those routines, period and unit,
+    plus ordinary-fixture overhead on the lookup core. general contains
+    ordinary-fixture tick counts by kind.
+    """
     text = open(os.path.join(ROOT, "doc", "performance.md")).read()
     stale = []
 
@@ -3512,7 +3419,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
     # an effect's pages: the block before the table of page bytes, a page
     # the 256 bytes a key reaches, since the key is a byte
     block = symbols["ymxr_htab"] - symbols["ymxr_pg0"]
-    reads(ticks_at, r"one of the effect's (\w+) pages of (\d+) bytes", WORDS[block // 256], 256)
+    reads(ticks_at, r"one of the effect's (\w+) (\d+)-byte pages", WORDS[block // 256], 256)
     # the row's read: the general handler's and its lookup instance's,
     # and the two for comparison, each with the marker's branch
     module = cycles_of
@@ -3586,16 +3493,16 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                     r" to [\d,]+)?) and to the identity ([\d,]+(?: to [\d,]+)?)\.",
           *(spans(*[(what, shape) for shape in others])
             for what in ("start", "switch", "from the identity", "to the identity")))
-    reads(frame_at, r"The page: ([\d,]+(?: to [\d,]+)?) cycles where a page of the instance has the"
-                    r" transformation, and ([\d,]+(?: to [\d,]+)?) where neither has it, the other"
-                    r" page filled", span(pages.get("found", {0})), span(pages.get("filled", {0})))
-    reads(frame_at, r"is the page byte's one write, (\d+) cycles", span(switched or {0}))
+    reads(frame_at, r"Page selection costs ([\d,]+(?: to [\d,]+)?) cycles for a cached"
+                    r" transformation, or ([\d,]+(?: to [\d,]+)?) when the unused page needs filling",
+          span(pages.get("found", {0})), span(pages.get("filled", {0})))
+    reads(frame_at, r"changes one page byte atomically, (\d+) cycles", span(switched or {0}))
     three = moves.get("lb", set()) | moves.get("lv", set())
     every = set().union(*moves.values()) if moves else {0}
     if moves.get("lk") != {min(every)} or three != {max(every)}:
         stale.append("the moves between the identity and a transformation are %s" % moves)
-    reads(frame_at, r"from one handler to the other, ([\d,]+) cycles on one column to ([\d,]+) on"
-                    r" three", span(moves.get("lk", {0})), span(three or {0}))
+    reads(frame_at, r"between handlers: ([\d,]+) cycles on one column to ([\d,]+) on three",
+          span(moves.get("lk", {0})), span(three or {0}))
     # the copy table: a row a fill kind and a count of entries
     kind, listed = None, set()
     for m in re.finditer(r"^\| ([^|]+?) \| (\d+) \| ([\d,]+) \|$", frame_at, re.M):
@@ -3626,10 +3533,9 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                     r" has the transformation", 16,
           span(totals.get(("switch", "lk", ((1, 16),)), {0})),
           span(totals.get(("switch", "lk", ()), {0})))
-    # a tune of version 9 on this core against the core without the lookup:
-    # each frame of the tunes of v9_tunes, a frame whose row starts no
-    # source and resets no place the head of each effect it runs, and
-    # every other the path its row's step runs (V9_PATHS)
+    # Measure version 9 frame overhead with and without lookup support.
+    # Rows without a start or place reset use the effect-head path;
+    # other rows use their V9_PATHS label.
     plain = build([d for d in DEFINES if d != MAP_ON])
     heads, paths, narrow = set(), {}, set()
     for title, at, rows in v9_tunes():
@@ -3689,7 +3595,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
     if path("square start kept") != level + path("start kept"):
         stale.append("a square's start at the running row is %s, not %d"
                      % (path("square start kept"), level + path("start kept")))
-    reads(frame_at, r"counted on the build as it is over the rig's (\w+) tunes of version 9",
+    reads(frame_at, r"on the default build with the rig's (\w+) version 9 fixtures",
           WORDS[len(v9_tunes())])
     more_on = [got[1] - said[1] for said, got, _, _, _ in plays.values()]
     more_at = [got[2] - said[2] for said, got, _, _, _ in plays.values()]
@@ -3699,17 +3605,16 @@ def mapped_read(code, symbols, cycles_of, general, plays):
           WORDS.get(len(plays), len(plays)), min(more_on or [0]), max(more_on or [0]),
           min(more_at or [0]), max(more_at or [0]))
 
-    # the cost of 34 columns: the columns, the period and the unit, and
-    # each tune's costliest call, with the lookup's routines and without
-    # them
+    # Verify version 10 column count, period, unit and worst frame cost,
+    # including and excluding lookup routines.
     if len(widths) != 1 or len(narrow) != 1:
         stale.append("the tunes are of %s columns and of %s" % (sorted(widths), sorted(narrow)))
     else:
         wide_, narrow_ = next(iter(widths)), next(iter(narrow))
-        reads(cost_at, r"A tune of version 10 has (\d+) columns, the (\w+) of version 9 and the"
-                       r" (\w+) mapping columns", wide_, WORDS[narrow_], WORDS[wide_ - narrow_])
+        reads(cost_at, r"Version 10 adds (\w+) mapping columns to version 9's (\w+)",
+              WORDS[wide_ - narrow_], WORDS[narrow_])
     fixtures = {width for _, _, _, effects, width in plays.values() if not effects & 0x20}
-    reads(cost_at, r"The (\w+) fixtures map no value, and their tables have (\w+) columns",
+    reads(cost_at, r"The (\w+) dump fixtures use identity and retain (\w+) columns",
           WORDS.get(len(plays), len(plays)) if len(fixtures) == 1 else None,
           WORDS.get(next(iter(fixtures)), fixtures) if len(fixtures) == 1 else None)
     periods = {period for _, _, _, _, period in played}
@@ -3717,8 +3622,8 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         stale.append("the tunes through a transformation pack at %s" % sorted(periods))
     else:
         P, k = next(iter(periods))
-        reads(cost_at, r"packs at unit (\d+) and a period of ([\w-]+) rows, so a refill is"
-                       r" ([\w-]+) units of two bytes, against (\w+) at thirty columns",
+        reads(cost_at, r"pack at unit (\d+) with a period of ([\w-]+) rows: ([\w-]+) units"
+                       r" per refill, against (\w+) for thirty columns",
               k, WORDS.get(P, P), WORDS.get(P // k, P // k), WORDS[30 // k])
     budget = re.search(r"A play call costs at most ([\d,]+) cycles",
                        " ".join(open(os.path.join(ROOT, "doc", "requirements.md")).read().split()))
@@ -3783,12 +3688,10 @@ def decoder_of(file, bound, tune, dtx):
     """
     image, labels = dtx.package(file[long_at(file, 12):])
     at = FILE + tune.image_at
-    # The packager reads the tune file's tail, so its image has the
-    # sources' tables in it where the binder packs each as a separate
-    # table: the binder's image region is the packager's image as far as
-    # the image runs, to the end of the bound tune or to the transformation
-    # block of version 10 (BINARIES.md 1.2), and the decoder is at its head
-    # either way.
+    # The packager reads the tune-file tail, including sources; the
+    # binder packages the tune table separately. Compare their
+    # reader-image regions only, ending at the transformation block in
+    # version 10 or the bound file's end otherwise (BINARIES.md 1.2).
     have = bound[tune.image_at:tune.image_end]
     over = min(len(image), len(have))
     assert image[:over] == have[:over], \
@@ -4931,18 +4834,17 @@ def heads_are(got, effects):
     return all(one in want for one, want in zip(got, want_heads(effects)))
 
 
-# The mapping column's three sites of an effect on the player with the
-# lookup in (68k/YMXR.S, EFFECT): the or at the head, or.b d16(a1),d1 for a
-# live column and or.b #v,d1 for a constant one, and the start's read and
-# the remap's, move.b d16(a1),d1 and move.b #v,d1. A table of 30 columns,
-# versions 7 to 9, reads each as the constant 0 (ymxr_col).
+# Mapping-column sites per effect (EFFECT in 68k/YMXR.S): the head's or,
+# then the start and remap reads. Live columns use a displacement from
+# a1; constants use immediates. Versions 7 to 9 patch all three to
+# constant 0 (ymxr_col).
 MAP_SITES = (("q", (0x8229, 0x0001)), ("c", (0x1229, 0x123C)), ("m", (0x1229, 0x123C)))
 
 
 def mapping_sites(m, symbols):
-    """Each effect's three mapping sites as init left them, each its
-    opcode and its operand, effect 0 first; an empty list on a player
-    without the lookup."""
+    """Each effect's three patched mapping sites, opcode and operand, in
+    effect order. Return an empty list without lookup support.
+    """
     if "ymxr_look" not in symbols:
         return []
     return [[(m.word(CODE + symbols["%s_%d" % (site, 30 + i)]),
@@ -4951,9 +4853,9 @@ def mapping_sites(m, symbols):
 
 
 def sites_are(got, version):
-    """Whether each mapping site is one init writes for a tune of this
-    version: a read of the column or its immediate, and the immediate 0 for
-    a table of 30 columns."""
+    """Whether each site matches the table version: a live-column read or
+    constant operand in version 10; constant 0 for thirty-column tables.
+    """
     for sites in got:
         for (site, ops), (op, operand) in zip(MAP_SITES, sites):
             if op not in ops or (version != MAPPED and (op, operand) != (ops[1], 0)):
@@ -4967,12 +4869,10 @@ DEFERRING = os.path.join(ROOT, "doc", "conformance", "tunes", "deferred.ymxr")
 
 
 def opening(defines):
-    """The tunes an SNDH file of the rig opens with: the tool selects the
-    deferred start and the lookup by the effects bytes of the subtunes
-    (BINARIES.md 2.1), so on a run with -defer the kit's tune that defers
-    a start comes first, and on one with -map the first tune that maps a
-    value (mapped_tunes), and the file is on the core of the run's
-    switches."""
+    """Prepend a fixture requiring each enabled deferred/lookup capability,
+    so automatic SNDH core selection matches this run's switches
+    (BINARIES.md 2.1).
+    """
     out = []
     if DEFER_ON in defines:
         out.append(DEFERRING)
@@ -5014,13 +4914,12 @@ PAST_THE_REACH = b"a tick that reads a row through the program counter reaches 3
 
 
 def sndh_of(files, defines, work):
-    """An SNDH file of tune files, subtune 1 up in their order, as the
-    tools write one (BINARIES.md 3): bin/ymxr-multi writes a multi file of
-    several, and bin/ymxr-sndh the SNDH file around the core with the
-    run's -perf and -lean, -pcrel or -abs as the run reads a row, and the
-    deferred start and the lookup as the subtunes select them (2.1). None
-    where the tool reports the tunes past the reach of a displacement
-    (2.10)."""
+    """Build an SNDH from tune files in subtune order through ymxr-multi
+    and ymxr-sndh. Explicit flags select monitoring, lean ticks and
+    addressing; subtune effects bytes select deferred and lookup support
+    (BINARIES.md 2.1, 3). Return None when sources exceed displacement
+    reach.
+    """
     if len(files) > 1:
         paths = []
         for n, file in enumerate(files):
@@ -5045,18 +4944,12 @@ def sndh_of(files, defines, work):
 
 
 def from_core(made, defines):
-    """An SNDH file as a machine loads it, the core's first byte at CODE
-    (BINARIES.md 3.1): the bytes from there to the file's end, the core the
-    rig assembles with the switches of its flags word (2.3) and the
-    symbols, that word, the end of the subtune table, and the first byte
-    of each subtune's bound tune with the byte past it, the last one's
-    being where the images begin.
-
-    The core is that assembly byte for byte, the fields at 28 and 32 that
-    the tool patches aside; its flags word reads the run's switches, and
-    the deferred start and the lookup where the effects byte of a subtune
-    sets bit 4 and bit 5 (2.1); the subtune table is at even(L), L the
-    core's bytes."""
+    """Load an SNDH with its core at CODE. Return bytes from that origin,
+    matching assembled core and symbols, flags, subtune-table end and
+    bound-tune spans. Compare assembly byte for byte except patched
+    fields 28 and 32. Feature flags follow subtune effects bits 4 and 5;
+    the table follows the even-aligned core end (BINARIES.md 2.1, 3.1).
+    """
     at = struct.unpack(">h", made[2:4])[0] + 2
     body = made[at:]
     assert len(body) <= WORK - CODE, \
@@ -5091,27 +4984,15 @@ def that_map(count):
 
 
 def patched_code_follows_the_subtune(defines, tunes):
-    """Init leaves the player's code a function of the subtune and not of
-    the subtune before it.
+    """Verify init output depends only on the selected subtune. Compare a
+    fresh initialization with initialization after each other subtune in
+    the same loaded SNDH. Check player code and the selected bound tune.
+    Exclude shared images, workspace and other tunes: DTX init can
+    modify an image shared by tables of the same shape.
 
-    A set shares one loaded player, and init patches it: the effect heads,
-    the shape word of every tick, the row displacements, the advance's
-    address. A word written on one path and left alone on another reads
-    the subtune before it. So the set goes into one SNDH file through the
-    tools (sndh_of), every subtune is inited alone on a fresh copy of the
-    file, and then after every other, and the core with the subtune table
-    and the subtune's bound tune must read the same both ways. The images
-    and the workspace are outside both and are not compared, and so are
-    the other subtunes' bound tunes: DTX's init writes the ring's size
-    into an image where its table has copies (DTX, abi.md 2), and the
-    subtunes of a shape share one image (BINARIES.md 1.4).
-
-    The tool selects the core with the deferred start in for a set of
-    which a subtune defers a start, and the one with the lookup in for a
-    set of which a subtune maps a value (BINARIES.md 2.1); a set of a run
-    with -defer or -map opens with such a tune (opening). A subtune at a
-    rate other than the first's is left out, since an SNDH file records one
-    rate (BINARIES.md 3.3).
+    opening ensures the set requires this run's deferred and lookup
+    capabilities. Omit tunes with a different frame rate from the first
+    because an SNDH records one rate (BINARIES.md 1.4, 2.1, 3.3).
     """
     work = tempfile.mkdtemp()
     first = opening(defines)
@@ -5197,23 +5078,16 @@ def patched_code_follows_the_subtune(defines, tunes):
 
 
 def core(defines, ym):
-    """The SNDH core's vector at $60 (BINARIES.md 2), under the emulator:
-    init keeps the host's and puts an rte there, and exit puts the host's
-    back.
+    """Check the SNDH core's vector $60: init saves the host vector and
+    installs rte; exit restores it. Clearing an MFP pending/enable bit
+    before acknowledgement can cause this spurious exception instead of
+    a timer interrupt (BINARIES.md 2).
 
-    A write of the player's that clears a pending or an enable bit between
-    the MFP raising an interrupt and the 68000 acknowledging it leaves the
-    MFP with no vector to place on the bus, and the 68000 runs exception 24
-    rather than the timer's handler. The tick that acknowledge belonged to is
-    the one the write cancelled, so the handler returns. The tune is the
-    last subtune of an SNDH file of the tools (sndh_of), after the tunes the
-    run's switches open a file with (opening), so the file is on the core
-    with the deferred start in where a subtune sets bit 4 or the run is
-    with -defer, and on the core with the lookup in where one sets bit 5 or
-    the run is with -map (BINARIES.md 2.1). On the core with the lookup
-    in, init leaves the mapping sites read as the tune's table has them,
-    and every lookup instance's key write before its page read (pairs).
-    Returns the core's name, its bytes and the instances read."""
+    Use the last subtune after opening's capability fixtures so core
+    selection includes required deferred/lookup support. Verify patched
+    mapping sites and key-write/page-read order (pairs). Return core
+    name, size and instance count.
+    """
     work = tempfile.mkdtemp()
     files = [convert(one, work)[0] for one in opening(defines) if one != ym]
     files.append(convert(ym, work)[0])
@@ -5501,15 +5375,11 @@ def main():
                                 open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
                 said = row and tuple(int(x) for x in row.groups())
                 counted = (frames, average, max(cost), int(sum(adv) / len(adv)), adv[where[0]])
-                # A play call's figures a tune are the player as it is
-                # assembled. A start of -abs does less arithmetic and its
-                # ticks cost more, which moves three of the eleven tunes, and
-                # the table of tick paths under that build's heading is
-                # what those ticks read against.
-                # The tables are the player without the deferred start
-                # and the lookup, and of the tunes that map no value:
-                # -defer reads its play call in the section on it, and
-                # -map the fixtures' in the section on a remap at the
+                # Measure each build against its matching play-call and
+                # tick tables. Absolute reads change start arithmetic
+                # and tick costs. Ordinary tables omit deferred and
+                # lookup support; -defer uses its deferred section,
+                # while -map reads fixture overhead in A remap at the
                 # frame (plays).
                 if PCREL and MAP and not DEFER and not LEAN and said:
                     plays[stem] = (said, counted, where[6], where[5], where[9])
@@ -5630,9 +5500,9 @@ def main():
         stale += counted_read(code, symbols, cycles_of, general)
     if costs and MAP and not args and wide is None and not kit and not DEFER \
             and (PCREL or not LEAN):
-        # a run over the eleven fixtures on the core with the lookup in reads
-        # the sections on a tick through a transformation, a remap at the
-        # frame and the cost of 34 columns against the tunes that map a value
+        # For eleven fixtures with lookup support, verify A tick through
+        # a transformation, A remap at the frame and The cost of 34
+        # columns against mapped tunes.
         stale += mapped_read(code, symbols, cycles_of, general, plays)
     if costs and not args and wide is None and not kit and PCREL and not LEAN:
         # plan.md's shares, gates and parts over the eleven fixtures

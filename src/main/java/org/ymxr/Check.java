@@ -13,17 +13,14 @@ import org.ymxs.tool.Tool;
 import org.ymxs.ym.Lha;
 
 /**
- * A dump converted and replayed against itself: the tune file's table
- * stepped frame by frame by {@link Replay}, every frame's registers against
- * the dump's, a volume register an effect owns checked against an unset column
- * instead, and every effect's source, target, rate and count checked against what
- * the dump flags. {@code ConversionTest} runs it on the tunes under
- * {@code ym/test}, and {@code bin/ymxr-check} on any dumps, the corpus
- * among them.
+ * Compares a converted tune with its YM recording, frame by frame:
+ * register writes, effect source, target and rate. Registers used by
+ * effects are checked against unset frame columns because ticks write
+ * them.
  *
- * <p>A tune file is read as SPEC.md 6.4 defines instead ({@link
- * #places}): its source and mapping columns against rule 2(b), and the
- * mapping column of a stop against rule 3(c).
+ * <p>For a tune file alone, {@link #places} checks source and
+ * transformation numbers against file counts and reports a set mapping
+ * column on a stop (SPEC.md 6.4).
  */
 final class Check {
 
@@ -206,14 +203,11 @@ final class Check {
     }
 
     /**
-     * The starts of a tune file that name a source past the file's, a line
-     * each, the rows of that source being unknown. A start that leaves bit
-     * 5 of the control column at 0 leaves the place at its number modulo
-     * the row count of the source it starts (SPEC.md 1.8.4), so every
-     * other start reads a row of its source. In version 10, beside each, a
-     * row whose mapping column numbers a transformation past the file's,
-     * and a stop that sets the mapping column, which a player leaves
-     * unread (SPEC.md 1.10, 6.4).
+     * reports source numbers above the file's source count,
+     * transformation numbers above its transformation count, and stops
+     * with a set mapping column (SPEC.md 6.4). A stop ignores that
+     * column. Starts without place reset use their current row number
+     * modulo the source length (1.8.4).
      */
     static List<String> places(TuneFile file) {
         Table table = file.table();

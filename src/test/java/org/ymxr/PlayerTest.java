@@ -34,20 +34,18 @@ final class PlayerTest {
 
     private static final Path BINARIES = Path.of("doc/BINARIES.md");
 
-    /** Every {@code NAME equ VALUE} in the player, decimal or hex, as it
-     *  is assembled without the deferred start and the lookup. */
+    /**
+     * Player equates for the build without deferred-start or lookup
+     * support.
+     */
     static Map<String, Integer> equates() throws IOException {
         return equates(false, false);
     }
 
     /**
-     * Every {@code NAME equ VALUE} in the player, decimal or hex, as it is
-     * assembled with {@code YMXR_DEFER} at 1 where {@code defer} and at 0
-     * where not, and {@code YMXR_MAP} at 1 where {@code map} and at 0 where
-     * not: {@code YMXR_PCREL} is at 1 unless a host defines it, so the
-     * branch of a block on any of the three switches that the assembly
-     * skips is left out (68k/YMXR.S). A block on another condition is read
-     * on both branches.
+     * Read player equates for the selected deferred and lookup
+     * switches. Follow the active YMXR_PCREL branch, whose default is
+     * 1; scan both sides of unrelated conditions (68k/YMXR.S).
      */
     static Map<String, Integer> equates(boolean defer, boolean map) throws IOException {
         Map<String, Integer> switches = Map.of("YMXR_PCREL", 1, "YMXR_DEFER", defer ? 1 : 0,
@@ -167,12 +165,9 @@ final class PlayerTest {
     }
 
     /**
-     * The bound tune's layout as BINARIES.md 1 defines it, against the
-     * player's equates and the binder's constants. A host reads a bound
-     * tune by that table, so a field that moves in one of the three moves
-     * in all three or the three disagree. In version 10 the transformation
-     * block's long is at 24, which the player with the lookup in reads as
-     * {@code TF_TRANS}, and the source index follows it.
+     * Compare bound-layout fields in BINARIES.md, player equates and
+     * binder constants. Version 10 places the block pointer at 24, read
+     * as TF_TRANS, and the source index after it.
      */
     @Test
     void theBoundTuneIsLaidOutAsBinariesDefines() throws IOException {
@@ -238,11 +233,9 @@ final class PlayerTest {
     }
 
     /**
-     * The figures of BINARIES.md 2.2 against the player's equates: the
-     * version a core reads, 9 and 10 with the lookup in, and
-     * {@code YMXR_FIXED} without the two switches, with the deferred start,
-     * with the lookup and with both; and the least and the most of these in
-     * 5.2.
+     * Compare core-version and workspace figures in BINARIES.md with
+     * equates for all combinations of deferred and lookup support,
+     * including minimum and maximum workspace.
      */
     @Test
     void theCoresFiguresAreThePlayers() throws IOException {
@@ -310,10 +303,9 @@ final class PlayerTest {
         assertTrue(e.size() > 20, "the player's equates read as " + e.size());
         assertEquals(java.nio.ByteBuffer.wrap(Bound.MAGIC).getInt(), e.get("YMXR_MAGIC"),
                 "the player's magic is the bound tune's");
-        // the player without the lookup reads to the version of a tune
-        // that maps no value, a table of thirty columns, and the index at
-        // 24; with it, to version 10, thirty-four columns, the block's long
-        // at 24 and the index after it (BINARIES.md 1.2, SPEC.md 3.3.5)
+        // Version 9 has thirty columns and source index at 24. Version
+        // 10 adds mapping columns, block pointer at 24 and source index
+        // after it (BINARIES.md 1.2; SPEC.md 3.3.5).
         for (boolean defer : new boolean[] {false, true}) {
             Map<String, Integer> plain = equates(defer, false);
             Map<String, Integer> mapped = equates(defer, true);

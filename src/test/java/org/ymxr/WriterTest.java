@@ -10,25 +10,14 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Two faults a writer reported by writing the wrong bytes, and the bound
- * tune of version 10.
+ * Writer regressions: reject frame rates above the header word, align
+ * the first bound subtune even, and preserve version 10 transformation
+ * blocks.
  *
- * <p>The frame rate is a word (BINARIES.md 1, SPEC.md 3.3) and a YMXS rate
- * reaches 2,147,483,647 (YMXS, SPEC.md 1.3), so a rate above 65,535 wrote
- * its low sixteen bits: a tune at 70,000 Hz became one at 4,464 Hz, and
- * the tool reported 0.
- *
- * <p>Every bound tune of a set begins on an even address (BINARIES.md
- * 5.1), which {@code Sndh.combine} evened for every subtune after the
- * first; the first was at the byte after the last image, odd where that
- * image's length is odd.
- *
- * <p>A bound tune of version 10 has the transformation block's offset at
- * 24 and its source index at 28, and the block after the image, byte for
- * byte the tune file's (BINARIES.md 1.2, 1.3); in an SNDH file the field
- * at 24 is patched to reach the block after the images (3.1). A table of
- * 34 columns has a separate image from one of 30, whose period differs
- * at the writer's unit (1.4).
+ * <p>A bound version 10 tune points to its block at offset 24 and
+ * starts its source index at 28. The unchanged block follows images in
+ * SNDH files. Thirty- and thirty-four-column tables require separate
+ * images (BINARIES.md 1.2 to 1.4).
  */
 final class WriterTest {
 
@@ -87,8 +76,10 @@ final class WriterTest {
         assertEquals(2, found, "the file has the set's two bound tunes in it");
     }
 
-    /** The bytes of a tune file from the long at 16 to the DTX3 table,
-     *  which the writer puts on a long after transformation T. */
+    /**
+     * Tune-file transformation block, from the header pointer at 16 to
+     * the aligned DTX3 table.
+     */
     private static byte[] blockOf(byte[] file) {
         return Arrays.copyOfRange(file, Tune.getLong(file, Tune.TRANSFORMATIONS_AT),
                 Tune.getLong(file, Tune.TABLE_AT));
@@ -118,9 +109,8 @@ final class WriterTest {
             assertArrayEquals(Arrays.copyOfRange(file, fileAt & ~Tune.COUNTED, fileEnd),
                     Arrays.copyOfRange(bound, at & ~Tune.COUNTED, end), "source " + (i + 1));
         }
-        // the block on a long after the image, byte for byte, and last:
-        // the bytes to the end of transformation 16, which the writer
-        // pads to a long before the DTX3 table
+        // The unchanged transformation block follows the image and is
+        // padded to a four-byte boundary.
         byte[] block = Bound.block(file);
         assertEquals(blockOf(file).length, Tune.align(block.length));
         assertArrayEquals(Arrays.copyOf(blockOf(file), block.length), block,

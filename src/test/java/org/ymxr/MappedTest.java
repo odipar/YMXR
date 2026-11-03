@@ -15,11 +15,10 @@ import org.dtx.Table;
 import org.junit.jupiter.api.Test;
 
 /**
- * A tune file of version 10 (SPEC.md 1.10, 3.3, 3.4): the thirty-four
- * columns of {@link BuiltTunes#mapped} packed into a file and read back
- * field by field, its record, the lines of the reader for a file written
- * wrong, the lines of the check, and the SNDH writer, which reports the
- * version line of a core that reads bound tunes to version 9.
+ * Version 10 file and reader checks: mapping columns, transformation
+ * layout, frame records, malformed-file errors and writer diagnostics.
+ * SNDH conversion must select lookup support; a core limited to version
+ * 9 reports an unsupported version (SPEC.md 1.10, 3.3, 3.4).
  */
 final class MappedTest {
 
@@ -145,7 +144,8 @@ final class MappedTest {
                 + "\"timer\":true,\"place\":true,\"deferred\":false,\"mapping\":3}");
         assertEffect(lines[7], 3, "{\"target\":9,\"source\":3,\"select\":7,\"count\":120,"
                 + "\"timer\":false,\"place\":true,\"deferred\":true,\"mapping\":1}");
-        // a remap while the start is pending, then a start that keeps it
+        // Remap current ticks while a start is pending; the later start
+        // reuses kept.
         assertEffect(lines[8], 3, "{\"target\":9,\"source\":3,\"select\":7,\"count\":120,"
                 + "\"timer\":false,\"place\":false,\"deferred\":false,\"mapping\":2}");
         assertEffect(lines[13], 3, "{\"target\":9,\"source\":1,\"select\":7,\"count\":180,"
@@ -249,10 +249,9 @@ final class MappedTest {
     }
 
     /**
-     * Files of version 10 whose rows break a rule the check reads, each
-     * with its lines (SPEC.md 6.4): a mapping column that numbers a
-     * transformation past the file's, and a stop that sets the mapping
-     * column. {@code ParityTest} checks each in both trees.
+     * Version 10 check failures: transformation number above the file
+     * count and a stop with its mapping column set. Java and Go must
+     * report the same lines (SPEC.md 6.4).
      */
     static Map<List<String>, byte[]> unchecked() {
         Map<List<String>, byte[]> out = new LinkedHashMap<>();
@@ -306,8 +305,8 @@ final class MappedTest {
 
     @Test
     void theStopLeavesTheKeptMappingAsItIs() {
-        // a stop reads the source column alone (SPEC.md 1.10), so the record
-        // keeps the identity row 36 set, where the stop's column numbers 2
+        // A stop ignores its mapping column and preserves the identity
+        // selected earlier (SPEC.md 1.10.3).
         byte[] stop = unchecked().values().toArray(new byte[0][])[1];
         String[] lines = new String(Trace.record(stop, -1), StandardCharsets.US_ASCII)
                 .split("\n");
@@ -315,10 +314,11 @@ final class MappedTest {
                 + "\"timer\":false,\"place\":false,\"deferred\":false,\"mapping\":0}");
     }
 
-    /** The SNDH writer puts the core with the deferred start and the
-     *  lookup in under a set of a deferred tune and this one, which defers
-     *  a start and maps a value, and a core without the lookup reports the
-     *  version it reads (BINARIES.md 2.1, 2.10). */
+    /**
+     * A mixed deferred/mapped set requires both core features. An
+     * explicit core without lookups reports the unsupported version
+     * (BINARIES.md 2.1, 2.10).
+     */
     @Test
     void theSndhWriterPutsTheCoreWithTheLookupUnderVersionTen() {
         String line = "the core reads bound tunes to version 9, and this binds at 10";

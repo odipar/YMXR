@@ -1,17 +1,13 @@
-// Package schema maps a YMXS tune onto this format's columns
-// (doc/ymxs.md): the structure YMXS defines, encoded as SPEC.md 1 encodes
-// it.
+// Package schema encodes YMXS tune data as YMXR columns (doc/ymxs.md).
+// Every converter uses this stage after constructing a YMXS tune.
+// Register writes follow the row; effect columns are omitted when the
+// player can reuse kept values.
 //
-// YMXS defines what is true of a row; a column is written where its value
-// differs from the value the player keeps (R3.6, R4.6). So this keeps the
-// target, the select, the count and the mapping of each effect as a player
-// does, and a retune whose select did not move leaves the control column
-// unset. The registers a row sets are the row's, since a YMXS row lists
-// what it sets and leaves the rest alone.
-//
-// Every conversion here passes through this: a dump is read into a YMXS
-// tune and mapped by this package, so the columns follow from the
-// structure alone.
+// Transformation lookups are optional. Identity-only tunes use version
+// 9. Version 10 permits a lookup on the target's last value alone.
+// Kept, running and pending mappings are tracked separately because a
+// deferred start can change the running mapping between frames (SPEC.md
+// 6, rule 2(g)).
 package schema
 
 import (
@@ -29,8 +25,9 @@ func Timer(i int) ymxs.Timer {
 	return timers[i]
 }
 
-// Made is a tune mapped: its columns, its sources numbered as SPEC.md 3.1
-// numbers them, and the rate its header records.
+// Made contains encoded columns, sources in first-start order and frame
+// rate. Columns also includes optional transformation tables (SPEC.md
+// 3.1, 3.4).
 type Made struct {
 	Columns ymxr.Columns
 	Sources *ymxr.Sources
@@ -47,23 +44,18 @@ func Of(tune ymxs.Tune) (Made, error) {
 	return Padded(tune, frames)
 }
 
-// Padded is a tune that ymxr.PadToUnit padded, as columns and sources:
-// frames is, for each row of the tune, the row of the structure it comes
-// from, or -1 for a row the padding added, and the line of an error
-// numbers that row (SPEC.md 6.5).
+// Padded encodes a padded tune as columns and sources. frames maps each
+// output row to its original structure row, or -1 for an added row;
+// diagnostics use original row numbers (SPEC.md 6.5).
 //
-// The tune file is version 10 where a row sets a mapping column to a
-// transformation, 1 to 127, and version 9 otherwise, with 30 columns and
-// no transformation index (SPEC.md 3.3.5).
+// A row selecting a transformation produces version 10. Identity-only
+// rows produce version 9, without mapping columns or tables.
 //
-// The error names a structure this format cannot encode: more sources than
-// the source column numbers, more transformations than the mapping column
-// numbers in a tune that maps a value, a count outside 0 to 255, a mapping
-// through a transformation in a part other than the last, a target past
-// 24, a source on two targets that mark different columns, a source on
-// setR7 and on another target, a source value past seven bits in its
-// marker's column or past eight bits in another column, or a key past 63
-// on setR7.
+// An error reports an unencodable structure: excess sources or
+// transformations, count outside byte range, lookup before the last
+// target value, unsupported target, incompatible shared-source markers
+// or setR7 use, or a source value or lookup key outside the encoded
+// range.
 func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	rows := ymxs.Rows(tune)
 	size := len(rows)
@@ -77,11 +69,9 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 		return Made{}, fmt.Errorf("the tune runs %d sources, and a source column numbers"+
 			" %d", len(sources), ymxr.Most)
 	}
-	// Transformation n is the one a mapping column numbers n, in the order
-	// of YMXS, SPEC.md 1.9 (SPEC.md 3.4.1). A remap on a timer outside the
-	// tune leaves every column as it is (rule 2(a)), so more than 127
-	// transformations is an error only where a start, or a remap on a timer
-	// of the tune, maps through one.
+	// Transformation numbers follow YMXS first-use order. Ignore remaps on
+	// timers outside the tune; the count limit applies only when an
+	// encoded start or remap uses a lookup (SPEC.md 6, rule 2(a)).
 	maps := mappingsOf(tune)
 	if maps.transforms() && len(maps.list) > ymxr.MostTransformations {
 		return Made{}, fmt.Errorf("the tune maps through %d transformations, and a mapping"+
@@ -101,11 +91,10 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	last := ratesAfter(rows)
 	used := 0
 	for f := 0; f < size; f++ {
-		// After the wrap the player keeps what the last row left, so the
-		// row the tune repeats to writes its targets again, the mapping of
-		// each effect a row maps through a transformation, and each value
-		// of the rate whose value after the last row differs from its value
-		// before the repeat row (rule 4(e)).
+		// The wrap preserves player state. Write targets again after the
+		// repeat row, restore mappings for effects using lookups, and restore
+		// rate values that differ from the end of the tune (SPEC.md 6, rules
+		// 2(g), 4(e)).
 		if f == repeat {
 			for i := range target {
 				target[i] = -1
@@ -154,8 +143,8 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	return Made{Columns: columns, Sources: ymxr.Passed(built), Rate: tune.Rate}, nil
 }
 
-// mapsAValue is whether a row sets a mapping column to a transformation, 1
-// to 127, which makes the tune file version 10 (SPEC.md 3.3.5).
+// mapsAValue reports whether any row selects a transformation number,
+// requiring version 10 (SPEC.md 3.3.5).
 func mapsAValue(column [][]byte) bool {
 	for c := ymxr.MappingColumn; c < ymxr.Mapped; c++ {
 		for _, value := range column[c] {
@@ -185,17 +174,17 @@ func registers(row ymxs.Row, out []byte) {
 	}
 }
 
-// effect writes one row's operation on one effect, as its four columns and
-// its mapping column, and the bit of the effects word where the row starts
-// one. at is the row of the structure, for the line of an error.
+// effect encodes one effect operation into its four columns and
+// optional mapping column, updating effects-used bits. at is the
+// original structure row for diagnostics.
 func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 	target *[4]int, kept *rates, maps *mappings, at int) (int, error) {
 	t := ymxr.Effect + 4*i
 	switch e := one.(type) {
 	case ymxs.Stop:
-		// The set bit with no source under it: the timer stops, and the
-		// row leaves the rate columns and the mapping column unset (SPEC.md
-		// 1.8, rule 3(c)).
+		// A stop sets source 0 and leaves rate and mapping columns unset. It
+		// cancels a pending start but preserves the kept mapping for later
+		// starts (SPEC.md 6, rule 3(c)).
 		out[t+1] = byte(0x80)
 		kept.keep(i, one)
 		maps.stop(i)
@@ -348,34 +337,30 @@ func ratesAfter(rows []ymxs.Row) rates {
 	return out
 }
 
-// mappings is the mapping of each effect as the rows set it (SPEC.md 6,
-// rule 2(g)): kept is the kept mapping (1.10.3), 0 at the first row;
-// running the mapping the running effect writes through, where the rows
-// fix it, and open where a deferred start through another may be pending;
-// and pending the mapping of a deferred start that may be pending, none,
-// or open after the wrap.
+// mappings tracks three values per effect: kept for later starts
+// (initially 0), running for current ticks, and pending for a deferred
+// start's captured mapping. open marks values not determined by frame
+// rows; none marks an absent pending start (SPEC.md 6, rule 2(g)).
 type mappings struct {
 	kept, running, pending [4]int
 
-	// list is the tune's transformations, transformation n at n - 1
-	// (YMXS, SPEC.md 1.9).
+	// list contains transformations in first-use order, with number n at
+	// index n - 1 (YMXS, SPEC.md 1.9).
 	list []ymxs.Transformation
 
-	// claimed is whether the effect's timer is a timer of the tune, which a
-	// row starts a source on (YMXS, SPEC.md 1.10); maps whether a start of
-	// the effect, or a remap on a timer of the tune, maps through a
+	// claimed marks timers used by a start anywhere in the tune. maps
+	// marks effects with an encoded start or remap through a
 	// transformation.
 	claimed, maps [4]bool
 
-	// runs is the target of the last start on the effect, and before its
-	// first start the target of that start: the target a line reports for
-	// a remap.
+	// runs records the latest start's target, or the first start's target
+	// before one occurs. Used for remap diagnostics.
 	runs [4]ymxs.Target
 }
 
-// transforms is whether a start, or a remap on a timer of the tune, maps
-// through a transformation: the first such row on an effect sets its mapping
-// column to 1 to T, so the file is version 10 (SPEC.md 3.3.5).
+// transforms reports whether an encoded start or remap uses a
+// transformation. Its first selection requires version 10 (SPEC.md
+// 3.3.5).
 func (m *mappings) transforms() bool {
 	for _, one := range m.maps {
 		if one {
@@ -392,7 +377,8 @@ const (
 	open = -1
 )
 
-// mappingsOf is the mappings of the tune at its first row.
+// mappingsOf initializes identity mappings at row 0 and records each
+// effect's targets and transformation use.
 func mappingsOf(tune ymxs.Tune) mappings {
 	out := mappings{list: ymxs.Transformations(tune)}
 	for i := range out.pending {
@@ -424,15 +410,12 @@ func mappingsOf(tune ymxs.Tune) mappings {
 	return out
 }
 
-// number is the number a mapping column is written with for the mapping
-// on the target (SPEC.md 1.10.1): 0 for a mapping of no parts, and
-// otherwise the number of its last part, 0 for the identity and n for
-// transformation n of the list. The last part maps the one value of setR0
-// to setR13, the volume of setVoiceX and setNoiseX, the shape of setBuzzer,
-// the coarse nibble of setToneX and the high byte of setEnvelope.
-//
-// The error is the line of a part before the last that is a
-// transformation, with the row at.
+// number encodes the mapping's last part: 0 for identity or an empty
+// mapping; otherwise its transformation number in list. Earlier parts
+// must be Identity. The last value is volume for voice/noise targets,
+// shape for buzzer, the coarse nibble for tone, envelope high byte for
+// envelope, or the sole register value (SPEC.md 1.10.1). An earlier
+// lookup returns an error with structure row at.
 func (m *mappings) number(mapping ymxs.Mapping, target ymxs.Target, at int) (int, error) {
 	parts := mapping.Parts
 	if len(parts) == 0 {
@@ -452,12 +435,11 @@ func (m *mappings) number(mapping ymxs.Mapping, target ymxs.Target, at int) (int
 	return numbers[0], nil
 }
 
-// start writes the mapping column of a start on effect i through that
-// mapping number, where it differs from the kept mapping: a start whose
-// mapping column is unset runs through the kept mapping, and a deferred
-// one keeps it from its row (SPEC.md 1.10.2, 1.10.3). The effect before a
-// deferred start runs through its mapping until the tick that performs
-// it, which the rows leave open.
+// start writes a changed kept mapping and captures it for this start.
+// An immediate start replaces running and clears pending. A deferred
+// start preserves current ticks until the boundary; if its mapping
+// differs, running becomes open because rows alone do not determine
+// when installation occurs (SPEC.md 6, rule 2(g)).
 func (m *mappings) start(out []byte, i, mapping int, target ymxs.Target, deferred bool) {
 	m.runs[i] = target
 	if mapping != m.kept[i] {
@@ -475,13 +457,12 @@ func (m *mappings) start(out []byte, i, mapping int, target ymxs.Target, deferre
 	m.pending[i] = none
 }
 
-// remap writes the mapping column of a remap on effect i. A remap on a
-// timer outside the tune leaves every column as it is (rule 2(a)). On a
-// timer of the tune, idle or running, it sets the mapping column with the
-// source column unset (SPEC.md 1.10.2), and is left out where the effect
-// runs through its mapping already. Equal to the kept mapping it is
-// written all the same where a deferred start through another mapping may
-// be pending or may have been performed (rule 2(g)).
+// remap ignores timers outside the tune. Otherwise it writes the
+// mapping column with the source column unset when the requested
+// mapping differs from running. Equality with kept does not remove the
+// write: a deferred start may have installed a different mapping. A
+// written remap updates kept; pending retains its snapshot (SPEC.md 6,
+// rule 2(g)).
 func (m *mappings) remap(out []byte, i int, mapping ymxs.Mapping, at int) error {
 	if !m.claimed[i] {
 		return nil
@@ -502,18 +483,17 @@ func (m *mappings) remap(out []byte, i int, mapping ymxs.Mapping, at int) error 
 	return nil
 }
 
-// stop is a stop on effect i, which leaves the mapping column unset (rule
-// 3(c)): it drops a pending start, and the next start keeps the kept
-// mapping.
+// stop leaves the mapping column unset, cancels pending and preserves
+// kept for later starts (SPEC.md 6, rule 3(c)).
 func (m *mappings) stop(i int) {
 	m.pending[i] = none
 	m.running[i] = m.kept[i]
 }
 
-// wrap is the repeat row: the player keeps what the last row left, so the
-// first pass leaves open the mapping of each effect a row maps through a
-// transformation. An effect through the identity alone keeps 0 through the
-// wrap, and its mapping column is 0 in every row.
+// wrap opens kept, running and pending for effects using
+// transformations, so the first later start or remap writes the
+// required mapping. Identity-only effects retain 0 and their mapping
+// column remains constant (SPEC.md 6, rule 2(g)).
 func (m *mappings) wrap() {
 	for i := range m.maps {
 		if m.maps[i] {
@@ -528,12 +508,11 @@ func (m *mappings) wrap() {
 // column for.
 const unstarted = -1 << 30
 
-// marks is where each source's marker is and which target it runs on: the
-// column bit 7 marks, -1 where the target's register fills its byte; the
-// target's number, which a counted source on setR7 reads the port
-// directions in for (rule 2(f)); whether every start of the source maps it
-// through a transformation, so its rows are keys (3.1.6); and whether a
-// start on setR7 maps it through one (rule 2(f)).
+// marks records source encoding attributes: marker column (-1 for
+// counted full-byte targets), target number, whether every start uses a
+// lookup, and whether a setR7 start uses one. These select counted
+// encoding for high keys and preserve mixer port bits (SPEC.md 3.1.6;
+// rule 2(f)).
 type marks struct {
 	column, target []int
 	keyed, mixer   []bool
@@ -609,14 +588,11 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 	return out, nil
 }
 
-// sourceTables is the sources as tables of this format: a column a value of
-// the row, bit 7 set on the last row of the marker's column (SPEC.md 3.2),
-// and the row the source repeats to, its row count where it plays once.
-//
-// A source whose target's register fills its byte has no bit for the
-// marker: every row is a whole byte and a player counts them (3.1). So is a
-// source of one column whose every start maps it through a transformation,
-// where a key of 128 or more is in a row (3.1.6).
+// sourceTables encodes DTX1 sources with one byte column per target
+// value. Marked sources set bit 7 of the marker column on the last row
+// alone; counted sources preserve all byte bits. Full-byte targets
+// require counting. A one-column source used only through lookups also
+// requires counting when a key reaches 128 (SPEC.md 3.1.6, 3.2).
 func sourceTables(sources []ymxs.Source, marks marks) ([]ymxr.Source, error) {
 	var out []ymxr.Source
 	for n, source := range sources {
@@ -645,8 +621,8 @@ func sourceTables(sources []ymxs.Source, marks marks) ([]ymxr.Source, error) {
 		for r, row := range values {
 			for c := range columns {
 				value := row[c]
-				// Through a transformation on setR7 a key k is read as k +
-				// 192, the two port directions set (rule 2(f)).
+				// Store setR7 key k as k + 192, preserving both port directions
+				// (SPEC.md 6, rule 2(f)).
 				if marks.mixer[n] && value > ymxr.MostMixerKey {
 					return nil, fmt.Errorf("the source %s has the key %d in row %d on"+
 						" setR7, and a key on setR7 is 0 to %d", ymxs.SourceName(source),

@@ -11,14 +11,10 @@ import (
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
-// A bound tune: a tune file's tables bound with DTX's reader into what the
-// player reads. doc/BINARIES.md is the contract. The header has bytes 4 to
-// 11 of the tune file after the magic, then the bytes of the state block
-// the image's reader needs, so that a host allocates them without reading
-// the image, the image's offset, the table's offset in the image, in
-// version 10 the transformation block's offset, and the source index. The
-// DTX1 tables follow it, then the image DTX packages the DTX3 table into,
-// and in version 10 the transformation block.
+// A tune bound with DTX's reader for playback (doc/BINARIES.md 1).
+// Sources precede the reader image; optional transformation tables follow
+// it. Frames prepare lookups from those tables; ticks read source rows
+// and prepared lookup pages.
 //
 //	offset  bytes  what it is
 //	0       4      YMXB
@@ -46,8 +42,9 @@ import (
 // BoundMagic is the four bytes a bound tune opens with.
 var BoundMagic = []byte{'Y', 'M', 'X', 'B'}
 
-// Where a bound tune's fields are: BoundIndexAt in versions 7 to 9, and in
-// version 10 BoundTransformationsAt, where the transformation block begins.
+// Bound field offsets: BoundIndexAt is the source index in versions 7
+// to 9; version 10 replaces that position with BoundTransformationsAt,
+// the transformation-block pointer.
 const (
 	StateAt                = 12
 	ImageAt                = 16
@@ -56,8 +53,8 @@ const (
 	BoundTransformationsAt = 24
 )
 
-// BoundIndex is where a bound tune's source index begins: at 24, and at 28
-// in version 10, after the transformation block's offset.
+// BoundIndex returns the source-index offset: 24 in versions 7 to 9; 28
+// in version 10, after the transformation-block pointer.
 func BoundIndex(version int) int {
 	if version == ymxr.Version {
 		return BoundTransformationsAt + 4
@@ -73,15 +70,11 @@ const (
 	FormatTableAt = 8
 )
 
-// Set is a set of tunes bound together: the images their tables were
-// packaged into, and a bound tune for each, in the order named. A bound
-// tune here has no image and no transformation block in it, and its
-// ImageAt and in version 10 its BoundTransformationsAt are at 0 for the
-// caller that lays them out to patch.
-//
-// The tunes are grouped by what an image fixes once (DTX abi.md 1), so
-// tunes that agree on those share one image and the reader's code is
-// once for the group.
+// Set contains shared images and bound tunes in input order. Tunes with
+// the same image parameters share reader code (DTX abi.md 1). Each
+// bound tune omits its image and transformation block; ImageAt and
+// BoundTransformationsAt are 0 until the caller places and patches
+// them.
 type Set struct {
 	Images []([]byte)
 	Shapes []string
@@ -92,8 +85,8 @@ type Set struct {
 	Image []int
 	Table []int
 
-	// Blocks is each tune's transformation block, nil for a tune below
-	// version 10.
+	// Blocks contains each tune's transformation block, nil below version
+	// 10.
 	Blocks [][]byte
 }
 
@@ -186,10 +179,9 @@ func shape(dtx3 []byte) (string, error) {
 		int(dtx3[payload+2]), columns, header.Width), nil
 }
 
-// Bound is the bound tune of a tune file: the header with the magic and
-// the version replaced and the state block's bytes and the image's place
-// put in, the index recomputed, the file's DTX1 tables as they are, the
-// image, then in version 10 the file's transformation block.
+// Bound binds a tune file: header, recomputed source index, unchanged
+// DTX1 tables, packaged DTX3 image and, in version 10, transformation
+// block (doc/BINARIES.md 1).
 func Bound(tuneFile []byte) ([]byte, error) {
 	read, err := ymxr.Read(tuneFile)
 	if err != nil {
@@ -203,11 +195,11 @@ func Bound(tuneFile []byte) ([]byte, error) {
 		ymxr.GetLong(image, FormatAt+FormatStateAt))
 }
 
-// Block is the transformation block of a tune file of version 10, and nil
-// for one of versions 7 to 9: bytes O to M - 1, O the long at 16 and M the
-// highest of O + 2 + 4T and the P + 2 + E of each transformation (SPEC.md
-// 3.4.2), byte for byte. The reader has read each offset against the
-// file's length.
+// Block copies a version 10 transformation block unchanged, or returns
+// nil for versions 7 to 9. The block begins at the header's long at 16
+// and ends after its index or last entry, whichever is later. Index
+// offsets are relative to the block, so relocation preserves them. The
+// reader has already checked bounds (SPEC.md 3.4.2).
 func Block(tuneFile []byte) []byte {
 	if ymxr.GetWord(tuneFile, 4) != ymxr.Version {
 		return nil
@@ -224,11 +216,10 @@ func Block(tuneFile []byte) []byte {
 	return tuneFile[at:end]
 }
 
-// build is the bound tune: the header, the state block's bytes, the
-// table's place in the image it is in, the source index, the file's DTX1
-// tables, then where the tune has an image the image and in version 10 the
-// transformation block. A nil image is a tune of a set, whose ImageAt and
-// BoundTransformationsAt the caller patches.
+// build writes the bound header, source index and DTX1 tables. If image
+// is supplied, append it and the version 10 transformation block. With
+// nil image, the caller places the shared image and block and patches
+// ImageAt and BoundTransformationsAt.
 func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	read, err := ymxr.Read(tuneFile)
 	if err != nil {
@@ -246,12 +237,10 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 		}
 		tables[i] = tuneFile[at:to]
 	}
-	// The DTX1 tables first and the image after them, so that a source's
-	// rows are beside the header however long the image is: a player
-	// whose ticks read a row through a displacement reaches 32,767 bytes
-	// (68k/YMXR.S, YMXR_PCREL). The transformation block is last, so that
-	// its 127 tables at most leave the sources where they are: a tick
-	// reads a source, and the block is read at the frame.
+	// Place sources before the image to preserve their reach through the
+	// player's signed word displacements. Put the transformation block
+	// last: frames read it, while ticks read sources and prepared lookup
+	// pages (BINARIES.md 1.3).
 	here := ymxr.Align(index + 4*count)
 	sourceAt := make([]int, count)
 	for i := 0; i < count; i++ {

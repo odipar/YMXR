@@ -113,26 +113,27 @@ YMXR_AEOI       equ     0
                 .else
 YMXR_DEFER      equ     0
                 .endif
-; The lookup (SPEC.md 1.10, 3.4): a tune of version 10 maps the last value
-; of an effect's target through a transformation, a table of entries that
-; a row's key indexes. YMXR_MAP=1 (rmac -dYMXR_MAP=1) assembles it in: a
-; core with it reads versions 7 to 10, and a tick of a source through a
-; transformation writes the key into the low byte of the displacement of
-; the read that follows, whose high byte selects one of two pages of 256
-; bytes, and that read writes the entry. A core without it reads versions
-; 7 to 9, reports -1 at init for version 10, and assembles to the bytes
-; it had before the lookup. In a core with it every byte from ymxr_tick0
-; on is a handler, an installer, or the padding that places a lookup
-; instance's page read and bank 1, so the reach a tool measures from there
-; (BINARIES.md 2.1) leaves out the frame's routines and the pages.
+; Optional transformation support (SPEC.md 1.10, 3.4). YMXR_MAP=1 adds
+; version 10: a lookup can replace only the target's last value; mapping
+; 0 writes source values unchanged. A remap changes values while
+; preserving source place and timing.
+;
+; At the frame, prepare an effect's lookup page. Each tick writes its
+; source key into the low byte of the next read's displacement; the high
+; byte selects one of two 256-byte pages. That read writes the selected
+; entry. Marker mirrors and setR7 port bits are prepared by ymxr_fill.
+;
+; With lookup support, init accepts versions 7 to 10. Without it, init
+; accepts 7 to 9 and reports -1 for 10. Code from ymxr_tick0 onward
+; contains handlers, installers and alignment padding; tools measure
+; source reach from there (BINARIES.md 2.1).
                 .if     ^^defined YMXR_MAP
                 .else
 YMXR_MAP        equ     0
                 .endif
                 .if     YMXR_MAP
-YMXR_VERSION    equ     $000A           ; the version it reads: 10, whose
-                                        ; table has the four mapping
-                                        ; columns, and 7 to 9
+YMXR_VERSION    equ     $000A           ; reads versions 7 to 10,
+                                        ; including mapping columns
 YMXR_COLUMNS    equ     34
                 .if     YMXR_DEFER
 YMXR_SITES      equ     38              ; the other read sites (ymxr_sites)
@@ -308,13 +309,11 @@ ARMOFF          equ     32              ; the mirror: the armed start's target,
 FX_APLACE       equ     52              ; the row the armed start is at
 FX_ABANK        equ     56              ; the bank it is armed in, 0 or BANK
                 .if     YMXR_MAP
-; The lookup's bytes (SPEC.md 1.10.3): the kept mapping, 0 the identity
-; and 1 to 127 a transformation; the mapping the running source plays
-; through; a square's level at row 0, which the place's reset writes; for
-; each bank the page its lookup instances read, 0 or 1; and for each of its
-; two pages the transformation it was filled with, 0 before a fill, and the
-; fill kind: 0 plain, 1 the mirror of a marked column, 2 the ports of
-; setR7 (ymxr_fill).
+; Lookup state (SPEC.md 1.10.3): kept mapping for later starts, running
+; mapping for current ticks, and a square's row-0 level for place reset.
+; Mapping 0 is identity; 1 to 127 select tables. Each bank records its
+; selected page and each page's cached transformation and fill kind: 0
+; plain, 1 marker mirror, 2 setR7 ports (ymxr_fill).
                 .if     YMXR_DEFER
 FX_MAP          equ     21              ; the kept mapping
 FX_AMAP         equ     33              ; an armed start's mapping and its
@@ -408,16 +407,16 @@ r\{col}:
                 move.b  $7FFF(a1),d1
                 .endm
 
-; The count column at a deferred start's site (4.8), and with the lookup
-; the mapping column, which init patches from the table of sites as it
-; patches the two above.
+; Deferred-start count-column site (SPEC.md 4.8). With lookup support,
+; the mapping-column site follows. Init patches both from the site
+; table.
                 .macro  DREAD   col
 d\{col}:
                 move.b  $7FFF(a1),d1
                 .endm
 
-; The mapping column at a remap's site (SPEC.md 1.10.2), which init patches
-; from the table of sites as it patches the three above.
+; Remap mapping-column site (SPEC.md 1.10.2), patched by init from the
+; site table.
                 .macro  MREAD   col
 m\{col}:
                 move.b  $7FFF(a1),d1
@@ -715,11 +714,10 @@ q\{ct}:         bra.w   \{tick}_done
                 bclr    #5,d2
                 bra.w   \{tick}_rate
                 .if     YMXR_MAP
-; A start in a tune that maps a value (SPEC.md 1.10.2), which init aims
-; the branch at _now at: the mapping column, or the kept mapping where the
-; row leaves it unset, is the mapping the source runs through. The
-; identity runs the start above; a transformation the routine every
-; effect shares. d1 the source.
+; Start with optional lookup support (SPEC.md 1.10.2). Init redirects
+; _now here. A set mapping column replaces kept; an unset column reuses
+; it. Identity uses the start above; a transformation uses the shared
+; lookup-start routine. d1 is the source number.
 \{tick}_mapped: move.w  d1,d3
                 READ    \cm                     ; the mapping column
                 bpl.s   .kept\~
@@ -733,9 +731,9 @@ q\{ct}:         bra.w   \{tick}_done
                 bsr.w   ymxr_lstart
                 bclr    #5,d2
                 bra.w   \{tick}_rate
-; A remap (1.10.2): a row that sets the mapping column and leaves the
-; source column unset, which init aims _unset at in a tune that maps a
-; value. A row that sets neither reads the rate.
+; Remap entry (SPEC.md 1.10.2). Init redirects _unset here for a tune
+; using lookups. A set mapping column changes current ticks; an unset
+; one continues to rate processing.
 \{tick}_remapck:
                 MREAD   \cm
 \{tick}_mexit:  bpl.w   \{tick}_rate            ; _retune where a row defers
@@ -743,12 +741,11 @@ q\{ct}:         bra.w   \{tick}_done
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
                 bsr.w   ymxr_remap
                 bra.w   \{tick}_rate
-; The timer's reset in a tune that maps a value, which init aims the
-; reset's test at: d3 is the control register's byte before the reset
-; stops the timer, so a remap on the row reads the timer as it was before
-; the row, a remap, then a retune (1.10.2). With deferred starts the
-; reset of a row with bit 3 waits for the switch, as at _rck below (4.3
-; step 1).
+; Timer reset with lookup support. Init redirects the reset test here.
+; Preserve the pre-reset control byte in d3 so remap processing reads
+; the timer's state before this row: remap precedes retune (SPEC.md
+; 1.10.2). A deferred row delays reset until installation, as at _rck
+; below.
 \{tick}_rmk:    btst    #6,d2
                 beq.w   \{tick}_kept
                 move.b  \ctrl.w,d3
@@ -1310,18 +1307,15 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 .endm
 
-; The lookup instances, beside TICK, TICKC and TICKW: a tick writes
-; its place's byte, the key, into the low byte of the displacement of the
-; read that follows, whose high byte selects one of the effect's two
-; pages, and that read writes the entry to the chip. A marked column's page
-; has entry k + 128 equal to entry k with bit 7 set, so the read leaves the
-; marker in N; a counted source ends on its counter. Each kind stops at the
-; marker by a beq.w to one halt an effect: the general handler's, whose
-; instructions are the same, or with the monitor an LHALT, whose count is
-; the lookup's.
-
-; The key's write and the page's read. The place is the key write's
-; source, at +8 as in TICK.
+; Lookup instances of TICK, TICKC and TICKW. A tick writes its source
+; key into the next read's low displacement byte; the high byte selects
+; an effect page. The read writes the lookup entry. For a marked column,
+; page[k + 128] is page[k] with bit 7 set, preserving the marker in N.
+; Counted sources end on their counter.
+;
+; Each kind branches to one halt per effect: the general halt, or LHALT
+; under the monitor for lookup-cycle counts. The key write's source
+; operand is the place at +8, as in TICK.
                 .macro  LKEY    name,ptr,cells,page
                 .if     YMXR_PCREL
 \{name}_\{ptr}: move.b  \{name}_\{cells}(pc),($12345678).l ; +2 the place,
@@ -1408,9 +1402,9 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 .endm
 
-; A lookup instance of several columns: column \look of \columns is the
-; one mapped (SPEC.md 1.10.1), and every other is written as TICKW writes
-; it.
+; Multi-column lookup instance. Only column \look of \columns uses a
+; transformation; all other columns follow TICKW unchanged (SPEC.md
+; 1.10.1).
                 .macro  TICKWL  name,columns,counted,look,page,halt,eoi,eoir,ctrl,keep,ier,bit,colour,inst
 \name:
                 MARK    \colour
@@ -1508,8 +1502,8 @@ q\{ct}:         bra.w   \{tick}_done
                 ds.b    (\page-(*+\key))&255
                 .endm
 
-; The stop at the marker under the monitor, one an effect for its eight
-; lookup kinds.
+; Monitor halt at the marker: one per effect, shared by its eight lookup
+; kinds.
                 .macro  LHALT   name,eoi,eoir,ctrl,keep,ier,bit
 \name:          andi.b  #\keep,\ctrl.w
                 move.b  #255-(1<<\bit),(\ier+4).w
@@ -1520,10 +1514,9 @@ q\{ct}:         bra.w   \{tick}_done
                 rte
                 .endm
 
-; A lookup kind's four instances linked at init, in the bank d6 names, as
-; the identity's handlers are: the addresses its steps and its loop read,
-; its key's address, its counter at 1, and the page byte of page 0, out of
-; the table of page bytes from \kind(a4) on, eight bytes an effect.
+; Link four instances of a lookup kind at init in bank d6. Patch step,
+; loop and key addresses, initialize the counter to 1, and select page 0
+; from the page-byte table at \kind(a4), eight bytes per effect.
                 .macro  LINKKEY p
                 lea     \{p}_KEY(a5),a3
                 move.l  a3,\{p}_KEYA(a5)
@@ -1588,11 +1581,10 @@ q\{ct}:         bra.w   \{tick}_done
                 dbra    d2,.l\~
                 .endm
 
-; A stepping handler's kind as the lookup's routines read it: its effect-0
-; instance from ymxr_tick0, the stride to the next effect's, its columns
-; less 1, its first loop cell, its rows left and rows of a pass (0 where
-; it counts none), its page byte (0 for the identity), the shape the
-; record names it by, its fill kind, and a register and a place a column.
+; Stepping-handler descriptor: effect-0 offset from ymxr_tick0, effect
+; stride, column count minus 1, first loop cell, remaining/pass counters
+; (0 when absent), page byte (0 for identity), shape, fill kind, then
+; register and place offsets per column.
 KD_BASE         equ     0
 KD_STEP         equ     2
 KD_COLS         equ     4
@@ -1611,8 +1603,8 @@ KD_SIZE         equ     28
                 dc.w    \s1,\p1,\s2,\p2,\s3,\p3
                 .endm
 
-; The offsets of a lookup kind, measured off its effect-0 instance as the
-; handlers' are, and the assertions on its instances.
+; Offsets within an effect-0 lookup instance, plus assertions for each
+; instance.
                 .macro  LOOKAT1 p,name,counted
 \{p}_SEL        equ     \{name}_row-\name+3
 \{p}_PTR        equ     \{name}_ptr-\name+2
@@ -1731,9 +1723,9 @@ KEY_LV          equ     LOOK_MK+6+LOOK_RD+6+LOOK_KW+2
 KEY_LE          equ     LOOK_MK+6+LOOK_RD+6+LOOK_KW+2
 KEY_LF          equ     LOOK_MK+6+LOOK_KW+2
 KEY_LB          equ     LOOK_MK+6+LOOK_RD+6+LOOK_RD+6+LOOK_KW+2
-; The stride of every lookup kind, the size of the two of three columns:
-; each kind's four instances are this far apart, so effect e's page read
-; is e times this past effect 0's modulo 256, the residue of its pages.
+; Common lookup-instance stride, sized for three columns. Effect e's
+; page read is e * LOOK_STRIDE past effect 0's modulo 256, matching that
+; effect's pages.
 LOOK_STRIDE     equ     114+(4*YMXR_NEST)+(12*(1-YMXR_AEOI))+(42*YMXR_PERF)+(12*(1-YMXR_PCREL))+(4*YMXR_DEFER)
                 .endif
 
@@ -1801,10 +1793,9 @@ YMXR_init:
                 bne     .bad6                   ; needs a core with them
                 .endif
                 .if     YMXR_MAP
-; Version 10: the transformations' block, the signed long at 24 from the
-; bound tune's first byte, and the source index at 28 (BINARIES.md 1.2);
-; 0 for versions 7 to 9, whose effects run through the identity. A tune
-; that maps a value, bit 5 of the effects used, is version 10 (SPEC.md
+; Version 10 bound layout: signed transformation-block offset at 24,
+; source index at 28 (BINARIES.md 1.2). Earlier versions use identity
+; and a zero block pointer. Effects bit 5 marks version 10 (SPEC.md
 ; 3.3.5).
                 moveq   #0,d0
                 cmp.w   #10,TF_VERSION(a0)
@@ -2147,9 +2138,9 @@ YMXR_init:
                 lea     TWC_SIZE(a5),a5
                 dbra    d2,.linkenv
                 .if     YMXR_MAP
-; The lookup instances, linked as the handlers above are, with each one's
-; page byte for page 0 out of the bank's 32 bytes of the table. The
-; records cleared below load no page.
+; Link lookup instances as above, selecting page 0 from the bank's
+; page-byte table. Clearing the records below leaves every page
+; uncached.
                 lea     ymxr_htab(pc),a4
                 tst.w   d6
                 beq.s   .htab
@@ -2283,17 +2274,15 @@ YMXR_init:
                 .endif
 
                 .if     YMXR_MAP
-; A tune that maps a value, bit 5 of the effects used (SPEC.md 3.3), aims
-; three branches of every effect at the paths that read the mapping
-; column: the start's, the one of a row that leaves the source column
-; unset, and the timer's reset, whose path copies the control register
-; into d3 for a remap on the row. Every other tune runs the start through
-; the identity, the rate and the reset. Each is written on every init, as
-; the heads are; a core with deferred starts writes the reset's branch of
-; every other tune above. With deferred starts a fourth, the remap's exit
-; where the row leaves the mapping column unset, goes to _retune in a tune
-; that defers a start as well, which settles a switch the tick has made,
-; and to the rate in every other.
+; For effects bit 5, redirect each effect's start, unset-source and
+; timer-reset branches to mapping-aware paths. Reset preserves the
+; control byte in d3 for remaps. Other tunes use identity start and
+; ordinary rate/reset paths. Rewrite every branch at each init.
+;
+; With deferred support, an unset mapping continues through _retune when
+; the tune also defers starts. That path updates the record after a tick
+; installs a pending start; other tunes continue directly to rate
+; processing.
                 lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
                 moveq   #3,d2
@@ -2728,12 +2717,10 @@ ymxr_sites:
                 .endif
                 .endif
 
-; The handlers, from ymxr_tick0 to ymxr_reach, and the offsets measured
-; off them, as two macros: a core without the lookup places both here, and
-; one with it after the frame's routines, so that every byte from
-; ymxr_tick0 on is a handler, an installer or padding (YMXR_MAP above).
-; rmac measures an equate off labels before it, so the offsets follow the
-; handlers.
+; Handler and offset macros. Without lookups, expand both here; with
+; lookups, expand them after frame routines. This keeps handlers,
+; installers and padding together from ymxr_tick0 for reach measurement.
+; Offsets follow their labels because rmac requires prior definitions.
                 .macro  HANDLERS
 ; ---------------------------------------------------------------- ticks
 
@@ -2777,11 +2764,10 @@ ymxr_sites:
                 TICKW   ymxr_env2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
                 TICKW   ymxr_env3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
                 .if     YMXR_MAP
-; The lookup instances of bank 0, after the identity's handlers: eight
-; kinds an effect, each instance padded so that its page read's
-; displacement is on its effect's pages modulo 256, and under YMXR_DEFER
-; the bank padded to a multiple of 256, so bank 1's are on the same.
-; Without the monitor each kind stops at the general handler's halt.
+; Bank-0 lookup instances follow identity handlers. Pad each of eight
+; kinds per effect so its page-read displacement matches its pages
+; modulo 256. With deferred support, align bank 1 to the same residue.
+; Without the monitor, all kinds use the general halt.
                 .if     YMXR_PERF=0
 ymxr_lhalt0     equ     ymxr_tick0_halt
 ymxr_lhalt1     equ     ymxr_tick1_halt
@@ -3250,8 +3236,8 @@ RS_MAP          equ     ymxr_tick0_rmk-ymxr_tick0_rs-2
                 .endif
                 .endif
                 .if     YMXR_MAP&YMXR_DEFER
-; The remap's exit where the row leaves the mapping column unset, and its
-; displacement to the rate and to _retune.
+; Remap exit for an unset mapping column: displacements to ordinary rate
+; processing and _retune.
 REMAP_AT        equ     ymxr_tick0_mexit-ymxr_tick0_over+2
 REMAP_RATE      equ     ymxr_tick0_rate-ymxr_tick0_mexit-2
 REMAP_RETUNE    equ     ymxr_tick0_retune-ymxr_tick0_mexit-2
@@ -3277,8 +3263,8 @@ SET_DEFER       equ     ymxr_tick0_check-ymxr_tick0_set-2
                 .endif
 RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .if     YMXR_MAP
-; The byte branches init writes, against the larger effect of a core with
-; the lookup.
+; Init branch bytes for the larger effect record used with lookup
+; support.
                 .if     (((WIDE_ONE+128)|(WIDE_WIDEN+128)|(RESET_DONE+128)|(RESET_WIDE+128))&$FFFFFF00)<>0
                 .error  "a branch init writes is past a byte's displacement"
                 .endif
@@ -3338,10 +3324,9 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .endm
 
                 .if     YMXR_MAP
-; The place's reset on a handler of several columns or a counted one
-; (SPEC.md 1.9), by the offsets of the kind the effect runs: the
-; identity's handler, or the lookup instance of its shape where it runs
-; through a transformation. d3 the effect; d0 to d5, a3 and a5 clobbered.
+; Place reset for counted or multi-column handlers. Use the running
+; kind's offsets for identity or lookup instances (SPEC.md 1.9). d3 is
+; the effect; clobbers d0 to d5, a3 and a5.
 ymxr_widereset:
                 move.w  d3,d4
                 mulu    #FX_SIZE,d4
@@ -3675,12 +3660,11 @@ ymxr_rem:       cmp.l   d4,d3
                 bra.s   .down
 
                 .if     YMXR_DEFER
-; A switch the installer has made (SPEC.md 4.8): the armed start's shape,
-; places at row 0 and row count become the record's, and no start is
-; pending. With the lookup its mapping becomes the running source's, the
-; kept mapping left as it is (1.10.3), and its square's level at row 0
-; the reset's; the page its lookup instance reads is FX_USE of the armed
-; bank, which the arming wrote. a3 the record.
+; Update the record after installation (SPEC.md 4.8): copy the armed
+; shape, row-0 places and row count, then clear pending. With lookups,
+; install its captured mapping as running and preserve kept (1.10.3).
+; Copy its square level for reset; FX_USE selects the armed bank's
+; prepared page. a3 is the record.
 ymxr_take:      move.b  FX_SHAPE+ARMOFF(a3),FX_SHAPE(a3)
                 move.l  FX_FIRST+ARMOFF(a3),FX_FIRST(a3)
                 move.l  FX_FIRST2+ARMOFF(a3),FX_FIRST2(a3)
@@ -3725,23 +3709,21 @@ ymxr_pend:      movem.l d4/a6,-(sp)
                 tst.b   FX_PENDING(a3)
                 rts
 
-; A deferred start on a running timer, armed (SPEC.md 4.8): the handler of
-; its source's shape, in the bank the vector does not point into, patched
-; as a start patches it, at the last row of the running source modulo R
-; of this one; its count, select, timer reset and handler into the
-; effect's installer; and one word of the running handler, the head of the
-; path that ends its source, written as a bra.s to its hook. A start
-; pending already is replaced: its hook stays, and the arming runs at
-; level 7, since the installer it patches may run. d1 the count column,
-; d2 the control byte, d3 the source, d4 the effect. Z where the start is
-; pending; NZ where the timer is stopped, with d1 the source, which the
-; frame then starts at once. d0, d3 to d5 and a3 to a5 are clobbered.
+; Arm a deferred start on a running timer (SPEC.md 4.8). Patch the
+; inactive bank's handler at the running source's row count modulo the
+; new source length. Store count, select and timer reset in the
+; installer; replace the running handler's end-path word with a branch
+; to its hook. Replacing a pending start retains the hook and patches
+; the installer at level 7.
 ;
-; With the lookup the start runs through the kept mapping after its row
-; (SPEC.md 1.10.3), which becomes FX_AMAP: a square and a source of one
-; row have entries in their immediates, and a source that steps a place
-; runs the lookup instance of its shape in that bank, its page filled with
-; interrupts on (ymxr_lstart).
+; d1=count column, d2=control byte, d3=source, d4=effect. Z means
+; pending; NZ means stopped, with source in d1 for an immediate start.
+; Clobbers d0, d3 to d5 and a3 to a5.
+;
+; With lookups, capture the row's kept mapping in FX_AMAP. Squares and
+; one-row sources store mapped entries as immediates. Stepping sources
+; use the inactive bank's lookup instance, with its page prepared while
+; interrupts remain enabled (ymxr_lstart).
 ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.w  sr,-(sp)
                 move.w  d4,d6                   ; the effect
@@ -3755,14 +3737,11 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 tst.b   FX_PENDING(a3)
                 beq.s   .first
                 .if     YMXR_MAP
-; A start through a transformation that replaces a pending one: its page
-; filled first, with interrupts on, in the bank the vector does not point
-; into, and beside the page the pending start reads, which FX_USE of that
-; bank selects (ymxr_page). A tick that performs the pending start
-; meanwhile moves the vector to the other bank; the test below reads it,
-; and the arming fills again, with interrupts on, into the bank the vector
-; moved from. That tick performs the one start pending, so the vector
-; keeps its bank until the arming writes the hook (SPEC.md 4.8).
+; Replacing a pending lookup start first fills an unused page with
+; interrupts enabled. If a tick installs the old pending start during
+; that fill, the vector changes banks. Re-read it and fill the newly
+; inactive bank once more. The old pending start has completed, so the
+; bank remains stable until the new hook is installed (SPEC.md 4.8).
                 tst.b   FX_MAP(a3)              ; the start's mapping
                 beq.s   .filled
                 move.w  d3,d0
@@ -3803,10 +3782,10 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.b  (a4),d5                 ; timer's control register
                 and.b   6(a6),d5
                 beq.w   .stopped
-; The rate the start writes at the switch, kept as a frame keeps it (4.3):
-; the count column, or the kept count where it is 0 and bit 4 is clear;
-; and the select. The target its source runs on is the mirror's, and with
-; the lookup its mapping the kept one after its row.
+; Capture the installation rate using frame rules (SPEC.md 4.3):
+; explicit count, or kept count when the column is unset, plus select.
+; Target comes from the mirror; mapping is the row's resulting kept
+; mapping.
 .live:
                 .if     YMXR_MAP
                 move.b  FX_MAP(a3),FX_AMAP(a3)
@@ -4113,27 +4092,21 @@ ymxr_park:      dc.b    $80
                 .even
 
                 .if     YMXR_MAP
-; ---------------------------------------------------------------- lookup
-
-; A start through a transformation (SPEC.md 1.10.2), which every effect
-; reaches: FX_RUN the transformation, 1 to 127, d3 the source, d2 the
-; row's control byte, d4 the effect. A source that steps a place runs the
-; lookup instance of its shape in bank 0, whose page is filled first with
-; interrupts on (ymxr_page); a square and a source of one row run their
-; handler, with entries in place of the keys in its immediates. The
-; handler's operands and the vector are written behind level 7, as a
-; start through the identity writes them, and the place is the row the
-; running handler is at modulo R where the row leaves bit 5 clear, read
-; behind level 7 too, since a tick between the read and the write steps
-; it (1.8.4). d0, d1, d3 to d5 and a3 to a5 are clobbered, and a2 is the
-; chip's select register on return.
+; Start through a transformation (SPEC.md 1.10.2). Inputs: FX_RUN=table
+; number, d3=source, d2=control byte, d4=effect. For stepping sources,
+; fill bank 0's lookup page with interrupts enabled. Squares and one-row
+; sources store mapped entries in handler immediates.
 ;
-; With deferred starts, a source that steps a place is armed here too
-; (ymxr_arm, WS_ARMING set): through the kept mapping after the row, in
-; the bank FX_ABANK selects and at the row FX_APLACE, into the record's
-; mirror, with FX_USE of that bank its page; the installer writes the
-; vector. a5 the instance and a3 the mirror on return. With WS_ARMING at
-; 1 the page alone is filled, and a3 is the record.
+; Patch operands and vector at level 7. With place reset clear, read the
+; running place and reduce it modulo the new source length at that level
+; too, so a tick cannot advance it between read and write (1.8.4).
+; Clobbers d0, d1, d3 to d5 and a3 to a5; returns a2 at the chip select
+; register.
+;
+; Deferred arming uses FX_ABANK and FX_APLACE, the captured mapping, and
+; the record mirror. The installer writes the vector later. Return
+; a5=instance, a3=mirror. With WS_ARMING=1, fill only the page and
+; return a3=record.
 ymxr_lstart:    movem.l d2/d6-d7/a1/a6,-(sp)
                 move.w  d4,d6                   ; the effect
                 mulu    #FX_SIZE,d4
@@ -4387,29 +4360,22 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 lea     YM_SELECT.w,a2
                 rts
 
-; A remap (SPEC.md 1.10.2): d1 the mapping a row sets with the source
-; column unset, 0 to 127, d4 the effect, d2 the row's control byte, and
-; d3 the timer's control register before the reset where the row resets
-; the timer (_rmk). The kept mapping is set; on a timer running at the
-; row the running source plays through the mapping from its next tick,
-; its place and its rate as they are, and on a stopped timer the next
-; start keeps it. A square and a source of one row have their entries
-; rewritten. A source that steps a place runs the lookup instance
-; of its shape in the bank of the running handler: between two
-; transformations the instance's page byte moves to the other page, which
-; has the new one (ymxr_page); between the identity and a transformation
-; the source moves to the other handler (ymxr_move). d0, d1, d3 to d5
-; and a3 to a5 are clobbered, and a2 is the chip's select register on
-; return.
+; Remap (SPEC.md 1.10.2). Inputs: d1=mapping number 0 to 127, d4=effect,
+; d2=control byte, d3=pre-reset timer control when applicable. Replace
+; kept. If running, replace its mapping while preserving source, place
+; and rate; if stopped, preserve the new mapping for a later start.
 ;
-; A start pending on the timer (4.8) keeps the mapping of its row, and the
-; remap sets the running source's (YMXS, SPEC.md 3.5.5): a switch the tick
-; has made is settled first, then the remap runs behind level 7, so the
-; tick that would perform the start comes before it or after it. The fill
-; of a page alone runs with interrupts on; where the tick performs the
-; start meanwhile, the record becomes the armed start's and the remap acts
-; on the source the tick started. A source moved to another handler moves
-; the hook with it (ymxr_rehook), and a square's hook has its mask too.
+; Squares and one-row sources replace immediate entries. Stepping
+; sources switch the running bank's page between transformations
+; (ymxr_page), or move between identity and lookup handlers (ymxr_move).
+; Clobbers d0, d1, d3 to d5 and a3 to a5; returns a2 at the chip select
+; register.
+;
+; A pending start retains its captured mapping. First update the record
+; for any completed installation, then remap at level 7. Page filling
+; alone enables interrupts; if installation occurs during the fill,
+; remap the newly running source. Moving handlers also moves the pending
+; hook (ymxr_rehook), including a square's mask.
 ymxr_remap:     movem.l d2/d6-d7/a1/a6,-(sp)
                 .if     YMXR_DEFER
                 move.w  sr,-(sp)
@@ -4526,10 +4492,9 @@ ymxr_rpage      equ     *                       ; the rig's boundary (inside)
                 bsr     ymxr_move
                 bra     .done
                 .if     YMXR_DEFER
-; A start pending: the page filled with interrupts on, then the vector
-; read again behind level 7. Where the tick has performed the start
-; meanwhile, the record becomes the armed start's, and the remap acts on
-; the source the tick started.
+; Fill with interrupts enabled, then re-read the vector at level 7. If a
+; tick installed the pending start meanwhile, update the record and
+; remap the new running source.
 .pfill:         move.w  (sp),sr
                 bsr     ymxr_page
                 ori.w   #$0700,sr
@@ -4663,13 +4628,11 @@ ymxr_move:      move.w  KD_COLS(a2),d4
                 .endif
 
                 .if     YMXR_DEFER
-; A remap that moves the running source to the handler a4, of kind d0 in
-; ymxr_kinds, while a start is pending (SPEC.md 4.8): the word the hook
-; wrote over put back into the handler the source leaves, and a4 hooked
-; at the head of its path that ends the source, its word kept for the
-; installer to write back at the switch and for a drop. Behind level 7,
-; with the vector still on the handler the source leaves. a3 the record,
-; d6 the effect; d0 clobbered.
+; Move a pending hook when remapping to handler a4, kind d0 in
+; ymxr_kinds. Restore the old handler's end-path word, hook a4, and save
+; its overwritten word for installation or cancellation. Runs at level 7
+; while the vector still selects the old handler. a3=record, d6=effect;
+; clobbers d0.
 ymxr_rehook:    tst.b   FX_PENDING(a3)
                 beq.s   .none
                 movem.l d1/a1-a2,-(sp)
@@ -4694,14 +4657,14 @@ ymxr_rehook:    tst.b   FX_PENDING(a3)
 .none:          rts
                 .endif
 
-; The page of effect d6 in bank d4 that has FX_RUN's transformation in the
-; fill kind d5, a3 the record: the page in use where it has it, else the
-; other, filled where it has another. A page the running instance does not
-; read is filled with interrupts on. d0 the page, 0 or 1; the other
-; registers are kept. While a deferred start is armed (WS_ARMING) the
-; transformation is the kept mapping after its row, and where a start
-; pending in that bank reads a page, FX_USE of the bank selects it, so the
-; fill leaves it as it is.
+; Select the cached page for FX_RUN, effect d6, bank d4 and fill kind
+; d5; a3 is the record. Prefer the selected page if it matches,
+; otherwise use or fill the other page. Fill only an unused page, with
+; interrupts enabled. Return d0=page 0 or 1; preserve other registers.
+;
+; While arming, use the row's captured mapping. FX_USE identifies any
+; page read by an existing pending start, so filling preserves that
+; page.
 ymxr_page:      movem.l d1-d5/a2/a4-a5,-(sp)
                 move.b  FX_RUN(a3),d1
                 .if     YMXR_DEFER
@@ -4751,16 +4714,16 @@ ymxr_page:      movem.l d1-d5/a2/a4-a5,-(sp)
                 movem.l (sp)+,d1-d5/a2/a4-a5
                 rts
 
-; a2 transformation d0, 1 to 127: its E at 0 and entry k at 2 + k (SPEC.md
-; 3.4.2). d0 clobbered.
+; Resolve transformation d0 (1 to 127) into a2: E at offset 0, entry k
+; at 2 + k (SPEC.md 3.4.2). Clobbers d0.
 ymxr_tab:       movea.l WS_TRANS(a0),a2
                 add.w   d0,d0
                 add.w   d0,d0
                 adda.l  -2(a2,d0.w),a2
                 rts
 
-; d0 the entry of the key d0 of a marked column in the transformation a2:
-; entry k of the key's bits 6 to 0, with the key's bit 7, the marker. d5
+; Map marked byte d0 through table a2: use bits 6 to 0 as the key,
+; replace those bits with the entry, and preserve source bit 7. d5 is
 ; scratch.
 ymxr_entry:     moveq   #$7F,d5
                 and.b   d0,d5
@@ -4768,13 +4731,12 @@ ymxr_entry:     moveq   #$7F,d5
                 or.b    2(a2,d5.w),d0
                 rts
 
-; The page a4 filled with the transformation a2 in the fill kind d5
-; (SPEC.md 1.10.1, 3.2): plain, the E entries as longs, eight at a time
-; through movem; the mirror of a marked column, entries 0 to E' - 1 and
-; again at 128 with bit 7 set, E' the lesser of E and 128; the ports of
-; setR7, entries 0 to 63 at 192 with bits 7 and 6 set, the rows of a
-; counted source on it having both (SPEC.md rule 2(f)). A page has room
-; for the 3 entries past E a long reads. d0, d1, a2 and a4 clobbered.
+; Fill page a4 from transformation a2, according to kind d5 (SPEC.md
+; 2.1.5). Plain: copy entries as longs, eight per movem. Marker mirror:
+; copy up to 128 entries, then duplicate them at offset 128 with bit 7
+; set. setR7: copy keys 0 to 63 at offset 192 with both port bits set.
+; Page storage allows the three extra bytes read by a final long.
+; Clobbers d0, d1, a2 and a4.
 ymxr_fill:      move.w  (a2)+,d0                ; E
                 tst.b   d5
                 beq.s   .plain
@@ -4849,16 +4811,15 @@ ymxr_runrow:    moveq   #0,d3
                 moveq   #1,d3
 .row:           rts
 
-; d0 the lookup kind of the stepping shape the record a3 runs, its number
-; in ymxr_kinds, and d1 the identity's, a5 the running handler: the
-; column a target maps is its last value (SPEC.md 1.10.1), written first
-; of two on setNoiseX, last of two on setToneX and setEnvelope, last of
-; three on setBuzzer and the middle on setVoiceX, in a marked and in a
-; counted source. The target is the running source's, and the kept
-; target is the next start's (1.8.2), so the handler's first register, at
-; TICK_SEL in every handler that steps a place, separates them: R8 to R10
-; on setNoiseX against R0, R2 or R4 on setToneX and R11 on setEnvelope,
-; and R11 on setBuzzer against R0, R2 or R4 on setVoiceX (2.1).
+; Resolve the running shape's lookup kind into d0 and identity kind into
+; d1. a3=record, a5=running handler. Lookup selects the target's last
+; value, which write order places first for noise, last for
+; tone/envelope/buzzer, and in the middle for voice (SPEC.md 1.10.1).
+;
+; Use the running handler's first register at TICK_SEL, rather than the
+; kept target for a later start. R8 to R10 identify noise versus
+; tone/envelope; R11 identifies buzzer versus voice (2.1). Applies to
+; marked and counted sources.
 ymxr_kindof:    moveq   #0,d0
                 move.b  FX_SHAPE(a3),d0
                 moveq   #0,d1
@@ -4898,8 +4859,8 @@ ymxr_at:        move.w  KD_STEP(a2),d5
                 .endif
                 rts
 
-; The kinds of handler that step a place: the eight lookup kinds in the
-; order of the table of page bytes, then the identity's five.
+; Stepping-handler kinds: eight lookup kinds in page-byte-table order,
+; then five identity kinds.
 ymxr_kinds:     KIND    ymxr_lk0,LOOK_STRIDE,1,LK_CELL,0,0,LK_PAGE,0,1,LK_SEL,LK_PTR,0,0,0,0
                 KIND    ymxr_lc0,LOOK_STRIDE,1,LC_CELL,LC_LEFT,LC_RELD,LC_PAGE,4,0,LC_SEL,LC_PTR,0,0,0,0
                 KIND    ymxr_lt0,LOOK_STRIDE,2,LT_CELLS,0,0,LT_PAGE,2,1,LT_SEL1,LT_PTR1,LT_SEL2,LT_PTR2,0,0
@@ -4930,8 +4891,8 @@ ymxr_pgat:      dc.w    0,ymxr_pg1-ymxr_pg0,ymxr_pg2-ymxr_pg0,ymxr_pg3-ymxr_pg0
                 .endif
 
                 .if     YMXR_MAP
-; The stop at the marker of the lookup kinds under the monitor, one an
-; effect, whose count is the lookup's.
+; Monitor halt for lookup kinds: one per effect, with lookup-cycle
+; counts.
                 .if     YMXR_PERF
                 LHALT   ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5
                 LHALT   ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4
@@ -4939,17 +4900,16 @@ ymxr_pgat:      dc.w    0,ymxr_pg1-ymxr_pg0,ymxr_pg2-ymxr_pg0,ymxr_pg3-ymxr_pg0
                 LHALT   ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5
                 .endif
 
-; The pages: two of 256 bytes an effect a bank, bank 1's 512 bytes
-; after bank 0's, and effect e's on effect 0's plus e times LOOK_STRIDE
-; modulo 256, the residue of its lookup instances' reads.
+; Two 256-byte pages per effect per bank. Bank 1 is 512 bytes past bank
+; 0. Effect e's page residue is effect 0's plus e * LOOK_STRIDE modulo
+; 256, matching its lookup reads.
 ymxr_pages:
 ymxr_pg0:       ds.b    512
                 .if     YMXR_DEFER
 ymxr_pg0b:      ds.b    512
                 .endif
-; The page byte of each lookup instance for page 0, the high
-; byte of its read's displacement: bank, then effect, then kind in
-; the order of ymxr_kinds. Page 1's is this plus 1.
+; Page-0 high displacement bytes, ordered by bank, effect, then kind as
+; in ymxr_kinds. Add 1 for page 1.
 ymxr_htab:
                 dc.b    (ymxr_pg0-(ymxr_lk0_key+2))/256,(ymxr_pg0-(ymxr_lc0_key+2))/256,(ymxr_pg0-(ymxr_lt0_key+2))/256,(ymxr_pg0-(ymxr_ln0_key+2))/256,(ymxr_pg0-(ymxr_lb0_key+2))/256,(ymxr_pg0-(ymxr_lv0_key+2))/256,(ymxr_pg0-(ymxr_le0_key+2))/256,(ymxr_pg0-(ymxr_lf0_key+2))/256
                 dc.b    (ymxr_pg1-(ymxr_lk1_key+2))/256,(ymxr_pg1-(ymxr_lc1_key+2))/256,(ymxr_pg1-(ymxr_lt1_key+2))/256,(ymxr_pg1-(ymxr_ln1_key+2))/256,(ymxr_pg1-(ymxr_lb1_key+2))/256,(ymxr_pg1-(ymxr_lv1_key+2))/256,(ymxr_pg1-(ymxr_le1_key+2))/256,(ymxr_pg1-(ymxr_lf1_key+2))/256
@@ -4979,10 +4939,9 @@ ymxr_pg3b:      ds.b    512
 
                 HANDLERS
                 HANDLEQU
-; The offsets of the eight lookup kinds, measured off effect 0's
-; instances, and the assertions on every instance: its read on its pages'
-; residue and within their reach, inside its bank, bank 1's BANK bytes
-; from bank 0's, and each kind's four LOOK_STRIDE apart.
+; Lookup-kind offsets relative to effect 0. Assert each read's page
+; residue and reach, bank bounds, BANK spacing between banks and
+; LOOK_STRIDE spacing between effects.
                 LOOKAT1 LK,ymxr_lk0,0
                 LOOKAT1 LC,ymxr_lc0,1
                 LOOKATW LT,ymxr_lt0,0,0
@@ -4992,8 +4951,8 @@ ymxr_pg3b:      ds.b    512
                 LOOKATW LE,ymxr_le0,0,1
                 LOOKATW LF,ymxr_lf0,0,1
                 .if     YMXR_DEFER
-; The word a hook writes in each lookup kind, as HOOKW writes it for the
-; identity's handlers.
+; Hook words for lookup kinds, equivalent to HOOKW for identity
+; handlers.
                 HOOKW   LK
                 HOOKW   LC
                 HOOKW   LT

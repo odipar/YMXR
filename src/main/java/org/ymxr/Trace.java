@@ -26,9 +26,10 @@ final class Trace {
         return repeat < rows ? rows + rows - repeat : rows + 1;
     }
 
-    /** The record's first line: the tune's fixed values, and in version
-     *  10 the entries of each transformation after the sources (SPEC.md
-     *  7.2). */
+    /**
+     * The record's header, including transformation entries after
+     * sources in version 10 (SPEC.md 7.2).
+     */
     static String header(TuneFile tune) {
         StringBuilder line = new StringBuilder("{\"rate\":").append(tune.frameRate())
                 .append(",\"effects\":").append(tune.effects()).append(",\"sources\":[");
@@ -59,9 +60,12 @@ final class Trace {
         return line.append("}\n").toString();
     }
 
-    /** The record: the first line, then {@code calls} entries of the tune,
-     *  one a line, to {@code out}; a frame reporting -1 ends it. An effect
-     *  of a version 10 record reports its kept mapping (SPEC.md 7.3). */
+    /**
+     * Writes the header and up to {@code calls} frame entries to {@code
+     * out}, one per line. A frame reporting -1 ends the record. Version
+     * 10 effect entries report the kept mapping; ticks and
+     * pending-start mappings are outside the record (SPEC.md 7.3).
+     */
     static void trace(TuneFile tune, int calls, PrintStream out) {
         out.print(header(tune));
         boolean mapped = tune.version() == Tune.VERSION;

@@ -314,42 +314,52 @@ order of the two writes.
 
 ### 1.10 Mapping
 
-**1.10.1** In a tune file of version 10, column 30 + i is the mapping
-column of effect i: bit 7 the set bit, bits 6 to 0 the number of a
-transformation, 1 to T, T the transformations of the file (3.4), or 0 for
-the identity (YMXS, SPEC.md 3.6.2). Number n is the mapping whose part for
-the last value the effect's target reads is transformation n, every other
-part the identity, and 0 the identity in every part (YMXS, SPEC.md 3.1.1,
-3.6.3). A table of versions 7 to 9 ends at column 29, and each of its
-effects runs through the identity.
+**1.10.1** Transformation lookups are optional. Mapping 0 is identity:
+each source value is written unchanged. Mapping n selects transformation
+n for the target's last value; earlier values use identity. In versions
+7 to 9 every effect uses mapping 0. Version 10 adds column 30 + i, the
+mapping column of effect i:
 
-The last value is the one value of `setR0` to `setR13`, the volume of
-`setVoiceX` and `setNoiseX`, the shape of `setBuzzer`, the coarse nibble
-of `setToneX` and the high byte of `setEnvelope` (2.1). A start, or a
-remap on a timer of the tune, through a mapping with a transformation for
-another value is an error of the writer (6.5).
+| bit | meaning |
+|---|---|
+| 7 | the set bit |
+| 6 to 0 | 0 for identity, or transformation number 1 to T (3.4) |
 
-**1.10.2** A row that sets the mapping column of an effect and sets its
-source column to 1 to 127, a start, starts the source through that
-mapping (YMXS, SPEC.md 3.6.3); a start that leaves the mapping column
-unset starts it through the kept mapping. A row that sets the mapping
-column and leaves the source column unset is a *remap*: the effect keeps
-its source, its place and its rate, and runs through that mapping (YMXS,
-SPEC.md 4.3); a remap on a stopped timer sets the mapping the next start
-keeps. A remap that sets the control or the count column as well is a
-remap and a retune, in the order of 4.3: the remap comes before the writes
-of the count and the select.
+T is the file's transformation count. An unset column preserves the kept
+mapping. Setting it to 0 selects identity: the byte `$80` differs from
+the unset byte `$00`.
 
-**1.10.3** The *kept mapping* of an effect is the number the last start or
-remap on it set its mapping column to; it is 0 until a row sets it, and a
-start that leaves the column unset leaves it as it is. A deferred start
-runs, from the tick that performs it (4.8), through the kept mapping after
-its row; a remap while it is pending sets the kept mapping and the tick's
-mapping (4.3 step 3), and leaves the pending start's as it is (YMXS,
-SPEC.md 3.5.5). A stop reads the source column alone: a row that sets the
-source column to 0 leaves the mapping column unread and the kept mapping
-as it is, and a writer leaves the mapping column of a stop unset (rule
-3(c)).
+The last value is the sole value of `setR0` to `setR13`, volume for
+`setVoiceX` and `setNoiseX`, shape for `setBuzzer`, the coarse nibble for
+`setToneX`, and the envelope period's high byte for `setEnvelope` (2.1).
+Last refers to source-column order. A start, or a remap on a timer of
+the tune, with a transformation on an earlier value is an error of the
+writer (6.5).
+
+**1.10.2** Read the mapping column with the source column:
+
+| source column | mapping column | operation |
+|---|---|---|
+| set to 1 to 127 | set | keep the selected mapping and start through it |
+| set to 1 to 127 | unset | start through the kept mapping |
+| unset | set | remap: keep the selected mapping and apply it to current ticks |
+| unset | unset | preserve the mapping |
+| set to 0, a stop | either | ignore the mapping column |
+
+A remap preserves the source, target, place and rate. On a stopped timer
+it changes the kept mapping for a later start. If the same row sets rate
+columns, apply the remap before writing the count and select (4.3).
+
+**1.10.3** Each effect has a *kept mapping*, initially 0. A start or remap
+that sets the mapping column replaces it. A stop and the tune's wrap
+preserve it; a writer leaves a stop's mapping column unset (rule 3(c)).
+
+A deferred start captures the kept mapping after its row. Until the
+source boundary, ticks use the running effect's mapping. A remap during
+that interval changes the kept and running mappings, while the pending
+start retains its captured mapping. At the boundary the pending start
+installs its captured mapping without changing the kept mapping (4.8).
+The next start with an unset mapping column uses the kept mapping.
 
 ---
 
@@ -418,20 +428,20 @@ the value, a period 32,768 above the one the rows before it write. A
 player reads such a source as this clause defines it, and a writer writes
 a counted source in its place.
 
-**2.1.5** A tick writes the column of the last value (1.10.1) through the
-tick's mapping (4.3 step 3): through mapping 0, the identity, the byte at
-the place whole; through mapping n, 1 to 127, entry k of transformation n
-(3.4.1; YMXS, SPEC.md 3.6.4), k the key the byte at the place has, with
-the bits of that byte above the key:
+**2.1.5** For the target's last value, read byte b at the source place.
+Mapping 0 writes b unchanged. For mapping n, extract key k, read entry k
+of transformation n, and construct the output below. Every earlier
+source column is written unchanged.
 
 | the column of the last value | the key k | the byte written |
 |---|---|---|
-| the marker's column of a marked source (3.2.1) | bits 6 to 0 | bits 6 to 0 of entry k, and bit 7 of the byte, the marker |
-| the one column of a source on `setR7` (rule 2(f)) | bits 5 to 0 | bits 5 to 0 of entry k, and bits 7 and 6 of the byte, the two port directions |
-| any other column | the byte | entry k |
+| the marker's column of a marked source (3.2.1) | bits 6 to 0 of b | bits 6 to 0 of entry k, with bit 7 of b, the marker |
+| the one column of a source on `setR7` (rule 2(f)) | bits 5 to 0 of b | bits 5 to 0 of entry k, with bits 7 and 6 of b, the port directions |
+| any other column | b | entry k |
 
-A key above the last key of transformation n, E - 1, is left to a later
-version (section 8).
+The marker and port directions remain source bits, independent of the
+lookup entry. A key above the last key of transformation n, E - 1, is
+left to a later version (section 8).
 
 ### 2.2 The sources
 
@@ -665,22 +675,23 @@ other than I + 4S is a field a reader follows (3.3.2).
 
 **3.3.5** The version. A writer writes version 10 where a row sets a
 mapping column to a transformation, 1 to 127 (1.10), and version 9
-otherwise. Version 10 is version 9 with the four mapping columns, bit 5 of
-the effects used, the long at 16, the source index at 20 and the
+otherwise. Version 10 is version 9 with the four mapping columns, bit 5
+of the effects used, the long at 16, the source index at 20 and the
 transformations (3.4), and a reader of an earlier version reports it
 (3.3.4). Version 9: its table is DTX3, which a player of version 6 or
 before reads wrongly, and bit 3 of a control column is a deferred start
-(1.9.2), which a player of version 7 reads as 0, whose place with bit 5 at
-0 continues the count of the rows the running source played (4.8). A
-reader of this version reads 10, 9, 8 and 7, and a player 9, 8 and 7
-(4.1). A tune file of version 8 reads as version 9: version 8 placed a
-deferred start with bit 5 at 0 at R - 1 of the running source, its last
-row, modulo R of the source started. A tune file of version 7 has bit 3 at
-0 in every control column, and a start with bit 5 at 0 in it names a
-source of the row count of the one last started, where the modulo of 1.8.4
-leaves the place as it is. Versions 3 to 6 are tune files whose table is
-DTX2, and a reader of this version reports them (3.3.4); the tools write
-such a tune again from the dump or the structure it was converted from.
+(1.9.2), which a player of version 7 reads as 0, whose place with bit 5
+at 0 continues the count of the rows the running source played (4.8). A
+reader reads versions 7 to 10. A player with transformation support
+reads the same versions; a player without it reads 7 to 9 (4.1). A tune
+file of version 8 reads as version 9: version 8 placed a deferred start
+with bit 5 at 0 at R - 1 of the running source, its last row, modulo R
+of the source started. A tune file of version 7 has bit 3 at 0 in every
+control column, and a start with bit 5 at 0 in it names a source of the
+row count of the one last started, where the modulo of 1.8.4 leaves the
+place as it is. Versions 3 to 6 are tune files whose table is DTX2, and
+a reader of this version reports them (3.3.4); the tools write such a
+tune again from the dump or the structure it was converted from.
 
 Note: versions 3 to 6 told apart a tune's sources, from one column each to
 a counted source of several columns, so that a player of an older version
@@ -693,11 +704,14 @@ bytes of the name at 16, and the DTX3 table at 40.
 
 ### 3.4 The transformations
 
-**3.4.1** A tune file of version 10 has T transformations, 1 to 127,
-transformation n the one a mapping column numbers n (1.10), in the order
-YMXS numbers them (YMXS, SPEC.md 1.9). Transformation n is E entries, 1
-to 256, each a byte: entry k is the value written where the key is k
-(YMXS, SPEC.md 3.6.1).
+**3.4.1** A version 10 tune file has T transformations, 1 to 127.
+Transformation n has E byte entries, 1 to 256; source key k selects entry
+k, with the output bits defined in 2.1.5. Number transformations in the
+order of YMXS, SPEC.md 1.9: first use in row order, then timer order A to
+D, then mapping-part order. Omit identity parts and repeated equal
+transformations. Equality compares names and entries, including entry
+count and order. Names are absent from the binary file. Versions 7 to 9
+have no transformation index or entries.
 
 **3.4.2** The long at 16 is O, the offset of the transformation index: a
 word T at O, then T longs, the offset of each transformation counted
@@ -711,19 +725,17 @@ from O. Transformation n is a word E at P, O plus its offset, 0 to
 | P | 2 | E, the entries of the transformation, 1 to 256 |
 | P + 2 | E | its entries, entry k at P + 2 + k |
 
-**3.4.3** The transformation index begins at the first offset on a long
-at or after the end of the name, or of the source index where the name is
-empty, transformation 1 at the first on a long at or after the end of the
-index, and each transformation after it at the first on a long at or
-after the end of the one before. Each byte between the end of one of
-those and the start of the next is 0, and the DTX3 table follows
-transformation T (3.3.1).
+**3.4.3** Start the index and each transformation at the first four-byte
+boundary at or after the preceding block's end. The index follows the
+name, or the source index if the name is empty; transformations follow
+the index in number order. Fill alignment bytes with 0. The DTX3 table
+follows transformation T (3.3.1).
 
-Note: each offset of the index counts from O, so the index and the
-transformations are one block a tool copies to another offset with the
-long at 16 alone changed. A bound tune written alone has the block byte
-for byte after its image, and its offset in the long at 24 (BINARIES.md
-1.3); an SNDH file has it after the images (BINARIES.md 3.1).
+Note: all transformation offsets are relative to O, so the index and
+entries form one movable block. Moving it changes only the header's
+long at 16. A bound tune places this block after its image, with its
+offset at 24 (BINARIES.md 1.3); an SNDH file places it after the shared
+images (BINARIES.md 3.1).
 
 ---
 
@@ -738,10 +750,10 @@ reading only set columns and keeping values needed by later rows (R4.6).
 The host calls the player once with the tune, then once a frame at the
 frame rate (3.3). The player, in order:
 
-1. Read the version; for a version other than 7, 8 and 9 (3.3.5), report
-   -1 and leave every register and every timer as it is. A reader reads
-   version 10 as well, and for another version reports the line of 3.3.4
-   in place of that, and its record is empty (7.4).
+1. Read the version. Accept 7 to 9, and 10 with transformation support
+   (3.3.5; BINARIES.md 1.5). Otherwise report -1, leaving every register
+   and timer unchanged. A reader accepts 7 to 10; for another version it
+   reports the line of 3.3.4 and produces an empty record (7.4).
 2. Read R and RR of the tune's table and the effects used.
 3. Resolve each source of the source index: its first row, and its loop
    row, row RR where it repeats and the end where it plays once (3.1.4).
@@ -844,20 +856,19 @@ effect continues unchanged.
 Note: step 4 before step 5 loads the count before the select starts a
 stopped timer (YMXS, SPEC.md 3.4.1 and 8.5).
 
-**4.3.1** In version 10, M is read with S (1.10.2):
+**4.3.1** In version 10, process mapping column M with source column S:
 
-- Where S is set to 0, a stop: M is unread, and the kept mapping keeps its
-  value (1.10.3).
-- Where S is set to 1 to 127, a start: where M is set, the kept mapping is
-  bits 6 to 0 of M at step 3. Source s starts through the kept mapping
-  after this step: at step 3, in the one operation of 4.2.1, or for a
-  start that becomes pending, at the tick that performs it (1.10.3).
-- Where S is unset and M is set, a remap: after step 3 and before step 4,
-  the kept mapping is bits 6 to 0 of M, and each tick of the timer writes
-  through it until the tick that performs a start pending on the timer:
-  that start runs through the kept mapping after its row (1.10.3).
+- Stop, S set to 0: ignore M and preserve the kept mapping.
+- Start, S set to 1 to 127: if M is set, replace the kept mapping with
+  bits 6 to 0 of M. Use the resulting kept mapping for this start. An
+  immediate start installs it at step 3; a deferred start captures it for
+  installation at the source boundary.
+- Remap, S unset and M set: after step 3 and before step 4, replace the
+  kept and running mappings with bits 6 to 0 of M. Preserve any pending
+  start's captured mapping.
 
-Where M is unset, the kept mapping keeps its value.
+An unset M preserves the kept mapping. Installing a deferred start uses
+its captured mapping and preserves the kept mapping (1.10.3).
 
 ### 4.4 The register columns
 
@@ -916,8 +927,8 @@ Every other timer is left as it is.
 
 A start whose control column has bit 3 at 1, on a timer running with a
 source connected, is *pending* on that timer from 4.3 step 3 (YMXS,
-SPEC.md 3.5). It is source s, the kept target and the kept mapping after
-4.3 step 2, the count and the select the row keeps at 4.3 steps 4 and 5,
+SPEC.md 3.5). Capture source s, the kept target after 4.3 step 2, the
+start's mapping after 4.3.1, the count and select from steps 4 and 5,
 bit 6 of K, and a place: row 0 where bit 5 of K is 1, and otherwise R of
 the source running, the count of the rows it played, modulo R of source s
 (1.8.4). One start at most is pending on a timer:
@@ -1099,14 +1110,14 @@ numbers the maps assign.**
   of the writer (6.5). A source on `setR7` and on `setR0`, `setR2`,
   `setR4`, `setR11` or `setR12` is an error of the writer (6.5): a tick on
   that target writes the two bits of each row to its register.
-- 2(g) A start whose mapping column is unset runs through the kept
-  mapping (1.10.3), through the wrap (4.5). A writer reads the rows in
-  order with three values an effect: the kept mapping and the *running*
-  mapping, the tick's mapping (4.3 step 3), each a mapping number of
-  1.10.1 or *open*, which differs from every number, 0 at row 0; and the
-  *pending* mapping, the mapping of a deferred start, a number, *open* or
-  *none*, which differs from both, none at row 0. It writes the mapping
-  column with the set bit and the operation's mapping number (1.10.1):
+- 2(g) An unset mapping column reuses the kept mapping, including after
+  the wrap. To omit redundant column writes, track three values per
+  effect in row order: *kept* for later starts, *running* for current
+  ticks, and *pending* for a deferred start. Initially kept and running
+  are 0 and pending is *none*. A value may also be *open*, unequal to
+  every mapping number; pending may be a number, open or none. The rows
+  alone cannot determine when a deferred start reaches its boundary.
+  Apply these rules, writing the set bit and mapping number together:
   - a start writes it where its mapping differs from the kept mapping,
     which is then the start's mapping. A start with `deferred` clear
     makes the running mapping the start's and the pending mapping none; a

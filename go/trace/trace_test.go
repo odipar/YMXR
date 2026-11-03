@@ -39,11 +39,11 @@ func TestAVersion10RecordHasTheTransformationsAndTheMappings(t *testing.T) {
 		`{"rate":50,"effects":33,"sources":[{"rows":[12,128],"repeat":0}],` +
 			`"transformations":[[15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0],[0,0,1]]}`,
 		effect(1, 1, true, `,"mapping":1`),
-		// a remap: the source as it is, the mapping 2
+		// Remap preserves source and selects mapping 2.
 		effect(1, 1, false, `,"mapping":2`),
-		// a start that leaves the mapping column unset keeps the mapping
+		// An unset start mapping reuses kept.
 		effect(1, 1, false, `,"mapping":2`),
-		// a stop that sets the mapping column leaves the mapping as it is
+		// A stop ignores its set mapping column and preserves kept.
 		effect(0, 1, false, `,"mapping":2`),
 		// a remap on the idle timer
 		effect(0, 1, false, `,"mapping":0`),

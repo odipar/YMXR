@@ -17,43 +17,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 /**
- * The calls {@code 68k/test/emu/test_ymxr.py} makes, and a short run of it.
+ * Checks rig tool calls and capped emulation runs against SPEC.md 4 and 5.
+ * The model compares frame writes, MFP programming, handler places and
+ * tick writes. Short runs cover starts, retunes and stops; complete runs
+ * also reach tune wraps and endings.
  *
- * <p>The rig plays every tune under {@code ym/test} row by row on an
- * emulated 68000 against a model of SPEC.md 4 and 5. A tune of ten thousand
- * rows is minutes by itself, so no build runs the rig whole, and a rig no
- * build runs is one whose calls go unread: DTX's named files for weeks
- * after its tools became filters, and the check inside it reached no
- * table.
+ * <p>Run each combination of source addressing, lean ticks, monitoring,
+ * deferred starts and optional lookups. Conformance tunes add multi-column
+ * targets, counted sources and mapped deferred starts absent from dumps.
+ * A complete refill run on one source tune checks reader-image bounds
+ * against performance.md.
  *
- * <p>So this runs the rig capped. {@code -framesN} plays each tune for N
- * frames, which reads those frames against the model as a whole run reads
- * them: the chip writes of every frame, the timers' programming, each
- * handler's place and every tick's write. Two built fixtures at 24 frames
- * are under a second, against minutes for the ten whole.
- *
- * <p>What a capped run leaves is the wrap and the end: a tune is cut before
- * the row it repeats to comes round. The whole run reaches those, and it is
- * the run to make before a release.
- *
- * <p>The rig's other modes ran by hand alone, and one of them read seven
- * fixtures of ten wrong until a hand run found it: {@code -refill} read
- * the packager's image against the binder's whole, where the packager's has
- * the sources' tables in it and the binder packs each as a separate table,
- * so every tune with a source failed. So this also runs {@code -refill}
- * over one tune with a source, whole, against performance.md.
- *
- * <p>The same capped run plays on each of the thirty-two cores a release
- * ships, the five switches {@code -abs}, {@code -lean}, {@code -perf},
- * {@code -defer} and {@code -map} alone and together, since
- * {@code BinariesTest} reads a core's bytes and leaves what the core does
- * to the rig. The kit's tunes play too, capped: their versions 4 to 6 have
- * the targets of several registers and the counted sources, which no dump
- * converts to. The modes under Hatari, {@code -hatari} and {@code -stub},
- * need an emulator and a TOS image, and run by hand.
- *
- * <p>Skipped where the tools the rig runs are absent, which the build is
- * not made to install.
+ * <p>Hatari modes require a TOS image and run separately. Missing local
+ * tools skip these tests; bin/suite requires them.
  */
 final class RigCallsTest {
 

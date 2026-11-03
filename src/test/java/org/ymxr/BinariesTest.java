@@ -61,9 +61,8 @@ final class BinariesTest {
         assertEquals(0, core.length & 1, "the core is even-sized");
         assertArrayEquals(Sndh.CORE_MAGIC, Arrays.copyOfRange(core, 12, 16));
         assertEquals(1, Tune.getWord(core, 16));
-        // a core without the lookup reads to the version of a tune that
-        // maps no value, and a core with it to the version of one that
-        // does (SPEC.md 3.3.5)
+        // Cores without lookups support version 9; lookup cores also
+        // support version 10 (SPEC.md 3.3.5).
         assertEquals(map ? Tune.VERSION : Tune.UNMAPPED, Tune.getWord(core, 18),
                 "the bound tune version the core reads");
         assertEquals(PlayerTest.equates(defer, map).get("YMXR_VERSION"), Tune.getWord(core, 18),
@@ -72,9 +71,8 @@ final class BinariesTest {
                 Tune.getWord(core, 20),
                 "the workspace's fixed bytes are the player's");
         assertEquals(flags, Tune.getWord(core, 22), "the flags word");
-        // where the handlers begin: the first handler of a core with the
-        // lookup in, past the descriptor and the init it reaches, and 0 in
-        // a core without it, whose reach counts from its first byte
+        // Source reach starts at the first handler for lookup cores, or
+        // the core start when field 26 is zero.
         int handlers = Tune.getWord(core, Sndh.CORE_HANDLERS_AT);
         if (map) {
             assertTrue(handlers > reaches(core, 0) && handlers < core.length
@@ -137,8 +135,8 @@ final class BinariesTest {
             if (!map) {
                 assertArrayEquals(core, Binaries.core(monitor, lean, pcrel, defer),
                         "the four switches name the core without the lookup");
-                // a core without the lookup reads bound tunes to version 9,
-                // which the version line reports before its flags
+                // Without lookup support, report the unsupported bound
+                // version before checking feature flags.
                 IllegalArgumentException old = assertThrows(IllegalArgumentException.class,
                         () -> Sndh.checkCore(core, monitor, lean, pcrel, defer, true,
                                 Tune.VERSION));
@@ -165,9 +163,10 @@ final class BinariesTest {
                 Binaries.binary(true, true, false, true, true).name());
     }
 
-    /** A core with the lookup in whose flags word has bit 4 cleared, which
-     *  the check reports after the version, which it reads (BINARIES.md
-     *  2.10). */
+    /**
+     * Clearing lookup flag bit 4 produces a descriptor error after
+     * version validation (BINARIES.md 2.10).
+     */
     @Test
     void aCoreWhoseFlagsLackTheLookupIsRejectedForATuneThatMapsAValue() throws IOException {
         byte[] core = Binaries.core(false, false, true, false, true).clone();
@@ -435,9 +434,8 @@ final class BinariesTest {
         next = Sndh.even(next);
         for (int i = 0; i < files.size(); i++) {
             byte[] bound = set.tunes().get(i).clone();
-            // The tune reaches its image from its first byte, which the
-            // combine put in and the set left at zero, and in version 10
-            // its transformation block the same way.
+            // Patch image and optional transformation-block offsets
+            // relative to each bound tune.
             Tune.putLong(bound, Bound.IMAGE_AT, imageAt[set.image()[i]] - tuneAt[i]);
             if (blockAt[i] > 0) {
                 Tune.putLong(bound, Bound.TRANSFORMATIONS_AT, blockAt[i] - tuneAt[i]);
@@ -522,9 +520,10 @@ final class BinariesTest {
         assertEquals(32769, Sndh.seconds(Integer.MAX_VALUE, 65535));
     }
 
-    /** The kit's mapped tune defers a start and maps a value, so the file
-     *  is on the core with the deferred start and the lookup in
-     *  (BINARIES.md 2.1). */
+    /**
+     * The mapped fixture requires both deferred-start and lookup
+     * support (BINARIES.md 2.1).
+     */
     @Test
     void aSubtuneThatDefersAndMapsIsOnTheCoreWithBoth() throws IOException {
         List<byte[]> both = List.of(tune("mapped"));
@@ -819,13 +818,10 @@ final class BinariesTest {
     }
 
     /**
-     * The core under a file whose subtunes map a value has the lookup in
-     * (BINARIES.md 2.1): a core without it reads bound tunes to version 9,
-     * and its init reports -1 for a tune of version 10. A file uses the
-     * larger core only where a subtune's effects byte sets bit 5, and the
-     * core with the deferred start and the lookup in where a subtune sets
-     * bit 4 and one sets bit 5. A core without the lookup named by the
-     * caller reports the version it reads before its flags (2.10).
+     * Select lookup support only when a subtune sets effects bit 5.
+     * Select deferred support independently from bit 4. Explicitly
+     * supplied cores without lookup support report the unsupported
+     * version before flags (BINARIES.md 2.1, 2.10).
      */
     @Test
     void aFileWithASubtuneThatMapsAValueUsesTheCoreWithTheLookupIn() throws IOException {
@@ -882,13 +878,10 @@ final class BinariesTest {
     }
 
     /**
-     * A tick of a core with the lookup in reads its row through a
-     * displacement from its handler, and the handlers begin at the field at
-     * 26, so the tool measures the reach from there (BINARIES.md 2.1): a
-     * mapped source of 20,000 rows ends within it from there and past it
-     * from the core's first byte, and one of 30,000 rows ends past it, so
-     * that file is on the core that reads an address, and -pcrel reports
-     * the line that names the first handler.
+     * Measure lookup source reach from the first handler at descriptor
+     * field 26. The shorter fixture fits that displacement; the longer
+     * one requires absolute reads, and -pcrel reports the
+     * handler-relative reach error (BINARIES.md 2.1).
      */
     @Test
     void aFileOnTheCoreWithTheLookupIsMeasuredFromItsFirstHandler() throws IOException {
@@ -933,8 +926,10 @@ final class BinariesTest {
                 wrong.getMessage());
     }
 
-    /** The fade of YMXS (YmxsTest), its tune file as ymxs-to-ymxr writes
-     *  it: a square on `setR8` through four transformations, version 10. */
+    /**
+     * Version 10 encoding of the YMXS fade: a square on setR8 through
+     * four volume tables.
+     */
     static byte[] fade() {
         org.ymxs.YMXS.Tune tune = YmxsTest.fade();
         Schema.Made made = Schema.of(Padding.toUnit(tune, YmToYmxr.UNIT, new Report()));
@@ -1007,8 +1002,10 @@ final class BinariesTest {
                 BuiltTunes.RING, new Report()).file();
     }
 
-    /** The same source through transformation 1 of the sixteen of
-     *  {@link BuiltTunes#fade}, a tune file of version 10. */
+    /**
+     * The same source through the first volume transformation of {@link
+     * BuiltTunes#fade}, encoded as version 10.
+     */
     static byte[] longMapped(int rows) {
         byte[][] c = new byte[Columns.MAPPED][8];
         c[7][0] = (byte) (0x80 | 0x3E);                  // voice A's tone alone

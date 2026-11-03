@@ -1,21 +1,13 @@
-// Package binaries contains the 68000 binaries the tools combine with
-// bound tunes (doc/BINARIES.md): the SNDH core, which goes under an SNDH
-// file's entries, and the program stub, which goes in front of an SNDH
-// file.
+// Package binaries contains the assembled 68000 SNDH cores and program
+// stub (doc/BINARIES.md). Five switches select thirty-two cores: raster
+// monitor, lean ticks, absolute source reads, deferred starts and
+// transformation lookups. Tools select lookup support only when a
+// subtune requires it, and deferred support only when a subtune defers
+// a start. Source reads use the program counter by default.
 //
-// Five switches of the player's are in the core, the raster monitor, the
-// lean tick, the row read through an absolute address, the deferred start
-// and the lookup, and each of their thirty-two settings is a separate core,
-// so a file that requests two uses the core that is both. A tick reads its
-// row through the program counter where YMXR_PCREL is at 1, its value
-// unasked, a file uses a core with the deferred start in where a subtune
-// defers one (doc/performance.md), and a core with the lookup in where a
-// subtune maps a value (SPEC.md 1.10).
-//
-// The files are build output. The Maven build writes them into data/,
-// which go:embed reads only inside its module. A tree built without
-// them does not contain one: Read then returns nil and the caller reads
-// them out of the directory YMXR_68K names.
+// The Maven build copies these files into data/ for go:embed. Read
+// returns nil for absent resources; callers then use the directory
+// named by YMXR_68K.
 package binaries
 
 import (
@@ -59,20 +51,20 @@ var all = []string{
 	Stub,
 }
 
-// All is the thirty-three, in the order the build writes them: the
-// thirty-two cores, the sixteen without the lookup first, then the stub.
+// All returns thirty-three binaries in build order: sixteen cores
+// without lookup support, sixteen with it, then the program stub.
 func All() []string {
 	return append([]string(nil), all...)
 }
 
-// Named is the core of the five switches (doc/performance.md), each a
-// suffix of its name in this order: -perf where monitor, the raster
-// monitor in; -lean where lean, ticks that neither drop the interrupt
-// level nor write their end of interrupt; -abs where pcrel is false, a row
-// read through an absolute address, where every other core reads it
-// through the program counter; -defer where deferred, the deferred start
-// in; and -map where mapped, the lookup in, which reads bound tunes to
-// version 10 where every other core reads them to version 9.
+// Named selects a core by five switches. Suffixes occur in this order:
+// -perf for the raster monitor; -lean for ticks without interrupt
+// nesting or an end-of-interrupt write; -abs when pcrel is false;
+// -defer for deferred starts; -map for transformation lookups.
+//
+// Without -abs, ticks use program-counter displacements. A subtune with
+// effects bit 4 requires -defer; bit 5 requires -map. Lookup cores read
+// bound versions 7 to 10; other cores read 7 to 9 (doc/BINARIES.md 2).
 func Named(monitor, lean, pcrel, deferred, mapped bool) string {
 	name := "YMXR_sndh"
 	if monitor {

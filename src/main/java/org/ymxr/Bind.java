@@ -58,10 +58,9 @@ final class Bind {
         }
         int state = Tune.getLong(bound, Bound.STATE_AT);
         int image = Tune.getLong(bound, Bound.IMAGE_AT);
-        // The DTX1 source tables follow the index and the image follows
-        // them, so the sources run from the first one's offset to the
-        // image, and the image ends at the transformation block where the
-        // tune has one and at the file's end otherwise (BINARIES.md 1.3).
+        // Sources occupy the bytes between their first table and the
+        // image. The image ends at the transformation block when
+        // present, or at the file's end (BINARIES.md 1.3).
         TuneFile file = TuneFile.read(tune);
         int sources = file.sources().size();
         int block = file.version() == Tune.VERSION

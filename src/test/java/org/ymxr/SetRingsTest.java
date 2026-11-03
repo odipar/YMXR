@@ -184,10 +184,11 @@ final class SetRingsTest {
         assertEquals(Tune.getLong(tune.file(), Tune.TABLE_AT), Tune.getLong(moved, Tune.TABLE_AT),
                 "the table is where it was");
     }
-    /** A set of a tune of version 10 and one of version 9: each table
-     *  packs again through a multiple of its column count, and in the file
-     *  of version 10 the table moves after the transformations, which stay
-     *  where they were. */
+    /**
+     * Repacking a mixed version 9/10 set preserves each column-count
+     * period. In version 10, transformation tables remain before the
+     * replaced DTX3 table.
+     */
     @Test
     void aMappedTuneOfASetPacksThroughAMultipleOfItsColumns() {
         List<byte[]> files = List.of(BuiltTunes.mapped().file(), BuiltTunes.deferred().file());

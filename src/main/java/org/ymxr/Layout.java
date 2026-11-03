@@ -101,17 +101,18 @@ final class Layout {
         }
     }
 
-    /** 6.3: the header, a line a source, the image of a bound tune
-     *  written alone, and of one of version 10 its transformation
-     *  block. */
+    /**
+     * the bound header, sources and image, plus the transformation
+     * block in version 10 (BINARIES.md 6.3).
+     */
     private static void bound(StringBuilder out, byte[] file) {
         out.append("{\"part\":\"header\"").append(fields(file, 0)).append("}\n");
         sources(out, file, 0);
         int block = word(file, 4) == Tune.VERSION ? Tune.getLong(file, 24) : 0;
         int image = Tune.getLong(file, 16);
         if (image > 0) {
-            // the image ends at the transformation block where the field
-            // at 24 is set, and at the file's end otherwise
+            // The image ends at the transformation block when offset 24
+            // is set; otherwise it ends at the file's end.
             out.append("{\"part\":\"image\",\"at\":").append(image)
                     .append(",\"bytes\":").append((block > 0 ? block : file.length) - image)
                     .append("}\n");
@@ -290,9 +291,10 @@ final class Layout {
         }
     }
 
-    /** The fields of 1.2 a record reports of the bound tune at
-     *  {@code at}, its image resolved against the file, and in version 10
-     *  its transformation block. */
+    /**
+     * the bound fields at the supplied offset, resolving the image and
+     * optional version 10 transformation block (BINARIES.md 1.2).
+     */
     private static String fields(byte[] file, int at) {
         int version = word(file, at + 4);
         return ",\"version\":" + version

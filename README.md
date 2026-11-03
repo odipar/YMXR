@@ -91,30 +91,33 @@ The MFP's interrupts run the tick at each effect's rate.
 
 ```mermaid
 flowchart TD
-    host[Host] -->|frame| frame[Player: apply tune row]
-    dtx[DTX reader] -->|unpacked row| frame
-    frame -->|effect columns| mfp[MFP timers]
-    frame -->|register columns| ym[YM2149]
-    mfp -->|tick| tick[Player: write source byte]
-    source[DTX1 source tables] -->|byte at place| tick
-    tick --> ym
+    host[Host: frame clock] -->|frame| frame[Player: apply tune row]
+    dtx[DTX3 tune table] -->|unpack row| frame
+    frame -->|register columns| ym[YM2149 sound chip]
+    frame -->|start / stop / rate| mfp[MC68901 MFP timers]
+    frame -->|start / remap| mapping[Active mapping per effect]
+    tables[Optional transformation tables] -->|prepare lookup at frame| mapping
+    mfp -->|tick| tick[Player: read source row]
+    source[DTX1 source tables] -->|row at place| tick
+    mapping -->|identity or selected lookup| write[Map last value; preserve other values]
+    tick --> write
+    write -->|target registers| ym
 ```
 
-A tick writes a source byte through its target and advances the *place*;
-at the marker on the last row it repeats the source, stops its timer, or
-performs the deferred start pending on it. [SPEC.md](doc/SPEC.md) sections
+A tick writes a source row through its target and advances the *place*.
+At the last row, detected by a marker or row count, it repeats the source,
+stops its timer, or installs a pending deferred start. [SPEC.md](doc/SPEC.md) sections
 4 and 5 define the order and where a tick may fall. A YMXR reader records
 the frames instead of writing the chips, and its record leaves the ticks
 out (section 7).
 
-Version 10 of the format adds a mapping to the tick
-([SPEC.md](doc/SPEC.md) 1.10, 2.1.5, 3.4): where an effect's mapping
-column is the number of a transformation, each row of its source has a key
-in the column of the last value its target reads, and the value written is
-the transformation's entry for that key, with the marker of a marked
-source and the two port directions of `setR7` read from the row. A reader
-reads versions 7 to 10, and a player 7 to 9 ([SPEC.md](doc/SPEC.md)
-3.3.5).
+Transformation lookups are optional. Mapping 0 writes source values
+unchanged. In version 10, an effect can select a lookup table for its
+target's last value: sample volume, for example. A remap can fade a sample
+while playback continues from its current place. [writing.md](doc/writing.md)
+5.7 covers uses and encoding; [SPEC.md](doc/SPEC.md) 1.10, 2.1.5 and 3.4
+define the column, tick processing and table layout. SNDH tools select a
+core with lookup support when required.
 
 ## The documents
 

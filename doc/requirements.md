@@ -77,12 +77,10 @@ Go tree read. Note: they change in that repository.
 
 - **R3.1** The schema covers the registers of the YM2149 and the MFP and
   the effects of the corpus (glossary.md): SID voices, sync buzzers,
-  samples and waveforms. It also covers the effects a tune makes through
-  the mappings of YMXS (YMXS, SPEC.md 3.6), a fade among them, which are
-  beyond the corpus: every effect of a dump runs through the identity,
-  and a tune that maps a value is written from a YMXS structure. An
-  effect absent from both is outside the schema until a change puts it
-  in.
+  samples and waveforms. Optional YMXS transformations add sample-volume
+  control and fades (YMXS, SPEC.md 3.6). Dumps use identity; tunes using
+  lookups are encoded from YMXS structures. Effects absent from both are
+  outside the schema.
 - **R3.2** The schema is an abstraction over those effects rather than
   one tracker's arrangement of them: the ubiquitous language a tracker
   maps its terms onto.
@@ -145,10 +143,10 @@ tune requires beyond a row.
 - **R5.2** The four columns of an effect select the source, the target
   and the rate (SPEC.md 1.8, 1.9), and in version 10 a fifth, its mapping
   column, selects the mapping (SPEC.md 1.10).
-- **R5.3** A source's rows are values that fit the register its target
-  writes, and keys where an effect maps them through a transformation
-  (YMXS, SPEC.md 3.2.2, 3.6.5); a writer converts a recording to such
-  values (R3.3).
+- **R5.3** Source values fit their target registers under identity. With
+  an optional transformation, they are keys whose selected entries fit
+  the target (YMXS, SPEC.md 3.2.2, 3.6.5). A writer converts a recording
+  to such values (R3.3).
 - **R5.4** A player reads the sources from the tune file alone (SPEC.md
   3.1); in version 10 the tune file also has every transformation a tick
   maps through (SPEC.md 3.4).

@@ -3,36 +3,42 @@ package org.ymxr;
 import java.util.List;
 
 /**
- * The columns of a tune, one byte a column a frame (SPEC.md 1), thirty or
- * thirty-four: the columns themselves, the row the tune repeats to, the
- * effects the tune runs, and the transformations the mapping columns
- * number (SPEC.md 1.10, 3.4).
+ * Tune columns, one byte per column per frame, plus the repeat row,
+ * effects used and optional transformations (SPEC.md 1). Version 9 has
+ * thirty columns; version 10 adds four mapping columns. Mapping 0 uses
+ * source values unchanged.
  *
- * <p>{@link Schema} writes them from a YMXS structure, which {@link Ym}
- * reads a dump into (doc/ymxs.md). What is here beside the columns is
- * the arithmetic both stages read: which column a register reaches, the
- * bit beside a column that fills its byte, the prescalers, and how long a
- * source of so many rows runs at a rate.
+ * <p>{@link Schema} encodes a YMXS tune; {@link Ym} imports a dump into
+ * that structure. Constants here define register columns, set bits,
+ * prescalers and source-duration arithmetic (doc/ymxs.md).
  */
 final class Columns {
 
     /** The column count of versions 7 to 9, and a row's bytes there. */
     static final int C = 30;
 
-    /** The mapping column of effect 0; column 30 + i is effect i's
-     *  (SPEC.md 1.10). */
+    /**
+     * The first mapping column. Effect i uses column 30 + i in version
+     * 10 (SPEC.md 1.10).
+     */
     static final int MAPPING = 30;
 
-    /** The column count of version 10, whose rows set the mapping
-     *  columns (SPEC.md 3.3.5). */
+    /**
+     * The version 10 column count, including four mapping columns
+     * (SPEC.md 3.3.5).
+     */
     static final int MAPPED = 34;
 
-    /** The most transformations a tune file has: a mapping column numbers
-     *  1 to 127 (SPEC.md 1.10). */
+    /**
+     * The transformation limit: mapping numbers 1 to 127 select
+     * lookups; 0 selects identity (SPEC.md 1.10).
+     */
     static final int MOST_TRANSFORMATIONS = 127;
 
-    /** The most entries of a transformation, one for each key of a byte
-     *  (SPEC.md 3.4). */
+    /**
+     * The entry-count limit for a transformation: one entry per byte
+     * key (SPEC.md 3.4).
+     */
     static final int MOST_ENTRIES = 256;
 
     /** The first effect's target column; four columns an effect. */
@@ -44,8 +50,10 @@ final class Columns {
     static final int DEFERRED = 0x08;
     /** Bit 4 of the effects used: a row defers a start (SPEC.md 3.3). */
     static final int DEFERS = 0x10;
-    /** Bit 5 of the effects used: the tune has the mapping columns, and a
-     *  row maps a value (SPEC.md 3.3). */
+    /**
+     * Effects-used bit 5: version 10 mapping columns and transformation
+     * block are present (SPEC.md 3.3).
+     */
     static final int MAPS = 0x20;
 
     /** Bit 4 of a control column: the count column beside it is 0, and
@@ -78,9 +86,11 @@ final class Columns {
     /** The target whose register is R7, the mixer (SPEC.md 2.1). */
     static final int MIXER_TARGET = 7;
 
-    /** The most a key can be on `setR7` through a transformation: bits 5
-     *  to 0 of a row, below the port directions, so a tick reads key k as
-     *  k + 192 (rule 2(f)). */
+    /**
+     * The largest setR7 lookup key. Keys use bits 5 to 0; stored key k
+     * is k + 192, with both port-direction bits set (SPEC.md 6, rule
+     * 2(f)).
+     */
     static final int MOST_MIXER_KEY = ~PORTS & 0xFF;
 
     /** A column that fills its byte, and the column and bit beside it that
@@ -97,24 +107,31 @@ final class Columns {
     /** The row the tune repeats to, `R` where it does not. */
     final int repeat;
 
-    /** The effects used: bits 3 to 0 the effects the tune ever runs, bit
-     *  4 a deferred start, bit 5 the mapping columns (SPEC.md 3.3). */
+    /**
+     * Effects used: bits 3 to 0 select effects, bit 4 marks deferred
+     * starts, and bit 5 marks version 10 mapping columns (SPEC.md 3.3).
+     */
     final int effects;
 
-    /** The transformations, transformation n at n - 1: entry k of each is
-     *  the value of key k (SPEC.md 3.4). Empty in a tune of thirty
-     *  columns. */
+    /**
+     * Optional lookup tables: transformation n is at index n - 1 and
+     * key k selects entry k. Empty with thirty columns (SPEC.md 3.4).
+     */
     final List<byte[]> transformations;
 
-    /** Columns passed whole, {@code column[c][frame]}, for a tune built
-     *  rather than converted: the row it repeats to, or the frame count
-     *  where it plays once, and the effects it runs, with no
-     *  transformation. */
+    /**
+     * Builds columns directly: {@code column[c][frame]}, repeat row or
+     * frame count for a tune played once, and effects used. This
+     * constructor uses identity without transformation tables.
+     */
     Columns(byte[][] column, int repeat, int effects) {
         this(column, repeat, effects, List.of());
     }
 
-    /** The same, with the transformations the mapping columns number. */
+    /**
+     * Builds columns with the lookup tables selected by their mapping
+     * columns. Transformation n is at index n - 1.
+     */
     Columns(byte[][] column, int repeat, int effects, List<byte[]> transformations) {
         this.column = column;
         this.repeat = repeat;

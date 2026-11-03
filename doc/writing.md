@@ -125,35 +125,51 @@ DTX2 table.
 | two rows repeating to row 0 | a volume moving between a level and 0 at the timer's rate: a SID voice |
 | many rows played once | a recording through a volume register: a digidrum |
 
-**5.6** The values belong to the source: two SID voices at two levels are
-two sources, and the source column selects one of them.
+**5.6** Without a lookup, source values are written unchanged. Different
+sample levels then require different sources. An optional transformation
+can change those levels while reusing the source.
 
-**5.7 A source through a transformation.** In version 10 the mapping
-column of an effect is the number of a transformation for the last value
-its target reads (SPEC.md 1.10.1): the one value of `setR0` to `setR13`,
-the volume of `setVoiceX` and `setNoiseX`, the shape of `setBuzzer`, the
-coarse nibble of `setToneX` and the high byte of `setEnvelope`. A mapping
-with a transformation for another value is an error of the writer (SPEC.md
-6.5). A source an effect maps through transformation n has keys in its
-column of the last value, 0 to the last key of n, and the value written
-where the key is k is entry k of n (SPEC.md 2.1.5, 3.4.1; YMXS, SPEC.md
-3.6.5). A writer sets the mapping column on a start whose mapping differs
-from the kept mapping, and on a remap on a timer of the tune, the source
-column unset, whose mapping differs from the running mapping (SPEC.md
-1.10.2; SPEC.md 6, rule 2(g)).
+**5.7 Transformations.** A source value becomes a lookup key: key k
+selects entry k of the chosen transformation. A mapping selects the
+lookup; mapping 0 is identity. YMXR can transform only the target's last
+value: volume on `setVoiceX` or `setNoiseX`, shape on `setBuzzer`, the coarse
+nibble on `setToneX`, the high byte on `setEnvelope`, or the sole value on
+`setRn`. Values follow source-column order; earlier mapping parts must
+be identity.
 
-The column bounds each key as well (SPEC.md 6, rule 2(h)). On `setToneX`
-and `setBuzzer` the key and the marker share a column, so a key is 0 to
-127 and bit 7 is the marker (SPEC.md 3.2.1). The volume of `setVoiceX` and
-`setNoiseX` is a whole byte, so a key there is 0 to 255, as is a key on
-`setEnvelope`, `setR0`, `setR2`, `setR4`, `setR11` or `setR12`, whose
-source is counted (5.3). On a target of 5.2 the key and the marker share
-the one column as well, and a source that every start maps through a
-transformation is written counted where a key is 128 or more (SPEC.md
-3.1.6). On `setR7` the row of key k is k + 192, the two port directions
-set, and a key is 0 to 63 (SPEC.md 6, rule 2(f)). A row that sets a
-mapping column to a transformation, 1 to 127, makes the file version 10
-(5.4).
+For sample volume, define `Vn[k] = floor(k * n / 15)` for keys 0 to 15,
+with n from 0 to 15. This scales register codes; the chip's output
+levels are close to logarithmic (terminology.md 1). Start a sample on
+`setR8` through `Vn`, or a `setVoiceA` source through `[identity,
+identity, Vn]`. A fade remaps through successively lower levels while
+the sample continues from its current place. The same source can play on
+separate timers at different levels. For 8-bit sample keys, use a table
+of 256 entries that converts each key to a YM volume. Transformations
+can also change envelope shapes or noise-effect volume; they do not
+change timing, source length or repeat position.
+
+Write the mapping column with its set bit when a start changes the kept
+mapping, or a remap changes the running mapping. A remap leaves the source
+column unset. Byte `$00` preserves the kept mapping; `$80` explicitly
+selects identity. Stops leave the mapping column unset. A deferred start
+captures its mapping; subsequent remaps affect current ticks, and the
+pending start retains its snapshot (SPEC.md 6, rule 2(g)).
+
+Keys must fit both the transformation and the source encoding:
+
+| source column | key range | encoding |
+|---|---|---|
+| marker column of a marked source | 0 to 127 | key in bits 6 to 0, marker in bit 7 |
+| `setR7` | 0 to 63 | key k stored as k + 192, port directions set |
+| any other column | 0 to 255 | whole byte |
+
+A one-column source used only through transformations is counted when a
+key reaches 128; otherwise that bit would conflict with its marker
+(SPEC.md 3.1.6). A writer checks every key against the selected table's
+last entry and preserves marker and port bits in the output
+(SPEC.md 2.1.5).
+A row that sets a mapping column to a transformation, 1 to 127, makes the
+file version 10 (5.4).
 
 ---
 

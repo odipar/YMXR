@@ -82,8 +82,8 @@ func layoutMulti(out *bytes.Buffer, file []byte) {
 	}
 }
 
-// layoutBound is 6.3: the header, a line a source, the image of a bound
-// tune written alone, and of one of version 10 its transformation block.
+// layoutBound reports the bound header, sources and image, plus the
+// transformation block in version 10 (BINARIES.md 6.3).
 func layoutBound(out *bytes.Buffer, file []byte) {
 	fmt.Fprintf(out, "{\"part\":\"header\"%s}\n", boundFields(file, 0))
 	layoutSources(out, file, 0)
@@ -92,8 +92,8 @@ func layoutBound(out *bytes.Buffer, file []byte) {
 		block = signedLong(file, BoundTransformationsAt)
 	}
 	if image := signedLong(file, 16); image > 0 {
-		// the image ends at the transformation block where the field at
-		// 24 is set, and at the file's end otherwise
+		// The image ends at the transformation block when offset 24 is set;
+		// otherwise it ends at the file's end.
 		ends := len(file)
 		if block > 0 {
 			ends = block
@@ -279,9 +279,9 @@ func layoutSources(out *bytes.Buffer, file []byte, at int) {
 	}
 }
 
-// boundFields is the fields of 1.2 a record reports of the bound tune at
-// `at`, its image resolved against the file, and in version 10 its
-// transformation block.
+// boundFields reports the bound fields at the supplied offset,
+// resolving the image and optional version 10 transformation block
+// (BINARIES.md 1.2).
 func boundFields(file []byte, at int) string {
 	fields := fmt.Sprintf(",\"version\":%d,\"rate\":%d,\"effects\":%d,\"sources\":%d,"+
 		"\"stateblock\":%d,\"image\":%d,\"table\":%d",

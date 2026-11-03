@@ -42,13 +42,13 @@ rather than either.
 <https://github.com/odipar/YMXR/releases/tag/v0.9.0>, built from the commit
 tagged `v0.9.0`.
 
-A tune that defers a start and maps a value plays: the cores with both the
-deferred start and the lookup in arm a deferred start through its mapping,
-where under 0.8.0 init reported -1 for such a tune and the tools reported
-the subtune. The tune format is 0.8.0's. Over the eleven dumps under
-`ym/test`, `ym-to-ymxr` writes 0.8.0's tune files, 11 of 11, `ym-to-ymxs`
-0.8.0's structures, 11 of 11, and the SNDH files come to 227,232 bytes, as
-under 0.8.0.
+Cores with deferred-start and lookup support now play tunes using both
+features. A deferred start captures its mapping, while subsequent remaps
+change the running effect. Under 0.8.0 init reported -1 for such a tune
+and the tools reported the subtune. The tune format is 0.8.0's. Over the
+eleven dumps under `ym/test`, `ym-to-ymxr` writes 0.8.0's tune files, 11
+of 11, `ym-to-ymxs` 0.8.0's structures, 11 of 11, and the SNDH files
+come to 227,232 bytes, as under 0.8.0.
 
 - **A mapped deferred start** (SPEC.md 4.8, BINARIES.md 1.5). The arming
   fills the page of the bank the timer does not run with interrupts on,
@@ -86,12 +86,12 @@ Checks: `bin/suite` green, 306 tests and 0 skipped.
 <https://github.com/odipar/YMXR/releases/tag/v0.8.0>, built from the commit
 tagged `v0.8.0`.
 
-A tune file is version 10 where a row maps a value, and encodes version 7
-of YMXS's structure (YMXS 0.7.0): an effect maps the key of each row of
-its source through a transformation, a table of entries its mapping column
-numbers, and the player writes the entry to the chip. A tune that maps no
-value is version 9, as under 0.7.0. A reader reads 10, 9, 8 and 7, a
-player with the lookup in the four, and a player without it 9, 8 and 7.
+Optional transformations from YMXS 0.7.0 add lookup tables for source
+values. A row selects a table for its target's last value; each tick
+writes the entry selected by that source key. A tune using a lookup is
+version 10; identity-only tunes remain version 9, as under 0.7.0.
+Readers and players with lookup support read versions 7 to 10; players
+without it read 7 to 9.
 Over the eleven dumps under `ym/test`, `ym-to-ymxr` writes 0.7.0's tune
 files, 11 of 11; `ym-to-ymxs` writes 0.7.0's structures but for version 7,
 an empty list of transformations and a mapping column a timer, 11 of 11;

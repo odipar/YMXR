@@ -33,8 +33,7 @@ func volumes(n int) ymxs.Transformation {
 	return ymxs.Transformation{Name: fmt.Sprintf("V%d", n), Entries: entries}
 }
 
-// whole is a transformation of 256 entries, one for each key of a byte:
-// entry k is k divided by 16.
+// whole builds a 256-entry table, entry k = floor(k / 16).
 var whole = func() ymxs.Transformation {
 	entries := make([]int, 256)
 	for k := range entries {
@@ -136,8 +135,8 @@ func expect(t *testing.T, what string, got, want []byte) {
 	}
 }
 
-// A mapping of identity parts is the identity, so the start through it
-// writes the columns of a start through the mapping of no parts.
+// Explicit Identity parts and an empty Mapping produce identical start
+// columns.
 func TestAStartThroughIdentityPartsWritesTheColumnsOfNoParts(t *testing.T) {
 	parts := made(t, tune([]ymxs.Row{on(ymxs.TimerA, struck(t, ymxs.R8, square,
 		ymxs.Mapped(ymxs.Identity{})))}, 0))
@@ -153,9 +152,8 @@ func TestAStartThroughIdentityPartsWritesTheColumnsOfNoParts(t *testing.T) {
 	}
 }
 
-// A tune through the identity alone, its remaps to the identity among its
-// rows, is the tune file of version 9 byte for byte: each remap leaves
-// every column as it is (SPEC.md 3.3.5, rule 2(g)).
+// Identity-only rows, including remaps, produce the same version 9 file
+// as the tune without those remaps (SPEC.md 3.3.5; rule 2(g)).
 func TestAnIdentityTuneWithIdentityRemapsWritesVersion9(t *testing.T) {
 	identity := ymxs.Mapped(ymxs.Identity{})
 	remapped := made(t, tune([]ymxs.Row{
@@ -183,9 +181,8 @@ func TestAnIdentityTuneWithIdentityRemapsWritesVersion9(t *testing.T) {
 	expect(t, "the tune file", written, file(t, plain))
 }
 
-// A remap on a timer outside the tune leaves every column as it is (rule
-// 2(a)), so a tune whose only transformation is on such a remap writes
-// version 9, as the YMXS kit's transformations.json has at Timer D row 0.
+// A lookup used only by a remap outside the tune does not require
+// version 10 (SPEC.md 6, rule 2(a)).
 func TestARemapOutsideTheTuneWritesVersion9(t *testing.T) {
 	one := made(t, tune([]ymxs.Row{{Effects: map[ymxs.Timer]ymxs.Effect{
 		ymxs.TimerA: struck(t, ymxs.R8, square, ymxs.Mapping{}),
@@ -197,9 +194,9 @@ func TestARemapOutsideTheTuneWritesVersion9(t *testing.T) {
 	}
 }
 
-// fade is a fade of voice A, YMXS's SPEC.md 3.6.5: a start of a voice on
-// setVoiceA through the identity, the identity and V15, then a remap a
-// row through V10, V5 and V0, the tune repeating to row 0.
+// fade starts setVoiceA through identity on both tone values and V15 on
+// volume, then remaps volume through V10, V5 and V0. It repeats from
+// row 0 (YMXS, SPEC.md 3.6.5).
 func fade(t *testing.T) ymxs.Tune {
 	t.Helper()
 	voice := ymxs.Triple{Name: "voice", Table: ymxs.Repeating([]ymxs.Three{
@@ -216,10 +213,9 @@ func fade(t *testing.T) ymxs.Tune {
 	}, 0)
 }
 
-// The fade writes version 10: the four mapping columns, column 30 a number
-// a row, bit 5 of the effects used, the long at 16 the transformation
-// index, the source index at 20 and the transformations in the order YMXS
-// numbers them (SPEC.md 1.10, 3.3, 3.4).
+// The fade requires version 10: mapping columns, effects bit 5,
+// transformation-index pointer at 16, source index at 20 and tables in
+// YMXS first-use order (SPEC.md 1.10, 3.3, 3.4).
 func TestTheFadeWritesVersion10(t *testing.T) {
 	one := made(t, fade(t))
 	if len(one.Columns.Column) != ymxr.Mapped {
@@ -265,8 +261,8 @@ func TestTheFadeWritesVersion10(t *testing.T) {
 	}
 }
 
-// The mapping of each remap row of the fade's record is the number YMXS,
-// SPEC.md 7.4 records for the last part of the remap's mapping.
+// Each fade remap record reports its mapping's last-part number,
+// matching YMXS (SPEC.md 7.4).
 func TestTheRecordOfARemapRowIsTheNumberOfItsLastPart(t *testing.T) {
 	fade := fade(t)
 	list := ymxs.Transformations(fade)
@@ -298,9 +294,8 @@ func TestTheRecordOfARemapRowIsTheNumberOfItsLastPart(t *testing.T) {
 	}
 }
 
-// The transformations are numbered in the order of YMXS's SPEC.md 1.9: the
-// rows from row 0 and within a row the timers A to D, the order of the
-// effects A, D, B and C aside.
+// Number transformations in YMXS first-use order: rows, then timers A
+// to D. YMXR effect order A, D, B, C does not change these numbers.
 func TestTheTransformationsAreNumberedInTimerOrder(t *testing.T) {
 	one := made(t, tune([]ymxs.Row{{Effects: map[ymxs.Timer]ymxs.Effect{
 		ymxs.TimerA: struck(t, ymxs.R8, square, ymxs.Mapped(volumes(15))),
@@ -314,11 +309,9 @@ func TestTheTransformationsAreNumberedInTimerOrder(t *testing.T) {
 	}
 }
 
-// A start that leaves the mapping column unset runs through the kept
-// mapping, so a start through the kept one writes it unset; a remap sets
-// it with the source column unset (SPEC.md 1.10.2), and a stop leaves it
-// unset and the kept mapping as it is (rule 3(c)), so a remap to the kept
-// mapping after the stop is left out.
+// Starts reuse kept by leaving the mapping column unset. Remaps write
+// it with the source unset. Stops preserve kept, so a later redundant
+// remap can also be omitted (SPEC.md 1.10.2; rule 3(c)).
 func TestAStartThroughTheKeptMappingLeavesTheColumnUnset(t *testing.T) {
 	v10 := ymxs.Mapped(volumes(10))
 	v5 := ymxs.Mapped(volumes(5))
@@ -335,9 +328,8 @@ func TestAStartThroughTheKeptMappingLeavesTheColumnUnset(t *testing.T) {
 		[]byte{0x81, 0x82, 0, 0x80, 0, 0x81})
 }
 
-// A remap on an idle timer of the tune is written, the mapping the next
-// start keeps (SPEC.md 1.10.2), and a start through it leaves the column
-// unset.
+// A remap on an idle timer of the tune changes kept. A later start
+// through that mapping leaves the column unset (SPEC.md 1.10.2).
 func TestARemapOnAnIdleTimerOfTheTuneIsWritten(t *testing.T) {
 	one := made(t, ymxs.Tune{Rate: 50, Table: ymxs.Once([]ymxs.Row{
 		on(ymxs.TimerC, remap(ymxs.Mapped(volumes(5)))),
@@ -346,11 +338,9 @@ func TestARemapOnAnIdleTimerOfTheTuneIsWritten(t *testing.T) {
 	expect(t, "column 33", mapping(one, 3), []byte{0x81, 0})
 }
 
-// After a deferred start the kept mapping is the pending start's, and the
-// running source may run through another until a tick performs it: a
-// remap equal to the kept mapping is written (YMXS, SPEC.md 3.5.5). Once
-// the remap and the pending start agree, a second such remap leaves the
-// column unset.
+// A deferred start can differ from current ticks, so a remap equal to
+// kept still needs a write. Once running and pending mappings agree,
+// another identical remap can be omitted (SPEC.md 6, rule 2(g)).
 func TestARemapEqualToTheKeptMappingAfterADeferredStartIsWritten(t *testing.T) {
 	v5 := ymxs.Mapped(volumes(5))
 	one := made(t, ymxs.Tune{Rate: 50, Table: ymxs.Once([]ymxs.Row{
@@ -362,10 +352,10 @@ func TestARemapEqualToTheKeptMappingAfterADeferredStartIsWritten(t *testing.T) {
 	expect(t, "column 30", mapping(one, 0), []byte{0x81, 0x82, 0x82, 0})
 }
 
-// While a deferred start through another mapping may be pending, a tick
-// may have performed it, so a remap to the mapping the effect ran through
-// before is written, and so is the same remap again: the pending start
-// keeps the mapping of its row (YMXS, SPEC.md 3.5.5).
+// After deferring a different mapping, its installation between frames
+// remains unknown. Remap to the previous running value must be written,
+// including repeated remaps, because pending retains its captured
+// mapping (SPEC.md 1.10.3).
 func TestARemapWhileAStartIsPendingThroughAnotherIsWritten(t *testing.T) {
 	v10 := ymxs.Mapped(volumes(10))
 	one := made(t, ymxs.Tune{Rate: 50, Table: ymxs.Once([]ymxs.Row{
@@ -378,10 +368,9 @@ func TestARemapWhileAStartIsPendingThroughAnotherIsWritten(t *testing.T) {
 	expect(t, "column 30", mapping(one, 0), []byte{0x81, 0x82, 0x81, 0x81})
 }
 
-// A remap to the mapping the effect runs through, with no start pending
-// through another, leaves the column unset; a deferred start through the
-// mapping the effect runs through leaves the running mapping as it is
-// (rule 2(g)).
+// Omit a remap when running already matches and no pending start can
+// change it. Deferring the same mapping preserves the known running
+// value (SPEC.md 6, rule 2(g)).
 func TestARemapToTheRunningMappingLeavesTheColumnUnset(t *testing.T) {
 	v5 := ymxs.Mapped(volumes(5))
 	one := made(t, ymxs.Tune{Rate: 50, Table: ymxs.Once([]ymxs.Row{
@@ -393,9 +382,9 @@ func TestARemapToTheRunningMappingLeavesTheColumnUnset(t *testing.T) {
 	expect(t, "column 30", mapping(one, 0), []byte{0x81, 0, 0, 0})
 }
 
-// The player keeps the mapping through the wrap, so the first start at or
-// after the repeat row writes the mapping column of an effect a row maps
-// (SPEC.md 1.10.3), and a remap there is written.
+// Mappings survive the wrap. For effects using lookups, the first start
+// or remap after the repeat row restores the required mapping (SPEC.md
+// 6, rule 2(g)).
 func TestTheRepeatRowWritesTheMappingColumn(t *testing.T) {
 	v10 := ymxs.Mapped(volumes(10))
 	one := made(t, tune([]ymxs.Row{
@@ -413,9 +402,9 @@ func TestTheRepeatRowWritesTheMappingColumn(t *testing.T) {
 		[]byte{0x81, 0x81, 0x82})
 }
 
-// An effect through the identity alone keeps a constant 0 mapping column in
-// a repeating tune of version 10: its remaps to the identity and its starts
-// after the repeat row leave the column unset (SPEC.md 1.10.3).
+// An identity-only effect keeps a constant 0 mapping column beside a
+// lookup effect, including starts and remaps after the repeat row
+// (SPEC.md 1.10.3).
 func TestAnIdentityEffectKeepsAConstantMappingColumn(t *testing.T) {
 	identity := ymxs.Mapped(ymxs.Identity{})
 	one := made(t, tune([]ymxs.Row{
@@ -452,8 +441,8 @@ func remappedThrough(t *testing.T, count int) ymxs.Tune {
 	return tune(rows, 0)
 }
 
-// More transformations than the mapping column numbers is a line of the
-// writer (SPEC.md 6.5), and 127 are 127 tables.
+// Reject a transformation count above the mapping-column limit; accept
+// and encode the limit (SPEC.md 6.5).
 func TestMoreThan127TransformationsIsALine(t *testing.T) {
 	said := reported(t, remappedThrough(t, ymxr.MostTransformations+1))
 	want := "the tune maps through 128 transformations, and a mapping column numbers 127"
@@ -466,9 +455,9 @@ func TestMoreThan127TransformationsIsALine(t *testing.T) {
 	}
 }
 
-// outsideThrough is a square started, then a remap a row on Timer D, a
-// timer outside the tune, through each of count transformations, and where
-// last is set a remap of the square through one more.
+// outsideThrough starts a square, remaps Timer D outside the tune
+// through count tables, then optionally remaps the square through one
+// more.
 func outsideThrough(t *testing.T, count int, last bool) ymxs.Tune {
 	t.Helper()
 	rows := []ymxs.Row{on(ymxs.TimerA, struck(t, ymxs.R8, square, ymxs.Mapping{}))}
@@ -483,10 +472,9 @@ func outsideThrough(t *testing.T, count int, last bool) ymxs.Tune {
 	return tune(rows, 0)
 }
 
-// A writer leaves out a remap on a timer outside the tune, and its
-// transformations with it: 128 of them write version 9 (SPEC.md 3.3.5,
-// rule 2(a)). A remap on a timer of the tune through one more makes a file
-// of 128 transformations, the line of SPEC.md 6.5.
+// Remaps outside the tune do not require version 10. If an encoded
+// operation uses a lookup, the full YMXS table list must fit the
+// transformation-count limit (SPEC.md 3.3.5, 6.5; rule 2(a)).
 func TestTransformationsOutsideTheTuneAreLeftOut(t *testing.T) {
 	one := made(t, outsideThrough(t, ymxr.MostTransformations+1, false))
 	if len(one.Columns.Column) != ymxr.C || one.Columns.Effects&ymxr.Maps != 0 ||
@@ -506,9 +494,8 @@ func TestTransformationsOutsideTheTuneAreLeftOut(t *testing.T) {
 	}
 }
 
-// A mapping column maps the last value of its target, so a mapping of
-// another value is a line of the writer with the row of the structure
-// (SPEC.md 1.10.1, 6.5).
+// Reject transformations before the target's last value, reporting the
+// original structure row (SPEC.md 1.10.1, 6.5).
 func TestAMappingOfAnotherValueIsALine(t *testing.T) {
 	voice := ymxs.Triple{Name: "voice", Table: ymxs.Repeating([]ymxs.Three{
 		{First: 0x60, Second: 1, Third: 15}}, 0)}
@@ -522,9 +509,9 @@ func TestAMappingOfAnotherValueIsALine(t *testing.T) {
 	}
 }
 
-// A remap of three values on setVoiceB, as the YMXS kit's
-// transformations.json has at Timer B row 2, maps the fine period first:
-// the line names the target of the start the remap maps.
+// The YMXS fixture remaps all three setVoiceB values. Reject its
+// fine-tone lookup first, using the latest start's target in the
+// diagnostic.
 func TestARemapOfThreeValuesOnSetVoiceBIsALine(t *testing.T) {
 	chord := ymxs.Triple{Name: "chord", Table: ymxs.Repeating([]ymxs.Three{
 		{First: 28, Second: 1, Third: 15}, {First: 214, Second: 0, Third: 12}}, 0)}
@@ -546,9 +533,8 @@ func TestARemapOfThreeValuesOnSetVoiceBIsALine(t *testing.T) {
 	}
 }
 
-// A start through a transformation at row 3 of four rows that repeat to
-// row 1: padding to a unit of 2 adds a row before row 1, and the line
-// numbers the row of the structure.
+// Padding before the repeat row must preserve original structure-row
+// numbers in errors for a later unsupported mapping.
 func TestTheRowOfAnErrorIsTheRowOfTheStructure(t *testing.T) {
 	tone := ymxs.Pair{Name: "tone", Table: ymxs.Repeating([]ymxs.Two{
 		{First: 0x60, Second: 1}}, 0)}
@@ -571,9 +557,9 @@ func TestTheRowOfAnErrorIsTheRowOfTheStructure(t *testing.T) {
 	}
 }
 
-// The source of start, on setR10 through a table of 256 entries, has a key
-// of 128 or more: every start of it is through a transformation, so it is
-// written counted, every row a whole byte and no marker (SPEC.md 3.1.6).
+// A one-column source used only through lookups needs counted encoding
+// when keys reach 128. Preserve the full key byte and set source-index
+// bit 31 (SPEC.md 3.1.6).
 func TestAKeyOf128OnSetR10ThroughATransformationIsCounted(t *testing.T) {
 	sample := ymxs.RepeatingSource("sample", []int{128, 200, 255, 56, 0}, 0)
 	one := made(t, tune([]ymxs.Row{on(ymxs.TimerC, struck(t, ymxs.R10, sample,
@@ -596,10 +582,9 @@ func TestAKeyOf128OnSetR10ThroughATransformationIsCounted(t *testing.T) {
 	expect(t, "the marked source's rows", low.Sources.At(1).Columns[0], []byte{100, 0x80 | 50})
 }
 
-// Through the identity, a value of 128 or more on setR10 is an error of the
-// structure (YMXS, SPEC.md 3.2.2), and so is a source that one start runs
-// through the identity and another through a transformation: YMXS's check
-// reports it before the writer reads it.
+// Identity values on setR10 must fit its register. YMXS validation
+// rejects byte keys used through identity, including sources shared
+// between identity and lookup starts.
 func TestAKeyOf128ThroughTheIdentityIsAnErrorOfTheStructure(t *testing.T) {
 	sample := ymxs.RepeatingSource("sample", []int{128, 0}, 0)
 	for _, rows := range [][]ymxs.Row{
@@ -615,9 +600,8 @@ func TestAKeyOf128ThroughTheIdentityIsAnErrorOfTheStructure(t *testing.T) {
 	}
 }
 
-// On setToneX the mapped value is in the marker's column, so a key of 128
-// or more there is the marker's line; on setVoiceX the mapped volume is a
-// whole byte, and a key of 255 passes.
+// Marked setToneX keys must fit below bit 7. setVoiceX volume has a
+// separate marker column and can use full-byte keys.
 func TestAKeyOf128OnAWiderTarget(t *testing.T) {
 	tone := ymxs.Pair{Name: "tone", Table: ymxs.Repeating([]ymxs.Two{
 		{First: 0x60, Second: 200}}, 0)}
@@ -640,9 +624,8 @@ func TestAKeyOf128OnAWiderTarget(t *testing.T) {
 	expect(t, "the volume column", one.Sources.At(1).Columns[2], []byte{255})
 }
 
-// Through a transformation on setR7 a source's rows keep the two port
-// directions of rule 2(f), so key k reads as k + 192; a key of 64 or more
-// is a line of the writer (SPEC.md 6.5).
+// Encode setR7 key k as k + 192, preserving both port bits. Reject keys
+// above 63 (SPEC.md 6, rule 2(f)).
 func TestSetR7ThroughATransformation(t *testing.T) {
 	ports := ymxs.Transformation{Name: "ports", Entries: make([]int, 64)}
 	for k := range ports.Entries {
@@ -667,10 +650,9 @@ func TestSetR7ThroughATransformation(t *testing.T) {
 	}
 }
 
-// Every row of a source on setR7 has bits 7 and 6 set, and a tick on setR0
-// writes the row whole to R0: a source on both is an error of the writer,
-// through a transformation or the identity, in either order (SPEC.md rule
-// 2(f), 6.5).
+// Reject sharing a source between setR7 and setR0: mixer port bits
+// would become R0 data. Apply the same rule to identity and lookup
+// mappings, in either start order (SPEC.md 6, rule 2(f)).
 func TestASourceOnSetR7AndOnAnotherTargetIsALine(t *testing.T) {
 	gate := ymxs.RepeatingSource("gate", []int{56, 57}, 0)
 	gated := ymxs.Transformation{Name: "gated", Entries: make([]int, 64)}

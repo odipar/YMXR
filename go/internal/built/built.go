@@ -7,7 +7,8 @@ import (
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
-// Fade is transformation 1 of Mapped: sixteen entries, entry k 15 - k.
+// Fade is transformation 1 of Mapped: sixteen entries with entry k = 15
+// - k.
 func Fade() []byte {
 	out := make([]byte, 16)
 	for k := range out {
@@ -16,16 +17,17 @@ func Fade() []byte {
 	return out
 }
 
-// Half is transformation 2 of Mapped: three entries, each key halved.
+// Half is transformation 2 of Mapped: three entries with entry k =
+// floor(k / 2).
 func Half() []byte {
 	return []byte{0, 0, 1}
 }
 
-// Mapped is the columns of a tune of version 10: on effect 0, a start of
-// source 1 on setR8 through the fade at row 0, a remap to half at row 1,
-// a start at row 2 that leaves the mapping column unset, a stop at row 3
-// that sets it, and a remap to the identity at row 4; six rows, played
-// once.
+// Mapped is a six-row version 10 fixture played once. Effect 0 starts
+// source 1 on setR8 through Fade, remaps to Half, starts with its
+// mapping column unset, stops with that column incorrectly set, then
+// remaps to identity. The invalid stop checks that the player ignores
+// its mapping column.
 func Mapped() ymxr.Columns {
 	frames := 6
 	c := make([][]byte, ymxr.Mapped)
@@ -48,8 +50,8 @@ func Mapped() ymxr.Columns {
 		Transformations: [][]byte{Fade(), Half()}}
 }
 
-// Unmapped is the columns of Mapped without the mapping columns, version
-// 9.
+// Unmapped removes the mapping columns and transformations from Mapped,
+// producing a version 9 fixture.
 func Unmapped() ymxr.Columns {
 	columns := Mapped()
 	columns.Column = columns.Column[:ymxr.C]

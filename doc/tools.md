@@ -349,9 +349,10 @@ row of the structure where it arises, numbered before the padding:
 | a source a `Start` on `setR7` maps through a transformation has a key past 63 | `the source <source> has the key K in row R on setR7, and a key on setR7 is 0 to 63` |
 | a source has a value past 255 | `the source <source> has the value V in row R of column C, and a column is one byte` |
 
-A tune whose rows set a mapping column to a transformation is a tune file
-of version 10, and every other tune one of version 9 (SPEC.md 3.3.5;
-SPEC.md 6, rule 2(g)).
+Transformation lookups are optional. A row selecting one produces version
+10; identity-only tunes remain version 9 (SPEC.md 3.3.5). Only the last
+target value can use a lookup. [writing.md](writing.md) 5.7 covers sample
+volume, fades and key encoding; [ymxs.md](ymxs.md) covers conversion.
 
 **7.2 The warnings.** After the check and before the report, each
 finding of YMXS's check of the writing rules (YMXS, SPEC.md 6.3) is a
@@ -604,18 +605,17 @@ the core that is those. Where neither `-pcrel` nor `-abs` is passed the
 tool reads the file's last bound tune against the core's first byte plus
 its field at 26, where its handlers begin (BINARIES.md 2.2): within
 32,767 bytes it writes the core that reads through the program counter,
-and further off the core that reads an address. Where the effects byte
-of a subtune sets bit 4 the core has the deferred start in, and where
-none does the core is without it; where the effects byte of a subtune
-sets bit 5 the core has the lookup in, and where none does the core is
-without it (BINARIES.md 2.1). The clock tag names Timer C, or the VBL
-where `-vbl` or `-perf` is passed: the raster monitor paints one frame
-of calls, which reads against the raster where the tick comes from the
-VBL (BINARIES.md 3.2, performance.md). `-tc` names Timer C over `-perf`,
-and `-vbl` and `-tc` together are `-vbl and -tc name two clocks`,
-exit 2. A set that claims Timer C names the VBL, and `-tc` with such a
-set is the error of 12.2. The title is `-tTITLE`, else the first name,
-`(untitled)` where a tune file was read or the name is blank; the
+and further off the core that reads an address. Deferred-start support
+is selected when any subtune sets effects bit 4; lookup support is
+selected when any subtune sets bit 5. Other files use the smaller cores
+without those features (BINARIES.md 2.1). The clock tag names Timer C,
+or the VBL where `-vbl` or `-perf` is passed: the raster monitor paints
+one frame of calls, which reads against the raster where the tick comes
+from the VBL (BINARIES.md 3.2, performance.md). `-tc` names Timer C over
+`-perf`, and `-vbl` and `-tc` together are `-vbl and -tc name two
+clocks`, exit 2. A set that claims Timer C names the VBL, and `-tc` with
+such a set is the error of 12.2. The title is `-tTITLE`, else the first
+name, `(untitled)` where a tune file was read or the name is blank; the
 composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md 3) each text
 is reduced to its characters $20 to $7E; the report of 12.4 prints the
 text as passed.

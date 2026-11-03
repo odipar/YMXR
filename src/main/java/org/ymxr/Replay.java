@@ -20,12 +20,14 @@ import org.dtx.Table;
  */
 final class Replay {
 
-    /** What one effect runs after a row: source 0 where it runs no source.
-     *  {@code set} marks the row that set one of its columns, {@code timer}
-     *  that the row's control column had bit 6, {@code place} bit 5 and
-     *  {@code deferred} bit 3. {@code mapping} is the kept mapping, the
-     *  number the last start or remap set the mapping column to, 0 the
-     *  identity and at the first frame (SPEC.md 1.10.3). */
+    /**
+     * One effect after a frame: source 0 means idle. {@code set} marks
+     * an effect-column write; {@code timer}, {@code place} and {@code
+     * deferred} record control bits 6, 5 and 3. {@code mapping} is the
+     * kept mapping, initially 0 for identity. A deferred start can run
+     * through a different captured mapping; this model omits ticks and
+     * pending starts (SPEC.md 1.10.3, 7.3).
+     */
     record Effect(int target, int source, int select, int count, boolean started,
                   boolean set, boolean timer, boolean place, boolean deferred,
                   int mapping) {
@@ -96,10 +98,10 @@ final class Replay {
                 place = (r[t + 2] & 0x20) != 0;
                 deferred = (r[t + 2] & Columns.DEFERRED) != 0;
             }
-            // A start or a remap that sets the mapping column sets the kept
-            // mapping, and a remap leaves the source as it is. A stop reads
-            // the source column alone, so a stop that sets the mapping
-            // column is a line of the check (SPEC.md 1.10, 6.4).
+            // A start or remap can replace the kept mapping. A remap
+            // preserves the source. A stop ignores its mapping column;
+            // the check reports that invalid combination (SPEC.md 1.10,
+            // 6.4).
             int mapping = was.mapping();
             boolean mapped = r.length > Columns.MAPPING + i
                     && (r[Columns.MAPPING + i] & 0x80) != 0;

@@ -188,8 +188,10 @@ final class YmxsTest {
         return built(rows, 1);
     }
 
-    /** The transformation V{most} of the sixteen levels of a volume
-     *  register: entry k is k * most / 15. */
+    /**
+     * Volume lookup with entry k = floor(k * most / 15) for sixteen
+     * keys.
+     */
     private static Transformation volume(int most) {
         List<Integer> entries = new ArrayList<>();
         for (int k = 0; k < 16; k++) {
@@ -198,8 +200,10 @@ final class YmxsTest {
         return new Transformation("V" + most, entries);
     }
 
-    /** A fade (YMXS, SPEC.md 3.6): a square started through V15, a remap
-     *  a row through V10, V5 and V0, then a stop. */
+    /**
+     * Fade: start a square through V15, remap through V10, V5 and V0,
+     * then stop (YMXS, SPEC.md 3.6).
+     */
     static Tune fade() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
         List<Row> rows = new ArrayList<>();
@@ -277,8 +281,10 @@ final class YmxsTest {
         return made.columns().column[Columns.MAPPING + i];
     }
 
-    /** A transformation of {@code size} entries, entry k at k divided by
-     *  {@code by}: one distinct from the identity, under its name. */
+    /**
+     * A named lookup with size entries, entry k = floor(k / by). It
+     * remains distinct from identity.
+     */
     private static Transformation divided(String name, int size, int by) {
         List<Integer> entries = new ArrayList<>();
         for (int k = 0; k < size; k++) {
@@ -297,10 +303,11 @@ final class YmxsTest {
 
     private static final Timing STOPPED = new Timing(Chip.prescaler(4), 100, true, true);
 
-    /** A remap to the identity on a tune that maps no value is left out,
-     *  and so is one on a timer outside the tune: the file is version 9,
-     *  byte for byte the file of the tune without them (SPEC.md 3.3.5,
-     *  rule 2(g)). */
+    /**
+     * Identity remaps and remaps outside the tune produce no mapping
+     * writes. The version 9 output matches the tune without those
+     * operations (SPEC.md 3.3.5; rule 2(g)).
+     */
     @Test
     void aTuneThroughTheIdentityWithRemapsWritesTheFileOfVersionNine() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
@@ -320,9 +327,10 @@ final class YmxsTest {
         assertArrayEquals(file(without), file, "the file of the tune without the remaps");
     }
 
-    /** The YMXS kit's transformations.json remaps Timer D, a timer outside
-     *  the tune, at row 0: a tune whose only transformation is on such a
-     *  remap writes version 9 (rule 2(a)). */
+    /**
+     * A lookup used only by a remap outside the tune does not require
+     * version 10 (SPEC.md 6, rule 2(a)).
+     */
     @Test
     void aTransformationOnARemapOutsideTheTuneWritesVersionNine() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
@@ -335,11 +343,11 @@ final class YmxsTest {
         assertEquals(org.ymxr.Tune.UNMAPPED, org.ymxr.Tune.getWord(file(tune), 4));
     }
 
-    /** The fade of {@link #fade} through the structure: version 10, its
-     *  four mapping columns, bit 5 of the effects used, the long at 16 the
-     *  offset of the transformation index, the source index at 20, and the
-     *  four transformations in the order YMXS numbers them (SPEC.md 1.10,
-     *  3.3, 3.4). */
+    /**
+     * The fade encodes as version 10: four mapping columns, effects bit
+     * 5, transformation-index pointer at 16, source index at 20 and
+     * lookup tables in YMXS first-use order (SPEC.md 1.10, 3.3, 3.4).
+     */
     @Test
     void theFadeWritesVersionTen() {
         Schema.Made made = Schema.of(fade());
@@ -376,9 +384,10 @@ final class YmxsTest {
         }
     }
 
-    /** The mapping of each remap row of the fade's record is the number
-     *  YMXS, SPEC.md 7.4 records for the last part of the remap's
-     *  mapping. */
+    /**
+     * Each fade remap's record reports the number of its mapping's last
+     * part, matching YMXS (SPEC.md 7.4).
+     */
     @Test
     void theRecordOfARemapRowIsTheNumberOfItsLastPart() {
         Tune fade = fade();
@@ -402,8 +411,10 @@ final class YmxsTest {
         assertEquals(3, read, "the three remaps of the fade");
     }
 
-    /** A start whose mapping is the kept mapping leaves the column unset,
-     *  and a start of another mapping sets it (rule 2(g)). */
+    /**
+     * Starts reuse the kept mapping by leaving its column unset; a
+     * changed mapping requires a write (SPEC.md 6, rule 2(g)).
+     */
     @Test
     void aStartThatKeepsTheMappingLeavesTheColumnUnset() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
@@ -421,10 +432,12 @@ final class YmxsTest {
                 mapping(Schema.of(tune), 0));
     }
 
-    /** A remap sets the mapping column with the source column unset, and
-     *  is left out where the effect runs through its mapping already. On
-     *  an idle timer of the tune it is written, and the next start keeps
-     *  it (rule 2(g)). */
+    /**
+     * A remap writes its mapping with the source column unset, unless
+     * the running mapping already matches. On an idle timer of the
+     * tune, the written mapping is reused by the next start (SPEC.md 6,
+     * rule 2(g)).
+     */
     @Test
     void aRemapSetsTheMappingColumnWithTheSourceColumnUnset() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
@@ -448,11 +461,10 @@ final class YmxsTest {
     }
 
     /**
-     * After a deferred start the kept mapping is the pending start's, and
-     * the running effect may run through another until the tick that
-     * performs it: a remap equal to the kept mapping is written. A start
-     * after a remap while a start is pending keeps the remap's mapping,
-     * which the next tick does not change (SPEC.md 1.10.3).
+     * Deferring a different mapping makes the running mapping
+     * uncertain. A remap equal to kept must still be written.
+     * Installation preserves kept, so a later start can reuse the remap
+     * value (SPEC.md 1.10.3).
      */
     @Test
     void aRemapEqualToTheKeptMappingAfterADeferredStartIsWritten() {
@@ -477,10 +489,11 @@ final class YmxsTest {
                 (byte) 0x82, 0, 0, 0}, mapping(Schema.of(tune), 0));
     }
 
-    /** The repeat row: the player keeps the mapping the last row left, so
-     *  the first start at or after the repeat row writes the mapping
-     *  column of an effect a row maps through a transformation (rule
-     *  2(g)). */
+    /**
+     * Mappings survive the wrap. For an effect using lookups, the first
+     * start or remap after the repeat row restores its required mapping
+     * (SPEC.md 6, rule 2(g)).
+     */
     @Test
     void theRepeatRowWritesTheMappingColumn() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
@@ -494,9 +507,10 @@ final class YmxsTest {
                 mapping(Schema.of(tune), 0));
     }
 
-    /** A tune of version 10 that repeats to row 2: effect 0 through V10 and
-     *  V5, and beside it effect 1 through the identity alone, with starts
-     *  and remaps to the identity before and after the repeat row. */
+    /**
+     * Repeating version 10 fixture: effect 0 changes volume tables,
+     * while effect 1 uses identity before and after the repeat row.
+     */
     static Tune identityBeside() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
         Single soft = Tunes.repeating("square 6", List.of(6, 0), 0);
@@ -516,10 +530,9 @@ final class YmxsTest {
     }
 
     /**
-     * A tune of version 10 that repeats, with an effect through the
-     * identity alone: its starts and its remaps to the identity before and
-     * after the repeat row leave its mapping column unset, so the column
-     * is 0 in every row and packs constant (rule 2(g)).
+     * An identity-only effect needs no mapping writes, even beside an
+     * effect using lookups in a repeating version 10 tune. Its mapping
+     * column packs as constant 0 (SPEC.md 6, rule 2(g)).
      */
     @Test
     void anEffectThroughTheIdentityKeepsAConstantColumn() {
@@ -555,9 +568,11 @@ final class YmxsTest {
         assertEquals(127, Schema.of(remappedThrough(127)).columns().transformations.size());
     }
 
-    /** A square started, then a remap a row on Timer D, a timer outside
-     *  the tune, through each of {@code count} transformations, and where
-     *  {@code last} is set a remap of the square through one more. */
+    /**
+     * Starts a square, remaps Timer D outside the tune through count
+     * transformations, then optionally remaps the square through one
+     * more.
+     */
     static Tune outsideThrough(int count, boolean last) {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);
         List<Row> rows = new ArrayList<>();
@@ -571,10 +586,12 @@ final class YmxsTest {
         return built(rows, 0);
     }
 
-    /** A writer leaves out a remap on a timer outside the tune, and its
-     *  transformations with it: 128 of them write version 9 (SPEC.md
-     *  3.3.5, rule 2(a)). A remap on a timer of the tune through one more
-     *  makes a file of 128 transformations, the line of SPEC.md 6.5. */
+    /**
+     * Remaps outside the tune are omitted and do not require version
+     * 10. If another encoded operation uses a lookup, the full YMXS
+     * list must fit the transformation-count limit (SPEC.md 3.3.5, 6.5;
+     * rule 2(a)).
+     */
     @Test
     void transformationsOutsideTheTuneAreLeftOut() {
         Schema.Made made = Schema.of(outsideThrough(128, false));
@@ -601,10 +618,11 @@ final class YmxsTest {
                 new org.ymxs.YMXS.SetVoice(org.ymxs.YMXS.Voice.B), chord);
     }
 
-    /** Rows 0 to 2 of the YMXS kit's transformations.json on Timers A and
-     *  B: a square through V15, the chord on `setVoiceB` through V10 for
-     *  its volume, and at row 2 a remap of the chord's three values; then
-     *  the repeat row, which stops both. */
+    /**
+     * YMXS transformation fixture: square volume on Timer A, chord
+     * volume on Timer B, then an unsupported remap of all chord values.
+     * The repeat row stops both timers.
+     */
     static Tune chordRemapped() {
         Single loud = Tunes.repeating("square 15", List.of(15, 0), 0);
         Mapping all = Tunes.mapping(divided("half", 256, 2), divided("half", 16, 2),
@@ -618,11 +636,12 @@ final class YmxsTest {
                 row(Timer.A, Tunes.STOP, Timer.B, Tunes.STOP)), 3);
     }
 
-    /** A mapping column maps the last value of a row alone: a start
-     *  through a transformation for another value is an error with its
-     *  row, and so is a remap of three values on `setVoiceB`, as the YMXS
-     *  kit's transformations.json has at Timer B row 2 (SPEC.md 1.10.1,
-     *  6.5). */
+    /**
+     * Reject lookups before the target's last value for starts and
+     * remaps, reporting the original structure row. The YMXS fixture's
+     * three-part setVoiceB remap exceeds YMXR's restriction (SPEC.md
+     * 1.10.1, 6.5).
+     */
     @Test
     void aMappingOfAValueOtherThanTheLastIsAnError() {
         assertEquals("row 2: the mapping maps value 0 of setVoiceB, and a mapping column maps"
@@ -665,10 +684,10 @@ final class YmxsTest {
         return built(rows, 1);
     }
 
-    /** The sample of the YMXS kit's transformations.json on `setR10`,
-     *  Timer C, through a transformation of 256 entries from eight bits to
-     *  four, entry k at k divided by 16, in place of the kit's `8 bits to
-     *  4`. */
+    /**
+     * Byte-key sample on setR10 through a 256-entry table, entry k =
+     * floor(k / 16), replacing the YMXS fixture's table.
+     */
     static Tune sampled() {
         Single sample = Tunes.repeating("sample", List.of(128, 200, 255, 200, 128, 56, 0, 56),
                 0);
@@ -685,13 +704,10 @@ final class YmxsTest {
     }
 
     /**
-     * A source on `setR10`, a target of one register whose column is the
-     * marker's, with keys of 128 or more through a transformation of 256
-     * entries: written counted, every row a whole byte and bit 31 of its
-     * index entry set (SPEC.md 3.1.6). Through the identity such a value
-     * is an error of the structure (YMXS, SPEC.md 3.2.2). On `setToneA`,
-     * where the marker's column is the mapped column, a key of 128 or
-     * more is the marker line.
+     * High lookup keys on one-column setR10 require counted encoding
+     * with index bit 31 set. Identity values there must fit the
+     * register. Multi-column setToneA retains a marker, so its lookup
+     * key must fit below bit 7 (SPEC.md 3.1.6, 6.5).
      */
     @Test
     void aKeyOf128OrMoreOnSetR10ThroughATransformationIsCounted() {
@@ -727,13 +743,13 @@ final class YmxsTest {
     }
 
     /**
-     * A source on `setR7` through a transformation: its rows keep rule
-     * 2(f)'s two port directions, key k the row k + 192, and a key of 64
-     * or more is an error (SPEC.md 6.5).
+     * setR7 key k is encoded as k + 192 to preserve both port bits.
+     * Reject keys above 63 (SPEC.md 6, rule 2(f)).
      */
-    /** A source on `setR7` on Timer A and on `setR0` on Timer B, in the
-     *  order {@code mixerFirst} sets, the start on `setR7` through a
-     *  transformation of 64 entries where {@code mapped} is set. */
+    /**
+     * Shares a source between setR7 on Timer A and setR0 on Timer B in
+     * either order. The mixer start optionally uses a lookup.
+     */
     static Tune mixerAndTone(boolean mixerFirst, boolean mapped) {
         Single gate = Tunes.repeating("gate", List.of(56, 57), 0);
         Start mixer = start(Register.R7, gate, STOPPED, false,
@@ -743,10 +759,11 @@ final class YmxsTest {
                 row(Map.of(), Timer.B, mixerFirst ? tone : mixer)), 0);
     }
 
-    /** Every row of a source on `setR7` has bits 7 and 6 set, and a tick
-     *  on `setR0` writes the row whole to R0: a source on both is an error
-     *  of the writer, through a transformation or the identity, in either
-     *  order (SPEC.md rule 2(f), 6.5). */
+    /**
+     * Reject sharing a setR7 source with setR0: mandatory port bits
+     * would become data bits on R0. Identity and lookup mappings have
+     * the same restriction (SPEC.md 6, rule 2(f)).
+     */
     @Test
     void aSourceOnTheMixerAndOnAnotherTargetIsAnError() {
         String line = "the source gate runs on setR7 and on setR0, and every row of a source"
@@ -775,9 +792,10 @@ final class YmxsTest {
                 + " 0 to 63", reported(wideMixer()));
     }
 
-    /** A start through a mapping of one part, the identity, writes the
-     *  columns of a start through the mapping of no parts, the identity in
-     *  every part (YMXS, SPEC.md 3.6.3). */
+    /**
+     * Explicit identity parts and an empty mapping produce identical
+     * start columns (YMXS, SPEC.md 3.6.3).
+     */
     @Test
     void aStartThroughTheIdentityInEveryPartWritesTheSameColumns() {
         Single loud = Tunes.repeating("square 12", List.of(12, 0), 0);

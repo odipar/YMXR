@@ -1,29 +1,28 @@
-// Package ymxr is the format: the columns of a tune, the sources its
-// effects run, the transformations they map through, the tune file those
-// are written to, and the multi file several tune files travel in.
+// Package ymxr defines tune columns, effect sources, optional
+// transformations, tune files and multi files (SPEC.md 1 to 3).
 package ymxr
 
 // C is the column count of versions 7 to 9, and a row's bytes (SPEC.md 1).
 const C = 30
 
-// MappingColumn is the mapping column of effect 0; column 30 + i is effect
-// i's (SPEC.md 1.10).
+// MappingColumn is the first mapping column. Effect i uses column 30 +
+// i in version 10 (SPEC.md 1.10).
 const MappingColumn = 30
 
-// Mapped is the column count of version 10, whose rows set the mapping
-// columns (SPEC.md 3.3.5).
+// Mapped is the version 10 column count, including four mapping columns
+// (SPEC.md 3.3.5).
 const Mapped = 34
 
-// Maps is bit 5 of the effects used: the tune has the mapping columns, and
-// a row maps a value (SPEC.md 3.3).
+// Maps is effects-used bit 5: version 10 mapping columns and
+// transformation block are present (SPEC.md 3.3).
 const Maps = 0x20
 
-// MostTransformations is the most transformations a tune file has: a
-// mapping column numbers 1 to 127 (SPEC.md 1.10).
+// MostTransformations is the transformation limit: numbers 1 to 127
+// select lookups; 0 selects identity (SPEC.md 1.10).
 const MostTransformations = 127
 
-// MostEntries is the most entries of a transformation, one for each key of
-// a byte (SPEC.md 3.4).
+// MostEntries is the entry-count limit for a transformation: one entry
+// per byte key (SPEC.md 3.4).
 const MostEntries = 256
 
 // Effect is the first effect's target column; four columns an effect.
@@ -59,9 +58,9 @@ const Ports = 0xC0
 // MixerTarget is the target whose register is R7, the mixer (SPEC.md 2.1).
 const MixerTarget = 7
 
-// MostMixerKey is the most a key can be on setR7 through a transformation:
-// bits 5 to 0 of a row, below the port directions, so a tick reads key k as
-// k + 192 (rule 2(f)).
+// MostMixerKey is the largest setR7 lookup key. Keys use bits 5 to 0;
+// stored key k is k + 192, with both port-direction bits set (SPEC.md
+// 6, rule 2(f)).
 const MostMixerKey = 0xFF &^ Ports
 
 // Marker is the column of a source's row the marker is in, a target
@@ -88,13 +87,10 @@ const MFP = 2457600
 // Prescaler is the number each select divides that clock by (SPEC.md 1.9).
 var Prescaler = [8]int{0, 4, 10, 16, 50, 64, 100, 200}
 
-// Columns is a tune's columns, one byte a column a frame (SPEC.md 1),
-// thirty or thirty-four: the columns themselves, the row the tune repeats
-// to, the effects the tune runs, and the transformations the mapping
-// columns number (SPEC.md 1.10, 3.4).
-//
-// Schema writes them from a YMXS structure, which the ym package reads a
-// dump into (doc/ymxs.md).
+// Columns contains a tune's columns, repeat row, effects used and
+// optional transformations. Version 9 has thirty columns; version 10
+// adds four mapping columns (SPEC.md 1.10, 3.4). Schema encodes these
+// from a YMXS tune; the ym package imports a dump into that structure.
 type Columns struct {
 	// Column[c][frame].
 	Column [][]byte
@@ -102,13 +98,14 @@ type Columns struct {
 	// Repeat is the row the tune repeats to, R where it does not.
 	Repeat int
 
-	// Effects is the effects used: bits 3 to 0 the effects the tune ever
-	// runs, bit 4 a deferred start, bit 5 the mapping columns (SPEC.md
-	// 3.3).
+	// Effects records effects used: bits 3 to 0 select effects, bit 4
+	// marks deferred starts, and bit 5 marks version 10 mapping columns
+	// (SPEC.md 3.3).
 	Effects int
 
-	// Transformations is transformation n at n - 1: entry k of each is the
-	// value of key k (SPEC.md 3.4). Empty in a tune of C columns.
+	// Transformations contains optional lookup tables: transformation n is
+	// at index n - 1 and key k selects entry k. Empty with C columns
+	// (SPEC.md 3.4).
 	Transformations [][]byte
 }
 
