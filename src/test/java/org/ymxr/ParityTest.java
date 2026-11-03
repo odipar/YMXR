@@ -184,12 +184,10 @@ final class ParityTest {
     }
 
     /**
-     * Mappings through the structure (SPEC.md 1.10, rule 2(g)): the fade,
-     * a remap to the identity, a start through a transformation after the
-     * rows padding adds, the counted source on `setR10` of keys of 128 or
-     * more, and an effect through the identity alone beside one that maps.
-     * One tune file, version 10 where a row maps a value and 9 otherwise,
-     * one record and one check in both trees, and one report.
+     * Java/Go parity for mapping conversion: fades, identity
+     * restoration, padding, counted byte keys and identity-only
+     * effects. Compare file, record, check and report; lookup use
+     * requires version 10, otherwise version 9.
      */
     @Test
     void aMappedTuneConvertsTheSameInBothTrees() throws Exception {
@@ -209,20 +207,17 @@ final class ParityTest {
         }
         byte[] sampled = both("ymxs-to-ymxr", json(YmxsTest.sampled()), "-silent");
         assertTrue(TuneFile.read(sampled).counted().get(0), "the sample is counted");
-        // DECISIONS: the mapping column of the effect through the identity
-        // is 0 in every row of the file both trees write
+        // The identity-only effect has a constant 0 mapping column in
+        // both encoders.
         byte[] beside = both("ymxs-to-ymxr", json(YmxsTest.identityBeside()), "-silent");
         byte[] column = TuneFile.read(beside).table().column(Columns.MAPPING + 1);
         assertArrayEquals(new byte[column.length], column, "effect 1's mapping column");
     }
 
     /**
-     * The kit's tune of version 10 (doc/conformance/README.md 6): its
-     * structure through {@code ymxs-to-ymxr} in both trees is the kit's
-     * file byte for byte, and the record of both trees is the reference
-     * MANIFEST.txt lists. The tune defers a start and maps a value, so
-     * {@code ymxr-sndh} and {@code ymxs-to-sndh} put it in both trees on the
-     * core with the deferred start and the lookup in (BINARIES.md 2.1).
+     * Both encoders reproduce the mapped conformance file and reference
+     * record byte for byte. SNDH conversion selects deferred-start and
+     * lookup support (BINARIES.md 2.1).
      */
     @Test
     void theKitsMappedTuneConvertsAndReadsTheSameInBothTrees() throws Exception {
@@ -266,14 +261,12 @@ final class ParityTest {
         }
     }
 
-    /** The fade through the binder, which writes a bound tune of version
-     *  10 (BINARIES.md 1.2): ymxr-bind with its report, ymxr-layout of the
-     *  bound tune, and a set of the fade and a dump through ymxr-multi and
-     *  ymxr-layout, the same in both trees; and the SNDH writer, which puts
-     *  the core with the lookup in under the fade and under the set, whose
-     *  two tables are in two images (BINARIES.md 2.1, 1.4): ymxr-sndh with
-     *  its report, ymxr-prg and ymxr-layout of each file, and ymxs-to-sndh
-     *  and ymxs-to-prg on the structure, the same in both trees. */
+    /**
+     * Compare Java/Go output for the fade through binding, layout,
+     * multi, SNDH and PRG tools, including reports. A mixed fade/dump
+     * set has separate thirty- and thirty-four-column images and
+     * requires lookup support (BINARIES.md 1.4, 2.1).
+     */
     @Test
     void theFadeBindsTheSameInBothTrees() throws Exception {
         byte[] structure = json(YmxsTest.fade());
@@ -317,12 +310,10 @@ final class ParityTest {
     }
 
     /**
-     * A tick of a core with the lookup in reads its row from its handlers,
-     * which begin at the core's field at 26 (BINARIES.md 2.1): a mapped
-     * source of 20,000 rows is on the core that reads a row through the
-     * program counter, and one of 30,000 on the core that reads an address,
-     * and -pcrel reports the line that names the first handler, the same in
-     * both trees.
+     * Both tools measure source reach from descriptor field 26. The
+     * shorter mapped source fits program-counter reads; the longer
+     * requires absolute reads, and explicit -pcrel reports the same
+     * error (BINARIES.md 2.1).
      */
     @Test
     void aMappedFileIsMeasuredFromTheFirstHandlerInBothTrees() throws Exception {
@@ -343,12 +334,12 @@ final class ParityTest {
                 + " counter reaches 32767\n"), asked.said());
     }
 
-    /** The fade with every offset of its transformation index 0, inside
-     *  the index, which the reader reads (SPEC.md 3.3.4): the binder
-     *  copies the block to the index's end (BINARIES.md 1.1), the same
-     *  bound tune in both trees; and that bound tune with -8 in the field
-     *  at 24, which ymxr-layout reads as a signed number (BINARIES.md
-     *  1.2), the same record in both trees. */
+    /**
+     * Offsets inside the transformation index are accepted and copied
+     * through the index end. Layout also reads a negative bound block
+     * offset as signed. Compare Java and Go files and records (SPEC.md
+     * 3.3.4; BINARIES.md 1.1, 1.2).
+     */
     @Test
     void aBlockWhoseTransformationsOverlapItsIndexBindsTheSameInBothTrees()
             throws Exception {
@@ -419,11 +410,10 @@ final class ParityTest {
     }
 
     /**
-     * Every tune of the YMXS conformance kit (YMXS, doc/conformance/tunes)
-     * through ymxs-to-ymxr in both trees: one tune file, or one line and
-     * one exit, and of each tune file one record and one check. The kit's
-     * transformations.json maps three values on `setVoiceB`, the line of
-     * SPEC.md 6.5.
+     * Compare every YMXS conformance tune through both encoders: file
+     * or error, exit status, record and check. YMXR rejects the
+     * transformation fixture's lookups before the last setVoiceB value
+     * (SPEC.md 6.5).
      */
     @Test
     void everyTuneOfTheYmxsKitConvertsTheSameInBothTrees() throws Exception {
@@ -452,9 +442,10 @@ final class ParityTest {
                 + " setVoiceB, and a mapping column maps its value 2 alone\n"), mapped.said());
     }
 
-    /** A mapping this version leaves unencoded: the writer reports its
-     *  line, with the row of the structure, exit 1, in both trees (SPEC.md
-     *  6.5). */
+    /**
+     * Unsupported mappings report the original structure row, the same
+     * line and exit 1 in both encoders (SPEC.md 6.5).
+     */
     @Test
     void aMappingThisFormatCannotEncodeIsTheSameErrorInBothTrees() throws Exception {
         assertWrong(YmxsTest.remappedThrough(128), "the tune maps through 128"
@@ -494,16 +485,11 @@ final class ParityTest {
     }
 
     /**
-     * A tune file of version 10 (SPEC.md 1.10, 3.4): one record and one
-     * check in both trees; each file a reader reports written wrong one
-     * line, and each check of the mapping columns the same lines; a multi
-     * file of it, and of it and a dump, version 10, its tables packed
-     * again with the same report, and read by the record, the check and
-     * the layout as one line or one record; and an SNDH file of it and of
-     * the set on the core with the deferred start and the lookup in, since
-     * the tune defers a start and maps a value, also with the raster
-     * monitor, whose core ends past 32,767 bytes and whose handlers begin
-     * within them (BINARIES.md 2.1), and a program of each.
+     * Compare version 10 files, records, malformed-file errors and
+     * mapping checks in Java and Go. Exercise multi repacking and
+     * layout, then deferred/lookup SNDH and PRG output, including the
+     * raster-monitor core and handler-relative source reach
+     * (BINARIES.md 2.1).
      */
     @Test
     void aMappedTuneFileReadsTheSameInBothTrees() throws Exception {

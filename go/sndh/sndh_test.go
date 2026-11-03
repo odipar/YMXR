@@ -26,9 +26,8 @@ func files(t *testing.T) (nine, ten []byte) {
 	return nine, ten
 }
 
-// block is the tune file's transformation index and transformations, from
-// the long at 16 to the end of transformation T, the DTX3 table on the
-// next long.
+// block extracts the tune-file transformation index and entries, ending
+// before the aligned DTX3 table.
 func block(t *testing.T, ten []byte) []byte {
 	t.Helper()
 	at := ymxr.GetLong(ten, ymxr.TransformationsAt)
@@ -120,8 +119,7 @@ func TestASetOf30And34ColumnsBindsIntoTwoImages(t *testing.T) {
 	}
 }
 
-// mappingCore is the plain core with the lookup in, whose field at 18 is
-// 10.
+// mappingCore returns a lookup core supporting bound version 10.
 func mappingCore(t *testing.T) []byte {
 	t.Helper()
 	core, err := binaries.Read(binaries.Named(false, false, true, false, true))
@@ -206,8 +204,8 @@ func TestASetThatMapsAValueIsOnTheCoreWithTheLookupIn(t *testing.T) {
 	}
 }
 
-// The kit's mapped tune defers a start and maps a value, so the file is on
-// the core with the deferred start and the lookup in (BINARIES.md 2.1).
+// The mapped fixture requires both deferred-start and lookup support
+// (BINARIES.md 2.1).
 func TestASubtuneThatDefersAndMapsIsOnTheCoreWithBoth(t *testing.T) {
 	both, err := os.ReadFile("../../doc/conformance/tunes/mapped.ymxr")
 	if err != nil {

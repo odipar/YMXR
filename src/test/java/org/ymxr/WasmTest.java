@@ -165,11 +165,11 @@ final class WasmTest {
         both("ymxr-check", dump);
     }
 
-    /** A structure that maps a value through the tools that put a core
-     *  under its tune: the module embeds the thirty-two cores, the sixteen
-     *  with the lookup in among them, and reads the one each file needs as
-     *  the executable does, the largest under a set of a tune that defers a
-     *  start and one of version 10, with the raster monitor in. */
+    /**
+     * Mapped YMXS through the WebAssembly tools. Embedded cores must
+     * include lookup support and, for the mixed deferred set, both
+     * features with the raster monitor.
+     */
     @Test
     void aMappedTuneIsOnTheSameCoreAsTheExecutables() throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(YmxsTest.fade()))

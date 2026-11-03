@@ -8,14 +8,10 @@ import org.dtx.Packager;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A bound tune: a tune file's tables bound with DTX's reader into what the
- * player reads. doc/BINARIES.md is the contract. The header has bytes 4 to
- * 11 of the tune file ({@link Tune}) after the magic, then the bytes of the
- * state block the image's reader needs, so that a host allocates them
- * without reading the image, the image's offset, the table's offset in the
- * image, in version 10 the transformation block's offset, and the source
- * index. The DTX1 tables follow it, then the image DTX packages the DTX3
- * table into, and in version 10 the transformation block.
+ * A tune bound with DTX's reader for playback (doc/BINARIES.md 1).
+ * Sources precede the reader image; optional transformation tables follow
+ * it. Frames prepare lookups from those tables; ticks read source rows
+ * and prepared lookup pages.
  *
  * <pre>
  *  offset  bytes  what it is
@@ -50,8 +46,10 @@ final class Bound {
     static final int TABLE_AT = 20;
     static final int INDEX_AT = 24;
 
-    /** Where the long is in version 10 that is the transformation block's
-     *  offset (BINARIES.md 1.2). */
+    /**
+     * Offset of the version 10 transformation-block pointer
+     * (BINARIES.md 1.2).
+     */
     static final int TRANSFORMATIONS_AT = 24;
 
     /** The image's format block, and where the state block's bytes and the
@@ -63,29 +61,26 @@ final class Bound {
     private Bound() {
     }
 
-    /** Where the source index begins in a bound tune of that version: at
-     *  24, and at 28 in version 10, after the transformation block's
-     *  offset (BINARIES.md 1.2). */
+    /**
+     * Source-index offset: 24 in versions 7 to 9; 28 in version 10,
+     * after the transformation-block pointer (BINARIES.md 1.2).
+     */
     static int indexAt(int version) {
         return version == Tune.VERSION ? TRANSFORMATIONS_AT + 4 : INDEX_AT;
     }
 
     /**
-     * A set of tunes bound together: the images their tables were packaged
-     * into, and a bound tune for each, in the order named. A bound tune
-     * here has no image and no transformation block in it, and its
-     * {@code IMAGE_AT} and in version 10 its {@code TRANSFORMATIONS_AT}
-     * are at 0 for the caller that lays them out to patch (SPEC.md's
-     * files are laid out by {@link Sndh}).
+     * Shared images and bound tunes in input order. Tunes with the same
+     * image parameters share reader code (DTX abi.md 1). Each bound
+     * tune omits its image and transformation block; their offsets
+     * remain 0 until the caller places and patches them.
      *
-     * <p>The tunes are grouped by what an image fixes once (DTX abi.md 1),
-     * so tunes that agree on those share one image and the reader's code
-     * appears once for the group.
+     * @param image image number for each tune
      *
-     * @param image which image each tune's table is in
-     * @param table where each tune's table is in it
-     * @param blocks the transformation block of each tune, empty for a
-     *     tune of version 7 to 9
+     * @param table table offset within each tune's image
+     *
+     * @param blocks transformation block per tune, empty below version
+     * 10
      */
     record Set(List<byte[]> images, List<String> shapes, List<byte[]> tunes,
             int[] image, int[] table, List<byte[]> blocks) {
@@ -149,18 +144,20 @@ final class Bound {
                 + ", values of " + header.width();
     }
 
-    /** A bound tune with no image in it: the header, the state block's
-     *  bytes off the image the table went into, the table's place, and the
-     *  file's DTX1 tables. The caller places the image and the
-     *  transformation block. */
+    /**
+     * Builds a bound header, source index and DTX1 tables without an
+     * image or transformation block. The caller places the shared image
+     * and optional block and patches their offsets.
+     */
     private static byte[] head(byte[] tuneFile, int table, int state) {
         return build(tuneFile, null, table, state);
     }
 
-    /** The bound tune of a tune file: the header with the magic and the
-     *  version replaced and the state block's bytes and the image's place
-     *  put in, the index recomputed, then the file's DTX1 tables as they
-     *  are, the image, and in version 10 the transformation block. */
+    /**
+     * Binds a tune file: header, recomputed source index, unchanged
+     * DTX1 tables, packaged DTX3 image and, in version 10,
+     * transformation block (doc/BINARIES.md 1).
+     */
     static byte[] of(byte[] tuneFile) {
         byte[] image = Packager.image(TuneFile.read(tuneFile).dtx3());
         return build(tuneFile, image,
@@ -169,11 +166,12 @@ final class Bound {
     }
 
     /**
-     * The transformation block of a tune file of version 10, and no bytes
-     * for one of versions 7 to 9: bytes O to M - 1, O the long at 16 and M
-     * the highest of O + 2 + 4T and the P + 2 + E of each transformation
-     * (SPEC.md 3.4.2), byte for byte. The reader has read each offset
-     * against the file's length.
+     * Copies a version 10 transformation block unchanged, or returns an
+     * empty array for versions 7 to 9. The block begins at the header's
+     * long at 16 and ends after its index or last entry, whichever is
+     * later. Index offsets are relative to the block, so relocation
+     * preserves them. The reader has already checked bounds (SPEC.md
+     * 3.4.2).
      */
     static byte[] block(byte[] tuneFile) {
         if (Tune.getWord(tuneFile, 4) != Tune.VERSION) {
@@ -190,14 +188,13 @@ final class Bound {
     }
 
     /**
-     * The bound tune: the header, the state block's bytes, the table's
-     * place in the image it is in, the source index, then the file's DTX1
-     * tables, and where the tune has an image the image and in version 10
-     * the transformation block.
+     * Builds the bound header, source index and DTX1 tables. If an
+     * image is supplied, append it and the version 10 transformation
+     * block.
      *
-     * @param image the image to write, or null where the tunes share one
-     *     the caller lays out and patches {@code IMAGE_AT} for, and
-     *     {@code TRANSFORMATIONS_AT} in version 10
+     * @param image the image to append, or null for a shared image
+     * placed by the caller, which patches {@code IMAGE_AT} and version
+     * 10 {@code TRANSFORMATIONS_AT}
      */
     private static byte[] build(byte[] tuneFile, byte @Nullable [] image, int table,
                                 int state) {
@@ -214,13 +211,10 @@ final class Bound {
                     : tuneFile.length;
             tables[i] = Arrays.copyOfRange(tuneFile, at, to);
         }
-        // The DTX1 tables first and the image after them, so that a
-        // source's rows are beside the header however long the image is:
-        // a player whose ticks read a row through a displacement reaches
-        // 32,767 bytes (68k/YMXR.S, YMXR_PCREL). The transformation block
-        // is last, so that its 127 tables at most leave the sources where
-        // they are: a tick reads a source, and the block is read at the
-        // frame.
+        // Place sources before the image to preserve their reach
+        // through the player's signed word displacements. Put the
+        // transformation block last: frames read it, while ticks read
+        // sources and prepared lookup pages (BINARIES.md 1.3).
         int here = Tune.align(index + 4 * count);
         int[] sourceAt = new int[count];
         for (int i = 0; i < count; i++) {

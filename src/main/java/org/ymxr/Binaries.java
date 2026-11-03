@@ -12,21 +12,16 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * The 68000 binaries the tools combine with bound tunes
- * (doc/BINARIES.md): the SNDH core, which {@link Sndh} puts under an SNDH
- * file's entries, and the program stub, which {@link Prg} puts in front
- * of an SNDH file. Five switches of the player's are in the core, the
- * raster monitor, the lean tick, the row read through an absolute address,
- * the deferred start and the lookup, and each of their thirty-two settings
- * is a separate core, so a file that requests two uses the core that is
- * both. A tick reads its row through the program counter where
- * {@code YMXR_PCREL} is at 1, its value unasked, a file uses a core with
- * the deferred start in where a subtune defers one (doc/performance.md),
- * and a core with the lookup in where a subtune maps a value (SPEC.md
- * 1.10).
- * The build assembles each once from its source under {@code 68k} and
- * writes it into the classes, the one step rmac is needed for; a tool
- * reads them there and runs no assembler.
+ * The assembled 68000 SNDH cores and program stub (doc/BINARIES.md).
+ * Five switches select thirty-two cores: raster monitor, lean ticks,
+ * absolute source reads, deferred starts and transformation lookups.
+ * The tools select lookup support only when a subtune requires it, and
+ * deferred support only when a subtune defers a start. Source reads use
+ * the program counter by default.
+ *
+ * <p>The build assembles the binaries under {@code 68k} and copies them
+ * into the classes. Tools read those resources without running an
+ * assembler.
  */
 final class Binaries {
 
@@ -45,9 +40,10 @@ final class Binaries {
     private Binaries() {
     }
 
-    /** All thirty-three, in the order the build writes them: the
-     *  thirty-two cores, the sixteen without the lookup first, then the
-     *  stub. */
+    /**
+     * All thirty-three binaries in build order: sixteen cores without
+     * lookup support, sixteen with it, then the program stub.
+     */
     static List<Binary> all() {
         List<Binary> all = new ArrayList<>();
         for (boolean map : new boolean[] {false, true}) {
@@ -76,7 +72,10 @@ final class Binaries {
         return core(monitor, lean, pcrel, false);
     }
 
-    /** The core of the four switches without the lookup, as carried. */
+    /**
+     * The carried core selected by four switches, with transformation
+     * support disabled.
+     */
     static byte[] core(boolean monitor, boolean lean, boolean pcrel, boolean defer) {
         return core(monitor, lean, pcrel, defer, false);
     }
@@ -92,41 +91,25 @@ final class Binaries {
         return binary(monitor, lean, pcrel, false);
     }
 
-    /** The binary of the four switches without the lookup. */
+    /**
+     * The binary selected by four switches, with transformation support
+     * disabled.
+     */
     static Binary binary(boolean monitor, boolean lean, boolean pcrel, boolean defer) {
         return binary(monitor, lean, pcrel, defer, false);
     }
 
     /**
-     * The binary of the five switches (doc/performance.md), each a suffix of
-     * its name in this order:
+     * Selects the core by five switches. Suffixes occur in this order:
+     * {@code -perf} for the raster monitor; {@code -lean} for ticks
+     * without interrupt nesting or an end-of-interrupt write; {@code
+     * -abs} for absolute source reads; {@code -defer} for deferred
+     * starts; {@code -map} for transformation lookups.
      *
-     * <ul>
-     * <li>{@code -perf} where {@code monitor}: the player's raster monitor
-     *     ({@code YMXR_PERF}). The play call paints the background red
-     *     while its work runs and burns a yellow bar for the timers'
-     *     counted cost, and each tick handler paints a separate colour. A
-     *     trace of the palette writes reports what the run cost, and a file
-     *     made for reading a run uses this core in place of the plain one.
-     * <li>{@code -lean} where {@code lean}: the player's two tick switches
-     *     the other way ({@code YMXR_NEST} and {@code YMXR_AEOI}). A tick
-     *     neither drops the interrupt level nor writes its end of
-     *     interrupt, so one that writes a row costs 32 cycles less and one
-     *     that ends a source 16. A host uses this core where no MFP
-     *     interrupt of the host nests inside another and the MFP's vector
-     *     register is the player's to set.
-     * <li>{@code -abs} where {@code pcrel} is false: a tick reads its row
-     *     through an absolute address ({@code YMXR_PCREL=0}), which a host
-     *     that places a tune further off than a displacement reaches uses.
-     *     Every other core reads it through the program counter.
-     * <li>{@code -defer} where {@code defer}: the deferred start
-     *     ({@code YMXR_DEFER=1}), which a file uses where a subtune's
-     *     effects byte sets bit 4 (SPEC.md 3.3).
-     * <li>{@code -map} where {@code map}: the lookup ({@code YMXR_MAP=1}),
-     *     which a file uses where a subtune's effects byte sets bit 5, a
-     *     tune of version 10 (SPEC.md 1.10, 3.3). The core reads bound
-     *     tunes to version 10, and every core without it to version 9.
-     * </ul>
+     * <p>Without {@code -abs}, ticks use program-counter displacements.
+     * A subtune with effects bit 4 requires {@code -defer}; bit 5
+     * requires {@code -map}. Lookup cores read bound versions 7 to 10;
+     * other cores read 7 to 9 (doc/BINARIES.md 2).
      */
     static Binary binary(boolean monitor, boolean lean, boolean pcrel, boolean defer,
                          boolean map) {

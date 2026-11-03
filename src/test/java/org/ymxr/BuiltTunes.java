@@ -455,9 +455,11 @@ final class BuiltTunes {
         return Tune.write(columns, sources, 50, YmToYmxr.UNIT, RING, new Report());
     }
 
-    /** The transformations of {@link #mapped}: transformation n is V(16 -
-     *  n) of YMXS, SPEC.md 3.6.5, entry k of the sixteen keys of a volume
-     *  k times 16 - n divided by 15, so 1 is V15 and 16 is V0. */
+    /**
+     * Sixteen volume tables: transformation n is V(16 - n), entry k =
+     * floor(k * (16 - n) / 15). Thus table 1 is V15 and table 16 is V0
+     * (YMXS, SPEC.md 3.6.5).
+     */
     static List<byte[]> fade() {
         List<byte[]> fade = new java.util.ArrayList<>();
         for (int n = 1; n <= 16; n++) {
@@ -471,17 +473,11 @@ final class BuiltTunes {
     }
 
     /**
-     * Mappings, the four columns of version 10 (SPEC.md 1.10, 3.4), through
-     * the sixteen transformations of {@link #fade}. On Timer A a loop on
-     * `setR8` starts through V15, then a remap a row through each
-     * transformation in turn to V0, a start of another source leaves the
-     * mapping column unset and runs through V0, and a remap goes back to
-     * the identity. On Timer C, idle, a remap to transformation 3; a start
-     * that leaves the mapping column unset and runs through it; a deferred
-     * start through transformation 1, a remap to transformation 2 while it
-     * is pending, and a start that leaves the column unset and runs through
-     * 2; then a remap and a retune in one row. Every value of a source is a
-     * key below 16.
+     * Version 10 mapping fixture (SPEC.md 1.10, 3.4). Timer A fades
+     * through the volume tables, reuses the final kept mapping on
+     * another source, then restores identity. Timer C checks a remap
+     * before first start, deferred capture followed by remap, later
+     * reuse of kept, and remap with retune. Every key is below 16.
      */
     static Tune.Written mapped() {
         return mapped(new Report());

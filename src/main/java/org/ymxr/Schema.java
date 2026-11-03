@@ -26,27 +26,27 @@ import org.ymxs.YMXS.Timing;
 import org.ymxs.YMXS.Transformation;
 
 /**
- * A YMXS tune as this schema's columns (doc/ymxs.md): the structure YMXS
- * defines, encoded as SPEC.md 1 encodes it.
+ * Encodes YMXS tune data as YMXR columns (doc/ymxs.md). Every converter
+ * uses this stage after constructing a YMXS tune. Register writes
+ * follow the row; effect columns are omitted when the player can reuse
+ * kept values.
  *
- * <p>YMXS defines what is true of a row; a column is written where its
- * value differs from the value the player keeps (R3.6, R4.6). So this
- * keeps the target, the select, the count and the mapping of each effect
- * as a player does, and a retune whose select did not move leaves the
- * control column unset. The registers a row sets are the row's, since a
- * YMXS row lists what it sets and leaves the rest alone.
- *
- * <p>Every conversion here passes through this: a dump is read into a
- * YMXS tune ({@link Ym}, {@link Ymx}) and mapped by this class, so the
- * columns follow from the structure alone.
+ * <p>Transformation lookups are optional. Identity-only tunes use
+ * version 9. Version 10 permits a lookup on the target's last value
+ * alone. Kept, running and pending mappings are tracked separately
+ * because a deferred start can change the running mapping between
+ * frames (SPEC.md 6, rule 2(g)).
  */
 final class Schema {
 
     /** The effect each timer runs, SPEC.md 2.3: A, D, B, C. */
     private static final Timer[] TIMERS = {Timer.A, Timer.D, Timer.B, Timer.C};
 
-    /** A tune mapped: its columns, its sources numbered as SPEC.md 3.1
-     *  numbers them, and the rate its header records. */
+    /**
+     * Encoded columns, sources in first-start order and frame rate.
+     * Columns also includes the optional transformation tables (SPEC.md
+     * 3.1, 3.4).
+     */
     record Made(Columns columns, Sources sources, int rate) {
     }
 
@@ -60,20 +60,20 @@ final class Schema {
                 .toArray()));
     }
 
-    /** A tune that {@link Padding#toUnit} padded, as columns and sources:
-     *  the frames of {@code padded} are, for each row of the tune, the row
-     *  of the structure it comes from, or -1 for a row the padding added,
-     *  and the line of an error numbers that row (SPEC.md 6.5).
+    /**
+     * Encodes a padded tune as columns and sources. Padding records the
+     * original structure row for each output row, or -1 for an added
+     * row; diagnostics use original row numbers (SPEC.md 6.5).
      *
-     * @throws IllegalArgumentException where the structure is one this
-     *     format cannot encode: more sources than the source column
-     *     numbers, more transformations than the mapping column numbers
-     *     in a tune that maps a value, a count outside 0 to 255, a mapping
-     *     through a transformation in a part other than the last, a target
-     *     past 24, a source on two targets that mark different columns, a
-     *     source on `setR7` and on another target, a source value past
-     *     seven bits in its marker's column or past eight bits in another
-     *     column, or a key past 63 on `setR7`
+     * <p>A row selecting a transformation produces version 10.
+     * Identity-only rows produce version 9, without mapping columns or
+     * tables.
+     *
+     * @throws IllegalArgumentException for an unencodable structure:
+     * excess sources or transformations, count outside byte range,
+     * lookup before the last target value, unsupported target,
+     * incompatible shared-source markers or setR7 use, or a source
+     * value or lookup key outside the encoded range
      */
     static Made of(Padding.Padded padded) {
         org.ymxs.YMXS.Tune tune = padded.tune();
@@ -85,15 +85,14 @@ final class Schema {
             throw new IllegalArgumentException("the tune runs " + sources.size()
                     + " sources, and a source column numbers " + Sources.MOST);
         }
-        // Transformation n is the one a mapping column numbers n, in the
-        // order of YMXS, SPEC.md 1.9 (SPEC.md 3.4.1). A file of version 10
-        // has every one, and a file of version 9 none (SPEC.md 3.3.5).
+        // Transformation numbers follow YMXS first-use order. Version
+        // 10 includes the full list; version 9 omits it (SPEC.md
+        // 3.4.1).
         List<Transformation> list = Tunes.transformations(tune);
         Kept kept = new Kept(rows, list, Tunes.timers(tune));
-        // A remap on a timer outside the tune leaves every column as it is
-        // (rule 2(a)), so more than 127 transformations is an error only
-        // where a start, or a remap on a timer of the tune, maps through
-        // one.
+        // Ignore remaps on timers outside the tune. The
+        // transformation-count limit applies only when an encoded start
+        // or remap uses a lookup (SPEC.md 6, rule 2(a)).
         if (kept.transforms() && list.size() > Columns.MOST_TRANSFORMATIONS) {
             throw new IllegalArgumentException("the tune maps through " + list.size()
                     + " transformations, and a mapping column numbers "
@@ -102,11 +101,10 @@ final class Schema {
         byte[][] column = new byte[Columns.MAPPED][size];
         int used = 0;
         for (int f = 0; f < size; f++) {
-            // After the wrap the player keeps what the last row left, so
-            // the row the tune repeats to writes its targets again, the
-            // mapping of each effect a row maps through a transformation,
-            // and each value of the rate whose value after the last row
-            // differs from its value before the repeat row (rule 4(e)).
+            // The wrap preserves player state. Write targets again
+            // after the repeat row, restore mappings for effects using
+            // lookups, and restore rate values that differ from the end
+            // of the tune (SPEC.md 6, rules 2(g), 4(e)).
             if (f == repeat) {
                 kept.wrap();
             }
@@ -121,9 +119,9 @@ final class Schema {
                 column[c][f] = out[c];
             }
         }
-        // The version follows the rows: 10 where a row sets a mapping
-        // column to a transformation, and otherwise 9, the thirty columns
-        // and no transformation (SPEC.md 3.3.5).
+        // Choose version 10 only when a row selects a transformation.
+        // Otherwise retain thirty columns and version 9 (SPEC.md
+        // 3.3.5).
         Columns columns = maps(column)
                 ? new Columns(column, repeat, used | Columns.MAPS, tables(list))
                 : new Columns(Arrays.copyOf(column, Columns.C), repeat, used);
@@ -131,8 +129,10 @@ final class Schema {
                 tune.rate());
     }
 
-    /** Whether a row sets a mapping column to a transformation, 1 to 127
-     *  (SPEC.md 1.10.1). */
+    /**
+     * Whether any row selects a transformation number, requiring
+     * version 10 (SPEC.md 3.3.5).
+     */
     private static boolean maps(byte[][] column) {
         for (int c = Columns.MAPPING; c < Columns.MAPPED; c++) {
             for (byte one : column[c]) {
@@ -144,8 +144,10 @@ final class Schema {
         return false;
     }
 
-    /** The transformations as the tables of a tune file, entry k of each
-     *  the value of key k (SPEC.md 3.4.1). */
+    /**
+     * Lookup tables in transformation-number order, with key k at entry
+     * k (SPEC.md 3.4.1).
+     */
     private static List<byte[]> tables(List<Transformation> list) {
         List<byte[]> out = new ArrayList<>();
         for (Transformation one : list) {
@@ -230,10 +232,11 @@ final class Schema {
     }
 
     /**
-     * What a player keeps of each effect, as the rows set it (R4.6): the
-     * kept target, select, count and mapping, OPEN where the rows leave
-     * it open, and beside them what the writer reads off the rows to
-     * leave a column unset.
+     * Tracks kept target, select, count and mapping per effect, plus
+     * information needed to omit redundant writes. OPEN marks a value
+     * not determined by the rows. Running and pending mappings differ
+     * from the kept mapping after deferred operations (SPEC.md 6, rule
+     * 2(g)).
      */
     private static final class Kept {
 
@@ -244,24 +247,33 @@ final class Schema {
         /** The same three after the last row, which the repeat row reads
          *  (rule 4(e)). */
         final Rate last = new Rate();
-        /** The kept mapping (SPEC.md 1.10.3), 0 at the first row. */
+        /**
+         * Mapping reused by later starts, initially 0 for identity
+         * (SPEC.md 1.10.3).
+         */
         final int[] mapping = new int[4];
-        /** The mapping the running effect writes through, where the rows
-         *  fix it, and OPEN where a deferred start through another may be
-         *  pending. */
+        /**
+         * Mapping used by current ticks, or OPEN when a deferred start
+         * may have installed a different mapping between frames.
+         */
         final int[] running = new int[4];
-        /** The mapping of a deferred start that may be pending, NONE, or
-         *  OPEN after the wrap. */
+        /**
+         * Captured mapping of a possibly pending start, NONE when
+         * absent, or OPEN after the wrap.
+         */
         final int[] pending = new int[4];
-        /** Whether a row of the effect maps through a transformation: a
-         *  start, or a remap on a timer of the tune. */
+        /**
+         * Whether an encoded start or remap on this effect uses a
+         * transformation.
+         */
         final boolean[] maps = new boolean[4];
         /** Whether the effect's timer is a timer of the tune, which a row
          *  starts a source on (YMXS, SPEC.md 1.10). */
         final boolean[] claimed = new boolean[4];
-        /** The target of the last start on the effect, and before its
-         *  first start the target of that start: the target a line
-         *  reports for a remap. */
+        /**
+         * Target of the latest start, or of the first start before one
+         * occurs. Used for remap diagnostics.
+         */
         final Target[] runs = new Target[4];
         final List<Transformation> list;
 
@@ -288,10 +300,10 @@ final class Schema {
             }
         }
 
-        /** Whether a start, or a remap on a timer of the tune, maps
-         *  through a transformation: the first such row on an effect sets
-         *  its mapping column to 1 to T, so the file is version 10 (SPEC.md
-         *  3.3.5). */
+        /**
+         * Whether an encoded start or remap uses a transformation. Its
+         * first selection requires version 10 (SPEC.md 3.3.5).
+         */
         boolean transforms() {
             for (boolean one : maps) {
                 if (one) {
@@ -301,12 +313,13 @@ final class Schema {
             return false;
         }
 
-        /** The repeat row: the player keeps what the last row left, so
-         *  the first pass leaves open the target of each effect, the
-         *  mapping of each effect a row maps through a transformation, and
-         *  each value of the rate whose value after the last row differs
-         *  from its value before the repeat row. An effect through the
-         *  identity alone keeps 0 through the wrap. */
+        /**
+         * Restores required writes at the repeat row. Open targets and
+         * all three mapping values for effects using lookups;
+         * identity-only effects retain mapping 0. Open rate values only
+         * when the end state differs from the state before the repeat
+         * row (SPEC.md 6, rules 2(g), 4(e)).
+         */
         void wrap() {
             Arrays.fill(target, OPEN);
             rate.wrap(last);
@@ -338,10 +351,11 @@ final class Schema {
         }
     }
 
-    /** One row's operation on one effect, as its four columns and its
-     *  mapping column; the bit of the effects word where the row starts
-     *  one. {@code at} is the row of the structure, for the line of an
-     *  error. */
+    /**
+     * Encodes one effect operation into its four columns and optional
+     * mapping column, updating effects-used bits. {@code at} is the
+     * original structure row for diagnostics.
+     */
     private static int effect(byte[] out, int i, Effect effect, List<Source> sources,
                               Kept kept, int at) {
         int t = Columns.EFFECT + 4 * i;
@@ -351,10 +365,10 @@ final class Schema {
         boolean[] counting = kept.rate.counting;
         switch (effect) {
             case Stop ignored -> {
-                // The set bit with no source under it: the timer stops,
-                // and the row leaves the rate columns and the mapping
-                // column unset (SPEC.md 1.8, rule 3(c)). The stop drops a
-                // pending start, and the next start keeps the kept mapping.
+                // A stop sets source 0 and leaves rate and mapping
+                // columns unset. It cancels a pending start but
+                // preserves the kept mapping for later starts (SPEC.md
+                // 6, rule 3(c)).
                 out[t + 1] = (byte) 0x80;
                 kept.rate.keep(i, effect);
                 kept.pending[i] = NONE;
@@ -362,14 +376,11 @@ final class Schema {
                 return 0;
             }
             case Remap remap -> {
-                // A remap on a timer outside the tune leaves every column
-                // as it is (rule 2(a)). On a timer of the tune, idle or
-                // running, it sets the mapping column with the source
-                // column unset (SPEC.md 1.10.2), and is left out where the
-                // effect runs through its mapping already. Equal to the
-                // kept mapping it is written all the same where a deferred
-                // start through another mapping may be pending or may
-                // have been performed (rule 2(g)).
+                // Ignore a remap outside the tune. Otherwise write it
+                // with the source column unset when it differs from the
+                // running mapping, even if it equals the kept mapping.
+                // A deferred start may have changed current ticks
+                // (SPEC.md 6, rule 2(g)).
                 if (!kept.claimed[i]) {
                     return 0;
                 }
@@ -386,9 +397,9 @@ final class Schema {
                 Target on = Tunes.target(start.connection());
                 int m = mapped(start.mapping(), on, kept.list, at);
                 kept.runs[i] = on;
-                // A start whose mapping column is unset runs through the
-                // kept mapping, and a deferred one keeps it from its row
-                // (SPEC.md 1.10.2, 1.10.3).
+                // An unset mapping column reuses the kept value. A
+                // deferred start captures it now for installation at
+                // the boundary (SPEC.md 1.10.3).
                 if (m != kept.mapping[i]) {
                     out[Columns.MAPPING + i] = (byte) (0x80 | m);
                     kept.mapping[i] = m;
@@ -421,8 +432,9 @@ final class Schema {
                 }
                 kept.rate.keep(i, effect);
                 if (deferred) {
-                    // The effect before it runs through its mapping until
-                    // the tick that performs it, which the rows leave open.
+                    // A deferred start preserves current ticks until
+                    // the boundary; frame rows alone do not determine
+                    // when it is installed.
                     kept.running[i] = kept.running[i] == m ? m : OPEN;
                     kept.pending[i] = m;
                 } else {
@@ -455,16 +467,15 @@ final class Schema {
     }
 
     /**
-     * The number a mapping column is written with for {@code mapping} on
-     * {@code target} (SPEC.md 1.10.1): 0 for a mapping of no parts, and
-     * otherwise the number of its last part, 0 for the identity and n for
-     * transformation n of {@code list}. The last part maps the one value
-     * of `setR0` to `setR13`, the volume of `setVoiceX` and `setNoiseX`,
-     * the shape of `setBuzzer`, the coarse nibble of `setToneX` and the
-     * high byte of `setEnvelope`.
+     * Encodes the mapping's last part: 0 for identity or an empty
+     * mapping; otherwise its transformation number in {@code list}.
+     * Earlier parts must be identity. The last value is volume for
+     * voice/noise targets, shape for buzzer, the coarse nibble for tone,
+     * envelope high byte for envelope, or the sole register value
+     * (SPEC.md 1.10.1).
      *
-     * @throws IllegalArgumentException where a part before the last is a
-     *     transformation, with the row {@code at}
+     * @throws IllegalArgumentException if an earlier part uses a
+     * transformation, reporting structure row {@code at}
      */
     private static int mapped(Mapping mapping, Target target, List<Transformation> list,
                               int at) {
@@ -534,13 +545,13 @@ final class Schema {
      *  wrote every source. */
     private static final int UNSTARTED = Integer.MIN_VALUE;
 
-    /** Where each source's marker is and which target it runs on: the
-     *  column bit 7 marks, -1 where the target's register fills its byte;
-     *  the target's number, which a counted source on `setR7` reads the
-     *  port directions in for (rule 2(f)); whether every start of the
-     *  source maps it through a transformation, so its rows are keys
-     *  (3.1.6); and whether a start on `setR7` maps it through one
-     *  (rule 2(f)). */
+    /**
+     * Source encoding attributes: marker column (-1 for counted
+     * full-byte targets), target number, whether every start uses a
+     * lookup, and whether a setR7 start uses one. These select counted
+     * encoding for high keys and preserve mixer port bits (SPEC.md
+     * 3.1.6; rule 2(f)).
+     */
     private record Marks(int[] column, int[] target, boolean[] keyed, boolean[] mixer) {
     }
 
@@ -616,13 +627,14 @@ final class Schema {
         return new Marks(marker, target, keyed, mixer);
     }
 
-    /** The sources as tables of this format: a column a value of the row,
-     *  bit 7 set on the last row of the marker's column (SPEC.md 3.2), and
-     *  the row the source repeats to, its row count where it plays once. A
-     *  source whose target's register fills its byte has no bit for the
-     *  marker: every row is a whole byte and a player counts them (3.1).
-     *  So is a source of one column whose every start maps it through a
-     *  transformation, where a key of 128 or more is in a row (3.1.6). */
+    /**
+     * Encodes DTX1 sources with one byte column per target value.
+     * Marked sources set bit 7 of the marker column on the last row
+     * alone; counted sources preserve all byte bits. Full-byte targets
+     * require counting. A one-column source used only through lookups
+     * also requires counting when a key reaches 128 (SPEC.md 3.1.6,
+     * 3.2).
+     */
     private static List<Sources.Source> sources(List<Source> sources, Marks marks) {
         int[] marker = marks.column();
         List<Sources.Source> out = new ArrayList<>();
@@ -642,8 +654,8 @@ final class Schema {
             for (int r = 0; r < values.size(); r++) {
                 for (int c = 0; c < columns.length; c++) {
                     int value = values.get(r).get(c);
-                    // Through a transformation on `setR7` a key k is read
-                    // as k + 192, the two port directions set (rule 2(f)).
+                    // Store setR7 key k as k + 192, preserving both
+                    // port directions (SPEC.md 6, rule 2(f)).
                     if (marks.mixer()[n] && value > Columns.MOST_MIXER_KEY) {
                         throw new IllegalArgumentException("the source " + Tunes.name(source)
                                 + " has the key " + value + " in row " + r

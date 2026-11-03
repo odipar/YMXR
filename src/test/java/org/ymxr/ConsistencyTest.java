@@ -1059,10 +1059,8 @@ final class ConsistencyTest {
     }
 
     /**
-     * writing.md's columns of version 10 against the tree: the column
-     * counts and the mapping columns of 3.1 and 4.1, the columns of 4.3,
-     * and the bounds of a key in 5.7. The guide read thirty columns alone
-     * after the trees wrote thirty-four.
+     * Checks writing.md's column counts, mapping positions, key limits
+     * and volume-table example against the implementation.
      */
     @Test
     void theWritersGuideReadsTheMappingColumns() throws IOException {
@@ -1092,23 +1090,36 @@ final class ConsistencyTest {
                              Columns.C - 1, Tune.VERSION, Columns.MAPPING + 1,
                              Columns.MAPPED - 1, Columns.MAPPING), groupsOf(one),
                 "4.3, the columns of effect 0 alone");
-        Matcher marked = wrapped("so a key is 0 to (\\d+) and bit 7 is the marker").matcher(guide);
-        assertTrue(marked.find(), "writing.md 5.7 has no key beside the marker");
-        assertEquals(Sources.MARK - 1, Integer.parseInt(marked.group(1)), "5.7, a marked key");
-        Matcher whole = wrapped("is a whole byte, so a key there is 0 to (\\d+)").matcher(guide);
-        assertTrue(whole.find(), "writing.md 5.7 has no key of a whole byte");
-        assertEquals(Columns.MOST_ENTRIES - 1, Integer.parseInt(whole.group(1)),
-                "5.7, a key of a whole byte");
-        Matcher counted = wrapped("is written counted where a key is (\\d+) or more")
+        Matcher marked = wrapped("\\| marker column of a marked source \\| 0 to (\\d+)")
                 .matcher(guide);
-        assertTrue(counted.find(), "writing.md 5.7 has no counted key");
+        assertTrue(marked.find(), "writing.md 5.7 has no marked-key range");
+        assertEquals(Sources.MARK - 1, Integer.parseInt(marked.group(1)), "5.7, a marked key");
+        Matcher whole = wrapped("\\| any other column \\| 0 to (\\d+)").matcher(guide);
+        assertTrue(whole.find(), "writing.md 5.7 has no whole-byte key range");
+        assertEquals(Columns.MOST_ENTRIES - 1, Integer.parseInt(whole.group(1)),
+                "5.7, a whole-byte key");
+        Matcher counted = wrapped("is counted when a key reaches (\\d+)").matcher(guide);
+        assertTrue(counted.find(), "writing.md 5.7 has no counted-key threshold");
         assertEquals(Sources.MARK, Integer.parseInt(counted.group(1)), "5.7, a counted key");
-        Matcher mixer = wrapped("the row of key k is k \\+ (\\d+), the two port directions set, and"
-                + " a key is 0 to (\\d+)").matcher(guide);
-        assertTrue(mixer.find(), "writing.md 5.7 has no key on setR7");
-        assertEquals(Columns.PORTS, Integer.parseInt(mixer.group(1)), "5.7, the port directions");
-        assertEquals(Columns.MOST_MIXER_KEY, Integer.parseInt(mixer.group(2)),
-                "5.7, a key on setR7");
+        Matcher mixer = wrapped("\\| `setR7` \\| 0 to (\\d+) \\| key k stored as k \\+ (\\d+)")
+                .matcher(guide);
+        assertTrue(mixer.find(), "writing.md 5.7 has no setR7 key encoding");
+        assertEquals(Columns.MOST_MIXER_KEY, Integer.parseInt(mixer.group(1)),
+                "5.7, a setR7 key");
+        assertEquals(Columns.PORTS, Integer.parseInt(mixer.group(2)), "5.7, port directions");
+        Matcher volume = wrapped("`Vn\\[k\\] = floor\\(k \\* n / (\\d+)\\)` for keys 0 to (\\d+)")
+                .matcher(guide);
+        assertTrue(volume.find(), "writing.md 5.7 has no sample-volume formula");
+        int denominator = Integer.parseInt(volume.group(1));
+        int lastKey = Integer.parseInt(volume.group(2));
+        for (org.ymxs.YMXS.Transformation table : org.ymxs.Tunes.transformations(YmxsTest.fade())) {
+            int level = Integer.parseInt(table.name().substring(1));
+            assertEquals(lastKey + 1, table.entries().size(), "5.7, volume table length");
+            for (int key = 0; key <= lastKey; key++) {
+                assertEquals(key * level / denominator, table.entries().get(key),
+                        "5.7, " + table.name() + " key " + key);
+            }
+        }
         Matcher version = wrapped("sets a mapping column to a transformation, (\\d+) to (\\d+),"
                 + " makes the file version (\\d+)").matcher(guide);
         assertTrue(version.find(), "writing.md 5.7 has no version of a mapping");
@@ -1323,11 +1334,8 @@ final class ConsistencyTest {
     }
 
     /**
-     * The figures of SPEC.md's mapping clauses against the tree: the
-     * column of the last value in 2.1, the mapping column of 1.8.1, the
-     * columns of 4.2 and 4.3, the keys of rule 2(h), the effects used of
-     * 7.2, and the example of 3.3.5 against the kit's circus, whose first
-     * bytes it quotes. The example read version 7 after the writer wrote 9.
+     * Checks SPEC.md's target/mapping columns, key ranges, effects byte
+     * and version 9 header example against constants and fixture bytes.
      */
     @Test
     void theMappingFiguresOfTheSpecificationAreTheTrees() throws IOException {

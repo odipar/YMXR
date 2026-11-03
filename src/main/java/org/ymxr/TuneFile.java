@@ -7,10 +7,10 @@ import org.dtx.Dtx;
 import org.dtx.Table;
 
 /**
- * A tune file read back: its header fields, its DTX3 table as the bytes
- * in the file and as the table unpacked out of them, its sources, and the
- * transformations of version 10, transformation n at n - 1 and entry k
- * of each the value of key k. What a reader reports (R2.4).
+ * A decoded tune file: metadata, packed and unpacked DTX3 table,
+ * sources and optional transformation entries. Transformation n is at
+ * index n - 1; source key k selects entry k. Versions below 10 have an
+ * empty transformation list (SPEC.md 3.3, 3.4).
  */
 record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table table,
                 List<Table> sources, List<Boolean> counted, List<byte[]> transformations) {
@@ -109,11 +109,11 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
     }
 
     /**
-     * The transformations of a file of version 10 (SPEC.md 3.4), read in
-     * the order of SPEC.md 3.3.4: the header's long at 16, the index's
-     * place and its T, then each transformation's place and its E, in
-     * ascending n. Each offset is read unsigned, and against the file's
-     * length before a byte is read through it.
+     * Reads version 10 transformations in validation order: header
+     * offset, index bounds and count, then each table's bounds and
+     * entry count in number order (SPEC.md 3.3.4). Offsets are unsigned
+     * and checked against the file length before reading entries.
+     * Earlier versions return an empty list.
      */
     private static List<byte[]> transformations(byte[] file) {
         // the header of version 10 has the long at 16 before the source

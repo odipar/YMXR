@@ -407,11 +407,28 @@ Two places changed for entries that left output as it is:
 | `counted` | a counted source on each of the six targets whose register reads every bit of its byte - `setR0` and `setR4` on Timer A, `setR7` on Timer D, `setR11` on Timer B, `setR12` and `setR2` on Timer C - each with rows whose bit 7 is set, where a source the marker ends reads that bit as its end; an index entry whose bit 31 is 1 and whose bits 30 to 0 are the offset (SPEC.md 3.1.1); a square on R8 in the same file, which the marker ends, so a player reads the end of a source from its index entry rather than from the version word; a counted source of one row, one that plays once and stops its timer at its count, one repeating to a row above 0; a target set while an effect runs and read at the next start; a row that sets R12 as it stops the effect running on it |
 | `envelope-counted` | a counted source of two columns on `setEnvelope`, whose two registers read every bit of their byte, so its rows are whole bytes and a tick counts them; the high byte runs past 127, where a marked source of that target stops, and reaches 255, an envelope period of 65,323; one source repeating to a row above 0 and one that plays once and stops its timer at its count, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `deferred` | deferred starts, bit 3 of the control column (SPEC.md 4.8), on Timer A and on Timer C, and bit 4 of the effects used: a fall after a loop, a source with the place at its number, bit 5 at 0, a deferred start a stop drops, and one on a stopped timer |
-| `mapped` | version 10 at 50 Hz, its four mapping columns (SPEC.md 1.10) and its transformations (SPEC.md 3.4) written by the schema from a YMXS structure: on Timer A a fade, a loop on `setR8` started through V15 and remapped every second row to V12, V9, V6, V3, V0 and the identity; on Timer B a square on `setR9` through V10, a fall through V5 that plays once, a deferred start of the square through V10 while the fall runs, a remap to V12 while that start is pending, and a start that leaves the mapping column unset and runs through V12, the kept mapping; on Timer C a remap on the idle timer before its first start, a start on `setToneC` that leaves the mapping column unset and runs through it, the coarse nibble mapped, and after the repeat row a remap to the identity; on Timer D a counted source on `setR10` whose keys reach 255, through a transformation of 256 entries, remapped to another and, after the repeat row, back to the first; the repeat row starts Timers A, B and C again, each through its first mapping, and retunes Timer D, whose entry reports the mapping kept through the wrap (SPEC.md 4.5) |
+| `mapped` | version 10 at 50 Hz; optional lookups, fades, deferred snapshots and kept mappings. See [Mapped transformations](#mapped-transformations). |
 | `wrong-version` | the version word $000B: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.
+
+### Mapped transformations
+
+The schema writes `mapped` as version 10 at 50 Hz. Each timer checks a
+different lookup case:
+
+| timer | case |
+|---|---|
+| A | Fade on `setR8`: started through V15 and remapped every second row to V12, V9, V6, V3, V0, then identity. |
+| B | Square on `setR9` through V10; a fall through V5; a deferred square through V10. A remap to V12 changes the fall while the start is pending. A later start reuses kept V12 with its mapping column unset. |
+| C | Remap before the first start on `setToneC`, transforming its coarse nibble. The start reuses that mapping; after the repeat row a remap restores identity. |
+| D | Counted source on `setR10`: keys reach 255 through a transformation of 256 entries. It is remapped to a second table, then back after the repeat row. |
+
+The repeat row restarts A, B and C through their initial mappings and
+retunes D. D's record reports the kept mapping preserved through the
+wrap. The pending start on B retains its captured mapping independently
+of the later kept value (SPEC.md 1.10.3, 4.5).
 
 **7. How the kit is kept true.**
 

@@ -91,28 +91,33 @@ The MFP's interrupts run the tick at each effect's rate.
 
 ```mermaid
 flowchart TD
-    host[Host] -->|frame| frame[Player: apply tune row]
-    dtx[DTX reader] -->|unpacked row| frame
-    frame -->|effect columns| mfp[MFP timers]
-    frame -->|register columns| ym[YM2149]
-    mfp -->|tick| tick[Player: write source byte]
-    source[DTX1 source tables] -->|byte at place| tick
-    tick --> ym
+    host[Host: frame clock] -->|frame| frame[Player: apply tune row]
+    dtx[DTX3 tune table] -->|unpack row| frame
+    frame -->|register columns| ym[YM2149 sound chip]
+    frame -->|start / stop / rate| mfp[MC68901 MFP timers]
+    frame -->|start / remap| mapping[Active mapping per effect]
+    tables[Optional transformation tables] -->|prepare lookup at frame| mapping
+    mfp -->|tick| tick[Player: read source row]
+    source[DTX1 source tables] -->|row at place| tick
+    mapping -->|identity or selected lookup| write[Map last value; preserve other values]
+    tick --> write
+    write -->|target registers| ym
 ```
 
-A tick writes a source byte through its target and advances the *place*;
-at the marker on the last row it repeats the source, stops its timer, or
-performs the deferred start pending on it. [SPEC.md](doc/SPEC.md) sections
+A tick writes a source row through its target and advances the *place*.
+At the last row, detected by a marker or row count, it repeats the source,
+stops its timer, or installs a pending deferred start. [SPEC.md](doc/SPEC.md) sections
 4 and 5 define the order and where a tick may fall. A YMXR reader records
 the frames instead of writing the chips, and its record leaves the ticks
 out (section 7).
 
 Transformation lookups are optional. Mapping 0 writes source values
-unchanged. In version 10, an effect can instead select a lookup table
-for the last value its target writes: sample volume on a voice target,
-for example. A remap changes that lookup while the source continues
-from its current place. [SPEC.md](doc/SPEC.md) 1.10, 2.1.5 and 3.4 define
-the column, tick processing and table layout.
+unchanged. In version 10, an effect can select a lookup table for its
+target's last value: sample volume, for example. A remap can fade a sample
+while playback continues from its current place. [writing.md](doc/writing.md)
+5.7 covers uses and encoding; [SPEC.md](doc/SPEC.md) 1.10, 2.1.5 and 3.4
+define the column, tick processing and table layout. SNDH tools select a
+core with lookup support when required.
 
 ## The documents
 

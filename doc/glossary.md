@@ -25,26 +25,26 @@ repository encodes YMXS's structure and reads DTX's table.
 | effect | A source connected to a target on one timer, at the rate of its prescaler and count (YMXS, SPEC.md 1.7). Four columns encode it: the target column, the source column, the control column and the count column; in version 10 a fifth, the mapping column. | YMXS, SPEC.md 1.7; SPEC.md 1.8, 1.9, 1.10 |
 | effect rate | The ticks a second of an effect's timer: 2,457,600 divided by the prescaler and by the count, 0 counting 256. The control column and the count column encode it. | SPEC.md 1.9 |
 | effects used | A byte of the tune file: bit i of bits 3 to 0 is 1 where a row starts effect i, bit 4 is 1 where a row defers a start, bit 5 is 1 in version 10, and bits 7 and 6 are 0. A player claims the timers of the effects bits 3 to 0 mark at init, before the first row is written. | SPEC.md 3.3 |
-| entry | One of the E bytes of a transformation, numbered from 0: entry k is the value written where the key is k (YMXS, SPEC.md 3.6.1); a tune file of version 10 has the entries of each transformation (SPEC.md 3.4.2). An index entry (SPEC.md 3.1) and a frame's entry of the record (SPEC.md 7.3) are other terms. | YMXS, SPEC.md 3.6.1; SPEC.md 3.4 |
+| entry | One lookup result, entry k for key k. Version 10 stores each entry as a byte; marker and port bits are preserved from the source. | YMXS, SPEC.md 3.6.1; SPEC.md 3.4 |
 | envelope generator | The YM2149's counter walking one of sixteen shapes at the envelope period. | terminology.md, 1. The sound chip |
 | envelope period | R11 and R12, the 16-bit divider of the envelope generator. | terminology.md, 1. The sound chip |
 | envelope shape | R13, four bits. Four of the sixteen shapes repeat; the other twelve run once and stop. | terminology.md, 1. The sound chip |
-| fade | A voice's volume moved through transformations, a remap a frame: on `setVoiceA` a mapping of the identity, the identity and `Vn`, entry k of `Vn` k times n divided by 15 for the 16 keys of a volume (YMXS, SPEC.md 3.6.5). | terminology.md, 5. Effects |
+| fade | Sample volume changed through successive transformation selections while the source continues. On a voice target, only the volume part changes. | terminology.md, 5. Effects |
 | frame | One call of the player: one row of the tune's table read, and the columns it sets written to the two chips. After the end of a tune that plays once, a call leaves every register as it is and reports -1 (SPEC.md 4). | terminology.md, 4. Frames and ticks |
 | frame rate | The frames a second at which the host calls the player, recorded once in the tune file. | SPEC.md 3.3 |
 | generator | One of the YM2149's five: three tone, one noise, one envelope. | terminology.md, 1. The sound chip |
 | host | The program that calls the player once a frame, provides the workspace, and runs every timer outside the tune's. | BINARIES.md 5 |
-| identity | The part of a mapping that writes each value as it is, distinct from a transformation whose entry k is k at every key (YMXS, SPEC.md 3.6.2). Mapping number 0 is the identity in every part, and every effect of versions 7 to 9 runs through it (SPEC.md 1.10.1). | YMXS, SPEC.md 3.6.2; SPEC.md 1.10 |
+| identity | A mapping part that writes its source value unchanged, without a lookup. Mapping number 0 uses identity for every value; an identity-valued transformation remains a separate bounded lookup. | YMXS, SPEC.md 3.6.2; SPEC.md 1.10 |
 | image | DTX's reader packaged with a table: its code and the table, entered through calls at its first bytes. A bound tune has one; a tune file has the table alone. | BINARIES.md 1 |
 | index entry | 4 bytes of the tune file for a source: bits 30 to 0 the offset of its DTX1 table, and bit 31 the mark of a counted source. | SPEC.md 3.1, 3.3 |
-| kept mapping | The number the last start or remap on an effect set its mapping column to, 0 until a row sets it: a start that leaves the mapping column unset runs through it, and a deferred start runs, from the tick that performs it, through the kept mapping after its row. | SPEC.md 1.10.3 |
+| kept mapping | The mapping selected by the last start or remap, initially 0. An unset mapping column reuses it. Deferred starts capture it; later remaps can change the kept value independently of that snapshot. | SPEC.md 1.10.3 |
 | kept value | The target, the select and the count of an effect, and in version 10 its mapping, as the player keeps them from the last row that set each, a start or a remap for the mapping: a row that leaves the column unset leaves the kept value, and bit 6 of the control column writes the kept count (SPEC.md 1.8, 1.9, 1.10). | requirements.md R4.6 |
-| key | A value of a source's row read through a transformation, 0 to its last key: the value written where the key is k is entry k (YMXS, SPEC.md 3.6.1, 3.6.5). A source's keys are in its column of the last value its target reads (SPEC.md 1.10.1, 2.1.5); a key of a JSON object of the record is JSON's term (SPEC.md 7.1). | YMXS, SPEC.md 3.6.1 |
-| last key | E - 1, the highest key of a transformation of E entries (YMXS, SPEC.md 3.6.1); a key above it is an error of the structure (YMXS, SPEC.md 3.6.5). | YMXS, SPEC.md 3.6.1 |
+| key | A source value used to select a transformation entry, from 0 to its last key. YMXR permits keys only in the target's last-value column; marker and port bits are excluded. | YMXS, SPEC.md 3.6.1 |
+| last key | E - 1 for a transformation with E entries. Every source key must be within this range. | YMXS, SPEC.md 3.6.1 |
 | live column | A column of a tune's table whose values change, which a DTX3 table packs with ST4 and a reader unpacks through a ring (DTX, SPEC.md 2.4). | SPEC.md 3.3.3 |
 | loop | The frames from the one that reads the repeat row to the one that reads the last row. | YMXS, SPEC.md 4.5 |
-| mapping | A list of parts, part i for value i of a row, each the identity or a transformation: a start connects its source to its target through one, and a remap sets the mapping of the effect the timer runs (YMXS, SPEC.md 3.6.3). A mapping column is the number of a mapping whose parts before the last are the identity (SPEC.md 1.10.1). | YMXS, SPEC.md 3.6.3; SPEC.md 1.10 |
-| mapping column | Column 30 + i of effect i in version 10: bit 7 the set bit, bits 6 to 0 the number of a transformation, 1 to T, for the last value the effect's target reads, or 0, the identity. | SPEC.md 1.10 |
+| mapping | One identity or transformation part per target value; an empty mapping means identity throughout. YMXR permits an optional transformation on the last value alone. | YMXS, SPEC.md 3.6.3; SPEC.md 1.10 |
+| mapping column | Column 30 + i for effect i in version 10. Bit 7 marks a set value; bits 6 to 0 select identity (0) or transformation 1 to T. Unset preserves the kept mapping. | SPEC.md 1.10 |
 | marker | Bit 7 of the column SPEC.md 2.1 names for a source's target, set in the last row alone: a tick tests it after the write; where the source repeats, the next tick reads row `RR`, and otherwise the timer stops. A counted source ends on its row count instead. | SPEC.md 3.2, 5 |
 | metadata | `R`, `C`, `RR` and `W`: the four values that describe a table. | terminology.md, 3. Tables, rows and procedures |
 | MFP | The MC68901: four timers, A to D, on a clock of 2,457,600 a second. | terminology.md, 2. The timers |
@@ -66,7 +66,7 @@ repository encodes YMXS's structure and reads DTX's table.
 | record | The lines a reader produces of a tune file: the fixed values on the first line, then each frame's entry. | SPEC.md 7 |
 | register | One byte of the YM2149's settings. Sixteen: fourteen are the sound, two are I/O ports. | terminology.md, 1. The sound chip |
 | release | The operation a player performs on a claimed timer at stop: it stops the timer, clears its enable bit and its mask bit, and clears its pending bit. | terminology.md, 2. The timers |
-| remap | A row that sets an effect's mapping column and leaves its source column unset: the effect keeps its source, its place and its rate and runs through that mapping, and on a stopped timer the remap sets the mapping the next start keeps (YMXS, SPEC.md 4.3). | SPEC.md 1.10.2 |
+| remap | A mapping-column write with the source column unset. It changes current ticks and the kept mapping, preserving source, target, place and rate. A pending start retains its captured mapping; a stopped timer remains stopped. | SPEC.md 1.10.2 |
 | ring | The bytes a live column of a DTX3 table unpacks through, one size for the payload (DTX, SPEC.md 2.4): a multiple of 30, a row's bytes, at least 60, and in version 10 a multiple of 34, at least 68; at most the largest a 16-bit displacement reaches at the table's live columns, which the tools of this repository choose by default. | tools.md |
 | row | One step of a table: `C` values, one a column. | terminology.md, 3. Tables, rows and procedures |
 | `RR` | The row a table repeats to after its last row; `R` where the table plays once. | requirements.md R1.1 |
@@ -96,8 +96,8 @@ repository encodes YMXS's structure and reads DTX's table.
 | tone generator | One of the YM2149's three counters that flip their output at the end of each period, producing a square wave. | terminology.md, 1. The sound chip |
 | tone period | A voice's 12-bit divider: R0 and R1, R2 and R3, R4 and R5. | terminology.md, 1. The sound chip |
 | tracker | A program that produces tunes; its terms map onto the schema (R3.2). | requirements.md R3.2 |
-| transformation | A name and a list of E entries, 1 to 256, each 0 to 255: entry k is the value written where the key is k (YMXS, SPEC.md 3.6.1). A tune file of version 10 has 1 to 127, numbered in the order of YMXS, SPEC.md 1.9, each a word E and its entries (SPEC.md 3.4). | YMXS, SPEC.md 3.6.1; SPEC.md 3.4 |
-| transformation index | A word T, the transformation count, and T longs, each the offset of a transformation from the index; the long at 16 of a tune file of version 10 is its offset. | SPEC.md 3.4.2 |
+| transformation | An optional lookup table of 1 to 256 byte entries: source key k selects entry k. Version 10 numbers tables from 1 to 127 in YMXS first-use order; names are absent from the binary. | YMXS, SPEC.md 3.6.1; SPEC.md 3.4 |
+| transformation index | A word T followed by T long offsets relative to the index. The version 10 header's long at 16 points to it. | SPEC.md 3.4.2 |
 | tune | A rate and a table of rows, with a title, a composer and a writer for display (YMXS, SPEC.md 1.3); a tune file encodes the rate, the table and the title, as its name (SPEC.md 3.3). | YMXS, SPEC.md 1.3; SPEC.md 3 |
 | tune file | The values fixed for a tune, its name, its DTX3 table, one DTX1 table a source and, in version 10, its transformations, in one file (SPEC.md 3.3, 3.4). A bound tune adds DTX's reader to it. | SPEC.md 3.3 |
 | ubiquitous language | The terms of this glossary, used with one meaning in every document, comment and name. | requirements.md R0.6 |

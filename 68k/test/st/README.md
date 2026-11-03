@@ -151,5 +151,5 @@ so E at 3 to 5 and P at 3 read a range.
 -xpatch`, under Hatari 2.6.1 on an ST at 8 MHz, cycle-exact, under TOS
 2.06, the file as the program wrote it, and each case's line of both
 runs reads as the table above. These runs are the check of the patched
-read of the cores with the lookup (BINARIES.md 2.1), and a release
+read of cores with lookup support (BINARIES.md 2.1), and a release
 requires no run on a real ST.

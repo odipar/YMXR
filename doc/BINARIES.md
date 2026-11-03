@@ -100,10 +100,11 @@ condition met of the table below; then reads each tune file as SPEC.md
 tables with an image in place of the tune file's DTX3 table. The packager
 builds that image using the table's unit and copies flag (DTX, SPEC.md
 2.4; abi.md 1). Every unpacked row matches the tune file byte for byte. A
-bound tune of version 10 also has the tune file's *transformation block*:
-bytes O to M - 1 of the tune file, O the long at 16 and M the highest of
-O + 2 + 4T and of P + 2 + E of each transformation (SPEC.md 3.4.2), byte
-for byte. Each offset of its index counts from the block's first byte.
+bound tune of version 10 also copies the *transformation block*
+unchanged: the index and entries, bytes O to M - 1 of the tune file.
+O is the header's long at 16; M is the highest of O + 2 + 4T and each
+P + 2 + E (SPEC.md 3.4.2). Index offsets are relative to the block, so
+moving it requires only the bound header's pointer to change.
 
 **1.2 Layout.**
 
@@ -127,9 +128,10 @@ for byte. Each offset of its index counts from the block's first byte.
 
 The tables come before the image so that a source's rows are within
 reach of the header at any length of image: a player whose ticks read a
-row through a displacement reaches 32,767 bytes (5.5). The transformation
-block comes after the image, so that the sources are within that reach at
-any count of transformations.
+row through a displacement reaches 32,767 bytes (5.5). Transformation
+blocks follow the image: frames read them to prepare lookup pages, while
+ticks read sources and those pages. Their size therefore leaves source
+reach unchanged.
 
 **1.3 A bound tune written alone.** A tool writes it from one tune file:
 bytes 6 to 11 are the tune file's; the field at 12 is the field at +4 of
@@ -204,8 +206,8 @@ reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
 core with it is 4,408 bytes larger.
 
 Each of the sixteen has a twin with `-map` before `.bin`, assembled with
-the lookup in, `YMXR_MAP=1` (SPEC.md 1.10), whose flags word is the
-sixteen's plus 16: `YMXR_sndh-map.bin` reads 20, and
+optional lookup support, `YMXR_MAP=1` (SPEC.md 1.10). Its flags word is
+the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 `YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to
 version 10 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
@@ -225,10 +227,9 @@ through the program counter for a file whose last bound tune ends within
 without the lookup, and the core that reads an absolute address for a
 file whose tunes end further off (5.5). A caller that names the third
 reads back that core, or the line of 2.10 where the file's tunes end
-past the reach. The tool selects a core with the deferred start in where
-the effects byte of a subtune sets bit 4, and one without it where none
-does; and a core with the lookup in where the effects byte of a subtune
-sets bit 5, and one without it where none does.
+past the reach. The tool enables deferred-start support if any subtune
+sets effects bit 4, and lookup support if any subtune sets bit 5. An
+identity-only set uses a core without lookup support.
 
 **2.2 Layout**, from the core's first byte:
 
@@ -368,7 +369,9 @@ the core's first byte, at H.
 The subtunes come before the images so that a subtune's sources are
 within reach of the core: a player whose ticks read a row through a
 displacement reaches 32,767 bytes (5.5). The transformation blocks come
-after the images, as in a bound tune written alone (1.2).
+after the images, as in a bound tune written alone (1.2). Frames prepare
+lookups from these blocks; tick reads remain within the source handlers'
+reach.
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.

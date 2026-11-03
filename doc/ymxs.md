@@ -51,26 +51,24 @@ assignments.
 | Timer A, D, B, C | effects 0, 1, 2, 3 (2.3) |
 | the tune's sources | numbered 1 upward in the order a row first starts each (3.1) |
 
-## The kept values a row leaves alone
+## Kept values
 
-The schema tracks each effect's target, select, count and mapping as a
-player keeps them (R3.6, R4.6), and leaves a column unset where the
-operation allows: a retune with both resets clear that changes only a
-count other than 0 leaves the control column unset. Of the mapping it
-tracks three values an effect, the kept, the running and the pending
-mapping (SPEC.md 6, rule 2(g)). For a start, the schema counts the timer
-as running only where its previous source repeats and no row stopped it.
+The schema tracks each effect's target, select, count and mapping, and
+omits columns whose values can be reused. A retune that changes only a
+nonzero count, with both resets clear, leaves the control column unset.
 
-The player's kept values run through the wrap, so the repeat row writes
-its targets again, and the first start or remap at or after it writes
-the mapping of each effect a row maps through a transformation (SPEC.md
-6, rule 2(g)). The kept select, the kept count and whether the timer
-counts run through the wrap as well. Before it reads the rows, the
-schema reads the value of each of the three after the last row. At the
-repeat row each value other than its value after the last row is open,
-so the first start or retune at or after the repeat row that compares
-against it writes its rate columns; a value equal to its value after the
-last row is kept, since the second pass starts from it as the first does
+For mappings, it tracks the kept value for later starts, the running
+value for ticks, and a pending deferred start's snapshot. After deferring
+a change, the running mapping may be unknown: the rows do not determine
+which tick reaches the source boundary. The next remap then writes its
+column even if its mapping equals the kept value (SPEC.md 6, rule 2(g)).
+
+Kept values survive the wrap. At the repeat row the schema marks targets
+and, for each effect that uses a transformation, all three mapping values
+as unknown. The first subsequent start or remap writes the required
+mapping. For select, count and timer-running state, it compares the
+values before the repeat row with those after the last row. Equal values
+can be reused; differing values require later rate-column writes
 (SPEC.md 6, rule 4(e)).
 
 ## The place's reset
@@ -97,12 +95,33 @@ its row count modulo R of the source started (YMXS, SPEC.md 3.5.3,
 version 6). A structure of version 5 reads as version 6, and a tune file
 of version 8 as version 9.
 
-A deferred start keeps the mapping of its row, and a remap while it is
-pending sets the mapping of the effect the timer runs (YMXS, SPEC.md
-3.5.5; SPEC.md 1.10.3). Until the tick that performs the start, the
-effect before it runs through its mapping, so after a deferred start
-through another mapping the schema counts the running mapping as open
-and writes the next remap (SPEC.md 6, rule 2(g)).
+A deferred start captures its row's mapping. A remap while it is pending
+changes the running effect and the kept mapping; the pending start
+retains its snapshot. At the source boundary it installs that snapshot,
+leaving the kept mapping for subsequent starts (SPEC.md 1.10.3).
+
+## Optional transformations
+
+An empty YMXS mapping uses identity: source values are written unchanged.
+A transformation is an optional lookup table, selected by a mapping part.
+YMXR permits it only on the target's last value; every earlier part must
+be identity. For `setVoiceA`, `[0, 0, Vn]` changes volume while preserving
+pitch. For `setR8`, `[Vn]` changes the sole value.
+
+Use volume tables to play a sample at different levels without copying
+its source. Successive `Remap` rows produce a fade without restarting it;
+independent timers can run the same sample at separate levels. A table
+can also convert 8-bit sample keys to YM volume values, change buzzer
+shapes, or scale a noise effect's volume. The table changes values alone;
+source timing, length and repetition remain unchanged.
+
+In YMXS JSON, 0 denotes identity and a positive number selects a
+transformation. In YMXR columns, the set bit distinguishes an explicit
+identity selection (`$80`) from an unset mapping (`$00`, preserve the
+kept value). The schema emits version 10 only when a row selects a
+transformation; identity-only tunes remain version 9. [writing.md](writing.md)
+5.7 covers key ranges and [SPEC.md](SPEC.md) 6, rule 2(g) defines the
+column-write algorithm.
 
 ## What is an error
 

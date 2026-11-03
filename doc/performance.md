@@ -413,15 +413,15 @@ a pending start's, and YMXR_FIXED 2,312 (A deferred start).
 
 ## A tick through a transformation
 
-`YMXR_MAP=1` assembles a player with the lookup in (BINARIES.md 2.1), which
-plays a tune of version 10. A source through a transformation (SPEC.md
-1.10) runs a lookup instance of its shape, and a source through the
-identity runs the handler A tick counts (68k/YMXR.S, TICKL and TICKWL). An
-instance writes the key, its place's byte, into the low byte of the
-displacement of the read that follows, `move.b page(pc),$FFFF8802.w`, whose
-high byte selects one of the effect's two pages of 256 bytes, and that read
-writes the entry. The row's read and the marker's branch, on the general
-handler and its lookup instance:
+`YMXR_MAP=1` enables optional lookup support and version 10 playback
+(BINARIES.md 2.1). Identity uses the ordinary handlers measured in A tick;
+a transformation uses the matching lookup instance (68k/YMXR.S, TICKL
+and TICKWL). A tick writes its source key into the low displacement byte
+of `move.b page(pc),$FFFF8802.w`. The high byte selects one of the
+effect's two 256-byte pages; the read writes the selected entry.
+
+The general handler's source read and marker test, with and without a
+lookup:
 
 | the row's read and the marker's branch | cycles | bytes | the handler |
 |---|---|---|---|
@@ -481,16 +481,14 @@ counts.
 
 ## A remap at the frame
 
-A row that starts a source through a transformation, or remaps a running
-source (SPEC.md 1.10.2), runs a routine of the frame in the effect's step.
-The routine selects the page of the effect's instance that has the
-transformation, copies the transformation into the other page with
-interrupts on where neither page has it, and writes the instance's operands
-and the vector at level 7, as a start through the identity writes them
-(68k/YMXR.S, ymxr_lstart and ymxr_remap, and the routines after them to
-ymxr_kinds). Counted from the routine's call to its return, the page and
-the copy apart, over the rows of the tunes the rig plays through a
-transformation that start or remap one effect:
+Starts through a transformation and remaps prepare lookups during the
+frame's effect step (SPEC.md 1.10.2). Reuse a cached page when possible;
+otherwise fill the unused page with interrupts enabled. Patch handler
+operands and the vector at level 7, as for identity starts (68k/YMXR.S,
+ymxr_lstart, ymxr_remap and routines through ymxr_kinds).
+
+The following costs run from routine call to return, excluding page
+selection and copying, for rows that start or remap one effect:
 
 | the row | one column | a square | a source of one row |
 |---|---|---|---|
@@ -510,13 +508,11 @@ column: a start at row 0 is 1,366 to 1,840 cycles on them, a remap between
 two transformations 796 to 850, from the identity 1,686 to 2,430 and to the
 identity 1,498 to 2,268.
 
-The page: 276 to 328 cycles where a page of the instance has the
-transformation, and 550 to 570 where neither has it, the other page filled.
-The switch between two transformations is the page byte's one write, 14
-cycles, which no tick splits, and a remap between the identity and a
-transformation moves the source's registers, loop cells and places from one
-handler to the other, 586 cycles on one column to 1,426 on three. The copy
-into a page:
+Page selection costs 276 to 328 cycles for a cached transformation, or
+550 to 570 when the unused page needs filling. Switching between two
+transformations changes one page byte atomically, 14 cycles. Switching
+between identity and a lookup also moves registers, loop cells and places
+between handlers: 586 cycles on one column to 1,426 on three. Copy costs:
 
 | the copy | the transformation's entries | cycles |
 |---|---|---|
@@ -531,10 +527,10 @@ So the routines of a volume's remap between two transformations, a marked
 source of one column through 16 entries, cost 1,726 to 1,746 cycles where
 the other page is filled, and 1,110 where it has the transformation.
 
-A tune that maps no value runs the handlers of the identity on this core,
-and these paths of its frame cost more than on the core without the lookup,
-counted on the build as it is over the rig's three tunes of version 9 that
-start a source of each shape and reset its place:
+Identity-only tunes still run ordinary tick handlers on a lookup core.
+Frame processing costs more than on the core without lookup support.
+These differences are measured on the default build with the rig's three
+version 9 fixtures, covering each source shape and place reset:
 
 | a path of the frame | cycles more |
 |---|---|
@@ -566,13 +562,11 @@ The play call, and 0 to 92 more at most.
 
 ## The cost of 34 columns
 
-A tune of version 10 has 34 columns, the thirty of version 9 and the four
-mapping columns (SPEC.md 3.3), and DTX's packager sets the period at the
-column count or above (DTX, abi.md 4). Each tune the rig plays through a
-transformation packs at unit 2 and a period of thirty-four rows, so a
-refill is seventeen units of two bytes, against fifteen at thirty columns
-(The play call). The eleven fixtures map no value, and their tables have
-thirty columns.
+Version 10 adds four mapping columns to version 9's thirty (SPEC.md 3.3).
+DTX's period is at least the column count (DTX, abi.md 4). The rig's lookup
+tunes pack at unit 2 with a period of thirty-four rows: seventeen units
+per refill, against fifteen for thirty columns (The play call). The
+eleven dump fixtures use identity and retain thirty columns.
 
 The routines of A remap at the frame run inside the play call. The
 costliest call of each tune the rig plays through a transformation, and its

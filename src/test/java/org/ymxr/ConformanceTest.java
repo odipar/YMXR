@@ -151,23 +151,8 @@ final class ConformanceTest {
                     + " bit 5 at 0, a deferred start a stop drops, and one on a stopped"
                     + " timer"),
             Fixture.built("mapped", "`ConformanceTest.mapped`", () -> schema(mapped()),
-                    "version 10 at 50 Hz, a YMXS structure written through the schema:"
-                    + " on Timer A a fade, a loop on `setR8` started through V15 and"
-                    + " remapped every second row to V12, V9, V6, V3, V0 and the identity;"
-                    + " on Timer B a square on `setR9` through V10, a fall through V5 that"
-                    + " plays once, a deferred start of the square through V10 while the"
-                    + " fall runs, a remap to V12 while that start is pending, which remaps"
-                    + " the fall, and a start that leaves the mapping column unset and runs"
-                    + " through V12, the kept mapping;"
-                    + " on Timer C a remap on the idle timer before its first start, a start"
-                    + " on `setToneC` that leaves the column unset and runs through it, the"
-                    + " coarse nibble mapped, and after the repeat row a remap to the"
-                    + " identity; on Timer D a counted source on `setR10` whose keys reach"
-                    + " 255, through a transformation of 256 entries, remapped to another"
-                    + " and, after the repeat row, back to the first; the repeat row starts"
-                    + " Timers A, B and C again, each through its first mapping, and"
-                    + " retunes Timer D, whose entry reports the mapping kept through the"
-                    + " wrap"),
+                    "version 10 at 50 Hz; optional lookups, fades, deferred snapshots"
+                    + " and kept mappings. See [Mapped transformations](#mapped-transformations)."),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
@@ -197,8 +182,10 @@ final class ConformanceTest {
                 Tune.CHOOSE, Tune.packers(), report, tune.title());
     }
 
-    /** The transformation Vn of the sixteen keys of a volume: entry k is k
-     *  times n divided by 15 (YMXS, SPEC.md 3.6.5). */
+    /**
+     * Volume transformation Vn: sixteen entries with entry k = floor(k
+     * * n / 15) (YMXS, SPEC.md 3.6.5).
+     */
     private static Transformation volume(int n) {
         List<Integer> entries = new ArrayList<>();
         for (int k = 0; k < 16; k++) {
@@ -207,8 +194,10 @@ final class ConformanceTest {
         return new Transformation("V" + n, entries);
     }
 
-    /** A transformation of 256 entries, a key a byte: entry k is k divided
-     *  by 17, a volume of 0 to 15, and 15 less that where {@code down}. */
+    /**
+     * Converts byte keys to volumes: entry k = floor(k / 17), inverted
+     * around 15 when {@code down} is set.
+     */
     private static Transformation steps(boolean down) {
         List<Integer> entries = new ArrayList<>();
         for (int k = 0; k < 256; k++) {
@@ -224,39 +213,29 @@ final class ConformanceTest {
                 new Timing(Chip.prescaler(by), count, true, true), false, mapping);
     }
 
-    /** Rows of {@link #mapped}: the start of the fall on Timer B, the
-     *  remap of Timer B while the deferred start of the square is pending,
-     *  the start of the square that leaves the mapping column unset, and
-     *  the repeat row. */
+    /**
+     * Key rows of {@link #mapped}: fall start, remap while its
+     * replacement is pending, later start reusing kept mapping, and
+     * repeat row.
+     */
     static final int FALL = 6;
     static final int PENDING = 10;
     static final int UNSET = 20;
     static final int REPEAT = 32;
 
     /**
-     * The kit's tune of version 10 (SPEC.md 1.10, 3.4): 48 rows at 50 Hz
-     * repeating to row 32, every effect mapped, written by the schema as
-     * {@code ymxs-to-ymxr} writes it.
+     * The version 10 conformance tune: four effects exercise fades,
+     * kept mappings, deferred snapshots, remaps before first start and
+     * byte-sized keys (SPEC.md 1.10, 3.4). Encoded through the schema
+     * as the tools encode YMXS.
      *
-     * <p>Timer A, a loop of four rows on {@code setR8} started through V15,
-     * then a remap every second row to V12, V9, V6, V3 and V0, and one to
-     * the identity: a fade. Timer B, a square on {@code setR9} through V10;
-     * at row 6 a start of a fall through V5, which plays once, its last row
-     * read by a tick after row 10's frame and before row 20's; at row 8 a
-     * deferred start of the square through V10, pending until that tick;
-     * at row 10 a remap to V12 while the start is pending, which remaps the
-     * fall and leaves the pending start's mapping as it is (YMXS, SPEC.md
-     * 3.5.5); at row 20 a start of the square through V12, the kept
-     * mapping, which leaves the mapping column unset. Timer C, idle, a
-     * remap at row 2 through a transformation of the coarse nibble; at row
-     * 4 a start on {@code setToneC} through that mapping, which leaves the
-     * column unset; a stop at row 20. Timer D, a ramp on {@code setR10} of
-     * keys 0 to 255 through a transformation of 256 entries, so the source
-     * is counted (3.1.6), and at row 16 a remap to a second of 256. Row 32
-     * starts Timers A, B and C again and retunes Timer D, so the ramp's
-     * entry there reports the mapping the wrap keeps (SPEC.md 4.5). Rows 33
-     * to 47 repeat the fade, remap the square, the tone to the identity and
-     * the ramp to the first of 256, and stop Timer C.
+     * <p>Timer A fades a setR8 loop through decreasing volume tables.
+     * Timer B starts a fall, defers a square, then remaps the fall
+     * while the square retains its captured mapping. A later start
+     * reuses the remap's kept value. Timer C remaps before starting
+     * setToneC and later restores identity. Timer D runs a counted
+     * byte-key ramp through two volume tables. The repeat row restarts
+     * A, B and C and retunes D, preserving its kept mapping.
      */
     static org.ymxs.YMXS.Tune mapped() {
         Single pulse = Tunes.repeating("pulse", List.of(15, 12, 9, 6), 0);
@@ -631,11 +610,9 @@ final class ConformanceTest {
     }
 
     /**
-     * The figures of the kit's tune of version 10 in its rows of README.md
-     * 6 and SOURCES.md, against {@link #mapped}: the transformations Timers
-     * A and B run through before the repeat row, in row order; the rows
-     * between two remaps of the fade; the largest key of the ramp; and the
-     * entries of its transformation.
+     * Checks mapped-fixture documentation against the structure:
+     * transformation order on A and B, fade intervals, largest ramp key
+     * and table length.
      */
     @Test
     void theDocumentsReadTheFiguresOfTheMappedTune() throws IOException {
@@ -672,19 +649,22 @@ final class ConformanceTest {
         }
         int keys = Collections.max(Tunes.values(Tunes.source(ramp.connection())));
         for (Path at : List.of(KIT.resolve("README.md"), KIT.resolve("SOURCES.md"))) {
-            Matcher row = Pattern.compile("(?m)^\\| `mapped` \\|.*$").matcher(Files.readString(at));
-            assertTrue(row.find(), at + " has no row for mapped");
+            String text = Files.readString(at);
+            int start = text.indexOf("### Mapped transformations");
+            assertTrue(start >= 0, at + " has no mapped transformation cases");
+            int end = text.indexOf("\n**7.", start);
+            String description = text.substring(start, end < 0 ? text.length() : end);
             List<String> named = new ArrayList<>();
-            Matcher name = Pattern.compile("\\bV\\d+\\b").matcher(row.group());
+            Matcher name = Pattern.compile("\\bV\\d+\\b").matcher(description);
             while (name.find()) {
                 named.add(name.group());
             }
             assertEquals(through, named, at + "'s transformations of Timers A and B");
-            assertTrue(row.group().contains("remapped every " + every + " row"),
+            assertTrue(description.contains("remapped every " + every + " row"),
                     at + " lacks \"remapped every " + every + " row\"");
-            assertEquals(List.of(keys), numbers(row.group(), "keys reach (\\d+)"),
+            assertEquals(List.of(keys), numbers(description, "keys reach (\\d+)"),
                     at + "'s largest key of the ramp");
-            assertEquals(List.of(steps.entries().size()), numbers(row.group(),
+            assertEquals(List.of(steps.entries().size()), numbers(description,
                     "a transformation of (\\d+) entries"), at + "'s entries of the ramp's mapping");
         }
     }
@@ -720,14 +700,10 @@ final class ConformanceTest {
     }
 
     /**
-     * A tick reads the last row of the fall {@link #mapped} starts on Timer
-     * B at row {@link #FALL} after the frame of row {@link #PENDING} and
-     * before that of row {@link #UNSET}: the remap of row PENDING comes
-     * while the deferred start between the two is pending, as SOURCES.md
-     * has it, and the tick that performs that start comes before the start
-     * of row UNSET, which leaves the mapping column unset and runs through
-     * the kept mapping. The record follows from the rows alone, and a
-     * player of the kit performs the remap on the running fall.
+     * Verifies the fall ends after the pending-start remap and before
+     * the later start. Thus the remap affects the fall, installation
+     * uses the captured square mapping, and the later start reuses the
+     * kept mapping (SPEC.md 1.10.3).
      */
     @Test
     void theMappedTuneRemapsWhileAStartIsPending() {

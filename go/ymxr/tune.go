@@ -14,11 +14,10 @@ import (
 	"github.com/odipar/ymxr/go/report"
 )
 
-// A tune file (SPEC.md 3.3): a tune's fixed values, the tune's table as a
-// DTX3 file, one DTX1 table a source, and in version 10 the
-// transformations the mapping columns number. The file contains the
-// tune's tables and no code; a tool binds them with DTX's reader into
-// what the player reads (doc/BINARIES.md).
+// A tune file: metadata, DTX3 tune table and DTX1 sources (SPEC.md 3.3).
+// Version 10 adds optional transformation tables; identity-only tunes use
+// version 9. Files contain data alone; binding adds DTX's reader for
+// playback (doc/BINARIES.md).
 //
 //	offset  bytes  what it is
 //	0       4      YMXR
@@ -47,15 +46,14 @@ import (
 // Magic is the four bytes a tune file opens with.
 var Magic = []byte{'Y', 'M', 'X', 'R'}
 
-// Version is the highest version a reader reads, the version a writer
-// writes where a row maps a value (SPEC.md 3.3.5): its table has Mapped
-// columns, and the file has the transformations they number.
+// Version is the highest supported version, written when a row selects
+// a transformation. Its table has Mapped columns and the file includes
+// transformation tables (SPEC.md 3.3.5).
 const Version = 0x000A
 
-// Unmapped is the version a writer writes where no row maps a value
-// (SPEC.md 3.3.5): its table is DTX3, which a player of an earlier version
-// reads wrongly, bit 3 of a control column marks a deferred start, and the
-// place of one with bit 5 at 0 continues the count of the rows (4.8).
+// Unmapped is the writer version for identity-only tunes. It uses
+// thirty DTX3 columns without a transformation index. Deferred starts
+// remain available (SPEC.md 3.3.5).
 const Unmapped = 0x0009
 
 // VersionDeferred is the first version with a deferred start: a file of
@@ -86,9 +84,8 @@ const (
 // whole bytes and a player counts them (SPEC.md 3.1).
 const Counted = 1 << 31
 
-// IndexAt is where the source index begins in a file of that version: at
-// 16, and at 20 in version 10, after the transformation index's offset
-// (SPEC.md 3.3).
+// IndexAt returns the source-index offset: 16 in versions 7 to 9; 20 in
+// version 10, after the transformation-index pointer (SPEC.md 3.3).
 func IndexAt(version int) int {
 	if version == Version {
 		return TransformationsAt + 4
@@ -116,8 +113,8 @@ const (
 	// tune file is at least.
 	HeaderLength = 16
 
-	// TransformationsAt is the long of version 10: where the
-	// transformation index begins.
+	// TransformationsAt is the header offset of the version 10
+	// transformation-index pointer.
 	TransformationsAt = 16
 )
 
@@ -209,8 +206,8 @@ type Written struct {
 // that reach. A loop longer than the ring is replayed at its exact rows by
 // DTX's reader.
 //
-// The file is version 10 where the table has Mapped columns, with the
-// transformations after the name, and version 9 otherwise.
+// A table with Mapped columns produces version 10, with transformation
+// tables after the name. Identity-only tables produce version 9.
 func Write(columns Columns, sources *Sources, frameRate, unit, ring int,
 	said *report.Report) (Written, error) {
 	return WriteNamed(columns, sources, frameRate, unit, ring, Plain(), said, "")
@@ -452,10 +449,9 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 		Plain: plain}, nil
 }
 
-// transformationBlock is the transformation index and the transformations
-// after it, as a version 10 file has them from the index's first byte: T,
-// a word, then T longs, each where its transformation begins from that
-// byte, then each transformation on a long, E, a word, and its E entries.
+// transformationBlock encodes from offset 0: word T, then T long
+// offsets relative to the block. Each aligned table has a word E
+// followed by E byte entries (SPEC.md 3.4).
 func transformationBlock(tables [][]byte) []byte {
 	at := make([]int, len(tables))
 	here := Align(2 + 4*len(tables))
@@ -704,10 +700,9 @@ func GetLong(b []byte, at int) int {
 	return GetWord(b, at)<<16 | GetWord(b, at+2)
 }
 
-// File is a tune file read back: its header fields, its DTX3 table as the
-// bytes in the file and as the table unpacked out of them, its sources,
-// and the entries of its transformations, none below version 10. What a
-// reader reports (R2.4).
+// File contains decoded metadata, packed and unpacked DTX3 table,
+// sources and optional transformation entries. Versions below 10 have
+// an empty transformation list (SPEC.md 3.3, 3.4).
 type File struct {
 	Version         int
 	FrameRate       int
@@ -819,13 +814,11 @@ func Read(file []byte) (File, error) {
 		Counted: counted, Transformations: transformations}, nil
 }
 
-// readTransformations is the transformations of a file of that version
-// and effects used (SPEC.md 3.4), none below version 10, read in the order
-// of SPEC.md 3.3.4: bit 5 of the effects used against the version, the
-// header's long at 16, the index's place and its T, then each
-// transformation's place and its E, in ascending n. Each offset is read
-// unsigned, and against the file's length before a byte is read through
-// it.
+// readTransformations checks the version and effects flag, then reads
+// version 10 transformations in validation order: header offset, index
+// bounds and count, then each table's bounds and entry count in number
+// order (SPEC.md 3.3.4). Offsets are unsigned and checked before
+// reading entries. Earlier versions return an empty list.
 func readTransformations(file []byte, version, effects int) ([][]byte, error) {
 	// SPEC.md 3.3: bit 5 of the effects used is 1 in version 10 and 0 in
 	// every other, so a reader of the bit and a reader of the version read

@@ -76,9 +76,11 @@ final class Sndh {
      *  effects byte sets bit 4 requires (SPEC.md 3.3). */
     static final int CORE_DEFER = 8;
 
-    /** The core's flag bit 4: the lookup assembled in (the player's
-     *  YMXR_MAP=1), which a tune whose effects byte sets bit 5 requires
-     *  (SPEC.md 1.10, 3.3). The core reads bound tunes to version 10. */
+    /**
+     * core flag bit 4, transformation support (YMXR_MAP=1). Effects
+     * byte bit 5 requires this core, which reads bound versions 7 to 10
+     * (SPEC.md 1.10, 3.3).
+     */
     static final int CORE_MAP = 16;
 
     /** What a displacement reaches, the bytes from the core's first byte
@@ -150,19 +152,14 @@ final class Sndh {
     }
 
     /**
-     * The file, from the tune files as subtunes 1 up, around the core the
-     * options' three switches and the tunes select: the raster monitor in
-     * where they ask to read the run, the lean tick where the options
-     * select it, ticks that read a row through the program counter where
-     * they select that, the core of any two or three where they select
-     * them, and the plain core where none. The deferred start is in the
-     * core where a subtune defers a start, and the lookup where a subtune
-     * maps a value.
+     * Builds an SNDH file from tune files in subtune order. Options
+     * select raster monitoring, lean ticks and source addressing. Any
+     * subtune with deferred starts enables that support; any subtune
+     * using a transformation enables lookups.
      *
-     * @throws IllegalArgumentException where a tune file is not one this
-     *     reads, the bound tunes are not of the version the core reads,
-     *     two tunes' rates differ, or there are more tunes than '##'
-     *     numbers
+     * @throws IllegalArgumentException for unreadable tune files,
+     * incompatible core versions, differing frame rates or too many
+     * subtunes for the '##' tag
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
         return build(null, tuneFiles, options);
@@ -271,12 +268,13 @@ final class Sndh {
         return combine(core, set, tags, workspace);
     }
 
-    /** Where the last bound tune of a file on this core ends, counted from
-     *  the core's first byte plus its field at 26 (BINARIES.md 2.1, 3.1):
-     *  a displacement is read against the handlers, which begin there, so
-     *  the bytes of the core from there are the margin it spends. The
-     *  field is 0 in a core without the lookup, whose count is from its
-     *  first byte. */
+    /**
+     * The last bound tune's end relative to the first handler, at the
+     * core's field 26 (BINARIES.md 2.1, 3.1). Program-counter
+     * displacements are measured from there. Cores without lookups have
+     * field 26 set to 0, so their reach is measured from the core's
+     * first byte.
+     */
     static int tunesEnd(byte[] core, Bound.Set set, byte[] tags) {
         int at = even(core.length) + 2 + 4 * set.tunes().size();
         int end = at;
@@ -300,19 +298,13 @@ final class Sndh {
     }
 
     /**
-     * The core's descriptor checked against what this writes, and its flags
-     * against the switches requested: the flags word records whether the
-     * raster
-     * monitor is in and whether the ticks are the lean ones, and the file
-     * the core was read from does not.
+     * Checks the core descriptor, supported bound version and required
+     * switches. Descriptor flags determine capabilities, independently
+     * of the filename.
      *
-     * @throws IllegalArgumentException where the core is not one, is of
-     *     another descriptor version, reads bound tunes below the version
-     *     {@code binds} names, has no raster monitor in
-     *     where {@code monitor} selects one, its ticks are not the
-     *     lean ones where {@code lean} does, it has no deferred start
-     *     in where {@code defers}, or it has no lookup in where
-     *     {@code maps}
+     * @throws IllegalArgumentException for an invalid descriptor,
+     * unsupported bound version or missing raster, lean-tick,
+     * deferred-start or lookup support requested by the arguments
      */
     static void checkCore(byte[] core, boolean monitor, boolean lean, int binds) {
         checkCore(core, monitor, lean, false, binds);
@@ -500,14 +492,12 @@ final class Sndh {
     }
 
     /**
-     * The same, of a set whose tunes share their images: the bound tunes
-     * are behind the subtune table, the images behind them, and the
-     * transformation blocks of the subtunes of version 10 behind those.
-     * Every bound tune's {@code IMAGE_AT} is patched to reach the image
-     * with its table in it, and the {@code TRANSFORMATIONS_AT} of each of
-     * version 10 to reach its block, from its first byte. A tune whose set
-     * has no image is packaged with one and with its block, as a bound
-     * tune written by itself is.
+     * Combines a set with shared images: bound tunes follow the subtune
+     * table, images follow the tunes, and version 10 transformation
+     * blocks follow the images. Patch each tune's {@code IMAGE_AT} and,
+     * in version 10, {@code TRANSFORMATIONS_AT} relative to that tune.
+     * A tune without a shared image is packaged separately with its
+     * image and block.
      */
     static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace) {
         List<byte[]> tunes = set.tunes();
@@ -537,9 +527,10 @@ final class Sndh {
             imageAt[i] = at;
             at += set.images().get(i).length;
         }
-        // Then the transformation blocks, each on a long, in subtune
-        // order: a frame reads them and a tick does not, so they are past
-        // the reach the subtunes are within (BINARIES.md 3.1).
+        // Transformation blocks follow the images, aligned to four
+        // bytes, in subtune order. Frames read these tables; ticks use
+        // prepared lookup pages, so the blocks need not fit the
+        // source-read displacement (BINARIES.md 3.1).
         int[] blockAt = new int[n];
         for (int i = 0; i < n; i++) {
             byte[] block = set.blocks().get(i);

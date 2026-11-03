@@ -10,25 +10,19 @@ import (
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
-// The frame procedure of SPEC.md section 4, as a model: what the fourteen
-// registers are after each row, and what each effect runs. A reader in the
-// sense of R2.4, writing to no chip.
+// The frame model of SPEC.md 4 records registers and effects after each
+// row, without chip writes. Unset registers are -1, as are registers
+// used by an effect from the frame after its start. Ticks, source
+// places and pending starts are outside the model.
 //
-// A register the model has not seen set is -1, and so is a register an
-// effect runs on, from the row after the one that starts it. The effects'
-// ticks are not modelled: a running effect's source, target and rate are
-// what the rows gave, and its place is not followed.
+// Written records the current row's register writes, with -1 for
+// omitted registers.
 //
-// What the last step wrote is beside the state: Written reports each
-// register's value where the row wrote it and -1 where not, and each
-// effect reports whether the row set it and which control bits the row
-// set.
-
-// Effect records one effect's run after a row: source 0 where it runs no
-// source. Set is true where the row set one of its columns, Timer that the
-// row's control column had bit 6, Place bit 5 and Deferred bit 3. Mapping
-// is the kept mapping, the number the last start or remap set the mapping
-// column to, 0 the identity and at the first frame (SPEC.md 1.10.3).
+// Effect records one effect after a frame: Source 0 means idle. Set
+// marks an effect-column write; Timer, Place and Deferred record
+// control bits 6, 5 and 3. Mapping is the kept mapping, initially 0 for
+// identity. A deferred start can run through a different captured
+// mapping (SPEC.md 1.10.3, 7.3).
 type Effect struct {
 	Target   int
 	Source   int
@@ -120,10 +114,9 @@ func (m *Replay) Step() {
 			place = r[t+2]&0x20 != 0
 			deferred = r[t+2]&ymxr.Deferred != 0
 		}
-		// A start or a remap that sets the mapping column sets the kept
-		// mapping, and a remap leaves the source as it is. A stop reads the
-		// source column alone, so a stop that sets the mapping column is a
-		// line of the check (SPEC.md 1.10, 6.4).
+		// A start or remap can replace the kept mapping. A remap preserves
+		// the source. A stop ignores its mapping column; the check reports
+		// that invalid combination (SPEC.md 1.10, 6.4).
 		mapping := was.Mapping
 		mapped := columns == ymxr.Mapped && r[ymxr.MappingColumn+i]&0x80 != 0
 		if mapped && r[t+1] != 0x80 {

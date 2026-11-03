@@ -14,10 +14,10 @@ import org.dtx.St4;
 import org.dtx.Table;
 
 /**
- * A tune file (SPEC.md 3.3): a tune's fixed values, the tune's table as a
- * DTX3 file, and one DTX1 table a source. The file contains the
- * tune's tables and no code; a tool binds them with DTX's reader into what
- * the player reads (doc/BINARIES.md, {@link Bound}).
+ * A tune file: metadata, DTX3 tune table and DTX1 sources (SPEC.md 3.3).
+ * Version 10 adds optional transformation tables; identity-only tunes use
+ * version 9. Files contain data alone; {@link Bound} adds DTX's reader
+ * for playback (doc/BINARIES.md).
  *
  * <pre>
  *  offset  bytes  what it is
@@ -50,17 +50,16 @@ final class Tune {
 
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
 
-    /** The highest version a reader reads, and the one a writer writes
-     *  where a row maps a value (SPEC.md 3.3.5): the table has the four
-     *  mapping columns, and the long at 16 is the transformation index's
-     *  offset. */
+    /**
+     * The highest supported version, written when a row selects a
+     * transformation. Its table has four mapping columns, and header
+     * offset 16 points to the transformation index (SPEC.md 3.3.5).
+     */
     static final int VERSION = 0x000A;
 
-    /** The version a writer writes where no row maps a value (SPEC.md
-     *  3.3.5): its table is DTX3, which a player of an earlier version
-     *  reads wrongly, bit 3 of a control column marks a deferred start,
-     *  and the place of one with bit 5 at 0 continues the count of the
-     *  rows (4.8). */
+    /** Writer version for identity-only tunes: thirty DTX3 columns without
+     *  a transformation index. Deferred starts remain available (SPEC.md
+     *  3.3.5). */
     static final int UNMAPPED = 0x0009;
 
     /** The first version with a deferred start: a file of version 8 reads
@@ -92,9 +91,10 @@ final class Tune {
         return version == VERSION ? Columns.MAPPED : Columns.C;
     }
 
-    /** Where the source index begins in a file of that version: at 16, and
-     *  at 20 in version 10, after the transformation index's offset
-     *  (SPEC.md 3.3). */
+    /**
+     * Source-index offset: 16 in versions 7 to 9; 20 in version 10,
+     * after the transformation-index pointer (SPEC.md 3.3).
+     */
     static int indexAt(int version) {
         return version == VERSION ? TRANSFORMATIONS_AT + 4 : INDEX_AT;
     }
@@ -124,8 +124,10 @@ final class Tune {
      *  their header. */
     static final int INDEX_AT = 16;
 
-    /** Where the long is in version 10 that is the transformation index's
-     *  offset (SPEC.md 3.3). */
+    /**
+     * Offset of the version 10 transformation-index pointer (SPEC.md
+     * 3.3).
+     */
     static final int TRANSFORMATIONS_AT = 16;
 
     /** The most bytes a name reaches, its zero aside. A longer one is cut
@@ -334,9 +336,9 @@ final class Tune {
         int after = index + 4 * tables.length;
         int nameAt = named.length == 0 ? 0 : after;
         int here = align(after + named.length);
-        // Version 10: the transformation index and the transformations
-        // after the name, before the DTX3 table, so that table ends where
-        // source 1 begins as in version 9 (SPEC.md 3.4).
+        // Place version 10 transformations after the name and before
+        // the DTX3 table. The table then ends at source 1, as in
+        // version 9 (SPEC.md 3.4).
         byte[] block = version == VERSION ? transformations(columns.transformations) : new byte[0];
         int blockAt = here;
         here = align(here + block.length);
@@ -372,11 +374,12 @@ final class Tune {
                 tables.length, sourceRows, sourceBytes, plain);
     }
 
-    /** The transformation index and the transformations (SPEC.md 3.4): a
-     *  word T and T longs, each where transformation n begins counted
-     *  from the index's first byte, then each transformation on a long, a
-     *  word E and its E entries. The index begins on a long, so the block
-     *  is laid out from 0. */
+    /**
+     * Encodes a transformation block from offset 0: word T, then T long
+     * offsets relative to the block. Each aligned table has a word E
+     * followed by E byte entries. The block itself starts on a
+     * four-byte boundary (SPEC.md 3.4).
+     */
     static byte[] transformations(List<byte[]> tables) {
         int here = align(2 + 4 * tables.size());
         int[] at = new int[tables.size()];
@@ -431,11 +434,11 @@ final class Tune {
         return rings;
     }
 
-    /** The tune file with `table` in place of its DTX3 table, every other
-     *  part as it is: the source tables after it move by what the table's
-     *  length moves them, and the index records where each now begins
-     *  (SPEC.md 3.3). The transformation index and the transformations
-     *  are before the DTX3 table, where they were. */
+    /**
+     * Replaces the DTX3 table, moves following sources by the size
+     * difference and updates their index offsets. Earlier
+     * transformation tables remain unchanged (SPEC.md 3.3).
+     */
     static byte[] withTable(byte[] file, byte[] table) {
         int tableAt = getLong(file, TABLE_AT);
         int count = file[COUNT_AT] & 0xFF;
@@ -607,9 +610,10 @@ final class Tune {
                 Report.count(written.file().length, "byte", "bytes")));
     }
 
-    /** What a column is, for a reported row: a register by its number, an
-     *  effect column by its effect and its part of it, and a mapping column
-     *  by its effect. */
+    /**
+     * Column label for a report: register number, effect and part, or
+     * effect mapping.
+     */
     static String name(int c) {
         if (c < Columns.EFFECT) {
             return "R" + c;

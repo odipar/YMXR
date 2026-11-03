@@ -218,14 +218,11 @@ func min(a, b int) int {
 	return b
 }
 
-// Places lists the starts of a tune file that name a source past the file's,
-// a line each, the rows of that source being unknown. A start that leaves
-// bit 5 of the control column at 0 leaves the place at its number modulo
-// the row count of the source it starts (SPEC.md 1.8.4), so every other
-// start reads a row of its source. In version 10, beside each, a row whose
-// mapping column numbers a transformation past the file's, and a stop that
-// sets the mapping column, which a player leaves unread (SPEC.md 1.10,
-// 6.4).
+// Places reports source numbers above the file's source count,
+// transformation numbers above its transformation count, and stops with
+// a set mapping column (SPEC.md 6.4). A stop ignores that column.
+// Starts without place reset use their current row number modulo the
+// source length (1.8.4).
 func Places(file ymxr.File) []string {
 	var lines []string
 	mapped := file.Table.Columns() == ymxr.Mapped

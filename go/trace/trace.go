@@ -20,9 +20,8 @@ func Calls(table *dtx.Table) int {
 	return rows + 1
 }
 
-// Header is the record's first line: the tune's fixed values, and in
-// version 10 the entries of each transformation after the sources
-// (SPEC.md 7.2).
+// Header writes the record's header, including transformation entries
+// after sources in version 10 (SPEC.md 7.2).
 func Header(tune ymxr.File) string {
 	var line bytes.Buffer
 	fmt.Fprintf(&line, "{\"rate\":%d,\"effects\":%d,\"sources\":[", tune.FrameRate,
@@ -65,9 +64,10 @@ func Header(tune ymxr.File) string {
 	return line.String()
 }
 
-// Trace is the record: the first line, then that many entries of the tune,
-// one a line; a frame reporting -1 ends it. An effect of a version 10
-// record reports its kept mapping (SPEC.md 7.3).
+// Trace writes the header and up to calls frame entries, one per line.
+// A frame reporting -1 ends the record. Version 10 effect entries
+// report the kept mapping; ticks and pending-start mappings are outside
+// the record (SPEC.md 7.3).
 func Trace(tune ymxr.File, calls int) []byte {
 	var out bytes.Buffer
 	out.WriteString(Header(tune))

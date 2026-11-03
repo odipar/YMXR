@@ -14,6 +14,10 @@ The record is `SPEC.md` 7's, which reports the columns of a tune file;
 `YMXS-SPEC.md` 7 defines the record of a separate reader, of the
 structure, and is outside this task.
 
+Transformation lookups are optional. For version 10, read table entries
+in the header record and track each effect's kept mapping. Ticks and
+pending-start snapshots are outside this reader's record (SPEC.md 7).
+
 **2. What to produce.** `decode.py` in this directory, run as
 
     python3 decode.py <file.ymxr> <file.rows> <lines>
