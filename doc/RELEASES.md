@@ -10,7 +10,7 @@ below it.
 
 - one zip a platform, over six: Windows, macOS and Linux, each on x64 and
   arm64. A zip contains the twelve tools as executables, and each
-  executable contains the seventeen 68000 binaries of BINARIES.md and
+  executable contains the thirty-three 68000 binaries of BINARIES.md and
   DTX's forty images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed
 - one zip of the twelve tools and YMXS's `ymxs-check` as one
@@ -22,7 +22,7 @@ below it.
 The version names every file. It is read out of `pom.xml`, or is
 the script's one argument.
 
-The seventeen binaries are assembled from `68k/` by rmac on the machine
+The thirty-three binaries are assembled from `68k/` by rmac on the machine
 that cuts the release, so the caller's machine has an assembler to install
 or not as it pleases. They are committed under `go/binaries/data`: a Go
 module fetched by its import path contains the files a commit has in it,
@@ -30,11 +30,79 @@ and an executable built from one embeds these. `BinariesTest` reads them
 against the assembly the build makes, so one that does not match what rmac
 writes today fails the build.
 
-A player pins a version of this format: a tune file is 9 (SPEC.md 3.3.5)
-and a bound tune the version of the tune file bound (BINARIES.md 1), and
-a release's number names the tools rather than either.
+A player pins a version of this format: a tune file is 9, or 10 where a
+row maps a value (SPEC.md 3.3.5), and a bound tune the version of the
+tune file bound (BINARIES.md 1), and a release's number names the tools
+rather than either.
 
 ## Published
+
+### 0.8.0, 2026-11-03
+
+<https://github.com/odipar/YMXR/releases/tag/v0.8.0>, built from the commit
+tagged `v0.8.0`.
+
+A tune file is version 10 where a row maps a value, and encodes version 7
+of YMXS's structure (YMXS 0.7.0): an effect maps the key of each row of
+its source through a transformation, a table of entries its mapping column
+numbers, and the player writes the entry to the chip. A tune that maps no
+value is version 9, as under 0.7.0. A reader reads 10, 9, 8 and 7, a
+player with the lookup in the four, and a player without it 9, 8 and 7.
+Over the eleven dumps under `ym/test`, `ym-to-ymxr` writes 0.7.0's tune
+files, 11 of 11; `ym-to-ymxs` writes 0.7.0's structures but for version 7,
+an empty list of transformations and a mapping column a timer, 11 of 11;
+and the SNDH files come to 227,232 bytes, 24 a file fewer than under
+0.7.0, the core's.
+
+- **The tune file** (SPEC.md 1.10, 3.4): 34 columns, column 30 + i the
+  mapping of effect i, bit 5 of the effects used, and the transformation
+  index at the long at 16, the source index at 20. `ymxs-to-ymxr` writes
+  version 10 where a row maps a value, and `ymxr-trace` records the
+  mapping of each effect a frame.
+- **The bound tune** (BINARIES.md 1): version 10 has the transformation
+  block at the long at 24 and the source index at 28, and in an SNDH file
+  the blocks follow the images.
+- **The cores.** Thirty-two, one for each setting of five switches: the
+  sixteen with the lookup in, `-map`, are 18,826 to 36,604 bytes. A tick
+  of a source through a transformation writes its key into the low byte
+  of the displacement of the read that follows, whose high byte selects
+  one of two pages of 256 bytes, and that read writes the entry, a key
+  write more than the tick of the identity. A file is on a core with the
+  lookup in where a subtune maps a value, and the reach of a read through
+  the program counter is measured from the core's first byte plus its
+  field at 26, the offset of its first handler.
+- **A deferred start and a mapping.** Init of every core reports -1 for
+  a tune that defers a start and maps a value, and `ymxr-sndh`,
+  `ymxs-to-sndh` and `ymxs-to-prg` report such a subtune, exit 1
+  (BINARIES.md 3.3). A set where one subtune defers a start and another
+  maps a value is on the core with both.
+- **The patched read under Hatari.** `68k/test/st/results/XPATCH.TXT`
+  has two runs of the real-ST program under Hatari 2.6.1, TOS 2.06, in
+  place of a run on a real ST: cases A and I, the forms of the cores,
+  read the new displacement in each of 50,000 iterations at levels 3 to 7.
+- **Defects of 0.7.0, fixed.** The repeat row kept the select, the count
+  and the counting flag of the first pass. `ymxr-bind` reported the bytes
+  of the image and of the source tables wrong, the image at -140 bytes on
+  four-timers, and `ymxr-layout` read bit 31 of a counted source's index
+  entry into its offset. A start of a source of several columns read the
+  running row before its window at level 7, so a tick between the two
+  started the new source a row behind; and a start on the general handler
+  aimed the vector after its window, so a tick due inside it ran the
+  handler before the start.
+- **The cores without the lookup** are 24 bytes smaller, 18 with the
+  deferred start in: `YMXR_sndh.bin` 9,076 bytes and the deferred one
+  4,408 bytes over it. Their play call counts what it counted.
+- **The rig** plays the mapped tunes on the cores with the lookup in
+  against its model and against `ymxr-trace`'s record a frame at a time,
+  and `-onlyNAMES` runs the checks it names alone.
+- **The tools** contain the thirty-three binaries, and `ymxr.wasm` is
+  5,742,642 bytes, 505,588 more than 0.7.0's source builds with the same
+  Go.
+- **The kits.** The conformance kit gains `mapped.ymxr`, version 10: 17
+  tunes and 18,945 entries; `wrong-version` is $000B. The binaries kit is
+  0.7.0's.
+
+Checks: `bin/suite` green, 306 tests and 0 skipped.
 
 ### 0.7.0, 2026-10-30
 
