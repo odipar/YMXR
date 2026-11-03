@@ -150,6 +150,10 @@ type Options struct {
 	Asked    Asked
 }
 
+// both is bits 4 and 5 of the effects used: a start deferred and a value
+// mapped, which no core plays together (BINARIES.md 1.5).
+const both = ymxr.Defers | ymxr.Maps
+
 // Of is the file, from the tune files as subtunes 1 up, around the core
 // the options' three switches and the tunes select: the raster monitor in
 // where they ask to read the run, the lean tick where the options select
@@ -198,6 +202,13 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		} else if tune.FrameRate != rate {
 			return nil, fmt.Errorf("subtune %d plays at %d Hz and subtune 1 at %d: an"+
 				" SNDH file records one rate", i+1, tune.FrameRate, rate)
+		}
+		// init of a core without the deferred start reports -1 for a tune
+		// with bit 4, of one without the lookup for bit 5, and of one with
+		// both for the two together (BINARIES.md 1.5)
+		if tune.Effects&both == both {
+			return nil, fmt.Errorf("subtune %d defers a start and maps a value, and"+
+				" init of every core reports -1 for such a tune", i+1)
 		}
 		if tune.Table.Repeat() >= tune.Table.Rows() {
 			frames[i] = tune.Table.Rows()

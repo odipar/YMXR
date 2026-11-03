@@ -213,6 +213,13 @@ final class Sndh {
                         + tune.frameRate() + " Hz and subtune 1 at " + rate + ": an SNDH file"
                         + " records one rate");
             }
+            // init of a core without the deferred start reports -1 for a
+            // tune with bit 4, of one without the lookup for bit 5, and of
+            // one with both for the two together (BINARIES.md 1.5)
+            if ((tune.effects() & BOTH) == BOTH) {
+                throw new IllegalArgumentException("subtune " + (i + 1) + " defers a start and"
+                        + " maps a value, and init of every core reports -1 for such a tune");
+            }
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
@@ -367,6 +374,10 @@ final class Sndh {
                     + flags + ", and a subtune that maps a value needs bit 4 set");
         }
     }
+
+    /** Bits 4 and 5 of the effects used: a start deferred and a value
+     *  mapped, which no core plays together (BINARIES.md 1.5). */
+    static final int BOTH = Columns.DEFERS | Columns.MAPS;
 
     /** The timers a tune's effects claim, a bit a timer, A to D. */
     static int claims(int effects) {

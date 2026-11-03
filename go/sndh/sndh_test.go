@@ -3,6 +3,7 @@ package sndh_test
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -202,6 +203,22 @@ func TestASetThatMapsAValueIsOnTheCoreWithTheLookupIn(t *testing.T) {
 	}
 	if flags := flagsOf(file); flags != 4 {
 		t.Fatalf("the core under a set of version 9 reads flags %d", flags)
+	}
+}
+
+// The kit's mapped tune defers a start and maps a value, which init of
+// every core reports -1 for (BINARIES.md 1.5).
+func TestASubtuneThatDefersAndMapsIsReported(t *testing.T) {
+	both, err := os.ReadFile("../../doc/conformance/tunes/mapped.ymxr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := "subtune 1 defers a start and maps a value, and init of every core reports" +
+		" -1 for such a tune"
+	if _, err := sndh.Of([][]byte{both}, sndh.Options{Title: "both"}); err == nil ||
+		err.Error() != line {
+		t.Fatalf("an SNDH file of the kit's mapped tune reads %v, and the line is %q", err,
+			line)
 	}
 }
 
