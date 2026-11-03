@@ -545,14 +545,15 @@ q\{ct}:         bra.w   \{tick}_done
 ; source's row to the new target, and one between the place and the loop
 ; cell reads the new place against the cell the old source left
 \{tick}_aim:    lea     \tick(pc),a5
-; The three behind level 7, so a tick reads none of them half made. The
-; window is three writes wide and costs no measurable jitter: the ticks
-; of a tune running one effect keep their period to 0.31 per cent with
-; it and to 0.31 without, where the reference player's keep 0.33. The
-; place the row does not reset is read in the window too, since a tick
-; between the read and the write steps it (1.9). Under YMXR_PCREL the
-; arithmetic that turns a row's address into a displacement is in the
-; window as well, a dozen instructions more.
+; The three behind level 7, so a tick reads none of them half made, and
+; the vector's write with them, so a tick due in the window runs the new
+; handler. With the window three writes wide, the ticks of a tune running
+; one effect kept their period to 0.31 per cent with it and to 0.31
+; without, where the reference player's keep 0.33; the vector's write
+; adds 16 cycles to it. The place the row does not reset is read in the
+; window too, since a tick between the read and the write steps it (1.9).
+; Under YMXR_PCREL the arithmetic that turns a row's address into a
+; displacement is in the window as well, a dozen instructions more.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  \fx+FX_TARGET(a0),TICK_SEL(a5)
@@ -609,9 +610,9 @@ q\{ct}:         bra.w   \{tick}_done
                 move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 .endif
-                move.w  (sp)+,sr
+                move.l  a5,\vector.w            ; a tick due in the window
+                move.w  (sp)+,sr                ; runs the new handler
                 move.l  a4,\fx+FX_FIRST(a0)
-                move.l  a5,\vector.w
                 clr.b   \fx+FX_SHAPE(a0)
 ; the start placed the source, so the row's place reset is made: a tick
 ; before the select steps the place on, and the reset below would undo it
