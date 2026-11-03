@@ -522,15 +522,18 @@ final class BinariesTest {
         assertEquals(32769, Sndh.seconds(Integer.MAX_VALUE, 65535));
     }
 
-    /** The kit's mapped tune defers a start and maps a value, which init of
-     *  every core reports -1 for (BINARIES.md 1.5). */
+    /** The kit's mapped tune defers a start and maps a value, so the file
+     *  is on the core with the deferred start and the lookup in
+     *  (BINARIES.md 2.1). */
     @Test
-    void aSubtuneThatDefersAndMapsIsRejected() throws IOException {
-        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(List.of(tune("mapped")),
-                        new Sndh.Options("Both", null, null, false, false)));
-        assertEquals("subtune 1 defers a start and maps a value, and init of every core"
-                + " reports -1 for such a tune", wrong.getMessage());
+    void aSubtuneThatDefersAndMapsIsOnTheCoreWithBoth() throws IOException {
+        List<byte[]> both = List.of(tune("mapped"));
+        int switches = Columns.DEFERS | Columns.MAPS;
+        assertEquals(switches, both.get(0)[Tune.EFFECTS_AT] & switches);
+        byte[] sndh = Sndh.of(both, new Sndh.Options("Both", null, null, false, false));
+        assertEquals(Sndh.CORE_PCREL | Sndh.CORE_DEFER | Sndh.CORE_MAP,
+                Tune.getWord(sndh, Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT));
+        assertCombined(Binaries.core(false, false, true, true, true), sndh, both, tags(sndh));
     }
 
     @Test

@@ -162,9 +162,7 @@ the images and the blocks and patches the fields.
 2. The field at 16 and the field at 8; where bit 4 of the field at 8 is
    set and the player is assembled without the deferred start (2.1),
    report -1 and stop. In a player assembled with the lookup, where bit 5
-   is set and the version is other than $000A, or bits 4 and 5 are set and
-   the player is assembled with the deferred start too, report -1 and
-   stop.
+   is set and the version is other than $000A, report -1 and stop.
 3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
@@ -212,10 +210,7 @@ sixteen's plus 16: `YMXR_sndh-map.bin` reads 20, and
 version 10 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
 bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,750 bytes larger than
-`YMXR_sndh.bin`. Init of a core with both the deferred start and the
-lookup in reports -1 for a tune whose effects byte sets bits 4 and 5, so
-every core does, and a tool that writes an SNDH file reports such a
-subtune (3.3). The field at 26 of a core with the lookup in is the
+`YMXR_sndh.bin`. The field at 26 of a core with the lookup in is the
 offset of its first handler: every byte from there to the core's end is
 a handler, an installer or padding. The padding puts the displacement
 word of each lookup handler's page read a multiple of 256 bytes from its
@@ -416,7 +411,7 @@ unread.
 2. Report the first condition met of the table's first three rows.
 3. For subtune i from 1 to `N`: read tune file i as SPEC.md 3.3 defines,
    an error reported as `subtune i: ` and that reader's line; then
-   report the table's fourth, fifth or sixth condition where it is met.
+   report the table's fourth or fifth condition where it is met.
 4. Bind the set (1.4).
 5. Write the tag block (3.2), its clock tag `!V` where the claims byte of
    the set has Timer C, whose handler is then the player's, or where the
@@ -433,7 +428,6 @@ unread.
 | N names for M tune files, N other than M | `N names for M subtunes` |
 | subtune 1 is at 0 Hz | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | subtune i, i above 1, is at H Hz and subtune 1 at R, H other than R | `subtune i plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
-| the effects byte of subtune i sets bits 4 and 5, which init of every core reports -1 for (1.5) | `subtune i defers a start and maps a value, and init of every core reports -1 for such a tune` |
 | H - 2 is above 32,767, the tag block being B bytes | `the tag block is B bytes, and a bra.w reaches 32767` |
 
 ---

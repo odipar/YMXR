@@ -221,8 +221,8 @@ final class ParityTest {
      * structure through {@code ymxs-to-ymxr} in both trees is the kit's
      * file byte for byte, and the record of both trees is the reference
      * MANIFEST.txt lists. The tune defers a start and maps a value, so
-     * {@code ymxr-sndh} and {@code ymxs-to-sndh} exit 1 in both trees with
-     * the line of BINARIES.md 3.3.
+     * {@code ymxr-sndh} and {@code ymxs-to-sndh} put it in both trees on the
+     * core with the deferred start and the lookup in (BINARIES.md 2.1).
      */
     @Test
     void theKitsMappedTuneConvertsAndReadsTheSameInBothTrees() throws Exception {
@@ -234,12 +234,10 @@ final class ParityTest {
         String line = ConformanceTest.sha256(record) + "  " + record.length + "  mapped.jsonl\n";
         assertTrue(Files.readString(ConformanceTest.KIT.resolve("MANIFEST.txt")).contains(line),
                 "the record of mapped.ymxr is the reference");
-        String reported = "subtune 1 defers a start and maps a value, and init of every core"
-                + " reports -1 for such a tune";
-        for (Ran made : List.of(same("ymxr-sndh", kit),
-                same("ymxs-to-sndh", json(ConformanceTest.mapped())))) {
-            assertEquals(1, made.exit(), made.said());
-            assertTrue(made.said().contains(reported), made.said());
+        for (byte[] sndh : List.of(both("ymxr-sndh", kit),
+                both("ymxs-to-sndh", json(ConformanceTest.mapped())))) {
+            assertEquals(Sndh.CORE_PCREL | Sndh.CORE_DEFER | Sndh.CORE_MAP, Tune.getWord(sndh,
+                    Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
         }
     }
 
@@ -501,13 +499,11 @@ final class ParityTest {
      * line, and each check of the mapping columns the same lines; a multi
      * file of it, and of it and a dump, version 10, its tables packed
      * again with the same report, and read by the record, the check and
-     * the layout as one line or one record. The tune defers a start and
-     * maps a value, so an SNDH file of it or of the set is the line of
-     * BINARIES.md 3.3, exit 1; a set of a tune that defers a start and one
-     * that maps a value is on the core with the deferred start and the
-     * lookup in, also with the raster monitor, whose core ends past 32,767
-     * bytes and whose handlers begin within them (BINARIES.md 2.1), with a
-     * program of each.
+     * the layout as one line or one record; and an SNDH file of it and of
+     * the set on the core with the deferred start and the lookup in, since
+     * the tune defers a start and maps a value, also with the raster
+     * monitor, whose core ends past 32,767 bytes and whose handlers begin
+     * within them (BINARIES.md 2.1), and a program of each.
      */
     @Test
     void aMappedTuneFileReadsTheSameInBothTrees() throws Exception {
@@ -544,22 +540,7 @@ final class ParityTest {
                 "a multi file is neither a dump nor a tune file");
         both("ymxr-layout", multi);
         both("ymxr-bind", mapped);
-        // the tune defers a start and maps a value, which init of every core
-        // reports -1 for, so the file is on the core with the deferred start
-        // and the lookup in where one subtune defers a start and another maps
-        // a value (BINARIES.md 3.3)
-        int subtune = 1;
         for (byte[] in : List.of(mapped, multi)) {
-            Ran refused = same("ymxr-sndh", in);
-            assertEquals(1, refused.exit(), refused.said());
-            assertTrue(refused.said().contains("subtune " + subtune + " defers a start and maps"
-                    + " a value"), refused.said());
-            subtune++;
-        }
-        byte[] apart = multiOf(List.of(Files.readAllBytes(
-                ConformanceTest.TUNES.resolve("deferred.ymxr")),
-                both("ymxs-to-ymxr", json(YmxsTest.fade()), "-silent")));
-        for (byte[] in : List.of(apart)) {
             byte[] sndh = both("ymxr-sndh", in);
             assertEquals(Sndh.CORE_PCREL | Sndh.CORE_DEFER | Sndh.CORE_MAP, Tune.getWord(sndh,
                     Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
