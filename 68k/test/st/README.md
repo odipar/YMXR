@@ -95,9 +95,8 @@ source writes.
    TOS shows an alert on a disk that is write protected: at 6 and 7 the
    keyboard ACIA's interrupt is masked, and a second byte it receives
    then overruns the first.
-4. Press a key; the program returns to the desktop.
-5. Return `XPATCH.TXT` from the folder `XPATCH.PRG` ran from, with the
-   lines of every run in it.
+4. Press a key; the program returns to the desktop. `XPATCH.TXT`, in the
+   folder `XPATCH.PRG` ran from, has the lines of every run.
 
 ## What the counts mean
 
@@ -151,6 +150,6 @@ so E at 3 to 5 and P at 3 read a range.
 `results/XPATCH.TXT` has the lines of two runs of `test_ymxr.py
 -xpatch`, under Hatari 2.6.1 on an ST at 8 MHz, cycle-exact, under TOS
 2.06, the file as the program wrote it, and each case's line of both
-runs reads as the table above. The patched read of the cores with the
-lookup (BINARIES.md 2.1) is checked against Hatari's 68000 alone, since
-the program has yet to run on a real ST.
+runs reads as the table above. These runs are the check of the patched
+read of the cores with the lookup (BINARIES.md 2.1), and a release
+requires no run on a real ST.
