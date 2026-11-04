@@ -215,7 +215,7 @@ Each of the eight has a twin with `-defer` before `.bin`, assembled with
 the deferred start in, `YMXR_DEFER=1`, whose flags word is the eight's
 plus 8: `YMXR_sndh-defer.bin` reads 12. Init of a core without it
 reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
-core with it is 4,408 bytes larger.
+core with it is 4,376 bytes larger.
 
 Each of the sixteen has a twin with `-map` before `.bin`, assembled with
 optional lookup support, `YMXR_MAP=1` (SPEC.md 1.10). Its flags word is
@@ -223,7 +223,7 @@ the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 `YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to
 version 10 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
-bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,230 bytes larger than
+bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,262 bytes larger than
 `YMXR_sndh.bin`. The field at 26 of a core with the lookup in is the
 offset of its first handler: every byte from there to the core's end is
 a handler, an installer or padding. The padding puts the displacement

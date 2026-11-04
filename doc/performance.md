@@ -304,13 +304,13 @@ only where it writes.
 | a row written, the place stepped | 96 |
 | the marker, the place to row `RR` | 114 |
 | the marker, the timer stopped | 124 |
-| a square's two rows, no place stepped | 88 |
-| a source of one row, no place stepped | 64 |
+| a square's two rows, no place stepped | 80 |
+| a source of one row, no place stepped | 56 |
 | a row written, the tune running one effect | 88 |
 | the marker to row `RR`, one effect | 114 |
 | the marker and the stop, one effect | 124 |
-| a square's two rows, one effect | 80 |
-| a source of one row, one effect | 56 |
+| a square's two rows, one effect | 72 |
+| a source of one row, one effect | 48 |
 
 A tick reads its row through the program counter by default; the section
 below measures an absolute address instead.
@@ -319,10 +319,10 @@ With the interrupt's entry and its `rte`, a tick is 160 cycles: 12% of an
 
 A source of two rows repeating to row 0 runs a separate handler
 (68k/player/ticks.S, SQUARE), which encodes both rows as immediates and
-moves between them by their difference: 88 cycles, 152 with the entry and
+moves between them by their difference: 80 cycles, 144 with the entry and
 the `rte`, against the 160 and 178 the two paths of the general handler
 cost. A tune whose effects are all such sources ticks 29.4 times a frame on
-Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 500, 422 and 343
+Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 735, 620 and 505
 cycles a frame come off those tunes, against a play call of 1,995, 1,456
 and 1,551 (the table above).
 
@@ -337,8 +337,8 @@ uses the core assembled with `YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md
 | a row written, the place stepped | 96 | 64 |
 | the marker, the place to row `RR` | 114 | 98 |
 | the marker, the timer stopped | 124 | 108 |
-| a square's two rows, no place stepped | 88 | 56 |
-| a source of one row, no place stepped | 64 | 32 |
+| a square's two rows, no place stepped | 80 | 48 |
+| a source of one row, no place stepped | 56 | 24 |
 
 The level is dropped on the three paths that write a row's value and the end
 of interrupt is written on all five, so those three lose 32 cycles and the
@@ -378,10 +378,10 @@ ticks no longer cost.
 A source of one row repeating runs a separate handler the same way
 (68k/player/ticks.S, ONEROW). A source of one row is the marker alone
 (SPEC.md 3.2) and its place is at row 0, so the handler encodes that row as
-an immediate, writes it, and moves no place: 56 cycles against the 114 the
-general handler's marker path costs, and 64 against 114 where the tune runs
+an immediate, writes it, and moves no place: 48 cycles against the 114 the
+general handler's marker path costs, and 56 against 114 where the tune runs
 more than one effect. The kit's `retune` ticks 7.7 times a frame, a 383 Hz
-buzzer, so 445 cycles a frame come off it against a play call of 1,379.
+buzzer, so 506 cycles a frame come off it against a play call of 1,379.
 `retune` is a built tune: every source the corpus names has another shape,
 83 tunes of it naming any source (experiments.md), so what the handler
 saves is measured on this tune and the conformance kit alone. The target
@@ -450,8 +450,8 @@ absolute address):
 | the marker, the timer stopped | 148 | 132 | 156 |
 | a row written, the tune running one effect | 112 | 88 | 124 |
 | counted, a row written | 140 | 108 | 152 |
-| counted, the end, the place to row `RR` | 202 | 186 | 226 |
-| counted, the end, the timer stopped | 188 | 172 | 204 |
+| counted, the end, the place to row `RR` | 182 | 166 | 198 |
+| counted, the end, the timer stopped | 168 | 152 | 176 |
 | two columns, a row written | 176 | 144 | 200 |
 | two columns, the marker, the places to row `RR` | 206 | 190 | 234 |
 | two columns, the marker, the timer stopped | 184 | 168 | 196 |
@@ -722,9 +722,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,392 bytes, 896 of them the counted shapes' eight
+The player is 8,360 bytes, 896 of them the counted shapes' eight
 instances, four of one column and four of two; where a tick reads an
-absolute address, 8,062 bytes and 952, instances of 138 bytes against the
+absolute address, 8,030 bytes and 952, instances of 138 bytes against the
 marked shape's 122.
 
 ## A tick through an absolute address
@@ -745,13 +745,13 @@ build:
 | a row written, the place stepped | 108 |
 | the marker, the place to row `RR` | 130 |
 | the marker, the timer stopped | 132 |
-| a square's two rows, no place stepped | 88 |
-| a source of one row, no place stepped | 64 |
+| a square's two rows, no place stepped | 80 |
+| a source of one row, no place stepped | 56 |
 | a row written, the tune running one effect | 100 |
 | the marker to row `RR`, one effect | 130 |
 | the marker and the stop, one effect | 132 |
-| a square's two rows, one effect | 80 |
-| a source of one row, one effect | 56 |
+| a square's two rows, one effect | 72 |
+| a source of one row, one effect | 48 |
 
 The lean tick of the table above leaves the same two writes out of these
 paths, the level's drop on the three that write a row's value and the end
@@ -762,8 +762,8 @@ of interrupt on all five:
 | a row written, the place stepped | 108 | 76 |
 | the marker, the place to row `RR` | 130 | 114 |
 | the marker, the timer stopped | 132 | 116 |
-| a square's two rows, no place stepped | 88 | 56 |
-| a source of one row, no place stepped | 64 | 32 |
+| a square's two rows, no place stepped | 80 | 48 |
+| a source of one row, no place stepped | 56 | 24 |
 
 So the player as it is saves 12 cycles a tick that writes a row and
 steps its place, 16 on the loop and 8 on the stop: at a digidrum's 6,000
@@ -792,7 +792,7 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 8,062 bytes against 8,392. Two figures
+assembles this build, which is 8,030 bytes against 8,360. Two figures
 move against each other: a place is a word where it was a long, which
 shortens a timer's handlers by 40 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
@@ -870,13 +870,13 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,800
-bytes against 8,392, and 12,618 against 8,062 where a tick reads an
+The second bank, the installers and the stubs make the player 12,736
+bytes against 8,360, and 12,554 against 8,030 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 17,604 bytes against 8,392,
-and 19,194 against 8,062 where a tick reads an absolute address; with the
-deferred start in as well, 27,710 against 12,800, and 30,824 against
-12,618.
+The lookup in, `YMXR_MAP=1`, makes the player 17,604 bytes against 8,360,
+and 19,194 against 8,030 where a tick reads an absolute address; with the
+deferred start in as well, 27,710 against 12,736, and 30,824 against
+12,554.

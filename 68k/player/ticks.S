@@ -129,7 +129,9 @@
 ; byte is the register's, so bit 7 is a value rather than a marker and
 ; the end of the source is in a counter beside the place. A word
 ; counts the rows left; the subq that steps it leaves Z on the row last,
-; and the loop reloads it with the rows of a pass through the loop. The register, the
+; and the loop reloads it with the rows of a pass through the loop. The
+; place is stepped after that test, so the last row leaves it at R - 1
+; (SPEC.md 5.1 step 5), as the handler above does. The register, the
 ; place, the counter and that reload are the immediates a start patches,
 ; so this handler uses no register either. A source whose column leaves
 ; bit 7 runs the handler above, which reads the marker and costs 20
@@ -144,15 +146,19 @@
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
                 .if     YMXR_PCREL
                 move.b  \{name}_cell(pc),YM_SELECT+2.w ; +8: the place, a
-\{name}_step:   addq.w  #1,($12345678).l        ; displacement under
-                .else                           ; YMXR_PCREL; +2: the place,
-                move.b  ($12345678).l,YM_SELECT+2.w ; stepped
-\{name}_step:   addq.l  #1,($12345678).l
+                .else                           ; displacement under YMXR_PCREL
+                move.b  ($12345678).l,YM_SELECT+2.w
                 .endif
 \{name}_cnt:    subq.w  #1,($12345678).l        ; +2: the rows left
                 beq.s   \{name}_last
                 .if     YMXR_NEST
                 move.w  #$2500,sr
+                .endif
+\{name}_step:
+                .if     YMXR_PCREL
+                addq.w  #1,($12345678).l        ; +2: the place, stepped
+                .else
+                addq.l  #1,($12345678).l
                 .endif
                 COUNT   PERF_ON,PERF_DROP
                 .if     YMXR_AEOI=0
@@ -308,8 +314,8 @@
                 .macro  SQUARE  name,eoi,eoir,colour,inst
 \name:
                 MARK    \colour
-\{name}_sel:    move.b  #8,YM_SELECT.w          ; +3: the target register
-\{name}_val:    move.b  #$0F,YM_SELECT+2.w      ; +3: the row it is at
+\{name}_sel:    move.l  #$08000F00,YM_SELECT.w  ; +2: the target register,
+                                                ; +4: the row it is at
                 .if     YMXR_NEST
                 move.w  #$2500,sr
                 .endif
@@ -324,7 +330,7 @@
 ; word: the row written last ends the source where it is the marker, row
 ; 1, and the installer performs the start; at row 0 the eori below moves
 ; to row 1 as the handler's does (SPEC.md 4.8).
-\{name}_hook:   btst    #7,\{name}_val+3(pc)
+\{name}_hook:   btst    #7,\{name}_sel+4(pc)
                 bne.w   \inst
 \{name}_htog:   eori.b  #$0F,($12345678).l      ; +3 and +4, as the eori above
                 bra.s   \{name}_after
@@ -343,8 +349,8 @@
                 .macro  ONEROW  name,eoi,eoir,colour,inst
 \name:
                 MARK    \colour
-\{name}_sel:    move.b  #8,YM_SELECT.w          ; +3: the target register
-\{name}_val:    move.b  #$0F,YM_SELECT+2.w      ; +3: the source's one row
+\{name}_sel:    move.l  #$08000F00,YM_SELECT.w  ; +2: the target register,
+                                                ; +4: the source's one row
 \{name}_end:
                 .if     YMXR_NEST
                 move.w  #$2500,sr

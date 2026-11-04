@@ -893,6 +893,12 @@ against performance.md. A tune whose RR equals R is played one frame
 past its last row, where the call reports -1 and leaves every register
 as it is. A tune that fails is named and the run continues.
 
+A cycle figure that performance.md or plan.md reads is true where it is
+within 5% of the cycles the rig counts: a change to the player moves a
+path by a few cycles, and the documents follow at the next measure. A
+size, a count of frames, ticks or pages, a word and the text around a
+figure are read exactly.
+
 | mode | reads |
 |---|---|
 | absent | the dumps named, or the eleven under `ym/test` |

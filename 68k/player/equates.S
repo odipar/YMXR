@@ -26,15 +26,15 @@ PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
 ; that write a patched value cost what they cost.
                 .if     YMXR_PCREL
 PERF_ON         equ     64      ; a row written, the place stepped
-PERF_SQ         equ     56      ; a square's two rows, no place stepped
-PERF_ONEROW     equ     32      ; a source of one row, no place stepped
+PERF_SQ         equ     48      ; a square's two rows, no place stepped
+PERF_ONEROW     equ     24      ; a source of one row, no place stepped
 PERF_LOOP       equ     98      ; the marker, the place to row RR
 PERF_STOP       equ     108     ; the marker, the timer stopped
 PERF_SWITCH     equ     150     ; the marker, a pending start performed
                 .else
 PERF_ON         equ     76      ; a row written, the place stepped
-PERF_SQ         equ     56      ; a square's two rows, no place stepped
-PERF_ONEROW     equ     32      ; a source of one row, no place stepped
+PERF_SQ         equ     48      ; a square's two rows, no place stepped
+PERF_ONEROW     equ     24      ; a source of one row, no place stepped
 PERF_LOOP       equ     114     ; the marker, the place to row RR
 PERF_STOP       equ     116     ; the marker, the timer stopped
 PERF_SWITCH     equ     150     ; the marker, a pending start performed
