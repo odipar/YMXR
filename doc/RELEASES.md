@@ -37,6 +37,96 @@ rather than either.
 
 ## Published
 
+### 0.10.0, 2026-11-04
+
+<https://github.com/odipar/YMXR/releases/tag/v0.10.0>, built from the commit
+tagged `v0.10.0`.
+
+A start or a remap through a transformation reads its page byte in a table
+at the frame, and init fills each page a tune maps through once, in an area
+right after the core. A volume's remap between two transformations costs 202
+to 236 cycles, against 1,110 under 0.9.0 where a page of the effect had the
+transformation, and 1,726 to 1,746 where the remap copied its 16 entries. A
+host of a player with the lookup passes the area in `a2` at init. The tune
+file is 0.9.0's, and a bound tune of version 10 lists its pages after its
+transformation block, so its version stays 10. Over the eleven dumps under
+`ym/test`, `ym-to-ymxr` writes 0.9.0's tune files, 11 of 11, `ym-to-ymxs`
+0.9.0's structures, 11 of 11, and the SNDH files come to 227,232 bytes, as
+under 0.9.0.
+
+- **A start and a remap through a transformation** (performance.md). A
+  remap between two transformations runs in each effect's frame code: it
+  tests a byte of the effect's cache and the timer, reads the new
+  transformation's page byte in the table of the source's form, and writes
+  it. A start of a marked source of one column reads its instance and its
+  vector as constants of the effect's frame code, and every other kind reads
+  its descriptor, its instance and its page byte by index from tables. The
+  cache and the addresses of the effect's tables are the last 28 bytes of
+  each effect's record, 56 bytes, and 100 with the deferred start in, so
+  `YMXR_FIXED` is 2,284 with the lookup in and 2,460 with both, 112 more
+  than under 0.9.0.
+- **The pages filled at init** (BINARIES.md 1.5, 5.6). Init fills each page
+  of the bound tune's list once in the page area, after a table of T bytes
+  for each effect and form the list names, byte n - 1 the page of
+  transformation n. A start and a remap at the frame read the page byte of
+  their transformation in one indexed byte of that table. Where the pages
+  pass the reach of the core's first handler, init fills the first k of the
+  list, and each effect of the rest has a fallback in the area, two pages a
+  bank of handlers: a start or a remap whose table has 0 copies the
+  transformation at the frame into the fallback page the handlers do not
+  read.
+- **The bound tune** (BINARIES.md 1.1, SPEC.md 3.4.4). A bound tune of
+  version 10 lists its pages after its transformation block: the tag `YP`, a
+  byte N, and for each page its effect, its form and its transformation, a
+  byte each. The pages are the pairs of a transformation and a form that
+  each effect's starts and remaps map through. A reader of the block through
+  its index reads past the list, so the version stays 10.
+- **The host interface** (BINARIES.md 1.5, 2.2, 5.1). A host of a player
+  with the lookup passes the page area in `a2` at init, even and at or past
+  the player's last byte, or 0 for a tune whose list counts no page. The
+  core's descriptor gains the field at 36, the area's offset, which the
+  tools patch, and the SNDH core passes the area at that offset in `a2`, or
+  0 where the field is 0; the descriptor is bytes 12 to 39 on a core with
+  the lookup. Init reports -1 for a bound tune of version 10 without the
+  list, with an entry out of range, or with a list that counts a page and an
+  area that is odd, below the player's last byte or too near the reach for
+  the fallback, and leaves the area as it was.
+- **The cores.** The sixteen with the lookup are 264 to 2,424 bytes smaller,
+  their pages of 256 bytes moved to the page area: `YMXR_sndh-map.bin` is
+  18,306 bytes, 520 less, `YMXR_sndh-defer-map.bin` 28,412, 2,128 less, and
+  the largest, `YMXR_sndh-perf-abs-defer-map.bin`, 34,758, 2,424 less. The
+  sixteen without the lookup and the program stub are 0.9.0's byte for byte.
+- **The tools** that write an SNDH file reserve the page area right after a
+  core with the lookup, the largest a subtune's list needs within the reach
+  of the core's first handler, and patch the core's field at 36 with its
+  offset; a list whose tables and fallbacks alone end past the reach is the
+  error of BINARIES.md 2.10. `ymxr-layout` reports the field and the area
+  (BINARIES.md 6.4). `ymxr-sndh` writes the kit's `mapped.ymxr` as 40,600
+  bytes, 1,136 more than under 0.9.0: the core is 2,128 bytes smaller, and
+  the page area of its 11 pages adds 3,116 bytes, the workspace 112 and the
+  list 36.
+- **The figures** (performance.md): a remap at the frame, the cost of 34
+  columns and the sizes of the builds with the lookup, measured again and
+  each read back by the rig. The frame that remaps four sources of 256
+  entries to another transformation costs 2,930 cycles, against 14,042 under
+  0.9.0, and the costliest call of the 32 tunes the rig plays through a
+  transformation 8,182, against 17,734. One call passes R4.5's 6,656, where
+  four did, and with the routines of its starts and remaps counted apart
+  every call is within it. Init copies each page once, 308 to 2,228 cycles a
+  page by its entries and form, the copies a start or a remap made at the
+  frame under 0.9.0 where neither of the effect's two pages had the
+  transformation.
+- **The rig** checks the page each lookup instance reads against its place
+  in the area, and `-onlyfallbacks` plays a tune whose pages pass the reach,
+  effects 0 and 1 through their fallback, every tick against the model and
+  every frame against the reader's record. The same check reads init's -1
+  with no area, with an area below the player and without a list.
+- **The tools** contain the thirty-three binaries, and `ymxr.wasm` is
+  5,808,207 bytes, 61,667 more than 0.9.0's source builds with the same Go.
+- **The kits.** The tunes, the files and the records are 0.9.0's.
+
+Checks: `bin/suite` green, 307 tests and 0 skipped.
+
 ### 0.9.0, 2026-11-03
 
 <https://github.com/odipar/YMXR/releases/tag/v0.9.0>, built from the commit

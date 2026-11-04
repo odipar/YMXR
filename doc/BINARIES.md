@@ -230,8 +230,9 @@ a handler, an installer or padding. The padding puts the displacement
 word of each lookup handler's page read on its effect's offset modulo
 256, the same for the eight lookup kinds of an effect, and with the
 deferred start in the second bank of handlers a multiple of 256 bytes
-from the first. The fallback of 5.6 and the frame's routines come before
-the first handler, and the page area after the core's last byte (3.1).
+from the first. The frame's routines come before the first handler, and
+the page area, with the fallbacks of 5.6, after the core's last byte
+(3.1).
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
