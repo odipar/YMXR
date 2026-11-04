@@ -922,6 +922,7 @@ figure are read exactly.
 | `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-map` | every tune on the player assembled with `YMXR_MAP=1`, against the model; without it, a tune whose effects byte sets bit 5 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
+| `-linked` | each tune on the player `ymxr-sndh -link` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. A tune whose effects byte sets bit 4 or bit 5 plays on the player assembled. The run leaves out the checks it makes before the tunes |
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
 program of twelve subtunes, each writing the number it is to R0, starts
@@ -935,11 +936,12 @@ outlives it is killed. `--keep` leaves the work directory, and `HATARI` and
 `TOS` name the emulator and a TOS image as 16.3 reads them; a missing one is
 exit 2, a key that lands on another subtune exit 1.
 
-`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs three things
-on every build: the two built tunes at `-frames24` on each of the
-thirty-two cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map`
-alone and together and the plain core; the conformance kit at `-frames24`
-under `-kit`; and `-refill` over `Turrican 2 - world completed 1` whole,
+`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs four things
+on every build: the two built tunes at `-frames24` on each of the thirty-two
+cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map` alone and
+together and the plain core; the conformance kit at `-frames24` under
+`-kit`; the kit at `-frames24` under `-linked -kit` on the plain core and
+with `-lean`; and `-refill` over `Turrican 2 - world completed 1` whole,
 which reads the tune's row of performance.md and a refill of a tune with a
 source. The workflow runs `-refill` over the eleven fixtures whole as a step
 after the suite, which reads the sentences over the set, and `-cycles -abs`

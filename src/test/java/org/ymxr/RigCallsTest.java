@@ -245,6 +245,26 @@ final class RigCallsTest {
                 () -> RIG + " -kit does not play the kit:\n" + said);
     }
 
+    /** The conformance kit's tunes, each on the player ymxr-sndh -link links
+     *  for it, on the plain core and the lean one: the tool's core against
+     *  the rig's link of the assembled core, and the frames against the
+     *  reader's entries (doc/LINKER.md, The check). The two tunes that need
+     *  the deferred start or the lookup run the core as carried. */
+    @Test
+    void theRigPlaysTheKitOnLinkedPlayers() throws Exception {
+        theRigRuns();
+        for (List<String> core : List.of(List.<String>of(), List.of("-lean"))) {
+            List<String> argv = new ArrayList<>(List.of("-linked", "-kit", FRAMES));
+            argv.addAll(core);
+            String said = rigWith(argv);
+            assertTrue(said.startsWith("0\n")
+                            && said.contains("16 tunes play as the specification reads")
+                            && said.contains("linked, "),
+                    () -> RIG + " " + String.join(" ", argv) + " does not play the kit on"
+                            + " linked players:\n" + said);
+        }
+    }
+
     /** The tune a counted run reads: 182 frames, so the whole tune plays in
      *  seconds, and a source on Timer D, so the bound image has the table of
      *  a source beside the tune's. performance.md has its row. */

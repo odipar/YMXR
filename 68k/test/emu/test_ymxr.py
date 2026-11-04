@@ -6053,12 +6053,15 @@ def main():
                 continue
             playing = (code, symbols)
             if LINKED:
-                playing = linked_player(ym, defines)
-                if playing is None:
-                    print("%-45s the deferred start or the lookup: the core as carried,"
-                          " not linked" % os.path.basename(ym))
-                    continue
-                print("%-45s %s" % (os.path.basename(ym), playing[2]))
+                # a tune that needs the deferred start or the lookup plays on
+                # the player assembled, which check switches it to
+                linked = linked_player(ym, defines)
+                if linked is None:
+                    print("%-45s the deferred start or the lookup: the player as"
+                          " assembled, not linked" % os.path.basename(ym))
+                else:
+                    playing = linked
+                    print("%-45s %s" % (os.path.basename(ym), linked[2]))
             frames, ticks, cost, tick_cost, tick_cycles, where, boundaries, refills_of = \
                 check(ym, playing[0], playing[1], cycles_of and CyclesOn(cycles_of),
                       kit, perf, parts)
