@@ -244,9 +244,12 @@ columns on each and the start of several columns, and links 7,108.
    -link`. Done.
 4. The check: the rig plays the player linked for each fixture against
    the model. Done.
-5. The stages that follow:
-   - each register column that no tune of the song sets a block, its
-     read sites left as they are where the column's bit is clear;
+5. A register's steps as a block, for the registers no tune of a song
+   sets, is left out. A dump writes every register on its first frame,
+   R11 and R12 through bits 6 and 5 of the shape's column, so a song of
+   dumps sets them all, and the test of a register's bit that init needs
+   costs every player more bytes than it saves a song that sets them all.
+6. The stages that follow:
    - the cores with the deferred start, whose second bank mirrors the
      first;
    - the cores with the lookup, whose instances keep their page residue
