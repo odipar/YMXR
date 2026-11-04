@@ -318,13 +318,13 @@ With the interrupt's entry and its `rte`, a tick is 160 cycles: 12% of an
 8 MHz 68000 at a digidrum's 6,000 ticks a second, and 51% at 25,600.
 
 A source of two rows repeating to row 0 runs a separate handler
-(68k/YMXR.S, SQUARE), which encodes both rows as immediates and moves
-between them by their difference: 88 cycles, 152 with the entry and the
-`rte`, against the 160 and 178 the two paths of the general handler cost. A
-tune whose effects are all such sources ticks 29.4 times a frame on Synergy
-Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 500, 422 and 343 cycles a
-frame come off those tunes, against a play call of 1,995, 1,456 and 1,551
-(the table above).
+(68k/player/ticks.S, SQUARE), which encodes both rows as immediates and
+moves between them by their difference: 88 cycles, 152 with the entry and
+the `rte`, against the 160 and 178 the two paths of the general handler
+cost. A tune whose effects are all such sources ticks 29.4 times a frame on
+Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 500, 422 and 343
+cycles a frame come off those tunes, against a play call of 1,995, 1,456
+and 1,551 (the table above).
 
 A tick drops the interrupt level and writes an end of interrupt because the
 MFP runs in software end-of-interrupt mode, as TOS leaves it, and because a
@@ -376,9 +376,9 @@ values and the difference each start patches, against the 343 to 500 its
 ticks no longer cost.
 
 A source of one row repeating runs a separate handler the same way
-(68k/YMXR.S, ONEROW). A source of one row is the marker alone (SPEC.md 3.2)
-and its place is at row 0, so the handler encodes that row as an
-immediate, writes it, and moves no place: 56 cycles against the 114 the
+(68k/player/ticks.S, ONEROW). A source of one row is the marker alone
+(SPEC.md 3.2) and its place is at row 0, so the handler encodes that row as
+an immediate, writes it, and moves no place: 56 cycles against the 114 the
 general handler's marker path costs, and 64 against 114 where the tune runs
 more than one effect. The kit's `retune` ticks 7.7 times a frame, a 383 Hz
 buzzer, so 445 cycles a frame come off it against a play call of 1,379.
@@ -415,11 +415,11 @@ a pending start's, and YMXR_FIXED 2,312 (A deferred start).
 
 `YMXR_MAP=1` enables optional lookup support and version 10 playback
 (BINARIES.md 2.1). Identity uses the ordinary handlers measured in A tick;
-a transformation uses the matching lookup instance (68k/YMXR.S, TICKL
-and TICKWL). A tick writes its source key into the low displacement byte
-of `move.b page(pc),$FFFF8802.w`. The high byte selects a page of 256
-bytes, which init filled in the page area after the core (BINARIES.md
-5.6); the read writes the selected entry.
+a transformation uses the matching lookup instance
+(68k/player/lookup_ticks.S, TICKL and TICKWL). A tick writes its source key
+into the low displacement byte of `move.b page(pc),$FFFF8802.w`. The high
+byte selects a page of 256 bytes, which init filled in the page area after
+the core (BINARIES.md 5.6); the read writes the selected entry.
 
 The general handler's source read and marker test, with and without a
 lookup:
@@ -465,20 +465,20 @@ absolute address):
 Each figure is the tick of the identity's handler of that shape and 24
 cycles, and 28 on the path that loops, whose branch to the general
 handler's halt of the effect is a word where the identity's branch is a
-byte (68k/YMXR.S, TICKL). As it is and lean, the 24 is the key's write; on
-the absolute build the key's write is 28 cycles, and the page read through
-the program counter, 20, is 4 less than the identity's read of an absolute
-address, 24. Init writes nops in place of the level's drop in the general
-instance on a tune that runs one effect, as it does in the general handler
-(A tick), and in no other lookup kind. The counted instance of one column
-costs 20 cycles a row more than the general one on a tune of several
-effects. The two kinds of two columns, the value mapped written last
-(`setToneX`, `setEnvelope`) or first (`setNoiseX`), cost the same, and so
-do the two of three, the value mapped last (`setBuzzer`) or in the middle
-(`setVoiceX`), and the two counted kinds of two columns. A square and a
-source of one row through a transformation run their handler of the
-identity, with entries in its immediates, and tick at the cost A tick
-counts.
+byte (68k/player/lookup_ticks.S, TICKL). As it is and lean, the 24 is the
+key's write; on the absolute build the key's write is 28 cycles, and the
+page read through the program counter, 20, is 4 less than the identity's
+read of an absolute address, 24. Init writes nops in place of the level's
+drop in the general instance on a tune that runs one effect, as it does in
+the general handler (A tick), and in no other lookup kind. The counted
+instance of one column costs 20 cycles a row more than the general one on a
+tune of several effects. The two kinds of two columns, the value mapped
+written last (`setToneX`, `setEnvelope`) or first (`setNoiseX`), cost the
+same, and so do the two of three, the value mapped last (`setBuzzer`) or in
+the middle (`setVoiceX`), and the two counted kinds of two columns. A
+square and a source of one row through a transformation run their handler
+of the identity, with entries in its immediates, and tick at the cost A
+tick counts.
 
 ## A remap at the frame
 
@@ -489,8 +489,7 @@ effect and fill kind of the list, a byte a transformation, so a start
 and a remap read their page in one byte and write its page byte; a page
 outside the list is copied into the fallback, the page not in use, with
 interrupts enabled. Patch handler operands and the vector at level 7, as
-for identity starts (68k/YMXR.S, ymxr_lstart, ymxr_remap and routines
-through ymxr_kinds).
+for identity starts (68k/player/lookup_start.S to lookup_kinds.S).
 
 A start of a source that steps a place caches its lookup instance, and
 init writes the addresses of the effect's three tables and the page of
@@ -599,11 +598,11 @@ the size, and 56 has three where 20 has two. A square's start writes row
 0's level into the effect's record, 12 cycles, and its place's reset
 then writes it in one move, 12 cycles less. The place's reset of a
 counted source or of one of several columns runs one routine for every
-kind, through the kind the source runs (68k/YMXR.S, ymxr_widereset and
-ymxr_kindof), where the core without the lookup runs a routine for each
-shape. Over the eleven fixtures, the play call counts 0 to 40 cycles
-more on average on this core than the table of The play call, and 0 to
-92 more at most.
+kind, through the kind the source runs (ymxr_widereset in
+68k/player/start.S, ymxr_kindof in lookup_kinds.S), where the core without
+the lookup runs a routine for each shape. Over the eleven fixtures, the
+play call counts 0 to 40 cycles more on average on this core than the table
+of The play call, and 0 to 92 more at most.
 
 ## The cost of 34 columns
 
@@ -699,14 +698,14 @@ marked shape's 122.
 
 `YMXR_PCREL=0` assembles a player whose tick reads its row through an
 absolute address rather than through a signed word displacement from the
-instruction that reads it (68k/YMXR.S; BINARIES.md 5.5), for a host that
-places a tune further off than a displacement reaches. The read costs 20
-cycles where a displacement costs 16; the step that moves the place is an
-`addq.l` on a long address, 28 against the 20 an `addq.w` on a
+instruction that reads it (68k/player/switches.S; BINARIES.md 5.5), for a
+host that places a tune further off than a displacement reaches. The read
+costs 20 cycles where a displacement costs 16; the step that moves the
+place is an `addq.l` on a long address, 28 against the 20 an `addq.w` on a
 displacement costs; and the loop's test and its reload move the same way,
-20 against 16 and 36 against 28. A square's handler and a one-row
-source's write a value the start patched into them, so both cost the same
-in either build:
+20 against 16 and 36 against 28. A square's handler and a one-row source's
+write a value the start patched into them, so both cost the same in either
+build:
 
 | tick | cycles |
 |---|---|

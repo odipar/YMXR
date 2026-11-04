@@ -740,9 +740,10 @@ the program on standard output (16.6).
 
 ## 15. The player
 
-**15.1** `68k/YMXR.S`, assembled with `rmac -m68000 -fr`, is the player;
-its first three longs are `bra.w` to the calls, and the SNDH core
-(BINARIES.md 2) and the rigs call them.
+**15.1** `68k/YMXR.S`, assembled with `rmac -m68000 -fr -i68k`, is the
+player. It includes the files under `68k/player`, which rmac finds
+through `-i68k`. Its first three longs are `bra.w` to the calls, and the
+SNDH core (BINARIES.md 2) and the rigs call them.
 
 | offset | call | in | out |
 |---|---|---|---|

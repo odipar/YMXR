@@ -893,7 +893,7 @@ final class ConsistencyTest {
         Matcher turn = wrapped("in turns of (\\w+) cycles").matcher(section);
         assertTrue(turn.find(), "performance.md has no turn of the count");
         Matcher macro = Pattern.compile("add\\.w\\s+#\\(\\\\cycles\\+\\\\drop\\+PERF_END\\+(\\d+)\\)"
-                + "/(\\d+),\\(a0\\)").matcher(read(Path.of("68k/YMXR.S")));
+                + "/(\\d+),\\(a0\\)").matcher(PlayerTest.source());
         assertTrue(macro.find(), "the player's COUNT macro has no turn");
         int ten = Integer.parseInt(macro.group(2));
         assertEquals("ten", turn.group(1), "the turn the player counts in");

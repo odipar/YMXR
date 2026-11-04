@@ -1,0 +1,761 @@
+; init.S - YMXR_init, and the routines it calls to measure a source's
+; reach, patch a read site and link a handler.
+
+YMXR_init:
+                cmp.l   #YMXR_MAGIC,(a0)
+                bne     .bad
+                move.w  TF_VERSION(a0),d0               ; version 7 to 9, a
+                .if     YMXR_MAP                        ; DTX3 table (SPEC.md
+                subq.w  #7,d0                           ; 3.3.5), and 10
+                cmp.w   #3,d0
+                .else
+                subq.w  #YMXR_VERSION-2,d0
+                cmp.w   #2,d0
+                .endif
+                bhi     .bad
+                move.l  a6,-(sp)
+                .if     YMXR_MAP
+                move.l  a2,-(sp)                ; the page area (5.1)
+                .endif
+                movea.l a1,a6
+                move.l  a0,WS_TUNE(a6)
+                movea.l a0,a2
+                adda.l  TF_IMAGE(a0),a2
+                move.l  a2,WS_IMAGE(a6)
+                move.b  TF_EFFECTS(a0),WS_EFFECTS(a6)
+                .if     YMXR_DEFER=0
+                btst    #4,WS_EFFECTS(a6)       ; a tune that defers a start
+                bne     .bad6                   ; needs a core with them
+                .endif
+                .if     YMXR_MAP
+; Version 10 bound layout: signed transformation-block offset at 24,
+; source index at 28 (BINARIES.md 1.2). Earlier versions use identity
+; and a zero block pointer. Effects bit 5 marks version 10 (SPEC.md
+; 3.3.5).
+                moveq   #0,d0
+                cmp.w   #10,TF_VERSION(a0)
+                bne.s   .v9
+                move.l  a0,d0
+                add.l   TF_TRANS(a0),d0
+.v9:            move.l  d0,WS_TRANS(a6)
+                btst    #5,WS_EFFECTS(a6)
+                beq.s   .v10
+                tst.l   d0
+                beq     .bad6
+.v10:
+                .endif
+                cmp.b   #3,IM_VARIANT(a2)       ; a DTX3 image: its rows come
+                bne     .bad6                   ; round by themselves
+; The table to read, which the image may carry beside others: subtunes
+; that agree on what an image fixes once share one, so the code in it
+; appears once for them and every bound tune names its table (DTX abi.md
+; 1). R and RR come out of that table's header (DTX SPEC.md 1) and not out
+; of the metadata call, which returns the image's first table.
+                movea.l a2,a1
+                adda.l  TF_TABLE(a0),a1
+                move.l  DT_ROWS(a1),d0
+                move.l  DT_REPEAT(a1),d2
+                move.l  d0,WS_R(a6)
+                move.l  d0,WS_ROWS(a6)
+                move.l  d2,WS_RR(a6)
+                lea     WS_STATE(a6),a6         ; the block, in a6 (DTX,
+                jsr     IM_INIT(a2)             ; abi.md 2); a1 the table's
+                lea     -WS_STATE(a6),a6        ; header, and the workspace
+                                                ; back at a fixed offset of it
+
+; Every source resolved once: its first row, and its loop cell, which is
+; row RR where it repeats, 0 where it plays once, -1 where it is two
+; rows repeating to row 0, and -2 where it is one row repeating. The
+; last two are the shapes with a separate handler. A start then
+; reads two longs where it walked the index and read the source's
+; header.
+                movea.l WS_TUNE(a6),a1
+                moveq   #0,d1
+                moveq   #0,d5                   ; bit 0 a square among the
+                move.b  TF_SOURCES(a1),d1       ; sources, bit 1 one row
+                subq.w  #1,d1
+                bmi     .resolved
+                lea     WS_SOURCES(a6),a4
+                moveq   #0,d4
+                .if     YMXR_MAP
+                tst.l   WS_TRANS(a6)            ; version 10: the index at 28
+                beq.s   .source
+                moveq   #4,d4
+                .endif
+.source:        movea.l WS_TUNE(a6),a3
+                move.l  TF_INDEX(a3,d4.w),d0
+                bclr    #31,d0                  ; the index's bit 31: a source
+                .if     YMXR_PCREL              ; whose column fills its byte
+                bne.w   .counted
+                .else
+                bne.s   .counted
+                .endif
+                adda.l  d0,a3                   ; the source's DTX1 table
+                lea     DT_PAYLOAD(a3),a5       ; its first row
+                move.l  a5,(a4)+
+                .if     YMXR_PCREL
+                bsr.w   ymxr_inreach
+                bcs     .bad6
+                .endif
+                move.l  DT_REPEAT(a3),d0
+                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
+                beq.s   .plays                  ; none where it plays once
+                add.l   a5,d0
+                cmp.w   #1,DT_COLUMNS(a3)       ; a source of several columns
+                bne.s   .several                ; runs the handler its columns
+                tst.l   DT_REPEAT(a3)           ; pick, at any rows; and a
+                bne.s   .cell                   ; source of one column
+                                                ; repeating to row 0 of one
+                cmp.l   #1,DT_ROWS(a3)          ; row or of two has a
+                bne.s   .pair                   ; separate handler
+                moveq   #-2,d0
+                bset    #1,d5
+                bra.s   .cell
+.pair:          cmp.l   #2,DT_ROWS(a3)
+                bne.s   .cell
+                moveq   #-1,d0
+                bset    #0,d5
+                bra.s   .cell
+.plays:         moveq   #0,d0
+                cmp.w   #1,DT_COLUMNS(a3)
+                beq.s   .cell
+; A source of several columns: its loop cell and the stride from one
+; column to the next are in the table beside, and the tag in the cell's
+; place sends a start to the handler its columns pick.
+.several:       move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                move.l  DT_ROWS(a3),d0
+                addq.l  #1,d0                   ; DTX1 pads a column to a word
+                and.w   #$FFFE,d0               ; (DTX, SPEC.md 2.2)
+                move.w  d0,WS_WIDE-WS_SOURCES(a4)
+                moveq   #-3,d0                  ; two columns
+                cmp.w   #2,DT_COLUMNS(a3)
+                beq.s   .tagged
+                moveq   #-4,d0                  ; three
+.tagged:        bset    #2,d5
+.cell:          move.l  d0,(a4)+
+                addq.w  #4,d4
+                dbra    d1,.source
+                bra.s   .resolved
+
+; A source whose one column fills its byte: its rows carry no marker, so
+; the rows of a pass and the rows of the loop are in the table beside,
+; with its loop cell, and the tag in the cell's place sends a start to
+; the routine every effect shares, which tells this tag from the tags of
+; a source of several columns.
+.counted:       adda.l  d0,a3                   ; the source's DTX1 table
+                lea     DT_PAYLOAD(a3),a5       ; its first row
+                move.l  a5,(a4)+
+                .if     YMXR_PCREL
+                bsr.w   ymxr_inreach
+                bcs     .bad6
+                .endif
+                cmp.w   #1,DT_COLUMNS(a3)       ; a counted source of several
+                bne.w   .ccolumns               ; columns
+                move.l  DT_ROWS(a3),d0
+                move.w  d0,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
+                sub.l   DT_REPEAT(a3),d0
+                move.w  d0,WS_WIDE-WS_SOURCES+2(a4) ; R less RR, the loop
+                move.l  DT_REPEAT(a3),d0
+                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
+                beq.s   .conce                  ; none where it plays once
+                add.l   a5,d0
+                bra.s   .ccell
+.conce:         moveq   #0,d0
+.ccell:         move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                moveq   #-5,d0
+                bset    #2,d5
+                bra.w   .cell
+
+; A counted source of several columns: the stride from one column to the
+; next and R are beside its loop cell, and a start reads the rows of a
+; pass through the loop off the cell and the first row (SPEC.md 3.1.6).
+.ccolumns:      move.l  DT_ROWS(a3),d0
+                addq.l  #1,d0                   ; DTX1 pads a column to a word
+                and.w   #$FFFE,d0               ; (DTX, SPEC.md 2.2)
+                move.w  d0,WS_WIDE-WS_SOURCES(a4)
+                move.l  DT_ROWS(a3),d0
+                move.w  d0,WS_WIDE-WS_SOURCES+2(a4)
+                move.l  DT_REPEAT(a3),d0
+                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
+                beq.s   .wonce                  ; none where it plays once
+                add.l   a5,d0
+                bra.s   .wcell
+.wonce:         moveq   #0,d0
+.wcell:         move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                moveq   #-6,d0
+                bset    #2,d5
+                bra.w   .cell
+.resolved:
+
+; The row's columns, as the table's column map defines them (DTX, abi.md
+; 2 and SPEC.md 2.4): a live column is its slot's ring, slot times N past
+; the pointer, and a constant column is its value. Every read site is
+; written whole, an immediate of the value where its column is constant:
+; a set inits one loaded copy for each subtune, and a column live in one
+; tune is constant in another.
+                movea.l WS_TUNE(a6),a1
+                movea.l WS_IMAGE(a6),a0
+                adda.l  TF_TABLE(a1),a0
+                lea     DT_PAYLOAD(a0),a0       ; the table's payload
+                moveq   #0,d3
+                move.w  (a0),d3                 ; N, the stride from one slot
+                                                ; to the next
+                lea     ymxr_reads(pc),a3
+                lea     ymxr_frame(pc),a4
+                moveq   #0,d1
+                moveq   #YMXR_COLUMNS-1,d2
+.patch:         move.w  (a3)+,d4
+                move.w  d1,d0
+                bsr     ymxr_col
+                bsr     ymxr_put
+                addq.w  #1,d1
+                dbra    d2,.patch
+                lea     ymxr_sites(pc),a3
+                moveq   #YMXR_SITES-1,d2
+.site:          move.w  (a3)+,d4
+                move.w  (a3)+,d0
+                bsr     ymxr_col
+                bsr     ymxr_put
+                dbra    d2,.site
+
+                .if     YMXR_AEOI
+                move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
+                bclr    #3,MFP_VECTOR.w             ; the MFP ends each
+                .endif
+
+                .if     YMXR_NEST
+; A tune that runs one effect has no second timer to nest inside a tick,
+; so the level that tick drops buys it no safety: two nops are where the
+; drop would, in all three of that effect's handlers. A tune running two
+; or more keeps the drop, and one running none skips the handlers. Every
+; handler's word is written on every init: a set inits one loaded copy
+; for each subtune, and a subtune that ran one effect alone left its nops
+; where the next, running that effect beside another, needs the drop.
+                move.l  #$46FC2500,d3           ; move.w #$2500,sr, the drop,
+                move.b  WS_EFFECTS(a6),d0       ; which a handler keeps unless
+                and.b   #$0F,d0                 ; its effect runs alone
+                move.b  d0,d1
+                subq.b  #1,d1
+                and.b   d1,d0                   ; more than one bit set
+                bne.s   .nests
+                move.l  #$4E714E71,d3           ; nop nop, for the one it runs
+.nests:
+                .endif
+
+; Where deferred starts are assembled in, every handler is in two banks
+; (4.8), and each bank is patched the same way: the loop below runs bank 0
+; with d6 at 0 and bank 1 with d6 at BANK; otherwise it runs bank 0
+; alone.
+                move.l  d6,-(sp)
+                moveq   #0,d6
+.banks:
+; The tick handlers: each one's step and loop operands name a
+; separate pair of cells, its place is parked on a marker until a start,
+; and the register it selects is R0 until a start aims it (SPEC.md 5.2.1).
+                lea     ymxr_tick0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.link:          bsr     ymxr_link
+                lea     TICK_SIZE(a5),a5
+                dbra    d2,.link
+                lea     ymxr_cnt0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.linkc:         bsr     ymxr_linkc
+                lea     TICKC_SIZE(a5),a5
+                dbra    d2,.linkc
+
+                .if     YMXR_NEST
+                lea     ymxr_tick0(pc),a5
+                adda.w  d6,a5
+                lea     ymxr_sq0(pc),a4
+                adda.w  d6,a4
+                lea     ymxr_one0(pc),a3
+                adda.w  d6,a3
+                .if     YMXR_MAP
+                lea     ymxr_lk0(pc),a1         ; and the general lookup
+                adda.w  d6,a1                   ; instance's
+                .endif
+                moveq   #0,d4
+                moveq   #3,d2
+.each:          move.l  #$46FC2500,d0           ; a handler the tune does not
+                btst    d4,WS_EFFECTS(a6)       ; run keeps the drop, and one
+                beq.s   .word                   ; it runs is written d3
+                move.l  d3,d0
+.word:          move.l  d0,TICK_SR(a5)
+                move.l  d0,SQ_SR(a4)
+                move.l  d0,ONE_SR(a3)
+                .if     YMXR_MAP
+                move.l  d0,LK_SR(a1)
+                lea     LOOK_STRIDE(a1),a1
+                .endif
+                lea     TICK_SIZE(a5),a5
+                lea     SQ_SIZE(a4),a4
+                lea     ONE_SIZE(a3),a3
+                addq.w  #1,d4
+                dbra    d2,.each
+                .endif
+
+; A square's handler names the row it is at in the one instruction
+; that moves between the two, and so does the copy of that instruction in
+; its hook (4.8).
+                lea     ymxr_sq0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.sq:            lea     SQ_VAL(a5),a3
+                move.l  a3,SQ_PTR(a5)
+                .if     YMXR_DEFER
+                move.l  a3,SQ_HPTR(a5)
+                .endif
+                lea     SQ_SIZE(a5),a5
+                dbra    d2,.sq
+
+; The handlers of several columns: the loop cells they read and the
+; places they step are in the handler, so one link writes every address
+; the loop path and the step read, as a general handler's link does. A
+; start writes the values, and no timer reaches one of these handlers
+; before a start has aimed its vector there.
+                lea     ymxr_two0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.linktwo:       lea     TW2_CELLS(a5),a3
+                move.l  a3,TW2_LOOPT(a5)
+                move.l  a3,TW2_LOOP1R(a5)
+                addq.l  #CELL_SIZE,a3
+                move.l  a3,TW2_LOOP2R(a5)
+                lea     TW2_PTR1(a5),a3
+                move.l  a3,TW2_STEP1(a5)
+                move.l  a3,TW2_LOOP1W(a5)
+                lea     TW2_PTR2(a5),a3
+                move.l  a3,TW2_STEP2(a5)
+                move.l  a3,TW2_LOOP2W(a5)
+                lea     TW2_SIZE(a5),a5
+                dbra    d2,.linktwo
+                lea     ymxr_three0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.linkthree:     lea     TW3_CELLS(a5),a3
+                move.l  a3,TW3_LOOPT(a5)
+                move.l  a3,TW3_LOOP1R(a5)
+                addq.l  #CELL_SIZE,a3
+                move.l  a3,TW3_LOOP2R(a5)
+                addq.l  #CELL_SIZE,a3
+                move.l  a3,TW3_LOOP3R(a5)
+                lea     TW3_PTR1(a5),a3
+                move.l  a3,TW3_STEP1(a5)
+                move.l  a3,TW3_LOOP1W(a5)
+                lea     TW3_PTR2(a5),a3
+                move.l  a3,TW3_STEP2(a5)
+                move.l  a3,TW3_LOOP2W(a5)
+                lea     TW3_PTR3(a5),a3
+                move.l  a3,TW3_STEP3(a5)
+                move.l  a3,TW3_LOOP3W(a5)
+                lea     TW3_SIZE(a5),a5
+                dbra    d2,.linkthree
+                lea     ymxr_env0(pc),a5
+                adda.w  d6,a5
+                moveq   #3,d2
+.linkenv:       lea     TWC_CELLS(a5),a3
+                move.l  a3,TWC_LOOPT(a5)
+                move.l  a3,TWC_LOOP1R(a5)
+                addq.l  #CELL_SIZE,a3
+                move.l  a3,TWC_LOOP2R(a5)
+                lea     TWC_PTR1(a5),a3
+                move.l  a3,TWC_STEP1(a5)
+                move.l  a3,TWC_LOOP1W(a5)
+                lea     TWC_PTR2(a5),a3
+                move.l  a3,TWC_STEP2(a5)
+                move.l  a3,TWC_LOOP2W(a5)
+                lea     TWC_LEFT(a5),a3
+                move.l  a3,TWC_CNT(a5)
+                move.l  a3,TWC_RELDA(a5)
+                move.w  #1,TWC_LEFT(a5)
+                lea     TWC_SIZE(a5),a5
+                dbra    d2,.linkenv
+                .if     YMXR_MAP
+; Link lookup instances as above, selecting page 0 from the bank's
+; page-byte table. Clearing the records below leaves every page
+; uncached.
+                lea     ymxr_htab(pc),a4
+                tst.w   d6
+                beq.s   .htab
+                lea     32(a4),a4
+.htab:          LINK1   LK,ymxr_lk0,0,0
+                LINK1   LC,ymxr_lc0,1,1
+                LINKW   LT,ymxr_lt0,2,0,0
+                LINKW   LN,ymxr_ln0,3,0,0
+                LINKW   LB,ymxr_lb0,4,1,0
+                LINKW   LV,ymxr_lv0,5,1,0
+                LINKW   LE,ymxr_le0,6,0,1
+                LINKW   LF,ymxr_lf0,7,0,1
+                .endif
+                .if     YMXR_DEFER
+                tst.w   d6
+                bne.s   .banked
+                move.w  #BANK,d6
+                bra     .banks
+.banked:
+                .endif
+                move.l  (sp)+,d6
+
+; The effects' records: the kept target, select, count and shape empty
+; until a start, the first row the parked place, so a start that moves
+; no place is at row 0 of the source it names (SPEC.md 4.1 step 4), and
+; no start pending.
+                lea     WS_FX(a6),a0
+                lea     ymxr_park(pc),a1
+                moveq   #3,d0
+.clear:         movea.l a0,a2
+                moveq   #FX_SIZE/4-1,d1
+.zero:          clr.l   (a2)+
+                dbra    d1,.zero
+                move.l  a1,FX_FIRST(a0)
+                move.l  a1,FX_FIRST2(a0)
+                move.l  a1,FX_FIRST3(a0)
+                lea     FX_SIZE(a0),a0
+                dbra    d0,.clear
+                .if     YMXR_DEFER
+                sf      WS_ARMING(a6)
+                .endif
+                .if     YMXR_MAP
+                movea.l (sp),a2                 ; the page area
+                bsr     ymxr_prefill
+                tst.l   d0
+                bmi     .bad6
+                .endif
+
+; The effects the tune runs are read every row; the others are jumped
+; over by the branch at each macro's head, where the tune does not run
+; its effect.
+; The head of each effect: the effect's first read where the tune runs
+; it, and where it does not, a branch, its displacement to the head of
+; the next effect the tune does run or past the last of them. A run of
+; effects the tune does not run then costs one branch. This is after the
+; sites above, which write the read whole into the two words a skipped
+; effect's branch occupies, so a head the tune runs is that read already.
+                lea     ymxr_frame(pc),a4
+                lea     ymxr_overs(pc),a3
+                lea     ymxr_tick3_done(pc),a5
+                moveq   #3,d2
+.over:          move.w  (a3)+,d4
+                lea     (a4,d4.w),a1
+                btst    d2,WS_EFFECTS(a6)
+                beq.s   .skip
+                movea.l a1,a5                   ; the effect's first read
+                bra.s   .next
+.skip:          move.w  #$6000,(a1)             ; bra.w: the head the assembler
+                move.l  a5,d0                   ; wrote, which a tune before
+                sub.l   a1,d0                   ; this one that ran the effect
+                subq.l  #2,d0                   ; replaced with the read
+                move.w  d0,2(a1)
+.next:          dbra    d2,.over
+
+; The start tells three shapes apart off one cell, and a tune using one
+; of the two shapes with a separate handler and not the other needs no
+; test: the branch that leaves the general handler's path goes straight
+; to that shape's block, and the start pays no test for the shape it
+; does not use. A tune using both, or neither, keeps the test. The word
+; is written on every path: a tune before this one that used one shape
+; wrote its block there, and a set inits one loaded copy for every
+; subtune.
+                move.w  #PICK_BOTH,d1
+                move.b  d5,d0
+                btst    #2,d0                   ; a tune with a source of
+                bne.s   .only                   ; several columns keeps the
+                tst.b   d0                      ; test in: such a source's
+                beq.s   .only                   ; cell is a tag past the two
+                cmp.b   #3,d0
+                beq.s   .only
+                move.w  #PICK_ONE,d1
+                btst    #0,d0
+                beq.s   .only
+                move.w  #PICK_SQ,d1
+.only:          move.l  #((WIDE_ONE&$FF)<<16)|(RESET_DONE&$FF),d0
+                btst    #2,d5                   ; and the three branches that
+                beq.s   .aims                   ; lie elsewhere where it has
+                move.l  #((WIDE_WIDEN&$FF)<<16)|(RESET_WIDE&$FF),d0
+.aims:          lea     ymxr_frame(pc),a4
+                lea     ymxr_overs(pc),a3
+                lea     ymxr_resets(pc),a2
+                moveq   #3,d2
+.pick:          move.w  (a3)+,d4
+                lea     (a4,d4.w),a1
+                move.w  d1,PICK_AT(a1)
+                move.l  d0,d5
+                move.w  (a2)+,d4
+                move.b  d5,(a4,d4.w)            ; the place's reset, at the site
+                swap    d5                      ; the table names
+                move.b  d5,WIDE_AT(a1)
+                dbra    d2,.pick
+
+                .if     YMXR_DEFER
+; A tune that defers a start, bit 4 of the effects used (SPEC.md 3.3),
+; aims three branches of every effect at the paths that read a pending
+; start (4.8); every other tune keeps the three the assembler wrote, so
+; its frame costs what it cost before deferred starts. Each is written
+; on every init, as the heads are.
+                lea     ymxr_frame(pc),a4
+                lea     ymxr_overs(pc),a3
+                moveq   #3,d2
+.defers:        move.w  (a3)+,d4
+                lea     (a4,d4.w),a1            ; the effect's head
+                btst    #4,WS_EFFECTS(a6)
+                beq.s   .plain
+                move.w  #$6000,RS_AT(a1)        ; bra.w
+                move.w  #RS_DEFER,RS_AT+2(a1)
+                move.w  #UNSET_DEFER,UNSET_AT(a1)
+                move.w  #$6000,SET_AT(a1)       ; bra.w
+                move.w  #SET_DEFER,SET_AT+2(a1)
+                bra.s   .aimed
+.plain:         move.l  #$08020006,RS_AT(a1)    ; btst #6,d2
+                move.w  #UNSET_RATE,UNSET_AT(a1)
+                move.w  #$6700,SET_AT(a1)       ; beq.w
+                move.w  #SET_STOP,SET_AT+2(a1)
+.aimed:         dbra    d2,.defers
+                .endif
+
+                .if     YMXR_MAP
+; For effects bit 5, redirect each effect's start, unset-source and
+; timer-reset branches to mapping-aware paths. Reset preserves the
+; control byte in d3 for remaps. Other tunes use identity start and
+; ordinary rate/reset paths. Rewrite every branch at each init.
+;
+; With deferred support, an unset mapping continues through _retune when
+; the tune also defers starts. That path updates the record after a tick
+; installs a pending start; other tunes continue directly to rate
+; processing.
+                lea     ymxr_frame(pc),a4
+                lea     ymxr_overs(pc),a3
+                moveq   #3,d2
+.maps:          move.w  (a3)+,d4
+                lea     (a4,d4.w),a1            ; the effect's head
+                .if     YMXR_DEFER
+                move.w  #REMAP_RATE,REMAP_AT(a1)
+                .endif
+                btst    #5,WS_EFFECTS(a6)
+                beq.s   .identity
+                move.w  #NOW_MAP,NOW_AT(a1)
+                move.w  #UNSET_MAP,UNSET_AT(a1)
+                move.w  #$6000,RS_AT(a1)        ; bra.w
+                move.w  #RS_MAP,RS_AT+2(a1)
+                .if     YMXR_DEFER
+                btst    #4,WS_EFFECTS(a6)
+                beq.s   .mapsnext
+                move.w  #REMAP_RETUNE,REMAP_AT(a1)
+                .endif
+                bra.s   .mapsnext
+.identity:      move.w  #NOW_START,NOW_AT(a1)
+                .if     YMXR_DEFER=0
+                move.w  #UNSET_RATE,UNSET_AT(a1)
+                move.l  #$08020006,RS_AT(a1)    ; btst #6,d2
+                .endif
+.mapsnext:      dbra    d2,.maps
+                .endif
+
+; The advance's address, written into the call that plays: a slot is
+; a bra.w (DTX, abi.md 1), so the body is two bytes past the slot
+; plus the branch's displacement, and a play call reaches it in one jsr.
+                movea.l WS_IMAGE(a6),a2
+                lea     IM_ADVANCE(a2),a3
+                move.w  2(a3),d0
+                ext.l   d0
+                lea     2(a3,d0.l),a3
+                lea     ymxr_call+2(pc),a4
+                move.l  a3,(a4)
+
+; The first row, read here so that a call writes a row it already has
+; (SPEC.md 4): the writes then leave a host's clock at one offset,
+; by the advance for the next row.
+                move.l  a6,-(sp)
+                lea     WS_STATE(a6),a6         ; the block, in a6
+                jsr     (a3)                    ; a1 the row
+                movea.l (sp)+,a6
+
+; The timers the tune runs, claimed. The others are left as they are.
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                CLAIM   0,$FFFFFA19,$F0,$134,$FFFFFA07,5,ymxr_tick0
+                CLAIM   1,$FFFFFA1D,$F0,$110,$FFFFFA09,4,ymxr_tick1
+                CLAIM   2,$FFFFFA1B,$F0,$120,$FFFFFA07,0,ymxr_tick2
+                CLAIM   3,$FFFFFA1D,$0F,$114,$FFFFFA09,5,ymxr_tick3
+                move.w  (sp)+,sr
+                .if     YMXR_MAP
+                addq.l  #4,sp
+                .endif
+                movea.l (sp)+,a6
+                moveq   #0,d0
+                rts
+.bad6:
+                .if     YMXR_MAP
+                addq.l  #4,sp
+                .endif
+                movea.l (sp)+,a6
+.bad:           moveq   #-1,d0
+                rts
+
+; Under YMXR_PCREL a tick reads its row through a signed word
+; displacement from the instruction that reads it, so every row of every
+; source is within reach of every handler. a5 the source's first row,
+; a3 its DTX1 table: the rows run (C - 1) strides and R bytes from the
+; first (SPEC.md 3.1.2), and the handlers run from ymxr_tick0 to
+; ymxr_reach. Carry marks a source a displacement does not reach, which
+; init reports -1 for.
+                .if     YMXR_PCREL
+ymxr_inreach:   movem.l d0-d1/a0-a1,-(sp)
+                move.l  DT_ROWS(a3),d0
+                addq.l  #1,d0
+                and.w   #$FFFE,d0               ; align(R), a column's stride
+                moveq   #0,d1                   ; (DTX, SPEC.md 2.2)
+                move.w  DT_COLUMNS(a3),d1
+                subq.w  #1,d1
+                mulu    d1,d0                   ; the columns before the last
+                add.l   DT_ROWS(a3),d0
+                lea     -1(a5,d0.l),a0          ; the source's last byte
+                lea     ymxr_tick0(pc),a1
+                move.l  a0,d0
+                sub.l   a1,d0                   ; from the first handler
+                cmp.l   #32767,d0
+                bgt.s   .far
+                lea     ymxr_reach(pc),a1
+                move.l  a1,d0
+                sub.l   a5,d0                   ; to the source's first byte
+                cmp.l   #32768,d0
+                bgt.s   .far
+                movem.l (sp)+,d0-d1/a0-a1
+                andi.b  #$FE,ccr
+                rts
+.far:           movem.l (sp)+,d0-d1/a0-a1
+                ori.b   #1,ccr
+                rts
+                .endif
+
+; The word a read of column d0 is written with, out of the payload in a0
+; and N in d3 (DTX, SPEC.md 2.4): a live column's displacement, its slot
+; times N, or a constant column's value with bit 15 set. The constant
+; values follow the map in column order, so a constant column's value is
+; one byte past the value of each constant column before it.
+ymxr_col:       movem.l d1/a1,-(sp)
+                .if     YMXR_MAP
+                cmp.w   DT_COLUMNS-DT_PAYLOAD(a0),d0    ; a column at or past
+                bcs.s   .in                             ; the table's C, a
+                move.w  #$8000,d0                       ; mapping column of a
+                bra.s   .done                           ; version 9 tune: the
+.in:                                                    ; constant 0
+                .endif
+                moveq   #0,d1
+                move.b  8(a0,d0.w),d1           ; the column's byte of the map
+                cmp.b   #$FF,d1
+                beq.s   .value
+                mulu.w  d3,d1                   ; its slot times N
+                move.w  d1,d0
+                bra.s   .done
+                .if     YMXR_MAP
+.value:         lea     8(a0),a1                ; the values, behind the map
+                adda.w  DT_COLUMNS-DT_PAYLOAD(a0),a1    ; of C columns
+                .else
+.value:         lea     8+YMXR_COLUMNS(a0),a1   ; the values, behind the map
+                .endif
+                subq.w  #1,d0
+                bmi.s   .at
+.before:        cmp.b   #$FF,8(a0,d0.w)
+                bne.s   .live
+                addq.l  #1,a1
+.live:          dbra    d0,.before
+.at:            moveq   #0,d0
+                move.b  (a1),d0
+                bset    #15,d0
+.done:          movem.l (sp)+,d1/a1
+                rts
+
+; One read site written whole: the word at (a4,d4.w) is its operand and
+; the word before it its opcode, and d0 is ymxr_col's word for its
+; column. The opcode as it is defines the read, whichever the last init
+; wrote: a move into d1, the head of an effect being one; a move into d2;
+; or an or into d1. A live column is read at its displacement, and a
+; constant column's read is the same instruction with its value as an
+; immediate, which costs 8 cycles to the displacement's 12 and sets the
+; flags as the read sets them.
+ymxr_put:       movem.l d1-d2/a5,-(sp)
+                lea     (a4,d4.w),a5
+                move.w  -2(a5),d1               ; the opcode as it is
+                move.w  #$8229,d2               ; or.b d16(a1),d1
+                cmp.w   d2,d1
+                beq.s   .or
+                cmp.w   #$0001,d1               ; or.b #v,d1
+                beq.s   .or
+                move.w  #$1429,d2               ; move.b d16(a1),d2
+                cmp.w   d2,d1
+                beq.s   .move
+                cmp.w   #$143C,d1               ; move.b #v,d2
+                beq.s   .move
+                move.w  #$1229,d2               ; move.b d16(a1),d1, or its
+                                                ; immediate, or a head's bra.w
+.move:          tst.w   d0
+                bpl.s   .live
+                move.w  d2,d1                   ; move.b #v: the register's
+                and.w   #$FE00,d1               ; bits kept, the source the
+                or.w    #$003C,d1               ; immediate
+                bra.s   .value
+.or:            tst.w   d0
+                bpl.s   .live
+                move.w  #$0001,d1               ; or.b #v,d1
+.value:         move.w  d1,-2(a5)
+                and.w   #$00FF,d0
+                move.w  d0,(a5)
+                bra.s   .done
+.live:          move.w  d2,-2(a5)
+                move.w  d0,(a5)
+.done:          movem.l (sp)+,d1-d2/a5
+                rts
+
+; a5 a tick handler: its operands linked, its place parked.
+ymxr_link:
+                lea     TICK_PTR(a5),a3
+                move.l  a3,TICK_STEP(a5)
+                move.l  a3,TICK_LOOPW(a5)
+                lea     TICK_CELL(a5),a3
+                move.l  a3,TICK_LOOPT(a5)
+                move.l  a3,TICK_LOOPR(a5)
+                .if     YMXR_PCREL
+                clr.w   TICK_CELL(a5)
+                lea     ymxr_park(pc),a3
+                suba.l  a5,a3
+                suba.w  #TICK_PTR,a3
+                move.w  a3,TICK_PTR(a5)
+                .else
+                clr.l   TICK_CELL(a5)
+                lea     ymxr_park(pc),a3
+                move.l  a3,TICK_PTR(a5)
+                .endif
+                clr.b   TICK_SEL(a5)            ; R0, the register of the kept
+                rts                             ; target init leaves (SPEC.md 5.2.1)
+
+; a5 a counted handler, the same way: its operands linked, its counter
+; at 1 and its cell at 0, so a tick before the first start writes the
+; parked marker and stops the timer, as the handler above does.
+ymxr_linkc:
+                lea     TICKC_PTR(a5),a3
+                move.l  a3,TICKC_STEP(a5)
+                move.l  a3,TICKC_LOOPW(a5)
+                lea     TICKC_CELL(a5),a3
+                move.l  a3,TICKC_LOOPT(a5)
+                move.l  a3,TICKC_LOOPR(a5)
+                .if     YMXR_PCREL
+                clr.w   TICKC_CELL(a5)
+                .else
+                clr.l   TICKC_CELL(a5)
+                .endif
+                lea     TICKC_LEFT(a5),a3
+                move.l  a3,TICKC_CNTA(a5)
+                move.l  a3,TICKC_RELDA(a5)
+                move.w  #1,TICKC_LEFT(a5)
+                lea     ymxr_park(pc),a3
+                .if     YMXR_PCREL
+                suba.l  a5,a3
+                suba.w  #TICKC_PTR,a3
+                move.w  a3,TICKC_PTR(a5)
+                .else
+                move.l  a3,TICKC_PTR(a5)
+                .endif
+                clr.b   TICKC_SEL(a5)           ; R0, as init leaves the kept
+                rts                             ; target (SPEC.md 5.2.1)
