@@ -2269,12 +2269,15 @@ def fallbacks(code, symbols):
     with open(at, "rb") as f:
         bound = bind(f.read(), work)
     count, entries = list_of(bound)
-    # the area past the tune, so that the tune's sources are within the
-    # reach the area leaves of the first handler (BINARIES.md 5.5, 5.6)
+    # on the build whose ticks read through a displacement, the area past
+    # the tune, so that the tune's sources are within the reach the area
+    # leaves of the first handler (BINARIES.md 5.5, 5.6); under -abs,
+    # whose ticks read an absolute address, the area right after the
+    # player and the tune past the reach
     global MOST_FRAMES
-    # the area past the tune, every frame of it played under -frames too:
-    # effect 0 reaches its fallback at its row k
-    AREA_AFTER, most = True, MOST_FRAMES
+    # every frame of the tune played under -frames too: effect 0 reaches
+    # its fallback at its row k
+    AREA_AFTER, most = PCREL, MOST_FRAMES
     MOST_FRAMES = None
     try:
         return refused(code, symbols, at, bound, count, entries, work)
