@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -167,9 +168,57 @@ final class RigCallsTest {
         return List.copyOf(out);
     }
 
+    /** The property that selects a shard of the thirty-two cores. */
+    static final String SHARD = "rig.shard";
+
+    /**
+     * The cores of a shard. Absent or empty, the shard is every core; {@code
+     * none} is no core; {@code k/n} is each core whose index in {@code all}
+     * leaves k after a division by n, so the shards 0 to n - 1 of n are every
+     * core once. The workflow runs the cores in four jobs of eight, and its
+     * suite job none (.github/workflows/test.yml).
+     */
+    static List<List<String>> shard(List<List<String>> all, @Nullable String named) {
+        if (named == null || named.isEmpty()) {
+            return all;
+        }
+        if (named.equals("none")) {
+            return List.of();
+        }
+        Matcher parts = Pattern.compile("(\\d+)/(\\d+)").matcher(named);
+        if (!parts.matches()) {
+            throw new IllegalArgumentException(SHARD + " reads none or k/n, and not " + named);
+        }
+        int k = Integer.parseInt(parts.group(1));
+        int n = Integer.parseInt(parts.group(2));
+        if (n < 1 || k >= n) {
+            throw new IllegalArgumentException(SHARD + " reads k/n with k from 0 to n - 1,"
+                    + " and not " + named);
+        }
+        List<List<String>> out = new ArrayList<>();
+        for (int i = k; i < all.size(); i += n) {
+            out.add(all.get(i));
+        }
+        return List.copyOf(out);
+    }
+
+    @Test
+    void theFourShardsAreEveryCoreOnce() {
+        List<List<String>> joined = new ArrayList<>();
+        for (int k = 0; k < 4; k++) {
+            List<List<String>> one = shard(CORES, k + "/4");
+            assertTrue(one.size() == 8, () -> "shard has " + one.size() + " cores, not 8");
+            joined.addAll(one);
+        }
+        assertTrue(joined.size() == CORES.size() && joined.containsAll(CORES),
+                () -> "the four shards are " + joined + ", not " + CORES);
+        assertTrue(shard(CORES, "none").isEmpty() && shard(CORES, null).equals(CORES),
+                "none is no core, and an absent shard every core");
+    }
+
     @TestFactory
     Stream<DynamicTest> theRigPlaysTheBuiltTunesOnEveryCore() {
-        return CORES.stream().map(core -> DynamicTest.dynamicTest(
+        return shard(CORES, System.getProperty(SHARD)).stream().map(core -> DynamicTest.dynamicTest(
                 core.isEmpty() ? "the plain core" : String.join(" ", core), () -> {
                     theRigRuns();
                     List<String> argv = new ArrayList<>(core);

@@ -1,5 +1,7 @@
-# The Java suite, run by hand. The Python rigs under 68k/test/emu are
-# outside it but for the one RigCallsTest drives; doc/tools.md lists them.
+# The Java suite and the Python rigs, run by hand, in parallel jobs: the
+# suite but the matrix of thirty-two cores, the matrix in four jobs of
+# eight cores, the three runs that read performance.md back, a job each,
+# and the runs under Hatari. doc/tools.md 19.2 lists them.
 name: test
 
 # Off by default: no push and no pull request starts it. A caller starts
@@ -8,97 +10,67 @@ on:
   workflow_dispatch:
 
 jobs:
-  maven:
+  # A skipped test is a check that did not run, and a run that skips one
+  # is green and asleep. bin/suite (doc/tools.md 19.6) requires what the
+  # skipping tests need, reads gofmt -l go and runs go test beside them,
+  # runs the suite and ends with 1 where the count is above 0. Here it
+  # runs every test but the matrix of RigCallsTest, which the four jobs
+  # of cores run.
+  suite:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '23'
-          cache: maven
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26'
-      # WasmTest runs the WebAssembly module of the tools under Node, and
-      # skips where node is absent.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      # The build assembles the thirty-three binaries of BINARIES.md at
-      # process-classes, thirty-two cores and the program stub, and
-      # BinariesTest reads the copies under go/binaries/data against that
-      # assembly. The version is pinned: another rmac writes other bytes
-      # and a red run.
-      - name: rmac 2.4.3
-        run: |
-          curl -fsSL -o /tmp/rmac.zip \
-            https://rmac.is-slick.com/static/rmac-2.4.3-lin-x64.zip
-          unzip -j -o /tmp/rmac.zip -d /tmp/rmac
-          sudo install -m 755 /tmp/rmac/rmac /usr/local/bin/rmac
-      # RigCallsTest plays the built tunes on the 68000 player under
-      # emulation, which wants unicorn.
-      - run: python3 -m pip install --quiet unicorn
-      # This tree resolves DTX and YMXS out of the local repository
-      # alone, since pom.xml names no <repositories>: both are built here
-      # at the release pom.xml requires, read from pom.xml so the two
-      # cannot drift. DTX assembles its images, so rmac is installed above this.
-      - name: DTX and YMXS at the releases pom.xml requires
-        run: |
-          dtx=$(grep -A1 '<artifactId>dtx</artifactId>' pom.xml \
-              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-          ymxs=$(grep -A1 '<artifactId>ymxs</artifactId>' pom.xml \
-              | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-          echo "DTX $dtx, YMXS $ymxs"
-          git clone --depth 1 --branch "v$dtx" \
-              https://github.com/odipar/DTX "$RUNNER_TEMP/DTX"
-          git clone --depth 1 --branch "v$ymxs" \
-              https://github.com/odipar/YMXS "$RUNNER_TEMP/YMXS"
-          mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/DTX" install -DskipTests
-          mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/YMXS" install -DskipTests
-          # RigCallsTest reads the packer DTX_WRITE names, and counts a
-          # tune on the rig of the checkout DTX_REPO names; ParityTest runs
-          # the conformance kit of the checkout YMXS_REPO names
-          # (doc/tools.md).
-          echo "DTX_WRITE=$RUNNER_TEMP/DTX/bin/dtx-write" >> "$GITHUB_ENV"
-          echo "DTX_REPO=$RUNNER_TEMP/DTX" >> "$GITHUB_ENV"
-          echo "YMXS_REPO=$RUNNER_TEMP/YMXS" >> "$GITHUB_ENV"
-      # ParityTest runs the two trees against one another and skips where
-      # go is absent, and WasmTest where node is, so a runner without either
-      # is green and asleep.
-      - run: go version && node --version && rmac | sed -n '7p' && "$DTX_WRITE" -help | head -1
-      # A skipped test is a check that did not run, and a run that skips
-      # one is green and asleep. bin/suite (doc/tools.md 19.6) requires
-      # what the skipping tests need, reads gofmt -l go and runs go test
-      # beside them, runs the suite and ends with 1 where the count is
-      # above 0; a caller runs the same script here.
-      - name: the suite, and no skip
-        run: bin/suite
-      # performance.md's sentences over the whole set are read back by a
-      # run of -refill over the eleven fixtures whole: which tunes fit the
-      # ring, a refill's cost outside and inside the decoder, the ends of
-      # the fit, the three costs of a refill that parses no operation, and
-      # each tune's bound tune and state block. RigCallsTest runs one tune
-      # of the set; this runs all of them, a few minutes the suite leaves
-      # to this step.
-      - name: performance.md over the whole set
-        run: python3 68k/test/emu/test_ymxr.py -refill
-      # The player whose ticks read a row through an absolute address has
-      # separate tables in performance.md: its ticks, and its columns of the
-      # counted ticks of two columns. A run of -cycles -abs over the
-      # fixtures reads them back.
-      - name: performance.md's absolute build over the whole set
-        run: python3 68k/test/emu/test_ymxr.py -cycles -abs
-      # Verify lookup tick costs, frame remaps and 34-column overhead
-      # against performance.md, using mapped and version 9 fixtures.
-      - name: performance.md's lookup over the whole set
-        run: python3 68k/test/emu/test_ymxr.py -cycles -map
-      # -stub and -hatari play the tunes on a real MFP, under Hatari. Its
-      # version is pinned, built from its tag and kept between runs: the rig
-      # reads Hatari's trace, whose lines 2.4.1, the version Ubuntu ships,
-      # writes another way. TOS 2.06, the image a caller runs them under,
-      # is Atari's; EmuTOS is free, and its PAL image boots the ST at the
-      # 50 Hz the two modes require.
+      - uses: ./.github/actions/setup
+      - name: the suite but the matrix of cores, and no skip
+        run: bin/suite -Drig.shard=none
+
+  # The matrix of RigCallsTest, the thirty-two cores, in four shards of
+  # eight. RigCallsTest's theFourShardsAreEveryCoreOnce, in the suite
+  # job, reads that shards 0 to 3 of 4 are every core, once each.
+  cores:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: shard ${{ matrix.shard }} of 4 of the cores, and no skip
+        run: >-
+          bin/suite '-Dtest=RigCallsTest#theRigPlaysTheBuiltTunesOnEveryCore'
+          -Drig.shard=${{ matrix.shard }}/4
+
+  # performance.md's sentences over the whole set. -refill reads which
+  # tunes fit the ring, a refill's cost outside and inside the decoder,
+  # the ends of the fit, the three costs of a refill that parses no
+  # operation, and each tune's bound tune and state block; -cycles -abs
+  # reads the tables of the player whose ticks read a row through an
+  # absolute address; -cycles -map reads the lookup's ticks, the remaps at
+  # the frame and the cost of 34 columns.
+  figures:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        run: ['-refill', '-cycles -abs', '-cycles -map']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: test_ymxr.py ${{ matrix.run }} over the whole set
+        run: python3 68k/test/emu/test_ymxr.py ${{ matrix.run }}
+
+  # -stub and -hatari play the tunes on a real MFP, under Hatari. Its
+  # version is pinned, built from its tag and kept between runs: the rig
+  # reads Hatari's trace, whose lines 2.4.1, the version Ubuntu ships,
+  # writes another way. TOS 2.06, the image a caller runs them under, is
+  # Atari's; EmuTOS is free, and its PAL image boots the ST at the 50 Hz
+  # the two modes require.
+  hatari:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
       - uses: actions/cache@v4
         with:
           path: /opt/hatari
