@@ -27,7 +27,8 @@ owed() {
     [ -f "$classes/org/ymxr/68k/YMXR_prg.bin" ] || return 0
     [ ! -f "$built" ] || [ ! -f "$path" ] \
         || [ -n "$(find "$root/src/main/java" "$root/pom.xml" \
-        "$root"/68k/*.S -newer "$built" -print -quit 2>/dev/null)" ]
+        "$root"/68k/*.S "$root/68k/player" -newer "$built" -print -quit \
+        2>/dev/null)" ]
 }
 
 build() {
