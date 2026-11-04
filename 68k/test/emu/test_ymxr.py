@@ -350,6 +350,9 @@ DEFINED = {"YMXR_PERF": 1 if PERF else 0,
 # -map enables YMXR_MAP=1 for every tune. Otherwise check enables it
 # only for tunes with effects bit 5 set.
 MAP = "-map" in sys.argv
+# Each tune played on the player ymxr-sndh -link links for it
+# (doc/LINKER.md), where the run's other checks are left out.
+LINKED = "-linked" in sys.argv
 
 # Build switches and assembled variants for this run. Deferred tunes
 # require YMXR_DEFER; version 10 tunes require YMXR_MAP (check).
@@ -509,7 +512,8 @@ def assemble(source="YMXR.S", defines=()):
                        + list(defines) + ["-o", out, os.path.join(ROOT, "68k", source)],
                        capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
-    symbols = {}
+    symbols = Symbols()
+    text = set()
     for line in open(lst):
         parts = line.split()
         for i in range(0, len(parts) - 2, 3):
@@ -520,8 +524,18 @@ def assemble(source="YMXR.S", defines=()):
                 try:
                     symbols.setdefault(parts[i], int(parts[i + 1], 16))
                 except ValueError:
-                    pass
+                    continue
+                if parts[i + 2] == "t":
+                    text.add(parts[i])
+    symbols.text = frozenset(text)
     return open(out, "rb").read(), symbols
+
+
+class Symbols(dict):
+    """An assembly's symbols, each name's value, and in text the names
+    that are labels of the text section: an offset of the code, which a
+    link moves (doc/LINKER.md), where every other symbol is an equate."""
+    text = frozenset()
 
 
 CORPUS = os.environ.get("YM_CORPUS",
@@ -1578,8 +1592,6 @@ def inside(code, symbols, bound, tune, workspace):
     """
     if not tune.effects:
         return []
-    wide = CODE + next(a for a in range(symbols["ymxr_widestart"], len(code), 2)
-                       if code[a:a + 6] == b"\x40\xe7\x00\x7c\x07\x00")
     at = []
     for i in range(4):
         if tune.effects & 1 << i:
@@ -1592,6 +1604,11 @@ def inside(code, symbols, bound, tune, workspace):
                 at.append((i, i + 1, CODE + symbols["ymxr_lkwindow"], "window one"))
                 at.append((i, i + 1, CODE + symbols["ymxr_rlevel"], "square"))
             if any(widens(tune, r, i) for r in tune.rows):
+                # the window of the start of several columns, in a player
+                # that has the routine: one linked for a tune without such
+                # a source leaves it out (doc/LINKER.md)
+                wide = CODE + next(a for a in range(symbols["ymxr_widestart"], len(code), 2)
+                                   if code[a:a + 6] == b"\x40\xe7\x00\x7c\x07\x00")
                 at.append((i, i, wide, "wide"))
                 at.append((i, i + 1, wide + 6, "wide end"))
             if any(aims(tune, r, i) for r in tune.rows):
@@ -5501,6 +5518,98 @@ def flagged(flags):
             + ([DEFER_ON] if flags & 8 else []) + ([MAP_ON] if flags & 16 else []))
 
 
+def pieces_of(name):
+    """The table of a core's pieces and fields, as the build cut it
+    beside the core in go/binaries/data (doc/LINKER.md, The library):
+    (name, first byte, byte past the last) a piece, and (offset, width,
+    {piece: c}) a field."""
+    pieces, fields = [], []
+    with open(os.path.join(ROOT, "go", "binaries", "data",
+                           name.replace(".bin", ".pieces"))) as f:
+        for line in f:
+            word = line.split()
+            if word and word[0] == "piece":
+                pieces.append((word[1], int(word[2]), int(word[3])))
+            elif word and word[0] == "field":
+                moves = {}
+                for one in word[3:]:
+                    m = re.match(r"([a-z]+_[0-9]+)([+-][0-9]+)$", one)
+                    moves[m.group(1)] = int(m.group(2))
+                fields.append((int(word[1]), int(word[2]), moves))
+    return pieces, fields
+
+
+def link(core, table, blocks_out):
+    """The core linked with every piece of the blocks named left out, and
+    every field moved by -c times the bytes of each piece left out it
+    refers across (doc/LINKER.md, The link): the rig's link, which the
+    tool's is read against. Returns the bytes and the pieces left out."""
+    pieces, fields = table
+    out = [one for one in pieces if one[0].rsplit("_", 1)[0] in blocks_out]
+    size = {name: to - at for name, at, to in out}
+    moved = bytearray(core)
+    for at, width, moves in fields:
+        by = sum(c * size[name] for name, c in moves.items() if name in size)
+        if by:
+            form = ">b" if width == 1 else ">h"
+            moved[at:at + width] = struct.pack(form, struct.unpack(form, core[at:at + width])[0] - by)
+    linked, start = bytearray(), 0
+    for _, at, to in out:
+        linked += moved[start:at]
+        start = to
+    linked += moved[start:]
+    return bytes(linked), out
+
+
+def linked_player(ym, defines):
+    """The player ymxr-sndh -link links for one tune, cut out of the SNDH
+    file it writes, and its symbols as the link moved them; and the line
+    the run prints of it. The rig links the assembled core with the
+    blocks the tool reports left out and requires the same bytes, its
+    patched longs aside, and the player in the core to be the player
+    assembled alone (doc/LINKER.md, The check)."""
+    work = tempfile.mkdtemp()
+    file, _ = convert(ym, work)
+    bits = asked(defines)
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-link"]
+                       + (["-perf"] if bits & 1 else []) + (["-lean"] if bits & 2 else [])
+                       + (["-pcrel"] if bits & 4 else ["-abs"]),
+                       input=file, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    if re.search(r"the core: \S+, \d+ bytes?\n", r.stderr.decode()):
+        return None
+    said = re.search(r"the core: (\S+) linked for the set, (\d+) bytes? of (\d+)"
+                     r"(?:, the blocks left out: ([a-z, ]+))?", r.stderr.decode())
+    assert said, "ymxr-sndh -link reports no linked core: " + r.stderr.decode()
+    name, blocks_out = said.group(1), (said.group(4) or "").split(", ")
+    made = r.stdout
+    at = struct.unpack(">h", made[2:4])[0] + 2
+    body = made[at:]
+    flags = struct.unpack(">H", body[22:24])[0]
+    assert core_name(flags) == name, "the file's flags read %s, and the report %s" % (
+        core_name(flags), name)
+    core_code, core_symbols = build(flagged(flags), "YMXR_sndh.S")
+    ours, out = link(core_code, pieces_of(name), blocks_out)
+    assert len(ours) == int(said.group(2)), "the rig links %d bytes, and the tool %s" % (
+        len(ours), said.group(2))
+    assert body[:28] == ours[:28] and body[36:len(ours)] == ours[36:], \
+        "the core ymxr-sndh linked is not the rig's link of %s, its patched longs aside" % name
+    code, symbols = build(flagged(flags))
+    first = core_symbols["YMXR_init"] - symbols["YMXR_init"]
+    assert core_code[first:] == code, "the player in %s is not the player assembled" % name
+    moved = Symbols()
+    for sym, value in symbols.items():
+        if sym not in symbols.text:
+            moved[sym] = value
+            continue
+        if any(a <= first + value < to for _, a, to in out):
+            continue
+        moved[sym] = value - sum(to - a for _, a, to in out if to <= first + value)
+    moved.text = frozenset(sym for sym in symbols.text if sym in moved)
+    return ours[first:], moved, "%s linked, %d bytes of %d, %s left out" % (
+        name, len(ours), len(core_code), ", ".join(blocks_out) or "no block")
+
+
 def core_name(flags):
     """The name of the core whose flags word reads `flags` (BINARIES.md
     2.1)."""
@@ -5873,7 +5982,7 @@ def main():
             continue
         first = one
         break
-    if first is not None:
+    if first is not None and not LINKED:
         def wanted(name):
             return only is None or name in only
         lookup = mapped_tunes() if wanted("cores") or wanted("sets") else None
@@ -5942,8 +6051,16 @@ def main():
                 frames, ticks = hatari(ym, code, symbols, perf)
                 print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
                 continue
+            playing = (code, symbols)
+            if LINKED:
+                playing = linked_player(ym, defines)
+                if playing is None:
+                    print("%-45s the deferred start or the lookup: the core as carried,"
+                          " not linked" % os.path.basename(ym))
+                    continue
+                print("%-45s %s" % (os.path.basename(ym), playing[2]))
             frames, ticks, cost, tick_cost, tick_cycles, where, boundaries, refills_of = \
-                check(ym, code, symbols, cycles_of and CyclesOn(cycles_of),
+                check(ym, playing[0], playing[1], cycles_of and CyclesOn(cycles_of),
                       kit, perf, parts)
             for kind, spent in tick_cost.items():
                 general.setdefault(kind, set()).update(spent)

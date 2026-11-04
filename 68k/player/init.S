@@ -185,11 +185,13 @@ YMXR_init:
                 .if     YMXR_NEST
 ; A tune that runs one effect has no second timer to nest inside a tick,
 ; so the level that tick drops buys it no safety: two nops are where the
-; drop would, in all three of that effect's handlers. A tune running two
-; or more keeps the drop, and one running none skips the handlers. Every
-; handler's word is written on every init: a set inits one loaded copy
-; for each subtune, and a subtune that ran one effect alone left its nops
-; where the next, running that effect beside another, needs the drop.
+; drop would be. A tune running two or more keeps the drop. The word is
+; written into the general handler, the square's and the one-row
+; source's of every effect: a timer the tune does not run is left
+; unclaimed, and its handlers do not run. Every handler's word is
+; written on every init: a set inits one loaded copy for each subtune,
+; and a subtune that ran one effect alone left its nops where the next,
+; running that effect beside another, needs the drop.
                 move.l  #$46FC2500,d3           ; move.w #$2500,sr, the drop,
                 move.b  WS_EFFECTS(a6),d0       ; which a handler keeps unless
                 and.b   #$0F,d0                 ; its effect runs alone
@@ -215,65 +217,64 @@ YMXR_init:
                 adda.w  d6,a5
                 moveq   #3,d2
 .link:          bsr     ymxr_link
+                .if     YMXR_NEST
+                move.l  d3,TICK_SR(a5)
+                .endif
                 lea     TICK_SIZE(a5),a5
                 dbra    d2,.link
+                PIECE   counted_1
                 lea     ymxr_cnt0(pc),a5
                 adda.w  d6,a5
                 moveq   #3,d2
 .linkc:         bsr     ymxr_linkc
                 lea     TICKC_SIZE(a5),a5
                 dbra    d2,.linkc
+                ENDPIECE counted_1
 
                 .if     YMXR_NEST
-                lea     ymxr_tick0(pc),a5
+                PIECE   one_1
+                lea     ymxr_one0(pc),a5
                 adda.w  d6,a5
-                lea     ymxr_sq0(pc),a4
-                adda.w  d6,a4
-                lea     ymxr_one0(pc),a3
-                adda.w  d6,a3
-                .if     YMXR_MAP
-                lea     ymxr_lk0(pc),a1         ; and the general lookup
-                adda.w  d6,a1                   ; instance's
-                .endif
-                moveq   #0,d4
                 moveq   #3,d2
-.each:          move.l  #$46FC2500,d0           ; a handler the tune does not
-                btst    d4,WS_EFFECTS(a6)       ; run keeps the drop, and one
-                beq.s   .word                   ; it runs is written d3
-                move.l  d3,d0
-.word:          move.l  d0,TICK_SR(a5)
-                move.l  d0,SQ_SR(a4)
-                move.l  d0,ONE_SR(a3)
+.one:           move.l  d3,ONE_SR(a5)
+                lea     ONE_SIZE(a5),a5
+                dbra    d2,.one
+                ENDPIECE one_1
                 .if     YMXR_MAP
-                move.l  d0,LK_SR(a1)
-                lea     LOOK_STRIDE(a1),a1
+                lea     ymxr_lk0(pc),a5         ; and the general lookup
+                adda.w  d6,a5                   ; instance's
+                moveq   #3,d2
+.lk:            move.l  d3,LK_SR(a5)
+                lea     LOOK_STRIDE(a5),a5
+                dbra    d2,.lk
                 .endif
-                lea     TICK_SIZE(a5),a5
-                lea     SQ_SIZE(a4),a4
-                lea     ONE_SIZE(a3),a3
-                addq.w  #1,d4
-                dbra    d2,.each
                 .endif
 
 ; A square's handler names the row it is at in the one instruction
 ; that moves between the two, and so does the copy of that instruction in
 ; its hook (4.8).
+                PIECE   square_1
                 lea     ymxr_sq0(pc),a5
                 adda.w  d6,a5
                 moveq   #3,d2
 .sq:            lea     SQ_VAL(a5),a3
                 move.l  a3,SQ_PTR(a5)
+                .if     YMXR_NEST
+                move.l  d3,SQ_SR(a5)
+                .endif
                 .if     YMXR_DEFER
                 move.l  a3,SQ_HPTR(a5)
                 .endif
                 lea     SQ_SIZE(a5),a5
                 dbra    d2,.sq
+                ENDPIECE square_1
 
 ; The handlers of several columns: the loop cells they read and the
 ; places they step are in the handler, so one link writes every address
 ; the loop path and the step read, as a general handler's link does. A
 ; start writes the values, and no timer reaches one of these handlers
 ; before a start has aimed its vector there.
+                PIECE   two_1
                 lea     ymxr_two0(pc),a5
                 adda.w  d6,a5
                 moveq   #3,d2
@@ -290,6 +291,8 @@ YMXR_init:
                 move.l  a3,TW2_LOOP2W(a5)
                 lea     TW2_SIZE(a5),a5
                 dbra    d2,.linktwo
+                ENDPIECE two_1
+                PIECE   three_1
                 lea     ymxr_three0(pc),a5
                 adda.w  d6,a5
                 moveq   #3,d2
@@ -311,6 +314,8 @@ YMXR_init:
                 move.l  a3,TW3_LOOP3W(a5)
                 lea     TW3_SIZE(a5),a5
                 dbra    d2,.linkthree
+                ENDPIECE three_1
+                PIECE   envelope_1
                 lea     ymxr_env0(pc),a5
                 adda.w  d6,a5
                 moveq   #3,d2
@@ -331,6 +336,7 @@ YMXR_init:
                 move.w  #1,TWC_LEFT(a5)
                 lea     TWC_SIZE(a5),a5
                 dbra    d2,.linkenv
+                ENDPIECE envelope_1
                 .if     YMXR_MAP
 ; Link lookup instances as above, selecting page 0 from the bank's
 ; page-byte table. Clearing the records below leaves every page
@@ -654,6 +660,7 @@ ymxr_link:
                 clr.b   TICK_SEL(a5)            ; R0, the register of the kept
                 rts                             ; target init leaves (SPEC.md 5.2.1)
 
+                PIECE   counted_2
 ; a5 a counted handler, the same way: its operands linked, its counter
 ; at 1 and its cell at 0, so a tick before the first start writes the
 ; parked marker and stops the timer, as the handler above does.
@@ -683,3 +690,4 @@ ymxr_linkc:
                 .endif
                 clr.b   TICKC_SEL(a5)           ; R0, as init leaves the kept
                 rts                             ; target (SPEC.md 5.2.1)
+                ENDPIECE counted_2

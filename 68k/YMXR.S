@@ -82,6 +82,7 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
 
 ; ---------------------------------------------------------------- macros
 
+                .include "player/pieces.S"
                 .include "player/columns.S"
                 .include "player/effect.S"
                 .include "player/ticks.S"

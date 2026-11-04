@@ -1,0 +1,127 @@
+piece counted_1 1082 1102
+piece one_1 1102 1122
+piece square_1 1122 1150
+piece two_1 1150 1208
+piece three_1 1208 1284
+piece envelope_1 1284 1360
+piece counted_2 1890 1950
+piece square_2 5564 5780
+piece one_2 5780 5964
+piece counted_3 5964 6596
+piece two_2 6596 7316
+piece three_2 7316 8156
+piece envelope_2 8156 8940
+piece several_1 8940 9722
+piece several_2 9818 9906
+field 294 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 636 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 690 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 694 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 704 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 718 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 752 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 762 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 984 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 988 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1000 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1010 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1020 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1060 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1068 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1084 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 one_2+1 square_1+1 square_2+1 three_1+1 two_1+1
+field 1092 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1104 2 counted_2+1 envelope_1+1 one_1+1 square_1+1 square_2+1 three_1+1 two_1+1
+field 1124 2 counted_2+1 envelope_1+1 square_1+1 three_1+1 two_1+1
+field 1152 2 counted_2+1 counted_3+1 envelope_1+1 one_2+1 square_2+1 three_1+1 two_1+1
+field 1210 2 counted_2+1 counted_3+1 envelope_1+1 one_2+1 square_2+1 three_1+1 two_2+1
+field 1286 2 counted_2+1 counted_3+1 envelope_1+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 1368 2 counted_2+1 counted_3+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
+field 1458 2 counted_2+1
+field 1462 2 counted_2+1
+field 1466 2 counted_2+1
+field 1470 2 counted_2+1
+field 1546 2 counted_2+1
+field 1582 2 counted_2+1
+field 1622 2 counted_2+1
+field 1662 2 counted_2+1
+field 1702 2 counted_2+1
+field 1878 2 counted_2+1 counted_3+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
+field 1938 2 counted_2+1 counted_3+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
+field 2368 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 2406 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 2540 2 square_2+1
+field 2710 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 2908 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 2946 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 3080 2 square_2+1
+field 3268 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 3466 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 3504 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 3638 2 square_2+1
+field 3808 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 4006 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 4044 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 4178 2 square_2+1
+field 4368 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 5806 2 square_2-1
+field 5852 2 square_2-1
+field 5898 2 square_2-1
+field 5944 2 square_2-1
+field 6010 2 one_2-1 square_2-1
+field 6060 2 one_2-1 square_2-1
+field 6096 2 one_2-1 square_2-1
+field 6168 2 one_2-1 square_2-1
+field 6218 2 one_2-1 square_2-1
+field 6254 2 one_2-1 square_2-1
+field 6326 2 one_2-1 square_2-1
+field 6376 2 one_2-1 square_2-1
+field 6412 2 one_2-1 square_2-1
+field 6484 2 one_2-1 square_2-1
+field 6534 2 one_2-1 square_2-1
+field 6570 2 one_2-1 square_2-1
+field 6656 2 counted_3-1 one_2-1 square_2-1
+field 6708 2 counted_3-1 one_2-1 square_2-1
+field 6744 2 counted_3-1 one_2-1 square_2-1
+field 6836 2 counted_3-1 one_2-1 square_2-1
+field 6888 2 counted_3-1 one_2-1 square_2-1
+field 6924 2 counted_3-1 one_2-1 square_2-1
+field 7016 2 counted_3-1 one_2-1 square_2-1
+field 7068 2 counted_3-1 one_2-1 square_2-1
+field 7104 2 counted_3-1 one_2-1 square_2-1
+field 7196 2 counted_3-1 one_2-1 square_2-1
+field 7248 2 counted_3-1 one_2-1 square_2-1
+field 7284 2 counted_3-1 one_2-1 square_2-1
+field 7396 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7458 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7494 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7606 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7668 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7704 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7816 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7878 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 7914 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 8026 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 8088 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 8124 2 counted_3-1 one_2-1 square_2-1 two_2-1
+field 8222 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8282 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8318 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8418 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8478 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8514 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8614 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8674 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8710 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8810 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8870 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8906 2 counted_3-1 one_2-1 square_2-1 three_2-1 two_2-1
+field 8964 2 several_1+1
+field 9128 2 envelope_2-1 three_2-1
+field 9146 2 envelope_2-1 three_2-1 two_2-1
+field 9176 2 several_1+1
+field 9232 2 several_1+1
+field 9266 2 several_1+1
+field 9472 2 several_1+1
+field 9508 2 counted_3-1 envelope_2-1 three_2-1 two_2-1
+field 9532 2 envelope_2-1
+field 9606 2 several_1+1

@@ -19,6 +19,7 @@ ymxr_timers:    TIMERAT $134,$FA19,ymxr_inst0,$07,$00
                 TIMERAT $120,$FA1B,ymxr_inst2,$07,$00
                 TIMERAT $114,$FA1D,ymxr_inst3,$70,$84
 
+                PIECE   several_2
 ; The targets that write several registers (SPEC.md 2.1): a register and
 ; the column that writes it, one slot a column and eight bytes a target,
 ; from target 14. The column the marker is in comes last, so the move
@@ -34,6 +35,7 @@ ymxr_wide:      dc.b    0,0,  1,1,  0,0,  0,0   ; 14 setToneA:     R0 R1
                 dc.b    8,1,  6,0,  0,0,  0,0   ; 22 setNoiseA:    R6 R8
                 dc.b    9,1,  6,0,  0,0,  0,0   ; 23 setNoiseB:    R6 R9
                 dc.b   10,1,  6,0,  0,0,  0,0   ; 24 setNoiseC:    R6 R10
+                ENDPIECE several_2
 
 ; A parked place: a marker with no loop cell, so a tick of a timer no row
 ; has started writes $80 to R0 and stops its timer (SPEC.md 5.2.1).

@@ -9,40 +9,52 @@
                 TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
                 TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 
+                PIECE   square_2
                 SQUARE  ymxr_sq0,$DF,$FFFFFA0F,$070,ymxr_inst0
                 SQUARE  ymxr_sq1,$EF,$FFFFFA11,$007,ymxr_inst1
                 SQUARE  ymxr_sq2,$FE,$FFFFFA0F,$707,ymxr_inst2
                 SQUARE  ymxr_sq3,$DF,$FFFFFA11,$077,ymxr_inst3
+                ENDPIECE square_2
 
+                PIECE   one_2
                 ONEROW  ymxr_one0,$DF,$FFFFFA0F,$070,ymxr_inst0
                 ONEROW  ymxr_one1,$EF,$FFFFFA11,$007,ymxr_inst1
                 ONEROW  ymxr_one2,$FE,$FFFFFA0F,$707,ymxr_inst2
                 ONEROW  ymxr_one3,$DF,$FFFFFA11,$077,ymxr_inst3
+                ENDPIECE one_2
 
+                PIECE   counted_3
                 TICKC   ymxr_cnt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
                 TICKC   ymxr_cnt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
                 TICKC   ymxr_cnt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
                 TICKC   ymxr_cnt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE counted_3
 
 ; The handlers of a target that writes two registers, and of one that
 ; writes three: one an effect, as the three above are.
+                PIECE   two_2
                 TICKW   ymxr_two0,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
                 TICKW   ymxr_two1,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
                 TICKW   ymxr_two2,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
                 TICKW   ymxr_two3,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE two_2
 
+                PIECE   three_2
                 TICKW   ymxr_three0,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
                 TICKW   ymxr_three1,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
                 TICKW   ymxr_three2,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
                 TICKW   ymxr_three3,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE three_2
 
 ; The counted shape of two columns: `setEnvelope` writes R11 and R12 and
 ; both read every bit of their byte, so the rows of a source on it are
 ; whole bytes and a tick counts them (SPEC.md 2.1.3, 3.1.6).
+                PIECE   envelope_2
                 TICKW   ymxr_env0,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
                 TICKW   ymxr_env1,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
                 TICKW   ymxr_env2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
                 TICKW   ymxr_env3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE envelope_2
                 .if     YMXR_MAP
 ; Bank-0 lookup instances follow identity handlers. Pad each of eight
 ; kinds per effect so its page-read displacement matches its pages

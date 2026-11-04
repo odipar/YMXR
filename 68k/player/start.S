@@ -149,6 +149,7 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .endif
                 .endm
 
+                PIECE   several_1
                 .if     YMXR_MAP
 ; Place reset for counted or multi-column handlers. Use the running
 ; kind's offsets for identity or lookup instances (SPEC.md 1.9). d3 is
@@ -448,6 +449,7 @@ ymxr_widestart:
                 move.w  (sp)+,(sp)              ; the level pushed, over R
                 bra.w   .aimed
 
+                ENDPIECE several_1
 ; A row number modulo R (SPEC.md 1.8.4): d3 the number, d4 R; d5
 ; scratch. A number below R is one compare. At R or above, one divu: its
 ; quotient fits a word where the number is below R times 65,536, which
