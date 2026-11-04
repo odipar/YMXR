@@ -74,7 +74,7 @@ its noun, singular for a count of 1 and plural for any other: `1 row`,
 | `ymxr-layout` | a multi file, a bound tune, an SNDH file or a program | the record of BINARIES.md 6 | - |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
 | `ymxr-multi` | the tune files named | a multi file | `-nNAME`, `-mN`, `-copies[S]` |
-| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
+| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-link` |
 | `ymxr-prg` | an SNDH file | a TOS program | `-rROWS`, `-vbl` |
 
 **2.1** Each tool is written twice, under one name, in the two trees of
@@ -608,9 +608,11 @@ its field at 26, where its handlers begin (BINARIES.md 2.2): within
 and further off the core that reads an address. Deferred-start support
 is selected when any subtune sets effects bit 4; lookup support is
 selected when any subtune sets bit 5. Other files use the smaller cores
-without those features (BINARIES.md 2.1). On a core with the lookup the
-tool reserves the page area right after the core, the largest a
-subtune's list needs within the reach of the core's first handler: a
+without those features (BINARIES.md 2.1). `-link` links the core for the
+set where no subtune sets bit 4 or bit 5: the pieces of each block no
+source of a subtune needs are left out (LINKER.md). On a core with the
+lookup the tool reserves the page area right after the core, the largest
+a subtune's list needs within the reach of the core's first handler: a
 table of T bytes for each effect and form of the list, T the
 transformations, 256 bytes for each page it fills and for each page of
 the fallbacks of the effects whose pages pass the reach, and 255 more;
@@ -652,29 +654,32 @@ tick asked for needs bit 1 set`, `... the row read through the program
 counter asked for needs bit 2 set`, `... a subtune that defers a start
 needs bit 3 set`, or `... a subtune that maps a value needs bit 4 set`.
 
-**12.4 The report:** the heading `the core: <file>, B bytes` with the
-row `the switches`, of `-perf, the raster monitor in` and `-lean, ticks
-that neither drop the interrupt level nor write an end of interrupt`
-where those were passed, and then one of `ticks that read a row through
-the program counter`, `-abs, ticks that read a row through an absolute
-address` where that was passed, and `ticks that read a row through an
-absolute address: the tunes end past the 32767 bytes a displacement
-reaches` where the tool chose it (12.1), `the deferred start in: a
-subtune defers a start` where the core has it, and `the lookup in: a
-subtune maps a value` where the core has it, joined by `; `; the
-heading `the tags: TITL <title>`, then `, COMM <composer>` where
-present, `, <clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N
-names` for several subtunes; a row a subtune, its name or `the tune`, `B
-bytes bound to B2, its table in image I`, B the tune file's bytes, B2
-the bound tune's, I the number of its image from 1; the heading `the
-images: N images of B bytes, DTX's reader once a set of tunes that share
-one` with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX3
-at unit K, values of W`, W the width of a value in bytes, and `DTX3 at
-unit K, 34 columns, values of W` for a table of 34 columns (BINARIES.md
-1.4); the heading `the file: B bytes, the core C, the images I, the
-tunes T, the workspace and the rest W`, C, I, T and W the bytes of the
-core, the images, the bound tunes, and the remainder. The summary line
-is `ymxr-sndh: B bytes, N subtunes`.
+**12.4 The report:** the heading `the core: <file>, B bytes`, or with
+`-link` on a core it links `the core: <file> linked for the set, B bytes
+of C` and then `, the blocks left out: <blocks>` or `, every block
+kept`, C the bytes of the core as carried, with the row `the switches`,
+of `-perf, the raster monitor in` and `-lean, ticks that neither drop
+the interrupt level nor write an end of interrupt` where those were
+passed, and then one of `ticks that read a row through the program
+counter`, `-abs, ticks that read a row through an absolute address`
+where that was passed, and `ticks that read a row through an absolute
+address: the tunes end past the 32767 bytes a displacement reaches`
+where the tool chose it (12.1), `the deferred start in: a subtune defers
+a start` where the core has it, and `the lookup in: a subtune maps a
+value` where the core has it, joined by `; `; the heading `the tags:
+TITL <title>`, then `, COMM <composer>` where present, `, <clock><rate>`
+and `, FLAG ~<letters>`, then `, !#SN with N names` for several
+subtunes; a row a subtune, its name or `the tune`, `B bytes bound to B2,
+its table in image I`, B the tune file's bytes, B2 the bound tune's, I
+the number of its image from 1; the heading `the images: N images of B
+bytes, DTX's reader once a set of tunes that share one` with a row an
+image, `image I`, `<shape>, N tunes`, the shape `DTX3 at unit K, values
+of W`, W the width of a value in bytes, and `DTX3 at unit K, 34 columns,
+values of W` for a table of 34 columns (BINARIES.md 1.4); the heading
+`the file: B bytes, the core C, the images I, the tunes T, the workspace
+and the rest W`, C, I, T and W the bytes of the core, the images, the
+bound tunes, and the remainder. The summary line is `ymxr-sndh: B bytes,
+N subtunes`.
 
 ---
 

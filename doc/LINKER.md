@@ -145,27 +145,65 @@ piece, and a linked core is read as the core it was linked from: the
 flags word is the core's, and init measures the reach from the general
 handler to the last handler kept.
 
+## Figures
+
+The blocks each tune of the conformance kit needs, and the bytes of the
+plain core of 8,798 bytes linked for it:
+
+| tune | the blocks kept | bytes |
+|---|---|---|
+| `chambers.ymxr` | none | 5,264 |
+| `circus.ymxr` | none | 5,264 |
+| `counted.ymxr` | square, counted, several | 6,968 |
+| `deferred.ymxr` | the deferred start: the core as carried | |
+| `envelope-counted.ymxr` | envelope, several | 6,946 |
+| `envelope.ymxr` | two, several | 6,864 |
+| `fine-zero.ymxr` | none | 5,264 |
+| `four-timers.ymxr` | square, one | 5,504 |
+| `mapped.ymxr` | the deferred start and the lookup: the core as carried | |
+| `plays-once.ymxr` | none | 5,264 |
+| `preempt.ymxr` | square | 5,404 |
+| `retune.ymxr` | one | 5,364 |
+| `synergy.ymxr` | square | 5,404 |
+| `turrican-2.ymxr` | none | 5,264 |
+| `turrican.ymxr` | none | 5,264 |
+| `voices.ymxr` | two, three, several | 7,500 |
+
+A tune of general sources alone links 5,264 bytes, 60% of the core: the
+blocks are 3,534 bytes of it. The kit's largest, `voices.ymxr`, keeps
+the handlers of two and three columns and the start of several columns,
+and links 7,500.
+
 ## The check
 
-- The build cuts each table, and BinariesTest requires the carried table
-  to be the one the build cuts.
-- LinkTest requires a link that leaves no piece out to be the core byte
-  for byte.
-- The rig plays the player linked for each fixture against the model.
+- The build cuts each table in every build, and LinkTest requires the
+  table under `go/binaries/data` to be the one the classes carry.
+- LinkTest requires a link that keeps every block to be the core byte
+  for byte, and reads the figures above.
+- ParityTest requires `ymxr-sndh -link` to write the same file and
+  report in the Java and the Go trees, for each tune of the kit, each
+  switch and a set of two.
+- The rig's `-linked` plays each tune on the player `ymxr-sndh -link`
+  links for it, cut out of the SNDH file, against the model. It first
+  requires the tool's core to be the rig's link of the assembled core,
+  its patched longs aside, and the player in the core to be the player
+  assembled alone. The 14 tunes of the kit that link play their whole
+  length as the specification reads on each of the eight cores the
+  library has, and the 11 dumps of `ym/test` their first 24 frames on
+  the plain core.
 
 ## Plan
 
 1. The design: the blocks, the library's format and the link. Done for
    the handler kinds; the frame is one block.
 2. The library: the pieces marked in the source and the tables cut by
-   the build.
-3. The linker, in the Java tree: the blocks a song needs, read from its
-   sources, the link, `ymxr-sndh -link`, and a report of the bytes of
-   each song against the core a tool picks today.
+   the build. Done.
+3. The linker, in the Java and the Go trees: the blocks a set needs,
+   read from its sources, the link, and `ymxr-sndh -link`. Done.
 4. The check: the rig plays the player linked for each fixture against
-   the model.
+   the model. Done.
 5. Later: the frame cut into a block an effect, which needs init to read
    the read sites through a table the link writes; the lookup instances
    as blocks, laid out at their page residues; the deferred start's
-   second bank; the Go linker, which ParityTest reads against the Java
-   one.
+   second bank; `-link` as the tools' default, with RigCallsTest's matrix
+   on linked cores.

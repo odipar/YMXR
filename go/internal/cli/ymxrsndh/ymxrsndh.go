@@ -16,9 +16,14 @@ import (
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
+// links is the flag that links the core for the set, which ymxr-sndh
+// reads beside the tags (doc/LINKER.md).
+var links = []string{"-link"}
+
 func Main() {
-	t, args := tool.Of("ymxr-sndh", os.Args[1:], flags.Tags...)
-	flags.Only(t, args, flags.Tags)
+	t, args := tool.Of("ymxr-sndh", os.Args[1:], append(append([]string(nil), flags.Tags...),
+		links...)...)
+	flags.Only(t, args, flags.Tags, links)
 	options := sndh.Options{Asked: flags.AskedOf(t, args)}
 	for _, flag := range args {
 		switch {
@@ -30,6 +35,8 @@ func Main() {
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":
 			options.Ticks = sndh.Absolute
+		case flag == "-link":
+			options.Link = true
 		case flag == "-vbl" || flag == "-tc":
 			// the clock asked for, read by AskedOf above
 		case strings.HasPrefix(flag, "-copies"):
@@ -86,12 +93,37 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	pcrel, deferred := flags&4 != 0, flags&8 != 0
 	mapped := flags&16 != 0
 	carried := binaries.Named(monitor, lean, pcrel, deferred, mapped)
-	core, err := binaries.Read(carried)
+	whole, err := binaries.Read(carried)
 	if err != nil {
 		return
 	}
-	said.Say(fmt.Sprintf("the core: %s, %s", carried,
-		report.Count(len(core), "byte", "bytes")))
+	core := len(whole)
+	if options.Link && sndh.Links(deferred, mapped) {
+		// the subtune table follows the linked core, on an even offset
+		// (BINARIES.md 3.1)
+		core = ymxr.GetLong(file, at+sndh.CoreTableAt)
+		var read []ymxr.File
+		for _, tune := range tunes {
+			one, err := ymxr.Read(tune)
+			if err != nil {
+				return
+			}
+			read = append(read, one)
+		}
+		table, err := sndh.CarriedPieces(carried)
+		if err != nil {
+			return
+		}
+		kept := ", every block kept"
+		if out := sndh.LeftOut(table, sndh.BlocksOf(read)); len(out) > 0 {
+			kept = ", the blocks left out: " + strings.Join(out, ", ")
+		}
+		said.Say(fmt.Sprintf("the core: %s linked for the set, %s of %d%s", carried,
+			report.Count(core, "byte", "bytes"), len(whole), kept))
+	} else {
+		said.Say(fmt.Sprintf("the core: %s, %s", carried,
+			report.Count(core, "byte", "bytes")))
+	}
 	var switches []string
 	if monitor {
 		switches = append(switches, "-perf, the raster monitor in")
@@ -170,9 +202,9 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 			"tunes"))
 	}
 	said.Say(fmt.Sprintf("the file: %s, the core %d, the images %d, the tunes %d,"+
-		" the workspace and the rest %d", report.Count(len(file), "byte", "bytes"), len(core),
+		" the workspace and the rest %d", report.Count(len(file), "byte", "bytes"), core,
 		images, bound,
-		len(file)-len(core)-images-bound))
+		len(file)-core-images-bound))
 }
 
 // even is at rounded up to an even address, as the file's parts are

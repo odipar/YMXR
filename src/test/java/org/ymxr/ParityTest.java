@@ -590,6 +590,37 @@ final class ParityTest {
         }
     }
 
+    /**
+     * A core linked for the set (doc/LINKER.md) is the same in both trees,
+     * and so is the report of its blocks: each tune of the conformance
+     * kit, a multi file of two that need other blocks, and each switch on
+     * one tune.
+     */
+    @Test
+    void aLinkedCoreIsTheSameInBothTrees() throws Exception {
+        Path kit = Path.of("doc/conformance/tunes");
+        List<Path> tunes;
+        try (Stream<Path> at = Files.list(kit)) {
+            tunes = at.filter(one -> one.toString().endsWith(".ymxr")
+                    && !one.getFileName().toString().equals("wrong-version.ymxr")).sorted()
+                    .toList();
+        }
+        for (Path tune : tunes) {
+            same("ymxr-sndh", Files.readAllBytes(tune), "-link");
+        }
+        byte[] voices = Files.readAllBytes(kit.resolve("voices.ymxr"));
+        for (String[] flags : new String[][] {{"-perf"}, {"-lean"}, {"-abs"},
+                {"-perf", "-lean", "-abs"}}) {
+            List<String> argv = new ArrayList<>(List.of("-link"));
+            argv.addAll(List.of(flags));
+            same("ymxr-sndh", voices, argv.toArray(new String[0]));
+        }
+        Ran set = ran(Path.of("bin"), "ymxr-multi", new byte[0], "-silent",
+                kit.resolve("counted.ymxr").toString(), kit.resolve("voices.ymxr").toString());
+        assertEquals(0, set.exit(), set.said());
+        same("ymxr-sndh", set.out(), "-link");
+    }
+
     @Test
     void theFlagsReadTheSameInBothTrees() throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym"));

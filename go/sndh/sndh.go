@@ -153,6 +153,9 @@ type Options struct {
 	Lean     bool
 	Ticks    Ticks
 	Asked    Asked
+	// Link links the core for the set, its blocks the subtunes need
+	// (doc/LINKER.md).
+	Link bool
 }
 
 // Of builds an SNDH file from tune files in subtune order. Options
@@ -185,11 +188,13 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	claimed := 0
 	defers := false
 	maps := false
+	var read []ymxr.File
 	for i, file := range tuneFiles {
 		tune, err := ymxr.Read(file)
 		if err != nil {
 			return nil, fmt.Errorf("subtune %d: %w", i+1, err)
 		}
+		read = append(read, tune)
 		if i == 0 {
 			rate = tune.FrameRate
 			// TIME divides the frames by the rate
@@ -237,15 +242,13 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		pcrel = ymxr.GetWord(core, CoreFlagsAt)&corePcrel != 0
 	}
 	if core == nil {
-		core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, pcrel,
-			defers, maps))
+		core, err = chosen(options, pcrel, defers, maps, read)
 		if err != nil {
 			return nil, err
 		}
 		if pcrel && options.Ticks == Chosen && TunesEnd(core, set, tags) > pcrelReach {
 			pcrel = false
-			core, err = binaries.Read(binaries.Named(options.Monitor, options.Lean, false,
-				defers, maps))
+			core, err = chosen(options, false, defers, maps, read)
 			if err != nil {
 				return nil, err
 			}
@@ -647,4 +650,20 @@ func Clean(said string) string {
 		}
 	}
 	return string(out)
+}
+
+// chosen is the core the switches select, and with Link, where the set
+// needs neither the deferred start nor the lookup, that core linked for
+// the blocks the set needs (doc/LINKER.md).
+func chosen(options Options, pcrel, defers, maps bool, tunes []ymxr.File) ([]byte, error) {
+	name := binaries.Named(options.Monitor, options.Lean, pcrel, defers, maps)
+	core, err := binaries.Read(name)
+	if err != nil || !options.Link || !Links(defers, maps) {
+		return core, err
+	}
+	table, err := CarriedPieces(name)
+	if err != nil {
+		return nil, err
+	}
+	return Link(core, table, BlocksOf(tunes))
 }
