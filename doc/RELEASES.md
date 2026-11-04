@@ -44,10 +44,12 @@ tagged `v0.10.1`.
 
 The player fixes two faults, writes two shapes of tick in fewer cycles, and
 starts and remaps a source through a transformation in fewer; every core is
-218 to 376 bytes smaller. The tune file and the bound tune are 0.10.0's, and
-the tools are 0.10.0's but for the cores they contain. Over the eleven dumps
-under `ym/test`, the SNDH files come to 224,592 bytes, 2,640 less than under
-0.10.0, 240 a file, the plain core's difference.
+218 to 376 bytes smaller. The tools check a structure's remaps in time
+linear in the tune, with YMXS 0.7.1. The tune file and the bound tune are
+0.10.0's, and the tools are 0.10.0's but for the cores they contain and
+YMXS's check. Over the eleven dumps under `ym/test`, the SNDH files come to
+224,592 bytes, 2,640 less than under 0.10.0, 240 a file, the plain core's
+difference.
 
 - **A counted tick of one column** (SPEC.md 5.1 step 5). The counted
   handler of one column, and its lookup instance, stepped the place before
@@ -75,18 +77,28 @@ under `ym/test`, the SNDH files come to 224,592 bytes, 2,640 less than under
   `YMXR_sndh-defer-map.bin` 28,036, 376 less. Init is 188 to 292 bytes of
   that. The program stub is 0.10.0's byte for byte. `ymxr-sndh` writes the
   kit's `mapped.ymxr` as 40,224 bytes, 376 less.
+- **YMXS 0.7.1** (tools.md 19.2, 19.3). The check reads each timer's starts
+  once, at its first remap, and the lines of a mapping once a timer, where
+  YMXS 0.7.0 read them again at every remap. `ymxs-to-ymxr` checks and
+  converts a structure of 16,384 rows and 18,432 remaps through four
+  transformations in 1.73 s, where the check of YMXS 0.7.0 alone ran in 733
+  s. Every other output of the check is YMXS 0.7.0's.
 - **The source.** `68k/YMXR.S` includes twenty files under `68k/player`,
   and an assembly of it alone names `-i68k` (tools.md 15.1).
 - **The rig** reads a cycle figure of performance.md and plan.md as true
   within 5% of its count; sizes, counts and words exactly (tools.md 17.1).
 - **The tools** contain the thirty-three binaries, and `ymxr.wasm` is
-  5,801,598 bytes, 12,624 less than 0.10.0's source builds with Go 1.26.0.
+  5,816,156 bytes with Go 1.26.2, 7,949 more than 0.10.0's source builds
+  with the same Go: YMXS 0.7.1's check adds 18,342, and the player's changes
+  save 10,393.
 - **The kits.** The tunes, the files and the records are 0.10.0's.
 
 Checks: test.yml run 41886656211 on 5595fc7, every step green: `bin/suite`
 with no test skipped, `RigCallsTest` on the 32 cores among it; `-refill`,
 `-cycles -abs` and `-cycles -map` over the eleven fixtures; and the tunes
-on Hatari's MFP and `-xpatch`.
+on Hatari's MFP and `-xpatch`. On cb983c5, which moves to YMXS 0.7.1, `go
+test ./...` and `ParityTest`, `ConformanceTest`, `WriterTest`,
+`ConsistencyTest` and `HouseStyleTest`, 100 tests and none skipped.
 
 ### 0.10.0, 2026-11-04
 
