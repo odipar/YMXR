@@ -33,6 +33,7 @@ import org.ymxs.tool.Tool;
  *  26      2      where the handlers begin, the reach measured from there
  *  28      4      the subtune table's offset, patched here
  *  32      4      the workspace's offset, patched here
+ *  36      4      with the lookup in, the page area's offset, patched here
  * </pre>
  */
 final class Sndh {
@@ -55,6 +56,20 @@ final class Sndh {
     static final int CORE_TABLE_AT = 28;
     static final int CORE_WORK_AT = 32;
     static final int CORE_DESCRIPTOR = 36;
+
+    /** The page area's offset in a core with the lookup in (BINARIES.md
+     *  2.2, 3.1), 0 where the file has none. */
+    static final int CORE_PAGES_AT = 36;
+
+    /** The page area's bytes for a list of P pages besides its tables:
+     *  256 bytes a page, and the 255 bytes over which each effect's pages
+     *  begin at its offset modulo 256 (BINARIES.md 3.1). */
+    static final int PAGE_BYTES = 256;
+    static final int PAGE_SPAN = 255;
+
+    /** What a page read reaches: its displacement is a signed word from
+     *  the instruction that reads it (68k/YMXR.S, LKEY). */
+    static final int PAGE_REACH = 32767;
 
     /** The core's flag bit 0: the player's raster monitor assembled in
      *  (doc/performance.md). */
@@ -264,8 +279,59 @@ final class Sndh {
                         + " row through the program counter reaches " + PCREL_REACH);
             }
         }
+        if (area(core, set) < 0) {
+            int handlers = Tune.getWord(core, CORE_HANDLERS_AT);
+            int least = 0;
+            for (byte[] block : set.blocks()) {
+                if (block.length > 0) {
+                    least = Math.max(least, Bound.least(block, fallback(core)));
+                }
+            }
+            throw new IllegalArgumentException("the page area ends "
+                    + (even(core.length) + least - handlers) + " bytes past the core's first"
+                    + " handler, at " + handlers + ", and a tick's page read reaches "
+                    + PAGE_REACH);
+        }
         int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
         return combine(core, set, tags, workspace);
+    }
+
+    /**
+     * The page area's bytes (BINARIES.md 3.1, 5.6): for a core with the
+     * lookup in, the largest area a subtune's list needs within the reach
+     * of the core's first handler, from the area's offset right after the
+     * core ({@link Bound#area}); -1 where a list's fallback pages do not
+     * fit, and 0 for a core without the lookup.
+     */
+    static int area(byte[] core, Bound.Set set) {
+        if (core.length < CORE_PAGES_AT + 4
+                || (Tune.getWord(core, CORE_FLAGS_AT) & CORE_MAP) == 0) {
+            return 0;
+        }
+        int reach = reach(core);
+        int most = 0;
+        for (byte[] block : set.blocks()) {
+            if (block.length > 0) {
+                int one = Bound.area(block, reach, fallback(core));
+                if (one < 0) {
+                    return -1;
+                }
+                most = Math.max(most, one);
+            }
+        }
+        return most;
+    }
+
+    /** The bytes past the page area's offset that the core's first handler
+     *  reaches (BINARIES.md 5.6). */
+    static int reach(byte[] core) {
+        return PAGE_REACH - (even(core.length) - Tune.getWord(core, CORE_HANDLERS_AT));
+    }
+
+    /** The fallback pages of an effect, two a bank of handlers (BINARIES.md
+     *  5.6). */
+    static int fallback(byte[] core) {
+        return (Tune.getWord(core, CORE_FLAGS_AT) & CORE_DEFER) != 0 ? 4 : 2;
     }
 
     /**
@@ -276,7 +342,8 @@ final class Sndh {
      * first byte.
      */
     static int tunesEnd(byte[] core, Bound.Set set, byte[] tags) {
-        int at = even(core.length) + 2 + 4 * set.tunes().size();
+        int at = even(even(core.length) + Math.max(0, area(core, set))) + 2
+                + 4 * set.tunes().size();
         int end = at;
         for (byte[] tune : set.tunes()) {
             end = at + tune.length;
@@ -492,9 +559,9 @@ final class Sndh {
     }
 
     /**
-     * Combines a set with shared images: bound tunes follow the subtune
-     * table, images follow the tunes, and version 10 transformation
-     * blocks follow the images. Patch each tune's {@code IMAGE_AT} and,
+     * Combines a set with shared images: the page area follows the core,
+     * bound tunes follow the subtune table, images follow the tunes, and
+     * version 10 transformation blocks follow the images. Patch each tune's {@code IMAGE_AT} and,
      * in version 10, {@code TRANSFORMATIONS_AT} relative to that tune.
      * A tune without a shared image is packaged separately with its
      * image and block.
@@ -507,7 +574,11 @@ final class Sndh {
                     + " bytes, and a bra.w reaches " + Short.MAX_VALUE);
         }
         int n = tunes.size();
-        int tableAt = even(core.length);
+        // The page area right after the core, within reach of the lookup
+        // handlers, the core's last bytes (BINARIES.md 3.1).
+        int pagesAt = even(core.length);
+        int area = Math.max(0, area(core, set));
+        int tableAt = even(pagesAt + area);
         int at = tableAt + 2 + 4 * n;
         // The bound tunes first, each on an even address (5.1), so that a
         // tune's sources are beside the core: a player whose ticks read a
@@ -551,6 +622,9 @@ final class Sndh {
         System.arraycopy(core, 0, file, header, core.length);
         Tune.putLong(file, header + CORE_TABLE_AT, tableAt);
         Tune.putLong(file, header + CORE_WORK_AT, workAt);
+        if (area > 0) {
+            Tune.putLong(file, header + CORE_PAGES_AT, pagesAt);
+        }
         Tune.putWord(file, header + tableAt, n);
         for (int i = 0; i < imageAt.length; i++) {
             System.arraycopy(set.images().get(i), 0, file, header + imageAt[i],

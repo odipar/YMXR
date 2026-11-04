@@ -2,6 +2,7 @@ package org.ymxr;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import org.dtx.Dtx;
 import org.dtx.Packager;
@@ -35,7 +36,8 @@ import org.jspecify.annotations.Nullable;
  *
  * Every offset counts from the first byte. The transformation block is
  * the tune file's transformation index and transformations byte for byte
- * (SPEC.md 3.4), each offset of its index counted from its first byte.
+ * (SPEC.md 3.4), each offset of its index counted from its first byte,
+ * then the list of the pages the tune maps through ({@link Pages}).
  */
 final class Bound {
 
@@ -166,12 +168,14 @@ final class Bound {
     }
 
     /**
-     * Copies a version 10 transformation block unchanged, or returns an
-     * empty array for versions 7 to 9. The block begins at the header's
-     * long at 16 and ends after its index or last entry, whichever is
-     * later. Index offsets are relative to the block, so relocation
-     * preserves them. The reader has already checked bounds (SPEC.md
-     * 3.4.2).
+     * The bound tune's transformation block of a version 10 tune file, or
+     * an empty array for versions 7 to 9: the tune file's block, copied
+     * unchanged, then the list of the pages the tune maps through
+     * ({@link Pages}, BINARIES.md 1.2). The tune file's block begins at
+     * the header's long at 16 and ends after its index or last entry,
+     * whichever is later. Index offsets are relative to the block, so
+     * relocation preserves them. The reader has already checked bounds
+     * (SPEC.md 3.4.2).
      */
     static byte[] block(byte[] tuneFile) {
         if (Tune.getWord(tuneFile, 4) != Tune.VERSION) {
@@ -184,7 +188,91 @@ final class Bound {
             int table = at + Tune.getLong(tuneFile, at + 2 + 4 * n);
             end = Math.max(end, table + 2 + Tune.getWord(tuneFile, table));
         }
-        return Arrays.copyOfRange(tuneFile, at, end);
+        byte[] list = Pages.of(TuneFile.read(tuneFile));
+        byte[] block = Arrays.copyOf(Arrays.copyOfRange(tuneFile, at, end),
+                end - at + list.length);
+        System.arraycopy(list, 0, block, end - at, list.length);
+        return block;
+    }
+
+    /** The pages the list after a bound tune's transformation block at
+     *  {@code block} counts, 0 where no list follows it (BINARIES.md
+     *  1.1). */
+    static int pages(byte[] bound, int block) {
+        int at = listAt(bound, block);
+        return tagged(bound, at) ? bound[at + Pages.TAG.length] & 0xFF : 0;
+    }
+
+    /** Whether the list's tag is at {@code at}. */
+    private static boolean tagged(byte[] bytes, int at) {
+        return at + Pages.TAG.length < bytes.length && bytes[at] == Pages.TAG[0]
+                && bytes[at + 1] == Pages.TAG[1];
+    }
+
+    /** Where the list is after the transformation block at {@code block}:
+     *  past its index and its last transformation. */
+    private static int listAt(byte[] bound, int block) {
+        int count = Tune.getWord(bound, block);
+        int end = block + 2 + 4 * count;
+        for (int n = 0; n < count; n++) {
+            int table = block + Tune.getLong(bound, block + 2 + 4 * n);
+            end = Math.max(end, table + 2 + Tune.getWord(bound, table));
+        }
+        return end;
+    }
+
+    /**
+     * The page area the transformation block {@code block} needs within
+     * {@code reach} bytes, its pages placed by the rule of BINARIES.md 5.6,
+     * {@code fallback} pages for each effect a page of the list falls back
+     * on; 0 where the list counts no page, and -1 where even the fallback
+     * pages do not fit.
+     */
+    static int area(byte[] block, int reach, int fallback) {
+        int at = listAt(block, 0);
+        int pages = pages(block, 0);
+        if (pages == 0) {
+            return 0;
+        }
+        int first = at + Pages.TAG.length + 1;
+        HashSet<Integer> pairs = new HashSet<>();
+        int[] last = new int[4];
+        for (int j = 0; j < pages; j++) {
+            int effect = block[first + 3 * j] & 0xFF;
+            pairs.add(effect << 8 | block[first + 3 * j + 1] & 0xFF);
+            last[effect & 3] = j + 1;
+        }
+        int tables = pairs.size() * Tune.getWord(block, 0) + Sndh.PAGE_SPAN;
+        int most = Math.floorDiv(reach - tables, Sndh.PAGE_BYTES);
+        int placed = pages;
+        int dropped = 0;
+        while (placed + fallback * dropped > most) {
+            placed--;
+            if (placed < 0) {
+                return -1;
+            }
+            dropped = 0;
+            for (int one : last) {
+                dropped += one > placed ? 1 : 0;
+            }
+        }
+        return tables + Sndh.PAGE_BYTES * (placed + fallback * dropped);
+    }
+
+    /** The least page area the block {@code block} needs: its tables and a
+     *  fallback for each effect of its list (BINARIES.md 5.6). */
+    static int least(byte[] block, int fallback) {
+        int at = listAt(block, 0);
+        int pages = pages(block, 0);
+        int first = at + Pages.TAG.length + 1;
+        HashSet<Integer> pairs = new HashSet<>();
+        HashSet<Integer> effects = new HashSet<>();
+        for (int j = 0; j < pages; j++) {
+            effects.add(block[first + 3 * j] & 0xFF);
+            pairs.add((block[first + 3 * j] & 0xFF) << 8 | block[first + 3 * j + 1] & 0xFF);
+        }
+        return pairs.size() * Tune.getWord(block, 0) + Sndh.PAGE_SPAN
+                + Sndh.PAGE_BYTES * fallback * effects.size();
     }
 
     /**

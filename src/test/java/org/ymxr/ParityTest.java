@@ -237,6 +237,45 @@ final class ParityTest {
     }
 
     /**
+     * The list of the pages a tune maps through, after the bound tune's
+     * transformation block (BINARIES.md 1.1, SPEC.md 3.4.4): the kit's
+     * mapped tune, the fade and a mapped tune with deferred starts bound
+     * the same in both trees, the kit's eleven pages six of them on effect
+     * 0, and its SNDH file with the page area after the core, the field
+     * at 36 its offset and the subtune table past it (3.1).
+     */
+    @Test
+    void theListOfPagesAndTheAreaAreTheSameInBothTrees() throws Exception {
+        byte[] kit = Files.readAllBytes(ConformanceTest.TUNES.resolve("mapped.ymxr"));
+        byte[] bound = both("ymxr-bind", kit, "-silent");
+        int block = Tune.getLong(bound, Bound.TRANSFORMATIONS_AT);
+        int pages = Bound.pages(bound, block);
+        assertEquals(11, pages, "the kit's pages");
+        byte[] list = Pages.of(TuneFile.read(kit));
+        int first = 0;
+        for (int k = 0; k < pages; k++) {
+            first += list[Pages.TAG.length + 1 + 3 * k] == 0 ? 1 : 0;
+        }
+        assertEquals(6, first, "the kit's pages on effect 0");
+        for (byte[] tune : List.of(both("ymxs-to-ymxr", json(YmxsTest.fade()), "-silent"),
+                BuiltTunes.mapped().file())) {
+            both("ymxr-bind", tune, "-silent");
+        }
+        byte[] sndh = both("ymxr-sndh", kit, "-silent");
+        int core = Sndh.even(Tune.getWord(sndh, 2) + 2);
+        byte[] carried = Binaries.core(false, false, true, true, true);
+        int length = carried.length;
+        int area = Sndh.area(carried, Bound.of(List.of(kit)));
+        assertEquals(Sndh.even(length), Tune.getLong(sndh, core + Sndh.CORE_PAGES_AT),
+                "the page area right after the core");
+        // a table of 11 bytes, the transformations, for each of the 4
+        // pairs of an effect and a form, and 256 bytes a page
+        assertEquals(4 * 11 + 256 * pages + Sndh.PAGE_SPAN, area, "the kit's page area");
+        assertEquals(Sndh.even(Sndh.even(length) + area),
+                Tune.getLong(sndh, core + Sndh.CORE_TABLE_AT), "the subtune table past it");
+    }
+
+    /**
      * A rate at the repeat row that the last row leaves otherwise (SPEC.md
      * rule 4(e)): the retune at the repeat row at count 100 with the last
      * row at 90, then the same with the select, a timer the last row stops,

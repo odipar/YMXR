@@ -737,6 +737,36 @@ long at 16. A bound tune places this block after its image, with its
 offset at 24 (BINARIES.md 1.3); an SNDH file places it after the shared
 images (BINARIES.md 3.1).
 
+**3.4.4** The *pages* of a tune are the pairs of a transformation and a
+form that each effect's starts and remaps map through, which a bound
+tune lists after the block behind the tag `YP`, so that a reader of the
+index reads past them (BINARIES.md 1.1). The form is the layout of the
+256 entries a tick reads its key through (2.1.5): 0 entry k at k; 1, a
+marked column's, entry k at k and at k + 128 with bit 7 set; and 2,
+setR7's, entry k at k + 192 with bits 7 and 6 set. A start of source s
+on target t has form 0 where s is counted, 2 where it is counted and t
+is `setR7`; and where s is marked, form 1 for one column, for two
+columns 0 on the noise targets and 1 on the others, and for three
+columns 1 on `setBuzzer` and 0 on the voices. A square and a source of
+one row (4.3) have no form. A writer reads the rows in order, row 0 to R
+- 1 and then rows RR to R - 1 again until each effect is at row RR as a
+pass before left it, with four values an effect the tune runs: the kept
+target and the kept mapping (4.3, 1.10.3), whether a start runs it,
+false at row 0, and the forms its timer may run, none at row 0. In a row
+of the effect:
+
+- a stop makes the third false and the fourth none, its mapping column
+  unread;
+- a start lists transformation m in the start's form, m the kept mapping
+  after the row where it is 1 to 127 and the source has a form; its
+  forms become its form, or with `deferred` set on an effect a start
+  runs, those forms and its form; and a start runs the effect;
+- a remap lists the transformation of its mapping in each of the forms,
+  where a start runs the effect and the mapping is 1 to 127.
+
+The pages are listed in effect order, each effect's in the order the
+rows first list them, and each pair once.
+
 ---
 
 ## 4. The frame

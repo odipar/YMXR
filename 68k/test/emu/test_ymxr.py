@@ -187,6 +187,100 @@ def placed(length):
     return ((end + 0xFF) & ~0xFF) + 2
 
 
+# The page area of a list of P pages besides its tables: 256 bytes a
+# page, and the 255 bytes over which each effect's pages begin at its
+# offset modulo 256 (BINARIES.md 3.1, 5.6), and the list's tag.
+PAGE_BYTES = 256
+PAGE_SPAN = 255
+LIST_TAG = b"YP"
+
+
+def list_of(tune_bytes):
+    """A bound tune's transformation count and its list's entries, (effect,
+    form, transformation) each; None for a tune of no block, and entries of
+    None where no list follows the block (BINARIES.md 1.1)."""
+    if tune_bytes[:4] != b"YMXB" or struct.unpack(">H", tune_bytes[4:6])[0] != MAPPED:
+        return None
+    block = struct.unpack(">i", tune_bytes[24:28])[0]
+    if block <= 0:
+        return None
+    count = struct.unpack(">H", tune_bytes[block:block + 2])[0]
+    last = block + 2 + 4 * count
+    for n in range(count):
+        at = block + long_at(tune_bytes, block + 2 + 4 * n)
+        last = max(last, at + 2 + struct.unpack(">H", tune_bytes[at:at + 2])[0])
+    if tune_bytes[last:last + 2] != LIST_TAG:
+        return count, None
+    return count, [tuple(tune_bytes[last + 3 + 3 * k:last + 6 + 3 * k])
+                   for k in range(tune_bytes[last + 2])]
+
+
+def plan_of(count, entries, reach, fallback):
+    """The pages init fills, k, and the area's bytes, by the rule of
+    BINARIES.md 5.6: QT + 255 + 256 X within reach, X the first k pages and
+    the fallback pages of each effect of an entry at or past k; None where
+    even the fallbacks do not fit."""
+    if not entries:
+        return 0, 0
+    tables = len({(e, f) for e, f, _ in entries}) * count + PAGE_SPAN
+    most = (reach - tables) // PAGE_BYTES
+    last = {e: j + 1 for j, (e, _, _) in enumerate(entries)}
+    k, dropped = len(entries), 0
+    while k + fallback * dropped > most:
+        k -= 1
+        if k < 0:
+            return None
+        dropped = sum(1 for one in last.values() if one > k)
+    return k, tables + PAGE_BYTES * (k + fallback * dropped)
+
+
+def reach_of(symbols, area):
+    """The bytes past an area at area the first handler reaches."""
+    return 32767 - (area - (CODE + symbols["ymxr_tick0"]))
+
+
+def fallback_of(symbols):
+    """An effect's fallback pages, two a bank of handlers."""
+    return 4 if "ymxr_bank1" in symbols else 2
+
+
+def area_of(tune_bytes, symbols, area=None, reach=None):
+    """The page area's bytes a bound tune needs on a player with the
+    lookup, its area at area, or reach bytes before the first handler's
+    reach; 0 for a player without it or a tune of no page, and None where
+    it does not fit."""
+    listed = list_of(tune_bytes)
+    if "ymxr_look" not in symbols or not listed or not listed[1]:
+        return 0
+    if reach is None:
+        reach = reach_of(symbols, area)
+    plan = plan_of(listed[0], listed[1], reach, fallback_of(symbols))
+    return plan and plan[1]
+
+
+def page_at(symbols, area, tune, effect, form, run, reach):
+    """Where init puts the page of transformation run in form on an
+    effect: the tables first, then each effect's pages, and its fallback
+    where it has one, at its offset modulo 256 past them, in the order of
+    those offsets (68k/YMXR.S, ymxr_prefill). The page's address, or the
+    effect's fallback pages for a page init leaves out."""
+    entries = tune.pages
+    count = len(tune.transformations)
+    fallback = fallback_of(symbols)
+    k = plan_of(count, entries, reach, fallback)[0]
+    base = area + count * len({(e, f) for e, f, _ in entries})
+    ref = [CODE + symbols["ymxr_ref"] + (symbols["FB_AT%d" % e] if e else 0) for e in range(4)]
+    off = [(ref[e] - base) & 0xFF for e in range(4)]
+    placed = [sum(1 for e_, _, _ in entries[:k] if e_ == e) for e in range(4)]
+    falls = [any(e_ == e for e_, _, _ in entries[k:]) for e in range(4)]
+    size = [placed[e] + (fallback if falls[e] else 0) for e in range(4)]
+    region = base + off[effect] + 256 * sum(size[f] for f in range(4) if off[f] < off[effect])
+    mine = [p for p in entries[:k] if p[0] == effect]
+    if (effect, form, run) in mine:
+        return region + 256 * mine.index((effect, form, run))
+    return [region + 256 * (placed[effect] + n) for n in range(fallback if falls[effect] else 0)]
+
+
 WORK = 0x40000
 STACK = 0x80000
 DONE = 0x90000
@@ -406,9 +500,9 @@ MOST_FRAMES = None
 # The checks a run makes after it builds the player and before it plays the
 # tunes, in their order, by the names -only reads: the SNDH cores, the two
 # sets of subtunes, and one each of the functions below.
-CHECKS = ("cores", "sets", "unplaced", "deferred", "mapped", "deferred_sizes",
-          "mapped_sizes", "absolute_sizes", "halves", "voices", "widekept", "envelope",
-          "wholebyte", "outofreach")
+CHECKS = ("cores", "sets", "unplaced", "deferred", "mapped", "fallbacks",
+          "deferred_sizes", "mapped_sizes", "absolute_sizes", "halves", "voices", "widekept",
+          "envelope", "wholebyte", "outofreach")
 
 
 def spread(most):
@@ -533,14 +627,27 @@ class Tune:
         # entries per table. Transformation n is transformations[n - 1]
         # (SPEC.md 3.4.2).
         self.transformations = []
+        # the pages the tune maps through, after the block's index and its
+        # last transformation: (effect, form, transformation) a page, the
+        # forms 0 plain, 1 marked and 2 setR7's ports (BINARIES.md 1.2)
+        self.pages = []
         index_at, end = 24, len(file)
         if self.version == MAPPED:
             block = struct.unpack(">i", file[24:28])[0]
             index_at, end = 28, block
-            for n in range(struct.unpack(">H", file[block:block + 2])[0]):
+            t = struct.unpack(">H", file[block:block + 2])[0]
+            last = block + 2 + 4 * t
+            for n in range(t):
                 at = block + long_at(file, block + 2 + 4 * n)
                 e = struct.unpack(">H", file[at:at + 2])[0]
                 self.transformations.append(list(file[at + 2:at + 2 + e]))
+                last = max(last, at + 2 + e)
+            # the list's tag, and a tune without one has no list
+            if file[last:last + 2] == LIST_TAG:
+                self.pages = [tuple(file[last + 3 + 3 * k:last + 6 + 3 * k])
+                              for k in range(file[last + 2])]
+            else:
+                self.pages = None
         # bit 31 of an index entry marks a source whose column fills its
         # byte: its rows carry no marker and a player counts them
         # (SPEC.md 3.1).
@@ -934,7 +1041,30 @@ class Machine:
 
     def __init__(self, code, symbols, tune_bytes):
         global FILE
-        FILE = placed(len(code))
+        # the page area right after the player, as the tools place it after
+        # the core (BINARIES.md 3.1), and the tune past it; with AREA_AFTER
+        # the area past the tune, within the reach that is left
+        if AREA_AFTER:
+            FILE = placed(len(code))
+            at = (FILE + len(tune_bytes) + 1) & ~1
+        else:
+            at = CODE + ((len(code) + 1) & ~1)
+        pages = area_of(tune_bytes, symbols, at) or 0
+        self.area = at if pages else 0
+        self.reach = reach_of(symbols, at) if pages else 0
+        self.pages = (self.area, self.area + pages)
+        self.filling = False
+        # the fallback pages a frame fills (ymxr_lfill), (first, past) each
+        self.falls = []
+        if pages:
+            count, entries = list_of(tune_bytes)
+            listed = type("Listed", (), {"pages": entries, "transformations": [0] * count})
+            for effect in range(4):
+                one = page_at(symbols, self.area, listed, effect, 9, 0, self.reach)
+                if one:
+                    self.falls.append((min(one), max(one) + 256))
+        if not AREA_AFTER:
+            FILE = placed(((len(code) + 1) & ~1) + pages)
         self.symbols = symbols
         self.size = len(code)
         # the key byte of every lookup instance: its page read's
@@ -1041,6 +1171,10 @@ class Machine:
                 self.stale = True
         elif any(lo <= address < hi for lo, hi in self.images):
             pass                        # DTX's init writing its decoder
+        elif self.pages[0] <= address < self.pages[1] and self.filling:
+            pass                        # init writing the page area
+        elif any(lo <= address < hi for lo, hi in self.falls):
+            pass                        # a fill of a fallback page
         elif not (WORK <= address < WORK + 0x40000 or STACK <= address < STACK + 0x10000):
             self.stray.append((address, size, value))
 
@@ -1063,6 +1197,9 @@ class Machine:
         mu.reg_write(UC_M68K_REG_A6, 0x00046000)
         mu.reg_write(UC_M68K_REG_A0, a0)
         mu.reg_write(UC_M68K_REG_A1, a1)
+        # the page area init fills, 0 where the tune needs none (5.1)
+        mu.reg_write(UC_M68K_REG_A2, self.area if name == "init" else 0)
+        self.filling = name == "init"
         mu.reg_write(UC_M68K_REG_SR, 0x2000)
         sp = STACK + 0x8000
         mu.mem_write(sp - 4, struct.pack(">I", DONE))
@@ -1824,6 +1961,18 @@ _MAPPED = []
 # Preserve these after run or mapped clears the active field (running).
 RAN = set()
 
+# The effects whose running page is in their fallback (pages).
+FELL = set()
+
+# Where Machine puts the page area: right after the player, as the tools
+# put it after the core, or past the tune (fallbacks).
+AREA_AFTER = False
+
+# Each copy init makes into the page area, (its fill kind, E): the cycles
+# from ymxr_fill to the return into ymxr_prefill, over the tunes a run of
+# -cycles plays (check).
+INIT_COPIES = {}
+
 # Number of lookup tunes before the ordinary fixtures in
 # patched_code_follows_the_subtune.
 SET_MAPPED = 6
@@ -2089,6 +2238,100 @@ def mapped(code, symbols):
             " square's mask and level at %d"
             % (played, inner["page"], inner["window"] + inner["window one"],
                inner["window one"], inner["square"]))
+
+
+def fallbacks(code, symbols):
+    """A tune whose pages pass the reach of the first handler: effect 0
+    remaps through 100 transformations a row and effect 1 through 20 in
+    its last rows, so init fills the first pages of the list and each
+    effect maps the rest through its fallback, both in the same rows,
+    every tick against the model and every frame against the reader's
+    record (BINARIES.md 5.6). Then init reports -1 for a tune that maps a
+    value with a2 at 0, with an area below the player and without a list,
+    and leaves the area below as it was; and 0 for one whose list has no
+    page, with a2 at 0 (5.1)."""
+    global AREA_AFTER
+    if "ymxr_look" not in symbols:
+        code, symbols = build(switched(DEFINES, lookup=True))
+    rows = 100
+    tables = [("T%d" % n, [(k * (2 * (n % 8) + 1) + n // 8 + 1) % 16 for k in range(16)])
+              for n in range(120)]
+    ramp = ("ramp", list(range(16)), 0)
+    a = {0: ("start", 1, 8, 50, 100, 1, 1, 0, [1])}
+    a.update({r: ("remap", [1 + r]) for r in range(1, rows)})
+    d = {0: ("start", 1, 9, 50, 100, 1, 1, 0, [101])}
+    d.update({r: ("remap", [21 + r]) for r in range(81, rows)})
+    tune = effects_tune("two effects through their fallback", rows, [ramp],
+                        {"A": a, "D": d}, transformations=tables)
+    at, version = built("fallbacks", tune)
+    assert version == MAPPED, "the fallback's tune is of version %d" % version
+    work = tempfile.mkdtemp()
+    with open(at, "rb") as f:
+        bound = bind(f.read(), work)
+    count, entries = list_of(bound)
+    # the area past the tune, so that the tune's sources are within the
+    # reach the area leaves of the first handler (BINARIES.md 5.5, 5.6)
+    global MOST_FRAMES
+    # the area past the tune, every frame of it played under -frames too:
+    # effect 0 reaches its fallback at its row k
+    AREA_AFTER, most = True, MOST_FRAMES
+    MOST_FRAMES = None
+    try:
+        return refused(code, symbols, at, bound, count, entries, work)
+    finally:
+        AREA_AFTER, MOST_FRAMES = False, most
+
+
+def refused(code, symbols, at, bound, count, entries, work):
+    """The rest of fallbacks, with the area past the tune."""
+    m = Machine(code, symbols, bound)
+    k = plan_of(count, entries, m.reach, fallback_of(symbols))[0]
+    dropped = {e for e, _, _ in entries[k:]}
+    assert dropped == {0, 1}, "init fills %d of %d pages, and effects %s fall back" % (
+        k, len(entries), sorted(dropped))
+    FELL.clear()
+    frames, ticks = check(at, code, symbols, kit=True)[:2]
+    assert FELL == {0, 1}, "effects %s ran a page of their fallback" % sorted(FELL)
+    # init reports -1, and leaves the bytes it was handed as they were
+    mapped_bound = bound
+    workspace = WORK + 0x100
+    m = Machine(code, symbols, mapped_bound)
+    m.area = 0
+    assert m.call("init", a0=FILE, a1=workspace) == 0xFFFFFFFF, \
+        "init took a tune that maps a value with no page area"
+    m = Machine(code, symbols, mapped_bound)
+    below = CODE - 0x400
+    m.area = below
+    was = bytes(m.mu.mem_read(below, 0x400))
+    assert m.call("init", a0=FILE, a1=workspace) == 0xFFFFFFFF, \
+        "init took a page area below the player"
+    assert bytes(m.mu.mem_read(below, 0x400)) == was, "init wrote below the player"
+    block = struct.unpack(">i", mapped_bound[24:28])[0]
+    count = struct.unpack(">H", mapped_bound[block:block + 2])[0]
+    tag = block + 2 + 4 * count
+    for n in range(count):
+        at = block + long_at(mapped_bound, block + 2 + 4 * n)
+        tag = max(tag, at + 2 + struct.unpack(">H", mapped_bound[at:at + 2])[0])
+    assert mapped_bound[tag:tag + 2] == LIST_TAG, "the kit's list is untagged"
+    untagged = mapped_bound[:tag] + bytes(2) + mapped_bound[tag + 2:]
+    m = Machine(code, symbols, untagged)
+    m.area = (FILE + len(untagged) + 1) & ~1
+    assert m.call("init", a0=FILE, a1=workspace) == 0xFFFFFFFF, \
+        "init took a tune that maps a value without a list"
+    square = built("a-mapped-square", effects_tune(
+        "a mapped square", 8, [("square", [15, 0], 0)],
+        {"A": {0: ("start", 1, 8, 50, 100, 1, 1, 0, [1])}},
+        transformations=[("V", [15 - k for k in range(16)])]))[0]
+    with open(square, "rb") as f:
+        none = bind(f.read(), work)
+    assert list_of(none)[1] == [], "the mapped square lists pages"
+    m = Machine(code, symbols, none)
+    assert m.area == 0 and m.call("init", a0=FILE, a1=workspace) == 0, \
+        "init rejected a tune that lists no page, with no area"
+    return ("the fallback: %d of %d pages in the area and effects 0 and 1 through their"
+            " fallback, %d frames, %d ticks; init reports -1 with no area, with one below the"
+            " player and without a list, and 0 for a list of no page with no area"
+            % (k, len(entries), frames, ticks))
 
 
 def deferred_sizes():
@@ -2683,13 +2926,24 @@ def pages(m, symbols, model, i, at, name, said):
     """
     fx = model.fx[i]
     base = page_of(m, symbols, at, name)
-    bank = "b" if "ymxr_bank1" in symbols and at >= CODE + symbols["ymxr_bank1"] else ""
-    first = CODE + symbols["ymxr_pg%d%s" % (i, bank)]
-    assert base in (first, first + 256), \
-        "%seffect %d's %s instance reads %x, outside its pages at %x" % (said, i, name, base, first)
+    fill = model.fill(i)
+    form = {"plain": 0, "mirror": 1, "ports": 2}[fill]
+    # a start through a transformation finds its page in the list the
+    # binder wrote, which init put in the area (BINARIES.md 1.2, 3.1)
+    assert (i, form, fx["run"]) in model.tune.pages, \
+        "%seffect %d runs transformation %d in form %d, outside the list %s" % (
+            said, i, fx["run"], form, model.tune.pages)
+    want = page_at(symbols, m.area, model.tune, i, form, fx["run"], m.reach)
+    if isinstance(want, list):
+        # a page init left out, in the effect's fallback (BINARIES.md 5.6)
+        assert base in want, "%seffect %d's %s instance reads %x, outside its fallback at %s" % (
+            said, i, name, base, [hex(one) for one in want])
+        FELL.add(i)
+    else:
+        assert base == want, \
+            "%seffect %d's %s instance reads %x, not its page at %x" % (said, i, name, base, want)
     entries = model.tune.transformations[fx["run"] - 1]
     page = bytes(m.mu.mem_read(base, 256))
-    fill = model.fill(i)
     if fill == "plain":
         want = dict(enumerate(entries))
     elif fill == "mirror":
@@ -2777,6 +3031,22 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                            struct.unpack(">H", bytes(mu.mem_read(table, 2)))[0]))
         m.mu.hook_add(UC_HOOK_CODE, copied, begin=CODE + symbols["ymxr_fill"],
                       end=CODE + symbols["ymxr_fill"])
+        # init's copies, each from its call to its return into the prefill
+        filling = {}
+
+        def fill_from(mu, address, size, data):
+            filling.update(at=cycles.counter.cycles, key=(
+                mu.reg_read(UC_M68K_REG_D5) & 0xFF,
+                struct.unpack(">H", bytes(mu.mem_read(mu.reg_read(UC_M68K_REG_A2), 2)))[0]))
+
+        def filled(mu, address, size, data):
+            if filling:
+                INIT_COPIES.setdefault(filling["key"], set()).add(
+                    cycles.counter.cycles - filling["at"])
+        m.mu.hook_add(UC_HOOK_CODE, fill_from, begin=CODE + symbols["ymxr_fill"],
+                      end=CODE + symbols["ymxr_fill"])
+        m.mu.hook_add(UC_HOOK_CODE, filled, begin=CODE + symbols["ymxr_filled"],
+                      end=CODE + symbols["ymxr_filled"])
     # Measure each call of a routine of ROUTINES from entry after bsr
     # to the instruction after its rts (routine_calls).
     routine = {"cycles": 0, "at": None}
@@ -3476,10 +3746,8 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         # the row's read and the frame are the player as it is
         return stale
 
-    # an effect's pages: the block before the table of page bytes, a page
-    # the 256 bytes a key reaches, since the key is a byte
-    block = symbols["ymxr_htab"] - symbols["ymxr_pg0"]
-    reads(ticks_at, r"one of the effect's (\w+) (\d+)-byte pages", WORDS[block // 256], 256)
+    # a page: the 256 bytes a key reaches, since the key is a byte
+    reads(ticks_at, r"The high byte selects a page of (\d+)\s+bytes", 256)
     # the row's read: the general handler's and its lookup instance's,
     # and the two for comparison, each with the marker's branch
     module = cycles_of
@@ -3558,12 +3826,11 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                     r" to [\d,]+)?) and to the identity ([\d,]+(?: to [\d,]+)?)\.",
           *(spans(*[(what, shape) for shape in others])
             for what in ("start", "switch", "from the identity", "to the identity")))
-    reads(frame_at, r"and where neither page has them they fill the page not in use: ([\d,]+(?: to"
-                    r" [\d,]+)?) cycles besides the copy", span(pages.get("fill", {0})))
+    # every page in the list: no remap fills a page of the fallback
+    if pages.get("fill") or pages.get("filled"):
+        stale.append("a remap fills a page at the frame: %s" % sorted(pages))
     reads(frame_at, r"A remap from the identity selects its page in a separate routine,"
-                    r" ([\d,]+(?: to [\d,]+)?) cycles for a cached transformation, or ([\d,]+(?:"
-                    r" to [\d,]+)?) when the unused page needs filling",
-          span(pages.get("found", {0})), span(pages.get("filled", {0})))
+                    r" ([\d,]+(?: to [\d,]+)?) cycles", span(pages.get("found", {0})))
     # the cache, the last bytes of the record (68k/YMXR.S, FX_LBYTE)
     deferred = build([d for d in DEFINES if d != DEFER_ON] + [DEFER_ON])[1]
     reads(frame_at, r"in the last (\d+) bytes of the effect's record, which is (\d+) bytes, and"
@@ -3596,7 +3863,9 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         stale.append("the moves between the identity and a transformation are %s" % moves)
     reads(frame_at, r"between handlers: ([\d,]+) cycles on one column to ([\d,]+) on three",
           span(moves.get("lk", {0})), span(three or {0}))
-    # the copy table: a row a fill kind and a count of entries
+    # the copy table: a row a fill kind and a count of entries, the copies
+    # init makes (INIT_COPIES)
+    copies = {key: set(v) for key, v in INIT_COPIES.items()}
     kind, listed = None, set()
     for m in re.finditer(r"^\| ([^|]+?) \| (\d+) \| ([\d,]+) \|$", frame_at, re.M):
         kind = {"entry k at k": 0, "the same": kind}.get(
@@ -3617,14 +3886,13 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         if copies.get(key) != {int(m.group(3).replace(",", ""))}:
             stale.append("performance.md reads the copy %s of %s entries as %s, and the rig counts"
                          " %s" % (m.group(1), m.group(2), m.group(3), copies.get(key)))
-    if listed != set(copies):
+    # init copies every page of a list, so the rig counts more sizes than
+    # the table has rows, and each row is a size it counts
+    if not listed <= set(copies):
         stale.append("performance.md's copies are %s, and the rig counts %s"
                      % (sorted(listed, key=str), sorted(copies)))
     reads(frame_at, r"So the routines of a volume's remap between two transformations, a marked"
-                    r" source of one column through (\d+) entries, cost ([\d,]+(?: to [\d,]+)?)"
-                    r" cycles where the other page is filled, and ([\d,]+(?: to [\d,]+)?) where it"
-                    r" has the transformation", 16,
-          span(totals.get(("switch", "lk", ((1, 16),)), {0})),
+                    r" source of one column, cost ([\d,]+(?: to [\d,]+)?) cycles",
           span(totals.get(("switch", "lk", ()), {0})))
     # Measure version 9 frame overhead with and without lookup support.
     # Rows without a start or place reset use the effect-head path;
@@ -3737,7 +4005,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                          % (title, apart))
         if max(cost) > budget:
             over.append(title)
-    reads(cost_at, r"Of the (\d+), (\w+) pass R4\.5's ([\d,]+)", len(played),
+    reads(cost_at, r"Of the (\d+), (\w+) pass(?:es)? R4\.5's ([\d,]+)", len(played),
           WORDS.get(len(over), len(over)), budget)
     costliest = sorted((max(cost), title) for title, cost, _, _, _ in played)
     for title, cost, _, lookups, _ in played:
@@ -3746,26 +4014,24 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         f = cost.index(max(cost))
         events, _, filled = lookups[f]
         starts = [shape for _, what, shape in events if what.startswith("start")]
-        if f or len(starts) < 2 or len(filled) != sum(1 for shape in starts
-                                                       if shape not in ("square", "one")):
+        if f or len(starts) < 2 or filled:
             stale.append("%s: its costliest frame, %d, starts %s and fills %d pages"
                          % (title, f, starts, len(filled)))
     if costliest[-1][1] != FOUR_REMAPS:
         stale.append("the costliest tune through a transformation is %s" % costliest[-1][1])
     four = next((cost[f] for title, cost, _, lookups, _ in played if title == FOUR_REMAPS
                  for f, (events, _, filled) in enumerate(lookups)
-                 if len(filled) == 4 and all(what == "switch" for _, what, _ in events)), None)
+                 if len(events) == 4 and all(what == "switch" for _, what, _ in events)), None)
     # its first row's starts and copies, and its row of four remaps'
     frames = next((lookups for title, _, _, lookups, _ in played if title == FOUR_REMAPS), [])
     begun = frames[0] if frames else ([], {}, [])
-    remapped = next((frame for frame in frames if len(frame[2]) == 4
+    remapped = next((frame for frame in frames if len(frame[0]) == 4
                      and all(what == "switch" for _, what, _ in frame[0])), ([], {}, []))
     shapes = {shape for _, what, shape in begun[0] if what == "start"}
-    reads(cost_at, r"The costliest starts (\w+) counted sources through (\d+) entries, and its"
-                   r" frame that remaps the (\w+) to another (\d+) entries costs ([\d,]+)",
+    reads(cost_at, r"The costliest starts (\w+) counted sources, and its frame that remaps the"
+                   r" (\w+) to another transformation costs ([\d,]+)",
           WORDS.get(len(begun[0])) if shapes == {"lc"} else shapes,
-          span({e for _, e in begun[2]} or {0}), WORDS.get(len(remapped[0])),
-          span({e for _, e in remapped[2]} or {0}), four)
+          WORDS.get(len(remapped[0])), four)
     return stale
 
 
@@ -5061,11 +5327,22 @@ def from_core(made, defines):
         "ymxr-sndh wrote %s, flags %d, and the run and the subtunes select %s" % (
             core_name(flags), flags, core_name(want))
     code, symbols = build(flagged(flags), "YMXR_sndh.S")
-    assert body[:28] == code[:28] and body[36:len(code)] == code[36:], \
-        "%s in the SNDH file is not the one assembled, its two patched longs aside" % (
+    # with the lookup in, the page area's offset at 36 is patched too, and
+    # the area is between the core and the table (BINARIES.md 2.2, 3.1)
+    patched = 40 if flags & 16 else 36
+    assert body[:28] == code[:28] and body[patched:len(code)] == code[patched:], \
+        "%s in the SNDH file is not the one assembled, its patched longs aside" % (
             core_name(flags))
-    assert table == (len(code) + 1) & ~1, \
-        "the subtune table is at %d, and the core is %d bytes" % (table, len(code))
+    pages = long_at(body, 36) if flags & 16 else 0
+    # the area's reach from the core's first handler, its field at 26
+    reach = 32767 - (((len(code) + 1) & ~1) - struct.unpack(">H", body[26:28])[0])
+    most = max([area_of(body[one:], symbols, reach=reach) or 0 for one in starts
+                if body[one + 8] & 0x20] + [0]) if pages else 0
+    assert pages in (0, (len(code) + 1) & ~1), \
+        "the page area is at %d, and the core is %d bytes" % (pages, len(code))
+    assert table == (((len(code) + 1) & ~1) + most + 1) & ~1, \
+        "the subtune table is at %d, and the core is %d bytes and its page area %d" % (
+            table, len(code), most)
     return (body, code, symbols, flags, table + 2 + 4 * count,
             list(zip(starts, starts[1:] + [images])))
 
@@ -5146,7 +5423,13 @@ def patched_code_follows_the_subtune(defines, tunes):
             m.call("core-init", d0=a + 1)
             m.call("core-init", d0=b + 1)
             got = image(m)
-            for name, lo, hi in (("the code", 0, shared), ("the tune", spans[b][0], spans[b][1])):
+            # the page area between the core and the subtune table, where
+            # a subtune's pages past the next one's are left as they were,
+            # which no tick of the next one reads (BINARIES.md 3.1)
+            area = long_at(body, 36) if flags & 16 else 0
+            table = long_at(body, 28)
+            for name, lo, hi in (("the code", 0, area or table), ("the code", table, shared),
+                                 ("the tune", spans[b][0], spans[b][1])):
                 if got[lo:hi] != alone[b][lo:hi]:
                     where = [i for i in range(lo, hi) if got[i] != alone[b][i]]
                     near = {}
@@ -5366,6 +5649,7 @@ def main():
         for name, run in (("unplaced", lambda: unplaced(code, symbols)),
                           ("deferred", lambda: deferred(*deferring(defines))),
                           ("mapped", lambda: mapped(code, symbols)),
+                          ("fallbacks", lambda: fallbacks(code, symbols)),
                           ("deferred_sizes", deferred_sizes),
                           ("mapped_sizes", mapped_sizes),
                           ("absolute_sizes", absolute_sizes),

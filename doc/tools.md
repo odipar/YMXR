@@ -608,17 +608,23 @@ its field at 26, where its handlers begin (BINARIES.md 2.2): within
 and further off the core that reads an address. Deferred-start support
 is selected when any subtune sets effects bit 4; lookup support is
 selected when any subtune sets bit 5. Other files use the smaller cores
-without those features (BINARIES.md 2.1). The clock tag names Timer C,
-or the VBL where `-vbl` or `-perf` is passed: the raster monitor paints
-one frame of calls, which reads against the raster where the tick comes
-from the VBL (BINARIES.md 3.2, performance.md). `-tc` names Timer C over
-`-perf`, and `-vbl` and `-tc` together are `-vbl and -tc name two
-clocks`, exit 2. A set that claims Timer C names the VBL, and `-tc` with
-such a set is the error of 12.2. The title is `-tTITLE`, else the first
-name, `(untitled)` where a tune file was read or the name is blank; the
-composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md 3) each text
-is reduced to its characters $20 to $7E; the report of 12.4 prints the
-text as passed.
+without those features (BINARIES.md 2.1). On a core with the lookup the
+tool reserves the page area right after the core, the largest a
+subtune's list needs within the reach of the core's first handler: a
+table of T bytes for each effect and form of the list, T the
+transformations, 256 bytes for each page it fills and for each page of
+the fallbacks of the effects whose pages pass the reach, and 255 more;
+and patches the core's field at 36 with its offset (BINARIES.md 3.1,
+5.6). The clock tag names Timer C, or the VBL where `-vbl` or `-perf` is
+passed: the raster monitor paints one frame of calls, which reads
+against the raster where the tick comes from the VBL (BINARIES.md 3.2,
+performance.md). `-tc` names Timer C over `-perf`, and `-vbl` and `-tc`
+together are `-vbl and -tc name two clocks`, exit 2. A set that claims
+Timer C names the VBL, and `-tc` with such a set is the error of 12.2.
+The title is `-tTITLE`, else the first name, `(untitled)` where a tune
+file was read or the name is blank; the composer `-cCOMPOSER`, or
+absent. In the tags (BINARIES.md 3) each text is reduced to its
+characters $20 to $7E; the report of 12.4 prints the text as passed.
 
 **12.2 Errors**, each exit 1:
 
@@ -635,6 +641,7 @@ text as passed.
 | the core's descriptor fails its check (12.3) | the line of 12.3 |
 | `-pcrel` was passed, the core's field at 26 is 0, and the last bound tune ends B bytes past the core's first byte, B above 32,767; the tool that was passed neither switch writes the other core instead (12.1) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
 | `-pcrel` was passed, the core's field at 26 is F, above 0, and the last bound tune ends B bytes past the core's first byte plus F, B above 32,767; the tool that was passed neither switch writes the other core instead (12.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
+| the core has the lookup in, its field at 26 is F, and a subtune's list needs a page area whose tables and fallbacks alone end B bytes past the core's first byte plus F, past the reach (BINARIES.md 5.6) | `the page area ends B bytes past the core's first handler, at F, and a tick's page read reaches 32767` |
 
 **12.3 The core's descriptor** (BINARIES.md 2) is checked before the
 combine: `not an SNDH core: no YMXS at 12`; `the core's descriptor is
