@@ -145,10 +145,9 @@ func (t Pieces) Text() string {
 }
 
 // Cuts is whether the build cuts a table from the core of that name: one
-// without the deferred start and the lookup.
+// without the lookup.
 func Cuts(core string) bool {
-	return strings.HasPrefix(core, "YMXR_sndh") && !strings.Contains(core, "-defer") &&
-		!strings.Contains(core, "-map")
+	return strings.HasPrefix(core, "YMXR_sndh") && !strings.Contains(core, "-map")
 }
 
 // CarriedPieces is the table carried beside the core of that name.
@@ -160,10 +159,10 @@ func CarriedPieces(core string) (Pieces, error) {
 	return ReadPieces(string(text))
 }
 
-// Links is whether a set of these effects links: one that needs neither
-// the deferred start nor the lookup.
+// Links is whether a set of these effects links: one that needs no
+// lookup, with the deferred start or without it.
 func Links(defers, maps bool) bool {
-	return !defers && !maps
+	return !maps
 }
 
 // Kind is the block of a source's handler kind, or general for the

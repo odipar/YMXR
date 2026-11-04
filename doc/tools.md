@@ -609,24 +609,24 @@ and further off the core that reads an address. Deferred-start support
 is selected when any subtune sets effects bit 4; lookup support is
 selected when any subtune sets bit 5. Other files use the smaller cores
 without those features (BINARIES.md 2.1). `-link` links the core for the
-set where no subtune sets bit 4 or bit 5: the pieces of each block no
-source of a subtune needs are left out (LINKER.md). On a core with the
-lookup the tool reserves the page area right after the core, the largest
-a subtune's list needs within the reach of the core's first handler: a
-table of T bytes for each effect and form of the list, T the
-transformations, 256 bytes for each page it fills and for each page of
-the fallbacks of the effects whose pages pass the reach, and 255 more;
-and patches the core's field at 36 with its offset (BINARIES.md 3.1,
-5.6). The clock tag names Timer C, or the VBL where `-vbl` or `-perf` is
-passed: the raster monitor paints one frame of calls, which reads
-against the raster where the tick comes from the VBL (BINARIES.md 3.2,
-performance.md). `-tc` names Timer C over `-perf`, and `-vbl` and `-tc`
-together are `-vbl and -tc name two clocks`, exit 2. A set that claims
-Timer C names the VBL, and `-tc` with such a set is the error of 12.2.
-The title is `-tTITLE`, else the first name, `(untitled)` where a tune
-file was read or the name is blank; the composer `-cCOMPOSER`, or
-absent. In the tags (BINARIES.md 3) each text is reduced to its
-characters $20 to $7E; the report of 12.4 prints the text as passed.
+set where no subtune sets bit 5: the pieces of each block the set does
+not need are left out (LINKER.md). On a core with the lookup the tool
+reserves the page area right after the core, the largest a subtune's
+list needs within the reach of the core's first handler: a table of T
+bytes for each effect and form of the list, T the transformations, 256
+bytes for each page it fills and for each page of the fallbacks of the
+effects whose pages pass the reach, and 255 more; and patches the core's
+field at 36 with its offset (BINARIES.md 3.1, 5.6). The clock tag names
+Timer C, or the VBL where `-vbl` or `-perf` is passed: the raster
+monitor paints one frame of calls, which reads against the raster where
+the tick comes from the VBL (BINARIES.md 3.2, performance.md). `-tc`
+names Timer C over `-perf`, and `-vbl` and `-tc` together are `-vbl and
+-tc name two clocks`, exit 2. A set that claims Timer C names the VBL,
+and `-tc` with such a set is the error of 12.2. The title is `-tTITLE`,
+else the first name, `(untitled)` where a tune file was read or the name
+is blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
+3) each text is reduced to its characters $20 to $7E; the report of 12.4
+prints the text as passed.
 
 **12.2 Errors**, each exit 1:
 
@@ -922,7 +922,7 @@ figure are read exactly.
 | `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-map` | every tune on the player assembled with `YMXR_MAP=1`, against the model; without it, a tune whose effects byte sets bit 5 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
-| `-linked` | each tune on the player `ymxr-sndh -link` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. A tune whose effects byte sets bit 4 or bit 5 plays on the player assembled. The run leaves out the checks it makes before the tunes |
+| `-linked` | each tune on the player `ymxr-sndh -link` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. A tune whose effects byte sets bit 5 plays on the player assembled. Of the checks the run makes before the tunes it runs the deferred starts' alone, each of its tunes on the player linked for it |
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
 program of twelve subtunes, each writing the number it is to R0, starts

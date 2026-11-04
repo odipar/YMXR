@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,7 +21,7 @@ import java.util.stream.Stream;
  * The library of a core (doc/LINKER.md): its pieces, the runs of bytes a
  * player linked for one song leaves out, and its fields, the values that
  * move where a piece is left out. The build cuts a table from the
- * assembly of each core without the deferred start and the lookup, and
+ * assembly of each core without the lookup, and
  * writes it beside the core as {@code <core>.pieces}.
  *
  * @param pieces the pieces in the core's order
@@ -71,10 +72,9 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
     }
 
     /** Whether the build cuts a table from this core: one without the
-     *  deferred start and the lookup. */
+     *  lookup. */
     static boolean cuts(Binaries.Binary binary) {
         return binary.source().equals(Binaries.CORE.source())
-                && !binary.defines().contains("-dYMXR_DEFER=1")
                 && !binary.defines().contains("-dYMXR_MAP=1");
     }
 
@@ -195,9 +195,38 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
         masks.sort(Comparator.comparingInt(Mask::at));
         Map<Integer, Integer> widths = new TreeMap<>();
         Map<Integer, Map<String, Integer>> moves = new TreeMap<>();
+        // A piece of the second bank and the piece of the first it copies
+        // keep one layout: the cut pads both at once, and the first one's
+        // coefficient is the sum of the two, which a link that leaves both
+        // out moves a field by with the one length.
+        Map<String, List<Piece>> twins = new LinkedHashMap<>();
+        Set<String> copies = new java.util.HashSet<>();
         for (Piece piece : pieces) {
-            byte[] small = padded(rmac, sources, binary, piece, PAD, core.length);
-            byte[] wide = padded(rmac, sources, binary, piece, WIDE_PAD, core.length);
+            twins.put(piece.name(), new ArrayList<>(List.of(piece)));
+        }
+        for (Piece piece : pieces) {
+            Integer of = base.labels().get("ymxr_t_" + piece.name());
+            if (of == null) {
+                continue;
+            }
+            Piece first = pieces.stream().filter(one -> one.from() == of).findFirst()
+                    .orElseThrow(() -> new IllegalStateException(binary.name() + ": piece "
+                            + piece.name() + " copies no piece"));
+            if (first.size() != piece.size()) {
+                throw new IllegalStateException(binary.name() + ": piece " + piece.name()
+                        + " is " + piece.size() + " bytes, and " + first.name() + ", which it"
+                        + " copies, " + first.size());
+            }
+            twins.computeIfAbsent(first.name(), k -> new ArrayList<>()).add(piece);
+            copies.add(piece.name());
+        }
+        for (Piece piece : pieces) {
+            if (copies.contains(piece.name())) {
+                continue;
+            }
+            List<Piece> padding = twins.getOrDefault(piece.name(), List.of(piece));
+            byte[] small = padded(rmac, sources, binary, padding, PAD, core.length);
+            byte[] wide = padded(rmac, sources, binary, padding, WIDE_PAD, core.length);
             boolean[] taken = new boolean[core.length];
             for (int i = 0; i < core.length; i++) {
                 if (small[i] == core[i] || taken[i]) {
@@ -251,21 +280,34 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
         return new Pieces(List.copyOf(pieces), List.copyOf(masks), List.copyOf(fields));
     }
 
-    /** The core assembled with a pad of {@code pad} bytes past the piece,
-     *  the pad cut out again, so each byte is at its offset in the core. */
-    private static byte[] padded(Path rmac, Path sources, Binaries.Binary binary, Piece piece,
-                                 int pad, int length) throws IOException {
-        byte[] code = assemble(rmac, sources, binary,
-                List.of("-dYMXR_PAD_" + piece.name() + "=1", "-dYMXR_PADSIZE=" + pad), false)
-                .code();
-        if (code.length != length + pad) {
-            throw new IllegalStateException(binary.name() + " is " + (code.length - length)
-                    + " bytes longer with a pad of " + pad + " past " + piece.name()
-                    + ": a branch past it has the size rmac picks by its distance");
+    /** The core assembled with a pad of {@code pad} bytes past each of the
+     *  pieces, the pads cut out again, so each byte is at its offset in the
+     *  core. */
+    private static byte[] padded(Path rmac, Path sources, Binaries.Binary binary,
+                                 List<Piece> padding, int pad, int length) throws IOException {
+        List<String> defines = new ArrayList<>(List.of("-dYMXR_PADSIZE=" + pad));
+        for (Piece piece : padding) {
+            defines.add("-dYMXR_PAD_" + piece.name() + "=1");
         }
+        byte[] code = assemble(rmac, sources, binary, defines, false).code();
+        String name = padding.get(0).name();
+        if (code.length != length + pad * padding.size()) {
+            throw new IllegalStateException(binary.name() + " is "
+                    + (code.length - length) + " bytes longer with a pad of " + pad
+                    + " past " + name + " and its copies: a branch past it has the size rmac"
+                    + " picks by its distance");
+        }
+        List<Piece> order = new ArrayList<>(padding);
+        order.sort(Comparator.comparingInt(Piece::to));
         byte[] out = new byte[length];
-        System.arraycopy(code, 0, out, 0, piece.to());
-        System.arraycopy(code, piece.to() + pad, out, piece.to(), length - piece.to());
+        int from = 0;
+        int to = 0;
+        for (Piece piece : order) {
+            System.arraycopy(code, from, out, to, piece.to() - to);
+            from += piece.to() - to + pad;
+            to = piece.to();
+        }
+        System.arraycopy(code, from, out, to, length - to);
         return out;
     }
 

@@ -22,8 +22,8 @@ final class LinkTest {
 
     private static final Path KIT = Path.of("doc/conformance/tunes");
 
-    /** The cores the build cuts a table from: the eight without the
-     *  deferred start and the lookup. */
+    /** The cores the build cuts a table from: the sixteen without the
+     *  lookup. */
     private static List<Binaries.Binary> cut() {
         List<Binaries.Binary> cut = new ArrayList<>();
         for (Binaries.Binary binary : Binaries.all()) {
@@ -35,14 +35,19 @@ final class LinkTest {
     }
 
     @Test
-    void theBuildCutsATableFromEachCoreWithoutTheDeferredStartAndTheLookup() {
+    void theBuildCutsATableFromEachCoreWithoutTheLookup() {
         List<String> names = new ArrayList<>();
         for (Binaries.Binary binary : cut()) {
             names.add(binary.name());
         }
-        assertEquals(List.of("YMXR_sndh.bin", "YMXR_sndh-perf.bin", "YMXR_sndh-lean.bin",
-                "YMXR_sndh-perf-lean.bin", "YMXR_sndh-abs.bin", "YMXR_sndh-perf-abs.bin",
-                "YMXR_sndh-lean-abs.bin", "YMXR_sndh-perf-lean-abs.bin"), names);
+        List<String> sixteen = new ArrayList<>();
+        for (String defer : List.of("", "-defer")) {
+            for (String core : List.of("", "-perf", "-lean", "-perf-lean", "-abs", "-perf-abs",
+                    "-lean-abs", "-perf-lean-abs")) {
+                sixteen.add("YMXR_sndh" + core + defer + ".bin");
+            }
+        }
+        assertEquals(sixteen, names);
     }
 
     /** A table reads back as the text it was written as, its pieces in the
@@ -161,14 +166,33 @@ final class LinkTest {
         assertEquals(linked.length, Tune.getLong(sndh, at + Sndh.CORE_TABLE_AT));
     }
 
-    /** A set that needs the deferred start keeps the core as carried. */
+    /** A set that needs the lookup keeps the core as carried. */
     @Test
-    void aSetThatDefersAStartKeepsTheCarriedCore() throws IOException {
-        byte[] file = Files.readAllBytes(KIT.resolve("deferred.ymxr"));
-        Sndh.Options linking = new Sndh.Options("deferred", null, null, false, false,
+    void aSetThatMapsAValueKeepsTheCarriedCore() throws IOException {
+        byte[] file = Files.readAllBytes(KIT.resolve("mapped.ymxr"));
+        Sndh.Options linking = new Sndh.Options("mapped", null, null, false, false,
                 Sndh.Ticks.CHOSEN, Sndh.Asked.CHOSEN, true);
-        Sndh.Options carried = new Sndh.Options("deferred", null, null, false, false);
+        Sndh.Options carried = new Sndh.Options("mapped", null, null, false, false);
         assertArrayEquals(Sndh.of(List.of(file), carried), Sndh.of(List.of(file), linking));
+    }
+
+    /** A set that defers a start links the core with the deferred start in:
+     *  the file's core is that core linked, and shorter. */
+    @Test
+    void aSetThatDefersAStartLinksTheCoreWithTheDeferredStart() throws IOException {
+        byte[] file = Files.readAllBytes(KIT.resolve("deferred.ymxr"));
+        Sndh.Options options = new Sndh.Options("deferred", null, null, false, false,
+                Sndh.Ticks.CHOSEN, Sndh.Asked.CHOSEN, true);
+        byte[] sndh = Sndh.of(List.of(file), options);
+        int at = Tune.getWord(sndh, 2) + 2;
+        Binaries.Binary binary = Binaries.binary(false, false, true, true, false);
+        byte[] core = Binaries.carried(binary.name());
+        byte[] linked = Link.link(core, Pieces.carried(binary),
+                Link.blocks(List.of(TuneFile.read(file))));
+        assertTrue(linked.length < core.length);
+        assertEquals(Sndh.CORE_DEFER | Sndh.CORE_PCREL, Tune.getWord(sndh, at + 22));
+        assertArrayEquals(Arrays.copyOfRange(linked, 36, linked.length),
+                Arrays.copyOfRange(sndh, at + 36, at + linked.length));
     }
 
     /** A value that leaves its field is an error of the link. */
@@ -192,7 +216,7 @@ final class LinkTest {
         String prose = doc.replaceAll("\\s+", " ");
         byte[] core = Binaries.core();
         Pieces table = Pieces.carried(Binaries.CORE);
-        assertTrue(prose.contains("the plain core of " + String.format("%,d", core.length)
+        assertTrue(prose.contains("the plain core, of " + String.format("%,d", core.length)
                 + " bytes"), "LINKER.md names another size of the plain core than "
                 + core.length);
         int least = Link.link(core, table, Set.of()).length;
@@ -208,20 +232,26 @@ final class LinkTest {
                     .filter(name -> name.endsWith(".ymxr") && !name.equals("wrong-version.ymxr"))
                     .sorted().forEach(names::add);
         }
+        Binaries.Binary deferring = Binaries.binary(false, false, true, true, false);
+        byte[] deferred = Binaries.carried(deferring.name());
+        assertTrue(prose.contains("the core with the deferred start in, of "
+                + String.format("%,d", deferred.length) + " bytes"),
+                "LINKER.md names another size of the core with the deferred start than "
+                + deferred.length);
         for (String name : names) {
             TuneFile tune = TuneFile.read(Files.readAllBytes(KIT.resolve(name)));
             boolean defers = (tune.effects() & Columns.DEFERS) != 0;
             boolean maps = (tune.effects() & Columns.MAPS) != 0;
             String row;
             if (!Link.links(defers, maps)) {
-                row = "| `" + name + "` | " + (defers && maps ? "the deferred start and the lookup"
-                        : defers ? "the deferred start" : "the lookup")
-                        + ": the core as carried | |";
+                row = "| `" + name + "` | the lookup: the core as carried | | |";
             } else {
                 Set<String> blocks = Link.blocks(List.of(tune));
-                row = "| `" + name + "` | " + (blocks.isEmpty() ? "none"
-                        : String.join(", ", blocks)) + " | "
-                        + String.format("%,d", Link.link(core, table, blocks).length) + " |";
+                byte[] linked = defers ? Link.link(deferred, Pieces.carried(deferring), blocks)
+                        : Link.link(core, table, blocks);
+                row = "| `" + name + "` | " + (defers ? "the deferred start" : "plain") + " | "
+                        + (blocks.isEmpty() ? "none" : String.join(", ", blocks)) + " | "
+                        + String.format("%,d", linked.length) + " |";
             }
             assertTrue(doc.contains(row + "\n"), "LINKER.md has no row " + row);
         }

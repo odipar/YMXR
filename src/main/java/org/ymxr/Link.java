@@ -44,10 +44,10 @@ final class Link {
     private Link() {
     }
 
-    /** Whether a song with these effects links: one that needs neither the
-     *  deferred start nor the lookup. */
+    /** Whether a song with these effects links: one that needs no lookup,
+     *  with the deferred start or without it. */
     static boolean links(boolean defers, boolean maps) {
-        return !defers && !maps;
+        return !maps;
     }
 
     /**

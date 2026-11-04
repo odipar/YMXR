@@ -166,9 +166,9 @@ field 5204 2 effect0_1+1 effect1_1+1 effect2_1+1
 field 5206 2 effect0_1+1 effect1_1+1 effect2_1+1
 field 5208 2 effect0_1+1 effect1_1+1
 field 5210 2 effect0_1+1
-field 5216 2 effect0_1+1
-field 5218 2 effect0_1+1 effect1_1+1
-field 5220 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5214 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5216 2 effect0_1+1 effect1_1+1
+field 5218 2 effect0_1+1
 field 5238 2 effect0_1+1
 field 5242 2 effect0_1+1
 field 5246 2 effect0_1+1

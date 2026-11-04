@@ -1890,7 +1890,8 @@ def deferred(code, symbols):
         assert version == MAPPED or not through, \
             "%s: ymxs-to-ymxr wrote version %d" % (title, version)
         ticked = []
-        frames, ticks = check(at, code, symbols, kit=bool(through), ticked=ticked)[:2]
+        frames, ticks = check(at, *played_on(at, code, symbols), kit=bool(through),
+                              ticked=ticked)[:2]
         assert ticks, "%s: no tick" % title
         played += 1
         mapped += bool(through)
@@ -5614,12 +5615,39 @@ def linked_player(ym, defines):
         if sym not in symbols.text:
             moved[sym] = value
             continue
-        if any(a <= first + value < to for _, a, to in out):
+        # a label inside a piece left out goes with it; one of the code
+        # between pieces at a piece's first byte names the byte the link
+        # keeps there
+        if any(a < first + value < to or (a == first + value and sym not in BETWEEN)
+               for _, a, to in out):
             continue
         moved[sym] = value - sum(to - a for _, a, to in out if to <= first + value)
     moved.text = frozenset(sym for sym in symbols.text if sym in moved)
     return ours[first:], moved, "%s linked, %d bytes of %d, %s left out" % (
         name, len(ours), len(core_code), ", ".join(blocks_out) or "no block")
+
+
+# The labels at a piece's first byte that name the first byte the link
+# keeps there (doc/LINKER.md): the frame's, before effect 0's frame code;
+# the first handler's, which the reach and the second bank are measured
+# from; and the second bank's, before its first handler.
+BETWEEN = ("ymxr_frame", "ymxr_tick0", "ymxr_bank1")
+
+
+def played_on(at, code, symbols):
+    """The player a tune file plays on: under -linked, the one ymxr-sndh
+    -link links for it where it links (doc/LINKER.md), and the player
+    assembled otherwise."""
+    if LINKED:
+        linked = linked_player(at, DEFINES)
+        if linked is not None:
+            return linked[0], linked[1]
+    return code, symbols
+
+
+# The checks before the tunes that play their tunes through played_on, so
+# a run under -linked plays them on linked players.
+LINKABLE = ("deferred",)
 
 
 def core_name(flags):
@@ -5994,9 +6022,9 @@ def main():
             continue
         first = one
         break
-    if first is not None and not LINKED:
+    if first is not None:
         def wanted(name):
-            return only is None or name in only
+            return (only is None or name in only) and (not LINKED or name in LINKABLE)
         lookup = mapped_tunes() if wanted("cores") or wanted("sets") else None
         if wanted("cores"):
             print("the SNDH core of ymxr-sndh, %s: %d bytes, $60 kept and put back"

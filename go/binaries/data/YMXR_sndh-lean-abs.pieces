@@ -162,9 +162,9 @@ field 4910 2 effect0_1+1 effect1_1+1 effect2_1+1
 field 4912 2 effect0_1+1 effect1_1+1 effect2_1+1
 field 4914 2 effect0_1+1 effect1_1+1
 field 4916 2 effect0_1+1
-field 4922 2 effect0_1+1
-field 4924 2 effect0_1+1 effect1_1+1
-field 4926 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 4920 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 4922 2 effect0_1+1 effect1_1+1
+field 4924 2 effect0_1+1
 field 4944 2 effect0_1+1
 field 4948 2 effect0_1+1
 field 4952 2 effect0_1+1

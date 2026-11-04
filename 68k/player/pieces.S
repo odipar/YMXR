@@ -16,6 +16,14 @@
 ymxr_p_\name    equ     *
                 .endm
 
+; A piece of the second bank (deferred.S), the copy of a piece of the
+; first: the two keep one layout, so the cut pads both at once and a link
+; leaves both out. ymxr_t_<name> is the first one's start.
+                .macro  PIECE2  name,twin
+ymxr_p_\name    equ     *
+ymxr_t_\name    equ     ymxr_p_\twin
+                .endm
+
                 .macro  ENDPIECE name
 ymxr_e_\name    equ     *
                 .if     ^^defined YMXR_PAD_\name

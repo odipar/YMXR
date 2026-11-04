@@ -165,9 +165,9 @@ field 5006 2 effect0_1+1 effect1_1+1 effect2_1+1
 field 5008 2 effect0_1+1 effect1_1+1 effect2_1+1
 field 5010 2 effect0_1+1 effect1_1+1
 field 5012 2 effect0_1+1
-field 5018 2 effect0_1+1
-field 5020 2 effect0_1+1 effect1_1+1
-field 5022 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5016 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5018 2 effect0_1+1 effect1_1+1
+field 5020 2 effect0_1+1
 field 5040 2 effect0_1+1
 field 5044 2 effect0_1+1
 field 5048 2 effect0_1+1

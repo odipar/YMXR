@@ -219,34 +219,90 @@ ymxr_bank0end:
 ; not point into, so the handler its first tick reads is patched whole
 ; while the running one plays on (SPEC.md 4.8).
 ymxr_bank1:
+                PIECE2  effect0_3,effect0_2
                 TICK    ymxr_tick0b,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE effect0_3
+                PIECE2  effect1_3,effect1_2
                 TICK    ymxr_tick1b,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE effect1_3
+                PIECE2  effect2_3,effect2_2
                 TICK    ymxr_tick2b,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE effect2_3
+                PIECE2  effect3_3,effect3_2
                 TICK    ymxr_tick3b,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE effect3_3
+                PIECE2  square0_2,square0_1
                 SQUARE  ymxr_sq0b,$DF,$FFFFFA0F,$070,ymxr_inst0
+                ENDPIECE square0_2
+                PIECE2  square1_2,square1_1
                 SQUARE  ymxr_sq1b,$EF,$FFFFFA11,$007,ymxr_inst1
+                ENDPIECE square1_2
+                PIECE2  square2_2,square2_1
                 SQUARE  ymxr_sq2b,$FE,$FFFFFA0F,$707,ymxr_inst2
+                ENDPIECE square2_2
+                PIECE2  square3_2,square3_1
                 SQUARE  ymxr_sq3b,$DF,$FFFFFA11,$077,ymxr_inst3
+                ENDPIECE square3_2
+                PIECE2  one0_2,one0_1
                 ONEROW  ymxr_one0b,$DF,$FFFFFA0F,$070,ymxr_inst0
+                ENDPIECE one0_2
+                PIECE2  one1_2,one1_1
                 ONEROW  ymxr_one1b,$EF,$FFFFFA11,$007,ymxr_inst1
+                ENDPIECE one1_2
+                PIECE2  one2_2,one2_1
                 ONEROW  ymxr_one2b,$FE,$FFFFFA0F,$707,ymxr_inst2
+                ENDPIECE one2_2
+                PIECE2  one3_2,one3_1
                 ONEROW  ymxr_one3b,$DF,$FFFFFA11,$077,ymxr_inst3
+                ENDPIECE one3_2
+                PIECE2  counted0_2,counted0_1
                 TICKC   ymxr_cnt0b,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE counted0_2
+                PIECE2  counted1_2,counted1_1
                 TICKC   ymxr_cnt1b,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE counted1_2
+                PIECE2  counted2_2,counted2_1
                 TICKC   ymxr_cnt2b,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE counted2_2
+                PIECE2  counted3_2,counted3_1
                 TICKC   ymxr_cnt3b,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE counted3_2
+                PIECE2  two0_2,two0_1
                 TICKW   ymxr_two0b,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE two0_2
+                PIECE2  two1_2,two1_1
                 TICKW   ymxr_two1b,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE two1_2
+                PIECE2  two2_2,two2_1
                 TICKW   ymxr_two2b,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE two2_2
+                PIECE2  two3_2,two3_1
                 TICKW   ymxr_two3b,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE two3_2
+                PIECE2  three0_2,three0_1
                 TICKW   ymxr_three0b,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE three0_2
+                PIECE2  three1_2,three1_1
                 TICKW   ymxr_three1b,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE three1_2
+                PIECE2  three2_2,three2_1
                 TICKW   ymxr_three2b,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE three2_2
+                PIECE2  three3_2,three3_1
                 TICKW   ymxr_three3b,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE three3_2
+                PIECE2  envelope0_2,envelope0_1
                 TICKW   ymxr_env0b,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE envelope0_2
+                PIECE2  envelope1_2,envelope1_1
                 TICKW   ymxr_env1b,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE envelope1_2
+                PIECE2  envelope2_2,envelope2_1
                 TICKW   ymxr_env2b,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE envelope2_2
+                PIECE2  envelope3_2,envelope3_1
                 TICKW   ymxr_env3b,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE envelope3_2
                 .if     YMXR_MAP
                 LPAD    KEY_LT,ymxr_ref0
                 TICKWL  ymxr_lt0b,2,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
@@ -354,10 +410,18 @@ ymxr_bank1end:
 ; select are written, and the vector is aimed at the armed handler, whose
 ; next tick reads the new source (SPEC.md 4.8). Every operand is patched
 ; at the frame that arms the start.
+                PIECE   effect0_4
                 INSTALL ymxr_inst0,$FFFFFA19,$FFFFFA1F,$F0,$FFFFFA07,5,0,0,$134,$DF,$FFFFFA0F
+                ENDPIECE effect0_4
+                PIECE   effect1_4
                 INSTALL ymxr_inst1,$FFFFFA1D,$FFFFFA25,$F0,$FFFFFA09,4,0,1,$110,$EF,$FFFFFA11
+                ENDPIECE effect1_4
+                PIECE   effect2_4
                 INSTALL ymxr_inst2,$FFFFFA1B,$FFFFFA21,$F0,$FFFFFA07,0,0,0,$120,$FE,$FFFFFA0F
+                ENDPIECE effect2_4
+                PIECE   effect3_4
                 INSTALL ymxr_inst3,$FFFFFA1D,$FFFFFA23,$0F,$FFFFFA09,5,4,1,$114,$DF,$FFFFFA11
+                ENDPIECE effect3_4
                 .endif
 ymxr_reach:                             ; past the last handler, which the
                                         ; reach init measures runs to

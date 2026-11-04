@@ -5,11 +5,11 @@ runs, where a release ships 32 cores today and a tool picks one by the
 song's effects byte (issue #329). This document defines the blocks, the
 library they come in, the link, and how a linked player is checked.
 
-Status: in stages. A player linked from the eight cores without the
-deferred start and the lookup leaves out the frame code and the
-handlers of each effect the song does not run, and each handler of an
-effect whose rows start no source of the handler's kind. The plan at the
-end lists what is done and what follows.
+Status: in stages. A player linked from the sixteen cores without the
+lookup leaves out the frame code and the handlers of each effect the
+song does not run, and each handler of an effect whose rows start no
+source of the handler's kind, in both banks of a core with the deferred
+start. The plan at the end lists what is done and what follows.
 
 ## The player today
 
@@ -47,8 +47,9 @@ general and square sources runs 432 of them.
 
 A block is the code and data a player runs for one part of a song:
 
-- an effect's block, `effect0` to `effect3`, is its frame code and its
-  general handler, which a song needs where its effects byte sets the
+- an effect's block, `effect0` to `effect3`, is its frame code, its
+  general handler and, in a core with the deferred start, its
+  installer, which a song needs where its effects byte sets the
   effect's bit, bits 0 to 3, in a tune of the song;
 - a handler's block, such as `square1`, is one handler of one kind on
   one effect, which a song needs where the effect's rows start a source
@@ -109,7 +110,15 @@ unclaimed and its handlers do not run.
 
 Each effect's frame code and its general handler are pieces of the
 effect's block, and an effect's frame code falls through to the next one
-the player has. Init writes each effect's
+the player has.
+
+A core with the deferred start has a second bank of handlers, BANK bytes
+past the first, the same handlers in the same order (deferred.S). Each
+handler of the second bank is a piece of its twin's block, marked by
+`PIECE2`, which names the twin: a link leaves both out or keeps both,
+so the banks keep one layout, and BANK, a difference of two labels,
+moves by the bytes the first bank loses. Each effect's installer is a
+piece of the effect's block. Init writes each effect's
 read sites, the branch at its head and its place's reset out of three
 tables, which list all four effects. The word `ymxr_k_effect` has a bit
 an effect the player has, all four in a core as carried, and init
@@ -164,6 +173,12 @@ measured from the first handler to the second would move when the first
 is left out, as a distance does. The sizes in `68k/player/handlers.S` are
 measured to the end of the first handler's piece.
 
+A piece of the second bank is padded with its twin, both at once, since
+a pad past one alone breaks the layout the assembly checks: the field
+moves by c times 2 for the two together, and the table records c under
+the twin of the first bank. A link leaves the two out together, and
+the two are one length, so a field moves by c times that length.
+
 The cut fails where a padded core is not P bytes longer, which a branch
 whose size rmac picks by its distance makes, or where a byte moves that
 no field of the two pads explains. The source then names the branch's
@@ -189,27 +204,28 @@ handler to the last handler kept.
 
 ## Figures
 
-The blocks each tune of the conformance kit needs, and the bytes of the
-plain core of 8,942 bytes linked for it:
+The blocks each tune of the conformance kit needs, the core it links,
+and the bytes of that core linked for it: the plain core, of 8,942
+bytes, or the core with the deferred start in, of 13,322 bytes.
 
-| tune | the blocks kept | bytes |
-|---|---|---|
-| `chambers.ymxr` | none | 2,676 |
-| `circus.ymxr` | none | 2,676 |
-| `counted.ymxr` | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,996 |
-| `deferred.ymxr` | the deferred start: the core as carried | |
-| `envelope-counted.ymxr` | envelope, envelope0, several, effect0 | 4,654 |
-| `envelope.ymxr` | two, two0, several, effect0 | 4,620 |
-| `fine-zero.ymxr` | none | 2,676 |
-| `four-timers.ymxr` | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,458 |
-| `mapped.ymxr` | the deferred start and the lookup: the core as carried | |
-| `plays-once.ymxr` | none | 2,676 |
-| `preempt.ymxr` | square, square0, effect0, effect1 | 4,074 |
-| `retune.ymxr` | one, one0, effect0 | 3,382 |
-| `synergy.ymxr` | square, square0, square1, effect0, effect1 | 4,102 |
-| `turrican-2.ymxr` | effect1 | 3,352 |
-| `turrican.ymxr` | effect1 | 3,352 |
-| `voices.ymxr` | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3 | 7,108 |
+| tune | the core | the blocks kept | bytes |
+|---|---|---|---|
+| `chambers.ymxr` | plain | none | 2,676 |
+| `circus.ymxr` | plain | none | 2,676 |
+| `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,996 |
+| `deferred.ymxr` | the deferred start | effect0, effect3 | 5,396 |
+| `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0 | 4,654 |
+| `envelope.ymxr` | plain | two, two0, several, effect0 | 4,620 |
+| `fine-zero.ymxr` | plain | none | 2,676 |
+| `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,458 |
+| `mapped.ymxr` | the lookup: the core as carried | | |
+| `plays-once.ymxr` | plain | none | 2,676 |
+| `preempt.ymxr` | plain | square, square0, effect0, effect1 | 4,074 |
+| `retune.ymxr` | plain | one, one0, effect0 | 3,382 |
+| `synergy.ymxr` | plain | square, square0, square1, effect0, effect1 | 4,102 |
+| `turrican-2.ymxr` | plain | effect1 | 3,352 |
+| `turrican.ymxr` | plain | effect1 | 3,352 |
+| `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3 | 7,108 |
 
 A tune of general sources alone, with no effect, links 2,676 bytes, 30%
 of the core: the blocks are 6,266 bytes of it. The kit's largest,
@@ -238,7 +254,8 @@ columns on each and the start of several columns, and links 7,108.
 
 1. The design: the blocks, the library's format and the link. Done.
 2. The library: the pieces marked in the source and the tables cut by
-   the build. Done for each effect's frame code and for each handler.
+   the build. Done for each effect's frame code and for each handler, in
+   the sixteen cores without the lookup.
 3. The linker, in the Java and the Go trees: the blocks a set needs,
    read from its sources and its effects, the link, and `ymxr-sndh
    -link`. Done.
@@ -246,12 +263,11 @@ columns on each and the start of several columns, and links 7,108.
    the model. Done.
 5. A register's steps as a block, for the registers no tune of a song
    sets, is left out. A dump writes every register on its first frame,
-   R11 and R12 through bits 6 and 5 of the shape's column, so a song of
-   dumps sets them all, and the test of a register's bit that init needs
-   costs every player more bytes than it saves a song that sets them all.
+   R11 and R12 through bits 6 and 5 of the shape's column, and of the
+   eleven fixtures of `ym/test` one, built by hand, leaves a register
+   unset. The test of a register's bit that init needs costs every player
+   more bytes than it saves a song that sets every register.
 6. The stages that follow:
-   - the cores with the deferred start, whose second bank mirrors the
-     first;
    - the cores with the lookup, whose instances keep their page residue
      modulo 256;
    - `-link` as the tools' default, with RigCallsTest's matrix on linked

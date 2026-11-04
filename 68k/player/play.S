@@ -143,13 +143,16 @@ ymxr_overs:
                 dc.w    ymxr_tick3_over-ymxr_frame,ymxr_tick2_over-ymxr_frame
                 dc.w    ymxr_tick1_over-ymxr_frame,ymxr_tick0_over-ymxr_frame
 
+; Each effect's place's reset, in the order of the heads above, effect 3
+; first: init reads the two tables side by side, and leaves both entries
+; of an effect a link left out.
+ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
+                dc.w    ymxr_tick2_reset-ymxr_frame+1
+                dc.w    ymxr_tick1_reset-ymxr_frame+1
+                dc.w    ymxr_tick0_reset-ymxr_frame+1
+
 ; The other sites a column is read at, each with its column: the effects'
 ; one-pass tests, and the envelope period's plain path.
-ymxr_resets:    dc.w    ymxr_tick0_reset-ymxr_frame+1
-                dc.w    ymxr_tick1_reset-ymxr_frame+1
-                dc.w    ymxr_tick2_reset-ymxr_frame+1
-                dc.w    ymxr_tick3_reset-ymxr_frame+1
-
 ymxr_sites:
                 dc.w    q_14-ymxr_frame+2,14,q_15-ymxr_frame+2,15
                 dc.w    q_16-ymxr_frame+2,16,q_17-ymxr_frame+2,17
