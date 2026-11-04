@@ -106,19 +106,14 @@ ymxr_prefill:   movem.l d1-d7/a0-a6,-(sp)
 .fewer:         subq.w  #1,d5
                 bmi     .bad
                 moveq   #0,d0                   ; the effects of an entry at
-                cmp.b   WS_FX+FX_LLAST(a0),d5   ; or past k
-                bcc.s   .in0
+                lea     WS_FX+FX_LLAST(a0),a1   ; or past k
+                moveq   #3,d1
+.past:          cmp.b   (a1),d5
+                bcc.s   .before
                 addq.w  #1,d0
-.in0:           cmp.b   WS_FX+FX_SIZE+FX_LLAST(a0),d5
-                bcc.s   .in1
-                addq.w  #1,d0
-.in1:           cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_LLAST(a0),d5
-                bcc.s   .in2
-                addq.w  #1,d0
-.in2:           cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_SIZE+FX_LLAST(a0),d5
-                bcc.s   .in3
-                addq.w  #1,d0
-.in3:           mulu    #FB_PAGES,d0
+.before:        lea     FX_SIZE(a1),a1
+                dbra    d1,.past
+                mulu    #FB_PAGES,d0
                 add.l   d5,d0
                 cmp.l   d3,d0
                 bhi.s   .fewer
@@ -187,19 +182,14 @@ ymxr_prefill:   movem.l d1-d7/a0-a6,-(sp)
                 moveq   #0,d0
                 move.b  FX_LRES(a3),d0          ; its offset, and the pages of
                 moveq   #0,d1                   ; the effects at lower ones
-                cmp.b   WS_FX+FX_LRES(a0),d0
-                bls.s   .low0
-                add.b   WS_FX+FX_LN(a0),d1
-.low0:          cmp.b   WS_FX+FX_SIZE+FX_LRES(a0),d0
-                bls.s   .low1
-                add.b   WS_FX+FX_SIZE+FX_LN(a0),d1
-.low1:          cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_LRES(a0),d0
-                bls.s   .low2
-                add.b   WS_FX+FX_SIZE+FX_SIZE+FX_LN(a0),d1
-.low2:          cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_SIZE+FX_LRES(a0),d0
-                bls.s   .low3
-                add.b   WS_FX+FX_SIZE+FX_SIZE+FX_SIZE+FX_LN(a0),d1
-.low3:          lsl.l   #8,d1
+                lea     WS_FX(a0),a1
+                moveq   #3,d2
+.low:           cmp.b   FX_LRES(a1),d0
+                bls.s   .lower
+                add.b   FX_LN(a1),d1
+.lower:         lea     FX_SIZE(a1),a1
+                dbra    d2,.low
+                lsl.l   #8,d1
                 add.l   d4,d1
                 add.l   d0,d1
                 movea.l d1,a6                   ; its first page

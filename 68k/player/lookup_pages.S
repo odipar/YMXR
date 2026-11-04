@@ -85,15 +85,12 @@ ymxr_page:      movem.l d1/a4,-(sp)
                 adda.w  d2,a4
                 moveq   #0,d2
                 move.b  FX_LFB(a3),d2
-                lsl.l   #8,d2
-                adda.l  d2,a4
-                move.w  d4,d2
-                lsl.w   #8,d2
+                add.w   d4,d2
+                add.w   d4,d2
                 add.w   d2,d2
-                adda.w  d2,a4
-                move.w  d0,d2
-                lsl.w   #7,d2
-                adda.w  d2,a4
+                add.w   d0,d2                   ; in units of 128 bytes
+                lsl.l   #7,d2
+                adda.l  d2,a4
                 move.w  d0,-(sp)
                 moveq   #0,d0
                 move.b  d1,d0
@@ -163,19 +160,19 @@ ymxr_fill:      move.w  (a2)+,d0                ; E
                 rts
 .plain:         addq.w  #3,d0
                 lsr.w   #2,d0                   ; E in longs
-                movem.l d2-d7/a3,-(sp)
                 subq.w  #8,d0
                 bcs.s   .rest
+                movem.l d2-d7/a3,-(sp)
 .eight:         movem.l (a2)+,d1-d7/a3
                 movem.l d1-d7/a3,(a4)
                 lea     32(a4),a4
                 subq.w  #8,d0
                 bcc.s   .eight
+                movem.l (sp)+,d2-d7/a3
 .rest:          addq.w  #8,d0
                 bra.s   .lnext
 .long:          move.l  (a2)+,(a4)+
 .lnext:         dbra    d0,.long
-                movem.l (sp)+,d2-d7/a3
                 rts
 
 ; d3 the row the running handler is at, a2 the vector that names it and a3
@@ -193,9 +190,8 @@ ymxr_runrow:    moveq   #0,d3
 .steps:
                 .if     YMXR_PCREL
                 move.w  TICK_PTR(a2),d3
-                ext.l   d3
-                add.l   a2,d3
-                add.l   #TICK_PTR,d3
+                lea     TICK_PTR(a2,d3.w),a2
+                move.l  a2,d3
                 .else
                 move.l  TICK_PTR(a2),d3
                 .endif
