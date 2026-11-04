@@ -6,9 +6,10 @@ song's effects byte (issue #329). This document defines the blocks, the
 library they come in, the link, and how a linked player is checked.
 
 Status: in stages. A player linked from the eight cores without the
-deferred start and the lookup leaves out each handler kind the song runs
-no source of, and the frame code of each effect the song does not run.
-The plan at the end lists what is done and what follows.
+deferred start and the lookup leaves out the frame code and the
+handlers of each effect the song does not run, and each handler of an
+effect whose rows start no source of the handler's kind. The plan at the
+end lists what is done and what follows.
 
 ## The player today
 
@@ -19,7 +20,7 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,406 | 2,226 |
+| init | 1,462 | 2,282 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
 | the frame | 2,776 | 3,712 |
 | the frame's read-site tables | 164 | 204 |
@@ -31,50 +32,57 @@ player and of the player with the lookup in:
 | the handler of three columns | 560 | 560 |
 | the counted handler of two columns | 512 | 512 |
 | the place's reset of several columns | 216 | 116 |
-| the start of several columns | 790 | 790 |
+| the start of several columns | 772 | 772 |
 | `ymxr_rem` | 64 | 64 |
-| the mask of the effects | 2 | 2 |
-| the timers' table and the parked place | 122 | 122 |
+| the mask words | 14 | 14 |
+| the timers' table, the tables of instances and the parked place | 154 | 154 |
 | the lookup's routines | | 3,222 |
 | the lookup instances, eight kinds | | 4,188 |
-| the player | 8,176 | 17,282 |
+| the player | 8,258 | 17,364 |
 
 The handlers are 2,416 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
 
 ## Blocks
 
-A block is the code and data a player runs for one part of a song: for
-the sources of one kind, a handler kind's four handlers, one an effect,
-the loops of init that link them, and the routines a start of that kind
-calls; for an effect, its frame code. A song needs a kind's block where
-one of its sources is of that kind, and init resolves every source of
-the tune at its first call, so a source the rows never start counts as
-well. A song needs an effect's block where its effects byte sets the
-effect's bit, bits 0 to 3, in a tune of the song.
+A block is the code and data a player runs for one part of a song:
 
-| block | its bytes | a source that needs it |
+- an effect's block, `effect0` to `effect3`, is its frame code and its
+  general handler, which a song needs where its effects byte sets the
+  effect's bit, bits 0 to 3, in a tune of the song;
+- a handler's block, such as `square1`, is one handler of one kind on
+  one effect, which a song needs where the effect's rows start a source
+  of that kind: its source column with bit 7 set and the source's number
+  (SPEC.md 1.8.3);
+- a kind's block, such as `square`, is init's loop over the kind's
+  handlers, which a song needs where it needs a handler of the kind;
+- `several` is the start of a source of several columns and the routines
+  it calls, which a song needs where a start is of a counted source or of
+  one of several columns.
+
+| kind | a handler | a source of the kind |
 |---|---|---|
-| `square` | the square's handlers, and init's loop over them | one column, two rows, repeating to row 0 |
-| `one` | the one-row source's handlers, and init's loop over their level drop | one column, one row, repeating to row 0 |
-| `counted` | the counted handlers of one column, init's loop over them and its link routine | counted, one column |
-| `two` | the handlers of two columns, and init's loop over them | marked, two columns |
-| `three` | the handlers of three columns, and init's loop over them | marked, three columns |
-| `envelope` | the counted handlers of two columns, and init's loop over them | counted, two or three columns |
-| `several` | the start of a source of several columns, the place's reset on its handler, and the table of the targets that write several registers | counted, or two or three columns |
-| `effect0` to `effect3` | the effect's frame code, 578 to 598 bytes | a tune that runs the effect |
+| `square` | 28 | one column, two rows, repeating to row 0 |
+| `one` | 20 | one column, one row, repeating to row 0 |
+| `counted` | 96 | counted, one column |
+| `two` | 112 | marked, two columns |
+| `three` | 140 | marked, three columns |
+| `envelope` | 128 | counted, two or three columns |
+
+Sizes are in bytes, of the plain core. An effect's block is its frame
+code, 578 to 598 bytes, and its general handler, 80; `several` is 988
+bytes of routines and 120 of tables.
 
 The rest is in every linked player: the jump table, init, `YMXR_stop`,
-`YMXR_play`, the frame's register steps and its tables, the general
-handler, `ymxr_rem`, the mask of the effects, the timers' table and the
-parked place. A source of one column that is none of the shapes above
-runs the general handler.
-
-The frame reaches a handler kind on the start of a source of that kind
-alone. Init writes the branch that picks a start's shape from the shapes
-of every source of the tune, and a start of a source of several columns
-or a counted source calls the routines of `several`. A path to a block
-the song does not need is a path no row of the song runs.
+`YMXR_play`, the frame's register steps and its tables, `ymxr_rem`, the
+mask words, the timers' table and the parked place. A source of one
+column that is none of the shapes above runs the general handler.
+The frame reaches an effect's handler of a kind on a start on that
+effect of a source of that kind alone. Init writes the branch that picks
+a start's shape from the shapes of every source of the tune, and a start
+of a source of several columns or a counted source calls the routines of
+`several`. A path to a block the song does not need is a path no row of
+the song runs.
 
 ### Pieces
 
@@ -86,14 +94,22 @@ squares, `square_2` the four squares. Neither macro writes a byte, so the
 core a release ships is the same with the pieces marked.
 
 Init links each handler kind in a loop over its four handlers, and each
-loop is a piece of the kind's block. The level drop of a tick that nests
+loop is a piece of the kind's block. The handlers of one kind are one
+after the other, all of one size, so the handlers a player keeps are too:
+the loop walks the four effects, and links a handler and steps past it
+where the effect's bit in the kind's mask, `ymxr_k_square` for the
+square, is set. The start of several columns and the deferred start read
+an effect's handler out of a table of the kind's four, `ymxr_at_two` for
+two columns, each entry the handler's distance from the table, which the
+link moves as it leaves handlers out. The level drop of a tick that nests
 is written in the loop of each kind it is in: the general handler, the
 square and the one-row source. The word is written into all four
 effects' handlers, since a timer the tune does not run is left
 unclaimed and its handlers do not run.
 
-Each effect's frame code is a piece of the effect's block, and an effect
-falls through to the next one the player has. Init writes each effect's
+Each effect's frame code and its general handler are pieces of the
+effect's block, and an effect's frame code falls through to the next one
+the player has. Init writes each effect's
 read sites, the branch at its head and its place's reset out of three
 tables, which list all four effects. The word `ymxr_k_effect` has a bit
 an effect the player has, all four in a core as carried, and init
@@ -112,9 +128,10 @@ lookup, eight tables, as it assembles the cores.
 The table is text, a line each:
 
 ```
-piece square_1 1148 1176
-mask 8736 effect
-field 1178 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_2+1 square_2+1 three_1+1 two_1+1
+piece square_1 1172 1208
+piece square0_1 5626 5654
+mask 8776 square
+field 5194 2 effect0_1+1 effect1_1+1 effect2_1+1
 ```
 
 A `piece` line is the piece's name, its first byte and the byte past its
@@ -140,6 +157,12 @@ that refers across the end moves by c times P. Two pads define each field:
 - with a pad of 256, the high byte of a word field moves, and a byte
   field moves by 0;
 - the field moves by c times 2 and by c times 256 exactly.
+
+A value the source means as a size, such as `TW2_SIZE`, the bytes of a
+handler of two columns, is a difference of two labels in one piece: one
+measured from the first handler to the second would move when the first
+is left out, as a distance does. The sizes in `68k/player/handlers.S` are
+measured to the end of the first handler's piece.
 
 The cut fails where a padded core is not P bytes longer, which a branch
 whose size rmac picks by its distance makes, or where a byte moves that
@@ -167,31 +190,31 @@ handler to the last handler kept.
 ## Figures
 
 The blocks each tune of the conformance kit needs, and the bytes of the
-plain core of 8,860 bytes linked for it:
+plain core of 8,942 bytes linked for it:
 
 | tune | the blocks kept | bytes |
 |---|---|---|
-| `chambers.ymxr` | none | 2,976 |
-| `circus.ymxr` | none | 2,976 |
-| `counted.ymxr` | square, counted, several, effect0, effect1, effect2, effect3 | 7,030 |
+| `chambers.ymxr` | none | 2,676 |
+| `circus.ymxr` | none | 2,676 |
+| `counted.ymxr` | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,996 |
 | `deferred.ymxr` | the deferred start: the core as carried | |
-| `envelope-counted.ymxr` | envelope, several, effect0 | 5,236 |
-| `envelope.ymxr` | two, several, effect0 | 5,154 |
-| `fine-zero.ymxr` | none | 2,976 |
-| `four-timers.ymxr` | square, one, effect0, effect1, effect2, effect3 | 5,566 |
+| `envelope-counted.ymxr` | envelope, envelope0, several, effect0 | 4,654 |
+| `envelope.ymxr` | two, two0, several, effect0 | 4,620 |
+| `fine-zero.ymxr` | none | 2,676 |
+| `four-timers.ymxr` | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,458 |
 | `mapped.ymxr` | the deferred start and the lookup: the core as carried | |
-| `plays-once.ymxr` | none | 2,976 |
-| `preempt.ymxr` | square, effect0, effect1 | 4,290 |
-| `retune.ymxr` | one, effect0 | 3,654 |
-| `synergy.ymxr` | square, effect0, effect1 | 4,290 |
-| `turrican-2.ymxr` | effect1 | 3,572 |
-| `turrican.ymxr` | effect1 | 3,572 |
-| `voices.ymxr` | two, three, several, effect0, effect1, effect2, effect3 | 7,562 |
+| `plays-once.ymxr` | none | 2,676 |
+| `preempt.ymxr` | square, square0, effect0, effect1 | 4,074 |
+| `retune.ymxr` | one, one0, effect0 | 3,382 |
+| `synergy.ymxr` | square, square0, square1, effect0, effect1 | 4,102 |
+| `turrican-2.ymxr` | effect1 | 3,352 |
+| `turrican.ymxr` | effect1 | 3,352 |
+| `voices.ymxr` | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3 | 7,108 |
 
-A tune of general sources alone, with no effect, links 2,976 bytes, 34%
-of the core: the blocks are 5,884 bytes of it. The kit's largest,
-`voices.ymxr`, runs all four effects, keeps the handlers of two and
-three columns and the start of several columns, and links 7,562.
+A tune of general sources alone, with no effect, links 2,676 bytes, 30%
+of the core: the blocks are 6,266 bytes of it. The kit's largest,
+`voices.ymxr`, runs all four effects, keeps a handler of two or three
+columns on each and the start of several columns, and links 7,108.
 
 ## The check
 
@@ -215,18 +238,13 @@ three columns and the start of several columns, and links 7,562.
 
 1. The design: the blocks, the library's format and the link. Done.
 2. The library: the pieces marked in the source and the tables cut by
-   the build. Done for the handler kinds and for each effect's frame
-   code.
+   the build. Done for each effect's frame code and for each handler.
 3. The linker, in the Java and the Go trees: the blocks a set needs,
    read from its sources and its effects, the link, and `ymxr-sndh
    -link`. Done.
 4. The check: the rig plays the player linked for each fixture against
    the model. Done.
 5. The stages that follow:
-   - each handler instance a block, of one kind on one effect, which
-     needs init and the start of several columns to read an instance's
-     address through a table rather than as the first instance plus the
-     effect times the instance's size;
    - each register column that no tune of the song sets a block, its
      read sites left as they are where the column's bit is clear;
    - the cores with the deferred start, whose second bank mirrors the

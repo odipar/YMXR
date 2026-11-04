@@ -4,57 +4,101 @@
                 .macro  HANDLERS
 ; ---------------------------------------------------------------- ticks
 
+                PIECE   effect0_2
                 TICK    ymxr_tick0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE effect0_2
+                PIECE   effect1_2
                 TICK    ymxr_tick1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE effect1_2
+                PIECE   effect2_2
                 TICK    ymxr_tick2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE effect2_2
+                PIECE   effect3_2
                 TICK    ymxr_tick3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                ENDPIECE effect3_2
 
-                PIECE   square_2
+                PIECE   square0_1
                 SQUARE  ymxr_sq0,$DF,$FFFFFA0F,$070,ymxr_inst0
+                ENDPIECE square0_1
+                PIECE   square1_1
                 SQUARE  ymxr_sq1,$EF,$FFFFFA11,$007,ymxr_inst1
+                ENDPIECE square1_1
+                PIECE   square2_1
                 SQUARE  ymxr_sq2,$FE,$FFFFFA0F,$707,ymxr_inst2
+                ENDPIECE square2_1
+                PIECE   square3_1
                 SQUARE  ymxr_sq3,$DF,$FFFFFA11,$077,ymxr_inst3
-                ENDPIECE square_2
+                ENDPIECE square3_1
 
-                PIECE   one_2
+                PIECE   one0_1
                 ONEROW  ymxr_one0,$DF,$FFFFFA0F,$070,ymxr_inst0
+                ENDPIECE one0_1
+                PIECE   one1_1
                 ONEROW  ymxr_one1,$EF,$FFFFFA11,$007,ymxr_inst1
+                ENDPIECE one1_1
+                PIECE   one2_1
                 ONEROW  ymxr_one2,$FE,$FFFFFA0F,$707,ymxr_inst2
+                ENDPIECE one2_1
+                PIECE   one3_1
                 ONEROW  ymxr_one3,$DF,$FFFFFA11,$077,ymxr_inst3
-                ENDPIECE one_2
+                ENDPIECE one3_1
 
-                PIECE   counted_3
+                PIECE   counted0_1
                 TICKC   ymxr_cnt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE counted0_1
+                PIECE   counted1_1
                 TICKC   ymxr_cnt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE counted1_1
+                PIECE   counted2_1
                 TICKC   ymxr_cnt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE counted2_1
+                PIECE   counted3_1
                 TICKC   ymxr_cnt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
-                ENDPIECE counted_3
+                ENDPIECE counted3_1
 
 ; The handlers of a target that writes two registers, and of one that
 ; writes three: one an effect, as the three above are.
-                PIECE   two_2
+                PIECE   two0_1
                 TICKW   ymxr_two0,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE two0_1
+                PIECE   two1_1
                 TICKW   ymxr_two1,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE two1_1
+                PIECE   two2_1
                 TICKW   ymxr_two2,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE two2_1
+                PIECE   two3_1
                 TICKW   ymxr_two3,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
-                ENDPIECE two_2
+                ENDPIECE two3_1
 
-                PIECE   three_2
+                PIECE   three0_1
                 TICKW   ymxr_three0,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE three0_1
+                PIECE   three1_1
                 TICKW   ymxr_three1,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE three1_1
+                PIECE   three2_1
                 TICKW   ymxr_three2,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE three2_1
+                PIECE   three3_1
                 TICKW   ymxr_three3,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
-                ENDPIECE three_2
+                ENDPIECE three3_1
 
 ; The counted shape of two columns: `setEnvelope` writes R11 and R12 and
 ; both read every bit of their byte, so the rows of a source on it are
 ; whole bytes and a tick counts them (SPEC.md 2.1.3, 3.1.6).
-                PIECE   envelope_2
+                PIECE   envelope0_1
                 TICKW   ymxr_env0,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                ENDPIECE envelope0_1
+                PIECE   envelope1_1
                 TICKW   ymxr_env1,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                ENDPIECE envelope1_1
+                PIECE   envelope2_1
                 TICKW   ymxr_env2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                ENDPIECE envelope2_1
+                PIECE   envelope3_1
                 TICKW   ymxr_env3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
-                ENDPIECE envelope_2
+                ENDPIECE envelope3_1
                 .if     YMXR_MAP
 ; Bank-0 lookup instances follow identity handlers. Pad each of eight
 ; kinds per effect so its page-read displacement matches its pages
@@ -324,7 +368,10 @@ ymxr_reach:                             ; past the last handler, which the
 ; labels: the row it writes, the marker it reads, and its loop cell.
 ; A monitor's mark is between those blocks, and the distances follow
 ; it. Every handler is laid out by the one macro, so one handler's
-; offsets are all four handlers'. The rig reads them back.
+; offsets are all four handlers'. The rig reads them back. A size is
+; measured to the end of the first handler's piece (pieces.S): both its
+; labels are in one piece, so a link that leaves handlers out leaves it
+; as it is.
 TICK_SEL        equ     ymxr_tick0_row-ymxr_tick0+3   ; the target register
 TICK_PTR        equ     ymxr_tick0_row-ymxr_tick0+8   ; the place: a tick's row
 TICK_STEP       equ     ymxr_tick0_step-ymxr_tick0+2  ; the place's address
@@ -335,7 +382,7 @@ TICK_CELL       equ     ymxr_tick0_cell-ymxr_tick0    ; row RR, or 0 once
                 .if     YMXR_NEST
 TICK_SR         equ     ymxr_tick0_sr-ymxr_tick0      ; the level it drops
                 .endif
-TICK_SIZE       equ     ymxr_tick1-ymxr_tick0
+TICK_SIZE       equ     ymxr_e_effect0_2-ymxr_tick0
 
 ; The counted handler, the same way: the register it selects, the place,
 ; the address of the place, the counter's address in the subq that steps
@@ -352,7 +399,7 @@ TICKC_RELD      equ     ymxr_cnt0_reld-ymxr_cnt0+2
 TICKC_RELDA     equ     ymxr_cnt0_reld-ymxr_cnt0+4
 TICKC_CELL      equ     ymxr_cnt0_cell-ymxr_cnt0
 TICKC_LEFT      equ     ymxr_cnt0_left-ymxr_cnt0
-TICKC_SIZE      equ     ymxr_cnt1-ymxr_cnt0
+TICKC_SIZE      equ     ymxr_e_counted0_1-ymxr_cnt0
 
 ; A square's handler, the same way: the register it selects, the row it
 ; is at, the two rows' difference, and the address of the row it
@@ -362,14 +409,14 @@ SQ_VAL          equ     ymxr_sq0_sel-ymxr_sq0+4
 SQ_MASK         equ     ymxr_sq0_tog-ymxr_sq0+3
 SQ_PTR          equ     ymxr_sq0_tog-ymxr_sq0+4
 SQ_SR           equ     ymxr_sq0_sel-ymxr_sq0+8
-SQ_SIZE         equ     ymxr_sq1-ymxr_sq0
+SQ_SIZE         equ     ymxr_e_square0_1-ymxr_sq0
 
 ; A one-row source's handler: the register it selects and the row it
 ; writes, both immediates a start puts there, those two fields alone.
 ONE_SEL         equ     ymxr_one0_sel-ymxr_one0+2
 ONE_VAL         equ     ymxr_one0_sel-ymxr_one0+4
 ONE_SR          equ     ymxr_one0_sel-ymxr_one0+8
-ONE_SIZE        equ     ymxr_one1-ymxr_one0
+ONE_SIZE        equ     ymxr_e_one0_1-ymxr_one0
 
                 TWAT    TW2,ymxr_two0
                 TWAT    TW3,ymxr_three0
@@ -378,8 +425,8 @@ TW3_PTR3        equ     ymxr_three0_ptr3-ymxr_three0+2
 TW3_STEP3       equ     ymxr_three0_step3-ymxr_three0+2
 TW3_LOOP3R      equ     ymxr_three0_loop3-ymxr_three0+2
 TW3_LOOP3W      equ     ymxr_three0_loop3-ymxr_three0+6
-TW2_SIZE        equ     ymxr_two1-ymxr_two0
-TW3_SIZE        equ     ymxr_three1-ymxr_three0
+TW2_SIZE        equ     ymxr_e_two0_1-ymxr_two0
+TW3_SIZE        equ     ymxr_e_three0_1-ymxr_three0
 
 ; The counted shape of two columns, the offsets above and four besides:
 ; the counter's address in the subq that steps it, the rows of a pass
@@ -389,7 +436,7 @@ TWC_CNT         equ     ymxr_env0_cnt-ymxr_env0+2
 TWC_RELD        equ     ymxr_env0_reld-ymxr_env0+2
 TWC_RELDA       equ     ymxr_env0_reld-ymxr_env0+4
 TWC_LEFT        equ     ymxr_env0_left-ymxr_env0
-TWC_SIZE        equ     ymxr_env1-ymxr_env0
+TWC_SIZE        equ     ymxr_e_envelope0_1-ymxr_env0
 
                 .if     YMXR_DEFER
 ; A pending start (SPEC.md 4.8): bank 1 at a fixed distance from bank 0;

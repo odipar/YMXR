@@ -222,32 +222,45 @@ YMXR_init:
 ; The tick handlers: each one's step and loop operands name a
 ; separate pair of cells, its place is parked on a marker until a start,
 ; and the register it selects is R0 until a start aims it (SPEC.md 5.2.1).
+; Each loop below walks the instances of one kind the player has, a bit
+; an effect in the kind's mask: a player linked for a song has the
+; instances of the effects that start a source of the kind, one after
+; the other (doc/LINKER.md).
                 lea     ymxr_tick0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_effect+1(pc),d4
                 moveq   #3,d2
-.link:          bsr     ymxr_link
+.link:          lsr.b   #1,d4
+                bcc.s   .nolink
+                bsr     ymxr_link
                 .if     YMXR_NEST
                 move.l  d3,TICK_SR(a5)
                 .endif
                 lea     TICK_SIZE(a5),a5
-                dbra    d2,.link
+.nolink:        dbra    d2,.link
                 PIECE   counted_1
                 lea     ymxr_cnt0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_counted+1(pc),d4
                 moveq   #3,d2
-.linkc:         bsr     ymxr_linkc
+.linkc:         lsr.b   #1,d4
+                bcc.s   .nolinkc
+                bsr     ymxr_linkc
                 lea     TICKC_SIZE(a5),a5
-                dbra    d2,.linkc
+.nolinkc:       dbra    d2,.linkc
                 ENDPIECE counted_1
 
                 .if     YMXR_NEST
                 PIECE   one_1
                 lea     ymxr_one0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_one+1(pc),d4
                 moveq   #3,d2
-.one:           move.l  d3,ONE_SR(a5)
+.one:           lsr.b   #1,d4
+                bcc.s   .noone
+                move.l  d3,ONE_SR(a5)
                 lea     ONE_SIZE(a5),a5
-                dbra    d2,.one
+.noone:         dbra    d2,.one
                 ENDPIECE one_1
                 .if     YMXR_MAP
                 lea     ymxr_lk0(pc),a5         ; and the general lookup
@@ -265,8 +278,11 @@ YMXR_init:
                 PIECE   square_1
                 lea     ymxr_sq0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_square+1(pc),d4
                 moveq   #3,d2
-.sq:            lea     SQ_VAL(a5),a3
+.sq:            lsr.b   #1,d4
+                bcc.s   .nosq
+                lea     SQ_VAL(a5),a3
                 move.l  a3,SQ_PTR(a5)
                 .if     YMXR_NEST
                 move.l  d3,SQ_SR(a5)
@@ -275,7 +291,7 @@ YMXR_init:
                 move.l  a3,SQ_HPTR(a5)
                 .endif
                 lea     SQ_SIZE(a5),a5
-                dbra    d2,.sq
+.nosq:          dbra    d2,.sq
                 ENDPIECE square_1
 
 ; The handlers of several columns: the loop cells they read and the
@@ -286,8 +302,11 @@ YMXR_init:
                 PIECE   two_1
                 lea     ymxr_two0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_two+1(pc),d4
                 moveq   #3,d2
-.linktwo:       lea     TW2_CELLS(a5),a3
+.linktwo:       lsr.b   #1,d4
+                bcc.s   .nolinktwo
+                lea     TW2_CELLS(a5),a3
                 move.l  a3,TW2_LOOPT(a5)
                 move.l  a3,TW2_LOOP1R(a5)
                 addq.l  #CELL_SIZE,a3
@@ -299,13 +318,16 @@ YMXR_init:
                 move.l  a3,TW2_STEP2(a5)
                 move.l  a3,TW2_LOOP2W(a5)
                 lea     TW2_SIZE(a5),a5
-                dbra    d2,.linktwo
+.nolinktwo:     dbra    d2,.linktwo
                 ENDPIECE two_1
                 PIECE   three_1
                 lea     ymxr_three0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_three+1(pc),d4
                 moveq   #3,d2
-.linkthree:     lea     TW3_CELLS(a5),a3
+.linkthree:     lsr.b   #1,d4
+                bcc.s   .nolinkthree
+                lea     TW3_CELLS(a5),a3
                 move.l  a3,TW3_LOOPT(a5)
                 move.l  a3,TW3_LOOP1R(a5)
                 addq.l  #CELL_SIZE,a3
@@ -322,13 +344,16 @@ YMXR_init:
                 move.l  a3,TW3_STEP3(a5)
                 move.l  a3,TW3_LOOP3W(a5)
                 lea     TW3_SIZE(a5),a5
-                dbra    d2,.linkthree
+.nolinkthree:   dbra    d2,.linkthree
                 ENDPIECE three_1
                 PIECE   envelope_1
                 lea     ymxr_env0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_envelope+1(pc),d4
                 moveq   #3,d2
-.linkenv:       lea     TWC_CELLS(a5),a3
+.linkenv:       lsr.b   #1,d4
+                bcc.s   .nolinkenv
+                lea     TWC_CELLS(a5),a3
                 move.l  a3,TWC_LOOPT(a5)
                 move.l  a3,TWC_LOOP1R(a5)
                 addq.l  #CELL_SIZE,a3
@@ -344,7 +369,7 @@ YMXR_init:
                 move.l  a3,TWC_RELDA(a5)
                 move.w  #1,TWC_LEFT(a5)
                 lea     TWC_SIZE(a5),a5
-                dbra    d2,.linkenv
+.nolinkenv:     dbra    d2,.linkenv
                 ENDPIECE envelope_1
                 .if     YMXR_MAP
 ; Link lookup instances as above, selecting page 0 from the bank's

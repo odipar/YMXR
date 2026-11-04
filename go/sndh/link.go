@@ -17,11 +17,28 @@ import (
 // linked core's report reads its length off (BINARIES.md 2.2, 3.1).
 const CoreTableAt = coreTableAt
 
+// Kinds are the handler kinds that are blocks: the general handler is in
+// each effect's block.
+var Kinds = []string{"square", "one", "counted", "two", "three", "envelope"}
+
 // Blocks are the blocks a core's pieces belong to, in the order
-// doc/LINKER.md lists them: the handler kinds, the start of several
-// columns, and the frame code of each effect.
-var Blocks = []string{"square", "one", "counted", "two", "three", "envelope", "several",
-	"effect0", "effect1", "effect2", "effect3"}
+// doc/LINKER.md lists them: each handler kind, which init's loop over it
+// is, and its instance on each effect; the start of several columns; and
+// each effect's frame code and general handler.
+var Blocks = func() []string {
+	var all []string
+	for _, kind := range Kinds {
+		all = append(all, kind)
+		for i := 0; i < 4; i++ {
+			all = append(all, fmt.Sprintf("%s%d", kind, i))
+		}
+	}
+	all = append(all, "several")
+	for i := 0; i < 4; i++ {
+		all = append(all, fmt.Sprintf("effect%d", i))
+	}
+	return all
+}()
 
 // Piece is a run of bytes of a core a player linked for one song leaves
 // out: its name, <block>_<n>, its first byte and the byte past its last.
@@ -170,22 +187,29 @@ func Kind(source *dtx.Table, counted bool) string {
 	return "general"
 }
 
-// BlocksOf is the blocks a set of tunes needs: for each source of each
-// tune, the block of its handler kind, and several for a counted source
-// or one of several columns; and the frame code of each effect a tune
-// runs, bits 0 to 3 of its effects byte; in the order of Blocks.
+// BlocksOf is the blocks a set of tunes needs: the block of each effect
+// a tune runs, bits 0 to 3 of its effects byte; for each source an
+// effect's rows start, the instance of its handler kind on that effect
+// and the kind's loop of init; and several where a start is of a counted
+// source or one of several columns; in the order of Blocks.
 func BlocksOf(tunes []ymxr.File) []string {
 	needed := map[string]bool{}
 	for _, tune := range tunes {
-		for s, source := range tune.Sources {
-			needed[Kind(source, tune.Counted[s])] = true
-			if tune.Counted[s] || source.Columns() > 1 {
-				needed["several"] = true
-			}
-		}
 		for i := 0; i < 4; i++ {
-			if tune.Effects&(1<<i) != 0 {
-				needed[fmt.Sprintf("effect%d", i)] = true
+			if tune.Effects&(1<<i) == 0 {
+				continue
+			}
+			needed[fmt.Sprintf("effect%d", i)] = true
+			for _, s := range Started(tune, i) {
+				source := tune.Sources[s-1]
+				kind := Kind(source, tune.Counted[s-1])
+				if kind != "general" {
+					needed[kind] = true
+					needed[fmt.Sprintf("%s%d", kind, i)] = true
+				}
+				if tune.Counted[s-1] || source.Columns() > 1 {
+					needed["several"] = true
+				}
 			}
 		}
 	}
@@ -196,6 +220,26 @@ func BlocksOf(tunes []ymxr.File) []string {
 		}
 	}
 	return ordered
+}
+
+// Started is the sources effect i's rows start: a source column with its
+// bit 7 set and a number from 1 up (SPEC.md 1.8.3), a number of a source
+// the tune has, in order.
+func Started(tune ymxr.File, i int) []int {
+	seen := map[int]bool{}
+	for _, b := range tune.Table.Column(ymxr.Effect + 4*i + 1) {
+		s := int(b & 0x7F)
+		if b&0x80 != 0 && s > 0 && s <= len(tune.Sources) {
+			seen[s] = true
+		}
+	}
+	var out []int
+	for s := 1; s <= len(tune.Sources); s++ {
+		if seen[s] {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // LeftOut is the blocks the table has that the set named leaves out, in

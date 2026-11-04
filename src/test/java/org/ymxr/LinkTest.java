@@ -63,7 +63,13 @@ final class LinkTest {
                 blocks.add(piece.block());
                 after = piece.to();
             }
-            assertEquals(Set.copyOf(Link.BLOCKS), blocks, binary.name());
+            // a lean core leaves the level drop out, and the loop over the
+            // one-row handlers that writes it
+            Set<String> all = new LinkedHashSet<>(Link.BLOCKS);
+            if (binary.defines().contains("-dYMXR_NEST=0")) {
+                all.remove("one");
+            }
+            assertEquals(all, blocks, binary.name());
             for (Pieces.Field field : table.fields()) {
                 assertTrue(field.at() >= Sndh.CORE_DESCRIPTOR
                         && field.at() + field.width() <= core.length, binary.name() + ": "
@@ -113,20 +119,23 @@ final class LinkTest {
         }
     }
 
-    /** The blocks of a source follow its shape as init resolves it. */
+    /** The blocks of a tune: each effect it runs, and the instance of each
+     *  kind on the effect whose rows start a source of the kind, its shape
+     *  as init resolves it. */
     @Test
     void theBlocksOfTheKitsTunes() throws IOException {
         assertEquals(List.of(), List.copyOf(blocks("chambers.ymxr")));
-        assertEquals(List.of("square", "effect0", "effect1"),
+        assertEquals(List.of("square", "square0", "effect0", "effect1"),
                 List.copyOf(blocks("preempt.ymxr")));
-        assertEquals(List.of("one", "effect0"), List.copyOf(blocks("retune.ymxr")));
+        assertEquals(List.of("one", "one0", "effect0"), List.copyOf(blocks("retune.ymxr")));
         assertEquals(List.of("effect1"), List.copyOf(blocks("turrican.ymxr")));
-        assertEquals(List.of("square", "counted", "several", "effect0", "effect1", "effect2",
-                "effect3"), List.copyOf(blocks("counted.ymxr")));
-        assertEquals(List.of("envelope", "several", "effect0"),
+        assertEquals(List.of("square", "square1", "counted", "counted0", "counted1", "counted2",
+                "counted3", "several", "effect0", "effect1", "effect2", "effect3"),
+                List.copyOf(blocks("counted.ymxr")));
+        assertEquals(List.of("envelope", "envelope0", "several", "effect0"),
                 List.copyOf(blocks("envelope-counted.ymxr")));
-        assertEquals(List.of("two", "three", "several", "effect0", "effect1", "effect2",
-                "effect3"), List.copyOf(blocks("voices.ymxr")));
+        assertEquals(List.of("two", "two1", "two3", "three", "three0", "three2", "several",
+                "effect0", "effect1", "effect2", "effect3"), List.copyOf(blocks("voices.ymxr")));
     }
 
     private static Set<String> blocks(String name) throws IOException {

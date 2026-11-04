@@ -1,11 +1,32 @@
 ; tables.S - each effect's timer, the registers of the targets that write
 ; several, and the parked place.
 
-; The effects whose frame code a player has, a bit an effect: init
-; writes the read sites, the head and the reset of these effects alone. A
-; core as carried has all four, and a link writes the effects of the song
-; (doc/LINKER.md).
+; The effects whose frame code and general handler a player has, a bit
+; an effect: init writes the read sites, the head and the reset of these
+; effects alone, and links their handlers. A core as carried has all
+; four, and a link writes the effects of the song (doc/LINKER.md).
 ymxr_k_effect:  dc.w    $000F
+; The instances of each kind of handler a player has, a bit an effect,
+; which init links: a link writes the effects that start a source of the
+; kind.
+ymxr_k_square:  dc.w    $000F
+ymxr_k_one:     dc.w    $000F
+ymxr_k_counted: dc.w    $000F
+ymxr_k_two:     dc.w    $000F
+ymxr_k_three:   dc.w    $000F
+ymxr_k_envelope: dc.w   $000F
+
+; Each effect's handler of a kind, from the kind's table: a start reads
+; the instance there, which a link moves as it leaves instances out.
+                .macro  AT      kind,first
+ymxr_at_\kind:  dc.w    \{first}0-ymxr_at_\kind,\{first}1-ymxr_at_\kind
+                dc.w    \{first}2-ymxr_at_\kind,\{first}3-ymxr_at_\kind
+                .endm
+                .if     YMXR_DEFER
+                AT      tick,ymxr_tick
+                AT      square,ymxr_sq
+                AT      one,ymxr_one
+                .endif
 
 ; Each effect's timer, as a start reads it: its vector, by which a start
 ; finds the running handler, and where deferred starts are assembled in,
@@ -41,6 +62,10 @@ ymxr_wide:      dc.b    0,0,  1,1,  0,0,  0,0   ; 14 setToneA:     R0 R1
                 dc.b    8,1,  6,0,  0,0,  0,0   ; 22 setNoiseA:    R6 R8
                 dc.b    9,1,  6,0,  0,0,  0,0   ; 23 setNoiseB:    R6 R9
                 dc.b   10,1,  6,0,  0,0,  0,0   ; 24 setNoiseC:    R6 R10
+                AT      counted,ymxr_cnt
+                AT      two,ymxr_two
+                AT      three,ymxr_three
+                AT      envelope,ymxr_env
                 ENDPIECE several_2
 
 ; A parked place: a marker with no loop cell, so a tick of a timer no row

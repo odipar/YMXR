@@ -268,17 +268,15 @@ ymxr_widestart:
                 addq.l  #1,d0
                 bne.w   .counted                ; three columns, or the tag of
                 moveq   #3,d4                   ; a source whose column fills
-                move.w  d6,d0                   ; its byte
-                mulu    #TW3_SIZE,d0
-                move.w  -4(a2,d1.w),d1          ; the stride from one column to
-                lea     ymxr_three0(pc),a5      ; the next
+                move.w  -4(a2,d1.w),d1          ; its byte; the stride from one
+                lea     ymxr_at_three(pc),a5    ; column to the next
                 bra.s   .handler
 .two:           moveq   #2,d4
-                move.w  d6,d0
-                mulu    #TW2_SIZE,d0
                 move.w  -4(a2,d1.w),d1
-                lea     ymxr_two0(pc),a5
-.handler:       adda.w  d0,a5                   ; this effect's handler
+                lea     ymxr_at_two(pc),a5
+.handler:       move.w  d6,d0                   ; this effect's handler, out
+                add.w   d0,d0                   ; of the kind's table
+                adda.w  (a5,d0.w),a5
                 move.l  d5,d0                   ; the loop cell
 ; R, which a pending start and a place's reset read; then level 7 from the
 ; place's read to the vector's write.
@@ -377,9 +375,7 @@ ymxr_widestart:
 .counted:       addq.l  #1,d0                   ; the tag of a counted source
                 bne.s   .env                    ; of several columns
                 moveq   #1,d4                   ; the shape this start leaves
-                move.w  d6,d0
-                mulu    #TICKC_SIZE,d0
-                lea     ymxr_cnt0(pc),a5
+                lea     ymxr_at_counted(pc),a5
                 bra.w   .handler
 
 ; A counted source of two columns, which `setEnvelope` runs (SPEC.md
@@ -388,10 +384,8 @@ ymxr_widestart:
 ; workspace.
 .env:           moveq   #4,d4
                 move.w  -2(a2,d1.w),-(sp)       ; R, a pass through the source
-                move.w  d6,d0
-                mulu    #TWC_SIZE,d0
                 move.w  -4(a2,d1.w),d1          ; the stride
-                lea     ymxr_env0(pc),a5
+                lea     ymxr_at_envelope(pc),a5
                 bra.w   .handler
 .countedaim:    lea     WS_WIDE(a0),a2
                 move.w  -4(a2,d1.w),d4          ; R, a pass through the source

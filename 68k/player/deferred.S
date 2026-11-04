@@ -195,10 +195,10 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 tst.l   d0
                 bmi.s   .shaped
 ; the general handler: the target, the place and the loop cell
-                move.w  d6,d5
-                mulu    #TICK_SIZE,d5
-                lea     ymxr_tick0(pc),a5
-                adda.w  d5,a5
+                move.w  d6,d5                   ; this effect's handler, out
+                add.w   d5,d5                   ; of the kind's table
+                lea     ymxr_at_tick(pc),a5
+                adda.w  (a5,d5.w),a5
                 adda.w  d4,a5
                 move.b  FX_TARGET(a3),TICK_SEL(a5)
                 add.l   a4,d3                   ; the row the place is at
@@ -223,10 +223,10 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
 .shaped:        addq.l  #1,d0
                 bne.s   .notsq
 ; a square: its two rows, and the row the place is at
-                move.w  d6,d5
-                mulu    #SQ_SIZE,d5
-                lea     ymxr_sq0(pc),a5
-                adda.w  d5,a5
+                move.w  d6,d5                   ; this effect's handler, out
+                add.w   d5,d5                   ; of the kind's table
+                lea     ymxr_at_square(pc),a5
+                adda.w  (a5,d5.w),a5
                 adda.w  d4,a5
                 move.b  FX_TARGET(a3),SQ_SEL(a5)
                 move.b  (a4),d5
@@ -262,10 +262,10 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
 .notsq:         addq.l  #1,d0
                 bne.s   .wide
 ; a source of one row
-                move.w  d6,d5
-                mulu    #ONE_SIZE,d5
-                lea     ymxr_one0(pc),a5
-                adda.w  d5,a5
+                move.w  d6,d5                   ; this effect's handler, out
+                add.w   d5,d5                   ; of the kind's table
+                lea     ymxr_at_one(pc),a5
+                adda.w  (a5,d5.w),a5
                 adda.w  d4,a5
                 move.b  FX_TARGET(a3),ONE_SEL(a5)
                 move.b  (a4),ONE_VAL(a5)

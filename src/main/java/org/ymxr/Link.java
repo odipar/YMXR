@@ -15,11 +15,31 @@ import org.dtx.Table;
  */
 final class Link {
 
+    /** The handler kinds that are blocks: the general handler is in each
+     *  effect's block. */
+    static final List<String> KINDS = List.of("square", "one", "counted", "two", "three",
+            "envelope");
+
     /** The blocks a core's pieces belong to, in the order the document
-     *  lists them: the handler kinds, the start of several columns, and
-     *  the frame code of each effect. */
-    static final List<String> BLOCKS = List.of("square", "one", "counted", "two", "three",
-            "envelope", "several", "effect0", "effect1", "effect2", "effect3");
+     *  lists them: each handler kind, which init's loop over it is, and
+     *  its instance on each effect; the start of several columns; and
+     *  each effect's frame code and general handler. */
+    static final List<String> BLOCKS = blocks();
+
+    private static List<String> blocks() {
+        List<String> all = new ArrayList<>();
+        for (String kind : KINDS) {
+            all.add(kind);
+            for (int i = 0; i < 4; i++) {
+                all.add(kind + i);
+            }
+        }
+        all.add("several");
+        for (int i = 0; i < 4; i++) {
+            all.add("effect" + i);
+        }
+        return List.copyOf(all);
+    }
 
     private Link() {
     }
@@ -31,26 +51,31 @@ final class Link {
     }
 
     /**
-     * The blocks a set of tunes needs: for each source of each tune, the
-     * block of its handler kind, and {@code several} for a counted source
-     * or one of several columns; and the frame code of each effect a tune
-     * runs, bits 0 to 3 of its effects byte. Init resolves every source of
-     * the tune, so a source the rows never start counts.
+     * The blocks a set of tunes needs: the block of each effect a tune runs,
+     * bits 0 to 3 of its effects byte; for each source an effect's rows
+     * start, the instance of its handler kind on that effect and the
+     * kind's loop of init; and {@code several} where a start is of a
+     * counted source or one of several columns.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
         for (TuneFile tune : tunes) {
-            for (int s = 0; s < tune.sources().size(); s++) {
-                Table source = tune.sources().get(s);
-                boolean counted = tune.counted().get(s);
-                needed.add(kind(source, counted));
-                if (counted || source.columns() > 1) {
-                    needed.add("several");
-                }
-            }
             for (int i = 0; i < 4; i++) {
-                if ((tune.effects() & 1 << i) != 0) {
-                    needed.add("effect" + i);
+                if ((tune.effects() & 1 << i) == 0) {
+                    continue;
+                }
+                needed.add("effect" + i);
+                for (int s : started(tune, i)) {
+                    Table source = tune.sources().get(s - 1);
+                    boolean counted = tune.counted().get(s - 1);
+                    String kind = kind(source, counted);
+                    if (KINDS.contains(kind)) {
+                        needed.add(kind);
+                        needed.add(kind + i);
+                    }
+                    if (counted || source.columns() > 1) {
+                        needed.add("several");
+                    }
                 }
             }
         }
@@ -61,6 +86,21 @@ final class Link {
             }
         }
         return ordered;
+    }
+
+    /** The sources effect {@code i}'s rows start: a source column with
+     *  its bit 7 set and a number from 1 up (SPEC.md 1.8.3), a number of
+     *  a source the tune has. */
+    static Set<Integer> started(TuneFile tune, int i) {
+        byte[] column = tune.table().column(Columns.EFFECT + 4 * i + 1);
+        Set<Integer> out = new java.util.TreeSet<>();
+        for (byte b : column) {
+            int s = b & 0x7F;
+            if ((b & 0x80) != 0 && s > 0 && s <= tune.sources().size()) {
+                out.add(s);
+            }
+        }
+        return out;
     }
 
     /** The block of a source's handler kind, or {@code general} for the
