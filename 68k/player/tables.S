@@ -1,6 +1,12 @@
 ; tables.S - each effect's timer, the registers of the targets that write
 ; several, and the parked place.
 
+; The effects whose frame code a player has, a bit an effect: init
+; writes the read sites, the head and the reset of these effects alone. A
+; core as carried has all four, and a link writes the effects of the song
+; (doc/LINKER.md).
+ymxr_k_effect:  dc.w    $000F
+
 ; Each effect's timer, as a start reads it: its vector, by which a start
 ; finds the running handler, and where deferred starts are assembled in,
 ; its control register, its installer from this table, the select bits of

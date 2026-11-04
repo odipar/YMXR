@@ -18,8 +18,10 @@ import (
 const CoreTableAt = coreTableAt
 
 // Blocks are the blocks a core's pieces belong to, in the order
-// doc/LINKER.md lists them.
-var Blocks = []string{"square", "one", "counted", "two", "three", "envelope", "several"}
+// doc/LINKER.md lists them: the handler kinds, the start of several
+// columns, and the frame code of each effect.
+var Blocks = []string{"square", "one", "counted", "two", "three", "envelope", "several",
+	"effect0", "effect1", "effect2", "effect3"}
 
 // Piece is a run of bytes of a core a player linked for one song leaves
 // out: its name, <block>_<n>, its first byte and the byte past its last.
@@ -41,14 +43,22 @@ type Field struct {
 	Moves     map[string]int
 }
 
-// Pieces is the table of a core: its pieces and its fields, in the
-// core's order.
+// Mask is a word of the core, at the label ymxr_k_<prefix>, that a link
+// writes with bit i set where it keeps block <prefix>i.
+type Mask struct {
+	Prefix string
+	At     int
+}
+
+// Pieces is the table of a core: its pieces, its masks and its fields,
+// in the core's order.
 type Pieces struct {
 	Pieces []Piece
+	Masks  []Mask
 	Fields []Field
 }
 
-var move = regexp.MustCompile(`^([a-z]+_[0-9]+)([+-][0-9]+)$`)
+var move = regexp.MustCompile(`^([a-z][a-z0-9]*_[0-9]+)([+-][0-9]+)$`)
 
 // ReadPieces is the table in that text, a line a piece and then a line a
 // field.
@@ -64,6 +74,12 @@ func ReadPieces(text string) (Pieces, error) {
 				return Pieces{}, fmt.Errorf("a line of a table reads %s", line)
 			}
 			table.Pieces = append(table.Pieces, Piece{word[1], from, to})
+		case word[0] == "mask" && len(word) == 3:
+			at, err := strconv.Atoi(word[1])
+			if err != nil {
+				return Pieces{}, fmt.Errorf("a line of a table reads %s", line)
+			}
+			table.Masks = append(table.Masks, Mask{word[2], at})
 		case word[0] == "field" && len(word) >= 4:
 			at, err1 := strconv.Atoi(word[1])
 			width, err2 := strconv.Atoi(word[2])
@@ -92,6 +108,9 @@ func (t Pieces) Text() string {
 	var out strings.Builder
 	for _, p := range t.Pieces {
 		fmt.Fprintf(&out, "piece %s %d %d\n", p.Name, p.From, p.To)
+	}
+	for _, m := range t.Masks {
+		fmt.Fprintf(&out, "mask %d %s\n", m.At, m.Prefix)
 	}
 	for _, f := range t.Fields {
 		fmt.Fprintf(&out, "field %d %d", f.At, f.Width)
@@ -153,7 +172,8 @@ func Kind(source *dtx.Table, counted bool) string {
 
 // BlocksOf is the blocks a set of tunes needs: for each source of each
 // tune, the block of its handler kind, and several for a counted source
-// or one of several columns, in the order of Blocks.
+// or one of several columns; and the frame code of each effect a tune
+// runs, bits 0 to 3 of its effects byte; in the order of Blocks.
 func BlocksOf(tunes []ymxr.File) []string {
 	needed := map[string]bool{}
 	for _, tune := range tunes {
@@ -161,6 +181,11 @@ func BlocksOf(tunes []ymxr.File) []string {
 			needed[Kind(source, tune.Counted[s])] = true
 			if tune.Counted[s] || source.Columns() > 1 {
 				needed["several"] = true
+			}
+		}
+		for i := 0; i < 4; i++ {
+			if tune.Effects&(1<<i) != 0 {
+				needed[fmt.Sprintf("effect%d", i)] = true
 			}
 		}
 	}
@@ -194,9 +219,10 @@ func LeftOut(table Pieces, blocks []string) []string {
 }
 
 // Link is the core linked for the blocks named: every piece of another
-// block left out, and every field in the bytes kept moved by -c times
-// the bytes of each piece left out it refers across (doc/LINKER.md, The
-// link). A value that no longer fits its field is an error.
+// block left out, every field in the bytes kept moved by -c times the
+// bytes of each piece left out it refers across, and each mask written
+// with the blocks kept (doc/LINKER.md, The link). A value that no longer
+// fits its field is an error.
 func Link(core []byte, table Pieces, blocks []string) ([]byte, error) {
 	kept := map[string]bool{}
 	for _, block := range blocks {
@@ -233,6 +259,15 @@ func Link(core []byte, table Pieces, blocks []string) ([]byte, error) {
 			}
 			ymxr.PutWord(moved, f.At, value)
 		}
+	}
+	for _, m := range table.Masks {
+		bits := 0
+		for i := 0; i < 16; i++ {
+			if kept[fmt.Sprintf("%s%d", m.Prefix, i)] {
+				bits |= 1 << i
+			}
+		}
+		ymxr.PutWord(moved, m.At, bits)
 	}
 	linked := make([]byte, 0, len(core)-left)
 	from := 0

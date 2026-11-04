@@ -24,9 +24,10 @@ import java.util.stream.Stream;
  * writes it beside the core as {@code <core>.pieces}.
  *
  * @param pieces the pieces in the core's order
+ * @param masks the words a link writes the blocks it keeps into
  * @param fields the fields in the core's order
  */
-record Pieces(List<Piece> pieces, List<Field> fields) {
+record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
 
     /** The suffix of a table beside its core. */
     static final String SUFFIX = ".pieces";
@@ -51,6 +52,14 @@ record Pieces(List<Piece> pieces, List<Field> fields) {
         int size() {
             return to - from;
         }
+    }
+
+    /**
+     * A mask: a word of the core, at the label {@code ymxr_k_<prefix>}, that
+     * a link writes with bit i set where it keeps block {@code <prefix>i}.
+     * The core as carried has every bit of its blocks set.
+     */
+    record Mask(String prefix, int at) {
     }
 
     /**
@@ -99,6 +108,10 @@ record Pieces(List<Piece> pieces, List<Field> fields) {
             out.append("piece ").append(piece.name()).append(' ').append(piece.from())
                     .append(' ').append(piece.to()).append('\n');
         }
+        for (Mask mask : masks) {
+            out.append("mask ").append(mask.at()).append(' ').append(mask.prefix())
+                    .append('\n');
+        }
         for (Field field : fields) {
             out.append("field ").append(field.at()).append(' ').append(field.width());
             for (Map.Entry<String, Integer> move : field.moves().entrySet()) {
@@ -110,7 +123,7 @@ record Pieces(List<Piece> pieces, List<Field> fields) {
         return out.toString();
     }
 
-    private static final Pattern MOVE = Pattern.compile("([a-z]+_[0-9]+)([+-][0-9]+)");
+    private static final Pattern MOVE = Pattern.compile("([a-z][a-z0-9]*_[0-9]+)([+-][0-9]+)");
 
     /**
      * A table out of its text.
@@ -119,12 +132,15 @@ record Pieces(List<Piece> pieces, List<Field> fields) {
      */
     static Pieces read(String text) {
         List<Piece> pieces = new ArrayList<>();
+        List<Mask> masks = new ArrayList<>();
         List<Field> fields = new ArrayList<>();
         for (String line : text.split("\n")) {
             String[] word = line.split(" ");
             if (word[0].equals("piece") && word.length == 4) {
                 pieces.add(new Piece(word[1], Integer.parseInt(word[2]),
                         Integer.parseInt(word[3])));
+            } else if (word[0].equals("mask") && word.length == 3) {
+                masks.add(new Mask(word[2], Integer.parseInt(word[1])));
             } else if (word[0].equals("field") && word.length >= 4) {
                 Map<String, Integer> moves = new TreeMap<>();
                 for (int i = 3; i < word.length; i++) {
@@ -139,7 +155,7 @@ record Pieces(List<Piece> pieces, List<Field> fields) {
                 throw new IllegalArgumentException("a line of a table reads " + line);
             }
         }
-        return new Pieces(List.copyOf(pieces), List.copyOf(fields));
+        return new Pieces(List.copyOf(pieces), List.copyOf(masks), List.copyOf(fields));
     }
 
     /** One assembly: the bytes, and the labels of the text section with
@@ -169,6 +185,14 @@ record Pieces(List<Piece> pieces, List<Field> fields) {
             }
         }
         pieces.sort(Comparator.comparingInt(Piece::from));
+        List<Mask> masks = new ArrayList<>();
+        for (Map.Entry<String, Integer> label : base.labels().entrySet()) {
+            if (label.getKey().startsWith("ymxr_k_")) {
+                masks.add(new Mask(label.getKey().substring("ymxr_k_".length()),
+                        label.getValue()));
+            }
+        }
+        masks.sort(Comparator.comparingInt(Mask::at));
         Map<Integer, Integer> widths = new TreeMap<>();
         Map<Integer, Map<String, Integer>> moves = new TreeMap<>();
         for (Piece piece : pieces) {
@@ -224,7 +248,7 @@ record Pieces(List<Piece> pieces, List<Field> fields) {
             fields.add(new Field(width.getKey(), width.getValue(),
                     new LinkedHashMap<>(moves.get(width.getKey()))));
         }
-        return new Pieces(List.copyOf(pieces), List.copyOf(fields));
+        return new Pieces(List.copyOf(pieces), List.copyOf(masks), List.copyOf(fields));
     }
 
     /** The core assembled with a pad of {@code pad} bytes past the piece,

@@ -1,18 +1,23 @@
-piece counted_1 1090 1110
-piece one_1 1110 1130
-piece square_1 1130 1158
-piece two_1 1158 1216
-piece three_1 1216 1292
-piece envelope_1 1292 1368
-piece counted_2 1976 2042
-piece square_2 5510 5622
-piece one_2 5622 5702
-piece counted_3 5702 6086
-piece two_2 6086 6534
-piece three_2 6534 7094
-piece envelope_2 7094 7606
-piece several_1 7606 8612
-piece several_2 8708 8796
+piece counted_1 1108 1128
+piece one_1 1128 1148
+piece square_1 1148 1176
+piece two_1 1176 1234
+piece three_1 1234 1310
+piece envelope_1 1310 1386
+piece counted_2 2036 2102
+piece effect0_1 2310 2888
+piece effect1_1 2888 3484
+piece effect2_1 3484 4062
+piece effect3_1 4062 4660
+piece square_2 5570 5682
+piece one_2 5682 5762
+piece counted_3 5762 6146
+piece two_2 6146 6594
+piece three_2 6594 7154
+piece envelope_2 7154 7666
+piece several_1 7666 8672
+piece several_2 8770 8858
+mask 8736 effect
 field 294 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 636 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 690 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
@@ -23,57 +28,140 @@ field 752 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 762 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 848 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 852 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
-field 992 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 992 2 counted_1+1 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 996 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 1008 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
-field 1018 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
-field 1028 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
-field 1068 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
-field 1076 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
-field 1092 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 one_2+1 square_1+1 square_2+1 three_1+1 two_1+1
-field 1100 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
-field 1112 2 counted_2+1 envelope_1+1 one_1+1 square_1+1 square_2+1 three_1+1 two_1+1
-field 1132 2 counted_2+1 envelope_1+1 square_1+1 three_1+1 two_1+1
-field 1160 2 counted_2+1 counted_3+1 envelope_1+1 one_2+1 square_2+1 three_1+1 two_1+1
-field 1218 2 counted_2+1 counted_3+1 envelope_1+1 one_2+1 square_2+1 three_1+1 two_2+1
-field 1294 2 counted_2+1 counted_3+1 envelope_1+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 1376 2 counted_2+1 counted_3+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
-field 1466 2 counted_2+1
-field 1470 2 counted_2+1
-field 1474 2 counted_2+1
-field 1478 2 counted_2+1
-field 1554 2 counted_2+1
-field 1590 2 counted_2+1
-field 1630 2 counted_2+1
-field 1670 2 counted_2+1
-field 1710 2 counted_2+1
-field 1780 2 counted_2+1
-field 1794 2 counted_2+1 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 1958 2 counted_2+1 counted_3+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
-field 2024 2 counted_2+1 counted_3+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
-field 2442 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
-field 2492 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 2636 2 square_2+1
-field 2806 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 3020 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
-field 3070 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 3214 2 square_2+1
-field 3402 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 3616 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
-field 3666 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 3810 2 square_2+1
-field 3980 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 4194 2 counted_3+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
-field 4244 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 4388 2 square_2+1
-field 4578 2 counted_3+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
-field 7630 2 several_1+1
-field 7874 2 envelope_2-1 three_2-1
-field 7892 2 envelope_2-1 three_2-1 two_2-1
-field 7922 2 several_1+1
-field 7988 2 several_1+1
-field 8022 2 several_1+1
-field 8310 2 several_1+1
-field 8346 2 counted_3-1 envelope_2-1 three_2-1 two_2-1
-field 8370 2 envelope_2-1
-field 8464 2 several_1+1
+field 1016 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1026 2 counted_1+1 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1038 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1046 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1086 2 counted_1+1 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1094 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1110 2 counted_1+1 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_1+1 one_2+1 square_1+1 square_2+1 three_1+1 two_1+1
+field 1118 2 counted_1+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
+field 1130 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_1+1 square_1+1 square_2+1 three_1+1 two_1+1
+field 1150 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 square_1+1 three_1+1 two_1+1
+field 1178 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_2+1 square_2+1 three_1+1 two_1+1
+field 1236 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_2+1 square_2+1 three_1+1 two_2+1
+field 1312 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 1394 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
+field 1484 2 counted_2+1
+field 1488 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1492 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1496 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1504 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 1584 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1620 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1660 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1700 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1740 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1810 2 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 1824 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 1980 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 2018 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
+field 2084 2 counted_2+1 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 several_2+1 square_2+1 three_2+1 two_2+1
+field 2300 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2416 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2448 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2474 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2502 2 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 2552 2 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 2572 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2636 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2696 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 square_2+1
+field 2850 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2866 2 counted_3+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 2872 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 2994 2 effect1_1+1 effect2_1+1 effect3_1+1
+field 3026 2 effect1_1+1 effect2_1+1 effect3_1+1
+field 3052 2 effect1_1+1 effect2_1+1 effect3_1+1
+field 3080 2 counted_3+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 3130 2 counted_3+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 3150 2 effect1_1+1 effect2_1+1 effect3_1+1
+field 3214 2 effect1_1+1 effect2_1+1 effect3_1+1
+field 3274 2 effect1_1+1 effect2_1+1 effect3_1+1 square_2+1
+field 3446 2 effect1_1+1 effect2_1+1 effect3_1+1
+field 3462 2 counted_3+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 3468 2 effect1_1+1 effect2_1+1 effect3_1+1
+field 3590 2 effect2_1+1 effect3_1+1
+field 3622 2 effect2_1+1 effect3_1+1
+field 3648 2 effect2_1+1 effect3_1+1
+field 3676 2 counted_3+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 3726 2 counted_3+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 3746 2 effect2_1+1 effect3_1+1
+field 3810 2 effect2_1+1 effect3_1+1
+field 3870 2 effect2_1+1 effect3_1+1 square_2+1
+field 4024 2 effect2_1+1 effect3_1+1
+field 4040 2 counted_3+1 effect2_1+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 4046 2 effect2_1+1 effect3_1+1
+field 4168 2 effect3_1+1
+field 4200 2 effect3_1+1
+field 4226 2 effect3_1+1
+field 4254 2 counted_3+1 effect3_1+1 envelope_2+1 one_2+1 several_1+1 square_2+1 three_2+1 two_2+1
+field 4304 2 counted_3+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 4324 2 effect3_1+1
+field 4388 2 effect3_1+1
+field 4448 2 effect3_1+1 square_2+1
+field 4622 2 effect3_1+1
+field 4638 2 counted_3+1 effect3_1+1 envelope_2+1 one_2+1 square_2+1 three_2+1 two_2+1
+field 4644 2 effect3_1+1
+field 5086 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5088 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5090 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5092 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5094 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5096 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5098 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5100 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5102 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5104 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5106 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5108 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5110 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5112 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5122 2 effect0_1+1
+field 5124 2 effect0_1+1
+field 5126 2 effect0_1+1
+field 5128 2 effect0_1+1
+field 5130 2 effect0_1+1 effect1_1+1
+field 5132 2 effect0_1+1 effect1_1+1
+field 5134 2 effect0_1+1 effect1_1+1
+field 5136 2 effect0_1+1 effect1_1+1
+field 5138 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5140 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5142 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5144 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5146 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5148 2 effect0_1+1 effect1_1+1
+field 5150 2 effect0_1+1
+field 5156 2 effect0_1+1
+field 5158 2 effect0_1+1 effect1_1+1
+field 5160 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5178 2 effect0_1+1
+field 5182 2 effect0_1+1
+field 5186 2 effect0_1+1
+field 5190 2 effect0_1+1
+field 5194 2 effect0_1+1 effect1_1+1
+field 5198 2 effect0_1+1 effect1_1+1
+field 5202 2 effect0_1+1 effect1_1+1
+field 5206 2 effect0_1+1 effect1_1+1
+field 5210 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5214 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5218 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5222 2 effect0_1+1 effect1_1+1 effect2_1+1
+field 5226 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5230 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5234 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5238 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5242 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 5246 2 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1
+field 7690 2 several_1+1
+field 7934 2 envelope_2-1 three_2-1
+field 7952 2 envelope_2-1 three_2-1 two_2-1
+field 7982 2 several_1+1
+field 8048 2 several_1+1
+field 8082 2 several_1+1
+field 8370 2 several_1+1
+field 8406 2 counted_3-1 envelope_2-1 three_2-1 two_2-1
+field 8430 2 envelope_2-1
+field 8524 2 several_1+1

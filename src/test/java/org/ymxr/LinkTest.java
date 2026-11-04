@@ -117,13 +117,16 @@ final class LinkTest {
     @Test
     void theBlocksOfTheKitsTunes() throws IOException {
         assertEquals(List.of(), List.copyOf(blocks("chambers.ymxr")));
-        assertEquals(List.of("square"), List.copyOf(blocks("preempt.ymxr")));
-        assertEquals(List.of("one"), List.copyOf(blocks("retune.ymxr")));
-        assertEquals(List.of("square", "counted", "several"),
-                List.copyOf(blocks("counted.ymxr")));
-        assertEquals(List.of("envelope", "several"),
+        assertEquals(List.of("square", "effect0", "effect1"),
+                List.copyOf(blocks("preempt.ymxr")));
+        assertEquals(List.of("one", "effect0"), List.copyOf(blocks("retune.ymxr")));
+        assertEquals(List.of("effect1"), List.copyOf(blocks("turrican.ymxr")));
+        assertEquals(List.of("square", "counted", "several", "effect0", "effect1", "effect2",
+                "effect3"), List.copyOf(blocks("counted.ymxr")));
+        assertEquals(List.of("envelope", "several", "effect0"),
                 List.copyOf(blocks("envelope-counted.ymxr")));
-        assertEquals(List.of("two", "three", "several"), List.copyOf(blocks("voices.ymxr")));
+        assertEquals(List.of("two", "three", "several", "effect0", "effect1", "effect2",
+                "effect3"), List.copyOf(blocks("voices.ymxr")));
     }
 
     private static Set<String> blocks(String name) throws IOException {
@@ -164,7 +167,7 @@ final class LinkTest {
     void aValuePastItsFieldIsAnError() {
         byte[] core = new byte[8];
         Tune.putWord(core, 4, 0x7FFF);
-        Pieces table = new Pieces(List.of(new Pieces.Piece("square_1", 0, 2)),
+        Pieces table = new Pieces(List.of(new Pieces.Piece("square_1", 0, 2)), List.of(),
                 List.of(new Pieces.Field(4, 2, java.util.Map.of("square_1", -1))));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Link.link(core, table, Set.of()));
@@ -184,7 +187,8 @@ final class LinkTest {
                 + " bytes"), "LINKER.md names another size of the plain core than "
                 + core.length);
         int least = Link.link(core, table, Set.of()).length;
-        String share = "A tune of general sources alone links " + String.format("%,d", least)
+        String share = "A tune of general sources alone, with no effect, links "
+                + String.format("%,d", least)
                 + " bytes, " + Math.round(100.0 * least / core.length)
                 + "% of the core: the blocks are " + String.format("%,d", core.length - least)
                 + " bytes of it.";

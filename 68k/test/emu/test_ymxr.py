@@ -5528,28 +5528,31 @@ def pieces_of(name):
     beside the core in go/binaries/data (doc/LINKER.md, The library):
     (name, first byte, byte past the last) a piece, and (offset, width,
     {piece: c}) a field."""
-    pieces, fields = [], []
+    pieces, masks, fields = [], [], []
     with open(os.path.join(ROOT, "go", "binaries", "data",
                            name.replace(".bin", ".pieces"))) as f:
         for line in f:
             word = line.split()
             if word and word[0] == "piece":
                 pieces.append((word[1], int(word[2]), int(word[3])))
+            elif word and word[0] == "mask":
+                masks.append((int(word[1]), word[2]))
             elif word and word[0] == "field":
                 moves = {}
                 for one in word[3:]:
-                    m = re.match(r"([a-z]+_[0-9]+)([+-][0-9]+)$", one)
+                    m = re.match(r"([a-z][a-z0-9]*_[0-9]+)([+-][0-9]+)$", one)
                     moves[m.group(1)] = int(m.group(2))
                 fields.append((int(word[1]), int(word[2]), moves))
-    return pieces, fields
+    return pieces, masks, fields
 
 
 def link(core, table, blocks_out):
     """The core linked with every piece of the blocks named left out, and
     every field moved by -c times the bytes of each piece left out it
-    refers across (doc/LINKER.md, The link): the rig's link, which the
-    tool's is read against. Returns the bytes and the pieces left out."""
-    pieces, fields = table
+    refers across, and each mask written with the blocks kept
+    (doc/LINKER.md, The link): the rig's link, which the tool's is read
+    against. Returns the bytes and the pieces left out."""
+    pieces, masks, fields = table
     out = [one for one in pieces if one[0].rsplit("_", 1)[0] in blocks_out]
     size = {name: to - at for name, at, to in out}
     moved = bytearray(core)
@@ -5558,6 +5561,10 @@ def link(core, table, blocks_out):
         if by:
             form = ">b" if width == 1 else ">h"
             moved[at:at + width] = struct.pack(form, struct.unpack(form, core[at:at + width])[0] - by)
+    kept = set(one[0].rsplit("_", 1)[0] for one in pieces) - set(blocks_out)
+    for at, prefix in masks:
+        moved[at:at + 2] = struct.pack(">H", sum(1 << i for i in range(16)
+                                                 if "%s%d" % (prefix, i) in kept))
     linked, start = bytearray(), 0
     for _, at, to in out:
         linked += moved[start:at]
@@ -5584,7 +5591,7 @@ def linked_player(ym, defines):
     if re.search(r"the core: \S+, \d+ bytes?\n", r.stderr.decode()):
         return None
     said = re.search(r"the core: (\S+) linked for the set, (\d+) bytes? of (\d+)"
-                     r"(?:, the blocks left out: ([a-z, ]+))?", r.stderr.decode())
+                     r"(?:, the blocks left out: ([a-z0-9, ]+))?", r.stderr.decode())
     assert said, "ymxr-sndh -link reports no linked core: " + r.stderr.decode()
     name, blocks_out = said.group(1), (said.group(4) or "").split(", ")
     made = r.stdout

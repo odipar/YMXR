@@ -154,7 +154,9 @@ YMXR_init:
 ; the pointer, and a constant column is its value. Every read site is
 ; written whole, an immediate of the value where its column is constant:
 ; a set inits one loaded copy for each subtune, and a column live in one
-; tune is constant in another.
+; tune is constant in another. A player linked for a song has the frame
+; code of the effects the song runs, and the sites of the others are
+; left as they are (ymxr_kept).
                 movea.l WS_IMAGE(a6),a0
                 adda.l  TF_TABLE(a1),a0
                 lea     DT_PAYLOAD(a0),a0       ; the table's payload
@@ -167,15 +169,22 @@ YMXR_init:
                 moveq   #YMXR_COLUMNS-1,d2
 .patch:         move.w  (a3)+,d4
                 move.w  d1,d0
+                bsr     ymxr_kept
+                beq.s   .apart
+                move.w  d1,d0
                 bsr     ymxr_col
-                addq.w  #1,d1
+.apart:         addq.w  #1,d1
                 dbra    d2,.patch
                 lea     ymxr_sites(pc),a3
                 moveq   #YMXR_SITES-1,d2
 .site:          move.w  (a3)+,d4
-                move.w  (a3)+,d0
+                move.w  (a3)+,d1
+                move.w  d1,d0
+                bsr     ymxr_kept
+                beq.s   .away
+                move.w  d1,d0
                 bsr     ymxr_col
-                dbra    d2,.site
+.away:          dbra    d2,.site
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
@@ -427,10 +436,14 @@ YMXR_init:
                 lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
                 lea     ymxr_resets(pc),a2
-                lea     ymxr_tick3_done(pc),a5
+                lea     ymxr_regs(pc),a5        ; past effect 3's frame code
                 moveq   #3,d2
 .over:          move.w  (a3)+,d4
-                lea     (a4,d4.w),a1
+                btst    d2,ymxr_k_effect+1(pc)  ; an effect the link left
+                bne.s   .linked                 ; out: no head, and its reset
+                addq.l  #2,a2                   ; is not there
+                bra.w   .unlinked
+.linked:        lea     (a4,d4.w),a1
                 btst    d2,WS_EFFECTS(a6)
                 beq.s   .skip
                 movea.l a1,a5                   ; the effect's first read
@@ -500,7 +513,7 @@ YMXR_init:
                 .endif
 .mapsnext:
                 .endif
-                dbra    d2,.over
+.unlinked:      dbra    d2,.over
 
 ; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body is two bytes past the slot
@@ -636,6 +649,22 @@ ymxr_col:       lea     (a4,d4.w),a5            ; the operand
 .immediate:     and.w   #$00FF,d0
 .live:          move.w  d4,-2(a5)
                 move.w  d0,(a5)
+                rts
+
+; Z set where column d0 is of an effect whose frame code a link left out
+; (doc/LINKER.md): its target, source, control and count columns, 14 to
+; 29, and its mapping column, 30 to 33. A register's column is kept. d0
+; clobbered.
+ymxr_kept:      sub.w   #14,d0
+                bcs.s   .register
+                cmp.w   #16,d0
+                bcs.s   .effect
+                sub.w   #16,d0                  ; a mapping column's effect
+                bra.s   .at
+.effect:        lsr.w   #2,d0
+.at:            btst    d0,ymxr_k_effect+1(pc)
+                rts
+.register:      moveq   #1,d0
                 rts
 
 ; a5 a tick handler: its operands linked, its place parked.

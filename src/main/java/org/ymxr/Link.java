@@ -16,9 +16,10 @@ import org.dtx.Table;
 final class Link {
 
     /** The blocks a core's pieces belong to, in the order the document
-     *  lists them. */
+     *  lists them: the handler kinds, the start of several columns, and
+     *  the frame code of each effect. */
     static final List<String> BLOCKS = List.of("square", "one", "counted", "two", "three",
-            "envelope", "several");
+            "envelope", "several", "effect0", "effect1", "effect2", "effect3");
 
     private Link() {
     }
@@ -32,8 +33,9 @@ final class Link {
     /**
      * The blocks a set of tunes needs: for each source of each tune, the
      * block of its handler kind, and {@code several} for a counted source
-     * or one of several columns. Init resolves every source of the tune,
-     * so a source the rows never start counts.
+     * or one of several columns; and the frame code of each effect a tune
+     * runs, bits 0 to 3 of its effects byte. Init resolves every source of
+     * the tune, so a source the rows never start counts.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
@@ -44,6 +46,11 @@ final class Link {
                 needed.add(kind(source, counted));
                 if (counted || source.columns() > 1) {
                     needed.add("several");
+                }
+            }
+            for (int i = 0; i < 4; i++) {
+                if ((tune.effects() & 1 << i) != 0) {
+                    needed.add("effect" + i);
                 }
             }
         }
@@ -80,8 +87,9 @@ final class Link {
 
     /**
      * The core linked for the blocks named: every piece of another block
-     * left out, and every field in the bytes kept moved by -c times the
-     * bytes of each piece left out it refers across.
+     * left out, every field in the bytes kept moved by -c times the bytes
+     * of each piece left out it refers across, and each mask written with
+     * the blocks kept.
      *
      * @throws IllegalArgumentException where a value no longer fits its
      *         field
@@ -121,6 +129,15 @@ final class Link {
                 }
                 Tune.putWord(moved, field.at(), value);
             }
+        }
+        for (Pieces.Mask mask : table.masks()) {
+            int bits = 0;
+            for (int i = 0; i < 16; i++) {
+                if (blocks.contains(mask.prefix() + i)) {
+                    bits |= 1 << i;
+                }
+            }
+            Tune.putWord(moved, mask.at(), bits);
         }
         byte[] linked = new byte[core.length - left];
         int from = 0;
