@@ -130,15 +130,19 @@ ymxr_rmove      equ     *
                 .else
                 st      FX_LOK(a3)
                 .endif
-                move.w  d4,d1                   ; its page byte: bank, effect,
-                lsl.w   #5,d1                   ; then kind
-                move.w  d6,d5
-                lsl.w   #3,d5
-                add.w   d5,d1
+                .if     YMXR_DEFER              ; its page byte: bank, effect,
+                move.w  d4,d1                   ; then kind
+                lsl.w   #2,d1
+                add.w   d6,d1
+                .else
+                move.w  d6,d1
+                .endif
+                lsl.w   #3,d1
                 add.w   d2,d1
                 lea     ymxr_htab(pc),a4
-                move.b  (a4,d1.w),FX_LHIGH(a3)  ; the first fallback page's
-                add.b   FX_LHIGH(a3),d0
+                move.b  (a4,d1.w),d5            ; the first fallback page's
+                move.b  d5,FX_LHIGH(a3)
+                add.b   d5,d0
                 move.w  KD_PAGE(a2),d1
                 tst.b   d7
                 beq.s   .tolook
@@ -147,9 +151,9 @@ ymxr_rmove      equ     *
                 move.b  d0,(a4)                 ; one write, which no tick
                 bra     .done                   ; splits
 .tolook:        bsr     ymxr_at                 ; the instance, its page byte
-                pea     0(a4,d1.w)              ; cached, and written before
-                move.l  (sp)+,FX_LBYTE(a3)      ; the vector names it
-                move.b  d0,(a4,d1.w)
+                lea     0(a4,d1.w),a1           ; cached, and written before
+                move.l  a1,FX_LBYTE(a3)         ; the vector names it
+                move.b  d0,(a1)
                 movea.l a2,a1                   ; names it
                 move.w  d3,d0
                 mulu    #KD_SIZE,d0
@@ -266,7 +270,10 @@ ymxr_move:      move.w  KD_COLS(a2),d4
                 .if     YMXR_PCREL
                 move.w  (a5,d0.w),d0            ; the loop cell, 0 where the
                 beq.s   .once                   ; source plays once
-                bsr.s   .moved
+                add.w   a5,d0                   ; the row, in its low word
+                add.w   KD_PTR(a2,d3.w),d0
+                sub.w   a4,d0                   ; from the new read
+                sub.w   KD_PTR(a1,d3.w),d0
 .once:          move.w  d0,(a4,d1.w)
                 .else
                 move.l  (a5,d0.w),(a4,d1.w)
@@ -285,9 +292,12 @@ ymxr_move:      move.w  KD_COLS(a2),d4
 .place:         move.w  KD_PTR(a2,d3.w),d0
                 move.w  KD_PTR(a1,d3.w),d1
                 .if     YMXR_PCREL
-                move.w  (a5,d0.w),d0
-                bsr.s   .moved
-                move.w  d0,(a4,d1.w)
+                move.w  (a5,d0.w),d2            ; the place, from the old read
+                add.w   d0,d2
+                add.w   a5,d2
+                sub.w   d1,d2                   ; from the new read
+                sub.w   a4,d2
+                move.w  d2,(a4,d1.w)
                 .else
                 move.l  (a5,d0.w),(a4,d1.w)
                 .endif
@@ -300,19 +310,6 @@ ymxr_move:      move.w  KD_COLS(a2),d4
 .aim:           move.l  a4,(a6)
                 move.w  (sp)+,sr
                 rts
-                .if     YMXR_PCREL
-; d0 a displacement from column d3's read in a5, as one from its read in a4.
-.moved:         ext.l   d0
-                add.l   a5,d0
-                move.w  KD_PTR(a2,d3.w),d2
-                ext.l   d2
-                add.l   d2,d0                   ; the row's address
-                sub.l   a4,d0
-                move.w  KD_PTR(a1,d3.w),d2
-                ext.l   d2
-                sub.l   d2,d0
-                rts
-                .endif
 
                 .if     YMXR_DEFER
 ; Move a pending hook when remapping to handler a4, kind d0 in
