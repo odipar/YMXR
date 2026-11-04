@@ -518,9 +518,9 @@ instance and its page byte by index from two tables and the table of
 page bytes.
 
 The following costs run from the remap's first instruction in the frame
-code, or from the start's call, to its return, excluding the routine
-that selects or fills a page and the copy, for rows that start or remap
-one effect:
+code to the branch it ends at, or from the start's first instruction to
+its return, excluding the routine that selects or fills a page and the
+copy, for rows that start or remap one effect:
 
 | the row | one column | a square | a source of one row |
 |---|---|---|---|
@@ -560,14 +560,46 @@ Init copies each page of the list, at these costs:
 | the copy | the transformation's entries | cycles |
 |---|---|---|
 | entry k at k | 256 | 1582 |
+| the same | 32 | 392 |
 | the same | 16 | 346 |
 | a marked column's: entry k at k, and at k + 128 with bit 7 set | 256 | 2228 |
+| the same | 32 | 638 |
 | the same | 16 | 374 |
 | the same | 10 | 308 |
 | a counted source on `setR7`: entry k at k + 192, bits 7 and 6 set | 64 | 916 |
 
 So the routines of a volume's remap between two transformations, a marked
 source of one column, cost 202 to 236 cycles, its page filled at init.
+Without the lookup a source at several volumes is a separate copy at
+each, and a change of volume is a start of another copy at the running
+source's row. On a marked source of one column, the copy as long as the
+running one, with the timer running and bits 6 and 5 of the control
+column clear, that start costs 412 cycles from the effect's start in the
+frame code to its rate, and 420 with the deferred start in, where the
+start reads the running handler through the vector. On one span, from
+effect 0's branch on the set bit of its source column to its rate, the
+copy's start costs 444 cycles, and 452 with the deferred start in, and a
+remap between two transformations, its page found and the timer running,
+254 on the core with the lookup: a change of volume through a
+transformation costs 190 cycles less there than a change of copy. Beyond
+that span the core with the lookup costs more at the head of each effect,
+in the table below, and on each tick (A tick through a transformation).
+
+A page outside the area is copied at the frame, into the effect's
+fallback page not in use (BINARIES.md 5.6). With that copy, the routines
+of a start and a remap of a marked source of one column cost, from the
+remap's first instruction in the frame code to the branch it ends at, or
+from the start's first instruction to its return:
+
+| the row | the transformation's entries | the routines | the copy | the rest |
+|---|---|---|---|---|
+| a remap between two transformations | 16 | 1062 | 374 | 688 |
+| the same | 32 | 1326 | 638 | 688 |
+| a start at row 0 | 16 | 1374 | 374 | 1000 |
+| the same | 32 | 1638 | 638 | 1000 |
+
+The copy costs what init's copy of as many entries in the same form
+costs in the table above, and the rest is the routines less the copy.
 
 Identity-only tunes still run ordinary tick handlers on a lookup core.
 Frame processing costs more than on the core without lookup support.
@@ -640,6 +672,7 @@ R4.5 counts them:
 | a remap and a retune with timerReset on a stopped timer, kept by a start | 2416 | 1938 |
 | a place's reset on a mapped square, loop and counted source, three effects | 5494 | 3104 |
 | one transformation through the mirror and through the plain fill | 2572 | 1894 |
+| a transformation of 32 entries through the mirror and through the plain fill | 2572 | 1894 |
 | squares and a loop started through a new mapping with placeReset clear | 2650 | 1894 |
 | starts with placeReset clear while a source of several columns runs | 3658 | 1894 |
 | remaps on Timers C and D, which share a control register, each idle while the other runs | 3124 | 2090 |
@@ -652,7 +685,7 @@ R4.5 counts them:
 | sources that play once on seven lookup kinds, one effect | 3540 | 1964 |
 | four sources through 256 entries remapped in one row | 8182 | 3750 |
 
-Of the 32, one passes R4.5's 6,656, at its first row, which starts
+Of the 33, one passes R4.5's 6,656, at its first row, which starts
 sources on two or more effects through a transformation, and with the
 routines counted apart every call is within it. The costliest starts four
 counted sources, and its frame that remaps the four to another

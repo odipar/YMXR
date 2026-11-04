@@ -1969,6 +1969,31 @@ def v9_tunes():
     return _V9
 
 
+# A volume's change through copies of a source, on the cores without the
+# lookup (performance.md, A remap at the frame): the rows of COPY_ROWS
+# each start the other of two sources at the running source's row.
+_COPIES = []
+COPY_ROWS = (5, 11, 17)
+
+
+def copies_tune():
+    """A tune that maps no value, on effect A alone: two marked sources of
+    one column and four rows, the second the first at a lower volume,
+    the first started at row 0 and then each row of COPY_ROWS a start of
+    the other with timerReset and placeReset clear, so the timer runs on
+    and the place is the running source's row."""
+    if _COPIES:
+        return _COPIES[0]
+    loud, soft = ("loop of four", [15, 12, 9, 6], 0), ("loop of four, softer", [10, 8, 6, 4], 0)
+    rows = {0: ("start", 1, 8, 50, 100, 1, 1, 0)}
+    rows.update({r: ("start", 2 - n % 2, 8, 50, 100, 0, 0, 0) for n, r in enumerate(COPY_ROWS)})
+    at, version = built("copies", effects_tune("copies of a loop at two volumes", 24,
+                                               [loud, soft], {"A": rows}))
+    assert version == WRITTEN, "the copies' tune is of version %d" % version
+    _COPIES.append(at)
+    return at
+
+
 # The tunes that map a value (SPEC.md 1.10), built once a run (mapped_tunes).
 _MAPPED = []
 
@@ -2001,7 +2026,8 @@ def mapped_tunes():
     Coverage includes sample-volume fades; square and one-row
     immediates; identity/lookup transitions; remaps on idle and stopped
     timers; byte keys; all eligible last-value columns; short tables;
-    and setR7 port bits.
+    a table of 32 entries in the mirror and the plain form; and setR7
+    port bits.
 
     State cases cover target-only rows, place preservation/reset, remap
     with retune/reset, shared C/D control, ignored mapping on stop, and
@@ -2019,6 +2045,7 @@ def mapped_tunes():
     def volume(n):
         return [k * n // 15 for k in range(16)]
     V15, V10, V5, V0 = volume(15), volume(10), volume(5), volume(0)
+    V32 = [k * 15 // 31 for k in range(32)]
     tone, tone2 = [(k + 3) & 15 for k in range(16)], [15 - k for k in range(16)]
     shape, shape2 = [8 + (k & 7) for k in range(16)], [15 - (k & 7) for k in range(16)]
     sample, sample2 = [k >> 3 for k in range(256)], [31 - (k >> 3) for k in range(256)]
@@ -2131,6 +2158,10 @@ def mapped_tunes():
                 15: ("retune", 64, 100, 0, 1)}}, None, {"sq", "lk", "lc"}),
         ("one transformation through the mirror and through the plain fill",
          [loop, noise], [("V10", V10)],
+         {"A": {0: start(1, 8, [1]), 6: start(2, 22, [0, 1], tr=0), 12: start(1, 8, [1], tr=0),
+                18: start(2, 22, [0, 1], tr=0)}}, None, {"lk", "ln"}),
+        ("a transformation of 32 entries through the mirror and through the plain fill",
+         [loop, noise], [("V32", V32)],
          {"A": {0: start(1, 8, [1]), 6: start(2, 22, [0, 1], tr=0), 12: start(1, 8, [1], tr=0),
                 18: start(2, 22, [0, 1], tr=0)}}, None, {"lk", "ln"}),
         ("squares and a loop started through a new mapping with placeReset clear",
@@ -2255,31 +2286,59 @@ def mapped(code, symbols):
                inner["window one"], inner["square"]))
 
 
-def fallbacks(code, symbols):
+# The tune whose pages pass the reach (fallback_tune), built once a run,
+# and the rows from FALLBACK_FROM on, every second one, that fill a page
+# of effect 0's fallback at the frame, each the one start or remap of its
+# row: the start or the remap, and the entries of its transformation
+# (performance.md, A remap at the frame).
+_FALLBACK = []
+FALLBACK_FROM = 100
+FALLBACK_FILLS = (("remap", 16), ("remap", 32), ("start", 16), ("start", 32))
+
+
+def fallback_tune():
     """A tune whose pages pass the reach of the first handler: effect 0
-    remaps through 100 transformations a row and effect 1 through 20 in
-    its last rows, so init fills the first pages of the list and each
-    effect maps the rest through its fallback, both in the same rows,
-    every tick against the model and every frame against the reader's
-    record (BINARIES.md 5.6). Then init reports -1 for a tune that maps a
-    value with a2 at 0, with an area below the player and without a list,
-    and leaves the area below as it was; and 0 for one whose list has no
-    page, with a2 at 0 (5.1)."""
-    global AREA_AFTER
-    if "ymxr_look" not in symbols:
-        code, symbols = build(switched(DEFINES, lookup=True))
-    rows = 100
+    remaps through 100 transformations of 16 entries, one a row, and
+    effect 1 through 20 in rows 81 to 99, so init fills the first pages of
+    the list and each effect maps the rest through its fallback, both in
+    the same rows. From row FALLBACK_FROM, in every second row, effect 0
+    alone runs a row of FALLBACK_FILLS, a start at row 0 or a remap,
+    through a transformation of 16 or 32 entries that each row before it
+    leaves unused, and fills a page of its fallback at the frame."""
+    if _FALLBACK:
+        return _FALLBACK[0]
     tables = [("T%d" % n, [(k * (2 * (n % 8) + 1) + n // 8 + 1) % 16 for k in range(16)])
               for n in range(120)]
     ramp = ("ramp", list(range(16)), 0)
     a = {0: ("start", 1, 8, 50, 100, 1, 1, 0, [1])}
-    a.update({r: ("remap", [1 + r]) for r in range(1, rows)})
+    a.update({r: ("remap", [1 + r]) for r in range(1, FALLBACK_FROM)})
     d = {0: ("start", 1, 9, 50, 100, 1, 1, 0, [101])}
-    d.update({r: ("remap", [21 + r]) for r in range(81, rows)})
+    d.update({r: ("remap", [21 + r]) for r in range(81, FALLBACK_FROM)})
+    rows = FALLBACK_FROM
+    for what, entries in FALLBACK_FILLS:
+        # an even step, so each table differs from the 120 above
+        n = len(tables) + 1
+        tables.append(("W%d" % n, [(2 * k + n) % 16 for k in range(entries)]))
+        a[rows] = ("remap", [n]) if what == "remap" else ("start", 1, 8, 50, 100, 1, 1, 0, [n])
+        rows += 2
     tune = effects_tune("two effects through their fallback", rows, [ramp],
                         {"A": a, "D": d}, transformations=tables)
     at, version = built("fallbacks", tune)
     assert version == MAPPED, "the fallback's tune is of version %d" % version
+    _FALLBACK.append(at)
+    return at
+
+
+def fallbacks(code, symbols):
+    """The tune of fallback_tune, every tick against the model and every
+    frame against the reader's record (BINARIES.md 5.6). Then init
+    reports -1 for a tune that maps a value with a2 at 0, with an area
+    below the player and without a list, and leaves the area below as it
+    was; and 0 for one whose list has no page, with a2 at 0 (5.1)."""
+    global AREA_AFTER
+    if "ymxr_look" not in symbols:
+        code, symbols = build(switched(DEFINES, lookup=True))
+    at = fallback_tune()
     work = tempfile.mkdtemp()
     with open(at, "rb") as f:
         bound = bind(f.read(), work)
@@ -2350,6 +2409,40 @@ def refused(code, symbols, at, bound, count, entries, work):
             " fallback, %d frames, %d ticks; init reports -1 with no area, with one below the"
             " player and without a list, and 0 for a list of no page with no area"
             % (k, len(entries), frames, ticks))
+
+
+def fallback_fills(code, symbols, cycles_of):
+    """The tune of fallback_tune counted on the player with the lookup in,
+    the area past the tune as fallbacks places it: each row of
+    FALLBACK_FILLS, on every pass, required to start or remap effect 0
+    alone and to fill one page in the mirror form at the frame, of the
+    entries the row names. By the start or the remap, the shape and the
+    page's (fill kind, E), the set of (the routines from the call to the
+    return, the copy) it counts (check, lookup_regions)."""
+    global AREA_AFTER, MOST_FRAMES
+    AREA_AFTER, most = PCREL, MOST_FRAMES
+    MOST_FRAMES = None
+    try:
+        where = check(fallback_tune(), code, symbols, CyclesOn(cycles_of))[5]
+    finally:
+        AREA_AFTER, MOST_FRAMES = False, most
+    R, fills = where[1], {}
+    for f, (events, spent, filled) in enumerate(where[8]):
+        row = f % R - FALLBACK_FROM
+        if row < 0:
+            continue
+        if row % 2:
+            assert not events and not filled, \
+                "frame %d: row %d starts or remaps %s and fills %s" % (f, f % R, events, filled)
+            continue
+        what, entries = FALLBACK_FILLS[row // 2]
+        want = [(0, {"remap": "switch", "start": "start"}[what], "lk")]
+        assert events == want and filled == [(1, entries)], \
+            "frame %d: row %d runs %s and fills %s, not %s and a page of %d entries" % (
+                f, f % R, events, filled, want, entries)
+        fills.setdefault((events[0][1], events[0][2], filled[0]), set()).add(
+            (spent["routine"], spent["copy"]))
+    return fills
 
 
 def deferred_sizes():
@@ -2977,12 +3070,17 @@ def pages(m, symbols, model, i, at, name, said):
 
 
 def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
-          ticked=None):
+          ticked=None, spans=None):
     """The tune on the player, against the model frame by frame and tick
     by tick; with kit, each frame against the reader's entry as well,
     and a tune that plays once to the call that reports its end. With
     ticked, a list, each tick is added to it as (frame, effect, source,
     row, writes): the row the tick read, the writes the player made.
+    With cycles and spans, a list, each start and each remap at the
+    frame is added to it as (frame, effect, label, cycles): the cycles to
+    the effect's rate from its start in the frame code (EFFECT, _now),
+    label "now", or from its branch on the set bit of its source column
+    (_unset), label "unset".
 
     With parts, the counter splits ST4's decoder out of the advance and
     counts the operations each refill parses, so one pass over the frames
@@ -3120,6 +3218,28 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                               end=CODE + symbols[name % i])
         m.mu.hook_add(UC_HOOK_CODE, through("lookup"), begin=CODE + symbols["ymxr_lstart"],
                       end=CODE + symbols["ymxr_lstart"])
+    # each start and each remap at the frame, from _now and from _unset to
+    # _rate, by the frame it is in
+    playing = {"frame": None, "at": {}}
+    if cycles and spans is not None:
+        def opened(i, label):
+            def hook(mu, address, size, data):
+                playing["at"][(i, label)] = cycles.counter.cycles
+            return hook
+
+        def rate(i):
+            def hook(mu, address, size, data):
+                for label in ("now", "unset"):
+                    if (i, label) in playing["at"]:
+                        spans.append((playing["frame"], i, label, cycles.counter.cycles
+                                      - playing["at"].pop((i, label))))
+            return hook
+        for i in range(4):
+            for name, hook in (("ymxr_tick%d_now", opened(i, "now")),
+                               ("ymxr_tick%d_unset", opened(i, "unset")),
+                               ("ymxr_tick%d_rate", rate(i))):
+                m.mu.hook_add(UC_HOOK_CODE, hook, begin=CODE + symbols[name % i],
+                              end=CODE + symbols[name % i])
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
@@ -3183,6 +3303,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     # columns', and whether its row sets a column of any effect
     steps = []
     for f in range(frames):
+        playing["frame"] = f
         if cycles:
             cycles._settle(None)
         spent_before = dict(cycles.spent) if cycles else {}
@@ -3604,6 +3725,11 @@ IDENTITY_TUNES = ENVELOPE_TUNES + (COUNTED_TUNE, "voices.ymxr")
 # names.
 FOUR_REMAPS = "four sources through 256 entries remapped in one row"
 
+# The tune of mapped_tunes whose remaps a remap at the frame reads
+# against a change of copy: effect 0's, each between two
+# transformations, the page found and the timer running.
+FADE = "a fade on setR8"
+
 
 def instructions(module, code, at, n, to=None):
     """The cycles and the bytes of n instructions of code from at, counted
@@ -3659,9 +3785,9 @@ def mapped_read(code, symbols, cycles_of, general, plays):
             stale.append("performance.md reads %s where the rig counts %s"
                          % (m.groups(), tuple(str(w) for w in want)))
 
-    played, widths = [], set()
+    played, widths, spans_of = [], set(), {}
     for title, at, kinds in mapped_tunes():
-        result = check(at, code, symbols, CyclesOn(cycles_of))
+        result = check(at, code, symbols, CyclesOn(cycles_of), spans=spans_of.setdefault(title, []))
         with open(at, "rb") as f:
             bound = bind(f.read(), None)
         played.append((title, result[2], result[3], result[5][8], image_period(bound)))
@@ -3914,6 +4040,73 @@ def mapped_read(code, symbols, cycles_of, general, plays):
     reads(frame_at, r"So the routines of a volume's remap between two transformations, a marked"
                     r" source of one column, cost ([\d,]+(?: to [\d,]+)?) cycles",
           span(totals.get(("switch", "lk", ()), {0})))
+    # a volume's change through copies, on the cores without the lookup:
+    # each start of COPY_ROWS from _now and from _unset to _rate, without
+    # the deferred start and with it; and through a transformation on this
+    # core, each remap of FADE between two transformations, from _unset to
+    # _rate
+    now_, unset_ = [], []
+    for defer in (False, True):
+        core_ = build([d for d in DEFINES if d not in (MAP_ON, DEFER_ON)]
+                      + ([DEFER_ON] if defer else []))
+        spans_ = []
+        R = check(copies_tune(), core_[0], core_[1], CyclesOn(cycles_of), spans=spans_)[5][1]
+        for label, into in (("now", now_), ("unset", unset_)):
+            into.append({n for f, _, at, n in spans_ if f % R in COPY_ROWS and at == label})
+    fade = next((lookups for title, _, _, lookups, _ in played if title == FADE), [])
+    remapped = {n for f, i, at, n in spans_of.get(FADE, ())
+                if at == "unset" and fade[f][0] == [(0, "switch", "lk")] and not fade[f][2]}
+    reads(frame_at, r"Without the lookup a source at several volumes is a separate copy at each, and"
+                    r" a change of volume is a start of another copy at the running source's row\. On"
+                    r" a marked source of one column, the copy as long as the running one, with the"
+                    r" timer running and bits 6 and 5 of the control column clear, that start costs"
+                    r" ([\d,]+(?: to [\d,]+)?) cycles from the effect's start in the frame code to its"
+                    r" rate, and ([\d,]+(?: to [\d,]+)?) with the deferred start in, where the start"
+                    r" reads the running handler through the vector\.",
+          *(span(values or {0}) for values in now_))
+    less = (next(iter(unset_[0])) - next(iter(remapped))
+            if len(unset_[0]) == 1 and len(remapped) == 1 else None)
+    reads(frame_at, r"On one span, from effect 0's branch on the set bit of its source column to its"
+                    r" rate, the copy's start costs ([\d,]+(?: to [\d,]+)?) cycles, and ([\d,]+(?: to"
+                    r" [\d,]+)?) with the deferred start in, and a remap between two transformations,"
+                    r" its page found and the timer running, ([\d,]+(?: to [\d,]+)?) on the core with"
+                    r" the lookup: a change of volume through a transformation costs ([\d,]+) cycles"
+                    r" less there than a change of copy\.",
+          span(unset_[0] or {0}), span(unset_[1] or {0}), span(remapped or {0}), less)
+    reads(frame_at, r"Beyond that span the core with the lookup costs more at the head of each effect,"
+                    r" in the table below, and on each tick \(A tick through a transformation\)\.")
+    # a page outside the area, copied at the frame (fallback_fills): a row
+    # a start or a remap and a count of entries, the only table of five
+    # columns in the section
+    fills = fallback_fills(code, symbols, cycles_of)
+    what, listed = None, set()
+    for m in re.finditer(r"^\| ([^|]+?) \| (\d+) \| ([^|]+?) \| ([^|]+?) \| ([^|]+?) \|$",
+                         frame_at, re.M):
+        what = what if m.group(1) == "the same" else dict(MAPPED_STEPS).get(m.group(1))
+        key = (what, "lk", (1, int(m.group(2))))
+        listed.add(key)
+        got = fills.get(key, set())
+        counted_ = tuple(span(values, "") for values in (
+            {r for r, _ in got}, {c for _, c in got}, {r - c for r, c in got})) if got else None
+        if m.groups()[2:] != counted_:
+            stale.append("performance.md reads the fill of %s at the frame as %s, and the rig"
+                         " counts %s" % (key, m.groups()[2:], counted_))
+    if listed != set(fills):
+        stale.append("performance.md's fills at the frame are %s, and the rig counts %s"
+                     % (sorted(listed, key=str), sorted(fills, key=str)))
+    for key, got in fills.items():
+        if {c for _, c in got} != INIT_COPIES.get(key[2]):
+            stale.append("the copy of %s at the frame is %s, and init's %s"
+                         % (key, sorted(c for _, c in got), INIT_COPIES.get(key[2])))
+    reads(frame_at, r"The copy costs what init's copy of as many entries in the same form costs in the"
+                    r" table above, and the rest is the routines less the copy\.")
+    # a marked source of one column: the mirror form, and the general
+    # lookup kind
+    reads(frame_at, r"With that copy, the routines of a start and a remap of a (\w+) source of one"
+                    r" (\w+) cost, from the remap's first instruction in the frame code to the branch"
+                    r" it ends at, or from the start's first instruction to its return:",
+          "marked" if {kind for _, _, (kind, _) in fills} == {1} else None,
+          "column" if {shape for _, shape, _ in fills} == {"lk"} else None)
     # Measure version 9 frame overhead with and without lookup support.
     # Rows without a start or place reset use the effect-head path;
     # other rows use their V9_PATHS label.
