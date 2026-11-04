@@ -58,7 +58,12 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
        test_ymxr.py -map [tunes]       optional lookup support, YMXR_MAP=1,
                                        checked against the same model;
                                        combines with the switches above
-       test_ymxr.py -xpatch            the real-ST program of 68k/test/st
+       test_ymxr.py -linked [tunes]    each tune on the player ymxr-sndh
+                                       -link links for it (doc/LINKER.md),
+                                       the tool's core against the rig's
+                                       link; combines with the switches
+                                       above and -kit
+       test_ymxr.py -xpatch           the real-ST program of 68k/test/st
                                        under Hatari: each case's line of
                                        the XPATCH.TXT it writes against
                                        the table of its README.md
