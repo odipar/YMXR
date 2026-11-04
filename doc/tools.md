@@ -1016,7 +1016,7 @@ and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
 needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.12.0`
-and YMXS `0.7.0` in the local Maven repository, `mvn install` in each
+and YMXS `0.7.1` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
 runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it so
 that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
@@ -1030,7 +1030,7 @@ test.yml`.
 ./cmd/...`, with the thirty-three 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go
-v0.7.0`, which a build fetches.
+v0.7.1`, which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and
 requires the same exit code, the same bytes on standard output and, with
