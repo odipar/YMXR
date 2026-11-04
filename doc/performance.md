@@ -585,8 +585,8 @@ version 9 fixtures, covering each source shape and place reset:
 | a square's start at the running source's row, after a source that steps a place | 30 |
 | a place's reset | 8 |
 | a square's place reset | -12 |
-| a counted source's place reset | 254 |
-| a place's reset of a source of several columns | 350 |
+| a counted source's place reset | 256 |
+| a place's reset of a source of several columns | 352 |
 
 The head reads the constant 0 of the effect's mapping column, and a
 start runs the branch init aims at the start through the identity, 10
