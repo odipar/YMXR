@@ -22,7 +22,8 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  d1,\fx+FX_COUNT(a0)
                 bra.w   \{tick}_done
 \{tick}_some:
-                READ2   \cc                     ; the timer's reset stops the
+                READ2   \cc
+                tst.b   d2                      ; the timer's reset stops the
                 bpl.s   \{tick}_kept            ; timer before the source is
 \{tick}_rs:     btst    #6,d2                   ; switched, so no tick of the
                 beq.s   \{tick}_kept            ; old rate reads the new
@@ -125,7 +126,7 @@ q\{ct}:         bra.w   \{tick}_done
                 clr.b   \fx+FX_SHAPE(a0)
 ; the start placed the source, so the row's place reset is made: a tick
 ; before the select steps the place on, and the reset below would undo it
-                andi.b  #$DF,d2
+                bclr    #5,d2
                 bra.w   \{tick}_rate
 
 ; A start of a source of several columns (SPEC.md 3.1.3), in the routine
@@ -134,10 +135,9 @@ q\{ct}:         bra.w   \{tick}_done
 ; that. The routine aims the vector at the handler its columns pick, and
 ; returns Z where the source is one row.
 \{tick}_widen:  moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                lea     \fx(a0),a3
                 bsr.w   ymxr_widestart
                 beq.w   \{tick}_one
-                andi.b  #$DF,d2
+                bclr    #5,d2
                 bra.w   \{tick}_rate
 
 ; The cell separates the two shapes: -1 two rows alternating, -2 one
@@ -205,7 +205,7 @@ q\{ct}:         bra.w   \{tick}_done
                 .if     YMXR_MAP
                 move.b  d3,\fx+FX_LEVEL(a0)     ; row 0's level, for the reset
                 .endif
-                andi.b  #$DF,d2
+                bclr    #5,d2
                 bra.w   \{tick}_rate
 
 ; A source of one row: the row into the handler's immediate. The
@@ -219,7 +219,7 @@ q\{ct}:         bra.w   \{tick}_done
                 move.w  (sp)+,sr
                 move.l  a4,\fx+FX_FIRST(a0)
                 move.b  #1,\fx+FX_SHAPE(a0)
-                andi.b  #$DF,d2
+                bclr    #5,d2
                 bra.w   \{tick}_rate
                 .if     YMXR_MAP
 ; Start with optional lookup support (SPEC.md 1.10.2). Init redirects
@@ -242,7 +242,7 @@ q\{ct}:         bra.w   \{tick}_done
                 move.w  #\vector,d1             ; of its page 0 and the vector
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
                 bsr.w   ymxr_lstart
-                andi.b  #$DF,d2
+                bclr    #5,d2
                 bra.w   \{tick}_rate
 ; Remap entry (SPEC.md 1.10.2). Init redirects _unset here for a tune
 ; using lookups. A set mapping column changes current ticks; an unset
@@ -371,7 +371,7 @@ q\{ct}:         bra.w   \{tick}_done
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
                 bsr.w   ymxr_arm
                 beq.w   \{tick}_done
-                andi.b  #$F7,d2                 ; the timer is stopped: d1 the
+                bclr    #3,d2                   ; the timer is stopped: d1 the
                 bra.w   \{tick}_now             ; source, started at once
 ; the record follows a switch the tick has made, a start at the frame
 ; drops the pending start, and a deferred start replaces it
@@ -444,13 +444,13 @@ q\{ct}:         bra.w   \{tick}_done
 ; inside an instruction; Timers C and D share theirs, and only there
 ; does the read, the mask and the or run at level 7.
                 .if     \shared
-                move.w  sr,d3
+                move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  \ctrl.w,d0
                 and.b   #\keep,d0
                 or.b    d1,d0
                 move.b  d0,\ctrl.w
-                move.w  d3,sr
+                move.w  (sp)+,sr
                 .else
                 move.b  d1,\ctrl.w
                 .endif
@@ -472,11 +472,9 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 bra.s   \{tick}_done
 ; The place's reset on a handler of several columns, in the routine every
-; effect shares: the effect's record and vector are here, since the
-; branch that reaches it has a byte's displacement and the routine is
-; further off.
-\{tick}_wrow:   lea     \fx(a0),a3
-                lea     \vector.w,a5
+; effect shares: the effect alone is here, since the branch that
+; reaches it has a byte's displacement and the routine is further off.
+\{tick}_wrow:   moveq   #(\fx-WS_FX)/FX_SIZE,d3
                 bsr.w   ymxr_widereset
                 bra.s   \{tick}_done
 

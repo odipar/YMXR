@@ -24,7 +24,7 @@ idle past the last.
 | Retrigger retune, built | 1200 | 1379 | 2796 | 668 | 2096 |
 | Synergy Credits | 10756 | 1995 | 5086 | 903 | 2924 |
 | Turrican - world 4-3 | 3680 | 1497 | 4362 | 779 | 3716 |
-| Turrican 2 - world completed 1 | 182 | 1358 | 4068 | 697 | 3456 |
+| Turrican 2 - world completed 1 | 182 | 1362 | 4072 | 697 | 3456 |
 | capture | 1844 | 1248 | 3536 | 663 | 3048 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so
@@ -114,7 +114,7 @@ Its play call, counted the same way on its player, against the table above:
 | Retrigger retune, built | 1490 | 1379 | 2220 | 2796 |
 | Synergy Credits | 2030 | 1995 | 5094 | 5086 |
 | Turrican - world 4-3 | 1606 | 1497 | 4532 | 4362 |
-| Turrican 2 - world completed 1 | 1606 | 1358 | 4060 | 4068 |
+| Turrican 2 - world completed 1 | 1606 | 1362 | 4060 | 4072 |
 | capture | 1414 | 1248 | 3422 | 3536 |
 
 The call costs less on average on ten of the eleven and 12 cycles more on
@@ -689,9 +689,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,304 bytes, 896 of them the counted shapes' eight
+The player is 8,360 bytes, 896 of them the counted shapes' eight
 instances, four of one column and four of two; where a tick reads an
-absolute address, 8,024 bytes and 952, instances of 138 bytes against the
+absolute address, 8,030 bytes and 952, instances of 138 bytes against the
 marked shape's 122.
 
 ## A tick through an absolute address
@@ -759,12 +759,12 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 8,024 bytes against 8,304. Two figures
+assembles this build, which is 8,030 bytes against 8,360. Two figures
 move against each other: a place is a word where it was a long, which
 shortens a timer's handlers by 40 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
 timer's frame code. The init and the routines the four timers share, the
-reach check among them, are 288 bytes more.
+reach check among them, are 338 bytes more.
 
 What the two cores do to a tune, under Hatari over 900 frames of Turrican -
 world 4-3, counted from the frame the player first writes in: both write
@@ -837,13 +837,13 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,672
-bytes against 8,304, and 12,540 against 8,024 where a tick reads an
+The second bank, the installers and the stubs make the player 12,736
+bytes against 8,360, and 12,554 against 8,030 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 17,562 bytes against 8,304,
-and 19,186 against 8,024 where a tick reads an absolute address; with the
-deferred start in as well, 27,660 against 12,672, and 30,808 against
-12,540.
+The lookup in, `YMXR_MAP=1`, makes the player 17,604 bytes against 8,360,
+and 19,194 against 8,030 where a tick reads an absolute address; with the
+deferred start in as well, 27,710 against 12,736, and 30,824 against
+12,554.

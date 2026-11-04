@@ -100,18 +100,13 @@ q\{col}:
                 bne.s   .go\~
                 tst.b   d2                      ; a coarse column of 0 has no
                 beq.s   .nc\~                   ; set bit and no bit beside
-                btst    #6,d2                   ; btst sets Z alone, so N is
-                beq.s   .ns\~                   ; still the coarse column's
-.go\~:
-                .if     \fsel
-                move.w  #\fsel,d0
-                .else
-                moveq   #0,d0                   ; R0's select
-                .endif
+                btst    #6,d2
+                beq.s   .nf\~
+.go\~:          move.w  #\fsel,d0
                 move.b  d1,d0
                 movep.w d0,(a2)
-                tst.b   d2
-.ns\~:          bpl.s   .nc\~
+.nf\~:          tst.b   d2
+                bpl.s   .nc\~
                 move.w  #\csel,d1
                 move.b  d2,d1
                 movep.w d1,(a2)

@@ -106,13 +106,11 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 move.b  \at(a2),\sel(a5)        ; the register it selects
                 move.l  d0,d4                   ; the column's loop cell, or
                 beq.s   .none\~                 ; none where the source plays
-                .if     YMXR_PCREL              ; once
-                add.w   d5,d4                   ; the displacement from the
-                sub.w   a5,d4                   ; instruction that reads the
-                sub.w   #\ptr,d4                ; column
-                .else
-                add.l   d5,d4
-                .endif
+                add.l   d5,d4                   ; once
+                .if     YMXR_PCREL
+                sub.l   a5,d4                   ; the displacement from the
+                sub.l   #\ptr,d4                ; instruction that reads the
+                .endif                          ; column
 .none\~:
                 .if     YMXR_PCREL
                 move.w  d4,\cell(a5)
@@ -121,20 +119,19 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .endif
                 add.l   a4,d5                   ; the place at row 0, kept for
                 move.l  d5,\first(a3)           ; the place's reset
-                .if     YMXR_PCREL              ; and the row it is at
-                add.w   d3,d5
-                sub.w   a5,d5
-                sub.w   #\ptr,d5
+                add.l   d3,d5                   ; and the row it is at
+                .if     YMXR_PCREL
+                sub.l   a5,d5
+                sub.l   #\ptr,d5
                 move.w  d5,\ptr(a5)
                 .else
-                add.l   d3,d5
                 move.l  d5,\ptr(a5)
                 .endif
                 .endm
 
 ; The place's reset on a handler of several columns (SPEC.md 1.9): a
 ; place a column, out of the places at row 0 the start wrote into the
-; effect's record. a3 the record, a5 the effect's vector.
+; effect's record. d3 the effect.
 ;
 ; The places are behind level 7: a tick between two of them reads one
 ; column at the row the reset names and another at the row it left.
@@ -143,9 +140,9 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
 ; effect's record, a5 the handler, d0 scratch.
                 .macro  WPLACE  first,ptr
                 .if     YMXR_PCREL
-                move.w  \first+2(a3),d0
-                sub.w   a5,d0
-                sub.w   #\ptr,d0
+                move.l  \first(a3),d0
+                sub.l   a5,d0
+                sub.l   #\ptr,d0
                 move.w  d0,\ptr(a5)
                 .else
                 move.l  \first(a3),\ptr(a5)
@@ -154,12 +151,19 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
 
                 .if     YMXR_MAP
 ; Place reset for counted or multi-column handlers. Use the running
-; kind's offsets for identity or lookup instances (SPEC.md 1.9). a3 the
-; effect's record, a5 its vector; clobbers d0 to d5 and a5.
+; kind's offsets for identity or lookup instances (SPEC.md 1.9). d3 is
+; the effect; clobbers d0 to d5, a3 and a5.
 ymxr_widereset:
+                move.w  d3,d4
+                mulu    #FX_SIZE,d4
+                lea     WS_FX(a0),a3
+                adda.w  d4,a3                   ; the effect's record
                 cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
                 beq.s   .moves                  ; row 0 and moves no place
                 movem.l a1-a2,-(sp)
+                lea     ymxr_timers(pc),a5
+                lsl.w   #3,d3
+                movea.w (a5,d3.w),a5
                 movea.l (a5),a5                 ; the running handler
                 bsr     ymxr_kindof             ; d0 the lookup kind, d1 the
                 tst.b   FX_RUN(a3)              ; identity's
@@ -173,11 +177,12 @@ ymxr_widereset:
                 lea     FX_FIRST(a3),a1         ; a column's place at row 0
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
-.col:           move.w  KD_PTR(a2),d1
+.col:           moveq   #0,d1
+                move.w  KD_PTR(a2),d1
                 move.l  (a1)+,d0
                 .if     YMXR_PCREL
-                sub.w   a5,d0
-                sub.w   d1,d0
+                sub.l   a5,d0
+                sub.l   d1,d0
                 move.w  d0,(a5,d1.w)
                 .else
                 move.l  d0,(a5,d1.w)
@@ -192,8 +197,15 @@ ymxr_widereset:
 .moves:         rts
                 .else
 ymxr_widereset:
+                move.w  d3,d4
+                mulu    #FX_SIZE,d4
+                lea     WS_FX(a0),a3
+                adda.w  d4,a3                   ; the effect's record
                 cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
                 beq.w   .moves                  ; row 0 and moves no place
+                lea     ymxr_timers(pc),a5
+                lsl.w   #3,d3
+                movea.w (a5,d3.w),a5
                 movea.l (a5),a5                 ; the running handler
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
@@ -222,10 +234,10 @@ ymxr_widereset:
 
 ; The start of a source of several columns, which every effect reaches:
 ; the handler its columns pick, and a register, a place and a loop cell a
-; column written into it. d4 the effect, a3 its record, d0 the source's
-; cell as init tagged it, d1 the source's number times eight, d2 the row's
-; control byte, a4 the source's first row. a5 the new handler, and Z where
-; the source is one row, which the general handler's shape runs.
+; column written into it. d4 the effect, d0 the source's cell as init
+; tagged it, d1 the source's number times eight, d2 the row's control
+; byte, a4 the source's first row. a5 the new handler, and Z where the
+; source is one row, which the general handler's shape runs.
 ;
 ; The writes are behind level 7, as the general handler's three do: a
 ; tick between a select and a place writes one column's row to another
@@ -240,6 +252,9 @@ ymxr_widestart:
                 beq.w   .one                    ; any columns
                 move.l  d6,-(sp)                ; the effect, kept while the
                 move.w  d4,d6                   ; handlers are resolved
+                mulu    #FX_SIZE,d4
+                lea     WS_FX(a0),a3
+                adda.w  d4,a3                   ; the effect's record
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; a deferred start is armed in
                 beq.s   .rec                    ; the record's mirror (4.8)
@@ -297,8 +312,8 @@ ymxr_widestart:
                 .if     YMXR_PCREL
                 move.w  TICK_PTR(a2),d3
                 ext.l   d3
-                lea     TICK_PTR(a2),a2
                 add.l   a2,d3
+                add.l   #TICK_PTR,d3
                 .else
                 move.l  TICK_PTR(a2),d3
                 .endif
@@ -307,11 +322,8 @@ ymxr_widestart:
 .square:        tst.b   SQ_VAL(a2)
                 bpl.w   .at
                 moveq   #1,d3
-.mod:           move.l  DT_ROWS-DT_PAYLOAD(a4),d5   ; R: a number below it is
-                cmp.l   d5,d3                       ; its remainder
-                bcs.s   .at
-                move.l  d4,-(sp)
-                move.l  d5,d4
+.mod:           move.l  d4,-(sp)
+                move.l  DT_ROWS-DT_PAYLOAD(a4),d4
                 bsr.w   ymxr_rem
                 move.l  (sp)+,d4
 ; A register, a place and a loop cell a column, out of the target's row
@@ -385,14 +397,13 @@ ymxr_widestart:
                 sub.w   d3,d4                   ; the rows from the place on
                 move.w  -2(a2,d1.w),d5          ; R less RR, the rows of a pass
                 move.l  a4,d1                   ; through the loop
+                add.l   d3,d1                   ; the row the place is at
                 move.b  FX_TARGET(a3),TICKC_SEL(a5)
                 .if     YMXR_PCREL
-                add.w   d3,d1                   ; the row the place is at, as
-                sub.w   a5,d1                   ; the displacement from the
-                sub.w   #TICKC_PTR,d1           ; instruction that reads it
+                sub.l   a5,d1                   ; the displacement from the
+                sub.l   #TICKC_PTR,d1           ; instruction that reads the row
                 move.w  d1,TICKC_PTR(a5)
                 .else
-                add.l   d3,d1                   ; the row the place is at
                 move.l  d1,TICKC_PTR(a5)
                 .endif
                 move.w  d4,TICKC_LEFT(a5)
@@ -400,8 +411,8 @@ ymxr_widestart:
                 .if     YMXR_PCREL
                 tst.l   d0                      ; 0: the source plays once
                 beq.s   .celled
-                sub.w   a5,d0
-                sub.w   #TICKC_PTR,d0
+                sub.l   a5,d0
+                sub.l   #TICKC_PTR,d0
 .celled:        move.w  d0,TICKC_CELL(a5)
                 .else
                 move.l  d0,TICKC_CELL(a5)
