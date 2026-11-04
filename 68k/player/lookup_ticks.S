@@ -37,19 +37,11 @@
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
                 LKEY    \name,ptr,cell,\page
                 .if     \counted
-\{name}_step:
-                .if     YMXR_PCREL
-                addq.w  #1,($12345678).l        ; +2: the place, stepped
-                .else
-                addq.l  #1,($12345678).l
-                .endif
 \{name}_cnt:    subq.w  #1,($12345678).l        ; +2: the rows left
                 beq.s   \{name}_last
-                .if     YMXR_NEST
-\{name}_sr:     move.w  #$2500,sr
-                .endif
                 .else
                 bmi.s   \{name}_last
+                .endif
                 .if     YMXR_NEST
 \{name}_sr:     move.w  #$2500,sr
                 .endif
@@ -58,7 +50,6 @@
                 addq.w  #1,($12345678).l        ; +2: the place, stepped
                 .else
                 addq.l  #1,($12345678).l
-                .endif
                 .endif
                 COUNT   PERF_ON,PERF_DROP
                 .if     YMXR_AEOI=0

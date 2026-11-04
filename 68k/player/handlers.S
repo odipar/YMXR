@@ -345,18 +345,18 @@ TICKC_SIZE      equ     ymxr_cnt1-ymxr_cnt0
 ; A square's handler, the same way: the register it selects, the row it
 ; is at, the two rows' difference, and the address of the row it
 ; is at, which init writes once.
-SQ_SEL          equ     ymxr_sq0_sel-ymxr_sq0+3
-SQ_VAL          equ     ymxr_sq0_val-ymxr_sq0+3
+SQ_SEL          equ     ymxr_sq0_sel-ymxr_sq0+2
+SQ_VAL          equ     ymxr_sq0_sel-ymxr_sq0+4
 SQ_MASK         equ     ymxr_sq0_tog-ymxr_sq0+3
 SQ_PTR          equ     ymxr_sq0_tog-ymxr_sq0+4
-SQ_SR           equ     ymxr_sq0_val-ymxr_sq0+6
+SQ_SR           equ     ymxr_sq0_sel-ymxr_sq0+8
 SQ_SIZE         equ     ymxr_sq1-ymxr_sq0
 
 ; A one-row source's handler: the register it selects and the row it
 ; writes, both immediates a start puts there, those two fields alone.
-ONE_SEL         equ     ymxr_one0_sel-ymxr_one0+3
-ONE_VAL         equ     ymxr_one0_val-ymxr_one0+3
-ONE_SR          equ     ymxr_one0_val-ymxr_one0+6
+ONE_SEL         equ     ymxr_one0_sel-ymxr_one0+2
+ONE_VAL         equ     ymxr_one0_sel-ymxr_one0+4
+ONE_SR          equ     ymxr_one0_sel-ymxr_one0+8
 ONE_SIZE        equ     ymxr_one1-ymxr_one0
 
                 TWAT    TW2,ymxr_two0
