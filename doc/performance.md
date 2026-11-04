@@ -524,26 +524,26 @@ copy, for rows that start or remap one effect:
 
 | the row | one column | a square | a source of one row |
 |---|---|---|---|
-| a start at row 0 | 442 to 526 | 756 | 636 |
+| a start at row 0 | 414 to 494 | 608 | 494 |
 | a remap between two transformations | 202 to 236 | 766 to 786 | 588 |
-| a remap from the identity | 1698 to 1702 | 766 | 588 |
-| a remap to the identity | 1426 to 1430 | 548 to 566 | 440 |
+| a remap from the identity | 1452 to 1456 | 766 | 588 |
+| a remap to the identity | 1230 to 1234 | 548 to 566 | 440 |
 
 The ranges are the effect, a row that resets the timer, a source that
 plays once, the half a square is at and the cache the start finds. A
 start at the running source's row, with bit 5 of the control column
 clear, reads that row as well, and on one column its remainder by R of
-the source (SPEC.md 1.8.4): 646 to 860 cycles on one column, and 884 to
-910 on a square. A remap on a stopped timer sets the
+the source (SPEC.md 1.8.4): 606 to 808 cycles on one column, and 736 to
+750 on a square. A remap on a stopped timer sets the
 kept mapping alone, 86 to 130 cycles. The counted kinds and the kinds of
 several columns write a register, a place and a loop cell a column: a
-start at row 0 is 1,054 to 1,764 cycles on them, a remap between two
-transformations 202, from the identity 1,792 to 2,536 and to the
-identity 1,494 to 2,264.
+start at row 0 is 1,014 to 1,600 cycles on them, a remap between two
+transformations 202, from the identity 1,546 to 2,018 and to the
+identity 1,298 to 1,796.
 
 Through the identity, a start at row 0 of a marked source of one column
 costs 396 cycles from the effect's start in the frame code to its rate,
-and through a transformation, the page found, 580 to 682. The lookup
+and through a transformation, the page found, 552 to 650. The lookup
 adds the page's read in the table; the cache, written where it names
 another instance; the call; and the page byte.
 
@@ -554,14 +554,14 @@ the source's and fill the page not in use. A remap from the identity
 selects its page in a separate routine, 140 cycles. Switching between
 two transformations changes one page byte atomically, 8 cycles.
 Switching between identity and a lookup also moves registers, loop cells
-and places between handlers: 586 cycles on one column to 1,426 on three.
+and places between handlers: 426 cycles on one column to 946 on three.
 Init copies each page of the list, at these costs:
 
 | the copy | the transformation's entries | cycles |
 |---|---|---|
 | entry k at k | 256 | 1582 |
 | the same | 32 | 392 |
-| the same | 16 | 346 |
+| the same | 16 | 214 |
 | a marked column's: entry k at k, and at k + 128 with bit 7 set | 256 | 2228 |
 | the same | 32 | 638 |
 | the same | 16 | 374 |
@@ -595,8 +595,8 @@ from the start's first instruction to its return:
 |---|---|---|---|---|
 | a remap between two transformations | 16 | 1062 | 374 | 688 |
 | the same | 32 | 1326 | 638 | 688 |
-| a start at row 0 | 16 | 1374 | 374 | 1000 |
-| the same | 32 | 1638 | 638 | 1000 |
+| a start at row 0 | 16 | 1342 | 374 | 968 |
+| the same | 32 | 1606 | 638 | 968 |
 
 The copy costs what init's copy of as many entries in the same form
 costs in the table above, and the rest is the routines less the copy.
@@ -616,7 +616,7 @@ version 9 fixtures, covering each source shape and place reset:
 | a square's start at the running source's row, after a source that steps a place | 30 |
 | a place's reset | 8 |
 | a square's place reset | -12 |
-| a counted source's place reset | 256 |
+| a counted source's place reset | 224 |
 | a place's reset of a source of several columns | 352 |
 
 The head reads the constant 0 of the effect's mapping column, and a
@@ -651,36 +651,36 @@ R4.5 counts them:
 
 | tune | the costliest call | the costliest, the starts and remaps apart |
 |---|---|---|
-| a fade on setR8 | 2632 | 1894 |
+| a fade on setR8 | 2388 | 1894 |
 | a fade of setVoiceA's volume | 3658 | 1894 |
-| a mapped square and its remap | 2650 | 1894 |
-| a mapped source of one row and its remap | 2530 | 1894 |
-| a source remapped from the identity to T, to T' and back | 3340 | 2134 |
+| a mapped square and its remap | 2502 | 1894 |
+| a mapped source of one row and its remap | 2388 | 1894 |
+| a source remapped from the identity to T, to T' and back | 3094 | 2134 |
 | a remap on an idle timer and on a stopped one, each kept by a start | 2384 | 1928 |
 | an 8-bit sample on setR10 through 256 entries | 3012 | 1904 |
-| the coarse nibble of setToneA | 3462 | 2452 |
-| the shape of setBuzzer | 3870 | 1982 |
+| the coarse nibble of setToneA | 3270 | 2450 |
+| the shape of setBuzzer | 3580 | 1982 |
 | the volume of setNoiseA | 3500 | 1978 |
-| the high byte of setEnvelope | 3580 | 2526 |
+| the high byte of setEnvelope | 3400 | 2510 |
 | a table of 10 entries on setR9 | 2420 | 1894 |
-| setR7 through a transformation | 3100 | 2386 |
+| setR7 through a transformation | 2952 | 2354 |
 | a start through T on setToneA, the target alone to setNoiseA, a place's reset and a remap | 3470 | 1964 |
 | a start through T on setVoiceA, the target alone to setBuzzer, a place's reset and a remap | 3726 | 1964 |
-| a counted source on setR7 remapped from the identity after the target alone | 3538 | 2662 |
+| a counted source on setR7 remapped from the identity after the target alone | 3292 | 2662 |
 | starts through a new mapping with placeReset clear while a source ticks | 2738 | 1894 |
 | a remap and a retune with timerReset on a running timer | 2420 | 1894 |
 | a remap and a retune with timerReset on a stopped timer, kept by a start | 2416 | 1938 |
 | a place's reset on a mapped square, loop and counted source, three effects | 5494 | 3104 |
 | one transformation through the mirror and through the plain fill | 2572 | 1894 |
 | a transformation of 32 entries through the mirror and through the plain fill | 2572 | 1894 |
-| squares and a loop started through a new mapping with placeReset clear | 2650 | 1894 |
+| squares and a loop started through a new mapping with placeReset clear | 2502 | 1894 |
 | starts with placeReset clear while a source of several columns runs | 3658 | 1894 |
-| remaps on Timers C and D, which share a control register, each idle while the other runs | 3124 | 2090 |
-| a remap and a retune with timerReset on a running square | 2650 | 1894 |
+| remaps on Timers C and D, which share a control register, each idle while the other runs | 2928 | 2090 |
+| a remap and a retune with timerReset on a running square | 2502 | 1894 |
 | a stop row with the mapping column set, then a start with it unset | 2420 | 1928 |
 | a remap in the row that sets the target to setNoiseA | 3452 | 1946 |
-| a marked source on setEnvelope through T, a remap, a place's reset and a remap from the identity | 3498 | 2492 |
-| counted sources of two columns on setToneA and setNoiseA through T, a remap, a place's reset and a remap from the identity | 6544 | 3676 |
+| a marked source on setEnvelope through T, a remap, a place's reset and a remap from the identity | 3280 | 2490 |
+| counted sources of two columns on setToneA and setNoiseA through T, a remap, a place's reset and a remap from the identity | 5764 | 3644 |
 | sources that play once on seven lookup kinds and loop on five, two effects | 5900 | 2472 |
 | sources that play once on seven lookup kinds, one effect | 3540 | 1964 |
 | four sources through 256 entries remapped in one row | 8182 | 3750 |
@@ -722,9 +722,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,360 bytes, 896 of them the counted shapes' eight
+The player is 8,152 bytes, 896 of them the counted shapes' eight
 instances, four of one column and four of two; where a tick reads an
-absolute address, 8,030 bytes and 952, instances of 138 bytes against the
+absolute address, 7,844 bytes and 952, instances of 138 bytes against the
 marked shape's 122.
 
 ## A tick through an absolute address
@@ -792,12 +792,12 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 8,030 bytes against 8,360. Two figures
+assembles this build, which is 7,844 bytes against 8,152. Two figures
 move against each other: a place is a word where it was a long, which
 shortens a timer's handlers by 40 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
 timer's frame code. The init and the routines the four timers share, the
-reach check among them, are 338 bytes more.
+reach check among them, are 316 bytes more.
 
 What the two cores do to a tune, under Hatari over 900 frames of Turrican -
 world 4-3, counted from the frame the player first writes in: both write
@@ -870,13 +870,13 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,736
-bytes against 8,360, and 12,554 against 8,030 where a tick reads an
+The second bank, the installers and the stubs make the player 12,508
+bytes against 8,152, and 12,348 against 7,844 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 17,604 bytes against 8,360,
-and 19,194 against 8,030 where a tick reads an absolute address; with the
-deferred start in as well, 27,710 against 12,736, and 30,824 against
-12,554.
+The lookup in, `YMXR_MAP=1`, makes the player 17,252 bytes against 8,152,
+and 18,876 against 7,844 where a tick reads an absolute address; with the
+deferred start in as well, 27,334 against 12,508, and 30,482 against
+12,348.

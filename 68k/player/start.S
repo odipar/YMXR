@@ -454,7 +454,9 @@ ymxr_widestart:
 ; every place of a core reading a row through the program counter is,
 ; and where divu overflows, a source of 65,536 rows or more, two divu, the
 ; high word over R and then its remainder above the low word; where R
-; itself is past a word, subtractions of R shifted.
+; itself is past a word, subtractions of R shifted. The shifts stop at
+; bit 31: a number of 2^31 or more would otherwise double R past 32 bits
+; and back below the number.
 ymxr_rem:       cmp.l   d4,d3
                 bcs.s   .in
                 cmp.l   #$FFFF,d4
@@ -476,7 +478,8 @@ ymxr_rem:       cmp.l   d4,d3
 .up:            cmp.l   d3,d5                   ; the number
                 bhi.s   .down
                 add.l   d5,d5
-                bra.s   .up
+                bcc.s   .up
+                roxr.l  #1,d5                   ; the carry back as bit 31
 .down:          cmp.l   d4,d5                   ; then halved back to R, and
                 bcs.s   .in                     ; subtracted where it fits
                 cmp.l   d5,d3

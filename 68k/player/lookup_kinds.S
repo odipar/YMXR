@@ -16,12 +16,10 @@ ymxr_kindof:    moveq   #0,d0
                 moveq   #0,d1
                 move.b  .ident(pc,d0.w),d1
                 move.b  .look(pc,d0.w),d0
+                cmp.b   #1,d0                   ; one column
+                bls.s   .kind
                 cmp.b   #4,d0
                 beq.s   .three
-                cmp.b   #2,d0                   ; two columns, marked
-                beq.s   .two
-                cmp.b   #6,d0                   ; or counted
-                bne.s   .kind
 .two:           cmp.b   #8,TICK_SEL(a5)
                 bcs.s   .kind
                 cmp.b   #11,TICK_SEL(a5)
@@ -39,7 +37,7 @@ ymxr_kindof:    moveq   #0,d0
 ; clobbered.
 ymxr_at:        move.w  KD_STEP(a2),d5
                 mulu    d6,d5
-                add.w   KD_BASE(a2),d5
+                add.w   (a2),d5                 ; KD_BASE
                 lea     ymxr_tick0(pc),a4
                 adda.w  d5,a4
                 .if     YMXR_DEFER
@@ -49,6 +47,10 @@ ymxr_at:        move.w  KD_STEP(a2),d5
 .bank:
                 .endif
                 rts
+
+                .if     KD_BASE<>0
+                .error  "a kind's descriptor has its base past its first word"
+                .endif
 
 ; Stepping-handler kinds: eight lookup kinds in page-byte-table order,
 ; then five identity kinds.

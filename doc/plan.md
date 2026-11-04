@@ -151,12 +151,12 @@ call now:
 | a separate tick for a square | 31 a tick | 80 against 96 and 114 |
 | every source resolved at init | 52 a start | 21 to 38 a frame |
 | DTX's state block in a6 | 36 | 36 off the advance, 12 off the call |
-| a separate tick for a one-row source | 74 a tick | 445 a frame on the kit's retune |
+| a separate tick for a one-row source | 74 a tick | 506 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
 its count. Synergy Credits reads 1,995 cycles a call against the 2,469
-this document opened at and 2,585 cycles of ticks against 5,380, so
-4,580 a frame against 7,849. performance.md has the call, and `-cycles`
+this document opened at and 2,350 cycles of ticks against 5,380, so
+4,345 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
 What was left was the costliest frame. A refill parses at most one ST4

@@ -28,10 +28,9 @@
 ; vector left to the installer. It returns a5 the instance and a3 the
 ; mirror; with WS_ARMING at 1 it fills the page alone and returns a3 the
 ; record.
-ymxr_lstart:    move.w  d3,d0
-                lsl.w   #3,d0                   ; the source's entry
-                movea.l WS_SOURCES-8(a0,d0.w),a4    ; its first row
-                move.l  WS_SOURCES-4(a0,d0.w),d3    ; its loop cell, or a tag
+ymxr_lstart:    lsl.w   #3,d3                   ; the source's entry
+                movea.l WS_SOURCES-8(a0,d3.w),a4    ; its first row
+                move.l  WS_SOURCES-4(a0,d3.w),d0    ; its loop cell, or a tag
                 bmi.w   .tagged
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)
@@ -40,29 +39,27 @@ ymxr_lstart:    move.w  d3,d0
 ; Marked, of one column, at the frame: the general kind, the marker
 ; mirror and the loop cell as a displacement from the place's read. The
 ; cache is written where it names another instance.
-                move.l  d3,d0                   ; the loop cell
-                moveq   #LK_PAGE,d3
-                add.l   a5,d3                   ; the page byte's address
-                cmp.l   FX_LBYTE(a3),d3
+                lea     LK_PAGE(a5),a2          ; the page byte's address
+                cmpa.l  FX_LBYTE(a3),a2
                 beq.s   .lcached
-                move.l  d3,FX_LBYTE(a3)
+                move.l  a2,FX_LBYTE(a3)
                 move.b  d5,FX_LHIGH(a3)
                 move.b  #1,FX_LKEY+1(a3)
                 move.l  FX_LMAPS+4(a3),FX_LMAP(a3)  ; the marked kind's table
                 .if     YMXR_DEFER
                 sf      FX_LBANK(a3)
                 .endif
-.lcached:       moveq   #0,d4
-                move.b  FX_RUN(a3),d4
+.lcached:       move.b  FX_RUN(a3),d4           ; d4.w is this byte: d4 was
+                                                ; the effect, below 256
                 movea.l FX_LMAP(a3),a2
                 move.b  0(a2,d4.w),d4           ; its page in the table, or
-                beq.w   .lfall                  ; 0 for the fallback
+                beq.s   .lfall                  ; 0 for the fallback
 .lpage:         add.b   d4,d5                   ; the page byte
                 move.b  d5,FX_LCUR(a3)
                 .if     YMXR_PCREL              ; the loop cell, 0 where the
                 tst.l   d0                      ; source plays once
                 beq.s   .lonce
-                sub.l   a5,d0
+                sub.w   a5,d0
                 sub.w   #LK_PTR,d0
 .lonce:
                 .endif
@@ -77,18 +74,18 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 bsr     ymxr_runrow
                 move.l  DT_ROWS-DT_PAYLOAD(a4),d4
                 bsr     ymxr_rem
-                lea     YM_SELECT.w,a2
                 move.b  FX_LCUR(a3),d5          ; the page byte again
 .lfirst:        move.b  FX_TARGET(a3),LK_SEL(a5)
                 move.l  a4,FX_FIRST(a3)         ; the place at row 0
-                adda.l  d3,a4                   ; the row the place is at
                 .if     YMXR_PCREL
-                move.l  a4,d4
-                sub.l   a5,d4
+                move.w  a4,d4
+                add.w   d3,d4                   ; the row the place is at
+                sub.w   a5,d4
                 sub.w   #LK_PTR,d4
                 move.w  d4,LK_PTR(a5)
                 move.w  d0,LK_CELL(a5)
                 .else
+                adda.l  d3,a4                   ; the row the place is at
                 move.l  a4,LK_PTR(a5)
                 move.l  d0,LK_CELL(a5)
                 .endif
@@ -104,8 +101,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
 ; where neither has the transformation in the marked kind.
 .lfall:         move.b  FX_RUN(a3),FX_LKEY(a3)
                 move.w  FX_LKEY(a3),d3
-                moveq   #0,d4
-                move.b  FX_USE(a3),d4
+                move.b  FX_USE(a3),d4           ; d4.w is this byte, as above
                 add.w   d4,d4
                 cmp.w   FX_PAGE(a3,d4.w),d3
                 beq.s   .lfound
@@ -122,8 +118,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 add.b   FX_LFB(a3),d4           ; past the effect's pages
                 bra.w   .lpage
                 .if     YMXR_DEFER
-.armlk:         move.l  d3,d0                   ; an arming of the general kind
-                moveq   #0,d5
+.armlk:         moveq   #0,d5                   ; an arming of the general kind
                 bra.s   .kind
                 .endif
 ; A kind's descriptor past ymxr_kinds, and an effect's lookup instances
@@ -131,10 +126,11 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
 .kd:            dc.b    0,KD_SIZE,2*KD_SIZE,3*KD_SIZE
                 dc.b    4*KD_SIZE,5*KD_SIZE,6*KD_SIZE,7*KD_SIZE
 .eff:           dc.w    0,LOOK_STRIDE,2*LOOK_STRIDE,3*LOOK_STRIDE
-.tagged:        addq.l  #1,d3
+.tagged:        addq.l  #1,d0
                 beq     .square
-                addq.l  #1,d3
+                addq.l  #1,d0
                 beq     .one
+                exg     d0,d3                   ; d0 the entry, d3 the tag
                 lea     WS_WIDE(a0),a2          ; a source of several columns,
                 swap    d1                      ; or counted: the stride from
                 move.w  -4(a2,d0.w),d1          ; one column to the next, in
@@ -182,12 +178,13 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 .endif
                 lea     ymxr_htab(pc),a5
                 move.b  (a5,d3.w),FX_LHIGH(a3)
+                move.l  a1,d3                   ; a1 kept
                 lea     ymxr_tick0(pc),a5
-                adda.w  KD_BASE(a2),a5
+                adda.w  (a2),a5                 ; KD_BASE
                 adda.w  d4,a5                   ; the instance
                 move.w  KD_PAGE(a2),d4
-                pea     0(a5,d4.w)
-                move.l  (sp)+,FX_LBYTE(a3)      ; its page byte, cached
+                lea     0(a5,d4.w),a1
+                move.l  a1,FX_LBYTE(a3)         ; its page byte, cached
 ; The fill kind, a counted source on setR7 the ports' bits, and the page.
                 move.b  KD_FILL(a2),d4
                 subq.w  #1,d5
@@ -196,7 +193,6 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 bne.s   .fill
                 moveq   #2,d4
 .fill:          move.b  d4,FX_LKEY+1(a3)        ; the fill kind, cached
-                move.l  a1,d3                   ; a1 kept
                 add.w   d4,d4
                 add.w   d4,d4
                 movea.l FX_LMAPS(a3,d4.w),a1    ; its table, cached
@@ -212,16 +208,13 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 move.b  0(a1,d5.w),d4           ; the page, or 0 for the
                 movea.l d3,a1                   ; fallback
                 beq.w   .kfall
-                .if     YMXR_DEFER
-                tst.b   WS_ARMING(a0)           ; at 1 the page alone
-                bgt.w   .started
-                .endif
 .kpage:         move.b  FX_LHIGH(a3),d5
                 add.b   d4,d5                   ; the page byte
                 move.b  d5,FX_LCUR(a3)
                 .if     YMXR_DEFER
-                tst.b   WS_ARMING(a0)           ; an arming writes the mirror
-                beq.s   .rec
+                tst.b   WS_ARMING(a0)           ; an arming writes the mirror,
+                beq.s   .rec                    ; and at 1 the page alone
+                bgt.w   .started
                 lea     ARMOFF(a3),a3
 .rec:
                 .endif
@@ -236,7 +229,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 .if     YMXR_PCREL
                 tst.l   d0
                 beq.s   .level
-                sub.l   a5,d0
+                sub.w   a5,d0
                 sub.w   #TICK_PTR,d0
                 .endif
                 bra.s   .level
@@ -244,9 +237,8 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 movea.l d0,a6
                 moveq   #0,d6
                 move.b  FX_TARGET(a3),d6
-                sub.w   #14,d6
                 lsl.w   #3,d6
-                lea     ymxr_wide(pc),a1
+                lea     ymxr_wide-(14*8)(pc),a1
                 adda.w  d6,a1
                 move.w  KD_CELLS(a2),d7
 .level:         move.w  sr,-(sp)
@@ -278,32 +270,36 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
 ; TICK_PTR, as every lookup kind has them, the loop cell and, counted,
 ; the rows from the place on and the rows of a pass through the loop.
                 move.b  FX_TARGET(a3),TICK_SEL(a5)
-                move.l  a4,d4
-                add.l   d3,d4                   ; the row the place is at
                 .if     YMXR_PCREL
-                sub.l   a5,d4
+                move.w  a4,d4
+                add.w   d3,d4                   ; the row the place is at
+                sub.w   a5,d4
                 sub.w   #TICK_PTR,d4
                 move.w  d4,TICK_PTR(a5)
                 move.w  KD_CELLS(a2),d4
                 move.w  d0,(a5,d4.w)
                 .else
+                move.l  a4,d4
+                add.l   d3,d4                   ; the row the place is at
                 move.l  d4,TICK_PTR(a5)
                 move.w  KD_CELLS(a2),d4
                 move.l  d0,(a5,d4.w)
                 .endif
                 move.w  KD_LEFT(a2),d4
                 beq.s   .one1
-                move.w  FX_ROWS+2(a3),(a5,d4.w) ; R less the place
-                sub.w   d3,(a5,d4.w)
-                move.w  FX_ROWS+2(a3),d3        ; R less the row the loop
+                move.w  FX_ROWS+2(a3),d5        ; R less the place
+                sub.w   d5,d3
+                neg.w   d3
+                move.w  d3,(a5,d4.w)
+                move.w  d5,d3                   ; R less the row the loop
                 tst.l   d0                      ; cell is at, or R where the
                 beq.s   .reld                   ; source plays once
-                move.l  d0,d4
+                move.w  d0,d4
                 .if     YMXR_PCREL
-                add.l   a5,d4
+                add.w   a5,d4
                 add.w   #TICK_PTR,d4
                 .endif
-                sub.l   a4,d4
+                sub.w   a4,d4
                 sub.w   d4,d3
 .reld:          move.w  KD_RELD(a2),d4
                 move.w  d3,(a5,d4.w)
@@ -330,31 +326,30 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 moveq   #0,d6                   ; four bytes a column
 .col:           move.w  KD_SEL(a2,d6.w),d2
                 move.b  (a1)+,(a5,d2.w)         ; the register
-                moveq   #0,d0
-                move.w  KD_PTR(a2,d6.w),d0
-                add.l   a5,d0                   ; the column's read
                 moveq   #0,d5
                 move.b  (a1)+,d5
                 mulu    d1,d5                   ; the column it writes
                 add.l   a4,d5                   ; at row 0, kept for the
                 move.l  d5,FX_FIRST(a3,d6.w)    ; place's reset
+                move.w  KD_PTR(a2,d6.w),d0      ; the column's read
+                .if     YMXR_PCREL
+                sub.w   a5,d5                   ; row 0 as a displacement
+                sub.w   d0,d5                   ; from the read
+                move.l  a6,d2                   ; the column's loop cell, or
+                beq.s   .none                   ; 0 where the source plays once
+                sub.w   a4,d2
+                add.w   d5,d2
+.none:          move.w  d2,(a5,d7.w)
+                add.w   d3,d5                   ; the row the place is at
+                move.w  d5,(a5,d0.w)
+                .else
                 move.l  a6,d2                   ; the column's loop cell, or
                 beq.s   .none                   ; 0 where the source plays once
                 sub.l   a4,d2
                 add.l   d5,d2
-                .if     YMXR_PCREL
-                sub.l   d0,d2                   ; a displacement from the read
-.none:          move.w  d2,(a5,d7.w)
-                .else
 .none:          move.l  d2,(a5,d7.w)
-                .endif
                 add.l   d3,d5                   ; the row the place is at
-                move.w  KD_PTR(a2,d6.w),d2
-                .if     YMXR_PCREL
-                sub.l   d0,d5
-                move.w  d5,(a5,d2.w)
-                .else
-                move.l  d5,(a5,d2.w)
+                move.l  d5,(a5,d0.w)
                 .endif
                 addq.w  #4,d6                   ; the next column
                 addq.w  #CELL_SIZE,d7
@@ -362,12 +357,13 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 swap    d1
                 move.w  KD_LEFT(a2),d4          ; counted: the rows from the
                 beq.s   .aim                    ; place on, and the rows of a
-                move.l  FX_ROWS(a3),d5          ; pass through the loop, R
-                move.w  d5,(a5,d4.w)            ; less RR, or R where it plays
-                sub.w   d3,(a5,d4.w)            ; once
+                move.w  FX_ROWS+2(a3),d5        ; pass through the loop, R
+                move.w  d5,d0                   ; less RR, or R where it plays
+                sub.w   d3,d0                   ; once
+                move.w  d0,(a5,d4.w)
                 move.l  a6,d0
                 beq.s   .pass
-                sub.l   a4,d0
+                sub.w   a4,d0
                 sub.w   d0,d5
 .pass:          move.w  KD_RELD(a2),d4
                 move.w  d5,(a5,d4.w)
@@ -412,7 +408,7 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 lsr.w   #1,d4                   ; the page in the bank
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; at 1 the page alone
-                bgt.w   .started
+                bgt.s   .started
                 moveq   #0,d5
                 move.b  FX_LBANK(a3),d5
                 move.b  d4,FX_USE(a3,d5.w)
@@ -424,68 +420,60 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 add.b   FX_LFB(a3),d4           ; past the effect's pages
                 bra.w   .kpage
 ; A square: the entries of its two keys, the second the marker's.
-.square:        movem.l d2/d6-d7/a1/a6,-(sp)
-                move.w  d4,d6                   ; the effect
+; ymxr_arm passes no square here, so d1 is the vector the frame writes.
+.square:        mulu    #SQ_SIZE,d4             ; the effect's square
+                lea     ymxr_sq0(pc),a5
+                adda.w  d4,a5
                 moveq   #0,d0
                 move.b  FX_RUN(a3),d0
                 bsr     ymxr_tab
                 move.b  (a4),d0
                 bsr     ymxr_entry
-                move.b  d0,d1                   ; row 0's level
+                move.b  d0,d4                   ; row 0's level
                 move.b  1(a4),d0
                 bsr     ymxr_entry              ; row 1's
-                move.b  d1,FX_LEVEL(a3)
-                move.b  d1,d4
-                eor.b   d0,d4                   ; the difference of the two
-                move.w  d6,d5
-                mulu    #SQ_SIZE,d5
-                lea     ymxr_sq0(pc),a5
-                adda.w  d5,a5
-                lea     ymxr_timers(pc),a1
-                lsl.w   #3,d6
-                movea.w (a1,d6.w),a1            ; the vector
+                move.b  d4,FX_LEVEL(a3)
+                move.b  d4,d3
+                eor.b   d0,d3                   ; the difference of the two
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
+                move.b  FX_TARGET(a3),SQ_SEL(a5)
+                move.b  d3,SQ_MASK(a5)
                 btst    #5,d2                   ; row 0, or the row of the
                 bne.s   .row0                   ; two the running handler is
-                movea.l a1,a2                   ; at, its row number modulo 2
+                movea.w d1,a2                   ; at, its row number modulo 2
                 bsr     ymxr_runrow             ; (1.8.4)
                 btst    #0,d3
                 beq.s   .row0
-                move.b  d0,d1
-.row0:          move.b  FX_TARGET(a3),SQ_SEL(a5)
-                move.b  d4,SQ_MASK(a5)
-                move.b  d1,SQ_VAL(a5)
-                move.l  a5,(a1)
+                move.b  d0,d4
+.row0:          move.b  d4,SQ_VAL(a5)
+                movea.w d1,a2
+                move.l  a5,(a2)
                 move.w  (sp)+,sr
                 move.l  a4,FX_FIRST(a3)
                 st      FX_SHAPE(a3)
                 sf      FX_LOK(a3)
-                bra.s   .done
-; A source of one row: its entry.
-.one:           movem.l d2/d6-d7/a1/a6,-(sp)
-                move.w  d4,d6                   ; the effect
-                moveq   #0,d0
+                lea     YM_SELECT.w,a2
+                rts
+; A source of one row: its entry. ymxr_arm passes no source of one row
+; here, so d1 is the vector the frame writes.
+.one:           moveq   #0,d0
                 move.b  FX_RUN(a3),d0
                 bsr     ymxr_tab
                 move.b  (a4),d0
                 bsr     ymxr_entry
-                move.w  d6,d1
-                mulu    #ONE_SIZE,d1
+                mulu    #ONE_SIZE,d4
                 lea     ymxr_one0(pc),a5
-                adda.w  d1,a5
-                lea     ymxr_timers(pc),a1
-                lsl.w   #3,d6
-                movea.w (a1,d6.w),a1
+                adda.w  d4,a5
+                movea.w d1,a2
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.b  FX_TARGET(a3),ONE_SEL(a5)
                 move.b  d0,ONE_VAL(a5)
-                move.l  a5,(a1)
+                move.l  a5,(a2)
                 move.w  (sp)+,sr
                 move.l  a4,FX_FIRST(a3)
                 move.b  #1,FX_SHAPE(a3)
                 sf      FX_LOK(a3)
-.done:          movem.l (sp)+,d2/d6-d7/a1/a6
                 lea     YM_SELECT.w,a2
                 rts

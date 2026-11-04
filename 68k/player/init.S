@@ -32,15 +32,15 @@ YMXR_init:
 ; source index at 28 (BINARIES.md 1.2). Earlier versions use identity
 ; and a zero block pointer. Effects bit 5 marks version 10 (SPEC.md
 ; 3.3.5).
-                moveq   #0,d0
-                cmp.w   #10,TF_VERSION(a0)
+                moveq   #0,d1
+                subq.w  #3,d0                   ; the version less 10
                 bne.s   .v9
-                move.l  a0,d0
-                add.l   TF_TRANS(a0),d0
-.v9:            move.l  d0,WS_TRANS(a6)
+                move.l  a0,d1
+                add.l   TF_TRANS(a0),d1
+.v9:            move.l  d1,WS_TRANS(a6)
                 btst    #5,WS_EFFECTS(a6)
                 beq.s   .v10
-                tst.l   d0
+                tst.l   d1
                 beq     .bad6
 .v10:
                 .endif
@@ -82,14 +82,10 @@ YMXR_init:
                 beq.s   .source
                 moveq   #4,d4
                 .endif
-.source:        movea.l WS_TUNE(a6),a3
+.source:        movea.l a1,a3
                 move.l  TF_INDEX(a3,d4.w),d0
                 bclr    #31,d0                  ; the index's bit 31: a source
-                .if     YMXR_PCREL              ; whose column fills its byte
-                bne.w   .counted
-                .else
-                bne.s   .counted
-                .endif
+                sne     d3                      ; whose column fills its byte
                 adda.l  d0,a3                   ; the source's DTX1 table
                 lea     DT_PAYLOAD(a3),a5       ; its first row
                 move.l  a5,(a4)+
@@ -97,40 +93,35 @@ YMXR_init:
                 bsr.w   ymxr_inreach
                 bcs     .bad6
                 .endif
+                move.l  DT_ROWS(a3),d2          ; R
                 move.l  DT_REPEAT(a3),d0
-                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
-                beq.s   .plays                  ; none where it plays once
-                add.l   a5,d0
+                sub.l   d2,d0                   ; 0 where it plays once
+                beq.s   .kind
+                add.l   d2,d0
+                add.l   a5,d0                   ; row RR, the loop cell
+.kind:          tst.b   d3
+                bne.s   .counted
                 cmp.w   #1,DT_COLUMNS(a3)       ; a source of several columns
                 bne.s   .several                ; runs the handler its columns
-                tst.l   DT_REPEAT(a3)           ; pick, at any rows; and a
+                cmp.l   a5,d0                   ; pick, at any rows; and a
                 bne.s   .cell                   ; source of one column
-                                                ; repeating to row 0 of one
-                cmp.l   #1,DT_ROWS(a3)          ; row or of two has a
-                bne.s   .pair                   ; separate handler
-                moveq   #-2,d0
-                bset    #1,d5
+                subq.l  #3,d2                   ; repeating to row 0 of one
+                bcc.s   .cell                   ; row or of two has a
+                move.l  d2,d0                   ; separate handler: -2 and
+                not.l   d2                      ; bit 1, or -1 and bit 0
+                bset    d2,d5
                 bra.s   .cell
-.pair:          cmp.l   #2,DT_ROWS(a3)
-                bne.s   .cell
-                moveq   #-1,d0
-                bset    #0,d5
-                bra.s   .cell
-.plays:         moveq   #0,d0
-                cmp.w   #1,DT_COLUMNS(a3)
-                beq.s   .cell
 ; A source of several columns: its loop cell and the stride from one
 ; column to the next are in the table beside, and the tag in the cell's
 ; place sends a start to the handler its columns pick.
 .several:       move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
-                move.l  DT_ROWS(a3),d0
-                addq.l  #1,d0                   ; DTX1 pads a column to a word
-                and.w   #$FFFE,d0               ; (DTX, SPEC.md 2.2)
-                move.w  d0,WS_WIDE-WS_SOURCES(a4)
                 moveq   #-3,d0                  ; two columns
                 cmp.w   #2,DT_COLUMNS(a3)
-                beq.s   .tagged
+                beq.s   .stride
                 moveq   #-4,d0                  ; three
+.stride:        addq.l  #1,d2                   ; DTX1 pads a column to a word
+                and.w   #$FFFE,d2               ; (DTX, SPEC.md 2.2)
+                move.w  d2,WS_WIDE-WS_SOURCES(a4)
 .tagged:        bset    #2,d5
 .cell:          move.l  d0,(a4)+
                 addq.w  #4,d4
@@ -141,50 +132,21 @@ YMXR_init:
 ; the rows of a pass and the rows of the loop are in the table beside,
 ; with its loop cell, and the tag in the cell's place sends a start to
 ; the routine every effect shares, which tells this tag from the tags of
-; a source of several columns.
-.counted:       adda.l  d0,a3                   ; the source's DTX1 table
-                lea     DT_PAYLOAD(a3),a5       ; its first row
-                move.l  a5,(a4)+
-                .if     YMXR_PCREL
-                bsr.w   ymxr_inreach
-                bcs     .bad6
-                .endif
+; a source of several columns. A counted source of several columns: the
+; stride from one column to the next and R are beside its loop cell, and
+; a start reads the rows of a pass through the loop off the cell and the
+; first row (SPEC.md 3.1.6).
+.counted:       move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
                 cmp.w   #1,DT_COLUMNS(a3)       ; a counted source of several
-                bne.w   .ccolumns               ; columns
-                move.l  DT_ROWS(a3),d0
-                move.w  d0,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
-                sub.l   DT_REPEAT(a3),d0
-                move.w  d0,WS_WIDE-WS_SOURCES+2(a4) ; R less RR, the loop
-                move.l  DT_REPEAT(a3),d0
-                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
-                beq.s   .conce                  ; none where it plays once
-                add.l   a5,d0
-                bra.s   .ccell
-.conce:         moveq   #0,d0
-.ccell:         move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                bne.s   .ccolumns               ; columns
+                move.w  d2,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
+                sub.l   DT_REPEAT(a3),d2
+                move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R less RR, the loop
                 moveq   #-5,d0
-                bset    #2,d5
-                bra.w   .cell
-
-; A counted source of several columns: the stride from one column to the
-; next and R are beside its loop cell, and a start reads the rows of a
-; pass through the loop off the cell and the first row (SPEC.md 3.1.6).
-.ccolumns:      move.l  DT_ROWS(a3),d0
-                addq.l  #1,d0                   ; DTX1 pads a column to a word
-                and.w   #$FFFE,d0               ; (DTX, SPEC.md 2.2)
-                move.w  d0,WS_WIDE-WS_SOURCES(a4)
-                move.l  DT_ROWS(a3),d0
-                move.w  d0,WS_WIDE-WS_SOURCES+2(a4)
-                move.l  DT_REPEAT(a3),d0
-                cmp.l   DT_ROWS(a3),d0          ; the row it repeats to, or
-                beq.s   .wonce                  ; none where it plays once
-                add.l   a5,d0
-                bra.s   .wcell
-.wonce:         moveq   #0,d0
-.wcell:         move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                bra.s   .tagged
+.ccolumns:      move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R, beside the stride
                 moveq   #-6,d0
-                bset    #2,d5
-                bra.w   .cell
+                bra.s   .stride
 .resolved:
 
 ; The row's columns, as the table's column map defines them (DTX, abi.md
@@ -193,7 +155,6 @@ YMXR_init:
 ; written whole, an immediate of the value where its column is constant:
 ; a set inits one loaded copy for each subtune, and a column live in one
 ; tune is constant in another.
-                movea.l WS_TUNE(a6),a1
                 movea.l WS_IMAGE(a6),a0
                 adda.l  TF_TABLE(a1),a0
                 lea     DT_PAYLOAD(a0),a0       ; the table's payload
@@ -207,7 +168,6 @@ YMXR_init:
 .patch:         move.w  (a3)+,d4
                 move.w  d1,d0
                 bsr     ymxr_col
-                bsr     ymxr_put
                 addq.w  #1,d1
                 dbra    d2,.patch
                 lea     ymxr_sites(pc),a3
@@ -215,7 +175,6 @@ YMXR_init:
 .site:          move.w  (a3)+,d4
                 move.w  (a3)+,d0
                 bsr     ymxr_col
-                bsr     ymxr_put
                 dbra    d2,.site
 
                 .if     YMXR_AEOI
@@ -424,32 +383,6 @@ YMXR_init:
                 bmi     .bad6
                 .endif
 
-; The effects the tune runs are read every row; the others are jumped
-; over by the branch at each macro's head, where the tune does not run
-; its effect.
-; The head of each effect: the effect's first read where the tune runs
-; it, and where it does not, a branch, its displacement to the head of
-; the next effect the tune does run or past the last of them. A run of
-; effects the tune does not run then costs one branch. This is after the
-; sites above, which write the read whole into the two words a skipped
-; effect's branch occupies, so a head the tune runs is that read already.
-                lea     ymxr_frame(pc),a4
-                lea     ymxr_overs(pc),a3
-                lea     ymxr_tick3_done(pc),a5
-                moveq   #3,d2
-.over:          move.w  (a3)+,d4
-                lea     (a4,d4.w),a1
-                btst    d2,WS_EFFECTS(a6)
-                beq.s   .skip
-                movea.l a1,a5                   ; the effect's first read
-                bra.s   .next
-.skip:          move.w  #$6000,(a1)             ; bra.w: the head the assembler
-                move.l  a5,d0                   ; wrote, which a tune before
-                sub.l   a1,d0                   ; this one that ran the effect
-                subq.l  #2,d0                   ; replaced with the read
-                move.w  d0,2(a1)
-.next:          dbra    d2,.over
-
 ; The start tells three shapes apart off one cell, and a tune using one
 ; of the two shapes with a separate handler and not the other needs no
 ; test: the branch that leaves the general handler's path goes straight
@@ -474,19 +407,39 @@ YMXR_init:
                 btst    #2,d5                   ; and the three branches that
                 beq.s   .aims                   ; lie elsewhere where it has
                 move.l  #((WIDE_WIDEN&$FF)<<16)|(RESET_WIDE&$FF),d0
-.aims:          lea     ymxr_frame(pc),a4
+.aims:
+
+; The effects the tune runs are read every row; the others are jumped
+; over by the branch at each macro's head, where the tune does not run
+; its effect.
+; The head of each effect: the effect's first read where the tune runs
+; it, and where it does not, a branch, its displacement to the head of
+; the next effect the tune does run or past the last of them. A run of
+; effects the tune does not run then costs one branch. This is after the
+; sites above, which write the read whole into the two words a skipped
+; effect's branch occupies, so a head the tune runs is that read already.
+                lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
                 lea     ymxr_resets(pc),a2
+                lea     ymxr_tick3_done(pc),a5
                 moveq   #3,d2
-.pick:          move.w  (a3)+,d4
+.over:          move.w  (a3)+,d4
                 lea     (a4,d4.w),a1
-                move.w  d1,PICK_AT(a1)
+                btst    d2,WS_EFFECTS(a6)
+                beq.s   .skip
+                movea.l a1,a5                   ; the effect's first read
+                bra.s   .pick
+.skip:          move.w  #$6000,(a1)             ; bra.w: the head the assembler
+                move.l  a5,d3                   ; wrote, which a tune before
+                sub.l   a1,d3                   ; this one that ran the effect
+                subq.l  #2,d3                   ; replaced with the read
+                move.w  d3,2(a1)
+.pick:          move.w  d1,PICK_AT(a1)
                 move.l  d0,d5
                 move.w  (a2)+,d4
                 move.b  d5,(a4,d4.w)            ; the place's reset, at the site
                 swap    d5                      ; the table names
                 move.b  d5,WIDE_AT(a1)
-                dbra    d2,.pick
 
                 .if     YMXR_DEFER
 ; A tune that defers a start, bit 4 of the effects used (SPEC.md 3.3),
@@ -494,11 +447,6 @@ YMXR_init:
 ; start (4.8); every other tune keeps the three the assembler wrote, so
 ; its frame costs what it cost before deferred starts. Each is written
 ; on every init, as the heads are.
-                lea     ymxr_frame(pc),a4
-                lea     ymxr_overs(pc),a3
-                moveq   #3,d2
-.defers:        move.w  (a3)+,d4
-                lea     (a4,d4.w),a1            ; the effect's head
                 btst    #4,WS_EFFECTS(a6)
                 beq.s   .plain
                 move.w  #$6000,RS_AT(a1)        ; bra.w
@@ -511,7 +459,7 @@ YMXR_init:
                 move.w  #UNSET_RATE,UNSET_AT(a1)
                 move.w  #$6700,SET_AT(a1)       ; beq.w
                 move.w  #SET_STOP,SET_AT+2(a1)
-.aimed:         dbra    d2,.defers
+.aimed:
                 .endif
 
                 .if     YMXR_MAP
@@ -524,11 +472,6 @@ YMXR_init:
 ; the tune also defers starts. That path updates the record after a tick
 ; installs a pending start; other tunes continue directly to rate
 ; processing.
-                lea     ymxr_frame(pc),a4
-                lea     ymxr_overs(pc),a3
-                moveq   #3,d2
-.maps:          move.w  (a3)+,d4
-                lea     (a4,d4.w),a1            ; the effect's head
                 .if     YMXR_DEFER
                 move.w  #REMAP_RATE,REMAP_AT(a1)
                 .endif
@@ -549,8 +492,9 @@ YMXR_init:
                 move.w  #UNSET_RATE,UNSET_AT(a1)
                 move.l  #$08020006,RS_AT(a1)    ; btst #6,d2
                 .endif
-.mapsnext:      dbra    d2,.maps
+.mapsnext:
                 .endif
+                dbra    d2,.over
 
 ; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body is two bytes past the slot
@@ -599,56 +543,60 @@ YMXR_init:
 ; a3 its DTX1 table: the rows run (C - 1) strides and R bytes from the
 ; first (SPEC.md 3.1.2), and the handlers run from ymxr_tick0 to
 ; ymxr_reach. Carry marks a source a displacement does not reach, which
-; init reports -1 for.
+; init reports -1 for. d0, d2 and a0 clobbered.
                 .if     YMXR_PCREL
-ymxr_inreach:   movem.l d0-d1/a0-a1,-(sp)
-                move.l  DT_ROWS(a3),d0
+ymxr_inreach:   move.l  DT_ROWS(a3),d0
                 addq.l  #1,d0
                 and.w   #$FFFE,d0               ; align(R), a column's stride
-                moveq   #0,d1                   ; (DTX, SPEC.md 2.2)
-                move.w  DT_COLUMNS(a3),d1
-                subq.w  #1,d1
-                mulu    d1,d0                   ; the columns before the last
+                moveq   #0,d2                   ; (DTX, SPEC.md 2.2)
+                move.w  DT_COLUMNS(a3),d2
+                subq.w  #1,d2
+                mulu    d2,d0                   ; the columns before the last
                 add.l   DT_ROWS(a3),d0
                 lea     -1(a5,d0.l),a0          ; the source's last byte
-                lea     ymxr_tick0(pc),a1
                 move.l  a0,d0
-                sub.l   a1,d0                   ; from the first handler
+                lea     ymxr_tick0(pc),a0
+                sub.l   a0,d0                   ; from the first handler
                 cmp.l   #32767,d0
                 bgt.s   .far
-                lea     ymxr_reach(pc),a1
-                move.l  a1,d0
+                lea     ymxr_reach(pc),a0
+                move.l  a0,d0
                 sub.l   a5,d0                   ; to the source's first byte
                 cmp.l   #32768,d0
                 bgt.s   .far
-                movem.l (sp)+,d0-d1/a0-a1
                 andi.b  #$FE,ccr
                 rts
-.far:           movem.l (sp)+,d0-d1/a0-a1
-                ori.b   #1,ccr
+.far:           ori.b   #1,ccr
                 rts
                 .endif
 
-; The word a read of column d0 is written with, out of the payload in a0
-; and N in d3 (DTX, SPEC.md 2.4): a live column's displacement, its slot
-; times N, or a constant column's value with bit 15 set. The constant
-; values follow the map in column order, so a constant column's value is
-; one byte past the value of each constant column before it.
-ymxr_col:       movem.l d1/a1,-(sp)
+; One read site written whole, of column d0, out of the payload in a0 and
+; N in d3 (DTX, SPEC.md 2.4): the word at (a4,d4.w) is its operand and
+; the word before it its opcode. A live column is read at its
+; displacement, its slot times N, and a constant column's read is the
+; same instruction with its value as an immediate, which costs 8 cycles
+; to the displacement's 12 and sets the flags as the read sets them. The
+; constant values follow the map in column order, so a constant column's
+; value is one byte past the value of each constant column before it.
+; The opcode as it is defines the read, whichever the last init wrote: an
+; or into d1, its bits 14 to 12 clear; a move into d2, bit 10 set; or a
+; move into d1, the head of an effect's bra.w being one. d0, d4, a1 and a5
+; clobbered.
+ymxr_col:       lea     (a4,d4.w),a5            ; the operand
                 .if     YMXR_MAP
                 cmp.w   DT_COLUMNS-DT_PAYLOAD(a0),d0    ; a column at or past
                 bcs.s   .in                             ; the table's C, a
                 move.w  #$8000,d0                       ; mapping column of a
-                bra.s   .done                           ; version 9 tune: the
+                bra.s   .put                            ; version 9 tune: the
 .in:                                                    ; constant 0
                 .endif
-                moveq   #0,d1
-                move.b  8(a0,d0.w),d1           ; the column's byte of the map
-                cmp.b   #$FF,d1
+                moveq   #0,d4
+                move.b  8(a0,d0.w),d4           ; the column's byte of the map
+                cmp.b   #$FF,d4
                 beq.s   .value
-                mulu.w  d3,d1                   ; its slot times N
-                move.w  d1,d0
-                bra.s   .done
+                mulu.w  d3,d4                   ; its slot times N
+                move.w  d4,d0
+                bra.s   .put
                 .if     YMXR_MAP
 .value:         lea     8(a0),a1                ; the values, behind the map
                 adda.w  DT_COLUMNS-DT_PAYLOAD(a0),a1    ; of C columns
@@ -658,54 +606,30 @@ ymxr_col:       movem.l d1/a1,-(sp)
                 subq.w  #1,d0
                 bmi.s   .at
 .before:        cmp.b   #$FF,8(a0,d0.w)
-                bne.s   .live
+                bne.s   .slot
                 addq.l  #1,a1
-.live:          dbra    d0,.before
+.slot:          dbra    d0,.before
 .at:            moveq   #0,d0
                 move.b  (a1),d0
                 bset    #15,d0
-.done:          movem.l (sp)+,d1/a1
-                rts
-
-; One read site written whole: the word at (a4,d4.w) is its operand and
-; the word before it its opcode, and d0 is ymxr_col's word for its
-; column. The opcode as it is defines the read, whichever the last init
-; wrote: a move into d1, the head of an effect being one; a move into d2;
-; or an or into d1. A live column is read at its displacement, and a
-; constant column's read is the same instruction with its value as an
-; immediate, which costs 8 cycles to the displacement's 12 and sets the
-; flags as the read sets them.
-ymxr_put:       movem.l d1-d2/a5,-(sp)
-                lea     (a4,d4.w),a5
-                move.w  -2(a5),d1               ; the opcode as it is
-                move.w  #$8229,d2               ; or.b d16(a1),d1
-                cmp.w   d2,d1
+.put:           move.w  #$7000,d4
+                and.w   -2(a5),d4
                 beq.s   .or
-                cmp.w   #$0001,d1               ; or.b #v,d1
-                beq.s   .or
-                move.w  #$1429,d2               ; move.b d16(a1),d2
-                cmp.w   d2,d1
-                beq.s   .move
-                cmp.w   #$143C,d1               ; move.b #v,d2
-                beq.s   .move
-                move.w  #$1229,d2               ; move.b d16(a1),d1, or its
-                                                ; immediate, or a head's bra.w
-.move:          tst.w   d0
+                move.w  #$0400,d4
+                and.w   -2(a5),d4               ; bit 10: a move into d2
+                lsr.w   #1,d4
+                add.w   #$1229,d4               ; move.b d16(a1),d1 or d2
+                tst.w   d0
                 bpl.s   .live
-                move.w  d2,d1                   ; move.b #v: the register's
-                and.w   #$FE00,d1               ; bits kept, the source the
-                or.w    #$003C,d1               ; immediate
-                bra.s   .value
-.or:            tst.w   d0
+                eori.w  #$0015,d4               ; move.b #v,d1 or d2
+                bra.s   .immediate
+.or:            move.w  #$8229,d4               ; or.b d16(a1),d1
+                tst.w   d0
                 bpl.s   .live
-                move.w  #$0001,d1               ; or.b #v,d1
-.value:         move.w  d1,-2(a5)
-                and.w   #$00FF,d0
+                moveq   #$0001,d4               ; or.b #v,d1
+.immediate:     and.w   #$00FF,d0
+.live:          move.w  d4,-2(a5)
                 move.w  d0,(a5)
-                bra.s   .done
-.live:          move.w  d2,-2(a5)
-                move.w  d0,(a5)
-.done:          movem.l (sp)+,d1-d2/a5
                 rts
 
 ; a5 a tick handler: its operands linked, its place parked.
