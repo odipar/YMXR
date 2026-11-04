@@ -24,7 +24,7 @@ idle past the last.
 | Retrigger retune, built | 1200 | 1379 | 2796 | 668 | 2096 |
 | Synergy Credits | 10756 | 1995 | 5086 | 903 | 2924 |
 | Turrican - world 4-3 | 3680 | 1497 | 4362 | 779 | 3716 |
-| Turrican 2 - world completed 1 | 182 | 1362 | 4072 | 697 | 3456 |
+| Turrican 2 - world completed 1 | 182 | 1358 | 4068 | 697 | 3456 |
 | capture | 1844 | 1248 | 3536 | 663 | 3048 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so
@@ -114,7 +114,7 @@ Its play call, counted the same way on its player, against the table above:
 | Retrigger retune, built | 1490 | 1379 | 2220 | 2796 |
 | Synergy Credits | 2030 | 1995 | 5094 | 5086 |
 | Turrican - world 4-3 | 1606 | 1497 | 4532 | 4362 |
-| Turrican 2 - world completed 1 | 1606 | 1362 | 4060 | 4072 |
+| Turrican 2 - world completed 1 | 1606 | 1358 | 4060 | 4068 |
 | capture | 1414 | 1248 | 3422 | 3536 |
 
 The call costs less on average on ten of the eleven and 12 cycles more on
