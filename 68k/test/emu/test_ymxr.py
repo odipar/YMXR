@@ -392,6 +392,21 @@ def needs(effects):
     return bool(effects & 0x10), bool(effects & 0x20)
 
 
+_SOURCE = {}
+
+
+def player_source(name="YMXR.S"):
+    """The player's source as rmac reads it: each .include line replaced
+    by the lines of the file it includes, under 68k/. Read once a run."""
+    if name not in _SOURCE:
+        lines = []
+        for line in open(os.path.join(ROOT, "68k", name)):
+            m = re.match(r'\s+\.include\s+"([^"]+)"', line)
+            lines.append(player_source(m.group(1)) if m else line)
+        _SOURCE[name] = "".join(lines)
+    return _SOURCE[name]
+
+
 def equate(name, symbols=None):
     """An equate out of the player's source, so the rig reads what the
     player reads. A term that names another equate is read through to its
@@ -403,9 +418,8 @@ def equate(name, symbols=None):
         return DEFINED[name]
     if symbols and name in symbols:
         return symbols[name]
-    source = open(os.path.join(ROOT, "68k", "YMXR.S")).read()
-    m = re.search(r"^%s\s+equ\s+([-$\w+*]+)" % name, source, re.M)
-    assert m, name + " is not an equate of YMXR.S"
+    m = re.search(r"^%s\s+equ\s+([-$\w+*]+)" % name, player_source(), re.M)
+    assert m, name + " is not an equate of the player's source"
     whole = 0
     for signed in re.finditer(r"([+-]?)([$\w*]+)", m.group(1)):
         product = 1

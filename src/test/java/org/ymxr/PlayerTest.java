@@ -32,7 +32,31 @@ final class PlayerTest {
 
     private static final Path PLAYER = Path.of("68k/YMXR.S");
 
+    /** A line that includes a file, and the file's path under 68k. */
+    private static final Pattern INCLUDE = Pattern.compile("^\\s+\\.include\\s+\"([^\"]+)\"");
+
     private static final Path BINARIES = Path.of("doc/BINARIES.md");
+
+    /**
+     * The player's source as rmac reads it: each {@code .include} line
+     * replaced by the lines of the file it includes, under {@code 68k}.
+     */
+    static String source() throws IOException {
+        return expanded(PLAYER);
+    }
+
+    private static String expanded(Path file) throws IOException {
+        StringBuilder out = new StringBuilder();
+        for (String line : Files.readAllLines(file)) {
+            Matcher include = INCLUDE.matcher(line);
+            if (include.find()) {
+                out.append(expanded(PLAYER.resolveSibling(include.group(1))));
+            } else {
+                out.append(line).append('\n');
+            }
+        }
+        return out.toString();
+    }
 
     /**
      * Player equates for the build without deferred-start or lookup
@@ -57,7 +81,7 @@ final class PlayerTest {
         // branch, empty for a block on another condition
         Deque<Optional<Boolean>> blocks = new ArrayDeque<>();
         Deque<Boolean> second = new ArrayDeque<>();
-        for (String line : Files.readString(PLAYER).split("\n")) {
+        for (String line : source().split("\n")) {
             String said = line.trim();
             if (said.startsWith(".if")) {
                 Matcher m = on.matcher(said);
