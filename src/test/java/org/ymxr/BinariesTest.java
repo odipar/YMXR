@@ -392,8 +392,18 @@ final class BinariesTest {
         int workAt = Tune.getLong(patched, Sndh.CORE_WORK_AT);
         Tune.putLong(patched, Sndh.CORE_TABLE_AT, 0);
         Tune.putLong(patched, Sndh.CORE_WORK_AT, 0);
-        assertArrayEquals(core, patched, "the core as assembled, its two offsets aside");
-        assertEquals(Sndh.even(core.length), tableAt);
+        // with the lookup in, the page area's offset at 36 too, and the
+        // area between the core and the table (BINARIES.md 2.2, 3.1)
+        int pagesAt = 0;
+        if ((Tune.getWord(core, Sndh.CORE_FLAGS_AT) & Sndh.CORE_MAP) != 0) {
+            pagesAt = Tune.getLong(patched, Sndh.CORE_PAGES_AT);
+            Tune.putLong(patched, Sndh.CORE_PAGES_AT, 0);
+        }
+        assertArrayEquals(core, patched, "the core as assembled, its patched offsets aside");
+        assertTrue(pagesAt == 0 || pagesAt == Sndh.even(core.length), "the page area's offset");
+        assertTrue(pagesAt == 0 ? tableAt == Sndh.even(core.length)
+                : tableAt >= pagesAt + Sndh.PAGE_BYTES + Sndh.PAGE_SPAN,
+                "the subtune table past the core and its page area");
         assertEquals(files.size(), Tune.getWord(sndh, header + tableAt));
         // The tunes are between the subtune table and the images, so
         // that a tune's sources are beside the core (68k/YMXR.S,

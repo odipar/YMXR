@@ -35,7 +35,8 @@ import (
 //	        ..     the image, on a long, in a bound tune written alone
 //	        ..     version 10: the transformation block, on a long, in a
 //	               bound tune written alone: the tune file's transformation
-//	               index and transformations, byte for byte
+//	               index and transformations, byte for byte, then the list
+//	               of the pages the tune maps through (Pages)
 //
 // Every offset counts from the first byte.
 
@@ -195,9 +196,11 @@ func Bound(tuneFile []byte) ([]byte, error) {
 		ymxr.GetLong(image, FormatAt+FormatStateAt))
 }
 
-// Block copies a version 10 transformation block unchanged, or returns
-// nil for versions 7 to 9. The block begins at the header's long at 16
-// and ends after its index or last entry, whichever is later. Index
+// Block is the bound tune's transformation block of a version 10 tune
+// file, or nil for versions 7 to 9: the tune file's block, copied
+// unchanged, then the list of the pages the tune maps through (Pages,
+// BINARIES.md 1.2). The tune file's block begins at the header's long at
+// 16 and ends after its index or last entry, whichever is later. Index
 // offsets are relative to the block, so relocation preserves them. The
 // reader has already checked bounds (SPEC.md 3.4.2).
 func Block(tuneFile []byte) []byte {
@@ -213,7 +216,11 @@ func Block(tuneFile []byte) []byte {
 			end = last
 		}
 	}
-	return tuneFile[at:end]
+	block := append([]byte{}, tuneFile[at:end]...)
+	if read, err := ymxr.Read(tuneFile); err == nil {
+		block = append(block, Pages(read)...)
+	}
+	return block
 }
 
 // build writes the bound header, source index and DTX1 tables. If image

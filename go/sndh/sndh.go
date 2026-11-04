@@ -30,6 +30,8 @@ import (
 //	26      2      where the handlers begin, the reach measured from there
 //	28      4      the subtune table's offset, patched here
 //	32      4      the workspace's offset, patched here
+//	36      4      with the lookup in, the page area's offset, patched
+//	               here
 
 // MaxSubtunes is the most the '##' tag's two digits number.
 const MaxSubtunes = ymxr.MaxSubtunes
@@ -52,6 +54,9 @@ const (
 	coreTableAt   = 28
 	coreWorkAt    = 32
 	coreLength    = 36
+	// CorePagesAt is the page area's offset in a core with the lookup in
+	// (BINARIES.md 2.2, 3.1), 0 where the file has none.
+	CorePagesAt = 36
 )
 
 // coreMonitor is the core's flag bit 0: the player's raster monitor
@@ -268,8 +273,72 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 				" reaches %d", last, handlers, pcrelReach)
 		}
 	}
+	if Area(core, set) < 0 {
+		handlers := ymxr.GetWord(core, coreHandlers)
+		least := 0
+		for _, block := range set.Blocks {
+			if len(block) > 0 {
+				if n := LeastOf(block, Fallback(core)); n > least {
+					least = n
+				}
+			}
+		}
+		return nil, fmt.Errorf("the page area ends %d bytes past the core's first handler,"+
+			" at %d, and a tick's page read reaches %d", even(len(core))+least-handlers,
+			handlers, PageReach)
+	}
 	workspace := ymxr.Align(ymxr.GetWord(core, CoreFixedAt)+state) + WorkRounding
 	return Combine(core, set, tags, workspace)
+}
+
+// The page area's bytes for a list of P pages besides its tables: 256
+// bytes a page, and the 255 bytes over which each effect's pages begin at
+// its offset modulo 256 (BINARIES.md 3.1). PageReach is the reach of a
+// page read, whose displacement is a signed word from the instruction
+// that reads it (68k/YMXR.S, LKEY).
+const (
+	PageBytes = 256
+	PageSpan  = 255
+	PageReach = 32767
+)
+
+// Area is the page area's bytes (BINARIES.md 3.1, 5.6): for a core with
+// the lookup in, the largest area a subtune's list needs within the reach
+// of the core's first handler, from the area's offset right after the
+// core (AreaOf); -1 where a list's fallback pages do not fit, and 0 for a
+// core without the lookup.
+func Area(core []byte, set Set) int {
+	if len(core) < CorePagesAt+4 || ymxr.GetWord(core, CoreFlagsAt)&coreMap == 0 {
+		return 0
+	}
+	most := 0
+	for _, block := range set.Blocks {
+		if len(block) > 0 {
+			n := AreaOf(block, Reach(core), Fallback(core))
+			if n < 0 {
+				return -1
+			}
+			if n > most {
+				most = n
+			}
+		}
+	}
+	return most
+}
+
+// Reach is the bytes past the page area's offset that the core's first
+// handler reaches (BINARIES.md 5.6).
+func Reach(core []byte) int {
+	return PageReach - (even(len(core)) - ymxr.GetWord(core, coreHandlers))
+}
+
+// Fallback is the fallback pages of an effect, two a bank of handlers
+// (BINARIES.md 5.6).
+func Fallback(core []byte) int {
+	if ymxr.GetWord(core, CoreFlagsAt)&coreDefer != 0 {
+		return 4
+	}
+	return 2
 }
 
 // TunesEnd returns the last bound tune's end relative to the first
@@ -278,7 +347,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 // lookups have field 26 set to 0, so their reach is measured from the
 // core's first byte.
 func TunesEnd(core []byte, set Set, tags []byte) int {
-	at := even(len(core)) + 2 + 4*len(set.Tunes)
+	at := even(even(len(core))+max(0, Area(core, set))) + 2 + 4*len(set.Tunes)
 	end := at
 	for _, tune := range set.Tunes {
 		end = at + len(tune)
@@ -455,8 +524,8 @@ func seconds(frames, rate int) int {
 	return int(s)
 }
 
-// Combine writes entries, tags, patched core, subtune table, bound
-// tunes and workspace. Each entry branches to the corresponding core
+// Combine writes entries, tags, patched core, page area, subtune table,
+// bound tunes and workspace. Each entry branches to the corresponding core
 // entry. Bound tunes start at even addresses.
 //
 // Shared images follow the tunes; version 10 transformation blocks
@@ -470,7 +539,11 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 			len(tags), 32767)
 	}
 	n := len(tunes)
-	tableAt := even(len(core))
+	// The page area right after the core, within reach of the lookup
+	// handlers, the core's last bytes (BINARIES.md 3.1).
+	pagesAt := even(len(core))
+	area := max(0, Area(core, set))
+	tableAt := even(pagesAt + area)
 	at := tableAt + 2 + 4*n
 	// The bound tunes first, each on an even address (5.1), so that a
 	// tune's sources are beside the core: a player whose ticks read a
@@ -513,6 +586,9 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	copy(file[header:], core)
 	ymxr.PutLong(file, header+coreTableAt, tableAt)
 	ymxr.PutLong(file, header+coreWorkAt, workAt)
+	if area > 0 {
+		ymxr.PutLong(file, header+CorePagesAt, pagesAt)
+	}
 	ymxr.PutWord(file, header+tableAt, n)
 	for i := range imageAt {
 		copy(file[header+imageAt[i]:], set.Images[i])

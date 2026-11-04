@@ -118,10 +118,15 @@ YMXR_DEFER      equ     0
 ; 0 writes source values unchanged. A remap changes values while
 ; preserving source place and timing.
 ;
-; At the frame, prepare an effect's lookup page. Each tick writes its
-; source key into the low byte of the next read's displacement; the high
-; byte selects one of two 256-byte pages. That read writes the selected
-; entry. Marker mirrors and setR7 port bits are prepared by ymxr_fill.
+; Each tick writes its source key into the low byte of the next read's
+; displacement; the high byte selects a 256-byte page, and that read
+; writes the selected entry. Init fills each page the bound tune lists in
+; the page area after the core, in its form (ymxr_prefill, BINARIES.md
+; 1.2 and 3.1): at the frame a start and a remap write the page byte of a
+; listed page and copy no entry. A page the list or the area leaves out
+; is filled at the frame into the fallback, two pages of one effect in
+; each bank (ymxr_lfill). Marker mirrors and setR7 port bits are prepared
+; by ymxr_fill.
 ;
 ; With lookup support, init accepts versions 7 to 10. Without it, init
 ; accepts 7 to 9 and reports -1 for 10. Code from ymxr_tick0 onward
@@ -311,18 +316,27 @@ FX_ABANK        equ     56              ; the bank it is armed in, 0 or BANK
                 .if     YMXR_MAP
 ; Lookup state (SPEC.md 1.10.3): kept mapping for later starts, running
 ; mapping for current ticks, and a square's row-0 level for place reset.
-; Mapping 0 is identity; 1 to 127 select tables. Each bank records its
-; selected page and each page's cached transformation and fill kind: 0
-; plain, 1 marker mirror, 2 setR7 ports (ymxr_fill).
+; Mapping 0 is identity; 1 to 127 select tables. Each bank records the
+; fallback page it selects and each fallback page's transformation and
+; fill kind: 0 plain, 1 marker mirror, 2 setR7 ports (ymxr_fill).
 ;
 ; A start and a remap into a lookup instance cache it: FX_LBYTE the
-; address of its page byte, FX_LHIGH the page byte of its bank's page 0,
-; FX_LBANK its bank and FX_LKEY the fill kind of its source, and FX_LOK
-; set where the record describes the running handler and no start is
-; pending. A remap between two transformations reads FX_LOK alone to use
-; the cache. A start of any other handler and the arming of a deferred
-; start clear FX_LOK. FX_LKEY is the transformation and the fill kind as
-; one word, its first byte written before each compare with a page.
+; address of its page byte, FX_LHIGH the page byte of the effect's first
+; fallback page, FX_LBANK its bank and FX_LKEY the fill kind of its
+; source, and FX_LOK set where the record describes the running handler
+; and no start is pending. A remap between two transformations reads
+; FX_LOK alone to use the cache. A start of any other handler and the
+; arming of a deferred start clear FX_LOK. FX_LKEY is the transformation
+; and the fill kind as one word, its first byte written before each
+; compare with a page.
+;
+; Init writes the effect's tables (ymxr_prefill): FX_LMAPS the address 1
+; below the table of each fill kind, whose byte n - 1 is the page of
+; transformation n, in 256 bytes from the effect's reference (ymxr_ref),
+; or 0 outside the pages init fills; and FX_LFB the page of its first
+; fallback page, 0 for an effect without one. A start caches the table of
+; its fill kind in FX_LMAP, whose four bytes are init's counts until
+; then. FX_LCUR is the page byte a start writes.
                 .if     YMXR_DEFER
 FX_MAP          equ     21              ; the kept mapping
 FX_AMAP         equ     33              ; an armed start's mapping and its
@@ -338,12 +352,20 @@ FX_LBANK        equ     62              ; the bank of the cache
 FX_PAGE         equ     64              ; two bytes a page, 4 a bank
 FX_LBYTE        equ     72              ; the cache: the page byte's address
 FX_LKEY         equ     76              ; a transformation, and the fill kind
-FX_LHIGH        equ     78              ; the page byte of page 0
+FX_LHIGH        equ     78              ; the page byte of the first fallback
 FX_LOK          equ     79              ; the cache in force
-FX_SIZE         equ     80
-WS_TRANS        equ     2376            ; the transformations' block, a long
-YMXR_FIXED      equ     2380
-WS_STATE        equ     2380            ; the image's state block, on a long
+FX_LMAP         equ     80              ; the table of the cache's fill kind
+FX_LN           equ     80              ; init's: an effect's pages, their
+FX_LRES         equ     81              ; offset modulo 256, their fill
+FX_LFORMS       equ     82              ; kinds, and its last entry plus 1
+FX_LLAST        equ     83
+FX_LMAPS        equ     84              ; the three fill kinds' tables
+FX_LCUR         equ     96              ; the page byte a start writes
+FX_LFB          equ     97              ; the page of the first fallback
+FX_SIZE         equ     100
+WS_TRANS        equ     2456            ; the transformations' block, a long
+YMXR_FIXED      equ     2460
+WS_STATE        equ     2460            ; the image's state block, on a long
                 .else
 FX_RUN          equ     20
 FX_MAP          equ     21
@@ -354,13 +376,24 @@ FX_LBYTE        equ     28
 FX_LKEY         equ     32
 FX_LHIGH        equ     34
 FX_LOK          equ     35
-FX_SIZE         equ     36
-WS_TRANS        equ     2200
-YMXR_FIXED      equ     2204
-WS_STATE        equ     2204
+FX_LMAP         equ     36
+FX_LN           equ     36
+FX_LRES         equ     37
+FX_LFORMS       equ     38
+FX_LLAST        equ     39
+FX_LMAPS        equ     40
+FX_LCUR         equ     52
+FX_LFB          equ     53
+FX_SIZE         equ     56
+WS_TRANS        equ     2280
+YMXR_FIXED      equ     2284
+WS_STATE        equ     2284
                 .endif
                 .if     (WS_FX+(4*FX_SIZE))<>WS_TRANS
                 .error  "the transformations' long is apart from the records"
+                .endif
+                .if     FX_LN<>FX_LMAP
+                .error  "init's counts are apart from FX_LMAP"
                 .endif
                 .else
                 .if     YMXR_DEFER
@@ -760,12 +793,14 @@ q\{ct}:         bra.w   \{tick}_done
 \{tick}_remapck:
                 MREAD   \cm
 \{tick}_mexit:  bpl.w   \{tick}_rate            ; _retune where a row defers
-                and.b   #$7F,d1                 ; a start (4.8)
+                and.w   #$7F,d1                 ; a start (4.8)
 ; With the cache in force (FX_LOK) and the timer running, a remap between
-; two transformations compares the page the instance does not read with
-; the new one, fills it where it differs (ymxr_lfill), and writes the
-; page byte. A stopped timer and the mapping it runs keep the mapping
-; alone. Every other remap is ymxr_remap's.
+; two transformations reads its page in the table of the instance's fill
+; kind (FX_LMAP) and writes its page byte. Where the table has 0, the
+; fallback page the instance does not read is compared with the new one
+; and filled where it differs (ymxr_lfill). A stopped timer and the
+; mapping it runs keep the mapping alone. Every other remap is
+; ymxr_remap's.
 \{tick}_remap:  lea     \fx(a0),a3              ; the record and the effect
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
                 move.b  \ctrl.w,d0              ; the timer's control register
@@ -782,10 +817,29 @@ q\{ct}:         bra.w   \{tick}_done
                 tst.b   d1
                 beq.s   \{tick}_rid            ; to the identity
                 move.b  d1,FX_RUN(a3)
-                move.b  d1,FX_LKEY(a3)
-                move.w  FX_LKEY(a3),d5          ; the transformation and the
-                .if     YMXR_DEFER              ; fill kind against the other
-                moveq   #0,d4                   ; page of the bank
+                movea.l FX_LMAP(a3),a5          ; its page in the table of the
+                move.b  0(a5,d1.w),d0           ; fill kind, 0 outside it
+                beq.s   \{tick}_rmiss
+\{tick}_rhigh:  add.b   FX_LHIGH(a3),d0         ; its page byte
+                movea.l FX_LBYTE(a3),a5
+\{tick}_rpage:  move.b  d0,(a5)                 ; one write, which no tick
+\{tick}_remapped:                               ; splits
+                bra.w   \{tick}_rate
+\{tick}_rreset: btst    #6,d2
+                beq.s   \{tick}_rrun
+                move.b  d3,d0
+                bra.s   \{tick}_rrun
+\{tick}_rid:    bsr.w   ymxr_rmove              ; past the tests above
+                bra.w   \{tick}_rate
+\{tick}_rslow:  bsr.w   ymxr_remap
+                bra.w   \{tick}_rate
+; Outside the pages: the fallback page of the bank the instance does not
+; read, filled where it has another transformation or fill kind, its
+; page 2 times the bank plus the page in the bank.
+\{tick}_rmiss:  move.b  d1,FX_LKEY(a3)          ; the transformation and the
+                move.w  FX_LKEY(a3),d5          ; fill kind
+                .if     YMXR_DEFER
+                moveq   #0,d4
                 move.b  FX_LBANK(a3),d4
                 moveq   #1,d0
                 sub.b   FX_USE(a3,d4.w),d0
@@ -799,28 +853,18 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 add.w   d3,d3                   ; its two bytes
                 cmp.w   FX_PAGE(a3,d3.w),d5
-                bne.s   \{tick}_rfill
+                beq.s   \{tick}_rswitch
+                bsr.w   ymxr_lfill
 \{tick}_rswitch:
                 .if     YMXR_DEFER
                 move.b  d0,FX_USE(a3,d4.w)
                 .else
                 move.b  d0,FX_USE(a3)
                 .endif
-                add.b   FX_LHIGH(a3),d0         ; its page byte
-                movea.l FX_LBYTE(a3),a5
-\{tick}_rpage:  move.b  d0,(a5)                 ; one write, which no tick
-\{tick}_remapped:                               ; splits
-                bra.w   \{tick}_rate
-\{tick}_rreset: btst    #6,d2
-                beq.s   \{tick}_rrun
-                move.b  d3,d0
-                bra.s   \{tick}_rrun
-\{tick}_rfill:  bsr.w   ymxr_lfill
-                bra.s   \{tick}_rswitch
-\{tick}_rid:    bsr.w   ymxr_rmove              ; past the tests above
-                bra.w   \{tick}_rate
-\{tick}_rslow:  bsr.w   ymxr_remap
-                bra.w   \{tick}_rate
+                move.w  d3,d0
+                lsr.w   #1,d0
+                add.b   FX_LFB(a3),d0           ; past the effect's pages
+                bra.s   \{tick}_rhigh
 ; Timer reset with lookup support. Init redirects the reset test here.
 ; Preserve the pre-reset control byte in d3 so remap processing reads
 ; the timer's state before this row: remap precedes retune (SPEC.md
@@ -1862,6 +1906,9 @@ YMXR_init:
                 .endif
                 bhi     .bad
                 move.l  a6,-(sp)
+                .if     YMXR_MAP
+                move.l  a2,-(sp)                ; the page area (5.1)
+                .endif
                 movea.l a1,a6
                 move.l  a0,WS_TUNE(a6)
                 movea.l a0,a2
@@ -2262,6 +2309,12 @@ YMXR_init:
                 .if     YMXR_DEFER
                 sf      WS_ARMING(a6)
                 .endif
+                .if     YMXR_MAP
+                movea.l (sp),a2                 ; the page area
+                bsr     ymxr_prefill
+                tst.l   d0
+                bmi     .bad6
+                .endif
 
 ; The effects the tune runs are read every row; the others are jumped
 ; over by the branch at each macro's head, where the tune does not run
@@ -2418,10 +2471,17 @@ YMXR_init:
                 CLAIM   2,$FFFFFA1B,$F0,$120,$FFFFFA07,0,ymxr_tick2
                 CLAIM   3,$FFFFFA1D,$0F,$114,$FFFFFA09,5,ymxr_tick3
                 move.w  (sp)+,sr
+                .if     YMXR_MAP
+                addq.l  #4,sp
+                .endif
                 movea.l (sp)+,a6
                 moveq   #0,d0
                 rts
-.bad6:          movea.l (sp)+,a6
+.bad6:
+                .if     YMXR_MAP
+                addq.l  #4,sp
+                .endif
+                movea.l (sp)+,a6
 .bad:           moveq   #-1,d0
                 rts
 
@@ -2855,101 +2915,101 @@ ymxr_lhalt2     equ     ymxr_tick2_halt
 ymxr_lhalt3     equ     ymxr_tick3_halt
                 .endif
 ymxr_look:
-                LPAD    KEY_LT,ymxr_pg0
-                TICKWL  ymxr_lt0,2,0,2,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LT,ymxr_ref0
+                TICKWL  ymxr_lt0,2,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lt0_end:
-                LPAD    KEY_LT,ymxr_pg1
-                TICKWL  ymxr_lt1,2,0,2,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LT,ymxr_ref1
+                TICKWL  ymxr_lt1,2,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lt1_end:
-                LPAD    KEY_LT,ymxr_pg2
-                TICKWL  ymxr_lt2,2,0,2,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LT,ymxr_ref2
+                TICKWL  ymxr_lt2,2,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lt2_end:
-                LPAD    KEY_LT,ymxr_pg3
-                TICKWL  ymxr_lt3,2,0,2,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LT,ymxr_ref3
+                TICKWL  ymxr_lt3,2,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lt3_end:
-                LPAD    KEY_LE,ymxr_pg0
-                TICKWL  ymxr_le0,2,1,2,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LE,ymxr_ref0
+                TICKWL  ymxr_le0,2,1,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_le0_end:
-                LPAD    KEY_LE,ymxr_pg1
-                TICKWL  ymxr_le1,2,1,2,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LE,ymxr_ref1
+                TICKWL  ymxr_le1,2,1,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_le1_end:
-                LPAD    KEY_LE,ymxr_pg2
-                TICKWL  ymxr_le2,2,1,2,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LE,ymxr_ref2
+                TICKWL  ymxr_le2,2,1,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_le2_end:
-                LPAD    KEY_LE,ymxr_pg3
-                TICKWL  ymxr_le3,2,1,2,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LE,ymxr_ref3
+                TICKWL  ymxr_le3,2,1,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_le3_end:
-                LPAD    KEY_LF,ymxr_pg0
-                TICKWL  ymxr_lf0,2,1,1,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LF,ymxr_ref0
+                TICKWL  ymxr_lf0,2,1,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lf0_end:
-                LPAD    KEY_LF,ymxr_pg1
-                TICKWL  ymxr_lf1,2,1,1,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LF,ymxr_ref1
+                TICKWL  ymxr_lf1,2,1,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lf1_end:
-                LPAD    KEY_LF,ymxr_pg2
-                TICKWL  ymxr_lf2,2,1,1,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LF,ymxr_ref2
+                TICKWL  ymxr_lf2,2,1,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lf2_end:
-                LPAD    KEY_LF,ymxr_pg3
-                TICKWL  ymxr_lf3,2,1,1,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LF,ymxr_ref3
+                TICKWL  ymxr_lf3,2,1,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lf3_end:
-                LPAD    KEY_LK,ymxr_pg0
-                TICKL   ymxr_lk0,0,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LK,ymxr_ref0
+                TICKL   ymxr_lk0,0,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lk0_end:
-                LPAD    KEY_LK,ymxr_pg1
-                TICKL   ymxr_lk1,0,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LK,ymxr_ref1
+                TICKL   ymxr_lk1,0,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lk1_end:
-                LPAD    KEY_LK,ymxr_pg2
-                TICKL   ymxr_lk2,0,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LK,ymxr_ref2
+                TICKL   ymxr_lk2,0,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lk2_end:
-                LPAD    KEY_LK,ymxr_pg3
-                TICKL   ymxr_lk3,0,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LK,ymxr_ref3
+                TICKL   ymxr_lk3,0,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lk3_end:
-                LPAD    KEY_LB,ymxr_pg0
-                TICKWL  ymxr_lb0,3,0,3,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LB,ymxr_ref0
+                TICKWL  ymxr_lb0,3,0,3,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lb0_end:
-                LPAD    KEY_LB,ymxr_pg1
-                TICKWL  ymxr_lb1,3,0,3,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LB,ymxr_ref1
+                TICKWL  ymxr_lb1,3,0,3,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lb1_end:
-                LPAD    KEY_LB,ymxr_pg2
-                TICKWL  ymxr_lb2,3,0,3,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LB,ymxr_ref2
+                TICKWL  ymxr_lb2,3,0,3,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lb2_end:
-                LPAD    KEY_LB,ymxr_pg3
-                TICKWL  ymxr_lb3,3,0,3,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LB,ymxr_ref3
+                TICKWL  ymxr_lb3,3,0,3,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lb3_end:
-                LPAD    KEY_LN,ymxr_pg0
-                TICKWL  ymxr_ln0,2,0,1,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LN,ymxr_ref0
+                TICKWL  ymxr_ln0,2,0,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_ln0_end:
-                LPAD    KEY_LN,ymxr_pg1
-                TICKWL  ymxr_ln1,2,0,1,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LN,ymxr_ref1
+                TICKWL  ymxr_ln1,2,0,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_ln1_end:
-                LPAD    KEY_LN,ymxr_pg2
-                TICKWL  ymxr_ln2,2,0,1,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LN,ymxr_ref2
+                TICKWL  ymxr_ln2,2,0,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_ln2_end:
-                LPAD    KEY_LN,ymxr_pg3
-                TICKWL  ymxr_ln3,2,0,1,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LN,ymxr_ref3
+                TICKWL  ymxr_ln3,2,0,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_ln3_end:
-                LPAD    KEY_LC,ymxr_pg0
-                TICKL   ymxr_lc0,1,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LC,ymxr_ref0
+                TICKL   ymxr_lc0,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lc0_end:
-                LPAD    KEY_LC,ymxr_pg1
-                TICKL   ymxr_lc1,1,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LC,ymxr_ref1
+                TICKL   ymxr_lc1,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lc1_end:
-                LPAD    KEY_LC,ymxr_pg2
-                TICKL   ymxr_lc2,1,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LC,ymxr_ref2
+                TICKL   ymxr_lc2,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lc2_end:
-                LPAD    KEY_LC,ymxr_pg3
-                TICKL   ymxr_lc3,1,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LC,ymxr_ref3
+                TICKL   ymxr_lc3,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lc3_end:
-                LPAD    KEY_LV,ymxr_pg0
-                TICKWL  ymxr_lv0,3,0,2,ymxr_pg0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LV,ymxr_ref0
+                TICKWL  ymxr_lv0,3,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lv0_end:
-                LPAD    KEY_LV,ymxr_pg1
-                TICKWL  ymxr_lv1,3,0,2,ymxr_pg1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LV,ymxr_ref1
+                TICKWL  ymxr_lv1,3,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lv1_end:
-                LPAD    KEY_LV,ymxr_pg2
-                TICKWL  ymxr_lv2,3,0,2,ymxr_pg2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LV,ymxr_ref2
+                TICKWL  ymxr_lv2,3,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lv2_end:
-                LPAD    KEY_LV,ymxr_pg3
-                TICKWL  ymxr_lv3,3,0,2,ymxr_pg3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LV,ymxr_ref3
+                TICKWL  ymxr_lv3,3,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lv3_end:
                 .if     YMXR_DEFER
                 ds.b    (ymxr_tick0-*)&255
@@ -2992,101 +3052,101 @@ ymxr_bank1:
                 TICKW   ymxr_env2b,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
                 TICKW   ymxr_env3b,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
                 .if     YMXR_MAP
-                LPAD    KEY_LT,ymxr_pg0b
-                TICKWL  ymxr_lt0b,2,0,2,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LT,ymxr_ref0
+                TICKWL  ymxr_lt0b,2,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lt0b_end:
-                LPAD    KEY_LT,ymxr_pg1b
-                TICKWL  ymxr_lt1b,2,0,2,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LT,ymxr_ref1
+                TICKWL  ymxr_lt1b,2,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lt1b_end:
-                LPAD    KEY_LT,ymxr_pg2b
-                TICKWL  ymxr_lt2b,2,0,2,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LT,ymxr_ref2
+                TICKWL  ymxr_lt2b,2,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lt2b_end:
-                LPAD    KEY_LT,ymxr_pg3b
-                TICKWL  ymxr_lt3b,2,0,2,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LT,ymxr_ref3
+                TICKWL  ymxr_lt3b,2,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lt3b_end:
-                LPAD    KEY_LE,ymxr_pg0b
-                TICKWL  ymxr_le0b,2,1,2,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LE,ymxr_ref0
+                TICKWL  ymxr_le0b,2,1,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_le0b_end:
-                LPAD    KEY_LE,ymxr_pg1b
-                TICKWL  ymxr_le1b,2,1,2,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LE,ymxr_ref1
+                TICKWL  ymxr_le1b,2,1,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_le1b_end:
-                LPAD    KEY_LE,ymxr_pg2b
-                TICKWL  ymxr_le2b,2,1,2,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LE,ymxr_ref2
+                TICKWL  ymxr_le2b,2,1,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_le2b_end:
-                LPAD    KEY_LE,ymxr_pg3b
-                TICKWL  ymxr_le3b,2,1,2,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LE,ymxr_ref3
+                TICKWL  ymxr_le3b,2,1,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_le3b_end:
-                LPAD    KEY_LF,ymxr_pg0b
-                TICKWL  ymxr_lf0b,2,1,1,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LF,ymxr_ref0
+                TICKWL  ymxr_lf0b,2,1,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lf0b_end:
-                LPAD    KEY_LF,ymxr_pg1b
-                TICKWL  ymxr_lf1b,2,1,1,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LF,ymxr_ref1
+                TICKWL  ymxr_lf1b,2,1,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lf1b_end:
-                LPAD    KEY_LF,ymxr_pg2b
-                TICKWL  ymxr_lf2b,2,1,1,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LF,ymxr_ref2
+                TICKWL  ymxr_lf2b,2,1,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lf2b_end:
-                LPAD    KEY_LF,ymxr_pg3b
-                TICKWL  ymxr_lf3b,2,1,1,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LF,ymxr_ref3
+                TICKWL  ymxr_lf3b,2,1,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lf3b_end:
-                LPAD    KEY_LK,ymxr_pg0b
-                TICKL   ymxr_lk0b,0,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LK,ymxr_ref0
+                TICKL   ymxr_lk0b,0,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lk0b_end:
-                LPAD    KEY_LK,ymxr_pg1b
-                TICKL   ymxr_lk1b,0,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LK,ymxr_ref1
+                TICKL   ymxr_lk1b,0,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lk1b_end:
-                LPAD    KEY_LK,ymxr_pg2b
-                TICKL   ymxr_lk2b,0,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LK,ymxr_ref2
+                TICKL   ymxr_lk2b,0,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lk2b_end:
-                LPAD    KEY_LK,ymxr_pg3b
-                TICKL   ymxr_lk3b,0,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LK,ymxr_ref3
+                TICKL   ymxr_lk3b,0,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lk3b_end:
-                LPAD    KEY_LB,ymxr_pg0b
-                TICKWL  ymxr_lb0b,3,0,3,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LB,ymxr_ref0
+                TICKWL  ymxr_lb0b,3,0,3,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lb0b_end:
-                LPAD    KEY_LB,ymxr_pg1b
-                TICKWL  ymxr_lb1b,3,0,3,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LB,ymxr_ref1
+                TICKWL  ymxr_lb1b,3,0,3,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lb1b_end:
-                LPAD    KEY_LB,ymxr_pg2b
-                TICKWL  ymxr_lb2b,3,0,3,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LB,ymxr_ref2
+                TICKWL  ymxr_lb2b,3,0,3,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lb2b_end:
-                LPAD    KEY_LB,ymxr_pg3b
-                TICKWL  ymxr_lb3b,3,0,3,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LB,ymxr_ref3
+                TICKWL  ymxr_lb3b,3,0,3,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lb3b_end:
-                LPAD    KEY_LN,ymxr_pg0b
-                TICKWL  ymxr_ln0b,2,0,1,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LN,ymxr_ref0
+                TICKWL  ymxr_ln0b,2,0,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_ln0b_end:
-                LPAD    KEY_LN,ymxr_pg1b
-                TICKWL  ymxr_ln1b,2,0,1,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LN,ymxr_ref1
+                TICKWL  ymxr_ln1b,2,0,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_ln1b_end:
-                LPAD    KEY_LN,ymxr_pg2b
-                TICKWL  ymxr_ln2b,2,0,1,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LN,ymxr_ref2
+                TICKWL  ymxr_ln2b,2,0,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_ln2b_end:
-                LPAD    KEY_LN,ymxr_pg3b
-                TICKWL  ymxr_ln3b,2,0,1,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LN,ymxr_ref3
+                TICKWL  ymxr_ln3b,2,0,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_ln3b_end:
-                LPAD    KEY_LC,ymxr_pg0b
-                TICKL   ymxr_lc0b,1,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LC,ymxr_ref0
+                TICKL   ymxr_lc0b,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lc0b_end:
-                LPAD    KEY_LC,ymxr_pg1b
-                TICKL   ymxr_lc1b,1,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LC,ymxr_ref1
+                TICKL   ymxr_lc1b,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lc1b_end:
-                LPAD    KEY_LC,ymxr_pg2b
-                TICKL   ymxr_lc2b,1,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LC,ymxr_ref2
+                TICKL   ymxr_lc2b,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lc2b_end:
-                LPAD    KEY_LC,ymxr_pg3b
-                TICKL   ymxr_lc3b,1,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LC,ymxr_ref3
+                TICKL   ymxr_lc3b,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lc3b_end:
-                LPAD    KEY_LV,ymxr_pg0b
-                TICKWL  ymxr_lv0b,3,0,2,ymxr_pg0b,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                LPAD    KEY_LV,ymxr_ref0
+                TICKWL  ymxr_lv0b,3,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lv0b_end:
-                LPAD    KEY_LV,ymxr_pg1b
-                TICKWL  ymxr_lv1b,3,0,2,ymxr_pg1b,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                LPAD    KEY_LV,ymxr_ref1
+                TICKWL  ymxr_lv1b,3,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lv1b_end:
-                LPAD    KEY_LV,ymxr_pg2b
-                TICKWL  ymxr_lv2b,3,0,2,ymxr_pg2b,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                LPAD    KEY_LV,ymxr_ref2
+                TICKWL  ymxr_lv2b,3,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lv2b_end:
-                LPAD    KEY_LV,ymxr_pg3b
-                TICKWL  ymxr_lv3b,3,0,2,ymxr_pg3b,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                LPAD    KEY_LV,ymxr_ref3
+                TICKWL  ymxr_lv3b,3,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lv3b_end:
 ymxr_bank1end:
                 .endif
@@ -4176,15 +4236,17 @@ ymxr_park:      dc.b    $80
 ; Start through a transformation (SPEC.md 1.10.2). Inputs: a3 the record,
 ; FX_RUN its table number, d3 the source, d2 the control byte, d4 the
 ; effect; at the frame a5 the effect's instance of the general lookup
-; kind, d5 the page byte of its page 0 and d1 the vector, which the
-; frame's start writes as constants. A source that steps a place runs the
-; lookup instance of its kind in bank 0. The general kind's operands are
-; at that kind's offsets; every other kind's descriptor, address and page
-; byte are read by index from the two tables below and ymxr_htab. Its
-; page is the page in use or the other where one has the transformation
-; in the source's fill kind, and otherwise the other, filled with
-; interrupts on (ymxr_lfill). The record caches the instance (FX_LOK).
-; Squares and one-row sources store mapped entries in handler immediates.
+; kind, d5 the page byte of its first fallback page and d1 the vector,
+; which the frame's start writes as constants. A source that steps a
+; place runs the lookup instance of its kind in bank 0. The general kind's
+; operands are at that kind's offsets; every other kind's descriptor,
+; address and page byte are read by index from the two tables below and
+; ymxr_htab. Its page is the one the table of the source's fill kind
+; has for the transformation (FX_LMAPS); outside it, the fallback page in
+; use or the other where one has it, and otherwise the other, filled
+; with interrupts on (ymxr_lfill). The record caches the
+; instance (FX_LOK). Squares and one-row sources store mapped entries in
+; handler immediates.
 ;
 ; Patch operands and vector at level 7. With place reset clear, read the
 ; running place and reduce it modulo the new source length at that level
@@ -4218,27 +4280,17 @@ ymxr_lstart:    move.w  d3,d0
                 move.l  d3,FX_LBYTE(a3)
                 move.b  d5,FX_LHIGH(a3)
                 move.b  #1,FX_LKEY+1(a3)
+                move.l  FX_LMAPS+4(a3),FX_LMAP(a3)  ; the marked kind's table
                 .if     YMXR_DEFER
                 sf      FX_LBANK(a3)
                 .endif
-.lcached:       move.b  FX_RUN(a3),FX_LKEY(a3)
-                move.w  FX_LKEY(a3),d3          ; the transformation and the
-                moveq   #0,d4                   ; fill kind against the page
-                move.b  FX_USE(a3),d4           ; in use, then the other
-                add.w   d4,d4
-                cmp.w   FX_PAGE(a3,d4.w),d3
-                beq.s   .lfound
-                eori.w  #2,d4
-                cmp.w   FX_PAGE(a3,d4.w),d3
-                beq.s   .lfound
-                move.l  d5,-(sp)
-                move.w  d3,d5
-                move.w  d4,d3
-                bsr     ymxr_lfill
-                move.l  (sp)+,d5
-.lfound:        lsr.w   #1,d4
-                move.b  d4,FX_USE(a3)
-                add.b   d4,d5                   ; the page byte
+.lcached:       moveq   #0,d4
+                move.b  FX_RUN(a3),d4
+                movea.l FX_LMAP(a3),a2
+                move.b  0(a2,d4.w),d4           ; its page in the table, or
+                beq.w   .lfall                  ; 0 for the fallback
+.lpage:         add.b   d4,d5                   ; the page byte
+                move.b  d5,FX_LCUR(a3)
                 .if     YMXR_PCREL              ; the loop cell, 0 where the
                 tst.l   d0                      ; source plays once
                 beq.s   .lonce
@@ -4258,8 +4310,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 move.l  DT_ROWS-DT_PAYLOAD(a4),d4
                 bsr     ymxr_rem
                 lea     YM_SELECT.w,a2
-                move.b  FX_USE(a3),d5           ; the page byte again
-                add.b   FX_LHIGH(a3),d5
+                move.b  FX_LCUR(a3),d5          ; the page byte again
 .lfirst:        move.b  FX_TARGET(a3),LK_SEL(a5)
                 move.l  a4,FX_FIRST(a3)         ; the place at row 0
                 adda.l  d3,a4                   ; the row the place is at
@@ -4279,7 +4330,29 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 move.w  (sp)+,sr
                 clr.b   FX_SHAPE(a3)
                 st      FX_LOK(a3)
+                lea     YM_SELECT.w,a2          ; past the table's read
                 rts
+; Outside the table: the fallback page in use, then the other, filled
+; where neither has the transformation in the marked kind.
+.lfall:         move.b  FX_RUN(a3),FX_LKEY(a3)
+                move.w  FX_LKEY(a3),d3
+                moveq   #0,d4
+                move.b  FX_USE(a3),d4
+                add.w   d4,d4
+                cmp.w   FX_PAGE(a3,d4.w),d3
+                beq.s   .lfound
+                eori.w  #2,d4
+                cmp.w   FX_PAGE(a3,d4.w),d3
+                beq.s   .lfound
+                move.l  d5,-(sp)
+                move.w  d3,d5
+                move.w  d4,d3
+                bsr     ymxr_lfill
+                move.l  (sp)+,d5
+.lfound:        lsr.w   #1,d4
+                move.b  d4,FX_USE(a3)
+                add.b   FX_LFB(a3),d4           ; past the effect's pages
+                bra.w   .lpage
                 .if     YMXR_DEFER
 .armlk:         move.l  d3,d0                   ; an arming of the general kind
                 moveq   #0,d5
@@ -4317,8 +4390,8 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 beq.s   .kind                   ; column, the volume
                 moveq   #5,d5
 ; d5 the kind, d0 the loop cell, a4 the first row, and the stride in the
-; high word of d1. The descriptor, the instance and the page byte of its
-; bank's page 0 into the record's cache.
+; high word of d1. The descriptor, the instance and the page byte of the
+; effect's first fallback page for the instance into the record's cache.
 .kind:          moveq   #0,d3
                 move.b  .kd(pc,d5.w),d3
                 lea     ymxr_kinds(pc),a2
@@ -4354,47 +4427,30 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 cmp.b   #7,FX_TARGET(a3)
                 bne.s   .fill
                 moveq   #2,d4
-.fill:          move.b  FX_RUN(a3),FX_LKEY(a3)
+.fill:          move.b  d4,FX_LKEY+1(a3)        ; the fill kind, cached
+                move.l  a1,d3                   ; a1 kept
+                add.w   d4,d4
+                add.w   d4,d4
+                movea.l FX_LMAPS(a3,d4.w),a1    ; its table, cached
+                move.l  a1,FX_LMAP(a3)
+                moveq   #0,d5
+                move.b  FX_RUN(a3),d5
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; an arming's captured mapping
                 beq.s   .run
-                move.b  FX_MAP(a3),FX_LKEY(a3)
+                move.b  FX_MAP(a3),d5
 .run:
                 .endif
-                move.b  d4,FX_LKEY+1(a3)
-                move.w  FX_LKEY(a3),d5
-                .if     YMXR_DEFER
-                moveq   #0,d4
-                move.b  FX_LBANK(a3),d4
-                moveq   #0,d3
-                move.b  FX_USE(a3,d4.w),d3
-                add.w   d4,d4
-                add.w   d4,d3
-                .else
-                moveq   #0,d3
-                move.b  FX_USE(a3),d3
-                .endif
-                add.w   d3,d3                   ; four bytes a bank, two a page
-                cmp.w   FX_PAGE(a3,d3.w),d5
-                beq.s   .found
-                eori.w  #2,d3
-                cmp.w   FX_PAGE(a3,d3.w),d5
-                beq.s   .found
-                bsr     ymxr_lfill
-.found:         moveq   #2,d4
-                and.w   d3,d4
-                lsr.w   #1,d4                   ; the page
+                move.b  0(a1,d5.w),d4           ; the page, or 0 for the
+                movea.l d3,a1                   ; fallback
+                beq.w   .kfall
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; at 1 the page alone
                 bgt.w   .started
-                moveq   #0,d3
-                move.b  FX_LBANK(a3),d3
-                move.b  d4,FX_USE(a3,d3.w)
-                .else
-                move.b  d4,FX_USE(a3)
                 .endif
-                move.b  FX_LHIGH(a3),d5
+.kpage:         move.b  FX_LHIGH(a3),d5
                 add.b   d4,d5                   ; the page byte
+                move.b  d5,FX_LCUR(a3)
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; an arming writes the mirror
                 beq.s   .rec
@@ -4445,8 +4501,7 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 move.l  DT_ROWS-DT_PAYLOAD(a4),d4
                 bsr     ymxr_rem
                 movea.l (sp)+,a2
-                move.b  FX_USE(a3),d5           ; the page byte again
-                add.b   FX_LHIGH(a3),d5
+                move.b  FX_LCUR(a3),d5          ; the page byte again
 .first:         move.w  KD_PAGE(a2),d4
                 move.b  d5,(a5,d4.w)            ; the page byte
                 move.w  KD_COLS(a2),d4
@@ -4562,6 +4617,44 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 movem.l (sp)+,d2/d6-d7/a1/a6
 .started:       lea     YM_SELECT.w,a2
                 rts
+; Outside the table: the fallback page of the bank in use, then the
+; other, filled where neither has the transformation in the fill kind.
+.kfall:         move.b  d5,FX_LKEY(a3)
+                move.w  FX_LKEY(a3),d5
+                .if     YMXR_DEFER
+                moveq   #0,d4
+                move.b  FX_LBANK(a3),d4
+                moveq   #0,d3
+                move.b  FX_USE(a3,d4.w),d3
+                add.w   d4,d4
+                add.w   d4,d3
+                .else
+                moveq   #0,d3
+                move.b  FX_USE(a3),d3
+                .endif
+                add.w   d3,d3                   ; four bytes a bank, two a page
+                cmp.w   FX_PAGE(a3,d3.w),d5
+                beq.s   .found
+                eori.w  #2,d3
+                cmp.w   FX_PAGE(a3,d3.w),d5
+                beq.s   .found
+                bsr     ymxr_lfill
+.found:         moveq   #2,d4
+                and.w   d3,d4
+                lsr.w   #1,d4                   ; the page in the bank
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)           ; at 1 the page alone
+                bgt.w   .started
+                moveq   #0,d5
+                move.b  FX_LBANK(a3),d5
+                move.b  d4,FX_USE(a3,d5.w)
+                .else
+                move.b  d4,FX_USE(a3)
+                .endif
+                move.w  d3,d4
+                lsr.w   #1,d4                   ; 2 a bank, and the page,
+                add.b   FX_LFB(a3),d4           ; past the effect's pages
+                bra.w   .kpage
 ; A square: the entries of its two keys, the second the marker's.
 .square:        movem.l d2/d6-d7/a1/a6,-(sp)
                 move.w  d4,d6                   ; the effect
@@ -4641,7 +4734,7 @@ ymxr_sels:      dc.b    $07,$07,$07,$70
 ;
 ; The frame switches the page itself where the cache is in force (the
 ; remap of EFFECT). Here squares and one-row sources replace immediate
-; entries, and stepping sources switch the running bank's page
+; entries, and stepping sources switch the running instance's page
 ; (ymxr_page) or move between identity and lookup handlers (ymxr_move);
 ; the record caches a lookup instance. Clobbers d0, d1, d3 to d5 and a3
 ; to a5; returns a2 at the chip select register.
@@ -4745,8 +4838,12 @@ ymxr_rmove      equ     *
                 bne     .pfill
                 .endif
                 bsr     ymxr_page               ; d0 the page
-.held:          move.b  d0,FX_USE(a3,d4.w)
-                move.b  d5,FX_LKEY+1(a3)        ; the cache: the fill kind and
+.held:          moveq   #0,d1                   ; the cache: the fill kind's
+                move.b  d5,d1                   ; table,
+                add.w   d1,d1
+                add.w   d1,d1
+                move.l  FX_LMAPS(a3,d1.w),FX_LMAP(a3)
+                move.b  d5,FX_LKEY+1(a3)        ; the fill kind and
                 .if     YMXR_DEFER              ; the bank, in force with no
                 move.b  d4,FX_LBANK(a3)         ; start pending
                 tst.b   FX_PENDING(a3)
@@ -4761,7 +4858,7 @@ ymxr_rmove      equ     *
                 add.w   d5,d1
                 add.w   d2,d1
                 lea     ymxr_htab(pc),a4
-                move.b  (a4,d1.w),FX_LHIGH(a3)  ; page 0's, cached
+                move.b  (a4,d1.w),FX_LHIGH(a3)  ; the first fallback page's
                 add.b   FX_LHIGH(a3),d0
                 move.w  KD_PAGE(a2),d1
                 tst.b   d7
@@ -4968,16 +5065,19 @@ ymxr_rehook:    tst.b   FX_PENDING(a3)
 .none:          rts
                 .endif
 
-; Fill a page of the lookup instance the record a3 caches with interrupts
-; enabled: d3 the offset of the page's two bytes past FX_PAGE, four a bank
-; and two a page, and d5 the two bytes, the transformation and the fill
-; kind, which the record then lists for the page. The page is the
+; Fill a fallback page of the lookup instance the record a3 caches with
+; interrupts enabled: d3 the offset of the page's two bytes past FX_PAGE,
+; four a bank and two a page, and d5 the two bytes, the transformation and
+; the fill kind, which the record then lists for the page. The page is the
 ; instance's page byte, at FX_LBYTE, plus its high byte times 256: FX_LHIGH,
-; and 1 more for page 1. Preserves every register.
+; and 2 more a bank and 1 more for the bank's page 1. Preserves every
+; register.
 ymxr_lfill:     movem.l d0-d1/d3/a2/a4,-(sp)
+                tst.b   FX_LFB(a3)              ; an effect without one: no
+                beq.s   .none                   ; page written
                 move.w  d5,FX_PAGE(a3,d3.w)
-                lsr.w   #1,d3
-                and.b   #1,d3                   ; the page
+                lsr.w   #1,d3                   ; the page
+                add.b   FX_LFB(a3),d3
                 add.b   FX_LHIGH(a3),d3
                 lsl.w   #8,d3
                 movea.l FX_LBYTE(a3),a4         ; the page read's displacement
@@ -4986,18 +5086,23 @@ ymxr_lfill:     movem.l d0-d1/d3/a2/a4,-(sp)
                 lsr.w   #8,d0                   ; the transformation
                 bsr     ymxr_tab
                 bsr     ymxr_fill
-                movem.l (sp)+,d0-d1/d3/a2/a4
+.none:          movem.l (sp)+,d0-d1/d3/a2/a4
                 rts
 
-; Select the cached page for FX_RUN, effect d6, bank d4 and fill kind
-; d5; a3 is the record. Prefer the selected page if it matches,
-; otherwise use or fill the other page. Fill only an unused page, with
-; interrupts enabled. Return d0=page 0 or 1; preserve other registers.
+; The page for FX_RUN, effect d6, bank d4 and fill kind d5; a3 is the
+; record. The page the table of the fill kind has for the transformation
+; (FX_LMAPS); where it has 0, the bank's fallback page in use where it
+; matches, and else the other, which the bank then uses, filled where it
+; has another transformation or fill kind. Fill only an unused page, with
+; interrupts enabled. Return d0 the page in 256 bytes from the effect's
+; first fallback page, a fallback page 2 times the bank plus the page in
+; the bank; preserve other registers.
 ;
 ; While arming, use the row's captured mapping. FX_USE identifies any
 ; page read by an existing pending start, so filling preserves that
 ; page.
 ymxr_page:      movem.l d1/a4,-(sp)
+                moveq   #0,d1
                 move.b  FX_RUN(a3),d1
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)
@@ -5005,7 +5110,16 @@ ymxr_page:      movem.l d1/a4,-(sp)
                 move.b  FX_MAP(a3),d1
 .run:
                 .endif
-                move.w  d4,d0
+                moveq   #0,d0                   ; the table of the fill kind
+                move.b  d5,d0
+                add.w   d0,d0
+                add.w   d0,d0
+                movea.l FX_LMAPS(a3,d0.w),a4
+                move.b  0(a4,d1.w),d0           ; the page, or 0 outside it
+                beq.s   .fall
+                movem.l (sp)+,d1/a4
+                rts
+.fall:          move.w  d4,d0
                 add.w   d0,d0
                 add.w   d0,d0
                 lea     FX_PAGE(a3,d0.w),a4     ; the bank's two pages
@@ -5021,15 +5135,21 @@ ymxr_page:      movem.l d1/a4,-(sp)
                 bne.s   .fill
                 cmp.b   1(a4,d0.w),d5
                 beq.s   .found
-.fill:          move.b  d1,(a4,d0.w)
+.fill:          tst.b   FX_LFB(a3)              ; an effect without one: no
+                beq.s   .found                  ; page written
+                move.b  d1,(a4,d0.w)
                 move.b  d5,1(a4,d0.w)
                 movem.l d2/a2,-(sp)
                 move.w  d6,d2                   ; the page: the effect's
-                add.w   d2,d2                   ; pages, 512 bytes a bank,
-                lea     ymxr_pgat(pc),a4        ; 256 a page
-                move.w  (a4,d2.w),d2
-                lea     ymxr_pg0(pc),a4
+                add.w   d2,d2                   ; fallback pages past its
+                lea     ymxr_refat(pc),a4       ; reference, 512 bytes a bank,
+                move.w  (a4,d2.w),d2            ; 256 a page
+                lea     ymxr_ref(pc),a4
                 adda.w  d2,a4
+                moveq   #0,d2
+                move.b  FX_LFB(a3),d2
+                lsl.l   #8,d2
+                adda.l  d2,a4
                 move.w  d4,d2
                 lsl.w   #8,d2
                 add.w   d2,d2
@@ -5045,6 +5165,10 @@ ymxr_page:      movem.l d1/a4,-(sp)
                 move.w  (sp)+,d0
                 movem.l (sp)+,d2/a2
 .found:         lsr.w   #1,d0
+                move.b  d0,FX_USE(a3,d4.w)      ; the bank's page in use
+                add.b   d4,d0
+                add.b   d4,d0
+                add.b   FX_LFB(a3),d0           ; past the effect's pages
                 movem.l (sp)+,d1/a4
                 rts
 
@@ -5145,6 +5269,280 @@ ymxr_runrow:    moveq   #0,d3
                 moveq   #1,d3
 .row:           rts
 
+; The pages of the bound tune's list (BINARIES.md 1.1, 5.6), each filled
+; in its form into the page area at a2, which the host provides (3.1,
+; 5.1), and each effect's tables into its record. The area begins with a
+; table of T bytes, T the transformations, for each effect and form the
+; list names, effect 0's first and each effect's in the order of the
+; forms: byte n - 1 the page of transformation n, in 256 bytes from the
+; effect's reference, and 0 for one outside the pages filled. FX_LMAPS
+; has the address 1 below each table. The pages follow the tables: each
+; effect's one after another, then its fallback where a page of it is
+; left out, at the least offset past the tables that is its offset
+; modulo 256 plus 256 bytes for each page of every effect whose offset
+; past the tables modulo 256 is lower. The pages filled are the first k
+; of the list, the most of them that fit within the reach of the first
+; handler with the fallbacks of the effects of the rest. d0 0, or -1 for
+; a version 10 tune without a list, an entry out of range, an area of a
+; list of pages that is odd, before the player's end or past the reach,
+; where the area is left as it was. a6 the workspace.
+ymxr_prefill:   movem.l d1-d7/a0-a6,-(sp)
+                movea.l a6,a0                   ; the workspace, as ymxr_tab
+                lea     WS_FX(a0),a3            ; reads it
+                lea     ymxr_nomap-1(pc),a1
+                moveq   #3,d0
+.none:          clr.l   FX_LMAP(a3)             ; init's counts
+                move.l  a1,FX_LMAPS(a3)
+                move.l  a1,FX_LMAPS+4(a3)
+                move.l  a1,FX_LMAPS+8(a3)
+                clr.b   FX_LFB(a3)
+                lea     FX_SIZE(a3),a3
+                dbra    d0,.none
+                move.l  WS_TRANS(a0),d0
+                beq     .ok                     ; versions 7 to 9
+                movea.l d0,a1                   ; the block: T, then the list
+                moveq   #0,d7                   ; past the index and past each
+                move.w  (a1),d7                 ; transformation
+                beq     .bad
+                move.l  d7,d1
+                lsl.l   #2,d1
+                addq.l  #2,d1
+                move.w  d7,d2
+                subq.w  #1,d2
+                lea     2(a1),a4
+.ends:          move.l  (a4)+,d3
+                moveq   #0,d4
+                move.w  0(a1,d3.l),d4
+                add.l   d3,d4
+                addq.l  #2,d4
+                cmp.l   d4,d1
+                bcc.s   .later
+                move.l  d4,d1
+.later:         dbra    d2,.ends
+                lea     0(a1,d1.l),a5
+                cmp.b   #'Y',(a5)+              ; the list's tag
+                bne     .bad
+                cmp.b   #'P',(a5)+
+                bne     .bad
+                moveq   #0,d6
+                move.b  (a5)+,d6                ; N, then its entries
+                beq     .ok
+                move.l  a2,d0                   ; the area, even and at or
+                btst    #0,d0                   ; past the player's end
+                bne     .bad
+                lea     ymxr_end(pc),a4
+                cmpa.l  a4,a2
+                bcs     .bad
+; Each entry: the pages of its effect, the effect's last entry plus 1 and
+; its forms, and Q, the pairs of an effect and a form.
+                lea     WS_FX(a0),a3
+                movea.l a5,a4
+                moveq   #0,d2
+                moveq   #0,d4
+.count:         bsr     .entry
+                beq     .bad
+                mulu    #FX_SIZE,d0
+                addq.b  #1,FX_LN(a3,d0.w)
+                move.b  d2,FX_LLAST(a3,d0.w)
+                addq.b  #1,FX_LLAST(a3,d0.w)
+                moveq   #0,d1
+                move.b  1(a4),d1
+                bset    d1,FX_LFORMS(a3,d0.w)
+                bne.s   .known
+                addq.w  #1,d4
+.known:         addq.l  #3,a4
+                addq.w  #1,d2
+                cmp.w   d6,d2
+                bcs.s   .count
+; The pages that fit: QT + 255 + 256 X within 32,767 bytes of the first
+; handler, X the pages filled and the fallback pages; k the pages filled,
+; N where every page fits, and otherwise the most below N.
+                lea     ymxr_tick0(pc),a4
+                move.l  a4,d0
+                add.l   #32767,d0
+                sub.l   a2,d0
+                move.w  d4,d1
+                mulu    d7,d1
+                sub.l   d1,d0
+                sub.l   #255,d0
+                bmi     .bad
+                asr.l   #8,d0
+                move.l  d0,d3                   ; X at most
+                move.l  d6,d5                   ; k
+                cmp.l   d3,d5
+                bls.s   .fits
+.fewer:         subq.w  #1,d5
+                bmi     .bad
+                moveq   #0,d0                   ; the effects of an entry at
+                cmp.b   WS_FX+FX_LLAST(a0),d5   ; or past k
+                bcc.s   .in0
+                addq.w  #1,d0
+.in0:           cmp.b   WS_FX+FX_SIZE+FX_LLAST(a0),d5
+                bcc.s   .in1
+                addq.w  #1,d0
+.in1:           cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_LLAST(a0),d5
+                bcc.s   .in2
+                addq.w  #1,d0
+.in2:           cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_SIZE+FX_LLAST(a0),d5
+                bcc.s   .in3
+                addq.w  #1,d0
+.in3:           mulu    #FB_PAGES,d0
+                add.l   d5,d0
+                cmp.l   d3,d0
+                bhi.s   .fewer
+; Each effect's pages in the area: its pages of the first k entries, and
+; its fallback where an entry past them is its, marked in FX_LFB.
+.fits:          moveq   #3,d0
+.zero:          clr.b   FX_LN(a3)
+                lea     FX_SIZE(a3),a3
+                dbra    d0,.zero
+                lea     WS_FX(a0),a3
+                movea.l a5,a4
+                move.w  d5,d2
+                bra.s   .tally
+.placed:        moveq   #0,d0
+                move.b  (a4),d0
+                mulu    #FX_SIZE,d0
+                addq.b  #1,FX_LN(a3,d0.w)
+                addq.l  #3,a4
+.tally:         dbra    d2,.placed
+                moveq   #3,d0
+.drops:         cmp.b   FX_LLAST(a3),d5
+                bcc.s   .whole
+                addq.b  #FB_PAGES,FX_LN(a3)
+                st      FX_LFB(a3)
+.whole:         lea     FX_SIZE(a3),a3
+                dbra    d0,.drops
+; The tables, each 0 to its end, and their pointers.
+                movea.l a2,a1
+                lea     WS_FX(a0),a3
+                moveq   #3,d0
+.tables:        moveq   #0,d1                   ; the form
+.form:          btst    d1,FX_LFORMS(a3)
+                beq.s   .untabled
+                move.w  d1,d2
+                add.w   d2,d2
+                add.w   d2,d2
+                lea     -1(a1),a4
+                move.l  a4,FX_LMAPS(a3,d2.w)
+                move.w  d7,d2
+                subq.w  #1,d2
+.clear:         clr.b   (a1)+
+                dbra    d2,.clear
+.untabled:      addq.w  #1,d1
+                cmp.w   #3,d1
+                bcs.s   .form
+                lea     FX_SIZE(a3),a3
+                dbra    d0,.tables
+                move.w  d5,d7                   ; k, past the tables
+; Each effect's offset past the tables modulo 256, in FX_LRES.
+                move.l  a1,d4                   ; the first byte past them
+                lea     ymxr_ref(pc),a4
+                lea     ymxr_refat(pc),a1
+                lea     WS_FX(a0),a3
+                moveq   #3,d0
+.residue:       move.l  a4,d1
+                add.w   (a1)+,d1
+                sub.b   d4,d1
+                move.b  d1,FX_LRES(a3)
+                lea     FX_SIZE(a3),a3
+                dbra    d0,.residue
+; Each effect's pages, their places in its tables, and its fallback.
+                lea     WS_FX(a0),a3
+                moveq   #0,d3                   ; the effect
+.effect:        tst.b   FX_LN(a3)
+                beq     .next
+                moveq   #0,d0
+                move.b  FX_LRES(a3),d0          ; its offset, and the pages of
+                moveq   #0,d1                   ; the effects at lower ones
+                cmp.b   WS_FX+FX_LRES(a0),d0
+                bls.s   .low0
+                add.b   WS_FX+FX_LN(a0),d1
+.low0:          cmp.b   WS_FX+FX_SIZE+FX_LRES(a0),d0
+                bls.s   .low1
+                add.b   WS_FX+FX_SIZE+FX_LN(a0),d1
+.low1:          cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_LRES(a0),d0
+                bls.s   .low2
+                add.b   WS_FX+FX_SIZE+FX_SIZE+FX_LN(a0),d1
+.low2:          cmp.b   WS_FX+FX_SIZE+FX_SIZE+FX_SIZE+FX_LRES(a0),d0
+                bls.s   .low3
+                add.b   WS_FX+FX_SIZE+FX_SIZE+FX_SIZE+FX_LN(a0),d1
+.low3:          lsl.l   #8,d1
+                add.l   d4,d1
+                add.l   d0,d1
+                movea.l d1,a6                   ; its first page
+                move.w  d3,d0
+                add.w   d0,d0
+                lea     ymxr_refat(pc),a2
+                move.w  0(a2,d0.w),d0
+                lea     ymxr_ref(pc),a2
+                adda.w  d0,a2                   ; its reference
+                sub.l   a2,d1
+                asr.l   #8,d1
+                move.b  d1,d5                   ; the first page past it
+                movea.l a5,a4
+                move.w  d7,d2
+                bra.s   .scanned
+.scan:          moveq   #0,d0
+                move.b  (a4),d0
+                cmp.w   d3,d0
+                bne.s   .pass
+                moveq   #0,d1
+                move.b  2(a4),d1                ; its transformation, in the
+                moveq   #0,d0                   ; table of its form
+                move.b  1(a4),d0
+                add.w   d0,d0
+                add.w   d0,d0
+                movea.l FX_LMAPS(a3,d0.w),a1
+                move.b  d5,0(a1,d1.w)           ; the page
+                movem.l d2/d5/a4,-(sp)
+                moveq   #0,d5
+                move.b  1(a4),d5                ; the fill kind
+                move.w  d1,d0
+                bsr     ymxr_tab
+                movea.l a6,a4
+                bsr     ymxr_fill
+ymxr_filled     equ     *                       ; past a page's copy: the rig's
+                movem.l (sp)+,d2/d5/a4          ; boundary
+                lea     256(a6),a6
+                addq.b  #1,d5
+.pass:          addq.l  #3,a4
+.scanned:       dbra    d2,.scan
+                tst.b   FX_LFB(a3)
+                beq.s   .next
+                move.b  d5,FX_LFB(a3)           ; its fallback, past its pages
+.next:          lea     FX_SIZE(a3),a3
+                addq.w  #1,d3
+                cmp.w   #4,d3
+                bcs     .effect
+.ok:            lea     WS_FX(a0),a3
+                lea     ymxr_nomap-1(pc),a1
+                moveq   #3,d0
+.cached:        move.l  a1,FX_LMAP(a3)
+                lea     FX_SIZE(a3),a3
+                dbra    d0,.cached
+                moveq   #0,d0
+                movem.l (sp)+,d1-d7/a0-a6
+                rts
+.bad:           moveq   #-1,d0
+                movem.l (sp)+,d1-d7/a0-a6
+                rts
+; The list's entry at a4: d0 its effect, d1 its transformation, and Z with
+; d1 0 where the effect, the form or the transformation is out of range.
+.entry:         moveq   #0,d0
+                moveq   #0,d1
+                move.b  (a4),d0
+                cmp.b   #3,d0
+                bhi.s   .out
+                cmp.b   #2,1(a4)
+                bhi.s   .out
+                move.b  2(a4),d1
+                cmp.w   d7,d1
+                bls.s   .in
+.out:           moveq   #0,d1
+.in:            tst.w   d1
+                rts
+
 ; Resolve the running shape's lookup kind into d0 and identity kind into
 ; d1. a3=record, a5=running handler. Lookup selects the target's last
 ; value, which write order places first for noise, last for
@@ -5220,8 +5618,11 @@ ymxr_hooks:     dc.w    LK_LAST,LK_HOOKW,LC_LAST,LC_HOOKW,LT_LAST,LT_HOOKW
                 dc.w    TWC_LAST,TWC_HOOKW
                 .endif
 
-; Each effect's pages, from effect 0's.
-ymxr_pgat:      dc.w    0,ymxr_pg1-ymxr_pg0,ymxr_pg2-ymxr_pg0,ymxr_pg3-ymxr_pg0
+; Each effect's fallback pages, from the fallback's first byte.
+ymxr_refat:      dc.w    0,ymxr_ref1-ymxr_ref,ymxr_ref2-ymxr_ref,ymxr_ref3-ymxr_ref
+; The table of a fill kind without pages: 0 for every transformation,
+; each page to the fallback (ymxr_prefill).
+ymxr_nomap:     dcb.b   128,0
                 .endif
 
                 .if     YMXR_MAP
@@ -5234,41 +5635,35 @@ ymxr_pgat:      dc.w    0,ymxr_pg1-ymxr_pg0,ymxr_pg2-ymxr_pg0,ymxr_pg3-ymxr_pg0
                 LHALT   ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5
                 .endif
 
-; Two 256-byte pages per effect per bank. Bank 1 is 512 bytes past bank
-; 0. Effect e's page residue is effect 0's plus e * LOOK_STRIDE modulo
-; 256, matching its lookup reads.
-ymxr_pages:
-ymxr_pg0:       ds.b    512
-                .if     YMXR_DEFER
-ymxr_pg0b:      ds.b    512
+; Each effect's reference: e * LOOK_STRIDE modulo 256 past ymxr_ref, the
+; offset modulo 256 its lookup reads match, and the page a page byte of
+; ymxr_htab selects. The pages are in the page area after the player
+; (ymxr_prefill), each a multiple of 256 bytes from its effect's
+; reference.
+FB_AT1          equ     (1*LOOK_STRIDE)&255
+FB_AT2          equ     (2*LOOK_STRIDE)&255
+FB_AT3          equ     (3*LOOK_STRIDE)&255
+FB_PAGES        equ     2*(1+YMXR_DEFER)    ; an effect's fallback pages
+                .if     (LOOK_STRIDE&127)=0
+                .error  "two effects read their pages on one residue"
                 .endif
-; Page-0 high displacement bytes, ordered by bank, effect, then kind as
-; in ymxr_kinds. Add 1 for page 1.
+ymxr_ref:
+ymxr_ref0       equ     ymxr_ref
+ymxr_ref1       equ     ymxr_ref+FB_AT1
+ymxr_ref2       equ     ymxr_ref+FB_AT2
+ymxr_ref3       equ     ymxr_ref+FB_AT3
+; The page byte of each instance's reference, ordered by bank, effect,
+; then kind as in ymxr_kinds; a page 256 bytes past it is 1 more.
 ymxr_htab:
-                dc.b    (ymxr_pg0-(ymxr_lk0_key+2))/256,(ymxr_pg0-(ymxr_lc0_key+2))/256,(ymxr_pg0-(ymxr_lt0_key+2))/256,(ymxr_pg0-(ymxr_ln0_key+2))/256,(ymxr_pg0-(ymxr_lb0_key+2))/256,(ymxr_pg0-(ymxr_lv0_key+2))/256,(ymxr_pg0-(ymxr_le0_key+2))/256,(ymxr_pg0-(ymxr_lf0_key+2))/256
-                dc.b    (ymxr_pg1-(ymxr_lk1_key+2))/256,(ymxr_pg1-(ymxr_lc1_key+2))/256,(ymxr_pg1-(ymxr_lt1_key+2))/256,(ymxr_pg1-(ymxr_ln1_key+2))/256,(ymxr_pg1-(ymxr_lb1_key+2))/256,(ymxr_pg1-(ymxr_lv1_key+2))/256,(ymxr_pg1-(ymxr_le1_key+2))/256,(ymxr_pg1-(ymxr_lf1_key+2))/256
-                dc.b    (ymxr_pg2-(ymxr_lk2_key+2))/256,(ymxr_pg2-(ymxr_lc2_key+2))/256,(ymxr_pg2-(ymxr_lt2_key+2))/256,(ymxr_pg2-(ymxr_ln2_key+2))/256,(ymxr_pg2-(ymxr_lb2_key+2))/256,(ymxr_pg2-(ymxr_lv2_key+2))/256,(ymxr_pg2-(ymxr_le2_key+2))/256,(ymxr_pg2-(ymxr_lf2_key+2))/256
-                dc.b    (ymxr_pg3-(ymxr_lk3_key+2))/256,(ymxr_pg3-(ymxr_lc3_key+2))/256,(ymxr_pg3-(ymxr_lt3_key+2))/256,(ymxr_pg3-(ymxr_ln3_key+2))/256,(ymxr_pg3-(ymxr_lb3_key+2))/256,(ymxr_pg3-(ymxr_lv3_key+2))/256,(ymxr_pg3-(ymxr_le3_key+2))/256,(ymxr_pg3-(ymxr_lf3_key+2))/256
+                dc.b    (ymxr_ref0-(ymxr_lk0_key+2))/256,(ymxr_ref0-(ymxr_lc0_key+2))/256,(ymxr_ref0-(ymxr_lt0_key+2))/256,(ymxr_ref0-(ymxr_ln0_key+2))/256,(ymxr_ref0-(ymxr_lb0_key+2))/256,(ymxr_ref0-(ymxr_lv0_key+2))/256,(ymxr_ref0-(ymxr_le0_key+2))/256,(ymxr_ref0-(ymxr_lf0_key+2))/256
+                dc.b    (ymxr_ref1-(ymxr_lk1_key+2))/256,(ymxr_ref1-(ymxr_lc1_key+2))/256,(ymxr_ref1-(ymxr_lt1_key+2))/256,(ymxr_ref1-(ymxr_ln1_key+2))/256,(ymxr_ref1-(ymxr_lb1_key+2))/256,(ymxr_ref1-(ymxr_lv1_key+2))/256,(ymxr_ref1-(ymxr_le1_key+2))/256,(ymxr_ref1-(ymxr_lf1_key+2))/256
+                dc.b    (ymxr_ref2-(ymxr_lk2_key+2))/256,(ymxr_ref2-(ymxr_lc2_key+2))/256,(ymxr_ref2-(ymxr_lt2_key+2))/256,(ymxr_ref2-(ymxr_ln2_key+2))/256,(ymxr_ref2-(ymxr_lb2_key+2))/256,(ymxr_ref2-(ymxr_lv2_key+2))/256,(ymxr_ref2-(ymxr_le2_key+2))/256,(ymxr_ref2-(ymxr_lf2_key+2))/256
+                dc.b    (ymxr_ref3-(ymxr_lk3_key+2))/256,(ymxr_ref3-(ymxr_lc3_key+2))/256,(ymxr_ref3-(ymxr_lt3_key+2))/256,(ymxr_ref3-(ymxr_ln3_key+2))/256,(ymxr_ref3-(ymxr_lb3_key+2))/256,(ymxr_ref3-(ymxr_lv3_key+2))/256,(ymxr_ref3-(ymxr_le3_key+2))/256,(ymxr_ref3-(ymxr_lf3_key+2))/256
                 .if     YMXR_DEFER
-                dc.b    (ymxr_pg0b-(ymxr_lk0b_key+2))/256,(ymxr_pg0b-(ymxr_lc0b_key+2))/256,(ymxr_pg0b-(ymxr_lt0b_key+2))/256,(ymxr_pg0b-(ymxr_ln0b_key+2))/256,(ymxr_pg0b-(ymxr_lb0b_key+2))/256,(ymxr_pg0b-(ymxr_lv0b_key+2))/256,(ymxr_pg0b-(ymxr_le0b_key+2))/256,(ymxr_pg0b-(ymxr_lf0b_key+2))/256
-                dc.b    (ymxr_pg1b-(ymxr_lk1b_key+2))/256,(ymxr_pg1b-(ymxr_lc1b_key+2))/256,(ymxr_pg1b-(ymxr_lt1b_key+2))/256,(ymxr_pg1b-(ymxr_ln1b_key+2))/256,(ymxr_pg1b-(ymxr_lb1b_key+2))/256,(ymxr_pg1b-(ymxr_lv1b_key+2))/256,(ymxr_pg1b-(ymxr_le1b_key+2))/256,(ymxr_pg1b-(ymxr_lf1b_key+2))/256
-                dc.b    (ymxr_pg2b-(ymxr_lk2b_key+2))/256,(ymxr_pg2b-(ymxr_lc2b_key+2))/256,(ymxr_pg2b-(ymxr_lt2b_key+2))/256,(ymxr_pg2b-(ymxr_ln2b_key+2))/256,(ymxr_pg2b-(ymxr_lb2b_key+2))/256,(ymxr_pg2b-(ymxr_lv2b_key+2))/256,(ymxr_pg2b-(ymxr_le2b_key+2))/256,(ymxr_pg2b-(ymxr_lf2b_key+2))/256
-                dc.b    (ymxr_pg3b-(ymxr_lk3b_key+2))/256,(ymxr_pg3b-(ymxr_lc3b_key+2))/256,(ymxr_pg3b-(ymxr_lt3b_key+2))/256,(ymxr_pg3b-(ymxr_ln3b_key+2))/256,(ymxr_pg3b-(ymxr_lb3b_key+2))/256,(ymxr_pg3b-(ymxr_lv3b_key+2))/256,(ymxr_pg3b-(ymxr_le3b_key+2))/256,(ymxr_pg3b-(ymxr_lf3b_key+2))/256
-                .endif
-                ds.b    ((ymxr_pg0+(LOOK_STRIDE*1))-*)&255
-ymxr_pg1:       ds.b    512
-                .if     YMXR_DEFER
-ymxr_pg1b:      ds.b    512
-                .endif
-                ds.b    ((ymxr_pg0+(LOOK_STRIDE*2))-*)&255
-ymxr_pg2:       ds.b    512
-                .if     YMXR_DEFER
-ymxr_pg2b:      ds.b    512
-                .endif
-                ds.b    ((ymxr_pg0+(LOOK_STRIDE*3))-*)&255
-ymxr_pg3:       ds.b    512
-                .if     YMXR_DEFER
-ymxr_pg3b:      ds.b    512
+                dc.b    (ymxr_ref0-(ymxr_lk0b_key+2))/256,(ymxr_ref0-(ymxr_lc0b_key+2))/256,(ymxr_ref0-(ymxr_lt0b_key+2))/256,(ymxr_ref0-(ymxr_ln0b_key+2))/256,(ymxr_ref0-(ymxr_lb0b_key+2))/256,(ymxr_ref0-(ymxr_lv0b_key+2))/256,(ymxr_ref0-(ymxr_le0b_key+2))/256,(ymxr_ref0-(ymxr_lf0b_key+2))/256
+                dc.b    (ymxr_ref1-(ymxr_lk1b_key+2))/256,(ymxr_ref1-(ymxr_lc1b_key+2))/256,(ymxr_ref1-(ymxr_lt1b_key+2))/256,(ymxr_ref1-(ymxr_ln1b_key+2))/256,(ymxr_ref1-(ymxr_lb1b_key+2))/256,(ymxr_ref1-(ymxr_lv1b_key+2))/256,(ymxr_ref1-(ymxr_le1b_key+2))/256,(ymxr_ref1-(ymxr_lf1b_key+2))/256
+                dc.b    (ymxr_ref2-(ymxr_lk2b_key+2))/256,(ymxr_ref2-(ymxr_lc2b_key+2))/256,(ymxr_ref2-(ymxr_lt2b_key+2))/256,(ymxr_ref2-(ymxr_ln2b_key+2))/256,(ymxr_ref2-(ymxr_lb2b_key+2))/256,(ymxr_ref2-(ymxr_lv2b_key+2))/256,(ymxr_ref2-(ymxr_le2b_key+2))/256,(ymxr_ref2-(ymxr_lf2b_key+2))/256
+                dc.b    (ymxr_ref3-(ymxr_lk3b_key+2))/256,(ymxr_ref3-(ymxr_lc3b_key+2))/256,(ymxr_ref3-(ymxr_lt3b_key+2))/256,(ymxr_ref3-(ymxr_ln3b_key+2))/256,(ymxr_ref3-(ymxr_lb3b_key+2))/256,(ymxr_ref3-(ymxr_lv3b_key+2))/256,(ymxr_ref3-(ymxr_le3b_key+2))/256,(ymxr_ref3-(ymxr_lf3b_key+2))/256
                 .endif
 
                 HANDLERS
@@ -5315,102 +5710,102 @@ ymxr_pg3b:      ds.b    512
                 .error  "BANK is off a multiple of 256"
                 .endif
                 .endif
-                LCHECK  ymxr_lk0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lk1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lk2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lk3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lc0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lc1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lc2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lc3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lt0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lt1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lt2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lt3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_ln0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_ln1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_ln2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_ln3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lb0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lb1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lb2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lb3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lv0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lv1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lv2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lv3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_le0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_le1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_le2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_le3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lf0,ymxr_pg0,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lf1,ymxr_pg1,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lf2,ymxr_pg2,ymxr_tick0,ymxr_bank0end
-                LCHECK  ymxr_lf3,ymxr_pg3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lk0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lk1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lk2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lk3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lc0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lc1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lc2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lc3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lt0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lt1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lt2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lt3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_ln0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_ln1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_ln2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_ln3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lb0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lb1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lb2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lb3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lv0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lv1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lv2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lv3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_le0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_le1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_le2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_le3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lf0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lf1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lf2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lf3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
                 .if     YMXR_DEFER
-                LCHECK  ymxr_lk0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lk0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lk0
-                LCHECK  ymxr_lk1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lk1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lk1
-                LCHECK  ymxr_lk2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lk2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lk2
-                LCHECK  ymxr_lk3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lk3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lk3
-                LCHECK  ymxr_lc0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lc0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lc0
-                LCHECK  ymxr_lc1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lc1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lc1
-                LCHECK  ymxr_lc2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lc2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lc2
-                LCHECK  ymxr_lc3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lc3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lc3
-                LCHECK  ymxr_lt0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lt0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lt0
-                LCHECK  ymxr_lt1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lt1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lt1
-                LCHECK  ymxr_lt2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lt2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lt2
-                LCHECK  ymxr_lt3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lt3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lt3
-                LCHECK  ymxr_ln0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_ln0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_ln0
-                LCHECK  ymxr_ln1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_ln1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_ln1
-                LCHECK  ymxr_ln2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_ln2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_ln2
-                LCHECK  ymxr_ln3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_ln3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_ln3
-                LCHECK  ymxr_lb0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lb0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lb0
-                LCHECK  ymxr_lb1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lb1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lb1
-                LCHECK  ymxr_lb2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lb2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lb2
-                LCHECK  ymxr_lb3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lb3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lb3
-                LCHECK  ymxr_lv0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lv0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lv0
-                LCHECK  ymxr_lv1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lv1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lv1
-                LCHECK  ymxr_lv2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lv2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lv2
-                LCHECK  ymxr_lv3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lv3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lv3
-                LCHECK  ymxr_le0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_le0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_le0
-                LCHECK  ymxr_le1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_le1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_le1
-                LCHECK  ymxr_le2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_le2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_le2
-                LCHECK  ymxr_le3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_le3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_le3
-                LCHECK  ymxr_lf0b,ymxr_pg0b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lf0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lf0
-                LCHECK  ymxr_lf1b,ymxr_pg1b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lf1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lf1
-                LCHECK  ymxr_lf2b,ymxr_pg2b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lf2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lf2
-                LCHECK  ymxr_lf3b,ymxr_pg3b,ymxr_bank1,ymxr_bank1end
+                LCHECK  ymxr_lf3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lf3
                 .endif
                 LSTRIDE ymxr_lk
@@ -5422,3 +5817,6 @@ ymxr_pg3b:      ds.b    512
                 LSTRIDE ymxr_le
                 LSTRIDE ymxr_lf
                 .endif
+
+; The player's last byte, which a page area begins at or past (5.1).
+ymxr_end:

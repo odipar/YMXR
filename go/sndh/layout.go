@@ -154,10 +154,27 @@ func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 	table := core + ymxr.GetLong(file, core+28)
 	work := core + ymxr.GetLong(file, core+32)
 	fmt.Fprintf(out, "{\"part\":\"core\",\"at\":%d,\"version\":%d,\"binds\":%d,"+
-		"\"fixed\":%d,\"flags\":%d,\"state\":%d,\"subtunetable\":%d,\"work\":%d}\n",
+		"\"fixed\":%d,\"flags\":%d,\"state\":%d,\"subtunetable\":%d,\"work\":%d",
 		core, ymxr.GetWord(file, core+16), ymxr.GetWord(file, core+18),
 		ymxr.GetWord(file, core+20), ymxr.GetWord(file, core+22),
 		core+ymxr.GetWord(file, core+24), table, work)
+	// with the lookup in, the page area's offset at 36, and the area to the
+	// subtune table (BINARIES.md 2.2, 3.1)
+	mapped := ymxr.GetWord(file, core+22)&coreMap != 0
+	pages := 0
+	if mapped {
+		pages = ymxr.GetLong(file, core+CorePagesAt)
+		at := 0
+		if pages != 0 {
+			at = core + pages
+		}
+		fmt.Fprintf(out, ",\"pages\":%d", at)
+	}
+	out.WriteString("}\n")
+	if pages != 0 {
+		fmt.Fprintf(out, "{\"part\":\"pages\",\"at\":%d,\"bytes\":%d}\n", core+pages,
+			table-core-pages)
+	}
 	n := ymxr.GetWord(file, table)
 	tunes := make([]int, n)
 	for i := 0; i < n; i++ {

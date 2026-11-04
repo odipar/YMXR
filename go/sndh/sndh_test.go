@@ -27,14 +27,20 @@ func files(t *testing.T) (nine, ten []byte) {
 }
 
 // block extracts the tune-file transformation index and entries, ending
-// before the aligned DTX3 table.
+// before the aligned DTX3 table, and the list of pages after them.
 func block(t *testing.T, ten []byte) []byte {
 	t.Helper()
 	at := ymxr.GetLong(ten, ymxr.TransformationsAt)
 	got := sndh.Block(ten)
+	read, err := ymxr.Read(ten)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := sndh.Pages(read)
+	own := len(got) - len(list)
 	want := ten[at:ymxr.GetLong(ten, ymxr.TableAt)]
-	if len(got) > len(want) || !bytes.Equal(want[:len(got)], got) ||
-		ymxr.Align(at+len(got)) != at+len(want) {
+	if own < 0 || own > len(want) || !bytes.Equal(want[:own], got[:own]) ||
+		ymxr.Align(at+own) != at+len(want) || !bytes.Equal(got[own:], list) {
 		t.Fatalf("the block is %d bytes at %d, and the file has %d to the table", len(got),
 			at, len(want))
 	}

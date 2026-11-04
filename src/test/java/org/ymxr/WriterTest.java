@@ -109,18 +109,23 @@ final class WriterTest {
             assertArrayEquals(Arrays.copyOfRange(file, fileAt & ~Tune.COUNTED, fileEnd),
                     Arrays.copyOfRange(bound, at & ~Tune.COUNTED, end), "source " + (i + 1));
         }
-        // The unchanged transformation block follows the image and is
-        // padded to a four-byte boundary.
+        // The unchanged transformation block follows the image, then the
+        // list of its pages (BINARIES.md 1.1), padded to a four-byte
+        // boundary.
         byte[] block = Bound.block(file);
-        assertEquals(blockOf(file).length, Tune.align(block.length));
-        assertArrayEquals(Arrays.copyOf(blockOf(file), block.length), block,
+        byte[] list = Pages.of(TuneFile.read(file));
+        int own = block.length - list.length;
+        assertEquals(blockOf(file).length, Tune.align(own));
+        assertArrayEquals(Arrays.copyOf(blockOf(file), own), Arrays.copyOf(block, own),
                 "the block from the long at 16");
+        assertArrayEquals(list, Arrays.copyOfRange(block, own, block.length),
+                "the list after the block");
         int at = Tune.getLong(bound, Bound.TRANSFORMATIONS_AT);
         assertTrue(at > image, "the block is after the image");
         assertEquals(0, at % 4, "the block begins on a long");
         assertEquals(Tune.align(at + block.length), bound.length, "the block is last");
-        assertArrayEquals(blockOf(file), Arrays.copyOfRange(bound, at, bound.length),
-                "the block is the tune file's");
+        assertArrayEquals(block, Arrays.copyOfRange(bound, at, at + block.length),
+                "the block is the tune file's and its list");
         assertArrayEquals(Tune.transformations(BuiltTunes.fade()), blockOf(file),
                 "the block is the index and the sixteen transformations");
         assertEquals(0, Bound.block(BuiltTunes.deferred().file()).length,

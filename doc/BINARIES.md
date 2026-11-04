@@ -104,7 +104,13 @@ bound tune of version 10 also copies the *transformation block*
 unchanged: the index and entries, bytes O to M - 1 of the tune file.
 O is the header's long at 16; M is the highest of O + 2 + 4T and each
 P + 2 + E (SPEC.md 3.4.2). Index offsets are relative to the block, so
-moving it requires only the bound header's pointer to change.
+moving it requires only the bound header's pointer to change. The
+*list* follows the block's byte M - O: the tag `YP`, a byte N, the
+pages, 0 to 255, then for each page its effect, 0 to 3, its form, 0 to
+2, and its transformation, 1 to T, a byte each, the pages of SPEC.md
+3.4.4 in that order, the first 255 where the rules list more. A reader
+that reads the block through its index reads past the list, and a
+block without the tag after byte M - O has no list.
 
 **1.2 Layout.**
 
@@ -124,7 +130,7 @@ moving it requires only the bound header's pointer to change.
 | 28 | 4`S` | in version 10, the source index, as at 24 in versions 7 to 9 |
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
-| | | in version 10, the transformation block (1.1), on a long, in a bound tune written alone |
+| | | in version 10, the transformation block and its list (1.1), on a long, in a bound tune written alone |
 
 The tables come before the image so that a source's rows are within
 reach of the header at any length of image: a player whose ticks read a
@@ -173,7 +179,13 @@ the images and the blocks and patches the fields.
    its `RR` and its rows from byte 16. A player of 5.5 measures each
    source against its handlers here and reports -1 for one past their
    reach.
-6. Report 0.
+6. In a player assembled with the lookup, a version 10 tune's list:
+   where the tag is absent, an entry is out of range, or the list counts
+   a page and the area of `a2` (5.1) is odd, below the player's last
+   byte, or too near the reach for the fallback of 5.6, report -1 and
+   stop, every byte of the area as it was; otherwise fill the pages of
+   5.6 in their form.
+7. Report 0.
 
 The player skips fields 6, 10 and 12. The host supplies the frame clock
 (5.4) and allocates the workspace sized by field 12 (5.2).
@@ -211,14 +223,15 @@ the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 `YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to
 version 10 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
-bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 10,692 bytes larger than
+bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,230 bytes larger than
 `YMXR_sndh.bin`. The field at 26 of a core with the lookup in is the
 offset of its first handler: every byte from there to the core's end is
 a handler, an installer or padding. The padding puts the displacement
-word of each lookup handler's page read a multiple of 256 bytes from its
-page, and with the deferred start in the second bank of handlers a
-multiple of 256 bytes from the first. The pages of 256 bytes its ticks
-read and the frame's routines come before the first handler.
+word of each lookup handler's page read on its effect's offset modulo
+256, the same for the eight lookup kinds of an effect, and with the
+deferred start in the second bank of handlers a multiple of 256 bytes
+from the first. The fallback of 5.6 and the frame's routines come before
+the first handler, and the page area after the core's last byte (3.1).
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
@@ -241,15 +254,16 @@ identity-only set uses a core without lookup support.
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
 | 18 | 2 | the highest bound tune version this core reads: 9, and 10 with the lookup in (2.1) |
-| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, 2,312 with the deferred start in, 2,204 with the lookup in, and 2,380 with both |
+| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, 2,312 with the deferred start in, 2,284 with the lookup in, and 2,460 with both |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
 | 26 | 2 | where the handlers begin, from which a tool measures the reach (2.1): the offset of the first handler in a core with the lookup in, and 0 in every other core |
 | 28 | 4 | the subtune table's offset (2.5): assembled 0, patched by the tool |
 | 32 | 4 | the workspace's offset (2.6): assembled 0, patched by the tool |
+| 36 | 4 | in a core with the lookup in, the page area's offset (3.1): assembled 0, patched by the tool, and 0 in a file whose subtunes list no page |
 
-The descriptor is bytes 12 to 35. The two patched offsets count from the
-core's first byte and are even.
+The descriptor is bytes 12 to 35, and 12 to 39 in a core with the lookup
+in. The patched offsets count from the core's first byte and are even.
 
 **2.3 The flags word:**
 
@@ -334,7 +348,7 @@ file (3) and reports the first condition met:
 
 | condition | reported as |
 |---|---|
-| the core is under 36 bytes, or bytes 12 to 15 are other than `YMXS` | `not an SNDH core: no YMXS at 12` |
+| the core is under 36 bytes, or under 40 with bit 4 of its flags set, or bytes 12 to 15 are other than `YMXS` | `not an SNDH core: no YMXS at 12` |
 | the field at 16 is V, other than 1 | `the core's descriptor is version V, and this writes 1` |
 | the field at 18 is V, below the version W the tune binds at | `the core reads bound tunes to version V, and this binds at W` |
 | the raster monitor is selected and bit 0 of the flags word F is clear | `the core's flags at 22 read F, and the raster monitor asked for needs bit 0 set` |
@@ -344,6 +358,7 @@ file (3) and reports the first condition met:
 | the effects byte of a subtune sets bit 5 and bit 4 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that maps a value needs bit 4 set` |
 | the row read through the program counter is selected, the core's field at 26 is 0, and the file's last bound tune ends B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
 | the row read through the program counter is selected, the core's field at 26 is F, above 0, and the file's last bound tune ends B bytes past the core's first byte plus F, B above 32,767 (2.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
+| the core has the lookup in, its field at 26 is F, and a subtune's list needs an area of 5.6 that ends past the reach with its tables and the fallback of each effect of the list alone, B bytes past the core's first byte plus F | `the page area ends B bytes past the core's first handler, at F, and a tick's page read reaches 32767` |
 
 ---
 
@@ -359,19 +374,26 @@ the core's first byte, at H.
 | the entry triple | 0, 4, 8 | three `bra.w`: the word $6000, then the displacement H - 2, to the same entry of the core's triple (2.2) |
 | the tag block | 12 | 3.2 |
 | a pad | 12 + T | a zero byte where 12 + T is odd |
-| the core | H | the core (2), its field at 28 patched with even(L) and its field at 32 with W below |
-| the subtune table | even(L) from the core | the word `N`, then `N` longs, each a bound tune's offset from the core (2.5) |
-| the bound tunes | subtune 1 at even(L) + 2 + 4`N`, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset |
+| the core | H | the core (2), its field at 28 patched with U below, its field at 32 with W below, and with the lookup in its field at 36 with even(L) where A is above 0 |
+| the page area | even(L) from the core | A zero bytes: the largest area of 5.6 a subtune's list needs (1.1), its reach 32,767 less even(L) less the core's field at 26, and 0 where no list counts a page or the core is without the lookup |
+| the subtune table | U = even(even(L) + A) from the core | the word `N`, then `N` longs, each a bound tune's offset from the core (2.5) |
+| the bound tunes | subtune 1 at U + 2 + 4`N`, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset |
 | the images | from even(the end of the last bound tune), each on a long, from the core | the images of the set (1.4), in group order |
 | the transformation blocks | from the end of the last image, each on a long, from the core | the block of each subtune of version 10 (1.1), in subtune order, the subtune's field at 24 patched with its block's offset less its offset |
 | the workspace | W = even(the end of the last block, or of the last image where no subtune is of version 10), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
 
-The subtunes come before the images so that a subtune's sources are
-within reach of the core: a player whose ticks read a row through a
-displacement reaches 32,767 bytes (5.5). The transformation blocks come
-after the images, as in a bound tune written alone (1.2). Frames prepare
-lookups from these blocks; tick reads remain within the source handlers'
-reach.
+The page area is right after the core, whose last bytes are its lookup
+handlers, so that a page is within reach of the handlers that read it:
+the area of a subtune is a table of T bytes for each effect and form its
+list names, then the pages of each effect, and its fallback where a page
+of it is left out, the effects at the offsets their handlers fix modulo
+256 (5.6). A set of several subtunes reserves the largest area of any of
+them, and each subtune's init fills it from its first byte. The area and
+the subtunes' sources share the reach (5.5), so a set whose area and
+subtunes end past it is on the core that reads an absolute address. The
+subtunes come before the images so that a subtune's sources are within
+reach of the core: a player whose ticks read a row through a
+displacement reaches 32,767 bytes (5.5).
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
@@ -644,7 +666,7 @@ called in supervisor mode:
 
 | call | in | out |
 |---|---|---|
-| init, at 0 | `a0` the bound tune (1), even; `a1` the workspace, on a long | `d0` 0, or -1 for a bound tune of a condition of 1.5 |
+| init, at 0 | `a0` the bound tune (1), even; `a1` the workspace, on a long; in a player assembled with the lookup, `a2` the page area of 5.6, even and at or past the player's last byte, or 0 for a tune whose list counts no page | `d0` 0, or -1 for a bound tune of a condition of 1.5 |
 | play, at 4 | `a0` the workspace | `d0` 0, or -1 where the tune has ended (SPEC.md 4): every register of the chip and the MFP is left as it is |
 | stop, at 8 | `a0` the workspace | the timers of the claims byte released and the registers written as 5.3 lists |
 
@@ -653,7 +675,7 @@ A call clobbers `d0` to `d5` and `a0` to `a5` and keeps `d6`, `d7` and
 and then reads the next.
 
 **5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,136 to
-2,380 by the player's switches (2.2), then the bound tune's field at 12
+2,460 by the player's switches (2.2), then the bound tune's field at 12
 bytes, on a long. Before init the host keeps, and after stop restores,
 what the player writes (5.3): of each timer in the claims byte, the
 vector, the nibble of the control register, the enable bit and the mask
@@ -700,6 +722,35 @@ passes the player a tune inside it meets the requirement. A host that
 loads the player and the tune separately places them within that reach,
 or assembles the player with `YMXR_PCREL=0`, whose ticks read an absolute
 address and reach any offset.
+
+**5.6 The page area.** A tick through a transformation reads its entry
+through a signed word displacement whose low byte is the source's key
+and whose high byte selects a page of 256 bytes, so the page is within
+32,767 bytes of the handler and on an offset modulo 256 the handler
+fixes, one for each effect. Init (1.5 step 6) reads the list of 1.1, P
+pages, the transformation count T, Q the pairs of an effect and a form
+the list names, and the area at `a2`, whose reach R is 32,767 bytes past
+the player's first handler less `a2`. F is the pages of an effect's
+fallback, 2 for each bank of handlers: 2, and 4 with the deferred start
+in. X is the most pages with QT + 255 + 256 X at most R; k is P where P
+is at most X, and otherwise the most k below P with k + F d at most X, d
+the effects of an entry k or later of the list; where none is, the area
+does not fit. The first k entries are the pages filled, and each effect
+of an entry k or later has a fallback. The area begins with a table of T
+bytes for each effect and form the list names, effect 0's first and each
+effect's in the order of the forms: byte n - 1 is the page of
+transformation n, in 256 bytes from the effect's reference, and 0 for a
+transformation outside the pages filled. Past the Q tables, each
+effect's pages filled follow one after another, in the list's order,
+then its F fallback pages, from the least offset at or past QT on the
+effect's offset modulo 256, plus 256 bytes for each page of every effect
+whose offset past QT modulo 256 is lower. The area ends within QT + 255
++ 256 (k + F d) bytes. A start and a remap read the page byte of their
+transformation in the table of their form and copy no entry; one whose
+table has 0 copies the transformation at the frame into its effect's
+fallback page that no handler reads, two pages a bank. Note: the area
+and a tune's sources share the reach (5.5), so a fallback of a tool's
+file is on the core that reads an absolute address.
 
 Note: the tools that write the files of this document are
 `bin/ymxr-multi`, `bin/ymxr-bind`, `bin/ymxr-sndh` and `bin/ymxr-prg`,
@@ -757,8 +808,8 @@ report that line alone and stop.
   record of the SNDH file instead (6.4).
 - `{"part":"transformations","at":X,"count":T,"bytes":B}` where V is 10
   and the field at 24 is above 0, T the word at X and B the file's bytes
-  less X, the block and its pad: the transformation block of a bound
-  tune written alone (1.3).
+  less X, the block, its list and its pad: the transformation block of a
+  bound tune written alone (1.3).
 
 **6.4 An SNDH file** (3.1), after the first line:
 
@@ -788,7 +839,12 @@ report that line alone and stop.
 - `{"part":"core","at":H,"version":V,"binds":R,"fixed":F,"flags":G,
   "state":S,"subtunetable":U,"work":W}`, H the core's first byte,
   even(12 + T) of 3.1 with T the tag block's bytes, the fields at 16,
-  18, 20, 22, 24, 28 and 32 (2.2), S, U and W each plus H.
+  18, 20, 22, 24, 28 and 32 (2.2), S, U and W each plus H. Where bit 4
+  of the flags is set, `,"pages":P` ends the line before the brace, P
+  the field at 36 plus H, or 0 where the field is 0.
+- `{"part":"pages","at":P,"bytes":B}` where the field at 36 is above 0,
+  P as the core line reports it and B the bytes from P to U: the page
+  area (3.1).
 - `{"part":"subtunes","at":U,"tunes":[...]}`, U as the core line
   reports it, H among it; the word `N` at U and the `N` longs after it,
   each plus H (2.5).

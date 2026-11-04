@@ -177,8 +177,19 @@ final class Layout {
                 .append(",\"flags\":").append(word(file, core + 22))
                 .append(",\"state\":").append(core + word(file, core + 24))
                 .append(",\"subtunetable\":").append(table)
-                .append(",\"work\":").append(work)
-                .append("}\n");
+                .append(",\"work\":").append(work);
+        // with the lookup in, the page area's offset at 36, and the area
+        // to the subtune table (BINARIES.md 2.2, 3.1)
+        boolean map = (word(file, core + 22) & Sndh.CORE_MAP) != 0;
+        int pages = map ? Tune.getLong(file, core + Sndh.CORE_PAGES_AT) : 0;
+        if (map) {
+            out.append(",\"pages\":").append(pages == 0 ? 0 : core + pages);
+        }
+        out.append("}\n");
+        if (pages != 0) {
+            out.append("{\"part\":\"pages\",\"at\":").append(core + pages)
+                    .append(",\"bytes\":").append(table - core - pages).append("}\n");
+        }
         int n = word(file, table);
         List<Integer> tunes = new ArrayList<>();
         for (int i = 0; i < n; i++) {

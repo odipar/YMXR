@@ -1,6 +1,7 @@
 ; YMXR_sndh.S - SNDH host for the player (doc/BINARIES.md).
 ; Tools append bound tunes and patch the descriptor's table and workspace
-; offsets. Entries preserve all registers:
+; offsets, and with lookup support the page area's, which init passes the
+; player. Entries preserve all registers:
 ;
 ;   +0   init  d0.w=subtune, numbered from 1; out of range selects 1
 ;   +4   exit
@@ -28,11 +29,19 @@
 ;   +26  source-reach origin: first handler with lookup support, else 0
 ;   +28  patched subtune-table offset: word count, then one long per tune
 ;   +32  patched workspace offset
+;   +36  with lookup support, the patched page area's offset, or 0 where
+;        the file reserves no area
 ;
 ; Lean ticks require host MFP handlers without nesting and player control
 ; of the vector register. Program-counter reads require sources within
 ; signed-word reach of the origin at +26. Init aligns workspace to four
 ; bytes; tools reserve two extra bytes for an SNDH loaded even.
+
+; The lookup switch, read before the player is included below.
+                .if     ^^defined YMXR_MAP
+                .else
+YMXR_MAP        equ     0
+                .endif
 
 sndh_core:
                 bra.w   sndh_init
@@ -50,6 +59,9 @@ sndh_core:
                                         ; measured from
 sndh_table:     dc.l    0
 sndh_work:      dc.l    0
+                .if     YMXR_MAP
+sndh_pages:     dc.l    0               ; the page area (BINARIES.md 3.1)
+                .endif
 
 ; The kept state of the timers, in timer order A, B, C, D.
 SAV_VEC         equ     0               ; four vectors
@@ -131,6 +143,14 @@ sndh_init:
                 bsr     sndh_workspace
                 moveq   #0,d6
                 move.b  TF_EFFECTS(a0),d6       ; kept through the call
+                .if     YMXR_MAP
+                suba.l  a2,a2                   ; the page area, or 0 where
+                move.l  sndh_pages(pc),d0       ; the tool reserved none
+                beq.s   .area
+                lea     sndh_core(pc),a2
+                adda.l  d0,a2
+.area:
+                .endif
                 bsr     YMXR_init
                 tst.l   d0
                 bmi.s   .done
