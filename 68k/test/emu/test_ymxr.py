@@ -393,6 +393,35 @@ def needs(effects):
     return bool(effects & 0x10), bool(effects & 0x20)
 
 
+# A cycle figure the documents read is true where it is within this share
+# of the cycles the rig counts (tools.md 17.1). Sizes, counts of frames,
+# ticks or pages, and words are read exactly, and are compared without
+# near.
+CYCLES_WITHIN = 0.05
+
+
+def near(said, counted):
+    """Whether the cycles a document reads are the rig's count within
+    CYCLES_WITHIN: a number against a number, a tuple or a list figure by
+    figure, a text by the figures in it with the rest of the text equal,
+    and a set of counts where it has one count."""
+    if isinstance(counted, set):
+        return len(counted) == 1 and near(said, next(iter(counted)))
+    if isinstance(said, (tuple, list)) or isinstance(counted, (tuple, list)):
+        return (isinstance(said, (tuple, list)) and isinstance(counted, (tuple, list))
+                and len(said) == len(counted)
+                and all(near(a, b) for a, b in zip(said, counted)))
+    if isinstance(said, (int, float)) and isinstance(counted, (int, float)):
+        return abs(said - counted) <= CYCLES_WITHIN * abs(counted)
+    if not isinstance(said, str) or not isinstance(counted, str):
+        return said == counted
+    figure = r"\d[\d,]*"
+    if re.sub(figure, "#", said) != re.sub(figure, "#", counted):
+        return False
+    return near([int(f.replace(",", "")) for f in re.findall(figure, said)],
+                [int(f.replace(",", "")) for f in re.findall(figure, counted)])
+
+
 _SOURCE = {}
 
 
@@ -3430,12 +3459,12 @@ def dense_read(savings, costs):
     counted = (str(costs["write"]), str(costs["skip"]), str(cost[0]), str(cost[-1]),
                WORDS[len(cost)], WORDS[len(rounded)], str(save[0]), str(save[-1]),
                WORDS[len(save)]) if cost and save else None
-    if m.groups() != counted:
+    if not near(m.groups(), counted):
         stale.append("performance.md reads dense register columns as %s, and the rig counts %s"
                      % (m.groups(), counted))
     t = re.search(r"applies to a (\d+)-cycle test and not to the (\d+) of a test that forms the"
                   r" select only where it writes", said)
-    if not t or (int(t.group(1)), int(t.group(2))) != (costs["then"], costs["skip"]):
+    if not t or not near((int(t.group(1)), int(t.group(2))), (costs["then"], costs["skip"])):
         stale.append("performance.md reads the two tests as %s, and the rig counts %d and %d"
                      % (t and t.groups(), costs["then"], costs["skip"]))
     return stale
@@ -3487,7 +3516,7 @@ def counted_read(code, symbols, cycles_of, general):
                    one(ENVELOPE_TUNES[1], "counted wide %s alone" % then))
         ticked[then] = counted
         read = (int(m.group(column + 1)), int(m.group(column + 2)))
-        if read != counted:
+        if not near(read, counted):
             stale.append("performance.md reads the ticks %s as %s, and the rig counts %s"
                          % (row, read, counted))
     d = re.search(r"So (\d+) cycles a tick that writes a row, as the counted handler of one"
@@ -3498,13 +3527,13 @@ def counted_read(code, symbols, cycles_of, general):
         stale.append("performance.md has no difference of a counted tick the rig reads")
     else:
         row_more, loop_more = int(d.group(1)), int(d.group(2))
-        if ticked["on"][1] - ticked["on"][0] != row_more or \
-                one_column - next(iter(general_on)) != row_more:
+        if not near(row_more, ticked["on"][1] - ticked["on"][0]) or \
+                not near(row_more, one_column - next(iter(general_on))):
             stale.append("performance.md reads %d cycles more a counted tick that writes a row,"
                          " and the rig counts %d on two columns and %d on one"
                          % (row_more, ticked["on"][1] - ticked["on"][0],
                             one_column - next(iter(general_on))))
-        if ticked["loop"][1] - ticked["loop"][0] != loop_more:
+        if not near(loop_more, ticked["loop"][1] - ticked["loop"][0]):
             stale.append("performance.md reads %d cycles more on the loop, and the rig counts %d"
                          % (loop_more, ticked["loop"][1] - ticked["loop"][0]))
     wide_size = symbols["ymxr_env1"] - symbols["ymxr_env0"]
@@ -3654,8 +3683,8 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         if not m:
             stale.append("performance.md has no \"%s\"" % claim)
             return
-        if tuple(g.replace(",", "") for g in m.groups()) != \
-                tuple(str(w).replace(",", "") for w in want):
+        if not near(tuple(g.replace(",", "") for g in m.groups()),
+                    tuple(str(w).replace(",", "") for w in want)):
             stale.append("performance.md reads %s where the rig counts %s"
                          % (m.groups(), tuple(str(w) for w in want)))
 
@@ -3692,7 +3721,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         if not m or not spent or column is None:
             stale.append("performance.md's ticks through a transformation read %s for %s, and"
                          " the rig counts %s" % (m and m.groups(), row, sorted(spent)))
-        elif spent != {int(m.group(column))}:
+        elif not near(int(m.group(column)), spent):
             stale.append("performance.md reads the tick %s through a transformation as %s,"
                          " and the rig counts %s" % (row, m.group(column), sorted(spent)))
     unread = sorted(kind for kind in ticked if kind.startswith("mapped ") and kind not in read
@@ -3789,7 +3818,8 @@ def mapped_read(code, symbols, cycles_of, general, plays):
             stale.append("the tick %s is %s, and its read and the rest %d" % (
                 row, whole, handler - through[0] + cycles))
         m = re.search(r"^\| %s[^|]* \| (\d+) \| (\d+) \| (\d+) \|$" % re.escape(row), ticks_at, re.M)
-        if not m or tuple(int(x) for x in m.groups()) != (cycles, size, whole):
+        if not m or int(m.group(2)) != size or not near(
+                (int(m.group(1)), int(m.group(3))), (cycles, whole)):
             stale.append("performance.md reads the row's read %s as %s, and the rig counts %s"
                          % (row, m and m.groups(), (cycles, size, whole)))
 
@@ -3824,7 +3854,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                       frame_at, re.M)
         counted_ = tuple(span(steps[(what, shape)], "") if (what, shape) in steps else None
                          for shape in MAPPED_SHAPES)
-        if not m or m.groups() != counted_:
+        if not m or not near(m.groups(), counted_):
             stale.append("performance.md reads %s at the frame as %s, and the rig counts %s"
                          % (row, m and m.groups(), counted_))
     def spans(*keys):
@@ -3903,7 +3933,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                 else struct.unpack(">h", fill[fill.index(b"\x49\xec") + 2:][:2])[0])):
             stale.append("performance.md reads the copy %s at an offset ymxr_fill does not write"
                          % m.group(1))
-        if copies.get(key) != {int(m.group(3).replace(",", ""))}:
+        if not near(int(m.group(3).replace(",", "")), copies.get(key, set())):
             stale.append("performance.md reads the copy %s of %s entries as %s, and the rig counts"
                          " %s" % (m.group(1), m.group(2), m.group(3), copies.get(key)))
     # init copies every page of a list, so the rig counts more sizes than
@@ -3933,7 +3963,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
     paths[None] = heads
     for row, path in V9_PATHS:
         m = re.search(r"^\| %s \| (-?\d+) \|$" % re.escape(row), frame_at, re.M)
-        if not m or paths.get(path) != {int(m.group(1))}:
+        if not m or not near(int(m.group(1)), paths.get(path, set())):
             stale.append("performance.md reads the path %s of a tune of version 9 as %s, and the"
                          " rig counts %s" % (row, m and m.group(1), paths.get(path)))
     def path(name):
@@ -4017,7 +4047,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
     for title, cost, _, lookups, _ in played:
         apart = max(c - spent["routine"] for c, (_, spent, _) in zip(cost, lookups))
         said = next(((int(most), int(less)) for named, most, less in rows if named == title), None)
-        if said != (max(cost), apart):
+        if not near(said, (max(cost), apart)):
             stale.append("performance.md reads the costliest call of %s as %s, and the rig counts"
                          " %s" % (title, said, (max(cost), apart)))
         if apart > budget:
@@ -4170,7 +4200,7 @@ def refills(parts, tunes, code, symbols, dtx, whole=True):
             stale.append("performance.md has no \"%s\"" % claim)
             return
         got = tuple(str(w).replace(",", "").lower() for w in want)
-        if tuple(g.replace(",", "").lower() for g in m.groups()) != got:
+        if not near(tuple(g.replace(",", "").lower() for g in m.groups()), got):
             stale.append("performance.md reads %s where the rig counts %s"
                          % (str(m.groups()), str(got)))
 
@@ -5781,7 +5811,7 @@ def main():
                 if PCREL and MAP and not DEFER and not LEAN and said:
                     plays[stem] = (said, counted, where[6], where[5], where[9])
                 if PCREL and not DEFER and not MAP and not where[5] & 0x20 \
-                        and said != counted:
+                        and (not said or said[0] != counted[0] or not near(said[1:], counted[1:])):
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
                 # the table against 0.4.22: that release's call and this
@@ -5790,8 +5820,8 @@ def main():
                                     % re.escape(stem),
                                     open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
                 if PCREL and not DEFER and not MAP and not where[5] & 0x20 and (
-                        not against or (int(against.group(2)), int(against.group(4)))
-                        != (average, max(cost))):
+                        not against or not near((int(against.group(2)), int(against.group(4))),
+                                                (average, max(cost)))):
                     stale.append("performance.md's table against 0.4.22 reads %s for %s, and the"
                                  " rig counts %d and %d" % (against and against.groups(), stem,
                                                             average, max(cost)))
@@ -5812,8 +5842,9 @@ def main():
                     with_it = re.search(
                         r"the play call of Synergy Credits counts ([\d,]+) cycles on"
                         r" average and ([\d,]+) at most", perf_said)
-                    if not with_it or tuple(int(x.replace(",", "")) for x in with_it.groups()) \
-                            != (average, max(cost)):
+                    if not with_it or not near(tuple(int(x.replace(",", ""))
+                                                     for x in with_it.groups()),
+                                               (average, max(cost))):
                         stale.append("performance.md reads the play call of Synergy Credits"
                                      " with the deferred start in as %s, and the rig counts"
                                      " %d and %d" % (with_it and with_it.groups(), average,
@@ -5837,7 +5868,7 @@ def main():
                     else:
                         was = tuple(int(x.replace(",", "")) for x in closing.groups())
                         got = (average, ticked, average + ticked)
-                        if was != got:
+                        if not near(was, got):
                             stale.append("plan.md says %s for Synergy Credits, and the"
                                          " rig counts %s" % (was, got))
                 # A lean tick drops no interrupt level, so the row a tune of
@@ -5866,7 +5897,7 @@ def main():
                         said_doc = said_doc.split(
                             "## A tick through an absolute address")[1]
                     tick = re.search(row, said_doc, re.M)
-                    if not tick or {int(tick.group(1))} != tick_cost[then]:
+                    if not tick or not near(int(tick.group(1)), tick_cost[then]):
                         stale.append("performance.md's tick %s is not %s" % (then, tick_cost[then]))
             if refills_of:
                 # the parts of the same pass, after the call's figures
@@ -6182,7 +6213,7 @@ def plan_read(walker, tunes, parts):
         got = m and tuple(g.replace(",", "") if re.fullmatch(r"[\d,]+", g) else g
                           for g in m.groups())
         want = tuple(str(x) for x in counted)
-        if got != want:
+        if not near(got, want):
             stale.append("plan.md reads %s as %s, and the rig counts %s" % (what, got, want))
 
     for name, v in tune.items():
