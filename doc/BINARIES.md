@@ -749,9 +749,10 @@ whose offset past QT modulo 256 is lower. The area ends within QT + 255
 + 256 (k + F d) bytes. A start and a remap read the page byte of their
 transformation in the table of their form and copy no entry; one whose
 table has 0 copies the transformation at the frame into its effect's
-fallback page that no handler reads, two pages a bank. Note: the area
-and a tune's sources share the reach (5.5), so a fallback of a tool's
-file is on the core that reads an absolute address.
+fallback page that no handler reads, two pages a bank, at the costs
+[performance.md](performance.md) lists. Note: the area and a tune's
+sources share the reach (5.5), so a fallback of a tool's file is on the
+core that reads an absolute address.
 
 Note: the tools that write the files of this document are
 `bin/ymxr-multi`, `bin/ymxr-bind`, `bin/ymxr-sndh` and `bin/ymxr-prg`,
