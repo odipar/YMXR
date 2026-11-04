@@ -1,7 +1,7 @@
 ; ticks.S - the macros of the tick handlers (SPEC.md 5): a timer claimed
 ; and released, the raster monitor's mark and count, each shape of
 ; handler, the hook of a deferred start and the installer that performs
-; it. init.S, stop.S and handlers.S expand them.
+; it. init.S, stop.S, handlers.S and lookup_checks.S expand them.
 
 ; One timer claimed, where the tune runs its effect: stopped, aimed at
 ; its handler, enabled and unmasked.

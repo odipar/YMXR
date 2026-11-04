@@ -1,5 +1,5 @@
 ; play.S - YMXR_play, the frame procedure it runs inline, and the tables
-; of the frame's read sites, which init patches.
+; init reads to patch the frame's read sites.
 
 YMXR_play:
                 tst.l   WS_ROWS(a0)

@@ -1,6 +1,6 @@
-; deferred.S - deferred starts (SPEC.md 4.8): a start armed, kept or
-; dropped by a later row, and the record updated once the installer has
-; performed it. YMXR.S includes it where YMXR_DEFER is 1.
+; deferred.S - deferred starts (SPEC.md 4.8): the frame's paths that arm,
+; settle and drop a pending start, and the record updated once the
+; installer has performed it. YMXR.S includes it where YMXR_DEFER is 1.
 
 ; Update the record after installation (SPEC.md 4.8): copy the armed
 ; shape, row-0 places and row count, then clear pending. With lookups,

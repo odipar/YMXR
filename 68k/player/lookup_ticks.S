@@ -1,6 +1,7 @@
 ; lookup_ticks.S - the macros of the lookup instances of the tick
 ; handlers (SPEC.md 1.10), the links init writes into them, the kinds'
-; descriptors and the checks of the instances' layout.
+; descriptors and the checks of the instances' layout; and the offset of
+; an instance's page read and the stride from one effect's to the next.
 
 ; Lookup instances of TICK, TICKC and TICKW. A tick writes its source
 ; key into the next read's low displacement byte; the high byte selects

@@ -1,5 +1,6 @@
-; lookup_checks.S - the offsets of the lookup kinds, and the checks of
-; each instance's page residue, reach, bank and stride.
+; lookup_checks.S - the offsets of the lookup kinds, the words their hooks
+; write, and the checks of each instance's page residue, reach, bank and
+; stride.
 
 ; Lookup-kind offsets relative to effect 0. Assert each read's page
 ; residue and reach, bank bounds, BANK spacing between banks and
