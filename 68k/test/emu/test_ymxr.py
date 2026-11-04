@@ -1371,7 +1371,10 @@ def reaches(model, i, kind):
         return False
     at, R, RR, columns = model.tune.sources[source]
     shaped = not model.tune.counted[source] and len(columns) == 1 and R <= 2 and RR == 0
-    return not shaped
+    # a marked source of one column starts in the window of the general
+    # kind (ymxr_lkwindow), every other in the window of every kind
+    one = not model.tune.counted[source] and len(columns) == 1
+    return not shaped and one == (kind == "window one")
 
 
 def inside(code, symbols, bound, tune, workspace):
@@ -1403,8 +1406,9 @@ def inside(code, symbols, bound, tune, workspace):
             # them. The head of an effect the tune does not run is branched
             # over; the point after effect 3 is reached on every row.
             if "ymxr_look" in symbols and tune.version == MAPPED:
-                at.append((i, i, CODE + symbols["ymxr_rpage"], "page"))
+                at.append((i, i, CODE + symbols["ymxr_tick%d_rpage" % i], "page"))
                 at.append((i, i + 1, CODE + symbols["ymxr_lwindow"], "window"))
+                at.append((i, i + 1, CODE + symbols["ymxr_lkwindow"], "window one"))
                 at.append((i, i + 1, CODE + symbols["ymxr_rlevel"], "square"))
             if any(widens(tune, r, i) for r in tune.rows):
                 at.append((i, i, wide, "wide"))
@@ -1450,7 +1454,7 @@ def inside(code, symbols, bound, tune, workspace):
                    until=None if kind in (None, "aim", "aim end") else
                    (lambda mu: mu.reg_read(UC_M68K_REG_A3) == record))
             level = (m.mu.reg_read(UC_M68K_REG_SR) >> 8) & 7
-            if kind in ("window", "square", "wide end", "aim end"):
+            if kind in ("window", "window one", "square", "wide end", "aim end"):
                 assert level == 7, \
                     "frame %d: effect %d's %s boundary is at level %d, not inside its window" % (
                         f, i, kind, level)
@@ -2062,7 +2066,7 @@ def mapped(code, symbols):
                 & 0xFFFFFFFF == 0xFFFFFFFF, "%s: init of a player without the lookup took it" % title
         tunes = tunes[:1]
     played = 0
-    inner = {"page": 0, "window": 0, "square": 0}
+    inner = {"page": 0, "window": 0, "window one": 0, "square": 0}
     for title, at, kinds in tunes:
         ticked = []
         RAN.clear()
@@ -2081,8 +2085,10 @@ def mapped(code, symbols):
     assert all(inner.values()), "a tick fell inside the boundaries of the lookup %s times" % inner
     return ("tunes that map a value: %d tunes, every tick against the model and every"
             " frame against the reader's record, a tick inside a remap's page switch at %d"
-            " rows, in a start's window at %d and between a square's mask and level at %d"
-            % (played, inner["page"], inner["window"], inner["square"]))
+            " rows, in a start's window at %d, %d of them the general kind's, and between a"
+            " square's mask and level at %d"
+            % (played, inner["page"], inner["window"] + inner["window one"],
+               inner["window one"], inner["square"]))
 
 
 def deferred_sizes():
@@ -2481,30 +2487,48 @@ def lookup_kind(model, i):
 
 def lookup_regions(symbols):
     """Cycle-counter regions for lookup preparation: page selection
-    (ymxr_page), table/entry reads (ymxr_tab, ymxr_entry), filling
-    (ymxr_fill), identity/lookup movement (ymxr_move), atomic page
-    switch (ymxr_rpage), and multi-column place reset (ymxr_widereset).
-    Count complete start/remap routines separately from call to return
-    (check), since ymxr_rem is shared with identity starts.
+    (ymxr_page), the fill a start or a remap between two transformations
+    makes of the page not in use (ymxr_lfill), table/entry reads
+    (ymxr_tab, ymxr_entry), filling (ymxr_fill), identity/lookup
+    movement (ymxr_move), atomic page switch (ymxr_tickN_rpage), and
+    multi-column place reset (ymxr_widereset). Count complete start/remap
+    routines separately from call to return (check), since ymxr_rem is
+    shared with identity starts.
     """
     at = {name: CODE + symbols[name] for name in (
-        "ymxr_page", "ymxr_tab", "ymxr_fill", "ymxr_runrow",
-        "ymxr_move", "ymxr_rpage", "ymxr_widereset", "ymxr_widestart")}
-    return {"page": (at["ymxr_page"], at["ymxr_tab"]),
-            "table": (at["ymxr_tab"], at["ymxr_fill"]),
-            "copy": (at["ymxr_fill"], at["ymxr_runrow"]),
-            "move": (at["ymxr_move"], at["ymxr_page"]),
-            "switch": (at["ymxr_rpage"], at["ymxr_rpage"] + 4),
-            "reset": (at["ymxr_widereset"], at["ymxr_widestart"])}
+        "ymxr_page", "ymxr_lfill", "ymxr_tab", "ymxr_fill", "ymxr_runrow",
+        "ymxr_move", "ymxr_widereset", "ymxr_widestart")}
+    # the page byte's write of each effect's remap, in its frame code
+    switches = {"switch%d" % i: (CODE + symbols["ymxr_tick%d_rpage" % i],
+                                 CODE + symbols["ymxr_tick%d_remapped" % i])
+                for i in range(4)}
+    return dict(switches, **{
+        "page": (at["ymxr_page"], at["ymxr_tab"]),
+        "fill": (at["ymxr_lfill"], at["ymxr_page"]),
+        "table": (at["ymxr_tab"], at["ymxr_fill"]),
+        "copy": (at["ymxr_fill"], at["ymxr_runrow"]),
+        "move": (at["ymxr_move"], at["ymxr_lfill"]),
+        "reset": (at["ymxr_widereset"], at["ymxr_widestart"])})
+
+
+# The routines of a start or a remap through a transformation, each
+# counted from its call to its return: the start, at the frame and armed,
+# and the remap, from its head or past its tests; and the remap in each
+# effect's frame code, counted from its first instruction to the branch it
+# ends at, or to the return of the routine it calls.
+ROUTINES = ("ymxr_lstart", "ymxr_remap", "ymxr_rmove")
+REMAPS = ("ymxr_tick%d_remap", "ymxr_tick%d_remapped")
 
 
 def routine_calls(code, symbols):
-    """Return addresses after each bsr.w calling ymxr_lstart or ymxr_remap.
+    """Return addresses after each bsr.w calling a routine of ROUTINES,
+    and the end of each effect's remap (REMAPS).
     """
-    called = {symbols["ymxr_lstart"], symbols["ymxr_remap"]}
+    called = {symbols[name] for name in ROUTINES if name in symbols}
     return [at + 4 for at in range(0, len(code) - 3, 2)
             if code[at:at + 2] == b"\x61\x00"
-            and at + 2 + struct.unpack(">h", code[at + 2:at + 4])[0] in called]
+            and at + 2 + struct.unpack(">h", code[at + 2:at + 4])[0] in called] + [
+        symbols[REMAPS[1] % i] for i in range(4) if REMAPS[1] % i in symbols]
 
 
 def shape_of(model, i):
@@ -2753,25 +2777,60 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                            struct.unpack(">H", bytes(mu.mem_read(table, 2)))[0]))
         m.mu.hook_add(UC_HOOK_CODE, copied, begin=CODE + symbols["ymxr_fill"],
                       end=CODE + symbols["ymxr_fill"])
-    # Measure each ymxr_lstart or ymxr_remap call from entry after bsr
+    # Measure each call of a routine of ROUTINES from entry after bsr
     # to the instruction after its rts (routine_calls).
     routine = {"cycles": 0, "at": None}
     looking = ()
     if cycles and "copy" in cycles.regions:
         looking = tuple(lookup_regions(symbols)) + ("routine",)
         def entered(mu, address, size, data):
-            routine["at"] = cycles.counter.cycles
+            # the remap of the frame code counts the routine it calls
+            if routine["at"] is None:
+                routine["at"] = cycles.counter.cycles
 
         def returned(mu, address, size, data):
             if routine["at"] is not None:
                 routine["cycles"] += cycles.counter.cycles - routine["at"]
                 routine["at"] = None
-        for name in ("ymxr_lstart", "ymxr_remap"):
-            m.mu.hook_add(UC_HOOK_CODE, entered, begin=CODE + symbols[name],
-                          end=CODE + symbols[name])
+        for name in ROUTINES + tuple(REMAPS[0] % i for i in range(4)):
+            if name in symbols:
+                m.mu.hook_add(UC_HOOK_CODE, entered, begin=CODE + symbols[name],
+                              end=CODE + symbols[name])
         for at in routine_calls(code, symbols):
             m.mu.hook_add(UC_HOOK_CODE, returned, begin=CODE + at, end=CODE + at)
     lookups = []
+    # a start of a marked source of one column at row 0, through the
+    # identity or a transformation, counted from the frame's start path
+    # (EFFECT, _mapped) to the rate it ends at: (path, cycles) a frame
+    begun = {"at": None, "path": None, "starts": []}
+    if looking:
+        sources = equate("WS_SOURCES", symbols)
+
+        def mapped_start(mu, address, size, data):
+            cell = struct.unpack(">i", bytes(mu.mem_read(
+                mu.reg_read(UC_M68K_REG_A0) + sources - 4
+                + 8 * (mu.reg_read(UC_M68K_REG_D1) & 0x7F), 4)))[0]
+            row0 = mu.reg_read(UC_M68K_REG_D2) & 0x20
+            begun.update(at=cycles.counter.cycles if cell >= 0 and row0 else None, path=None)
+
+        def through(path):
+            def mark(mu, address, size, data):
+                if begun["at"] is not None and begun["path"] is None:
+                    begun["path"] = path
+            return mark
+
+        def started(mu, address, size, data):
+            if begun["at"] is not None and begun["path"]:
+                begun["starts"].append((begun["path"], cycles.counter.cycles - begun["at"]))
+            begun["at"] = None
+        for i in range(4):
+            for name, hook in (("ymxr_tick%d_mapped", mapped_start),
+                               ("ymxr_tick%d_start", through("identity")),
+                               ("ymxr_tick%d_rate", started)):
+                m.mu.hook_add(UC_HOOK_CODE, hook, begin=CODE + symbols[name % i],
+                              end=CODE + symbols[name % i])
+        m.mu.hook_add(UC_HOOK_CODE, through("lookup"), begin=CODE + symbols["ymxr_lstart"],
+                      end=CODE + symbols["ymxr_lstart"])
     model = Model(tune)
     timers = Timers.of_machine(m, tune.effects)
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
@@ -2885,9 +2944,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         want = model.frame()
         if looking:
             spent = dict(cycles.spent, routine=routine["cycles"])
-            lookups.append((lookup_events(model, shapes, row),
-                            {name: spent[name] - spent_before[name] for name in looking},
-                            list(copies)))
+            delta = {name: spent[name] - spent_before[name] for name in looking}
+            delta["starts"] = tuple(begun["starts"])
+            begun["starts"].clear()
+            lookups.append((lookup_events(model, shapes, row), delta, list(copies)))
         if cycles and cycles.regions:
             steps.append((cycles.spent["effects"] - spent_before["effects"],
                           cycles.spent["registers"] - spent_before["registers"],
@@ -3456,14 +3516,19 @@ def mapped_read(code, symbols, cycles_of, general, plays):
             switches = sum(1 for _, what, shape in events
                            if what == "switch" and shape not in ("square", "one"))
             if switches:
-                switched.add(spent["switch"] // switches)
+                switched.add(sum(spent["switch%d" % i] for i in range(4)) // switches)
             if len(events) != 1:
                 continue
             _, what, shape = events[0]
-            page = spent["page"] + spent["table"] if spent["page"] else 0
+            # the page's selection in its routine, or the fill of the
+            # page not in use, each with the table's address
+            page = (spent["page"] + spent["fill"] + spent["table"]
+                    if spent["page"] or spent["fill"] else 0)
             steps.setdefault((what, shape), set()).add(spent["routine"] - page - spent["copy"])
-            if page:
+            if spent["page"]:
                 pages.setdefault("filled" if filled else "found", set()).add(page)
+            if spent["fill"]:
+                pages.setdefault("fill", set()).add(page)
             if spent["move"]:
                 moves.setdefault(shape, set()).add(spent["move"])
             totals.setdefault((what, shape, tuple(filled)), set()).add(spent["routine"])
@@ -3493,10 +3558,38 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                     r" to [\d,]+)?) and to the identity ([\d,]+(?: to [\d,]+)?)\.",
           *(spans(*[(what, shape) for shape in others])
             for what in ("start", "switch", "from the identity", "to the identity")))
-    reads(frame_at, r"Page selection costs ([\d,]+(?: to [\d,]+)?) cycles for a cached"
-                    r" transformation, or ([\d,]+(?: to [\d,]+)?) when the unused page needs filling",
+    reads(frame_at, r"and where neither page has them they fill the page not in use: ([\d,]+(?: to"
+                    r" [\d,]+)?) cycles besides the copy", span(pages.get("fill", {0})))
+    reads(frame_at, r"A remap from the identity selects its page in a separate routine,"
+                    r" ([\d,]+(?: to [\d,]+)?) cycles for a cached transformation, or ([\d,]+(?:"
+                    r" to [\d,]+)?) when the unused page needs filling",
           span(pages.get("found", {0})), span(pages.get("filled", {0})))
+    # the cache, the last bytes of the record (68k/YMXR.S, FX_LBYTE)
+    deferred = build([d for d in DEFINES if d != DEFER_ON] + [DEFER_ON])[1]
+    reads(frame_at, r"in the last (\d+) bytes of the effect's record, which is (\d+) bytes, and"
+                    r" (\d+) with the deferred start in",
+          symbols["FX_SIZE"] - symbols["FX_LBYTE"], symbols["FX_SIZE"], deferred["FX_SIZE"])
+    if deferred["FX_SIZE"] - deferred["FX_LBYTE"] != symbols["FX_SIZE"] - symbols["FX_LBYTE"]:
+        stale.append("the cache is %d bytes of the record with the deferred start in"
+                     % (deferred["FX_SIZE"] - deferred["FX_LBYTE"]))
     reads(frame_at, r"changes one page byte atomically, (\d+) cycles", span(switched or {0}))
+    # a start at row 0 of a marked source of one column from the effect's
+    # start in the frame code to its rate: through the identity, and
+    # through a transformation in a frame that starts it alone, the page
+    # found
+    ident, looked = set(), set()
+    for _, _, _, lookups, _ in played:
+        for events, spent, filled in lookups:
+            for path, n in spent.get("starts", ()):
+                if path == "identity":
+                    ident.add(n)
+                elif [what for _, what, shape in events] == ["start"] \
+                        and events[0][2] == "lk" and not filled:
+                    looked.add(n)
+    reads(frame_at, r"Through the identity, a start at row 0 of a marked source of one column"
+                    r" costs ([\d,]+(?: to [\d,]+)?) cycles from the effect's start in the frame"
+                    r" code to its rate, and through a transformation, the page found,"
+                    r" ([\d,]+(?: to [\d,]+)?)\.", span(ident or {0}), span(looked or {0}))
     three = moves.get("lb", set()) | moves.get("lv", set())
     every = set().union(*moves.values()) if moves else {0}
     if moves.get("lk") != {min(every)} or three != {max(every)}:

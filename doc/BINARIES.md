@@ -211,7 +211,7 @@ the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 `YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to
 version 10 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
-bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,750 bytes larger than
+bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 10,692 bytes larger than
 `YMXR_sndh.bin`. The field at 26 of a core with the lookup in is the
 offset of its first handler: every byte from there to the core's end is
 a handler, an installer or padding. The padding puts the displacement
@@ -241,7 +241,7 @@ identity-only set uses a core without lookup support.
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
 | 18 | 2 | the highest bound tune version this core reads: 9, and 10 with the lookup in (2.1) |
-| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, 2,312 with the deferred start in, 2,172 with the lookup in, and 2,348 with both |
+| 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, 2,312 with the deferred start in, 2,204 with the lookup in, and 2,380 with both |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
 | 26 | 2 | where the handlers begin, from which a tool measures the reach (2.1): the offset of the first handler in a core with the lookup in, and 0 in every other core |
@@ -653,7 +653,7 @@ A call clobbers `d0` to `d5` and `a0` to `a5` and keeps `d6`, `d7` and
 and then reads the next.
 
 **5.2 What a host provides.** The workspace: `YMXR_FIXED` bytes, 2,136 to
-2,348 by the player's switches (2.2), then the bound tune's field at 12
+2,380 by the player's switches (2.2), then the bound tune's field at 12
 bytes, on a long. Before init the host keeps, and after stop restores,
 what the player writes (5.3): of each timer in the claims byte, the
 vector, the nibble of the control register, the enable bit and the mask

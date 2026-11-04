@@ -314,6 +314,15 @@ FX_ABANK        equ     56              ; the bank it is armed in, 0 or BANK
 ; Mapping 0 is identity; 1 to 127 select tables. Each bank records its
 ; selected page and each page's cached transformation and fill kind: 0
 ; plain, 1 marker mirror, 2 setR7 ports (ymxr_fill).
+;
+; A start and a remap into a lookup instance cache it: FX_LBYTE the
+; address of its page byte, FX_LHIGH the page byte of its bank's page 0,
+; FX_LBANK its bank and FX_LKEY the fill kind of its source, and FX_LOK
+; set where the record describes the running handler and no start is
+; pending. A remap between two transformations reads FX_LOK alone to use
+; the cache. A start of any other handler and the arming of a deferred
+; start clear FX_LOK. FX_LKEY is the transformation and the fill kind as
+; one word, its first byte written before each compare with a page.
                 .if     YMXR_DEFER
 FX_MAP          equ     21              ; the kept mapping
 FX_AMAP         equ     33              ; an armed start's mapping and its
@@ -325,21 +334,30 @@ FX_ALEVEL       equ     34              ; square's level at row 0, in the
 FX_LEVEL        equ     58              ; the running square's level at row 0
 FX_RUN          equ     59              ; the running source's mapping
 FX_USE          equ     60              ; the page in use, bank 0's then 1's
+FX_LBANK        equ     62              ; the bank of the cache
 FX_PAGE         equ     64              ; two bytes a page, 4 a bank
-FX_SIZE         equ     72
-WS_TRANS        equ     2344            ; the transformations' block, a long
-YMXR_FIXED      equ     2348
-WS_STATE        equ     2348            ; the image's state block, on a long
+FX_LBYTE        equ     72              ; the cache: the page byte's address
+FX_LKEY         equ     76              ; a transformation, and the fill kind
+FX_LHIGH        equ     78              ; the page byte of page 0
+FX_LOK          equ     79              ; the cache in force
+FX_SIZE         equ     80
+WS_TRANS        equ     2376            ; the transformations' block, a long
+YMXR_FIXED      equ     2380
+WS_STATE        equ     2380            ; the image's state block, on a long
                 .else
 FX_RUN          equ     20
 FX_MAP          equ     21
 FX_USE          equ     22
 FX_LEVEL        equ     23
 FX_PAGE         equ     24
-FX_SIZE         equ     28
-WS_TRANS        equ     2168
-YMXR_FIXED      equ     2172
-WS_STATE        equ     2172
+FX_LBYTE        equ     28
+FX_LKEY         equ     32
+FX_LHIGH        equ     34
+FX_LOK          equ     35
+FX_SIZE         equ     36
+WS_TRANS        equ     2200
+YMXR_FIXED      equ     2204
+WS_STATE        equ     2204
                 .endif
                 .if     (WS_FX+(4*FX_SIZE))<>WS_TRANS
                 .error  "the transformations' long is apart from the records"
@@ -495,7 +513,7 @@ q\{col}:
 
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset.
-                .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,two,three,vector
+                .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,two,three,vector,lk
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
 ; that separates them, and the word after it has the read's
@@ -725,9 +743,14 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  d1,\fx+FX_MAP(a0)
 .kept\~:        move.b  \fx+FX_MAP(a0),\fx+FX_RUN(a0)
                 bne.s   .look\~
+                sf      \fx+FX_LOK(a0)          ; the identity's handler
                 move.w  d3,d1
                 bra.w   \{tick}_start
-.look\~:        moveq   #(\fx-WS_FX)/FX_SIZE,d4
+.look\~:        lea     \fx(a0),a3              ; the record, the effect's
+                lea     \lk(pc),a5              ; instance of the general
+                move.b  ymxr_htab+(8*((\fx-WS_FX)/FX_SIZE))(pc),d5 ; lookup kind, the page byte
+                move.w  #\vector,d1             ; of its page 0 and the vector
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
                 bsr.w   ymxr_lstart
                 bclr    #5,d2
                 bra.w   \{tick}_rate
@@ -738,8 +761,65 @@ q\{ct}:         bra.w   \{tick}_done
                 MREAD   \cm
 \{tick}_mexit:  bpl.w   \{tick}_rate            ; _retune where a row defers
                 and.b   #$7F,d1                 ; a start (4.8)
+; With the cache in force (FX_LOK) and the timer running, a remap between
+; two transformations compares the page the instance does not read with
+; the new one, fills it where it differs (ymxr_lfill), and writes the
+; page byte. A stopped timer and the mapping it runs keep the mapping
+; alone. Every other remap is ymxr_remap's.
+\{tick}_remap:  lea     \fx(a0),a3              ; the record and the effect
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                bsr.w   ymxr_remap
+                move.b  \ctrl.w,d0              ; the timer's control register
+                tst.b   FX_LOK(a3)
+                beq.s   \{tick}_rslow
+                move.b  d1,FX_MAP(a3)           ; the kept mapping
+                tst.b   d2                      ; the select bits, as they were
+                bmi.s   \{tick}_rreset          ; before the reset where the
+                                                ; row resets the timer
+\{tick}_rrun:   and.b   #255-\keep,d0
+                beq.s   \{tick}_remapped        ; a stopped timer
+                cmp.b   FX_RUN(a3),d1
+                beq.s   \{tick}_remapped        ; the mapping it runs
+                tst.b   d1
+                beq.s   \{tick}_rid            ; to the identity
+                move.b  d1,FX_RUN(a3)
+                move.b  d1,FX_LKEY(a3)
+                move.w  FX_LKEY(a3),d5          ; the transformation and the
+                .if     YMXR_DEFER              ; fill kind against the other
+                moveq   #0,d4                   ; page of the bank
+                move.b  FX_LBANK(a3),d4
+                moveq   #1,d0
+                sub.b   FX_USE(a3,d4.w),d0
+                move.w  d4,d3
+                add.w   d3,d3
+                add.w   d0,d3
+                .else
+                moveq   #1,d0
+                sub.b   FX_USE(a3),d0
+                move.w  d0,d3
+                .endif
+                add.w   d3,d3                   ; its two bytes
+                cmp.w   FX_PAGE(a3,d3.w),d5
+                bne.s   \{tick}_rfill
+\{tick}_rswitch:
+                .if     YMXR_DEFER
+                move.b  d0,FX_USE(a3,d4.w)
+                .else
+                move.b  d0,FX_USE(a3)
+                .endif
+                add.b   FX_LHIGH(a3),d0         ; its page byte
+                movea.l FX_LBYTE(a3),a5
+\{tick}_rpage:  move.b  d0,(a5)                 ; one write, which no tick
+\{tick}_remapped:                               ; splits
+                bra.w   \{tick}_rate
+\{tick}_rreset: btst    #6,d2
+                beq.s   \{tick}_rrun
+                move.b  d3,d0
+                bra.s   \{tick}_rrun
+\{tick}_rfill:  bsr.w   ymxr_lfill
+                bra.s   \{tick}_rswitch
+\{tick}_rid:    bsr.w   ymxr_rmove              ; past the tests above
+                bra.w   \{tick}_rate
+\{tick}_rslow:  bsr.w   ymxr_remap
                 bra.w   \{tick}_rate
 ; Timer reset with lookup support. Init redirects the reset test here.
 ; Preserve the pre-reset control byte in d3 so remap processing reads
@@ -2572,10 +2652,10 @@ YMXR_play:
 ; chip's select register, a0 the workspace.
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
-                EFFECT  WS_FX,_14,_15,_16,_17,_30,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,ymxr_two0,ymxr_three0,$134
-                EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,_31,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,ymxr_two1,ymxr_three1,$110
-                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,_32,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,ymxr_two2,ymxr_three2,$120
-                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,_33,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,ymxr_two3,ymxr_three3,$114
+                EFFECT  WS_FX,_14,_15,_16,_17,_30,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,ymxr_two0,ymxr_three0,$134,ymxr_lk0
+                EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,_31,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,ymxr_two1,ymxr_three1,$110,ymxr_lk1
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,_32,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,ymxr_two2,ymxr_three2,$120,ymxr_lk2
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,_33,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,ymxr_two3,ymxr_three3,$114,ymxr_lk3
 ; 4: the tone periods. Steps 4 to 8 are between this label and
 ; ymxr_played, where the rig counts what the register columns cost.
 ymxr_regs:
@@ -3789,6 +3869,7 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
 .live:
                 .if     YMXR_MAP
                 move.b  FX_MAP(a3),FX_AMAP(a3)
+                sf      FX_LOK(a3)              ; the cache, until a remap
                 .endif
                 tst.b   d1
                 bne.s   .cnt
@@ -4092,10 +4173,18 @@ ymxr_park:      dc.b    $80
                 .even
 
                 .if     YMXR_MAP
-; Start through a transformation (SPEC.md 1.10.2). Inputs: FX_RUN=table
-; number, d3=source, d2=control byte, d4=effect. For stepping sources,
-; fill bank 0's lookup page with interrupts enabled. Squares and one-row
-; sources store mapped entries in handler immediates.
+; Start through a transformation (SPEC.md 1.10.2). Inputs: a3 the record,
+; FX_RUN its table number, d3 the source, d2 the control byte, d4 the
+; effect; at the frame a5 the effect's instance of the general lookup
+; kind, d5 the page byte of its page 0 and d1 the vector, which the
+; frame's start writes as constants. A source that steps a place runs the
+; lookup instance of its kind in bank 0. The general kind's operands are
+; at that kind's offsets; every other kind's descriptor, address and page
+; byte are read by index from the two tables below and ymxr_htab. Its
+; page is the page in use or the other where one has the transformation
+; in the source's fill kind, and otherwise the other, filled with
+; interrupts on (ymxr_lfill). The record caches the instance (FX_LOK).
+; Squares and one-row sources store mapped entries in handler immediates.
 ;
 ; Patch operands and vector at level 7. With place reset clear, read the
 ; running place and reduce it modulo the new source length at that level
@@ -4103,204 +4192,380 @@ ymxr_park:      dc.b    $80
 ; Clobbers d0, d1, d3 to d5 and a3 to a5; returns a2 at the chip select
 ; register.
 ;
-; Deferred arming uses FX_ABANK and FX_APLACE, the captured mapping, and
-; the record mirror. The installer writes the vector later. Return
-; a5=instance, a3=mirror. With WS_ARMING=1, fill only the page and
-; return a3=record.
-ymxr_lstart:    movem.l d2/d6-d7/a1/a6,-(sp)
-                move.w  d4,d6                   ; the effect
-                mulu    #FX_SIZE,d4
-                lea     WS_FX(a0),a3
-                adda.w  d4,a3                   ; its record
-                move.w  d3,d1
-                lsl.w   #3,d1                   ; the source's entry
-                movea.l WS_SOURCES-8(a0,d1.w),a4    ; its first row
-                move.l  WS_SOURCES-4(a0,d1.w),d7    ; its cell
-                moveq   #0,d0                   ; the general handler's kind,
-                movea.l d7,a6                   ; and its loop cell
-                tst.l   d7
-                bpl.s   .steps
-                addq.l  #1,d7
+; A deferred start (SPEC.md 4.8) is armed here for ymxr_arm, at the frame
+; constants left aside: in the bank FX_ABANK names, through the captured
+; mapping FX_MAP, into the record's mirror at FX_APLACE, and with the
+; vector left to the installer. It returns a5 the instance and a3 the
+; mirror; with WS_ARMING at 1 it fills the page alone and returns a3 the
+; record.
+ymxr_lstart:    move.w  d3,d0
+                lsl.w   #3,d0                   ; the source's entry
+                movea.l WS_SOURCES-8(a0,d0.w),a4    ; its first row
+                move.l  WS_SOURCES-4(a0,d0.w),d3    ; its loop cell, or a tag
+                bmi.w   .tagged
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)
+                bne.w   .armlk
+                .endif
+; Marked, of one column, at the frame: the general kind, the marker
+; mirror and the loop cell as a displacement from the place's read. The
+; cache is written where it names another instance.
+                move.l  d3,d0                   ; the loop cell
+                moveq   #LK_PAGE,d3
+                add.l   a5,d3                   ; the page byte's address
+                cmp.l   FX_LBYTE(a3),d3
+                beq.s   .lcached
+                move.l  d3,FX_LBYTE(a3)
+                move.b  d5,FX_LHIGH(a3)
+                move.b  #1,FX_LKEY+1(a3)
+                .if     YMXR_DEFER
+                sf      FX_LBANK(a3)
+                .endif
+.lcached:       move.b  FX_RUN(a3),FX_LKEY(a3)
+                move.w  FX_LKEY(a3),d3          ; the transformation and the
+                moveq   #0,d4                   ; fill kind against the page
+                move.b  FX_USE(a3),d4           ; in use, then the other
+                add.w   d4,d4
+                cmp.w   FX_PAGE(a3,d4.w),d3
+                beq.s   .lfound
+                eori.w  #2,d4
+                cmp.w   FX_PAGE(a3,d4.w),d3
+                beq.s   .lfound
+                move.l  d5,-(sp)
+                move.w  d3,d5
+                move.w  d4,d3
+                bsr     ymxr_lfill
+                move.l  (sp)+,d5
+.lfound:        lsr.w   #1,d4
+                move.b  d4,FX_USE(a3)
+                add.b   d4,d5                   ; the page byte
+                .if     YMXR_PCREL              ; the loop cell, 0 where the
+                tst.l   d0                      ; source plays once
+                beq.s   .lonce
+                sub.l   a5,d0
+                sub.w   #LK_PTR,d0
+.lonce:
+                .endif
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+ymxr_lkwindow   equ     *                       ; inside the window: the rig's
+                                                ; boundary (inside)
+                moveq   #0,d3                   ; the place: row 0, or the
+                btst    #5,d2                   ; row the running handler is
+                bne.s   .lfirst                 ; at modulo R of this source
+                movea.w d1,a2
+                bsr     ymxr_runrow
+                move.l  DT_ROWS-DT_PAYLOAD(a4),d4
+                bsr     ymxr_rem
+                lea     YM_SELECT.w,a2
+                move.b  FX_USE(a3),d5           ; the page byte again
+                add.b   FX_LHIGH(a3),d5
+.lfirst:        move.b  FX_TARGET(a3),LK_SEL(a5)
+                move.l  a4,FX_FIRST(a3)         ; the place at row 0
+                adda.l  d3,a4                   ; the row the place is at
+                .if     YMXR_PCREL
+                move.l  a4,d4
+                sub.l   a5,d4
+                sub.w   #LK_PTR,d4
+                move.w  d4,LK_PTR(a5)
+                move.w  d0,LK_CELL(a5)
+                .else
+                move.l  a4,LK_PTR(a5)
+                move.l  d0,LK_CELL(a5)
+                .endif
+                move.b  d5,LK_PAGE(a5)          ; the page byte
+                movea.w d1,a4
+                move.l  a5,(a4)                 ; the vector
+                move.w  (sp)+,sr
+                clr.b   FX_SHAPE(a3)
+                st      FX_LOK(a3)
+                rts
+                .if     YMXR_DEFER
+.armlk:         move.l  d3,d0                   ; an arming of the general kind
+                moveq   #0,d5
+                bra.s   .kind
+                .endif
+; A kind's descriptor past ymxr_kinds, and an effect's lookup instances
+; past effect 0's.
+.kd:            dc.b    0,KD_SIZE,2*KD_SIZE,3*KD_SIZE
+                dc.b    4*KD_SIZE,5*KD_SIZE,6*KD_SIZE,7*KD_SIZE
+.eff:           dc.w    0,LOOK_STRIDE,2*LOOK_STRIDE,3*LOOK_STRIDE
+.tagged:        addq.l  #1,d3
                 beq     .square
-                addq.l  #1,d7
+                addq.l  #1,d3
                 beq     .one
                 lea     WS_WIDE(a0),a2          ; a source of several columns,
-                movea.l -8(a2,d1.w),a6          ; or counted: its loop cell
-                move.w  -4(a2,d1.w),d1          ; and the stride from one
-                moveq   #2,d0                   ; column to the next
-                addq.l  #1,d7
-                beq.s   .two
-                moveq   #4,d0
-                addq.l  #1,d7
-                beq.s   .three
-                moveq   #1,d0                   ; counted, of one column
-                addq.l  #1,d7
-                beq.s   .steps
-                moveq   #6,d0                   ; counted, of two
-.two:           cmp.b   #22,FX_TARGET(a3)       ; setNoiseX maps its first
-                bcs.s   .steps                  ; write, the volume, marked
-                addq.w  #1,d0                   ; or counted
-                bra.s   .steps
-.three:         cmp.b   #21,FX_TARGET(a3)       ; setVoiceX maps its middle
-                beq.s   .steps                  ; column, the volume
-                moveq   #5,d0
-; The page, the instance and its page byte, then a register, a place and a
-; loop cell a column, as a start through the identity writes them.
-.steps:         move.w  d0,d7                   ; the kind
-                mulu    #KD_SIZE,d0
-                lea     ymxr_kinds(pc),a2
-                adda.w  d0,a2                   ; its descriptor
-                move.b  KD_FILL(a2),d5
-                cmp.w   #1,d7                   ; a counted source on setR7
-                bne.s   .kind                   ; writes the ports' bits
-                cmp.b   #7,FX_TARGET(a3)
-                bne.s   .kind
+                swap    d1                      ; or counted: the stride from
+                move.w  -4(a2,d0.w),d1          ; one column to the next, in
+                swap    d1                      ; the high word of d1, and its
+                move.l  -8(a2,d0.w),d0          ; loop cell
                 moveq   #2,d5
-.kind:          moveq   #0,d4                   ; bank 0
+                addq.l  #1,d3
+                beq.s   .two
+                moveq   #4,d5
+                addq.l  #1,d3
+                beq.s   .three
+                moveq   #1,d5                   ; counted, of one column
+                addq.l  #1,d3
+                beq.s   .kind
+                moveq   #6,d5                   ; counted, of two
+.two:           cmp.b   #22,FX_TARGET(a3)       ; setNoiseX maps its first
+                bcs.s   .kind                   ; write, the volume, marked
+                addq.w  #1,d5                   ; or counted
+                bra.s   .kind
+.three:         cmp.b   #21,FX_TARGET(a3)       ; setVoiceX maps its middle
+                beq.s   .kind                   ; column, the volume
+                moveq   #5,d5
+; d5 the kind, d0 the loop cell, a4 the first row, and the stride in the
+; high word of d1. The descriptor, the instance and the page byte of its
+; bank's page 0 into the record's cache.
+.kind:          moveq   #0,d3
+                move.b  .kd(pc,d5.w),d3
+                lea     ymxr_kinds(pc),a2
+                adda.w  d3,a2                   ; the descriptor
+                move.w  d4,d3
+                add.w   d3,d3
+                move.w  .eff(pc,d3.w),d4        ; two bytes an effect
+                lsl.w   #2,d3                   ; eight page bytes an effect,
+                add.w   d5,d3                   ; one a kind
                 .if     YMXR_DEFER
-                moveq   #0,d3                   ; or an arming's, d3 its
-                tst.b   WS_ARMING(a0)           ; distance from bank 0
+                sf      FX_LBANK(a3)            ; bank 0, or an arming's
+                tst.b   WS_ARMING(a0)
                 beq.s   .bank
-                move.w  FX_ABANK(a3),d3
+                tst.w   FX_ABANK(a3)
                 beq.s   .bank
-                moveq   #1,d4
+                add.w   #BANK,d4
+                add.w   #32,d3                  ; bank 1's page bytes
+                move.b  #1,FX_LBANK(a3)
 .bank:
                 .endif
-                bsr     ymxr_page               ; d0 the page
+                lea     ymxr_htab(pc),a5
+                move.b  (a5,d3.w),FX_LHIGH(a3)
+                lea     ymxr_tick0(pc),a5
+                adda.w  KD_BASE(a2),a5
+                adda.w  d4,a5                   ; the instance
+                move.w  KD_PAGE(a2),d4
+                pea     0(a5,d4.w)
+                move.l  (sp)+,FX_LBYTE(a3)      ; its page byte, cached
+; The fill kind, a counted source on setR7 the ports' bits, and the page.
+                move.b  KD_FILL(a2),d4
+                subq.w  #1,d5
+                bne.s   .fill
+                cmp.b   #7,FX_TARGET(a3)
+                bne.s   .fill
+                moveq   #2,d4
+.fill:          move.b  FX_RUN(a3),FX_LKEY(a3)
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)           ; an arming's captured mapping
+                beq.s   .run
+                move.b  FX_MAP(a3),FX_LKEY(a3)
+.run:
+                .endif
+                move.b  d4,FX_LKEY+1(a3)
+                move.w  FX_LKEY(a3),d5
+                .if     YMXR_DEFER
+                moveq   #0,d4
+                move.b  FX_LBANK(a3),d4
+                moveq   #0,d3
+                move.b  FX_USE(a3,d4.w),d3
+                add.w   d4,d4
+                add.w   d4,d3
+                .else
+                moveq   #0,d3
+                move.b  FX_USE(a3),d3
+                .endif
+                add.w   d3,d3                   ; four bytes a bank, two a page
+                cmp.w   FX_PAGE(a3,d3.w),d5
+                beq.s   .found
+                eori.w  #2,d3
+                cmp.w   FX_PAGE(a3,d3.w),d5
+                beq.s   .found
+                bsr     ymxr_lfill
+.found:         moveq   #2,d4
+                and.w   d3,d4
+                lsr.w   #1,d4                   ; the page
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; at 1 the page alone
-                bgt     .done
-                move.b  d0,FX_USE(a3,d4.w)
+                bgt.w   .started
+                moveq   #0,d3
+                move.b  FX_LBANK(a3),d3
+                move.b  d4,FX_USE(a3,d3.w)
+                .else
+                move.b  d4,FX_USE(a3)
+                .endif
+                move.b  FX_LHIGH(a3),d5
+                add.b   d4,d5                   ; the page byte
+                .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)           ; an arming writes the mirror
                 beq.s   .rec
                 lea     ARMOFF(a3),a3
 .rec:
-                .else
-                move.b  d0,FX_USE(a3)
                 .endif
-                move.l  DT_ROWS-DT_PAYLOAD(a4),FX_ROWS(a3)
-                move.w  d6,d4
-                lsl.w   #3,d4                   ; eight kinds an effect
-                add.w   d7,d4
-                .if     YMXR_DEFER
-                tst.w   d3                      ; bank 1's page bytes, 32 on
-                beq.s   .htab
-                add.w   #32,d4
-.htab:
+                move.l  DT_ROWS-DT_PAYLOAD(a4),FX_ROWS(a3)  ; R
+; One column: the loop cell, under YMXR_PCREL a displacement from the
+; place's read at TICK_PTR, as every lookup kind has it. Several: the
+; registers the loop below uses kept, the loop cell, the map's row of the
+; target, eight bytes from target 14 (SPEC.md 2.1), and the offset of the
+; loop cells.
+                move.w  KD_COLS(a2),d4
+                bne.s   .wide
+                .if     YMXR_PCREL
+                tst.l   d0
+                beq.s   .level
+                sub.l   a5,d0
+                sub.w   #TICK_PTR,d0
                 .endif
-                lea     ymxr_htab(pc),a5
-                add.b   (a5,d4.w),d0            ; the page byte
-                move.w  KD_STEP(a2),d4
-                mulu    d6,d4
-                add.w   KD_BASE(a2),d4
-                lea     ymxr_tick0(pc),a5
-                adda.w  d4,a5                   ; the instance
-                .if     YMXR_DEFER
-                adda.w  d3,a5                   ; in its bank
-                .endif
-                lea     ymxr_timers(pc),a1
+                bra.s   .level
+.wide:          movem.l d2/d6-d7/a1/a6,-(sp)
+                movea.l d0,a6
+                moveq   #0,d6
+                move.b  FX_TARGET(a3),d6
+                sub.w   #14,d6
                 lsl.w   #3,d6
-                move.w  (a1,d6.w),d6            ; the effect's vector, and
-                swap    d6                      ; the page byte below it
-                move.b  d0,d6
-                lea     FX_TARGET(a3),a1        ; one column: the target's
-                moveq   #0,d0                   ; register, at the offset 0
-                tst.w   KD_COLS(a2)
-                bne.s   .map
-                moveq   #0,d1
-                bra.s   .write
-.map:           move.b  FX_TARGET(a3),d0        ; several: the map's row of
-                sub.w   #14,d0                  ; the target, eight bytes
-                lsl.w   #3,d0                   ; from target 14 (SPEC.md
-                lea     ymxr_wide(pc),a1        ; 2.1)
-                adda.w  d0,a1
-.write:         move.w  KD_CELLS(a2),d7
-                movem.l a2-a3,-(sp)
-                move.w  sr,-(sp)
+                lea     ymxr_wide(pc),a1
+                adda.w  d6,a1
+                move.w  KD_CELLS(a2),d7
+.level:         move.w  sr,-(sp)
                 ori.w   #$0700,sr
 ymxr_lwindow    equ     *                       ; inside the window: the rig's
                                                 ; boundary (inside)
-                .if     YMXR_DEFER
-                tst.b   WS_ARMING(a0)           ; an arming's row, at
-                beq.s   .run                    ; FX_APLACE
-                move.l  FX_APLACE-ARMOFF(a3),d3
-                bra.s   .first
-.run:
+                moveq   #0,d3                   ; the place: row 0, an
+                .if     YMXR_DEFER              ; arming's at FX_APLACE, or the
+                tst.b   WS_ARMING(a0)           ; row the running handler is
+                beq.s   .now                    ; at modulo R of this source,
+                move.l  FX_APLACE-ARMOFF(a3),d3 ; out of the record before
+                bra.s   .first                  ; the columns below write it
+.now:
                 .endif
-                moveq   #0,d3                   ; the place: row 0, or the
-                btst    #5,d2                   ; row the running handler is
-                bne.s   .first                  ; at modulo R of this source,
-                swap    d6                      ; out of the record before
-                movea.w d6,a2                   ; the columns below write it
-                swap    d6
+                btst    #5,d2
+                bne.s   .first
+                move.l  a2,-(sp)
+                movea.w d1,a2
                 bsr     ymxr_runrow
                 move.l  DT_ROWS-DT_PAYLOAD(a4),d4
                 bsr     ymxr_rem
-                movea.l 2(sp),a2                ; the kind, under the level
-.first:         move.w  KD_COLS(a2),d4          ; pushed
-.col:           move.w  KD_SEL(a2),d2
+                movea.l (sp)+,a2
+                move.b  FX_USE(a3),d5           ; the page byte again
+                add.b   FX_LHIGH(a3),d5
+.first:         move.w  KD_PAGE(a2),d4
+                move.b  d5,(a5,d4.w)            ; the page byte
+                move.w  KD_COLS(a2),d4
+                bne.s   .cols
+; One column: the target's register at TICK_SEL and the place at
+; TICK_PTR, as every lookup kind has them, the loop cell and, counted,
+; the rows from the place on and the rows of a pass through the loop.
+                move.b  FX_TARGET(a3),TICK_SEL(a5)
+                move.l  a4,d4
+                add.l   d3,d4                   ; the row the place is at
+                .if     YMXR_PCREL
+                sub.l   a5,d4
+                sub.w   #TICK_PTR,d4
+                move.w  d4,TICK_PTR(a5)
+                move.w  KD_CELLS(a2),d4
+                move.w  d0,(a5,d4.w)
+                .else
+                move.l  d4,TICK_PTR(a5)
+                move.w  KD_CELLS(a2),d4
+                move.l  d0,(a5,d4.w)
+                .endif
+                move.w  KD_LEFT(a2),d4
+                beq.s   .one1
+                move.w  FX_ROWS+2(a3),(a5,d4.w) ; R less the place
+                sub.w   d3,(a5,d4.w)
+                move.w  FX_ROWS+2(a3),d3        ; R less the row the loop
+                tst.l   d0                      ; cell is at, or R where the
+                beq.s   .reld                   ; source plays once
+                move.l  d0,d4
+                .if     YMXR_PCREL
+                add.l   a5,d4
+                add.w   #TICK_PTR,d4
+                .endif
+                sub.l   a4,d4
+                sub.w   d4,d3
+.reld:          move.w  KD_RELD(a2),d4
+                move.w  d3,(a5,d4.w)
+.one1:          move.l  a4,FX_FIRST(a3)         ; the place at row 0
+                move.b  KD_SHAPE(a2),FX_SHAPE(a3)
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)           ; the installer writes an
+                bne.s   .armed1                 ; armed start's vector
+                .endif
+                movea.w d1,a4
+                move.l  a5,(a4)                 ; the vector
+                move.w  (sp)+,sr
+                st      FX_LOK(a3)
+                lea     YM_SELECT.w,a2
+                rts
+                .if     YMXR_DEFER
+.armed1:        move.w  (sp)+,sr
+                lea     YM_SELECT.w,a2
+                rts
+                .endif
+; Several: a register, a place and a loop cell a column, as a start
+; through the identity writes them.
+.cols:          swap    d1                      ; the stride
+                moveq   #0,d6                   ; four bytes a column
+.col:           move.w  KD_SEL(a2,d6.w),d2
                 move.b  (a1)+,(a5,d2.w)         ; the register
                 moveq   #0,d0
-                move.w  KD_PTR(a2),d0
+                move.w  KD_PTR(a2,d6.w),d0
                 add.l   a5,d0                   ; the column's read
                 moveq   #0,d5
                 move.b  (a1)+,d5
                 mulu    d1,d5                   ; the column it writes
                 add.l   a4,d5                   ; at row 0, kept for the
-                move.l  d5,FX_FIRST(a3)         ; place's reset
+                move.l  d5,FX_FIRST(a3,d6.w)    ; place's reset
                 move.l  a6,d2                   ; the column's loop cell, or
-                beq.s   .once                   ; 0 where the source plays once
+                beq.s   .none                   ; 0 where the source plays once
                 sub.l   a4,d2
                 add.l   d5,d2
                 .if     YMXR_PCREL
                 sub.l   d0,d2                   ; a displacement from the read
-.once:          move.w  d2,(a5,d7.w)
+.none:          move.w  d2,(a5,d7.w)
                 .else
-.once:          move.l  d2,(a5,d7.w)
+.none:          move.l  d2,(a5,d7.w)
                 .endif
                 add.l   d3,d5                   ; the row the place is at
-                move.w  KD_PTR(a2),d2
+                move.w  KD_PTR(a2,d6.w),d2
                 .if     YMXR_PCREL
                 sub.l   d0,d5
                 move.w  d5,(a5,d2.w)
                 .else
                 move.l  d5,(a5,d2.w)
                 .endif
-                addq.l  #4,a2                   ; the next column
-                addq.l  #4,a3
+                addq.w  #4,d6                   ; the next column
                 addq.w  #CELL_SIZE,d7
                 dbra    d4,.col
-                movem.l 2(sp),a2-a3             ; under the level pushed
-                move.w  KD_LEFT(a2),d2          ; a counted source: the rows
-                beq.s   .page                   ; from the place on, and the
-                move.l  FX_ROWS(a3),d5          ; rows of a pass through the
-                move.w  d5,d0                   ; loop, R less RR, or R where
-                sub.w   d3,d0                   ; it plays once
-                move.w  d0,(a5,d2.w)
+                swap    d1
+                move.w  KD_LEFT(a2),d4          ; counted: the rows from the
+                beq.s   .aim                    ; place on, and the rows of a
+                move.l  FX_ROWS(a3),d5          ; pass through the loop, R
+                move.w  d5,(a5,d4.w)            ; less RR, or R where it plays
+                sub.w   d3,(a5,d4.w)            ; once
                 move.l  a6,d0
                 beq.s   .pass
                 sub.l   a4,d0
                 sub.w   d0,d5
-.pass:          move.w  KD_RELD(a2),d2
-                move.w  d5,(a5,d2.w)
-.page:          move.w  KD_PAGE(a2),d2
-                move.b  d6,(a5,d2.w)            ; the page byte
-                swap    d6
-                movea.w d6,a1
+.pass:          move.w  KD_RELD(a2),d4
+                move.w  d5,(a5,d4.w)
+; The vector, which the installer writes for an arming, and the shape.
+.aim:
                 .if     YMXR_DEFER
-                tst.b   WS_ARMING(a0)           ; the installer writes an
-                bne.s   .armed                  ; armed start's vector
+                tst.b   WS_ARMING(a0)
+                bne.s   .armed
                 .endif
-                move.l  a5,(a1)                 ; the vector
-                .if     YMXR_DEFER
-.armed:
-                .endif
-                move.w  (sp)+,sr
-                addq.l  #8,sp
+                movea.w d1,a4
+                move.l  a5,(a4)                 ; the vector
+                st      FX_LOK(a3)
+.armed:         move.w  (sp)+,sr
                 move.b  KD_SHAPE(a2),FX_SHAPE(a3)
-                bra     .done
+                movem.l (sp)+,d2/d6-d7/a1/a6
+.started:       lea     YM_SELECT.w,a2
+                rts
 ; A square: the entries of its two keys, the second the marker's.
-.square:        moveq   #0,d0
+.square:        movem.l d2/d6-d7/a1/a6,-(sp)
+                move.w  d4,d6                   ; the effect
+                moveq   #0,d0
                 move.b  FX_RUN(a3),d0
                 bsr     ymxr_tab
                 move.b  (a4),d0
@@ -4334,9 +4599,12 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 move.w  (sp)+,sr
                 move.l  a4,FX_FIRST(a3)
                 st      FX_SHAPE(a3)
+                sf      FX_LOK(a3)
                 bra.s   .done
 ; A source of one row: its entry.
-.one:           moveq   #0,d0
+.one:           movem.l d2/d6-d7/a1/a6,-(sp)
+                move.w  d4,d6                   ; the effect
+                moveq   #0,d0
                 move.b  FX_RUN(a3),d0
                 bsr     ymxr_tab
                 move.b  (a4),d0
@@ -4356,47 +4624,76 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 move.w  (sp)+,sr
                 move.l  a4,FX_FIRST(a3)
                 move.b  #1,FX_SHAPE(a3)
+                sf      FX_LOK(a3)
 .done:          movem.l (sp)+,d2/d6-d7/a1/a6
                 lea     YM_SELECT.w,a2
                 rts
 
+
+; Each timer's select bits in its control register, by effect.
+ymxr_sels:      dc.b    $07,$07,$07,$70
+
 ; Remap (SPEC.md 1.10.2). Inputs: d1=mapping number 0 to 127, d4=effect,
-; d2=control byte, d3=pre-reset timer control when applicable. Replace
-; kept. If running, replace its mapping while preserving source, place
-; and rate; if stopped, preserve the new mapping for a later start.
+; a3 its record, d0 its timer's control register, d2=control byte,
+; d3=pre-reset timer control when applicable.
+; Replace kept. If running, replace its mapping while preserving source,
+; place and rate; if stopped, preserve the new mapping for a later start.
 ;
-; Squares and one-row sources replace immediate entries. Stepping
-; sources switch the running bank's page between transformations
-; (ymxr_page), or move between identity and lookup handlers (ymxr_move).
-; Clobbers d0, d1, d3 to d5 and a3 to a5; returns a2 at the chip select
-; register.
+; The frame switches the page itself where the cache is in force (the
+; remap of EFFECT). Here squares and one-row sources replace immediate
+; entries, and stepping sources switch the running bank's page
+; (ymxr_page) or move between identity and lookup handlers (ymxr_move);
+; the record caches a lookup instance. Clobbers d0, d1, d3 to d5 and a3
+; to a5; returns a2 at the chip select register.
 ;
 ; A pending start retains its captured mapping. First update the record
 ; for any completed installation, then remap at level 7. Page filling
 ; alone enables interrupts; if installation occurs during the fill,
 ; remap the newly running source. Moving handlers also moves the pending
 ; hook (ymxr_rehook), including a square's mask.
-ymxr_remap:     movem.l d2/d6-d7/a1/a6,-(sp)
+ymxr_remap:     move.b  d1,FX_MAP(a3)           ; the kept mapping
+                .if     YMXR_DEFER
+                tst.b   FX_PENDING(a3)          ; a start pending: below
+                bne.w   .slow
+                .endif
+                tst.b   d2                      ; the select bits: 0 on a
+                bpl.s   .live                   ; stopped timer, and as they
+                btst    #6,d2                   ; were before the reset where
+                beq.s   .live                   ; the row resets the timer
+                move.b  d3,d0
+.live:          and.b   ymxr_sels(pc,d4.w),d0
+                beq.s   .kept
+                cmp.b   FX_RUN(a3),d1           ; the mapping it runs
+                bne.s   .moved
+.kept:          rts
+; Every other remap on a running timer: the running mapping in d7 and the
+; new one in the record, and the vector in a6. The frame enters here with
+; the kept mapping written, the timer running and no start pending.
+.moved:
+ymxr_rmove      equ     *
+                movem.l d2/d6-d7/a1/a6,-(sp)
                 .if     YMXR_DEFER
                 move.w  sr,-(sp)
                 .endif
                 move.w  d4,d6                   ; the effect
-                mulu    #FX_SIZE,d4
-                lea     WS_FX(a0),a3
-                adda.w  d4,a3                   ; its record
-                move.b  d1,FX_MAP(a3)
+                move.b  FX_RUN(a3),d7
+                move.b  d1,FX_RUN(a3)
+                lsl.w   #3,d4
+                lea     ymxr_timers(pc),a6
+                movea.w (a6,d4.w),a6            ; the vector
                 .if     YMXR_DEFER
-                tst.b   FX_PENDING(a3)
-                beq.s   .on
+                bra.s   .vec
+; A start pending: the record follows a switch the tick has made, then
+; the timer's select bits as above.
+.slow:          movem.l d2/d6-d7/a1/a6,-(sp)
+                move.w  sr,-(sp)
+                move.w  d4,d6                   ; the effect
                 ori.w   #$0700,sr
-                move.w  d6,d4
                 moveq   #0,d5                   ; left pending
                 bsr.w   ymxr_pend
                 bne.s   .on
                 move.w  (sp),sr                 ; the tick has performed it
-.on:
-                .endif
-                lea     ymxr_timers(pc),a6
+.on:            lea     ymxr_timers(pc),a6
                 move.w  d6,d0
                 lsl.w   #3,d0
                 adda.w  d0,a6                   ; its timer
@@ -4414,6 +4711,7 @@ ymxr_remap:     movem.l d2/d6-d7/a1/a6,-(sp)
                 beq     .done
                 move.b  d1,FX_RUN(a3)
                 movea.w (a6),a6                 ; the vector
+                .endif
 .vec:           movea.l (a6),a5                 ; the running handler
                 moveq   #0,d4                   ; and its bank
                 .if     YMXR_DEFER
@@ -4431,7 +4729,7 @@ ymxr_remap:     movem.l d2/d6-d7/a1/a6,-(sp)
                 move.w  d0,d2                   ; the lookup kind
                 move.w  d1,d3                   ; the identity's
                 tst.b   FX_RUN(a3)
-                beq.s   .toid
+                beq.w   .toid
                 mulu    #KD_SIZE,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
@@ -4448,6 +4746,14 @@ ymxr_remap:     movem.l d2/d6-d7/a1/a6,-(sp)
                 .endif
                 bsr     ymxr_page               ; d0 the page
 .held:          move.b  d0,FX_USE(a3,d4.w)
+                move.b  d5,FX_LKEY+1(a3)        ; the cache: the fill kind and
+                .if     YMXR_DEFER              ; the bank, in force with no
+                move.b  d4,FX_LBANK(a3)         ; start pending
+                tst.b   FX_PENDING(a3)
+                seq     FX_LOK(a3)
+                .else
+                st      FX_LOK(a3)
+                .endif
                 move.w  d4,d1                   ; its page byte: bank, effect,
                 lsl.w   #5,d1                   ; then kind
                 move.w  d6,d5
@@ -4455,15 +4761,19 @@ ymxr_remap:     movem.l d2/d6-d7/a1/a6,-(sp)
                 add.w   d5,d1
                 add.w   d2,d1
                 lea     ymxr_htab(pc),a4
-                add.b   (a4,d1.w),d0
+                move.b  (a4,d1.w),FX_LHIGH(a3)  ; page 0's, cached
+                add.b   FX_LHIGH(a3),d0
                 move.w  KD_PAGE(a2),d1
                 tst.b   d7
                 beq.s   .tolook
-ymxr_rpage      equ     *                       ; the rig's boundary (inside)
-                move.b  d0,(a5,d1.w)            ; one write, which no tick
+                lea     0(a5,d1.w),a4           ; the page byte, cached
+                move.l  a4,FX_LBYTE(a3)
+                move.b  d0,(a4)                 ; one write, which no tick
                 bra     .done                   ; splits
 .tolook:        bsr     ymxr_at                 ; the instance, its page byte
-                move.b  d0,(a4,d1.w)            ; written before the vector
+                pea     0(a4,d1.w)              ; cached, and written before
+                move.l  (sp)+,FX_LBYTE(a3)      ; the vector names it
+                move.b  d0,(a4,d1.w)
                 movea.l a2,a1                   ; names it
                 move.w  d3,d0
                 mulu    #KD_SIZE,d0
@@ -4475,7 +4785,8 @@ ymxr_rpage      equ     *                       ; the rig's boundary (inside)
                 .endif
                 bsr     ymxr_move
                 bra     .done
-.toid:          move.w  d3,d0
+.toid:          sf      FX_LOK(a3)              ; the identity's handler
+                move.w  d3,d0
                 mulu    #KD_SIZE,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
@@ -4657,6 +4968,27 @@ ymxr_rehook:    tst.b   FX_PENDING(a3)
 .none:          rts
                 .endif
 
+; Fill a page of the lookup instance the record a3 caches with interrupts
+; enabled: d3 the offset of the page's two bytes past FX_PAGE, four a bank
+; and two a page, and d5 the two bytes, the transformation and the fill
+; kind, which the record then lists for the page. The page is the
+; instance's page byte, at FX_LBYTE, plus its high byte times 256: FX_LHIGH,
+; and 1 more for page 1. Preserves every register.
+ymxr_lfill:     movem.l d0-d1/d3/a2/a4,-(sp)
+                move.w  d5,FX_PAGE(a3,d3.w)
+                lsr.w   #1,d3
+                and.b   #1,d3                   ; the page
+                add.b   FX_LHIGH(a3),d3
+                lsl.w   #8,d3
+                movea.l FX_LBYTE(a3),a4         ; the page read's displacement
+                adda.w  d3,a4                   ; word, the page past it
+                move.w  d5,d0
+                lsr.w   #8,d0                   ; the transformation
+                bsr     ymxr_tab
+                bsr     ymxr_fill
+                movem.l (sp)+,d0-d1/d3/a2/a4
+                rts
+
 ; Select the cached page for FX_RUN, effect d6, bank d4 and fill kind
 ; d5; a3 is the record. Prefer the selected page if it matches,
 ; otherwise use or fill the other page. Fill only an unused page, with
@@ -4665,7 +4997,7 @@ ymxr_rehook:    tst.b   FX_PENDING(a3)
 ; While arming, use the row's captured mapping. FX_USE identifies any
 ; page read by an existing pending start, so filling preserves that
 ; page.
-ymxr_page:      movem.l d1-d5/a2/a4-a5,-(sp)
+ymxr_page:      movem.l d1/a4,-(sp)
                 move.b  FX_RUN(a3),d1
                 .if     YMXR_DEFER
                 tst.b   WS_ARMING(a0)
@@ -4691,6 +5023,7 @@ ymxr_page:      movem.l d1-d5/a2/a4-a5,-(sp)
                 beq.s   .found
 .fill:          move.b  d1,(a4,d0.w)
                 move.b  d5,1(a4,d0.w)
+                movem.l d2/a2,-(sp)
                 move.w  d6,d2                   ; the page: the effect's
                 add.w   d2,d2                   ; pages, 512 bytes a bank,
                 lea     ymxr_pgat(pc),a4        ; 256 a page
@@ -4710,8 +5043,9 @@ ymxr_page:      movem.l d1-d5/a2/a4-a5,-(sp)
                 bsr.s   ymxr_tab
                 bsr.s   ymxr_fill
                 move.w  (sp)+,d0
+                movem.l (sp)+,d2/a2
 .found:         lsr.w   #1,d0
-                movem.l (sp)+,d1-d5/a2/a4-a5
+                movem.l (sp)+,d1/a4
                 rts
 
 ; Resolve transformation d0 (1 to 127) into a2: E at offset 0, entry k
