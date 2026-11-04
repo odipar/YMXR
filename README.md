@@ -151,6 +151,7 @@ to write a reader, SPEC.md sections 1 to 3 and 7, then the
 | [`go/`](go) | the same twelve in Go, the executables a release ships |
 | [`bin/`](bin) | the twelve as scripts, each writing standard output; ten read standard input, `ymxr-multi` and `ymxr-check` the files named ([tools.md](doc/tools.md) 1.1), and `ymxr-set` runs the calls of a whole set (16.6) |
 | [`68k/YMXR.S`](68k/YMXR.S) | the player; `YMXR_PERF` builds the raster monitor in |
+| [`68k/player/`](68k/player) | the parts of the player, which `YMXR.S` includes in the order rmac assembles them |
 | [`68k/YMXR_sndh.S`](68k/YMXR_sndh.S), [`68k/YMXR_prg.S`](68k/YMXR_prg.S) | the SNDH core around the player and the program stub, assembled once and combined with a tune by a tool |
 | [`ym/`](ym) | the measurement and play scripts ([tools.md](doc/tools.md) 18), and [`ym/test`](ym/test), eleven dumps the tests run on |
 | [`release/`](release) | the scripts that build and list a release |

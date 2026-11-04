@@ -373,7 +373,7 @@ final class PlayerTest {
             "a source of one row, no place stepped", "PERF_ONEROW", "16");
 
     /** The cycles an end of interrupt written by hand adds to every
-     *  path (68k/YMXR.S, PERF_END). */
+     *  path (68k/player/equates.S, PERF_END). */
     private static final int END = 16;
 
     @Test

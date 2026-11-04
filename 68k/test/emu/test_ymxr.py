@@ -51,8 +51,9 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        entries a frame at a time
        test_ymxr.py -abs [tunes]       the player built with YMXR_PCREL=0,
                                        whose ticks read a row through an
-                                       absolute address (68k/YMXR.S): the
-                                       same model, and it joins the switches
+                                       absolute address
+                                       (68k/player/switches.S): the same
+                                       model, and it joins the switches
                                        above
        test_ymxr.py -map [tunes]       optional lookup support, YMXR_MAP=1,
                                        checked against the same model;
@@ -259,11 +260,11 @@ def area_of(tune_bytes, symbols, area=None, reach=None):
 
 
 def page_at(symbols, area, tune, effect, form, run, reach):
-    """Where init puts the page of transformation run in form on an
-    effect: the tables first, then each effect's pages, and its fallback
-    where it has one, at its offset modulo 256 past them, in the order of
-    those offsets (68k/YMXR.S, ymxr_prefill). The page's address, or the
-    effect's fallback pages for a page init leaves out."""
+    """Where init puts the page of transformation run in form on an effect:
+    the tables first, then each effect's pages, and its fallback where it
+    has one, at its offset modulo 256 past them, in the order of those
+    offsets (68k/player/lookup_prefill.S, ymxr_prefill). The page's address,
+    or the effect's fallback pages for a page init leaves out."""
     entries = tune.pages
     count = len(tune.transformations)
     fallback = fallback_of(symbols)
@@ -312,8 +313,8 @@ FITS = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 
 
 # What YMXR_stop leaves on the chip: the three voices silenced first, then
 # every register zero, then the mixer with each channel off. A row sets the
-# registers it names alone, so a tune that follows one which set a
-# register it leaves unset would read that value (68k/YMXR.S, YMXR_stop).
+# registers it names alone, so a tune that follows one which set a register
+# it leaves unset would read that value (68k/player/stop.S, YMXR_stop).
 HUSHED = ([(8, 0), (9, 0), (10, 0)] + [(r, 0) for r in range(13, -1, -1)]
           + [(7, 0xFF)])
 
@@ -950,8 +951,8 @@ class Model:
 
     def fill(self, i):
         """Lookup page encoding for effect i: ports for counted setR7,
-        mirror for a mapped marker column, plain otherwise (68k/YMXR.S,
-        ymxr_fill).
+        mirror for a mapped marker column, plain otherwise
+        (68k/player/lookup_pages.S, ymxr_fill).
         """
         fx = self.fx[i]
         counted = self.tune.counted[fx["source"]]
@@ -980,14 +981,14 @@ class Model:
 
     def counted(self, i):
         """Whether effect i's source has its column filling its byte, which
-        the player's counted handler runs (68k/YMXR.S, TICKC)."""
+        the player's counted handler runs (68k/player/ticks.S, TICKC)."""
         fx = self.fx[i]
         return fx["source"] != 0 and self.tune.counted[fx["source"]]
 
     def square(self, i):
         """Whether effect i's source is two rows repeating to row 0, which
-        the player's square handler uses (68k/YMXR.S, SQUARE). A counted
-        source runs the counted handler at any shape."""
+        the player's square handler uses (68k/player/ticks.S, SQUARE). A
+        counted source runs the counted handler at any shape."""
         fx = self.fx[i]
         if fx["source"] == 0 or self.counted(i):
             return False
@@ -996,7 +997,7 @@ class Model:
 
     def onerow(self, i):
         """Whether effect i's source is one row repeating, which the
-        player's one-row handler uses (68k/YMXR.S, ONEROW)."""
+        player's one-row handler uses (68k/player/ticks.S, ONEROW)."""
         fx = self.fx[i]
         if fx["source"] == 0 or self.counted(i):
             return False
@@ -1014,7 +1015,7 @@ class Model:
 
     def wide(self, i):
         """The columns of effect i's source where it has several, which
-        the player's handlers of several registers run (68k/YMXR.S,
+        the player's handlers of several registers run (68k/player/ticks.S,
         TICKW), and 0 where it is one column."""
         fx = self.fx[i]
         if fx["source"] == 0:
@@ -1024,14 +1025,14 @@ class Model:
 
     def left(self, i):
         """The rows a counted handler has left: from the row its place
-        is at to the end of the source (68k/YMXR.S, TICKC)."""
+        is at to the end of the source (68k/player/ticks.S, TICKC)."""
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return R - fx["place"]
 
     def place_address(self, i):
         """The address the running handler's place is at: the row it
-        reads in the column it writes first (68k/YMXR.S, TICKW)."""
+        reads in the column it writes first (68k/player/ticks.S, TICKW)."""
         fx = self.fx[i]
         if fx["place"] is None or fx["source"] == 0:
             return None
@@ -1047,7 +1048,7 @@ class Machine:
     translates blocks in advance, so cached code would use the previous
     key. Mark key-byte writes, invalidate that instruction's translation
     and restart at its address. The cycle counter records it once
-    (68k/YMXR.S, LKEY).
+    (68k/player/lookup_ticks.S, LKEY).
 
     Load the bound tune at this machine's FILE address, computed beyond
     its code by placed. Callers read FILE after construction.
@@ -2715,7 +2716,7 @@ def handler_at(m, symbols, name, i):
     """Resolve effect i's handler by shape name: tick, sq, one, cnt, two,
     three or env; lookup kinds use lk, lc, lt, ln, lb, lv, le or lf.
     Select the bank containing the vector, or bank 0 when neither
-    matches (68k/YMXR.S, BANK).
+    matches (68k/player/handlers.S, BANK).
     """
     at = CODE + symbols["ymxr_%s%d" % (name, i)]
     if "ymxr_bank1" not in symbols:
@@ -2727,11 +2728,11 @@ def handler_at(m, symbols, name, i):
 
 def lookup_kind(model, i):
     """Lookup kind for the running source, using the target captured at its
-    start (68k/YMXR.S, ymxr_kinds). One-column sources use lc when
-    counted, otherwise lk. Two-column tone/envelope sources map the last
-    write, lt marked or le counted; noise maps the first write, ln
-    marked or lf counted. Three-column buzzer maps the last write, lb;
-    voice maps the middle write, lv.
+    start (68k/player/lookup_kinds.S, ymxr_kinds). One-column sources use lc
+    when counted, otherwise lk. Two-column tone/envelope sources map the
+    last write, lt marked or le counted; noise maps the first write, ln
+    marked or lf counted. Three-column buzzer maps the last write, lb; voice
+    maps the middle write, lv.
     """
     using = model.fx[i]["using"]
     columns = model.wide(i)
@@ -2840,7 +2841,7 @@ def lookup_events(model, before, row):
 
 def page_of(m, symbols, at, name):
     """Resolve the page read by lookup instance at, kind name, from its
-    displacement word with key 0 (68k/YMXR.S, LKEY).
+    displacement word with key 0 (68k/player/lookup_ticks.S, LKEY).
     """
     word = at + symbols[name.upper() + "_KEY"] - 1
     high = m.byte(word)
@@ -2903,7 +2904,8 @@ def running(m, symbols, model, i, said, ticked=False):
         sel = ONE_SEL
     else:
         # every handler that steps a place has it at TICK_PTR and its first
-        # register at TICK_SEL (68k/YMXR.S, the assertions after HANDLEQU)
+        # register at TICK_SEL (68k/player/handlers.S, HANDLEQU, and
+        # lookup_checks.S, the assertions after it)
         if fx["run"]:
             name = lookup_kind(model, i)
         elif model.counted(i):
@@ -3122,7 +3124,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     timers = Timers.of_machine(m, tune.effects)
     assert m.call("init", a0=FILE, a1=workspace) == 0, "init rejected the tune"
     # the frame procedure as init patched it: a constant column's read is
-    # an immediate (68k/YMXR.S, ymxr_put)
+    # an immediate (68k/player/init.S, ymxr_put)
     patched = bytes(m.mu.mem_read(CODE, len(code)))
     if "ymxr_look" in symbols:
         pairs(m, symbols)
@@ -3848,7 +3850,8 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         stale.append("a remap fills a page at the frame: %s" % sorted(pages))
     reads(frame_at, r"A remap from the identity selects its page in a separate routine,"
                     r" ([\d,]+(?: to [\d,]+)?) cycles", span(pages.get("found", {0})))
-    # the cache, the last bytes of the record (68k/YMXR.S, FX_LBYTE)
+    # the cache, the last bytes of the record (68k/player/equates.S,
+    # FX_LBYTE)
     deferred = build([d for d in DEFINES if d != DEFER_ON] + [DEFER_ON])[1]
     reads(frame_at, r"in the last (\d+) bytes of the effect's record, which is (\d+) bytes, and"
                     r" (\d+) with the deferred start in",
@@ -4886,17 +4889,17 @@ def hatari(ym, code, symbols, perf=False):
     ones = [(base + symbols["ymxr_one%d" % i], base + symbols["ymxr_one%d" % i] + one)
             for i in range(4)]
     # and the two handlers of a target that writes several registers, one
-    # an effect the same way (68k/YMXR.S, TICKW)
+    # an effect the same way (68k/player/ticks.S, TICKW)
     two = symbols["ymxr_two1"] - symbols["ymxr_two0"]
     twos = [(base + symbols["ymxr_two%d" % i], base + symbols["ymxr_two%d" % i] + two)
             for i in range(4)]
     three = symbols["ymxr_three1"] - symbols["ymxr_three0"]
     threes = [(base + symbols["ymxr_three%d" % i],
                base + symbols["ymxr_three%d" % i] + three) for i in range(4)]
-    # and the two counted shapes, of one column and of several (68k/YMXR.S,
-    # TICKC and TICKW with a counter): a write of a shape this misses is a
-    # write of no effect, so its tick is outside the count below and
-    # its registers outside the comparison with the model.
+    # and the two counted shapes, of one column and of several
+    # (68k/player/ticks.S, TICKC and TICKW with a counter): a write of a
+    # shape this misses is a write of no effect, so its tick is outside the
+    # count below and its registers outside the comparison with the model.
     cnt = symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]
     cnts = [(base + symbols["ymxr_cnt%d" % i], base + symbols["ymxr_cnt%d" % i] + cnt)
             for i in range(4)]
@@ -5186,11 +5189,11 @@ SPURIOUS = 0x60
 
 
 # The head of an effect: a bra.w over its columns where a tune does not run
-# it, and the read's opcode where it does (68k/YMXR.S, the EFFECT macro):
-# move.b d16(a1),d1 where the target column is live, and move.b #v,d1
-# where it is constant (DTX, SPEC.md 2.4). Init writes one or the other,
-# so a set where one subtune runs an effect and the next does not reads the
-# head back as the branch it began as.
+# it, and the read's opcode where it does (68k/player/effect.S, the EFFECT
+# macro): move.b d16(a1),d1 where the target column is live, and move.b
+# #v,d1 where it is constant (DTX, SPEC.md 2.4). Init writes one or the
+# other, so a set where one subtune runs an effect and the next does not
+# reads the head back as the branch it began as.
 HEAD_BRANCH = 0x6000
 HEAD_READ = (0x1229, 0x123C)
 
@@ -5210,9 +5213,9 @@ def heads_are(got, effects):
     return all(one in want for one, want in zip(got, want_heads(effects)))
 
 
-# Mapping-column sites per effect (EFFECT in 68k/YMXR.S): the head's or,
-# then the start and remap reads. Live columns use a displacement from
-# a1; constants use immediates. Versions 7 to 9 patch all three to
+# Mapping-column sites per effect (EFFECT in 68k/player/effect.S): the
+# head's or, then the start and remap reads. Live columns use a displacement
+# from a1; constants use immediates. Versions 7 to 9 patch all three to
 # constant 0 (ymxr_col).
 MAP_SITES = (("q", (0x8229, 0x0001)), ("c", (0x1229, 0x123C)), ("m", (0x1229, 0x123C)))
 

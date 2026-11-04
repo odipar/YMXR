@@ -295,7 +295,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 // bytes a page, and the 255 bytes over which each effect's pages begin at
 // its offset modulo 256 (BINARIES.md 3.1). PageReach is the reach of a
 // page read, whose displacement is a signed word from the instruction
-// that reads it (68k/YMXR.S, LKEY).
+// that reads it (68k/player/lookup_ticks.S, LKEY).
 const (
 	PageBytes = 256
 	PageSpan  = 255
@@ -547,8 +547,9 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	at := tableAt + 2 + 4*n
 	// The bound tunes first, each on an even address (5.1), so that a
 	// tune's sources are beside the core: a player whose ticks read a
-	// row through a displacement reaches 32,767 bytes (68k/YMXR.S,
-	// YMXR_PCREL), and an image between the two would be in the way.
+	// row through a displacement reaches 32,767 bytes
+	// (68k/player/switches.S, YMXR_PCREL), and an image between the
+	// two would be in the way.
 	offsets := make([]int, n)
 	for i := 0; i < n; i++ {
 		offsets[i] = at

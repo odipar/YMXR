@@ -68,7 +68,7 @@ final class Sndh {
     static final int PAGE_SPAN = 255;
 
     /** What a page read reaches: its displacement is a signed word from
-     *  the instruction that reads it (68k/YMXR.S, LKEY). */
+     *  the instruction that reads it (68k/player/lookup_ticks.S, LKEY). */
     static final int PAGE_REACH = 32767;
 
     /** The core's flag bit 0: the player's raster monitor assembled in
@@ -582,8 +582,9 @@ final class Sndh {
         int at = tableAt + 2 + 4 * n;
         // The bound tunes first, each on an even address (5.1), so that a
         // tune's sources are beside the core: a player whose ticks read a
-        // row through a displacement reaches 32,767 bytes (68k/YMXR.S,
-        // YMXR_PCREL), and an image between the two would be in the way.
+        // row through a displacement reaches 32,767 bytes
+        // (68k/player/switches.S, YMXR_PCREL), and an image between the
+        // two would be in the way.
         int[] offsets = new int[n];
         for (int i = 0; i < n; i++) {
             offsets[i] = at;

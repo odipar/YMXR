@@ -406,10 +406,10 @@ final class BinariesTest {
                 "the subtune table past the core and its page area");
         assertEquals(files.size(), Tune.getWord(sndh, header + tableAt));
         // The tunes are between the subtune table and the images, so
-        // that a tune's sources are beside the core (68k/YMXR.S,
-        // YMXR_PCREL); the tunes that agree on what an image fixes once
-        // share one image, so the reader's code appears once for them (DTX
-        // abi.md 1, BINARIES.md 2).
+        // that a tune's sources are beside the core
+        // (68k/player/switches.S, YMXR_PCREL); the tunes that agree on
+        // what an image fixes once share one image, so the reader's code
+        // appears once for them (DTX abi.md 1, BINARIES.md 2).
         Bound.Set set = Bound.of(files);
         int state = 0;
         int next = tableAt + 2 + 4 * files.size();
