@@ -24,19 +24,18 @@ ymxr_take:      move.b  FX_SHAPE+ARMOFF(a3),FX_SHAPE(a3)
 ; after the row: where the vector names the armed handler, the switch has
 ; run and the record is the armed start's; otherwise, where d5 is 1, the
 ; start is dropped and the hooked word written back. d4 the effect. Z
-; where no start is pending after it. a3 the record; a5 scratch.
-ymxr_pend:      movem.l d4/a6,-(sp)
-                lea     ymxr_timers(pc),a6
-                lsl.w   #3,d4
-                adda.w  d4,a6                   ; the effect's timer
-                lsr.w   #3,d4
+; where no start is pending after it. a3 the record; d0, d4, a4 and a5
+; scratch.
+ymxr_pend:      lea     ymxr_timers(pc),a4
+                move.w  d4,d0
+                lsl.w   #3,d0
+                movea.w (a4,d0.w),a4            ; the effect's vector
                 mulu    #FX_SIZE,d4
                 lea     WS_FX(a0),a3
                 adda.w  d4,a3                   ; its record
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
-                movea.w (a6),a5
-                movea.l (a5),a5                 ; the handler the vector names
+                movea.l (a4),a5                 ; the handler the vector names
                 cmpa.l  FX_ARMED(a3),a5
                 bne.s   .still
                 bsr.s   ymxr_take
@@ -47,7 +46,6 @@ ymxr_pend:      movem.l d4/a6,-(sp)
                 move.w  FX_HOOKW(a3),(a5)
                 clr.b   FX_PENDING(a3)
 .done:          move.w  (sp)+,sr
-                movem.l (sp)+,d4/a6
                 tst.b   FX_PENDING(a3)
                 rts
 

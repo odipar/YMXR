@@ -39,7 +39,7 @@ ymxr_regs:
 ;    is written where it is not 0, with no further test.
                 WRITE   _6,$0600
                 READ2   _13
-                beq.w   ymxr_plain
+                beq.s   ymxr_plain
                 RESERVED _11,6,$0B00
                 RESERVED _12,5,$0C00
 ; 6: the volumes.
@@ -49,9 +49,8 @@ ymxr_regs:
 ; 7: the mixer, with the host's port directions.
                 READ    _7
                 bpl.s   .no7
-                or.b    #YM_PORTS,d1
-                move.w  #$0700,d0
-                move.b  d1,d0
+                move.w  #$0700|YM_PORTS,d0
+                or.b    d1,d0
                 movep.w d0,(a2)
 .no7:
 ; 8: the shape, read above into d2. Step 5 found the column set, so the
@@ -73,9 +72,8 @@ ymxr_plain:     PLAIN   _11,$0B00
                 RWRITE  _10,$0A00
                 RREAD   _7
                 bpl.s   ymxr_played
-                or.b    #YM_PORTS,d1
-                move.w  #$0700,d0
-                move.b  d1,d0
+                move.w  #$0700|YM_PORTS,d0
+                or.b    d1,d0
                 movep.w d0,(a2)
 ; The row is written: the next one is read now, after every write this
 ; call makes, so no part of the advance's cost is between a host's clock
