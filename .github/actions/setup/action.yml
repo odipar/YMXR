@@ -1,0 +1,66 @@
+# What every job of test.yml requires before its checks: Java, Go and
+# Node, rmac, unicorn, and DTX and YMXS at the releases pom.xml requires.
+# bin/suite (doc/tools.md 19.6) exits 2 where one of them is absent, so a
+# job that skips a check fails instead.
+name: setup
+description: The tools and the two releases every job of test.yml requires
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '23'
+        cache: maven
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.26'
+        cache-dependency-path: go/go.sum
+    # WasmTest runs the WebAssembly module of the tools under Node, and
+    # skips where node is absent.
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    # The build assembles the thirty-three binaries of BINARIES.md at
+    # process-classes, thirty-two cores and the program stub, and
+    # BinariesTest reads the copies under go/binaries/data against that
+    # assembly. The version is pinned: another rmac writes other bytes and
+    # a red run.
+    - name: rmac 2.4.3
+      shell: bash
+      run: |
+        curl -fsSL -o /tmp/rmac.zip \
+          https://rmac.is-slick.com/static/rmac-2.4.3-lin-x64.zip
+        unzip -j -o /tmp/rmac.zip -d /tmp/rmac
+        sudo install -m 755 /tmp/rmac/rmac /usr/local/bin/rmac
+    # The rig plays the tunes on the 68000 player under unicorn.
+    - name: unicorn
+      shell: bash
+      run: python3 -m pip install --quiet unicorn
+    # This tree resolves DTX and YMXS out of the local repository alone,
+    # since pom.xml names no <repositories>: both are built here at the
+    # release pom.xml requires, read from pom.xml so the two cannot drift.
+    # DTX assembles its images, so rmac is installed before this step.
+    - name: DTX and YMXS at the releases pom.xml requires
+      shell: bash
+      run: |
+        dtx=$(grep -A1 '<artifactId>dtx</artifactId>' pom.xml \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        ymxs=$(grep -A1 '<artifactId>ymxs</artifactId>' pom.xml \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        echo "DTX $dtx, YMXS $ymxs"
+        git clone --depth 1 --branch "v$dtx" \
+            https://github.com/odipar/DTX "$RUNNER_TEMP/DTX"
+        git clone --depth 1 --branch "v$ymxs" \
+            https://github.com/odipar/YMXS "$RUNNER_TEMP/YMXS"
+        mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/DTX" install -DskipTests
+        mvn -B -q --no-transfer-progress -f "$RUNNER_TEMP/YMXS" install -DskipTests
+        # RigCallsTest reads the packer DTX_WRITE names, and counts a tune
+        # on the rig of the checkout DTX_REPO names; ParityTest runs the
+        # conformance kit of the checkout YMXS_REPO names (doc/tools.md).
+        echo "DTX_WRITE=$RUNNER_TEMP/DTX/bin/dtx-write" >> "$GITHUB_ENV"
+        echo "DTX_REPO=$RUNNER_TEMP/DTX" >> "$GITHUB_ENV"
+        echo "YMXS_REPO=$RUNNER_TEMP/YMXS" >> "$GITHUB_ENV"
+    - name: the versions
+      shell: bash
+      run: go version && node --version && rmac | sed -n '7p' && "$DTX_WRITE" -help | head -1

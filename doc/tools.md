@@ -1017,13 +1017,16 @@ which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
 needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.12.0`
 and YMXS `0.7.1` in the local Maven repository, `mvn install` in each
-checkout. `.github/workflows/test.yml` does that on a GitHub runner and then
-runs `bin/suite` (19.6), with Go, rmac, unicorn and DTX's `dtx-write` on it so
-that no check skips, then `test_ymxr.py -refill` over the eleven fixtures
-whole, which reads performance.md's sentences over the set, `-cycles -abs`
-over the fixtures, which reads the absolute build's tables, and then `-stub`,
-`-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari and EmuTOS (17). No
-push starts it: a caller starts it from the Actions tab or by `gh workflow run
+checkout. `.github/workflows/test.yml` does that on GitHub runners, in jobs
+that run at once, each with Go, rmac, unicorn and DTX's `dtx-write` on it so
+that no check skips: `bin/suite` (19.6) with `-Drig.shard=none`, every test
+but the matrix of RigCallsTest; that matrix of thirty-two cores in four jobs,
+`bin/suite` with `-Drig.shard=k/4` for k from 0 to 3; `test_ymxr.py -refill`
+over the eleven fixtures whole, which reads performance.md's sentences over
+the set, `-cycles -abs`, which reads the absolute build's tables, and `-cycles
+-map`, which reads the lookup's, a job each; and `-stub`, `-hatari`, `-clock`,
+`-cost` and `-xpatch` under Hatari and EmuTOS (17), in one job. No push
+starts it: a caller starts it from the Actions tab or by `gh workflow run
 test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
@@ -1065,7 +1068,10 @@ would be rewritten, and runs `go test ./...` in `go`, exit 1 where a Go test
 fails. After the run it reads the count of skipped tests, exit 1 and the
 lines that report it where the count is above 0. `pom.xml` requires one
 release of DTX and one of YMXS, and the messages name them: another release
-of DTX's packer is another set of bytes.
+of DTX's packer is another set of bytes. The maven argument `-Drig.shard=k/n`
+runs RigCallsTest's matrix on the cores whose index leaves k after a
+division by n, `-Drig.shard=none` on no core, and the matrix runs on all
+thirty-two without it.
 
 ---
 
