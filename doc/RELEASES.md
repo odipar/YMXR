@@ -37,6 +37,57 @@ rather than either.
 
 ## Published
 
+### 0.10.1, 2026-11-04
+
+<https://github.com/odipar/YMXR/releases/tag/v0.10.1>, built from the commit
+tagged `v0.10.1`.
+
+The player fixes two faults, writes two shapes of tick in fewer cycles, and
+starts and remaps a source through a transformation in fewer; every core is
+218 to 376 bytes smaller. The tune file and the bound tune are 0.10.0's, and
+the tools are 0.10.0's but for the cores they contain. Over the eleven dumps
+under `ym/test`, the SNDH files come to 224,592 bytes, 2,640 less than under
+0.10.0, 240 a file, the plain core's difference.
+
+- **A counted tick of one column** (SPEC.md 5.1 step 5). The counted
+  handler of one column, and its lookup instance, stepped the place before
+  they tested the counter, so a source that plays once halted with its place
+  at R, where the specification leaves it at R - 1, and a later start with
+  `placeReset` clear began a row on. The step follows the test: the row's
+  path costs the same, and the end of a pass 20 cycles less, 28 where a tick
+  reads an absolute address.
+- **A row number modulo R.** `ymxr_rem` doubled R past 32 bits where the
+  number was 2^31 or more, and did not return; a source header of R 2^31 or
+  more reached it. It now stops at bit 31.
+- **A square's tick and a one-row source's** (performance.md, A tick) write
+  the select and the value in one long move: 8 cycles less a tick, 80 and 56
+  as it is, 48 and 24 lean. Synergy Credits, whose effects are all squares,
+  spends 2,350 cycles of ticks a frame, against 2,585 under 0.10.0.
+- **A start and a remap through a transformation** (performance.md, A remap
+  at the frame). A start at row 0 is 414 to 494 cycles on one column, 608 on
+  a square and 494 on a source of one row, against 442 to 526, 756 and 636;
+  a remap from the identity 1,452 to 1,456, against 1,698 to 1,702; moving a
+  source between the identity and a lookup instance 426 cycles on one column
+  to 946 on three, against 586 to 1,426. A copy of 16 entries at init is 214
+  cycles, against 346.
+- **The cores** are 218 to 376 bytes smaller: `YMXR_sndh.bin` is 8,836
+  bytes, 240 less, `YMXR_sndh-map.bin` 17,954, 352 less, and
+  `YMXR_sndh-defer-map.bin` 28,036, 376 less. Init is 188 to 292 bytes of
+  that. The program stub is 0.10.0's byte for byte. `ymxr-sndh` writes the
+  kit's `mapped.ymxr` as 40,224 bytes, 376 less.
+- **The source.** `68k/YMXR.S` includes twenty files under `68k/player`,
+  and an assembly of it alone names `-i68k` (tools.md 15.1).
+- **The rig** reads a cycle figure of performance.md and plan.md as true
+  within 5% of its count; sizes, counts and words exactly (tools.md 17.1).
+- **The tools** contain the thirty-three binaries, and `ymxr.wasm` is
+  5,801,598 bytes, 12,624 less than 0.10.0's source builds with Go 1.26.0.
+- **The kits.** The tunes, the files and the records are 0.10.0's.
+
+Checks: test.yml run 41886656211 on 5595fc7, every step green: `bin/suite`
+with no test skipped, `RigCallsTest` on the 32 cores among it; `-refill`,
+`-cycles -abs` and `-cycles -map` over the eleven fixtures; and the tunes
+on Hatari's MFP and `-xpatch`.
+
 ### 0.10.0, 2026-11-04
 
 <https://github.com/odipar/YMXR/releases/tag/v0.10.0>, built from the commit
