@@ -731,14 +731,13 @@ tag, and calls exit at the end; it reads the end of a tune that plays
 once in the state byte (2.4). The clock tag names the clock an SNDH host
 under TOS calls play from: `TC` Timer C, and `!V` the VBL, written where
 the set claims Timer C, every subtune of a set is at 50 Hz, or the
-VBL is selected (3.2, 3.3 step 5). The
-`FLAG` letters list the timers the set claims, and a host that ticks
-from a timer selects one outside them. Under `TC` the program of 4
-writes Timer C's vector with a separate handler, arms the timer at the
-`ticks` of 4.10, adds the rate to an accumulator on each tick and plays
-the play entry for each `ticks` the accumulator reaches (4.7, 4.8), and restores
-the vector at the end (4.6 step 6); under `!V` it plays from the VBL
-(4.3).
+VBL is selected (3.2, 3.3 step 5). The `FLAG` letters list the timers
+the set claims. A host that ticks from a timer selects one outside
+those claims. Under `TC` the program of 4 installs a Timer C handler
+and arms the timer at the `ticks` of 4.10. It adds the rate to an
+accumulator on each tick and calls play for each `ticks` the
+accumulator reaches (4.7, 4.8). It restores the vector at exit
+(4.6 step 6). Under `!V` it calls play from the VBL (4.3).
 
 **5.5 A player that reads a row through a displacement.** A tick reads
 its row through a signed word displacement from the instruction that
