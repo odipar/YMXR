@@ -37,6 +37,33 @@ rather than either.
 
 ## Published
 
+### 0.11.0, 2026-11-05
+
+<https://github.com/odipar/YMXR/releases/tag/v0.11.0>, built from the commit
+tagged `v0.11.0`.
+
+`ymxr-sndh`, `ymxs-to-sndh` and `ymxs-to-prg` link the player for the
+subtunes by default. `-carried` writes the full core selected by the
+switches. The tools still accept `-link` for existing calls. Over the
+eleven dumps under `ym/test`, the default SNDH files total 163,084 bytes,
+against 224,592 in 0.10.1 and 238,892 with `-carried` in this release.
+The SNDH file from the kit's `mapped.ymxr` is 27,232 bytes.
+
+- **The linker** keeps the blocks the subtunes use in the selected core.
+  It links a set once for all its subtunes, including sets with remaps
+  and deferred starts. The binaries kit includes five linked SNDH files
+  and a program built from one of them.
+- **Playback fixes.** Init patches read sites in the pieces present in
+  the core. A counted handler keeps its last row when it stops, so a
+  frame that reselects it can play that row again. Counted sources of
+  three columns have handlers for the identity and both lookup orders.
+- **Playback checks.** The rig plays generated sets with each of the
+  eight combinations of monitor, lean ticks and addressing. The
+  workflow runs the 32 core checks in four parallel jobs.
+
+All ten jobs of [the test run](https://github.com/odipar/YMXR/actions/runs/42084073498)
+passed on `7920227`. The merge at `62e9f6f` has the same tree.
+
 ### 0.10.1, 2026-11-04
 
 <https://github.com/odipar/YMXR/releases/tag/v0.10.1>, built from the commit
