@@ -16,14 +16,10 @@ import (
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
-// links is the flag that links the core for the set, which ymxr-sndh
-// reads beside the tags (doc/LINKER.md).
-var links = []string{"-link"}
-
 func Main() {
 	t, args := tool.Of("ymxr-sndh", os.Args[1:], append(append([]string(nil), flags.Tags...),
-		links...)...)
-	flags.Only(t, args, flags.Tags, links)
+		flags.Links...)...)
+	flags.Only(t, args, flags.Tags, flags.Links)
 	options := sndh.Options{Asked: flags.AskedOf(t, args)}
 	for _, flag := range args {
 		switch {

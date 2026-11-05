@@ -706,8 +706,9 @@ final class Sndh {
         return out.toString();
     }
 
-    /** The flag that links the core for the set, which {@code ymxr-sndh}
-     *  reads beside the tags (doc/LINKER.md). */
+    /** The flag that links the core for the set, which {@code ymxr-sndh},
+     *  {@code ymxs-to-sndh} and {@code ymxs-to-prg} read beside the tags
+     *  (doc/LINKER.md). */
     static final String[] LINKS = {"-link"};
 
     /** Two lists of flags as one. */

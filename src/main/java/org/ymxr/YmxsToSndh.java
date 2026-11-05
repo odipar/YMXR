@@ -18,8 +18,9 @@ import org.ymxs.tool.Tool;
  *
  * <p>{@code -perf} selects the core with the raster monitor in and
  * {@code -lean} the core whose ticks neither drop the interrupt level nor
- * write an end of interrupt (doc/performance.md); the packer's flags are
- * {@code ymxs-to-ymxr}'s.
+ * write an end of interrupt (doc/performance.md), and {@code -link} links
+ * the core for the subtunes, as {@code ymxr-sndh -link} does
+ * (doc/LINKER.md); the packer's flags are {@code ymxs-to-ymxr}'s.
  */
 public final class YmxsToSndh {
 
@@ -29,7 +30,7 @@ public final class YmxsToSndh {
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymxs-to-sndh", flags, Ymxs.PACKING);
-        Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.TAGS);
+        Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.TAGS, Sndh.LINKS);
         Report report = new Report(tool.reports());
         Multi multi = Ymxs.read(tool);
         Out.write(tool, of(tool, multi, flags, report));
@@ -44,6 +45,7 @@ public final class YmxsToSndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
+        boolean link = false;
         Sndh.Asked asked = Ymxs.asked(tool, flags);
         Sndh.Ticks ticks = Sndh.Ticks.CHOSEN;
         for (String flag : flags) {
@@ -58,6 +60,8 @@ public final class YmxsToSndh {
                 monitor = true;
             } else if (flag.equals("-lean")) {
                 lean = true;
+            } else if (flag.equals("-link")) {
+                link = true;
             } else if (flag.equals("-pcrel")) {
                 ticks = Sndh.Ticks.PCREL;
             } else if (flag.equals("-abs")) {
@@ -78,7 +82,7 @@ public final class YmxsToSndh {
         List<byte[]> tunes = Ymxs.tuneFiles(tool, multi, Ymxs.Packing.of(tool, flags), report);
         try {
             return Sndh.of(tunes, new Sndh.Options(title, composer,
-                    tunes.size() > 1 ? names : null, monitor, lean, ticks, asked));
+                    tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link));
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }

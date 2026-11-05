@@ -14,7 +14,7 @@ import (
 
 func Main() {
 	t, args := tool.Of("ymxs-to-prg", os.Args[1:], flags.PackingFlags...)
-	flags.Only(t, args, flags.PackingFlags, flags.Tags, flags.Rows)
+	flags.Only(t, args, flags.PackingFlags, flags.Tags, flags.Rows, flags.Links)
 	rows := flags.RowsOf(t, args, 0)
 	said := report.Of(t.Reports())
 	multi := flags.Read(t)

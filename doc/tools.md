@@ -67,7 +67,7 @@ its noun, singular for a count of 1 and plural for any other: `1 row`,
 | `ym-to-ymxr` | a dump | a tune file (SPEC.md 3.3) | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ym-to-ymxs` | a dump | a structure of one tune | `-rRR`, `-r` |
 | `ymxs-to-ymxr` | a structure | a tune file, or a multi file (BINARIES.md 0) of several | `-kK`, `-mN`, `-copies[S]` |
-| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
+| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-link` |
 | `ymxs-to-prg` | a structure | a TOS program (BINARIES.md 4) | the flags of `ymxs-to-sndh` and `-rROWS` |
 | `ymxr-check` | a dump or a tune file, or the files named | one verdict a file, on standard output | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
@@ -379,11 +379,12 @@ the summary line is `ymxs-to-ymxr: N tunes in a multi file, B bytes`,
 and a multi of 100 tunes or more is the error of 11.2, exit 1.
 
 **7.5 `ymxs-to-sndh`.** The flags are those of 7.4 and `-tTITLE`,
-`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`. The
-output is the SNDH file of section 12 around the tune files of 7.3, one
-subtune a tune in the multi's order, with: the title `-tTITLE`, or the
-first tune's title, `(untitled)` where blank; the composer `-cCOMPOSER`,
-or the first tune's where present after stripping; the subtune names the
+`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` and
+`-link`, which links the core for the set as 12.1 defines. The output
+is the SNDH file of section 12 around the tune files of 7.3, one subtune
+a tune in the multi's order, with: the title `-tTITLE`, or the first
+tune's title, `(untitled)` where blank; the composer `-cCOMPOSER`, or
+the first tune's where present after stripping; the subtune names the
 titles, `(untitled)` where blank, where the multi has more than one
 tune. The errors of 12.2 are exit 1. The report is that of 7.3 alone;
 the tool omits a summary line.
@@ -780,38 +781,39 @@ SNDH core performs it.
 
 ## 16. The scripts
 
-**16.1 `ym/play.sh [options] tune [more ...] [out.wav]`** converts, combines
-and runs under Hatari with the emulator's sound on. The first name is a dump
-or a tune file; a later name ending `.ym` or `.ymxr` in either case is
-another, one subtune each in the order named, each named by its file; any
-other name records the run instead: Hatari writes an AVI, `ym/avi.py` reads
-its sound out as that WAV and its last frame as a PNG of the same stem. The
-options `-kK`, `-mN`, `-rRR`, `-r`, `-copies[S]` reach `ym-to-ymxr`, and
-with a tune file among the names are the error
-`ym/play.sh: <name> is a tune file, and -k, -m and -r pack one`, exit 2;
-where several names are a set, `-mN` reaches `ymxr-multi` beside
-`ym-to-ymxr`, and `-copies[S]` reaches `ymxr-multi` in place of it;
-`-tTITLE` and `-cCOMPOSER`, `-perf`, `-lean`, `-vbl` and `-tc` reach
-`ymxr-sndh`, the title the first name's stem by default; `-vN` stops the run
-after N frames, and `-vbl` is read as the clock before it; `-silent` reaches
-every tool; `-h` prints the head of the script, exit 0, and a call with zero
-names prints it, exit 2. Several tunes go through `ymxr-multi`, each named
-by its stem, and the program picks between them as 13.1 defines. The script
-writes `TUNE.SND` and `TUNE.PRG` under a temporary directory:
-`ym/play.sh: TUNE.SND and TUNE.PRG are under <dir>` on standard error. A
-second name to record to is the error
-`ym/play.sh: <a> and <b> both name a file to record to`, exit 2; an option
-outside these is `ym/play.sh does not read <option>`, exit 2.
+**16.1 `ym/play.sh [options] tune [more ...] [out.wav]`** converts,
+combines and runs under Hatari with the emulator's sound on. The first
+name is a dump or a tune file; a later name ending `.ym` or `.ymxr` in
+either case is another, one subtune each in the order named, each named
+by its file; any other name records the run instead: Hatari writes an
+AVI, `ym/avi.py` reads its sound out as that WAV and its last frame as a
+PNG of the same stem. The options `-kK`, `-mN`, `-rRR`, `-r`,
+`-copies[S]` reach `ym-to-ymxr`, and with a tune file among the names
+are the error `ym/play.sh: <name> is a tune file, and -k, -m and -r pack
+one`, exit 2; where several names are a set, `-mN` reaches `ymxr-multi`
+beside `ym-to-ymxr`, and `-copies[S]` reaches `ymxr-multi` in place of
+it; `-tTITLE` and `-cCOMPOSER`, `-perf`, `-lean`, `-vbl`, `-tc` and
+`-link` reach `ymxr-sndh`, the title the first name's stem by default;
+`-vN` stops the run after N frames, and `-vbl` is read as the clock
+before it; `-silent` reaches every tool; `-h` prints the head of the
+script, exit 0, and a call with zero names prints it, exit 2. Several
+tunes go through `ymxr-multi`, each named by its stem, and the program
+picks between them as 13.1 defines. The script writes `TUNE.SND` and
+`TUNE.PRG` under a temporary directory: `ym/play.sh: TUNE.SND and
+TUNE.PRG are under <dir>` on standard error. A second name to record to
+is the error `ym/play.sh: <a> and <b> both name a file to record to`,
+exit 2; an option outside these is `ym/play.sh does not read <option>`,
+exit 2.
 
 **16.2 `ym/play-ymxs.sh [options] [tune.ymxs] [out.wav]`** runs
 `ymxs-to-prg` on the file named, or on standard input otherwise, and the
 program under Hatari as 16.1 runs one; `-rROWS`, `-vN`, `-silent`, `-h`
 are the script's, and `-kK`, `-mN`, `-copies[S]`, `-tTITLE`,
-`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` reach
-`ymxs-to-prg`, and `-vbl` is read as the clock before `-vN`. A name
-ending `.ymxs` or `.json` is the structure; a second is the error `<a>
-and <b> both name a structure; a multi's tunes are its subtunes`, exit
-2.
+`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`, `-link`
+reach `ymxs-to-prg`, and `-vbl` is read as the clock before `-vN`. A
+name ending `.ymxs` or `.json` is the structure; a second is the error
+`<a> and <b> both name a structure; a multi's tunes are its subtunes`,
+exit 2.
 
 **16.3 `ym/hatari.sh WORK [VBLS] [out.wav]`** runs `TUNE.PRG` under `WORK`
 with `--tos $TOS --machine st --cpuclock 8 --cpu-exact on --compatible on
@@ -857,7 +859,7 @@ converter:
 | `-mN` | `ym-to-ymxr` and `ymxr-multi` (4.2, 11.1) |
 | `-copies[S]` | `ymxr-multi`, which packs each table again through the set's ring (4.3, 4.7) |
 | `-nNAME`, the i-th naming the i-th dump | `ymxr-multi` (11.1) |
-| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` | `ymxr-sndh` (12) |
+| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`, `-link` | `ymxr-sndh` (12) |
 | `-rowsN`, the rows the program plays | `ymxr-prg` as `-rN` (13.1) |
 | `-silent` | every tool (3.3) |
 

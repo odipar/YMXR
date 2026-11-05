@@ -16,7 +16,8 @@ import org.ymxs.tool.Tool;
  * the keys 1 to 9, and releases the machine on SPACE or ESC.
  *
  * <p>{@code -rROWS} stops the run after that many rows, 0 to play on
- * until a key stops it; every other flag is {@code ymxs-to-sndh}'s.
+ * until a key stops it; every other flag is {@code ymxs-to-sndh}'s, and
+ * {@code -link} among them links the core for the subtunes.
  */
 public final class YmxsToPrg {
 
@@ -26,7 +27,7 @@ public final class YmxsToPrg {
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
         Tool tool = Tool.of("ymxs-to-prg", flags, Ymxs.PACKING);
-        Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.TAGS, Ymxs.ROWS);
+        Ymxs.only(tool, flags, Ymxs.PACKING, Ymxs.TAGS, Ymxs.ROWS, Sndh.LINKS);
         Report report = new Report(tool.reports());
         long rows = Ymxs.rows(tool, flags, 0);
         Multi multi = Ymxs.read(tool);
