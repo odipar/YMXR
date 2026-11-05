@@ -20,7 +20,7 @@ func Main() {
 	t, args := tool.Of("ymxr-sndh", os.Args[1:], append(append([]string(nil), flags.Tags...),
 		flags.Links...)...)
 	flags.Only(t, args, flags.Tags, flags.Links)
-	options := sndh.Options{Asked: flags.AskedOf(t, args)}
+	options := sndh.Options{Asked: flags.AskedOf(t, args), Link: true}
 	for _, flag := range args {
 		switch {
 		case flag == "-perf":
@@ -31,8 +31,8 @@ func Main() {
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":
 			options.Ticks = sndh.Absolute
-		case flag == "-link":
-			options.Link = true
+		case flag == "-carried":
+			options.Link = false
 		case flag == "-vbl" || flag == "-tc":
 			// the clock asked for, read by AskedOf above
 		case strings.HasPrefix(flag, "-copies"):

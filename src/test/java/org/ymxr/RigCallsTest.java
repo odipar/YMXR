@@ -218,7 +218,7 @@ final class RigCallsTest {
     }
 
     /** The switches a linked player is linked under, the eight sets of
-     *  {@code -perf}, {@code -lean} and {@code -abs}: ymxr-sndh -link picks
+     *  {@code -perf}, {@code -lean} and {@code -abs}: ymxr-sndh picks
      *  the deferred start and the lookup by the tunes' effects. */
     private static final List<List<String>> LINKED = linked();
 
@@ -246,7 +246,7 @@ final class RigCallsTest {
 
     /** The conformance kit's tunes, the 20 of the check of deferred starts
      *  and the 33 of the check of tunes that map a value, each on the player
-     *  ymxr-sndh -link links for it, under each set of switches: the tool's
+     *  ymxr-sndh links for it, under each set of switches: the tool's
      *  core against the rig's link of the assembled core, and every tick
      *  against the model (doc/LINKER.md, The check). The workflow runs the
      *  sets in the four jobs of cores. */
@@ -315,7 +315,7 @@ final class RigCallsTest {
     }
 
     /** The generator's tunes of {@link #DRAWN}, each on the player
-     *  ymxr-sndh -link links for it, under each set of switches: the tool's
+     *  ymxr-sndh links for it, under each set of switches: the tool's
      *  core against the rig's link of the assembled core, every tick against
      *  the model and every frame against the reader's record (doc/LINKER.md,
      *  The check), and each operation of {@link #COVERED}, each shape, each

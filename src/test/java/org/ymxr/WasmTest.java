@@ -184,11 +184,13 @@ final class WasmTest {
         both("ymxr-layout", sndh);
         byte[] apart = Multi.of(List.of(Files.readAllBytes(
                 ConformanceTest.TUNES.resolve("deferred.ymxr")), tune), List.of("", ""));
-        byte[] watched = both("ymxr-sndh", apart, "-perf");
+        byte[] linked = both("ymxr-sndh", apart, "-perf");
+        byte[] carried = both("ymxr-sndh", apart, "-perf", "-carried");
+        assertTrue(linked.length < carried.length, "the writers link the core by default");
         assertEquals(Sndh.even(Binaries.core(true, false, true, true, true).length),
-                Tune.getLong(watched, Sndh.even(Tune.getWord(watched, 2) + 2)
+                Tune.getLong(carried, Sndh.even(Tune.getWord(carried, 2) + 2)
                         + Sndh.CORE_TABLE_AT),
-                "the subtune table follows the core with the raster monitor, the deferred"
+                "the subtune table follows the full core with the raster monitor, the deferred"
                         + " start and the lookup in");
     }
 

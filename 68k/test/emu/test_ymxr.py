@@ -59,7 +59,7 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        checked against the same model;
                                        combines with the switches above
        test_ymxr.py -linked [tunes]    each tune on the player ymxr-sndh
-                                       -link links for it (doc/LINKER.md),
+                                       links for it (doc/LINKER.md),
                                        the tool's core against the rig's
                                        link; combines with the switches
                                        above, -kit, -corpus and -generated
@@ -367,7 +367,7 @@ DEFINED = {"YMXR_PERF": 1 if PERF else 0,
 # -map enables YMXR_MAP=1 for every tune. Otherwise check enables it
 # only for tunes with effects bit 5 set.
 MAP = "-map" in sys.argv
-# Each tune played on the player ymxr-sndh -link links for it
+# Each tune played on the player ymxr-sndh links for it
 # (doc/LINKER.md), where the run's other checks are left out.
 LINKED = "-linked" in sys.argv
 
@@ -4614,7 +4614,7 @@ def clocks(ym, code, symbols):
     assert bound is not None, "the binder rejected the tune"
     rate = Tune(bound, work).rate
     assert rate == 50, "-stub requires tunes at 50 Hz, and this one plays at %d" % rate
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent",
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried",
                         "-t" + os.path.basename(ym)] + ([] if PCREL else ["-abs"]),
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
@@ -4836,7 +4836,8 @@ FIRST_TUNE = "DBA 2"
 def cost_program(file, work, name, flags):
     """A tune file in COST.PRG, as ym/cost.sh builds it: bin/ymxr-sndh with
     the flags named, then bin/ymxr-prg."""
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-t" + name] + flags,
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried", "-t" + name]
+                       + flags,
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     sndh = r.stdout
@@ -5156,7 +5157,7 @@ def hatari(ym, code, symbols, perf=False):
     # missed here fails there rather than running the plain core. The tool
     # reads a row through the program counter unasked, so a run under
     # -abs passes -abs for the core the rig assembled.
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-vbl",
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried", "-vbl",
                         "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
                        + (["-lean"] if LEAN else [])
                        + ([] if PCREL else ["-abs"]),
@@ -5699,7 +5700,7 @@ def link(core, table, blocks_out):
 
 
 def linked_player(ym, defines):
-    """The player ymxr-sndh -link links for one tune, or for the set of
+    """The player ymxr-sndh links for one tune, or for the set of
     the tune files a list names, which ymxr-multi joins in its order, cut
     out of the SNDH file it writes, and its symbols as the link moved
     them; the line the run prints of it; and the core's name and the
@@ -5716,14 +5717,14 @@ def linked_player(ym, defines):
     else:
         file, _ = convert(ym, work)
     bits = asked(defines)
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-link"]
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh")]
                        + (["-perf"] if bits & 1 else []) + (["-lean"] if bits & 2 else [])
                        + (["-pcrel"] if bits & 4 else ["-abs"]),
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     said = re.search(r"the core: (\S+) linked for the set, (\d+) bytes? of (\d+)"
                      r"(?:, the blocks left out: ([a-z0-9, ]+))?", r.stderr.decode())
-    assert said, "ymxr-sndh -link reports no linked core: " + r.stderr.decode()
+    assert said, "ymxr-sndh reports no linked core: " + r.stderr.decode()
     name, blocks_out = said.group(1), (said.group(4) or "").split(", ")
     made = r.stdout
     at = struct.unpack(">h", made[2:4])[0] + 2
@@ -5781,7 +5782,7 @@ BETWEEN = ("ymxr_frame", "ymxr_tick0", "ymxr_bank1", "ymxr_look")
 
 def played_on(at, code, symbols):
     """The player a tune file plays on: under -linked, the one ymxr-sndh
-    -link links for it (doc/LINKER.md), and the player assembled
+    links for it (doc/LINKER.md), and the player assembled
     otherwise."""
     if LINKED:
         linked = linked_player(at, DEFINES)
@@ -6255,7 +6256,7 @@ def plural(n, one, many):
 def generated(count, seed, code, symbols):
     """Tunes seed to seed + count - 1 of the generator, each subtune every
     tick against the model and every frame against the reader's record:
-    under -linked on the player ymxr-sndh -link links for the tune, a set
+    under -linked on the player ymxr-sndh links for the tune, a set
     of several subtunes linked as one, and otherwise on the player
     assembled, or the one with the switches its effects need (check).
     -frames caps each subtune, and each subtune plays one pass and one
@@ -6378,7 +6379,7 @@ def sndh_of(files, defines, work):
     else:
         file = files[0]
     bits = asked(defines)
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent"]
+    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried"]
                        + (["-perf"] if bits & 1 else []) + (["-lean"] if bits & 2 else [])
                        + (["-pcrel"] if bits & 4 else ["-abs"]),
                        input=file, capture_output=True)

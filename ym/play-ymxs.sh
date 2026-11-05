@@ -50,8 +50,8 @@
 #              tunes are within the reach (BINARIES.md 5.5)
 #   -abs       the core whose ticks read a row through an absolute
 #              address
-#   -link      the core linked for the tunes: the blocks no subtune runs
-#              left out (LINKER.md)
+#   -carried   the full core selected by the switches. By default the
+#              core is linked for the subtunes (LINKER.md).
 #
 # The run:
 #
@@ -89,7 +89,7 @@ while [ "$left" -gt 0 ]; do
         -v*) vbls=${arg#-v} ;;
         -r*) rows=$arg ;;
         -silent) silent=$arg ;;
-        -k*|-m*|-copies*|-t*|-c*|-perf|-lean|-pcrel|-abs|-link) set -- "$@" "$arg" ;;
+        -k*|-m*|-copies*|-t*|-c*|-perf|-lean|-pcrel|-abs|-carried|-link) set -- "$@" "$arg" ;;
         -*) echo "ym/play-ymxs.sh does not read $arg" >&2; exit 2 ;;
         *) set -- "$@" "$arg" ;;
     esac

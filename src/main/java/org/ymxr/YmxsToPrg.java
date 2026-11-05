@@ -16,8 +16,7 @@ import org.ymxs.tool.Tool;
  * the keys 1 to 9, and releases the machine on SPACE or ESC.
  *
  * <p>{@code -rROWS} stops the run after that many rows, 0 to play on
- * until a key stops it; every other flag is {@code ymxs-to-sndh}'s, and
- * {@code -link} among them links the core for the subtunes.
+ * until a key stops it. Every other flag is {@code ymxs-to-sndh}'s.
  */
 public final class YmxsToPrg {
 

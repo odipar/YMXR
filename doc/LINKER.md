@@ -5,8 +5,10 @@ runs, where a release ships 32 cores today and a tool picks one by the
 song's effects byte (issue #329). This document defines the blocks, the
 library they come in, the link, and how a linked player is checked.
 
-Status: in stages. A player linked from any of the 32 cores leaves out
-the frame code and the handlers of each effect the song does not run;
+The SNDH writers link by default. `-carried` writes the full core
+selected by the switches. A player linked from any of the 32 cores
+leaves out the frame code and the handlers of each effect the song does
+not run;
 each handler of an effect whose rows start no source of the handler's
 kind, with its start in the effect's frame code; each lookup instance of
 an effect that maps no source of the instance's kind; and the remap and
@@ -387,10 +389,10 @@ core.
   table under `go/binaries/data` to be the one the classes carry.
 - LinkTest requires a link that keeps every block to be the core byte
   for byte, and reads the figures above.
-- ParityTest requires `ymxr-sndh -link` to write the same file and
+- ParityTest requires `ymxr-sndh` to write the same file and
   report in the Java and the Go trees, for each tune of the kit, each
   switch and a set of two.
-- The rig's `-linked` plays each tune on the player `ymxr-sndh -link`
+- The rig's `-linked` plays each tune on the player `ymxr-sndh`
   links for it, cut out of the SNDH file, against the model. It first
   requires the tool's core to be the rig's link of the assembled core,
   its patched longs aside, and the player in the core to be the player
@@ -454,8 +456,5 @@ core.
    (#340). Done: init adds the bytes of the pieces an effect keeps, so
    two effects can keep different pieces, and aims an effect at the
    remap and the deferred start where the link keeps them.
-10. The stage that follows: `-link` as the tools' default (#342). It
-    changes the file every tool that writes an SNDH file writes, and the
-    SNDH files of `doc/conformance-binaries`. Init patches read sites
-    only in the pieces the link keeps, and the generator draws sets
-    whose effects keep different remap and deferred-start pieces.
+10. The SNDH writers link by default (#342). The SNDH files of the
+    binaries kit use the linked cores. Done.

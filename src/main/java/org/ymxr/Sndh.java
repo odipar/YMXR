@@ -305,8 +305,8 @@ final class Sndh {
         return combine(core, set, tags, workspace);
     }
 
-    /** The core the switches select, and with {@code -link} that core
-     *  linked for the blocks the set needs (doc/LINKER.md). */
+    /** The core the switches select, linked for the blocks the set needs
+     *  unless the caller selects the carried core (doc/LINKER.md). */
     private static byte[] chosen(Options options, boolean pcrel, boolean defers, boolean maps,
                                  List<TuneFile> tunes) {
         Binaries.Binary binary = Binaries.binary(options.monitor(), options.lean(), pcrel,
@@ -706,10 +706,9 @@ final class Sndh {
         return out.toString();
     }
 
-    /** The flag that links the core for the set, which {@code ymxr-sndh},
-     *  {@code ymxs-to-sndh} and {@code ymxs-to-prg} read beside the tags
-     *  (doc/LINKER.md). */
-    static final String[] LINKS = {"-link"};
+    /** The core selection flags of the three tools that write SNDH files.
+     *  {@code -link} is accepted as the default for existing calls. */
+    static final String[] LINKS = {"-carried", "-link"};
 
     /** Two lists of flags as one. */
     private static String[] read(String[] some, String[] more) {
@@ -729,10 +728,9 @@ final class Sndh {
      * in there, for reading a run, and {@code -pcrel} the core whose ticks
      * read a row through the program counter (BINARIES.md 5.5). The three
      * are one switch each, and any two together select the core that is
-     * both, so {@code -perf -lean} reads what a lean run costs. {@code
-     * -link} links the core for the subtunes: the blocks of the effects,
-     * the handler kinds and the lookup kinds the subtunes run are kept,
-     * and the rest left out (doc/LINKER.md).
+     * both, so {@code -perf -lean} reads what a lean run costs. The core
+     * is linked for the subtunes by default (doc/LINKER.md).
+     * {@code -carried} writes the full core selected by the switches.
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
@@ -742,7 +740,7 @@ final class Sndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
-        boolean link = false;
+        boolean link = true;
         Asked asked = Ymxs.asked(tool, flags);
         Ticks ticks = Ticks.CHOSEN;
         for (String flag : flags) {
@@ -754,8 +752,8 @@ final class Sndh {
                 ticks = Ticks.PCREL;
             } else if (flag.equals("-abs")) {
                 ticks = Ticks.ABSOLUTE;
-            } else if (flag.equals("-link")) {
-                link = true;
+            } else if (flag.equals("-carried")) {
+                link = false;
             } else if (flag.startsWith("-copies")) {
                 throw tool.usage("not a flag of the tool: " + flag
                         + "; a tune file is packed already");

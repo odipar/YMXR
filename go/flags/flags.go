@@ -46,9 +46,9 @@ var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl", "-tc
 // Rows is the row count a program stops after.
 var Rows = []string{"-r"}
 
-// Links is the flag that links the core for the set, which ymxr-sndh,
-// ymxs-to-sndh and ymxs-to-prg read beside the tags (doc/LINKER.md).
-var Links = []string{"-link"}
+// Links lists the core selection flags of the SNDH writers.
+// -link is accepted as the default for existing calls.
+var Links = []string{"-carried", "-link"}
 
 // Clocks are the clocks ymxr-prg reads, each over the clock the file
 // names.
@@ -267,7 +267,7 @@ func decimal(t *tool.Tool, said, flag string) float64 {
 // several.
 func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 	said *report.Report) []byte {
-	options := sndh.Options{Asked: AskedOf(t, args)}
+	options := sndh.Options{Asked: AskedOf(t, args), Link: true}
 	title, composer := "", ""
 	for _, flag := range args {
 		switch {
@@ -275,8 +275,8 @@ func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 			options.Monitor = true
 		case flag == "-lean":
 			options.Lean = true
-		case flag == "-link":
-			options.Link = true
+		case flag == "-carried":
+			options.Link = false
 		case flag == "-pcrel":
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":

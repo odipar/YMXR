@@ -261,7 +261,7 @@ final class ParityTest {
                 BuiltTunes.mapped().file())) {
             both("ymxr-bind", tune, "-silent");
         }
-        byte[] sndh = both("ymxr-sndh", kit, "-silent");
+        byte[] sndh = both("ymxr-sndh", kit, "-silent", "-carried");
         int core = Sndh.even(Tune.getWord(sndh, 2) + 2);
         byte[] carried = Binaries.core(false, false, true, true, true);
         int length = carried.length;
@@ -356,17 +356,17 @@ final class ParityTest {
      */
     @Test
     void aMappedFileIsMeasuredFromTheFirstHandlerInBothTrees() throws Exception {
-        byte[] within = both("ymxr-sndh", BinariesTest.longMapped(20000), "-silent");
+        byte[] within = both("ymxr-sndh", BinariesTest.longMapped(20000), "-carried", "-silent");
         assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(within,
                 Sndh.even(Tune.getWord(within, 2) + 2) + Sndh.CORE_FLAGS_AT));
         byte[] far = BinariesTest.longMapped(30000);
-        Ran chosen = same("ymxr-sndh", far);
+        Ran chosen = same("ymxr-sndh", far, "-carried");
         assertTrue(steady(chosen.said()).contains("ticks that read a row through an absolute"
                 + " address: the tunes end past the 32767 bytes a displacement reaches; the"
                 + " lookup in: a subtune maps a value\n"), chosen.said());
         assertEquals(Sndh.CORE_MAP, Tune.getWord(chosen.out(),
                 Sndh.even(Tune.getWord(chosen.out(), 2) + 2) + Sndh.CORE_FLAGS_AT));
-        Ran asked = same("ymxr-sndh", far, "-pcrel", "-silent");
+        Ran asked = same("ymxr-sndh", far, "-carried", "-pcrel", "-silent");
         assertEquals(1, asked.exit(), asked.said());
         assertTrue(asked.said().matches("ymxr-sndh: the tunes end \\d+ bytes past the core's"
                 + " first handler, at \\d+, and a tick that reads a row through the program"
@@ -594,8 +594,8 @@ final class ParityTest {
      * A core linked for the set (doc/LINKER.md) is the same in both trees,
      * and so is the report of its blocks: each tune of the conformance
      * kit, a multi file of two that need other blocks, and each switch on
-     * one tune; and through ymxs-to-sndh and ymxs-to-prg, whose -link
-     * writes the core ymxr-sndh -link writes for the same tune.
+     * one tune. The three tools link by default, and -carried writes
+     * the full core.
      */
     @Test
     void aLinkedCoreIsTheSameInBothTrees() throws Exception {
@@ -607,26 +607,29 @@ final class ParityTest {
                     .toList();
         }
         for (Path tune : tunes) {
-            same("ymxr-sndh", Files.readAllBytes(tune), "-link");
+            same("ymxr-sndh", Files.readAllBytes(tune));
         }
         byte[] voices = Files.readAllBytes(kit.resolve("voices.ymxr"));
         for (String[] flags : new String[][] {{"-perf"}, {"-lean"}, {"-abs"},
                 {"-perf", "-lean", "-abs"}}) {
-            List<String> argv = new ArrayList<>(List.of("-link"));
-            argv.addAll(List.of(flags));
-            same("ymxr-sndh", voices, argv.toArray(new String[0]));
+            same("ymxr-sndh", voices, flags);
         }
         Ran set = ran(Path.of("bin"), "ymxr-multi", new byte[0], "-silent",
                 kit.resolve("counted.ymxr").toString(), kit.resolve("voices.ymxr").toString());
         assertEquals(0, set.exit(), set.said());
-        same("ymxr-sndh", set.out(), "-link");
+        same("ymxr-sndh", set.out());
         byte[] mapped = json(ConformanceTest.mapped());
-        same("ymxs-to-prg", mapped, "-link");
-        byte[] linked = both("ymxs-to-sndh", mapped, "-silent", "-link");
-        assertTrue(linked.length < both("ymxs-to-sndh", mapped, "-silent").length,
-                "ymxs-to-sndh -link writes a shorter file");
+        for (String tool : List.of("ymxr-sndh", "ymxs-to-sndh", "ymxs-to-prg")) {
+            byte[] input = tool.equals("ymxr-sndh") ? voices : mapped;
+            byte[] linked = both(tool, input, "-silent");
+            byte[] carried = both(tool, input, "-silent", "-carried");
+            assertTrue(linked.length < carried.length, tool + " links by default");
+            assertArrayEquals(linked, both(tool, input, "-silent", "-link"),
+                    tool + " accepts the former flag");
+        }
+        byte[] linked = both("ymxs-to-sndh", mapped, "-silent");
         byte[] direct = both("ymxr-sndh", Files.readAllBytes(kit.resolve("mapped.ymxr")),
-                "-silent", "-link");
+                "-silent");
         int at = Sndh.even(Tune.getWord(linked, 2) + 2);
         int from = Sndh.even(Tune.getWord(direct, 2) + 2);
         // the core and the page area, the patched longs at 28 to 40 aside
@@ -637,7 +640,7 @@ final class ParityTest {
                 Arrays.copyOfRange(linked, at, at + Sndh.CORE_TABLE_AT));
         assertArrayEquals(Arrays.copyOfRange(direct, from + 40, from + table),
                 Arrays.copyOfRange(linked, at + 40, at + table),
-                "ymxs-to-sndh -link writes the core ymxr-sndh -link writes");
+                "ymxs-to-sndh writes the core ymxr-sndh writes");
     }
 
     @Test
@@ -1070,17 +1073,19 @@ final class ParityTest {
     @Test
     void theSetScriptWritesWhatItsFourCallsWrite() throws Exception {
         List<Path> two = dumps().subList(0, 2);
-        Ran script = ran(Path.of("bin"), "ymxr-set", new byte[0], "-silent",
-                two.get(0).toString(), two.get(1).toString());
-        assertEquals(0, script.exit(), "the script runs: " + script.said());
-
         List<byte[]> tunes = new ArrayList<>();
         for (Path dump : two) {
             tunes.add(both("ym-to-ymxr", Files.readAllBytes(dump), "-silent"));
         }
-        byte[] sndh = both("ymxr-sndh", multiOf(tunes, "-silent"), "-silent");
-        byte[] program = both("ymxr-prg", sndh, "-silent");
-        assertArrayEquals(program, script.out(),
-                "the script writes the program the four calls write");
+        byte[] multi = multiOf(tunes, "-silent");
+        for (List<String> flags : List.of(List.of("-silent"), List.of("-silent", "-carried"))) {
+            List<String> args = new ArrayList<>(flags);
+            two.forEach(dump -> args.add(dump.toString()));
+            Ran script = ran(Path.of("bin"), "ymxr-set", new byte[0], args.toArray(String[]::new));
+            assertEquals(0, script.exit(), "the script runs: " + script.said());
+            byte[] sndh = both("ymxr-sndh", multi, flags.toArray(String[]::new));
+            assertArrayEquals(both("ymxr-prg", sndh, "-silent"), script.out(),
+                    "the script writes the program the four calls write");
+        }
     }
 }

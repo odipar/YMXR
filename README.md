@@ -57,6 +57,8 @@ ym/play.sh tune.ym
 
 A tune file has tables alone. An SNDH file adds DTX's reader and the
 player, and a TOS program plays the SNDH file on a bare machine.
+The tools link the player for the subtunes by default. Pass `-carried`
+to write the full core selected by the switches ([LINKER.md](doc/LINKER.md)).
 [`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
 the Go tools ([tools.md](doc/tools.md) 16.6).
 
