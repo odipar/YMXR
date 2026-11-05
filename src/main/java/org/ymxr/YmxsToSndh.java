@@ -18,9 +18,10 @@ import org.ymxs.tool.Tool;
  *
  * <p>{@code -perf} selects the core with the raster monitor in and
  * {@code -lean} the core whose ticks neither drop the interrupt level nor
- * write an end of interrupt (doc/performance.md), and {@code -link} links
- * the core for the subtunes, as {@code ymxr-sndh -link} does
- * (doc/LINKER.md); the packer's flags are {@code ymxs-to-ymxr}'s.
+ * write an end of interrupt (doc/performance.md). The core is linked
+ * for the subtunes by default, and {@code -carried} writes the full
+ * core selected by the switches (doc/LINKER.md). The packer's flags
+ * are {@code ymxs-to-ymxr}'s.
  */
 public final class YmxsToSndh {
 
@@ -45,7 +46,7 @@ public final class YmxsToSndh {
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
-        boolean link = false;
+        boolean link = true;
         Sndh.Asked asked = Ymxs.asked(tool, flags);
         Sndh.Ticks ticks = Sndh.Ticks.CHOSEN;
         for (String flag : flags) {
@@ -54,14 +55,14 @@ public final class YmxsToSndh {
                 continue;
             } else if (flag.startsWith("-t")) {
                 title = flag.substring(2);
+            } else if (flag.equals("-carried")) {
+                link = false;
             } else if (flag.startsWith("-c") && !flag.startsWith("-copies")) {
                 composer = flag.substring(2);
             } else if (flag.equals("-perf")) {
                 monitor = true;
             } else if (flag.equals("-lean")) {
                 lean = true;
-            } else if (flag.equals("-link")) {
-                link = true;
             } else if (flag.equals("-pcrel")) {
                 ticks = Sndh.Ticks.PCREL;
             } else if (flag.equals("-abs")) {

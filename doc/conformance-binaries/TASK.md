@@ -40,8 +40,8 @@ of the repository from the tunes of the other kit.
 | `perf.snd` | one subtune behind the core with the raster monitor in | 15 |
 | `abs.snd` | one subtune behind the core whose ticks read an address | 15 |
 | `two.prg` | a program around `two.snd`, 2,000 rows | 21 |
-| `timers.prg` | a program around `timers.snd`, the VBL asked for | 22 |
-| `armed.prg` | the same, its stub of the later descriptor version | 22 |
+| `timers.prg` | a release 0.4.10 program, the VBL asked for | 22 |
+| `armed.prg` | a release 0.4.11 program with the same SNDH file and a later stub | 22 |
 
 **4. The rules.**
 

@@ -42,8 +42,8 @@
 #              counter, -abs the one whose ticks read an address
 #   -vbl       the VBL as the clock the program plays from, and -tc
 #              Timer C, which -perf would otherwise name the VBL over
-#   -link      the core linked for the set: the blocks no subtune runs
-#              left out (LINKER.md)
+#   -carried   the full core selected by the switches. By default the
+#              core is linked for the subtunes (LINKER.md).
 #
 # The program's (tools.md 13):
 #
@@ -77,7 +77,7 @@ perf=
 lean=
 ticks=
 clock=
-link=
+carried=
 rows=
 silent=
 help=
@@ -96,7 +96,8 @@ while [ "$left" -gt 0 ]; do
         -lean) lean=-lean ;;
         -pcrel|-abs) ticks=$arg ;;
         -vbl|-tc) clock=$arg ;;
-        -link) link=-link ;;
+        -carried) carried=-carried ;;
+        -link) ;;
         -silent) silent=-silent ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
@@ -175,6 +176,6 @@ while IFS= read -r named; do
 done < "$work/names"
 "$tools/ymxr-multi" "$@" ${ring:+"$ring"} ${copies:+"$copies"} $silent \
     > "$work/SET.YMXR"
-"$tools/ymxr-sndh" $perf $lean $ticks $clock $link $silent ${title:+"-t$title"} \
+"$tools/ymxr-sndh" $perf $lean $ticks $clock $carried $silent ${title:+"-t$title"} \
     ${composer:+"-c$composer"} < "$work/SET.YMXR" > "$work/SET.SND"
 exec "$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"

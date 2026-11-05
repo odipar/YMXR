@@ -41,7 +41,7 @@ for tune in "$@"; do
         /*) path=$tune ;;
         *) path=$(pwd)/$tune ;;
     esac
-    "$here/bin/ymxr-sndh" -perf $lean $silent -t"$(basename "$tune" .ymxr)" \
+    "$here/bin/ymxr-sndh" -carried -perf $lean $silent -t"$(basename "$tune" .ymxr)" \
         < "$path" > "$work/COST.SND"
     "$here/bin/ymxr-prg" $silent < "$work/COST.SND" > "$work/COST.PRG"
     (cd "$work" && SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-dummy} \

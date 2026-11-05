@@ -211,7 +211,7 @@ final class LinkTest {
         return Link.blocks(List.of(TuneFile.read(Files.readAllBytes(KIT.resolve(name)))));
     }
 
-    /** ymxr-sndh -link puts the linked core under the tunes: the file's
+    /** A linked SNDH file puts the linked core under the tunes: the file's
      *  core is the link of the carried one, its patched longs aside, and
      *  its subtune table follows it. */
     @Test
