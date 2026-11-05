@@ -25,8 +25,10 @@ jobs:
         run: bin/suite -Drig.shard=none
 
   # The matrix of RigCallsTest, the thirty-two cores, in four shards of
-  # eight. RigCallsTest's theFourShardsAreEveryCoreOnce, in the suite
-  # job, reads that shards 0 to 3 of 4 are every core, once each.
+  # eight, and the eight sets of switches of linked players, two a shard.
+  # RigCallsTest's theFourShardsAreEveryCoreOnce and
+  # theFourShardsAreEverySetOfLinkedSwitchesOnce, in the suite job, read
+  # that shards 0 to 3 of 4 are every core and every set, once each.
   cores:
     runs-on: ubuntu-latest
     strategy:
@@ -38,7 +40,7 @@ jobs:
       - uses: ./.github/actions/setup
       - name: shard ${{ matrix.shard }} of 4 of the cores, and no skip
         run: >-
-          bin/suite '-Dtest=RigCallsTest#theRigPlaysTheBuiltTunesOnEveryCore'
+          bin/suite '-Dtest=RigCallsTest#theRigPlaysTheBuiltTunesOnEveryCore+theRigPlaysOnLinkedPlayersOfEverySetOfSwitches'
           -Drig.shard=${{ matrix.shard }}/4
 
   # performance.md's sentences over the whole set. -refill reads which

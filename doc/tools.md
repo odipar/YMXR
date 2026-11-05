@@ -936,28 +936,31 @@ outlives it is killed. `--keep` leaves the work directory, and `HATARI` and
 `TOS` name the emulator and a TOS image as 16.3 reads them; a missing one is
 exit 2, a key that lands on another subtune exit 1.
 
-`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs four things
-on every build: the two built tunes at `-frames24` on each of the thirty-two
-cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map` alone and
-together and the plain core; the conformance kit at `-frames24` under
-`-kit`; the kit at `-frames24` under `-linked -kit` on the plain core and
-with `-lean`; and `-refill` over `Turrican 2 - world completed 1` whole,
-which reads the tune's row of performance.md and a refill of a tune with a
-source. The workflow runs `-refill` over the eleven fixtures whole as a step
-after the suite, which reads the sentences over the set, and `-cycles -abs`
-over them, which reads the absolute build's tables. The workflow then runs
-`-stub`, `-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari 2.6.1,
-built from its tag, and the PAL image of EmuTOS 1.4, which boots the ST at
-the 50 Hz the two modes require; a caller runs them under TOS 2.06, which
-`TOS` names. Each mode starts Hatari with `--fast-boot on`: TOS 2.06 then
-skips its test of the memory, which with fast boot off in the emulator's
-configuration outlasts the VBLs a run allows before the program starts. Both
-floppy drives are off (`--drive-a off --drive-b off`), so TOS addresses no
-disk; Hatari quits with no confirmation (`--confirm-quit off`) and opens a
-dialog only for a fatal message (`--alert-level fatal`). Where
-`SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` are unset, Hatari runs headless and
-silent, with SDL's dummy video and audio drivers. Its input is closed, and a
-time limit ends a run that waits on a dialog.
+`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs four
+things on every build: the two built tunes at `-frames24` on each of the
+thirty-two cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map`
+alone and together and the plain core; the conformance kit at
+`-frames24` under `-kit`; the kit and the checks of deferred starts and
+of tunes that map a value at `-frames24` under `-linked -kit -defer
+-map`, with each of the eight sets of `-abs`, `-lean` and `-perf`; and
+`-refill` over `Turrican 2 - world completed 1` whole, which reads the
+tune's row of performance.md and a refill of a tune with a source. The
+workflow runs `-refill` over the eleven fixtures whole as a step after
+the suite, which reads the sentences over the set, and `-cycles -abs`
+over them, which reads the absolute build's tables. The workflow then
+runs `-stub`, `-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari
+2.6.1, built from its tag, and the PAL image of EmuTOS 1.4, which boots
+the ST at the 50 Hz the two modes require; a caller runs them under TOS
+2.06, which `TOS` names. Each mode starts Hatari with `--fast-boot on`:
+TOS 2.06 then skips its test of the memory, which with fast boot off in
+the emulator's configuration outlasts the VBLs a run allows before the
+program starts. Both floppy drives are off (`--drive-a off --drive-b
+off`), so TOS addresses no disk; Hatari quits with no confirmation
+(`--confirm-quit off`) and opens a dialog only for a fatal message
+(`--alert-level fatal`). Where `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER`
+are unset, Hatari runs headless and silent, with SDL's dummy video and
+audio drivers. Its input is closed, and a time limit ends a run that
+waits on a dialog.
 
 ---
 
@@ -1064,21 +1067,23 @@ off the path or the Java tree is unbuilt.
 | `ymxr-check` on several files | read in parallel | read in order |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |
 
-**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the suite of
-19.2 on the caller's machine. A skipped test is a check that did not run, so
-the script requires go on the path, python3 with unicorn in it, rmac on the
-path or at `RMAC`, DTX's packer on the path or at `DTX_WRITE`, a built DTX
-checkout at `DTX_REPO`, and a YMXS checkout at `YMXS_REPO`, whose
-conformance kit ParityTest runs through both trees, exit 2 where one of them
-is absent; it reads `gofmt -l go` beside them and ends with 2 where a file
-would be rewritten, and runs `go test ./...` in `go`, exit 1 where a Go test
-fails. After the run it reads the count of skipped tests, exit 1 and the
-lines that report it where the count is above 0. `pom.xml` requires one
-release of DTX and one of YMXS, and the messages name them: another release
-of DTX's packer is another set of bytes. The maven argument `-Drig.shard=k/n`
-runs RigCallsTest's matrix on the cores whose index leaves k after a
-division by n, `-Drig.shard=none` on no core, and the matrix runs on all
-thirty-two without it.
+**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the
+suite of 19.2 on the caller's machine. A skipped test is a check that
+did not run, so the script requires go on the path, python3 with unicorn
+in it, rmac on the path or at `RMAC`, DTX's packer on the path or at
+`DTX_WRITE`, a built DTX checkout at `DTX_REPO`, and a YMXS checkout at
+`YMXS_REPO`, whose conformance kit ParityTest runs through both trees,
+exit 2 where one of them is absent; it reads `gofmt -l go` beside them
+and ends with 2 where a file would be rewritten, and runs `go test
+./...` in `go`, exit 1 where a Go test fails. After the run it reads the
+count of skipped tests, exit 1 and the lines that report it where the
+count is above 0. `pom.xml` requires one release of DTX and one of YMXS,
+and the messages name them: another release of DTX's packer is another
+set of bytes. The maven argument `-Drig.shard=k/n` runs RigCallsTest's
+matrix on the cores whose index leaves k after a division by n, and its
+linked runs on the sets of switches whose index does, `-Drig.shard=none`
+on none, and the matrix runs on all thirty-two cores and all eight sets
+without it.
 
 ---
 

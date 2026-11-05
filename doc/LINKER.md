@@ -358,6 +358,12 @@ core.
   check of deferred starts, and under `-map` the 33 tunes of the check of
   tunes that map a value, play every tick against the model on the
   players linked for them, with each of those switches.
+- RigCallsTest runs `-linked -kit -defer -map` at `-frames24` with each
+  of the eight sets of `-abs`, `-lean` and `-perf`, in the four jobs of
+  cores of the workflow: the kit, the 20 tunes of the deferred starts and
+  the 33 that map a value on the players linked for them. A tune's
+  effects pick the deferred start and the lookup, so the eight sets are
+  the 32 cores of a linked player.
 
 ## Plan
 
@@ -383,5 +389,8 @@ core.
    and the instances and their gaps 4,188 bytes, as before.
 7. Each effect's reference picked by the link, so the first instance
    of each effect it keeps needs no gap. Done.
-8. The stage that follows: `-link` as the tools' default, with
-   RigCallsTest's matrix on linked cores.
+8. RigCallsTest's matrix on linked players: each of the eight sets of
+   switches. Done.
+9. The stage that follows: `-link` as the tools' default. It changes
+   the file every tool that writes an SNDH file writes, and the SNDH
+   files of `doc/conformance-binaries`.
