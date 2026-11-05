@@ -328,9 +328,10 @@ The link writes each W with the N of the setting it keeps. The four
 references are on four offsets modulo 256, as the page area places the
 effects' pages by them (BINARIES.md 5.6).
 
-Pieces leave and none moves, so a field refers to the same label it did,
-or for a label in a piece left out, to the byte that follows the piece.
-The link fails where a value no longer fits its field. A field in a piece
+Pieces leave and none moves, so a field refers to the same label it did.
+A field for a label in a piece left out keeps the label's distance from
+the piece's first byte, counted from the next byte the link keeps. The
+link fails where a value no longer fits its field. A field in a piece
 left out is left out with it.
 
 The descriptor of BINARIES.md 2.2 is in the first 40 bytes, before every
@@ -402,6 +403,33 @@ core.
   the 33 that map a value on the players linked for them. A tune's
   effects pick the deferred start and the lookup, so the eight sets are
   the 32 cores of a linked player.
+- The rig's `-generated` plays tunes its generator draws over the rows
+  the specification allows, each written through `ymxs-to-ymxr` and
+  following every rule of YMXS's check: starts of each source shape on
+  each effect, at the frame and deferred, on an idle timer and a running
+  one, at the running rate and setting the source column alone; retunes,
+  stops, remaps between transformations and to and from the identity,
+  rows that set the target column alone, repeat rows, and sets of
+  several subtunes, each mapping a value or not and deferring a start or
+  not, which `-linked` links as one. RigCallsTest runs `-linked
+  -generated20 -seed0` with each of the eight sets, in a separate job of
+  the workflow, every tick against the model and every frame against the
+  reader's record, and requires each of those operations, each shape,
+  each effect and each target in the coverage line of the run.
+- The generator leaves three cases out, each a fault of the player. A
+  song that defers a start or maps a value keeps the deferred start and
+  the remap of each effect it runs: the first of its subtunes that does
+  runs every timer of the song, and its first start of each is deferred
+  or maps through a transformation. Where a link leaves one of the two
+  out of an effect it keeps, init writes the read sites of the block
+  over the code of the effect's next piece. A start of a counted source
+  that plays once, of one row or with placeReset clear, resets the
+  timer: where a tick inside the start ends the source and the frame's
+  select starts the timer again, the counted handler reads past the
+  source's last row. A source of three columns stays marked: the counted
+  handler of several columns writes two of its columns a tick.
+- `-linked -corpus` plays a spread of the dumps of `YM_CORPUS` on the
+  players linked for them.
 
 ## Plan
 
@@ -436,4 +464,7 @@ core.
    remap and the deferred start where the link keeps them.
 10. The stage that follows: `-link` as the tools' default (#342). It
     changes the file every tool that writes an SNDH file writes, and the
-    SNDH files of `doc/conformance-binaries`.
+    SNDH files of `doc/conformance-binaries`. Before it: init leaves the
+    read sites of a block the link leaves out as they are, and the rig's
+    EVERY_BLOCK is cleared, so the generator draws the songs that The
+    check names as left out.
