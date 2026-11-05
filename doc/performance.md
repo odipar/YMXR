@@ -451,7 +451,7 @@ absolute address):
 | a row written, the tune running one effect | 112 | 88 | 124 |
 | counted, a row written | 140 | 108 | 152 |
 | counted, the end, the place to row `RR` | 182 | 166 | 198 |
-| counted, the end, the timer stopped | 168 | 152 | 176 |
+| counted, the end, the timer stopped | 198 | 182 | 206 |
 | two columns, a row written | 176 | 144 | 200 |
 | two columns, the marker, the places to row `RR` | 206 | 190 | 234 |
 | two columns, the marker, the timer stopped | 184 | 168 | 196 |
@@ -460,12 +460,13 @@ absolute address):
 | three columns, the marker, the timer stopped | 220 | 204 | 236 |
 | two counted columns, a row written | 196 | 164 | 220 |
 | two counted columns, the end, the places to row `RR` | 246 | 230 | 274 |
-| two counted columns, the end, the timer stopped | 204 | 188 | 216 |
+| two counted columns, the end, the timer stopped | 234 | 218 | 246 |
 
 Each figure is the tick of the identity's handler of that shape and 24
-cycles, and 28 on the path that loops, whose branch to the general
-handler's halt of the effect is a word where the identity's branch is a
-byte (68k/player/lookup_ticks.S, TICKL). As it is and lean, the 24 is the
+cycles, 28 on the path that loops, and 34 when a counted source stops.
+The lookup handler uses a word branch to the halt, and a counted handler
+branches there after restoring its counter (68k/player/lookup_ticks.S,
+TICKL). As it is and lean, the 24 is the
 key's write; on the absolute build the key's write is 28 cycles, and the
 page read through the program counter, 20, is 4 less than the identity's
 read of an absolute address, 24. Init writes nops in place of the level's
@@ -537,9 +538,9 @@ the source (SPEC.md 1.8.4): 606 to 808 cycles on one column, and 736 to
 750 on a square. A remap on a stopped timer sets the
 kept mapping alone, 86 to 130 cycles. The counted kinds and the kinds of
 several columns write a register, a place and a loop cell a column: a
-start at row 0 is 1,014 to 1,600 cycles on them, a remap between two
-transformations 202, from the identity 1,546 to 2,018 and to the
-identity 1,298 to 1,796.
+start at row 0 is 1,068 to 1,654 cycles on them, a remap between two
+transformations 202, from the identity 1,536 to 2,006 and to the
+identity 1,254 to 1,750.
 
 Through the identity, a start at row 0 of a marked source of one column
 costs 396 cycles from the effect's start in the frame code to its rate,
@@ -696,7 +697,7 @@ transformation costs 2,930.
 `setEnvelope` writes R11 and R12, and both read every bit of their byte,
 so a source on that target is counted: its rows are whole bytes and a
 tick counts them (SPEC.md 2.1.3). The wide handler runs that source with
-a word counter where the marked one tests bit 7, 128 bytes an instance
+a word counter where the marked one tests bit 7, 134 bytes an instance
 against 112, and four instances of it are beside the two marked shapes.
 
 Both tunes of the kit that sweep the envelope period run one effect. Init
@@ -710,7 +711,7 @@ columns are the player whose ticks read a row through an absolute address
 |---|---|---|---|---|
 | a row written, the places stepped | 152 | 172 | 176 | 196 |
 | the end, the places to row `RR` | 178 | 218 | 206 | 246 |
-| the end, the timer stopped | 160 | 180 | 172 | 192 |
+| the end, the timer stopped | 160 | 200 | 172 | 212 |
 
 So 20 cycles a tick that writes a row, as the counted handler of one
 column costs against the general one, and 40 on the path that loops,
@@ -722,10 +723,10 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,312 bytes, 896 of them the counted shapes' eight
-instances, four of one column and four of two; where a tick reads an
-absolute address, 8,004 bytes and 952, instances of 138 bytes against the
-marked shape's 122.
+The player is 9,454 bytes, 1,592 of them the counted shapes' twelve
+instances, four each of one, two and three columns. Where a tick reads
+an absolute address, 9,112 bytes and 1,696, instances of 144 bytes
+against the marked shape's 122 for two columns.
 
 ## A tick through an absolute address
 
@@ -792,12 +793,12 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 8,004 bytes against 8,312. Two figures
+assembles this build, which is 9,112 bytes against 9,454. Two figures
 move against each other: a place is a word where it was a long, which
-shortens a timer's handlers by 40 bytes, and a start does the arithmetic
+shortens a timer's handlers by 52 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
 timer's frame code. The init and the routines the four timers share, the
-reach check among them, are 316 bytes more.
+reach check among them, are 398 bytes more.
 
 What the two cores do to a tune, under Hatari over 900 frames of Turrican -
 world 4-3, counted from the frame the player first writes in: both write
@@ -870,13 +871,13 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,738
-bytes against 8,312, and 12,578 against 8,004 where a tick reads an
+The second bank, the installers and the stubs make the player 14,636
+bytes against 9,454, and 14,490 against 9,112 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
-handler is 132 bytes against 128, and of the marked shape of two columns
+handler is 138 bytes against 134, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 17,728 bytes against 8,312,
-and 19,352 against 8,004 where a tick reads an absolute address; with the
-deferred start in as well, 27,874 against 12,738, and 31,022 against
-12,578.
+The lookup in, `YMXR_MAP=1`, makes the player 21,966 bytes against 9,454,
+and 23,256 against 9,112 where a tick reads an absolute address. With
+the deferred start in as well, 35,908 against 14,636, and 37,954 against
+14,490.

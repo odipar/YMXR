@@ -2584,7 +2584,7 @@ def mapped_sizes():
                     .split("## A deferred start")[1].split())
     m = re.search(r"The lookup in, `YMXR_MAP=1`, makes the player ([\d,]+) bytes against"
                   r" ([\d,]+), and ([\d,]+) against ([\d,]+) where a tick reads an absolute"
-                  r" address; with the deferred start in as well, ([\d,]+) against ([\d,]+),"
+                  r" address\. With the deferred start in as well, ([\d,]+) against ([\d,]+),"
                   r" and ([\d,]+) against ([\d,]+)\.", said)
     counted = tuple(sizes[(pcrel, defer, look)] for defer in (False, True)
                     for pcrel in (True, False) for look in (True, False))
@@ -3049,7 +3049,7 @@ def pairs(m, symbols):
     """
     count = 0
     for name, at in symbols.items():
-        one = re.match(r"ymxr_(l[kctnbvef])[0-3]b?$", name)
+        one = re.match(r"ymxr_(l[a-z])[0-3]b?$", name)
         if not one:
             continue
         key = CODE + at + symbols[one.group(1).upper() + "_KEY"]
@@ -3735,7 +3735,8 @@ def counted_read(code, symbols, cycles_of, general):
                          % (loop_more, ticked["loop"][1] - ticked["loop"][0]))
     wide_size = symbols["ymxr_env1"] - symbols["ymxr_env0"]
     marked_size = symbols["ymxr_two1"] - symbols["ymxr_two0"]
-    shapes = 4 * (symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]) + 4 * wide_size
+    shapes = 4 * sum(symbols["ymxr_%s1" % kind] - symbols["ymxr_%s0" % kind]
+                     for kind in ("cnt", "env", "cwide"))
     if DEFER or MAP:
         # the section's sizes are the player without the deferred start
         # and the lookup, and deferred_sizes and mapped_sizes read the
@@ -3744,10 +3745,10 @@ def counted_read(code, symbols, cycles_of, general):
     elif PCREL:
         sizes = re.search(r"(\d+) bytes an instance against (\d+)", said)
         player = re.search(r"The player is ([\d,]+) bytes, ([\d,]+) of them the counted shapes'"
-                           r" eight instances", said)
+                           r" twelve instances", said)
     else:
         sizes = re.search(r"instances of (\d+) bytes against the marked shape's (\d+)", said)
-        player = re.search(r"where a tick reads an absolute address, ([\d,]+) bytes and ([\d,]+),", said)
+        player = re.search(r"Where a tick reads an absolute address, ([\d,]+) bytes and ([\d,]+),", said)
     if DEFER or MAP:
         pass
     elif not sizes or (int(sizes.group(1)), int(sizes.group(2))) != (wide_size, marked_size):
@@ -3932,7 +3933,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         stale.append("performance.md has no row for the ticks %s" % unread)
     # each against the identity's tick of its shape
     more = re.search(r"Each figure is the tick of the identity's handler of that shape and (\d+)"
-                     r" cycles, and (\d+) on the path that loops",
+                     r" cycles, (\d+) on the path that loops, and (\d+) when a counted source stops",
                      " ".join(ticks_at.split()))
     paired = Counter()
     for kind, spent in sorted(ticked.items()):
@@ -3941,7 +3942,8 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                 or base.startswith(("square", "one")):
             continue
         loops = " loop" in kind
-        want = more and int(more.group(2 if loops else 1))
+        counted_stop = base.startswith("counted ") and " stop" in base
+        want = more and int(more.group(3 if counted_stop else 2 if loops else 1))
         if len(spent) != 1 or len(identity[base]) != 1 or \
                 next(iter(spent)) - next(iter(identity[base])) != want:
             stale.append("the tick %s is %s through a transformation and %s through the identity,"
