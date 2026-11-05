@@ -546,18 +546,18 @@ YMXR_init:
 ; the tune also defers starts. That path updates the record after a tick
 ; installs a pending start; other tunes continue directly to rate
 ; processing.
-                btst    #5,WS_EFFECTS(a6)
-                beq.s   .identity
-                btst    d2,ymxr_k_map+1(pc)     ; and an effect that keeps the
+                btst    d2,ymxr_k_map+1(pc)     ; an effect that keeps the
                 beq.s   .identity               ; paths, which maps one
                 .if     YMXR_DEFER
                 move.w  RES_MAP(a2),d4          ; the remap's exit, in its
                 lea     (a1,d4.w),a0            ; piece, to the rate past the
-                move.w  RES_TAIL(a2),d4         ; deferred start's piece
-                sub.w   RES_DEFER(a2),d4
+                move.w  RES_TAIL(a2),d4         ; deferred start's piece, on
+                sub.w   RES_DEFER(a2),d4        ; every init
                 add.w   #REMAP_RATE,d4
                 move.w  d4,REMAP_AT(a0)
                 .endif
+                btst    #5,WS_EFFECTS(a6)
+                beq.s   .identity
                 AIM     NOW_MAP,NOW_AT,RES_MAP
                 AIM     UNSET_MAP,UNSET_AT,RES_MAP
                 move.w  #$6000,RS_AT(a1)        ; bra.w
