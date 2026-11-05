@@ -27,8 +27,9 @@ final class Link {
 
     /** The blocks a core's pieces belong to, in the order the document
      *  lists them: each handler kind, which init's loop over it is, and
-     *  its instance on each effect; the start of several columns; and
-     *  each effect's frame code and general handler. */
+     *  its instance on each effect; the start of several columns; each
+     *  effect's frame code and general handler; each effect's remap and
+     *  deferred start; each lookup kind and its instances; and align. */
     static final List<String> BLOCKS = blocks();
 
     private static List<String> blocks() {
@@ -42,6 +43,11 @@ final class Link {
         all.add("several");
         for (int i = 0; i < 4; i++) {
             all.add("effect" + i);
+        }
+        for (String part : List.of("map", "defer")) {
+            for (int i = 0; i < 4; i++) {
+                all.add(part + i);
+            }
         }
         for (String kind : LOOKUPS) {
             all.add(kind);
@@ -64,7 +70,10 @@ final class Link {
 
     /**
      * The blocks a set of tunes needs: the block of each effect a tune runs,
-     * bits 0 to 3 of its effects byte; for each source an effect's rows
+     * bits 0 to 3 of its effects byte, and its remap where the tune maps a
+     * value and a row sets the effect's mapping column, and its deferred
+     * start where the tune defers a start and a row of the effect does;
+     * for each source an effect's rows
      * start, the instance of its handler kind on that effect and the
      * kind's loop of init; {@code several} where a start is of a counted
      * source or one of several columns; the lookup instance of each kind
@@ -84,6 +93,13 @@ final class Link {
                     continue;
                 }
                 needed.add("effect" + i);
+                if ((tune.effects() & Columns.MAPS) != 0 && sets(tune, Columns.MAPPING + i, 0)) {
+                    needed.add("map" + i);
+                }
+                if ((tune.effects() & Columns.DEFERS) != 0
+                        && sets(tune, Columns.EFFECT + 4 * i + 2, Columns.DEFERRED)) {
+                    needed.add("defer" + i);
+                }
                 for (int s : started(tune, i)) {
                     Table source = tune.sources().get(s - 1);
                     boolean counted = tune.counted().get(s - 1);
@@ -105,6 +121,22 @@ final class Link {
             }
         }
         return ordered;
+    }
+
+    /** Whether a row of the tune sets column {@code c}, bit 7, with the
+     *  bits of {@code bits} set too: the remap's piece of an effect's
+     *  frame code runs where its mapping column is set, and the deferred
+     *  start's where its control column defers a start. */
+    private static boolean sets(TuneFile tune, int c, int bits) {
+        if (c >= tune.table().columns()) {
+            return false;
+        }
+        for (byte b : tune.table().column(c)) {
+            if ((b & 0x80) != 0 && (b & bits) == bits) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

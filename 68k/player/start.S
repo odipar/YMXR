@@ -6,25 +6,39 @@
 ; handler's path has its displacement, and where the two shapes with
 ; a separate handler lie relative to it. One macro lays out every effect and no
 ; timer's field is between the three, so one effect's distances are
-; all four's.
+; all four's, but for the starts of the two shapes, which a link leaves
+; out of an effect that starts no source of their kind (doc/LINKER.md).
+; Each distance here is measured within one piece of effect 0's frame
+; code: a site or a target past the head is measured from the head's end
+; and from the first byte of the piece it is in, and init adds the bytes
+; from the head's end to that piece in the effect, which ymxr_resets
+; lists an effect at the offsets RES_ below.
+; An effect's record in ymxr_resets: the site of its place's reset, and
+; the bytes from its head's end to the start of a source of one row, to
+; the remap's piece, to the deferred start's and to the rest.
+RES_ONE         equ     2
+RES_MAP         equ     4
+RES_DEFER       equ     4+(2*YMXR_MAP)
+RES_TAIL        equ     4+(2*YMXR_MAP)+(2*YMXR_DEFER)
+RES_SIZE        equ     6+(2*YMXR_MAP)+(2*YMXR_DEFER)
 PICK_AT         equ     ymxr_tick0_pick-ymxr_tick0_over+2
-PICK_SQ         equ     ymxr_tick0_square-ymxr_tick0_pick-2
-PICK_ONE        equ     ymxr_tick0_one-ymxr_tick0_pick-2
+PICK_SQ         equ     ymxr_e_effect0_1-ymxr_tick0_pick-2
+PICK_ONE        equ     ymxr_e_effect0_1-ymxr_tick0_pick-2      ; and the square's
 PICK_BOTH       equ     ymxr_tick0_shaped-ymxr_tick0_pick-2
 
 ; The three branches a tune with a source of several columns aims
 ; elsewhere: the one that tells the shapes apart, the one that places a
 ; start whose running source has several columns, and the one that resets
-; such a place. Each is a byte displacement, and init writes the value the
-; tune's sources need. A tune whose sources are one column keeps all
-; three where the assembler wrote them.
+; such a place. The first is a word displacement and the other two a
+; byte's, and init writes the value the tune's sources need on every
+; init.
 ;
 ; The first two are at one offset from an effect's head under every
 ; effect. The third does not: the rate's path to it runs through the
 ; blocks the shared control register and the select's shift add, so the
 ; table below names that site an effect.
-WIDE_AT         equ     ymxr_tick0_wide-ymxr_tick0_over+1
-WIDE_ONE        equ     ymxr_tick0_one-ymxr_tick0_wide-2
+WIDE_AT         equ     ymxr_tick0_wide-ymxr_tick0_over+2
+WIDE_ONE        equ     ymxr_e_effect0_1-ymxr_tick0_wide-2      ; and the square's
 WIDE_WIDEN      equ     ymxr_tick0_widen-ymxr_tick0_wide-2
 RESET_DONE      equ     ymxr_tick0_done-ymxr_tick0_reset-2
 ; The three branches a tune that defers a start aims at the paths that
@@ -34,56 +48,58 @@ RESET_DONE      equ     ymxr_tick0_done-ymxr_tick0_reset-2
                 .if     YMXR_DEFER|YMXR_MAP
 RS_AT           equ     ymxr_tick0_rs-ymxr_tick0_over
 UNSET_AT        equ     ymxr_tick0_unset-ymxr_tick0_over+2
-UNSET_RATE      equ     ymxr_tick0_rate-ymxr_tick0_unset-2
+UNSET_RATE      equ     ymxr_e_effect0_1-ymxr_tick0_unset-2+ymxr_tick0_rate-ymxr_p_effect0_5    ; RES_TAIL
                 .if     (ymxr_tick3_rs-ymxr_tick3_over)<>RS_AT
                 .error  "effect 3 lays the timer's reset out apart from effect 0"
                 .endif
-                .if     (ymxr_tick3_rate-ymxr_tick3_unset-2)<>UNSET_RATE
+                .if     (ymxr_e_effect3_1-ymxr_tick3_unset-2+ymxr_tick3_rate-ymxr_p_effect3_5)<>UNSET_RATE
                 .error  "effect 3 lays its rate out apart from effect 0"
                 .endif
                 .endif
                 .if     YMXR_MAP
 NOW_AT          equ     ymxr_tick0_now-ymxr_tick0_over+2
 NOW_START       equ     ymxr_tick0_start-ymxr_tick0_now-2
-NOW_MAP         equ     ymxr_tick0_mapped-ymxr_tick0_now-2
-UNSET_MAP       equ     ymxr_tick0_remapck-ymxr_tick0_unset-2
-RS_MAP          equ     ymxr_tick0_rmk-ymxr_tick0_rs-2
+NOW_MAP         equ     ymxr_e_effect0_1-ymxr_tick0_now-2+ymxr_tick0_mapped-ymxr_p_map0_1       ; RES_MAP
+UNSET_MAP       equ     ymxr_e_effect0_1-ymxr_tick0_unset-2+ymxr_tick0_remapck-ymxr_p_map0_1    ; RES_MAP
+RS_MAP          equ     ymxr_e_effect0_1-ymxr_tick0_rs-2+ymxr_tick0_rmk-ymxr_p_map0_1           ; RES_MAP
                 .if     (ymxr_tick3_now-ymxr_tick3_over+2)<>NOW_AT
                 .error  "effect 3 lays its start out apart from effect 0"
                 .endif
-                .if     (ymxr_tick3_mapped-ymxr_tick3_now-2)<>NOW_MAP
+                .if     (ymxr_e_effect3_1-ymxr_tick3_now-2+ymxr_tick3_mapped-ymxr_p_map3_1)<>NOW_MAP
                 .error  "effect 3 lays its mapped start out apart from effect 0"
                 .endif
-                .if     (ymxr_tick3_remapck-ymxr_tick3_unset-2)<>UNSET_MAP
+                .if     (ymxr_e_effect3_1-ymxr_tick3_unset-2+ymxr_tick3_remapck-ymxr_p_map3_1)<>UNSET_MAP
                 .error  "effect 3 lays its remap out apart from effect 0"
                 .endif
-                .if     (ymxr_tick3_rmk-ymxr_tick3_rs-2)<>RS_MAP
+                .if     (ymxr_e_effect3_1-ymxr_tick3_rs-2+ymxr_tick3_rmk-ymxr_p_map3_1)<>RS_MAP
                 .error  "effect 3 lays its remap's reset out apart from effect 0"
                 .endif
                 .endif
                 .if     YMXR_MAP&YMXR_DEFER
 ; Remap exit for an unset mapping column: displacements to ordinary rate
-; processing and _retune.
-REMAP_AT        equ     ymxr_tick0_mexit-ymxr_tick0_over+2
-REMAP_RATE      equ     ymxr_tick0_rate-ymxr_tick0_mexit-2
-REMAP_RETUNE    equ     ymxr_tick0_retune-ymxr_tick0_mexit-2
-                .if     (ymxr_tick3_mexit-ymxr_tick3_over+2)<>REMAP_AT
+; processing and _retune. The site is in the remap's piece, RES_MAP past
+; the head's end; the rate is past the deferred start's piece, whose bytes
+; init adds, and _retune is in that piece, which follows the remap's.
+REMAP_AT        equ     ymxr_e_effect0_1-ymxr_tick0_over+ymxr_tick0_mexit-ymxr_p_map0_1+2
+REMAP_RATE      equ     ymxr_e_map0_1-ymxr_tick0_mexit-2+ymxr_tick0_rate-ymxr_p_effect0_5
+REMAP_RETUNE    equ     ymxr_e_map0_1-ymxr_tick0_mexit-2+ymxr_tick0_retune-ymxr_p_defer0_1
+                .if     (ymxr_e_effect3_1-ymxr_tick3_over+ymxr_tick3_mexit-ymxr_p_map3_1+2)<>REMAP_AT
                 .error  "effect 3 lays its remap's exit out apart from effect 0"
                 .endif
-                .if     (ymxr_tick3_rate-ymxr_tick3_mexit-2)<>REMAP_RATE
+                .if     (ymxr_e_map3_1-ymxr_tick3_mexit-2+ymxr_tick3_rate-ymxr_p_effect3_5)<>REMAP_RATE
                 .error  "effect 3 lays the rate after its remap out apart from effect 0"
                 .endif
-                .if     (ymxr_tick3_retune-ymxr_tick3_mexit-2)<>REMAP_RETUNE
+                .if     (ymxr_e_map3_1-ymxr_tick3_mexit-2+ymxr_tick3_retune-ymxr_p_defer3_1)<>REMAP_RETUNE
                 .error  "effect 3 lays _retune out apart from effect 0"
                 .endif
                 .endif
                 .if     YMXR_DEFER
-RS_DEFER        equ     ymxr_tick0_rck-ymxr_tick0_rs-2
-UNSET_DEFER     equ     ymxr_tick0_retune-ymxr_tick0_unset-2
+RS_DEFER        equ     ymxr_e_effect0_1-ymxr_tick0_rs-2+ymxr_tick0_rck-ymxr_p_defer0_1         ; RES_DEFER
+UNSET_DEFER     equ     ymxr_e_effect0_1-ymxr_tick0_unset-2+ymxr_tick0_retune-ymxr_p_defer0_1   ; RES_DEFER
 SET_AT          equ     ymxr_tick0_set-ymxr_tick0_over
-SET_STOP        equ     ymxr_tick0_stop-ymxr_tick0_set-2
-SET_DEFER       equ     ymxr_tick0_check-ymxr_tick0_set-2
-                .if     (ymxr_tick3_check-ymxr_tick3_set-2)<>SET_DEFER
+SET_STOP        equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_stop-ymxr_p_effect0_5      ; RES_TAIL
+SET_DEFER       equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_check-ymxr_p_defer0_1      ; RES_DEFER
+                .if     (ymxr_e_effect3_1-ymxr_tick3_set-2+ymxr_tick3_check-ymxr_p_defer3_1)<>SET_DEFER
                 .error  "effect 3 lays its pending paths out apart from effect 0"
                 .endif
                 .endif
@@ -91,7 +107,7 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .if     YMXR_MAP
 ; Init branch bytes for the larger effect record used with lookup
 ; support.
-                .if     (((WIDE_ONE+128)|(WIDE_WIDEN+128)|(RESET_DONE+128)|(RESET_WIDE+128))&$FFFFFF00)<>0
+                .if     (((RESET_DONE+128)|(RESET_WIDE+128))&$FFFFFF00)<>0
                 .error  "a branch init writes is past a byte's displacement"
                 .endif
                 .endif

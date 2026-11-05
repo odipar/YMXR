@@ -25,17 +25,17 @@ YMXR_play:
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
                 PIECE   effect0_1
-                EFFECT  WS_FX,_14,_15,_16,_17,_30,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,ymxr_two0,ymxr_three0,$134,ymxr_lk0
-                ENDPIECE effect0_1
+                EFFECT  WS_FX,_14,_15,_16,_17,_30,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,effect0,$134,ymxr_lk0
+                ENDPIECE effect0_5
                 PIECE   effect1_1
-                EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,_31,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,ymxr_two1,ymxr_three1,$110,ymxr_lk1
-                ENDPIECE effect1_1
+                EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,_31,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,effect1,$110,ymxr_lk1
+                ENDPIECE effect1_5
                 PIECE   effect2_1
-                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,_32,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,ymxr_two2,ymxr_three2,$120,ymxr_lk2
-                ENDPIECE effect2_1
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,_32,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,effect2,$120,ymxr_lk2
+                ENDPIECE effect2_5
                 PIECE   effect3_1
-                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,_33,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,ymxr_two3,ymxr_three3,$114,ymxr_lk3
-                ENDPIECE effect3_1
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,_33,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,effect3,$114,ymxr_lk3
+                ENDPIECE effect3_5
 ; 4: the tone periods. Steps 4 to 8 are between this label and
 ; ymxr_played, where the rig counts what the register columns cost.
 ymxr_regs:
@@ -144,12 +144,47 @@ ymxr_overs:
                 dc.w    ymxr_tick1_over-ymxr_frame,ymxr_tick0_over-ymxr_frame
 
 ; Each effect's place's reset, in the order of the heads above, effect 3
-; first: init reads the two tables side by side, and leaves both entries
-; of an effect a link left out.
+; first, and the bytes from the head's end to each piece of the frame
+; code past it that the effect keeps: the start of a source of one row,
+; the remap's, the deferred start's and the rest (RES_ in start.S). Init
+; reads the two tables side by side, and leaves the entries of an effect
+; a link left out.
 ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
+                dc.w    ymxr_p_one3_3-ymxr_e_effect3_1
+                .if     YMXR_MAP
+                dc.w    ymxr_p_map3_1-ymxr_e_effect3_1
+                .endif
+                .if     YMXR_DEFER
+                dc.w    ymxr_p_defer3_1-ymxr_e_effect3_1
+                .endif
+                dc.w    ymxr_p_effect3_5-ymxr_e_effect3_1
                 dc.w    ymxr_tick2_reset-ymxr_frame+1
+                dc.w    ymxr_p_one2_3-ymxr_e_effect2_1
+                .if     YMXR_MAP
+                dc.w    ymxr_p_map2_1-ymxr_e_effect2_1
+                .endif
+                .if     YMXR_DEFER
+                dc.w    ymxr_p_defer2_1-ymxr_e_effect2_1
+                .endif
+                dc.w    ymxr_p_effect2_5-ymxr_e_effect2_1
                 dc.w    ymxr_tick1_reset-ymxr_frame+1
+                dc.w    ymxr_p_one1_3-ymxr_e_effect1_1
+                .if     YMXR_MAP
+                dc.w    ymxr_p_map1_1-ymxr_e_effect1_1
+                .endif
+                .if     YMXR_DEFER
+                dc.w    ymxr_p_defer1_1-ymxr_e_effect1_1
+                .endif
+                dc.w    ymxr_p_effect1_5-ymxr_e_effect1_1
                 dc.w    ymxr_tick0_reset-ymxr_frame+1
+                dc.w    ymxr_p_one0_3-ymxr_e_effect0_1
+                .if     YMXR_MAP
+                dc.w    ymxr_p_map0_1-ymxr_e_effect0_1
+                .endif
+                .if     YMXR_DEFER
+                dc.w    ymxr_p_defer0_1-ymxr_e_effect0_1
+                .endif
+                dc.w    ymxr_p_effect0_5-ymxr_e_effect0_1
 
 ; The other sites a column is read at, each with its column: the effects'
 ; one-pass tests, and the envelope period's plain path.

@@ -1,6 +1,17 @@
 ; init.S - YMXR_init, and the routines it calls to measure a source's
 ; reach, patch a read site and link a handler.
 
+; A branch's displacement whose target is past the head of an effect's
+; frame code, into the word at the offset of the effect's head a1: the
+; displacement within the target's piece, and the bytes from the head's end
+; to that piece in the effect, at \res in its record at a2 (start.S). d4
+; clobbered.
+                .macro  AIM     disp,at,res
+                move.w  #\disp,d4
+                add.w   \res(a2),d4
+                move.w  d4,\at(a1)
+                .endm
+
 YMXR_init:
                 cmp.l   #YMXR_MAGIC,(a0)
                 bne     .bad
@@ -440,7 +451,9 @@ YMXR_init:
 ; is written on every path: a tune before this one that used one shape
 ; wrote its block there, and a set inits one loaded copy for every
 ; subtune.
-                move.w  #PICK_BOTH,d1
+; Bit 16 of d1 and bit 8 of d0 mark a branch to the start of a source of
+; one row, past the square's, whose bytes init adds for each effect.
+                move.l  #PICK_BOTH&$FFFF,d1
                 move.b  d5,d0
                 btst    #2,d0                   ; a tune with a source of
                 bne.s   .only                   ; several columns keeps the
@@ -448,14 +461,14 @@ YMXR_init:
                 beq.s   .only                   ; cell is a tag past the two
                 cmp.b   #3,d0
                 beq.s   .only
-                move.w  #PICK_ONE,d1
+                move.l  #$10000|(PICK_ONE&$FFFF),d1
                 btst    #0,d0
                 beq.s   .only
-                move.w  #PICK_SQ,d1
-.only:          move.l  #((WIDE_ONE&$FF)<<16)|(RESET_DONE&$FF),d0
+                move.l  #PICK_SQ&$FFFF,d1
+.only:          move.l  #((WIDE_ONE&$FFFF)<<16)|$100|(RESET_DONE&$FF),d0
                 btst    #2,d5                   ; and the three branches that
                 beq.s   .aims                   ; lie elsewhere where it has
-                move.l  #((WIDE_WIDEN&$FF)<<16)|(RESET_WIDE&$FF),d0
+                move.l  #((WIDE_WIDEN&$FFFF)<<16)|(RESET_WIDE&$FF),d0
 .aims:
 
 ; The effects the tune runs are read every row; the others are jumped
@@ -475,8 +488,7 @@ YMXR_init:
 .over:          move.w  (a3)+,d4
                 btst    d2,ymxr_k_effect+1(pc)  ; an effect the link left
                 bne.s   .linked                 ; out: no head, and its reset
-                addq.l  #2,a2                   ; is not there
-                bra.w   .unlinked
+                bra.w   .unlinked               ; is not there
 .linked:        lea     (a4,d4.w),a1
                 btst    d2,WS_EFFECTS(a6)
                 beq.s   .skip
@@ -487,12 +499,19 @@ YMXR_init:
                 sub.l   a1,d3                   ; this one that ran the effect
                 subq.l  #2,d3                   ; replaced with the read
                 move.w  d3,2(a1)
-.pick:          move.w  d1,PICK_AT(a1)
-                move.l  d0,d5
-                move.w  (a2)+,d4
+.pick:          move.l  d0,d5
+                move.w  (a2),d4
                 move.b  d5,(a4,d4.w)            ; the place's reset, at the site
-                swap    d5                      ; the table names
-                move.b  d5,WIDE_AT(a1)
+                move.w  d1,d4                   ; the table names; a branch to
+                btst    #16,d1                  ; the start of a source of one
+                beq.s   .pset                   ; row is past the square's
+                add.w   RES_ONE(a2),d4
+.pset:          move.w  d4,PICK_AT(a1)
+                swap    d5
+                btst    #8,d0
+                beq.s   .wset
+                add.w   RES_ONE(a2),d5
+.wset:          move.w  d5,WIDE_AT(a1)
 
                 .if     YMXR_DEFER
 ; A tune that defers a start, bit 4 of the effects used (SPEC.md 3.3),
@@ -502,16 +521,18 @@ YMXR_init:
 ; on every init, as the heads are.
                 btst    #4,WS_EFFECTS(a6)
                 beq.s   .plain
+                btst    d2,ymxr_k_defer+1(pc)   ; and an effect that keeps the
+                beq.s   .plain                  ; paths, which defers one
                 move.w  #$6000,RS_AT(a1)        ; bra.w
-                move.w  #RS_DEFER,RS_AT+2(a1)
-                move.w  #UNSET_DEFER,UNSET_AT(a1)
+                AIM     RS_DEFER,RS_AT+2,RES_DEFER
+                AIM     UNSET_DEFER,UNSET_AT,RES_DEFER
                 move.w  #$6000,SET_AT(a1)       ; bra.w
-                move.w  #SET_DEFER,SET_AT+2(a1)
+                AIM     SET_DEFER,SET_AT+2,RES_DEFER
                 bra.s   .aimed
 .plain:         move.l  #$08020006,RS_AT(a1)    ; btst #6,d2
-                move.w  #UNSET_RATE,UNSET_AT(a1)
+                AIM     UNSET_RATE,UNSET_AT,RES_TAIL
                 move.w  #$6700,SET_AT(a1)       ; beq.w
-                move.w  #SET_STOP,SET_AT+2(a1)
+                AIM     SET_STOP,SET_AT+2,RES_TAIL
 .aimed:
                 .endif
 
@@ -525,29 +546,39 @@ YMXR_init:
 ; the tune also defers starts. That path updates the record after a tick
 ; installs a pending start; other tunes continue directly to rate
 ; processing.
+                btst    d2,ymxr_k_map+1(pc)     ; an effect that keeps the
+                beq.s   .identity               ; paths, which maps one
                 .if     YMXR_DEFER
-                move.w  #REMAP_RATE,REMAP_AT(a1)
+                move.w  RES_MAP(a2),d4          ; the remap's exit, in its
+                lea     (a1,d4.w),a0            ; piece, to the rate past the
+                move.w  RES_TAIL(a2),d4         ; deferred start's piece, on
+                sub.w   RES_DEFER(a2),d4        ; every init
+                add.w   #REMAP_RATE,d4
+                move.w  d4,REMAP_AT(a0)
                 .endif
                 btst    #5,WS_EFFECTS(a6)
                 beq.s   .identity
-                move.w  #NOW_MAP,NOW_AT(a1)
-                move.w  #UNSET_MAP,UNSET_AT(a1)
+                AIM     NOW_MAP,NOW_AT,RES_MAP
+                AIM     UNSET_MAP,UNSET_AT,RES_MAP
                 move.w  #$6000,RS_AT(a1)        ; bra.w
-                move.w  #RS_MAP,RS_AT+2(a1)
+                AIM     RS_MAP,RS_AT+2,RES_MAP
                 .if     YMXR_DEFER
                 btst    #4,WS_EFFECTS(a6)
                 beq.s   .mapsnext
-                move.w  #REMAP_RETUNE,REMAP_AT(a1)
+                btst    d2,ymxr_k_defer+1(pc)
+                beq.s   .mapsnext
+                move.w  #REMAP_RETUNE,REMAP_AT(a0)
                 .endif
                 bra.s   .mapsnext
 .identity:      move.w  #NOW_START,NOW_AT(a1)
                 .if     YMXR_DEFER=0
-                move.w  #UNSET_RATE,UNSET_AT(a1)
+                AIM     UNSET_RATE,UNSET_AT,RES_TAIL
                 move.l  #$08020006,RS_AT(a1)    ; btst #6,d2
                 .endif
 .mapsnext:
                 .endif
-.unlinked:      dbra    d2,.over
+.unlinked:      lea     RES_SIZE(a2),a2
+                dbra    d2,.over
 
 ; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body is two bytes past the slot

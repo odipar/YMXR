@@ -92,8 +92,19 @@ final class LinkTest {
                     }
                 }
             }
-            if (!map || !binary.name().contains("-defer")) {
+            boolean defer = binary.name().contains("-defer");
+            if (!map || !defer) {
                 all.remove("align");
+            }
+            // the remap's piece of each effect's frame code is in a core
+            // with the lookup, and the deferred start's in one with it
+            for (int i = 0; i < 4; i++) {
+                if (!map) {
+                    all.remove("map" + i);
+                }
+                if (!defer) {
+                    all.remove("defer" + i);
+                }
             }
             assertEquals(all, blocks, binary.name());
             // the descriptor's offset of the first handler, in a core with
@@ -167,6 +178,19 @@ final class LinkTest {
         assertEquals(List.of("two", "two1", "two3", "three", "three0", "three2", "several",
                 "effect0", "effect1", "effect2", "effect3", "align"),
                 List.copyOf(blocks("voices.ymxr")));
+    }
+
+    /** The remap of each effect whose mapping column a tune sets, and the
+     *  deferred start of each effect whose rows defer a start. */
+    @Test
+    void theRemapsAndTheDeferredStartsOfTheKitsTunes() throws IOException {
+        Set<String> mapped = blocks("mapped.ymxr");
+        assertTrue(mapped.containsAll(List.of("map0", "map1", "map2", "map3", "defer2")),
+                "mapped.ymxr: " + mapped);
+        assertTrue(!mapped.contains("defer0") && !mapped.contains("defer1")
+                && !mapped.contains("defer3"), "mapped.ymxr: " + mapped);
+        assertEquals(List.of("effect0", "effect3", "defer0", "defer3", "align"),
+                List.copyOf(blocks("deferred.ymxr")));
     }
 
     /** The lookup instances of a tune: the kind of each source an effect
@@ -263,14 +287,18 @@ final class LinkTest {
     }
 
     /** LINKER.md's tables of the kinds: each handler's bytes in the plain
-     *  core, and each lookup instance's and its loop of init's in the core
-     *  with the lookup in. */
+     *  core and its start's in each effect's frame code, and each lookup
+     *  instance's and its loop of init's in the core with the lookup in. */
     @Test
     void theDocumentReadsTheSizesOfTheKinds() throws IOException {
         String doc = Files.readString(Path.of("doc/LINKER.md"));
         java.util.Map<String, Integer> plain = sizes(Pieces.carried(Binaries.CORE));
         for (String kind : Link.KINDS) {
-            String row = "| `" + kind + "` | " + plain.get(kind + "0_1") + " | ";
+            // a square's and a source of one row's start is a piece of the
+            // handler's block in each effect's frame code
+            Integer start = plain.get(kind + "0_3");
+            String row = "| `" + kind + "` | " + plain.get(kind + "0_1") + " | "
+                    + (start == null ? "in `several`" : start) + " | ";
             assertTrue(doc.contains("\n" + row), "LINKER.md has no row starting " + row);
         }
         java.util.Map<String, Integer> mapped =
