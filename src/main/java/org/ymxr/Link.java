@@ -20,6 +20,11 @@ final class Link {
     static final List<String> KINDS = List.of("square", "one", "counted", "two", "three",
             "envelope");
 
+    /** The lookup kinds, each a block on each effect: the general, the
+     *  counted, two columns, noise, buzzer, voice, the counted of two
+     *  columns and the counted on noise (68k/player/lookup_kinds.S). */
+    static final List<String> LOOKUPS = List.of("lk", "lc", "lt", "ln", "lb", "lv", "le", "lf");
+
     /** The blocks a core's pieces belong to, in the order the document
      *  lists them: each handler kind, which init's loop over it is, and
      *  its instance on each effect; the start of several columns; and
@@ -38,28 +43,42 @@ final class Link {
         for (int i = 0; i < 4; i++) {
             all.add("effect" + i);
         }
+        for (String kind : LOOKUPS) {
+            all.add(kind);
+            for (int i = 0; i < 4; i++) {
+                all.add(kind + i);
+            }
+        }
+        all.add("align");
         return List.copyOf(all);
     }
 
     private Link() {
     }
 
-    /** Whether a song with these effects links: one that needs no lookup,
-     *  with the deferred start or without it. */
+    /** Whether a song with these effects links: every song does, on the
+     *  core its switches and its effects select. */
     static boolean links(boolean defers, boolean maps) {
-        return !maps;
+        return true;
     }
 
     /**
      * The blocks a set of tunes needs: the block of each effect a tune runs,
      * bits 0 to 3 of its effects byte; for each source an effect's rows
      * start, the instance of its handler kind on that effect and the
-     * kind's loop of init; and {@code several} where a start is of a
-     * counted source or one of several columns.
+     * kind's loop of init; {@code several} where a start is of a counted
+     * source or one of several columns; the lookup instance of each kind
+     * an effect maps a source through, and the kind's loop of init; and
+     * {@code align}, the padding before the second bank.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
+        needed.add("align");
         for (TuneFile tune : tunes) {
+            for (String lookup : lookups(tune)) {
+                needed.add(lookup);
+                needed.add(lookup.substring(0, 2));
+            }
             for (int i = 0; i < 4; i++) {
                 if ((tune.effects() & 1 << i) == 0) {
                     continue;
@@ -87,6 +106,127 @@ final class Link {
         }
         return ordered;
     }
+
+    /**
+     * The lookup instances a tune runs, as blocks such as {@code lt1}: for
+     * each start of a source through a transformation, the kept mapping
+     * not 0, and each remap of a running source to a transformation, the
+     * lookup kind of the source on the target it started on. A square and
+     * a source of one row keep their entries in the identity handler. The
+     * rows are read as a player reads them, through the repeat row until
+     * each effect's state there is one it has had before, as Pages reads
+     * them; a deferred start on a running timer adds its source to the
+     * ones a remap reaches.
+     */
+    static Set<String> lookups(TuneFile tune) {
+        Set<String> out = new LinkedHashSet<>();
+        if (tune.version() != Tune.VERSION) {
+            return out;
+        }
+        Table table = tune.table();
+        int[] target = new int[4];
+        int[] mapping = new int[4];
+        List<Set<Integer>> running = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            running.add(new java.util.TreeSet<>());
+        }
+        for (int row = 0; row < table.rows(); row++) {
+            lookupRow(tune, table, row, target, mapping, running, out);
+        }
+        Set<List<Integer>> seen = new java.util.HashSet<>();
+        while (table.repeat() < table.rows()) {
+            List<Integer> state = new ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                state.add(target[i]);
+                state.add(mapping[i]);
+                state.add(-1);
+                state.addAll(running.get(i));
+            }
+            if (!seen.add(state)) {
+                break;
+            }
+            for (int row = table.repeat(); row < table.rows(); row++) {
+                lookupRow(tune, table, row, target, mapping, running, out);
+            }
+        }
+        return out;
+    }
+
+    /** One row's effect columns for {@link #lookups}: a running source is
+     *  kept with its target, its number times 64 plus the target. */
+    private static void lookupRow(TuneFile tune, Table table, int row, int[] target,
+                                  int[] mapping, List<Set<Integer>> running, Set<String> out) {
+        for (int i = 0; i < 4; i++) {
+            if ((tune.effects() & 1 << i) == 0) {
+                continue;
+            }
+            int t = Columns.EFFECT + 4 * i;
+            int tg = table.column(t)[row] & 0xFF;
+            int src = table.column(t + 1)[row] & 0xFF;
+            int control = table.column(t + 2)[row] & 0xFF;
+            int map = table.column(Columns.MAPPING + i)[row] & 0xFF;
+            if ((tg & 0x80) != 0) {
+                target[i] = tg & 0x7F;
+            }
+            if ((src & 0x80) != 0) {
+                int s = src & 0x7F;
+                if (s == 0) {
+                    running.get(i).clear();
+                    continue;
+                }
+                if ((map & 0x80) != 0) {
+                    mapping[i] = map & 0x7F;
+                }
+                String kind = lookup(tune, s, target[i]);
+                if (mapping[i] != 0 && kind != null) {
+                    out.add(kind + i);
+                }
+                boolean deferred = (control & 0x80) != 0 && (control & Columns.DEFERRED) != 0;
+                if (!deferred || running.get(i).isEmpty()) {
+                    running.get(i).clear();
+                }
+                running.get(i).add(s * 64 + target[i]);
+            } else if ((map & 0x80) != 0) {
+                mapping[i] = map & 0x7F;
+                if (mapping[i] != 0) {
+                    for (int one : running.get(i)) {
+                        String kind = lookup(tune, one / 64, one % 64);
+                        if (kind != null) {
+                            out.add(kind + i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** The lookup kind of source {@code s} on {@code target}, or null for a
+     *  square or a source of one row (68k/player/lookup_start.S, .kind). */
+    static @org.jspecify.annotations.Nullable String lookup(TuneFile tune, int s, int target) {
+        if (s < 1 || s > tune.sources().size()) {
+            return null;
+        }
+        Table source = tune.sources().get(s - 1);
+        switch (kind(source, tune.counted().get(s - 1))) {
+            case "square", "one":
+                return null;
+            case "general":
+                return "lk";
+            case "counted":
+                return "lc";
+            case "two":
+                return target >= NOISE ? "ln" : "lt";
+            case "three":
+                return target == BUZZER ? "lb" : "lv";
+            default:
+                return target >= NOISE ? "lf" : "le";
+        }
+    }
+
+    /** The first target that maps its first value, setNoiseA, and the target
+     *  of three columns that maps its last, setBuzzer (SPEC.md 1.10.1). */
+    private static final int NOISE = 22;
+    private static final int BUZZER = 21;
 
     /** The sources effect {@code i}'s rows start: a source column with
      *  its bit 7 set and a number from 1 up (SPEC.md 1.8.3), a number of
@@ -135,21 +275,41 @@ final class Link {
      *         field
      */
     static byte[] link(byte[] core, Pieces table, Set<String> blocks) {
-        Set<String> out = new LinkedHashSet<>();
-        int left = 0;
+        // the bytes each piece loses: all of a piece left out, and a kept
+        // gap's length less the length the alignment sets
+        Map<String, Integer> lost = new java.util.HashMap<>();
         for (Pieces.Piece piece : table.pieces()) {
             if (!blocks.contains(piece.block())) {
-                out.add(piece.name());
-                left += piece.size();
+                lost.put(piece.name(), piece.size());
+            }
+        }
+        Map<String, Pieces.Piece> byName = new java.util.HashMap<>();
+        for (Pieces.Piece piece : table.pieces()) {
+            byName.put(piece.name(), piece);
+        }
+        for (Pieces.Align align : table.aligns()) {
+            Pieces.Piece gap = byName.get(align.gap());
+            if (gap == null || lost.containsKey(gap.name())) {
+                continue;
+            }
+            int from = linked(table, lost, gap.from());
+            int anchor = linked(table, lost, align.anchor()) + align.add();
+            int length = Math.floorMod(anchor - from - align.base(), 256);
+            lost.put(gap.name(), gap.size() - length);
+        }
+        for (Pieces.Twin twin : table.twins()) {
+            int copy = lost.getOrDefault(twin.copy(), 0);
+            int first = lost.getOrDefault(twin.first(), 0);
+            if (copy != first) {
+                throw new IllegalArgumentException("piece " + twin.copy() + " loses " + copy
+                        + " bytes and " + twin.first() + ", which it copies, " + first);
             }
         }
         byte[] moved = Arrays.copyOf(core, core.length);
         for (Pieces.Field field : table.fields()) {
             int by = 0;
             for (Map.Entry<String, Integer> move : field.moves().entrySet()) {
-                if (out.contains(move.getKey())) {
-                    by += move.getValue() * size(table, move.getKey());
-                }
+                by += move.getValue() * lost.getOrDefault(move.getKey(), 0);
             }
             if (by == 0) {
                 continue;
@@ -179,27 +339,32 @@ final class Link {
             }
             Tune.putWord(moved, mask.at(), bits);
         }
-        byte[] linked = new byte[core.length - left];
+        java.io.ByteArrayOutputStream linked = new java.io.ByteArrayOutputStream();
         int from = 0;
-        int to = 0;
         for (Pieces.Piece piece : table.pieces()) {
-            if (out.contains(piece.name())) {
-                System.arraycopy(moved, from, linked, to, piece.from() - from);
-                to += piece.from() - from;
-                from = piece.to();
+            int loses = lost.getOrDefault(piece.name(), 0);
+            if (loses == 0) {
+                continue;
             }
+            linked.write(moved, from, piece.from() - from);
+            // a gap kept at its new length is zeros, as the assembler pads
+            linked.write(new byte[piece.size() - loses], 0, piece.size() - loses);
+            from = piece.to();
         }
-        System.arraycopy(moved, from, linked, to, core.length - from);
-        return linked;
+        linked.write(moved, from, core.length - from);
+        return linked.toByteArray();
     }
 
-    private static int size(Pieces table, String name) {
+    /** Where a byte of the core is in the linked core: its offset less the
+     *  bytes each piece that ends at or before it loses. */
+    private static int linked(Pieces table, Map<String, Integer> lost, int at) {
+        int by = 0;
         for (Pieces.Piece piece : table.pieces()) {
-            if (piece.name().equals(name)) {
-                return piece.size();
+            if (piece.to() <= at) {
+                by += lost.getOrDefault(piece.name(), 0);
             }
         }
-        throw new IllegalArgumentException("no piece " + name);
+        return at - by;
     }
 
     /** The blocks a table has that the set named leaves out, in the order

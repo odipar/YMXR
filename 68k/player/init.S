@@ -262,14 +262,6 @@ YMXR_init:
                 lea     ONE_SIZE(a5),a5
 .noone:         dbra    d2,.one
                 ENDPIECE one_1
-                .if     YMXR_MAP
-                lea     ymxr_lk0(pc),a5         ; and the general lookup
-                adda.w  d6,a5                   ; instance's
-                moveq   #3,d2
-.lk:            move.l  d3,LK_SR(a5)
-                lea     LOOK_STRIDE(a5),a5
-                dbra    d2,.lk
-                .endif
                 .endif
 
 ; A square's handler names the row it is at in the one instruction
@@ -379,14 +371,31 @@ YMXR_init:
                 tst.w   d6
                 beq.s   .htab
                 lea     32(a4),a4
-.htab:          LINK1   LK,ymxr_lk0,0,0
-                LINK1   LC,ymxr_lc0,1,1
-                LINKW   LT,ymxr_lt0,2,0,0
-                LINKW   LN,ymxr_ln0,3,0,0
-                LINKW   LB,ymxr_lb0,4,1,0
-                LINKW   LV,ymxr_lv0,5,1,0
-                LINKW   LE,ymxr_le0,6,0,1
-                LINKW   LF,ymxr_lf0,7,0,1
+.htab:
+                PIECE   lk_1                    ; with the level drop the
+                LINK1   LK,ymxr_k_lk,0,0,1      ; general handler has
+                ENDPIECE lk_1
+                PIECE   lc_1
+                LINK1   LC,ymxr_k_lc,1,1,0
+                ENDPIECE lc_1
+                PIECE   lt_1
+                LINKW   LT,ymxr_k_lt,2,0,0
+                ENDPIECE lt_1
+                PIECE   ln_1
+                LINKW   LN,ymxr_k_ln,3,0,0
+                ENDPIECE ln_1
+                PIECE   lb_1
+                LINKW   LB,ymxr_k_lb,4,1,0
+                ENDPIECE lb_1
+                PIECE   lv_1
+                LINKW   LV,ymxr_k_lv,5,1,0
+                ENDPIECE lv_1
+                PIECE   le_1
+                LINKW   LE,ymxr_k_le,6,0,1
+                ENDPIECE le_1
+                PIECE   lf_1
+                LINKW   LF,ymxr_k_lf,7,0,1
+                ENDPIECE lf_1
                 .endif
                 .if     YMXR_DEFER
                 tst.w   d6

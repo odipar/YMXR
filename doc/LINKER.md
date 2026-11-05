@@ -5,11 +5,12 @@ runs, where a release ships 32 cores today and a tool picks one by the
 song's effects byte (issue #329). This document defines the blocks, the
 library they come in, the link, and how a linked player is checked.
 
-Status: in stages. A player linked from the sixteen cores without the
-lookup leaves out the frame code and the handlers of each effect the
-song does not run, and each handler of an effect whose rows start no
-source of the handler's kind, in both banks of a core with the deferred
-start. The plan at the end lists what is done and what follows.
+Status: in stages. A player linked from any of the 32 cores leaves out
+the frame code and the handlers of each effect the song does not run,
+each handler of an effect whose rows start no source of the handler's
+kind, and each lookup instance of an effect that maps no source of the
+instance's kind, in both banks of a core with the deferred start. The
+plan at the end lists what is done and what follows.
 
 ## The player today
 
@@ -20,7 +21,7 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,462 | 2,282 |
+| init | 1,462 | 2,426 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
 | the frame | 2,776 | 3,712 |
 | the frame's read-site tables | 164 | 204 |
@@ -34,11 +35,12 @@ player and of the player with the lookup in:
 | the place's reset of several columns | 216 | 116 |
 | the start of several columns | 772 | 772 |
 | `ymxr_rem` | 64 | 64 |
-| the mask words | 14 | 14 |
+| the mask words | 14 | 30 |
+| the tables of the instances of the general handler, the square and the one-row source | | 24 |
 | the timers' table, the tables of instances and the parked place | 154 | 154 |
-| the lookup's routines | | 3,222 |
-| the lookup instances, eight kinds | | 4,188 |
-| the player | 8,258 | 17,364 |
+| the lookup's routines | | 3,308 |
+| the lookup instances and the gaps before them, eight kinds | | 4,188 |
+| the player | 8,258 | 17,634 |
 
 The handlers are 2,416 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -59,7 +61,16 @@ A block is the code and data a player runs for one part of a song:
   handlers, which a song needs where it needs a handler of the kind;
 - `several` is the start of a source of several columns and the routines
   it calls, which a song needs where a start is of a counted source or of
-  one of several columns.
+  one of several columns;
+- a lookup instance's block, such as `lt1`, is one instance of one lookup
+  kind on one effect and the gap before it, which a song needs where the
+  effect maps a source of that kind through a transformation: a start of
+  the source with the effect's mapping not 0, or a remap of the running
+  source to a mapping not 0 (SPEC.md 1.10);
+- a lookup kind's block, such as `lt`, is init's loop over the kind's
+  instances, which a song needs where it needs an instance of the kind;
+- `align`, in a core with the deferred start and the lookup, is the gap
+  before the second bank, which every song needs.
 
 | kind | a handler | a source of the kind |
 |---|---|---|
@@ -74,10 +85,33 @@ Sizes are in bytes, of the plain core. An effect's block is its frame
 code, 578 to 598 bytes, and its general handler, 80; `several` is 988
 bytes of routines and 120 of tables.
 
+| lookup kind | an instance | init's loop | a source of the kind, mapped to a target |
+|---|---|---|---|
+| `lk` | 70 | 82 | one column, of the general handler |
+| `lc` | 86 | 96 | counted, one column |
+| `lt` | 102 | 96 | marked, two columns, below `setNoiseA` |
+| `ln` | 102 | 96 | marked, two columns, `setNoiseA` or past it |
+| `lb` | 130 | 114 | marked, three columns, `setBuzzer` |
+| `lv` | 130 | 114 | marked, three columns, another target |
+| `le` | 118 | 114 | counted, two or three columns, below `setNoiseA` |
+| `lf` | 118 | 114 | counted, two or three columns, `setNoiseA` or past it |
+
+Sizes are in bytes, of the core with the lookup in and without the
+deferred start. A gap is 0 to 255 bytes. A square and a source of one
+row keep their entries in their handler, and run no lookup instance.
+
+A song's lookup instances are read from its rows as a player reads
+them: each effect's target, its mapping and the sources it runs, row by
+row, and past the last row from the repeat row again until the four
+effects' state at the repeat row is one they have had there before. A
+deferred start on a running timer adds its source to the ones a remap
+reaches.
+
 The rest is in every linked player: the jump table, init, `YMXR_stop`,
 `YMXR_play`, the frame's register steps and its tables, `ymxr_rem`, the
-mask words, the timers' table and the parked place. A source of one
-column that is none of the shapes above runs the general handler.
+mask words, the timers' table and the parked place, and in a core with
+the lookup the lookup's routines and the effects' references. A source
+of one column that is none of the shapes above runs the general handler.
 The frame reaches an effect's handler of a kind on a start on that
 effect of a source of that kind alone. Init writes the branch that picks
 a start's shape from the shapes of every source of the tune, and a start
@@ -127,12 +161,31 @@ leaves the entries of an effect whose bit is clear as they are
 effect a tune does not run reaches the next effect the tune runs, or
 the register steps past the last.
 
+A lookup instance reads its pages at an offset modulo 256 that its
+effect's reference sets (BINARIES.md 5.6). Each instance is two pieces of
+its block: the gap before it, `lt0_1`, zero bytes that put the
+instance's page read on that offset, and the instance, `lt0_2`. A link
+keeps the gap of an instance it keeps at the length that puts the page
+read on the offset in the linked player. Init links each lookup kind in
+a loop over its four instances, a piece of the kind's block: it reads
+each instance's distance from the first handler out of the kind's
+descriptor in `ymxr_kinds`, a word an effect, which the link moves,
+links the instance where the effect's bit in the kind's mask,
+`ymxr_k_lt` for two columns, is set, and computes the page byte of the
+instance's page 0 from the instance's address and its effect's
+reference. A start and a remap read the instance out of the same
+descriptor, and a square's or a one-row source's out of `ymxr_at_square`
+and `ymxr_at_one`. In a core with the deferred start, each gap and each
+instance of the second bank is a twin of the first bank's, and
+`align_1`, the gap before the second bank, puts its first handler on the
+offset modulo 256 of the first bank's: BANK is a multiple of 256, and the
+two banks read their pages at one offset.
+
 ## The library
 
 The library of a core is the core as carried and a table of its pieces
 and fields, `<core>.pieces` beside it in `go/binaries/data`. The build
-cuts it from the assembly of each core without the deferred start and the
-lookup, eight tables, as it assembles the cores.
+cuts it from the assembly of each of the 32 cores as it assembles them.
 
 The table is text, a line each:
 
@@ -140,6 +193,8 @@ The table is text, a line each:
 piece square_1 1172 1208
 piece square0_1 5626 5654
 mask 8776 square
+twin square0_2 square0_1
+align lt0_1 28 13850 0
 field 5194 2 effect0_1+1 effect1_1+1 effect2_1+1
 ```
 
@@ -147,13 +202,20 @@ A `piece` line is the piece's name, its first byte and the byte past its
 last, offsets from the core's first byte, in the core's order. A `mask`
 line is the offset of a word at the label `ymxr_k_<prefix>` and the
 prefix: a link writes the word with bit i set where it keeps the block
-`<prefix>i`. A `field`
-line is a value of the core that moves where a piece is left out: its
-offset, its width in bytes, a word or a byte, and for each piece whose
-end it refers across, the piece's name and the coefficient c. The value
-is signed, and a link that leaves out a piece of L bytes moves it by
--c times L: a displacement through the program counter, a branch, or a
-difference of two labels in a table.
+`<prefix>i`. A `twin` line is a piece of the second bank and the piece
+of the first it copies. An `align` line is a gap, a piece whose length a
+link sets, and three numbers B, A and N: the byte B past the gap's end
+is N bytes past the byte at offset A, modulo 256, in the core and in a
+linked core. For a lookup instance's gap B is the distance from the
+gap's end to the base of the instance's page read, A the offset of
+`ymxr_ref` and N its effect's reference past it; for `align_1` B is 0, A
+the offset of the first handler and N 0. A `field` line is a value of
+the core that moves where a piece is left out: its offset, its width in
+bytes, a word or a byte, and for each piece whose end it refers across,
+the piece's name and the coefficient c. The value is signed, and a link
+that leaves out a piece of L bytes moves it by -c times L: a
+displacement through the program counter, a branch, or a difference of
+two labels in a table.
 
 The build cuts the table with pads. It assembles the core once with the
 pieces marked, reads each piece's labels from rmac's listing, and then
@@ -179,18 +241,37 @@ moves by c times 2 for the two together, and the table records c under
 the twin of the first bank. A link leaves the two out together, and
 the two are one length, so a field moves by c times that length.
 
+A core with the lookup is padded 256 and 512 bytes, which leave each
+gap's length as it is: a field moves by c times 256 and c times 512, and
+is a word at an even offset, its high byte the byte that moves. A field
+of a core past 32 KB is read modulo 2^16: a pad moves its value past the
+range of a signed word, and a link that leaves pieces out moves it back.
+A byte field across a pad of 256 would move by 0: the source has no byte
+that is a difference of two labels, and a branch of a byte's
+displacement across the pad is out of its reach, an error of the
+assembly or of the cut.
+
 The cut fails where a padded core is not P bytes longer, which a branch
 whose size rmac picks by its distance makes, or where a byte moves that
 no field of the two pads explains. The source then names the branch's
-size. The eight tables of this version have word fields alone.
+size. The 32 tables of this version have word fields alone.
 
 ## The link
 
 The link reads the core of the song's switches, its table and the blocks
 the song needs. It writes the core's bytes in order with every piece of a
-block the song does not need left out, moves each field in the bytes it
-keeps by -c times the length of each piece left out whose end the field
-refers across, and writes each mask with the blocks it keeps.
+block the song does not need left out and each gap it keeps at the
+length its align line sets, moves each field in the bytes it keeps by -c
+times the bytes each piece it refers across loses, and writes each mask
+with the blocks it keeps.
+
+The link sets the gaps in the core's order: a gap's length is the
+distance, modulo 256, from the gap's first byte in the linked core to
+the byte its align line names there, less B, where the linked offset of
+a byte is its offset less the bytes each piece before it loses. A gap
+loses its length in the core less its length linked, which can be less
+than 0. A piece of the second bank loses what its twin loses, and the
+link fails where it does not.
 
 Pieces leave and none moves, so a field refers to the same label it did,
 or for a label in a piece left out, to the byte that follows the piece.
@@ -200,13 +281,17 @@ left out is left out with it.
 The descriptor of BINARIES.md 2.2 is in the first 40 bytes, before every
 piece, and a linked core is read as the core it was linked from: the
 flags word is the core's, and init measures the reach from the general
-handler to the last handler kept.
+handler to the last handler kept. In a core with the lookup the word at
+26, the first handler's offset, is a field, which the link moves. The
+page area follows the linked core (BINARIES.md 3.1), and a writer
+measures it against the linked core.
 
 ## Figures
 
-The blocks each tune of the conformance kit needs, the core it links,
-and the bytes of that core linked for it: the plain core, of 8,942
-bytes, or the core with the deferred start in, of 13,322 bytes.
+The blocks of its core each tune of the conformance kit keeps, the core
+it links, and the bytes of that core linked for it: the plain core, of
+8,942 bytes, the core with the deferred start in, of 13,322 bytes, or
+the core with the lookup and the deferred start in, of 28,418 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
@@ -218,7 +303,7 @@ bytes, or the core with the deferred start in, of 13,322 bytes.
 | `envelope.ymxr` | plain | two, two0, several, effect0 | 4,620 |
 | `fine-zero.ymxr` | plain | none | 2,676 |
 | `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,458 |
-| `mapped.ymxr` | the lookup: the core as carried | | |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, lk, lk0, lk2, lc, lc1, lt, lt3, align | 16,362 |
 | `plays-once.ymxr` | plain | none | 2,676 |
 | `preempt.ymxr` | plain | square, square0, effect0, effect1 | 4,074 |
 | `retune.ymxr` | plain | one, one0, effect0 | 3,382 |
@@ -231,6 +316,10 @@ A tune of general sources alone, with no effect, links 2,676 bytes, 30%
 of the core: the blocks are 6,266 bytes of it. The kit's largest,
 `voices.ymxr`, runs all four effects, keeps a handler of two or three
 columns on each and the start of several columns, and links 7,108.
+`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 16,362
+bytes of 28,418: the 28 instances and the 5 loops of init it leaves out
+are 8,128 bytes, and the gaps it keeps are 252 bytes longer than in the
+core.
 
 ## The check
 
@@ -245,17 +334,20 @@ columns on each and the start of several columns, and links 7,108.
   links for it, cut out of the SNDH file, against the model. It first
   requires the tool's core to be the rig's link of the assembled core,
   its patched longs aside, and the player in the core to be the player
-  assembled alone. The 14 tunes of the kit that link play their whole
-  length as the specification reads on each of the eight cores the
-  library has, and the 11 dumps of `ym/test` their first 24 frames on
-  the plain core.
+  assembled alone. The 16 tunes of the kit play their whole length as
+  the specification reads on linked players of the plain core, `-lean`,
+  `-abs -perf`, `-lean -abs` and `-perf -lean`, and the 11 dumps of
+  `ym/test` on the plain core. Under `-defer -map` the 20 tunes of the
+  check of deferred starts, and under `-map` the 33 tunes of the check of
+  tunes that map a value, play every tick against the model on the
+  players linked for them, with each of those switches.
 
 ## Plan
 
 1. The design: the blocks, the library's format and the link. Done.
 2. The library: the pieces marked in the source and the tables cut by
-   the build. Done for each effect's frame code and for each handler, in
-   the sixteen cores without the lookup.
+   the build. Done for each effect's frame code, each handler and each
+   lookup instance, in the 32 cores.
 3. The linker, in the Java and the Go trees: the blocks a set needs,
    read from its sources and its effects, the link, and `ymxr-sndh
    -link`. Done.
@@ -267,8 +359,13 @@ columns on each and the start of several columns, and links 7,108.
    eleven fixtures of `ym/test` one, built by hand, leaves a register
    unset. The test of a register's bit that init needs costs every player
    more bytes than it saves a song that sets every register.
-6. The stages that follow:
-   - the cores with the lookup, whose instances keep their page residue
-     modulo 256;
+6. The cores with the lookup, whose instances keep their page offset
+   modulo 256 through a gap the link sets. Done. The descriptors' words
+   an effect, the masks and init's loops make `YMXR_sndh-map.bin` as
+   carried 270 bytes larger than with the instances LOOK_STRIDE apart,
+   and the instances and their gaps 4,188 bytes, as before.
+7. The stages that follow:
+   - an order of the lookup instances that shortens the gaps a link
+     keeps;
    - `-link` as the tools' default, with RigCallsTest's matrix on linked
      cores.

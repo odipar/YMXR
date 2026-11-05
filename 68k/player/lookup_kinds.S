@@ -35,9 +35,9 @@ ymxr_kindof:    moveq   #0,d0
 
 ; a4 the handler of the kind a2 describes, of effect d6, in bank d4. d5
 ; clobbered.
-ymxr_at:        move.w  KD_STEP(a2),d5
-                mulu    d6,d5
-                add.w   (a2),d5                 ; KD_BASE
+ymxr_at:        move.w  d6,d5
+                add.w   d5,d5
+                move.w  (a2,d5.w),d5            ; KD_AT, the effect's instance
                 lea     ymxr_tick0(pc),a4
                 adda.w  d5,a4
                 .if     YMXR_DEFER
@@ -48,25 +48,51 @@ ymxr_at:        move.w  KD_STEP(a2),d5
                 .endif
                 rts
 
-                .if     KD_BASE<>0
-                .error  "a kind's descriptor has its base past its first word"
+                .if     KD_AT<>0
+                .error  "a kind's descriptor has its instances past its first word"
                 .endif
+
+; a5 the instance of effect d2 of the kind a1 describes, in bank d6 (the
+; bank's offset), out of the descriptor's KD_AT; d0 the effect times 2.
+; d1 clobbered.
+ymxr_inst:      move.w  d2,d0
+                add.w   d0,d0
+                move.w  (a1,d0.w),d1            ; KD_AT
+                lea     ymxr_tick0(pc),a5
+                adda.w  d1,a5
+                adda.w  d6,a5
+                rts
+
+; The page byte of page 0 of an instance, a3 its page byte, d0 its
+; effect times 2: the page byte the effect's reference is at from the
+; page read's base, 256 bytes a page, written there and at (a2), the
+; page-byte table's entry. d1 and a5 clobbered.
+ymxr_page0:     lea     ymxr_refat(pc),a5
+                move.w  (a5,d0.w),d1            ; the effect's reference,
+                lea     ymxr_ref(pc),a5         ; past ymxr_ref
+                adda.w  d1,a5
+                move.l  a5,d1
+                sub.l   a3,d1
+                asr.l   #8,d1
+                move.b  d1,(a3)
+                move.b  d1,(a2)
+                rts
 
 ; Stepping-handler kinds: eight lookup kinds in page-byte-table order,
 ; then five identity kinds.
-ymxr_kinds:     KIND    ymxr_lk0,LOOK_STRIDE,1,LK_CELL,0,0,LK_PAGE,0,1,LK_SEL,LK_PTR,0,0,0,0
-                KIND    ymxr_lc0,LOOK_STRIDE,1,LC_CELL,LC_LEFT,LC_RELD,LC_PAGE,4,0,LC_SEL,LC_PTR,0,0,0,0
-                KIND    ymxr_lt0,LOOK_STRIDE,2,LT_CELLS,0,0,LT_PAGE,2,1,LT_SEL1,LT_PTR1,LT_SEL2,LT_PTR2,0,0
-                KIND    ymxr_ln0,LOOK_STRIDE,2,LN_CELLS,0,0,LN_PAGE,2,0,LN_SEL1,LN_PTR1,LN_SEL2,LN_PTR2,0,0
-                KIND    ymxr_lb0,LOOK_STRIDE,3,LB_CELLS,0,0,LB_PAGE,3,1,LB_SEL1,LB_PTR1,LB_SEL2,LB_PTR2,LB_SEL3,LB_PTR3
-                KIND    ymxr_lv0,LOOK_STRIDE,3,LV_CELLS,0,0,LV_PAGE,3,0,LV_SEL1,LV_PTR1,LV_SEL2,LV_PTR2,LV_SEL3,LV_PTR3
-                KIND    ymxr_le0,LOOK_STRIDE,2,LE_CELLS,LE_LEFT,LE_RELD,LE_PAGE,5,0,LE_SEL1,LE_PTR1,LE_SEL2,LE_PTR2,0,0
-                KIND    ymxr_lf0,LOOK_STRIDE,2,LF_CELLS,LF_LEFT,LF_RELD,LF_PAGE,5,0,LF_SEL1,LF_PTR1,LF_SEL2,LF_PTR2,0,0
-                KIND    ymxr_tick0,TICK_SIZE,1,TICK_CELL,0,0,0,0,0,TICK_SEL,TICK_PTR,0,0,0,0
-                KIND    ymxr_cnt0,TICKC_SIZE,1,TICKC_CELL,TICKC_LEFT,TICKC_RELD,0,4,0,TICKC_SEL,TICKC_PTR,0,0,0,0
-                KIND    ymxr_two0,TW2_SIZE,2,TW2_CELLS,0,0,0,2,0,TW2_SEL1,TW2_PTR1,TW2_SEL2,TW2_PTR2,0,0
-                KIND    ymxr_three0,TW3_SIZE,3,TW3_CELLS,0,0,0,3,0,TW3_SEL1,TW3_PTR1,TW3_SEL2,TW3_PTR2,TW3_SEL3,TW3_PTR3
-                KIND    ymxr_env0,TWC_SIZE,2,TWC_CELLS,TWC_LEFT,TWC_RELD,0,5,0,TWC_SEL1,TWC_PTR1,TWC_SEL2,TWC_PTR2,0,0
+ymxr_kinds:     KIND    ymxr_lk,1,LK_CELL,0,0,LK_PAGE,0,1,LK_SEL,LK_PTR,0,0,0,0
+                KIND    ymxr_lc,1,LC_CELL,LC_LEFT,LC_RELD,LC_PAGE,4,0,LC_SEL,LC_PTR,0,0,0,0
+                KIND    ymxr_lt,2,LT_CELLS,0,0,LT_PAGE,2,1,LT_SEL1,LT_PTR1,LT_SEL2,LT_PTR2,0,0
+                KIND    ymxr_ln,2,LN_CELLS,0,0,LN_PAGE,2,0,LN_SEL1,LN_PTR1,LN_SEL2,LN_PTR2,0,0
+                KIND    ymxr_lb,3,LB_CELLS,0,0,LB_PAGE,3,1,LB_SEL1,LB_PTR1,LB_SEL2,LB_PTR2,LB_SEL3,LB_PTR3
+                KIND    ymxr_lv,3,LV_CELLS,0,0,LV_PAGE,3,0,LV_SEL1,LV_PTR1,LV_SEL2,LV_PTR2,LV_SEL3,LV_PTR3
+                KIND    ymxr_le,2,LE_CELLS,LE_LEFT,LE_RELD,LE_PAGE,5,0,LE_SEL1,LE_PTR1,LE_SEL2,LE_PTR2,0,0
+                KIND    ymxr_lf,2,LF_CELLS,LF_LEFT,LF_RELD,LF_PAGE,5,0,LF_SEL1,LF_PTR1,LF_SEL2,LF_PTR2,0,0
+                KIND    ymxr_tick,1,TICK_CELL,0,0,0,0,0,TICK_SEL,TICK_PTR,0,0,0,0
+                KIND    ymxr_cnt,1,TICKC_CELL,TICKC_LEFT,TICKC_RELD,0,4,0,TICKC_SEL,TICKC_PTR,0,0,0,0
+                KIND    ymxr_two,2,TW2_CELLS,0,0,0,2,0,TW2_SEL1,TW2_PTR1,TW2_SEL2,TW2_PTR2,0,0
+                KIND    ymxr_three,3,TW3_CELLS,0,0,0,3,0,TW3_SEL1,TW3_PTR1,TW3_SEL2,TW3_PTR2,TW3_SEL3,TW3_PTR3
+                KIND    ymxr_env,2,TWC_CELLS,TWC_LEFT,TWC_RELD,0,5,0,TWC_SEL1,TWC_PTR1,TWC_SEL2,TWC_PTR2,0,0
                 .if     YMXR_DEFER
 ; The hook of each kind in the order above (SPEC.md 4.8): the offset of
 ; the head of the path that ends a source, and the word a hook writes

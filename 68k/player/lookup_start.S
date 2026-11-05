@@ -121,11 +121,9 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
 .armlk:         moveq   #0,d5                   ; an arming of the general kind
                 bra.s   .kind
                 .endif
-; A kind's descriptor past ymxr_kinds, and an effect's lookup instances
-; past effect 0's.
+; A kind's descriptor past ymxr_kinds.
 .kd:            dc.b    0,KD_SIZE,2*KD_SIZE,3*KD_SIZE
                 dc.b    4*KD_SIZE,5*KD_SIZE,6*KD_SIZE,7*KD_SIZE
-.eff:           dc.w    0,LOOK_STRIDE,2*LOOK_STRIDE,3*LOOK_STRIDE
 .tagged:        addq.l  #1,d0
                 beq     .square
                 addq.l  #1,d0
@@ -162,7 +160,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 adda.w  d3,a2                   ; the descriptor
                 move.w  d4,d3
                 add.w   d3,d3
-                move.w  .eff(pc,d3.w),d4        ; two bytes an effect
+                move.w  (a2,d3.w),d4            ; KD_AT, the effect's instance
                 lsl.w   #2,d3                   ; eight page bytes an effect,
                 add.w   d5,d3                   ; one a kind
                 .if     YMXR_DEFER
@@ -180,7 +178,6 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 move.b  (a5,d3.w),FX_LHIGH(a3)
                 move.l  a1,d3                   ; a1 kept
                 lea     ymxr_tick0(pc),a5
-                adda.w  (a2),a5                 ; KD_BASE
                 adda.w  d4,a5                   ; the instance
                 move.w  KD_PAGE(a2),d4
                 lea     0(a5,d4.w),a1
@@ -421,9 +418,9 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 bra.w   .kpage
 ; A square: the entries of its two keys, the second the marker's.
 ; ymxr_arm passes no square here, so d1 is the vector the frame writes.
-.square:        mulu    #SQ_SIZE,d4             ; the effect's square
-                lea     ymxr_sq0(pc),a5
-                adda.w  d4,a5
+.square:        add.w   d4,d4                   ; the effect's square, out of
+                lea     ymxr_at_square(pc),a5   ; the kind's table
+                adda.w  (a5,d4.w),a5
                 moveq   #0,d0
                 move.b  FX_RUN(a3),d0
                 bsr     ymxr_tab
@@ -462,9 +459,9 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 bsr     ymxr_tab
                 move.b  (a4),d0
                 bsr     ymxr_entry
-                mulu    #ONE_SIZE,d4
-                lea     ymxr_one0(pc),a5
-                adda.w  d4,a5
+                add.w   d4,d4                   ; the effect's source of one
+                lea     ymxr_at_one(pc),a5      ; row, out of the kind's table
+                adda.w  (a5,d4.w),a5
                 movea.w d1,a2
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr

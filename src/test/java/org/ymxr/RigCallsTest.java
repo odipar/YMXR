@@ -248,8 +248,8 @@ final class RigCallsTest {
     /** The conformance kit's tunes, each on the player ymxr-sndh -link links
      *  for it, on the plain core and the lean one: the tool's core against
      *  the rig's link of the assembled core, and the frames against the
-     *  reader's entries (doc/LINKER.md, The check). The two tunes that need
-     *  the deferred start or the lookup run the core as carried. */
+     *  reader's entries (doc/LINKER.md, The check). A tune that needs the
+     *  deferred start or the lookup plays on the core with it, linked. */
     @Test
     void theRigPlaysTheKitOnLinkedPlayers() throws Exception {
         theRigRuns();

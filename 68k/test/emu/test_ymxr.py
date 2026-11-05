@@ -2317,7 +2317,7 @@ def mapped(code, symbols):
     for title, at, kinds in tunes:
         ticked = []
         RAN.clear()
-        result = check(at, code, symbols, kit=True, perf=PERF, ticked=ticked)
+        result = check(at, *played_on(at, code, symbols), kit=True, perf=PERF, ticked=ticked)
         assert ticked, "%s: no tick" % title
         assert kinds <= RAN, "%s: a source ran through a transformation in %s, and in none of %s" % (
             title, sorted(RAN), sorted(kinds - RAN))
@@ -5525,11 +5525,12 @@ def flagged(flags):
 
 
 def pieces_of(name):
-    """The table of a core's pieces and fields, as the build cut it
-    beside the core in go/binaries/data (doc/LINKER.md, The library):
-    (name, first byte, byte past the last) a piece, and (offset, width,
-    {piece: c}) a field."""
-    pieces, masks, fields = [], [], []
+    """The table of a core's pieces, masks, twins, aligns and fields, as the
+    build cut it beside the core in go/binaries/data (doc/LINKER.md, The
+    library): (name, first byte, byte past the last) a piece, (offset,
+    prefix) a mask, (copy, first) a twin, (gap, base, anchor, add) an
+    align, and (offset, width, {piece: c}) a field."""
+    pieces, masks, twins, aligns, fields = [], [], [], [], []
     with open(os.path.join(ROOT, "go", "binaries", "data",
                            name.replace(".bin", ".pieces"))) as f:
         for line in f:
@@ -5538,27 +5539,46 @@ def pieces_of(name):
                 pieces.append((word[1], int(word[2]), int(word[3])))
             elif word and word[0] == "mask":
                 masks.append((int(word[1]), word[2]))
+            elif word and word[0] == "twin":
+                twins.append((word[1], word[2]))
+            elif word and word[0] == "align":
+                aligns.append((word[1], int(word[2]), int(word[3]), int(word[4])))
             elif word and word[0] == "field":
                 moves = {}
                 for one in word[3:]:
                     m = re.match(r"([a-z][a-z0-9]*_[0-9]+)([+-][0-9]+)$", one)
                     moves[m.group(1)] = int(m.group(2))
                 fields.append((int(word[1]), int(word[2]), moves))
-    return pieces, masks, fields
+    return pieces, masks, twins, aligns, fields
 
 
 def link(core, table, blocks_out):
-    """The core linked with every piece of the blocks named left out, and
-    every field moved by -c times the bytes of each piece left out it
-    refers across, and each mask written with the blocks kept
-    (doc/LINKER.md, The link): the rig's link, which the tool's is read
-    against. Returns the bytes and the pieces left out."""
-    pieces, masks, fields = table
-    out = [one for one in pieces if one[0].rsplit("_", 1)[0] in blocks_out]
-    size = {name: to - at for name, at, to in out}
+    """The core linked with every piece of the blocks named left out, each
+    gap kept at the length its align sets, every field moved by -c times
+    the bytes each piece it refers across loses, and each mask written
+    with the blocks kept (doc/LINKER.md, The link): the rig's link, which
+    the tool's is read against. Returns the bytes and the bytes each
+    piece loses."""
+    pieces, masks, twins, aligns, fields = table
+    lost = {name: to - at for name, at, to in pieces
+            if name.rsplit("_", 1)[0] in blocks_out}
+    where = {name: (at, to) for name, at, to in pieces}
+
+    def linked(x):
+        return x - sum(lost.get(name, 0) for name, _, to in pieces if to <= x)
+    for gap, base, anchor, add in aligns:
+        if gap in lost:
+            continue
+        at, to = where[gap]
+        length = (linked(anchor) + add - linked(at) - base) % 256
+        lost[gap] = (to - at) - length
+    for copy, first in twins:
+        assert lost.get(copy, 0) == lost.get(first, 0), \
+            "piece %s loses %d bytes and %s, which it copies, %d" % (
+                copy, lost.get(copy, 0), first, lost.get(first, 0))
     moved = bytearray(core)
     for at, width, moves in fields:
-        by = sum(c * size[name] for name, c in moves.items() if name in size)
+        by = sum(c * lost.get(name, 0) for name, c in moves.items())
         if by:
             form = ">b" if width == 1 else ">h"
             moved[at:at + width] = struct.pack(form, struct.unpack(form, core[at:at + width])[0] - by)
@@ -5566,12 +5586,13 @@ def link(core, table, blocks_out):
     for at, prefix in masks:
         moved[at:at + 2] = struct.pack(">H", sum(1 << i for i in range(16)
                                                  if "%s%d" % (prefix, i) in kept))
-    linked, start = bytearray(), 0
-    for _, at, to in out:
-        linked += moved[start:at]
-        start = to
-    linked += moved[start:]
-    return bytes(linked), out
+    out, start = bytearray(), 0
+    for name, at, to in pieces:
+        if lost.get(name, 0):
+            out += moved[start:at] + bytes((to - at) - lost[name])
+            start = to
+    out += moved[start:]
+    return bytes(out), lost
 
 
 def linked_player(ym, defines):
@@ -5589,8 +5610,6 @@ def linked_player(ym, defines):
                        + (["-pcrel"] if bits & 4 else ["-abs"]),
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
-    if re.search(r"the core: \S+, \d+ bytes?\n", r.stderr.decode()):
-        return None
     said = re.search(r"the core: (\S+) linked for the set, (\d+) bytes? of (\d+)"
                      r"(?:, the blocks left out: ([a-z0-9, ]+))?", r.stderr.decode())
     assert said, "ymxr-sndh -link reports no linked core: " + r.stderr.decode()
@@ -5602,14 +5621,19 @@ def linked_player(ym, defines):
     assert core_name(flags) == name, "the file's flags read %s, and the report %s" % (
         core_name(flags), name)
     core_code, core_symbols = build(flagged(flags), "YMXR_sndh.S")
-    ours, out = link(core_code, pieces_of(name), blocks_out)
+    table = pieces_of(name)
+    ours, lost = link(core_code, table, blocks_out)
     assert len(ours) == int(said.group(2)), "the rig links %d bytes, and the tool %s" % (
         len(ours), said.group(2))
-    assert body[:28] == ours[:28] and body[36:len(ours)] == ours[36:], \
+    # the longs at 28 and 32, and in a core with the lookup the long at
+    # 36, are the file's offsets (BINARIES.md 2.2)
+    patched = 40 if "map" in name else 36
+    assert body[:28] == ours[:28] and body[patched:len(ours)] == ours[patched:], \
         "the core ymxr-sndh linked is not the rig's link of %s, its patched longs aside" % name
     code, symbols = build(flagged(flags))
     first = core_symbols["YMXR_init"] - symbols["YMXR_init"]
     assert core_code[first:] == code, "the player in %s is not the player assembled" % name
+    out = [(name, a, to) for name, a, to in table[0] if lost.get(name, 0) == to - a]
     moved = Symbols()
     for sym, value in symbols.items():
         if sym not in symbols.text:
@@ -5621,7 +5645,8 @@ def linked_player(ym, defines):
         if any(a < first + value < to or (a == first + value and sym not in BETWEEN)
                for _, a, to in out):
             continue
-        moved[sym] = value - sum(to - a for _, a, to in out if to <= first + value)
+        moved[sym] = value - sum(lost.get(name, 0) for name, _, to in table[0]
+                                 if to <= first + value)
     moved.text = frozenset(sym for sym in symbols.text if sym in moved)
     return ours[first:], moved, "%s linked, %d bytes of %d, %s left out" % (
         name, len(ours), len(core_code), ", ".join(blocks_out) or "no block")
@@ -5630,24 +5655,24 @@ def linked_player(ym, defines):
 # The labels at a piece's first byte that name the first byte the link
 # keeps there (doc/LINKER.md): the frame's, before effect 0's frame code;
 # the first handler's, which the reach and the second bank are measured
-# from; and the second bank's, before its first handler.
-BETWEEN = ("ymxr_frame", "ymxr_tick0", "ymxr_bank1")
+# from; the second bank's, before its first handler; and the lookup
+# instances', which marks a core with the lookup in.
+BETWEEN = ("ymxr_frame", "ymxr_tick0", "ymxr_bank1", "ymxr_look")
 
 
 def played_on(at, code, symbols):
     """The player a tune file plays on: under -linked, the one ymxr-sndh
-    -link links for it where it links (doc/LINKER.md), and the player
-    assembled otherwise."""
+    -link links for it (doc/LINKER.md), and the player assembled
+    otherwise."""
     if LINKED:
         linked = linked_player(at, DEFINES)
-        if linked is not None:
-            return linked[0], linked[1]
+        return linked[0], linked[1]
     return code, symbols
 
 
 # The checks before the tunes that play their tunes through played_on, so
 # a run under -linked plays them on linked players.
-LINKABLE = ("deferred",)
+LINKABLE = ("deferred", "mapped")
 
 
 def core_name(flags):
@@ -6094,14 +6119,9 @@ def main():
             playing = (code, symbols)
             if LINKED:
                 # a tune that needs the deferred start or the lookup plays on
-                # the player assembled, which check switches it to
-                linked = linked_player(ym, defines)
-                if linked is None:
-                    print("%-45s the deferred start or the lookup: the player as"
-                          " assembled, not linked" % os.path.basename(ym))
-                else:
-                    playing = linked
-                    print("%-45s %s" % (os.path.basename(ym), linked[2]))
+                # the core with it, linked
+                playing = linked_player(ym, defines)
+                print("%-45s %s" % (os.path.basename(ym), playing[2]))
             frames, ticks, cost, tick_cost, tick_cycles, where, boundaries, refills_of = \
                 check(ym, playing[0], playing[1], cycles_of and CyclesOn(cycles_of),
                       kit, perf, parts)

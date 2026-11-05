@@ -305,9 +305,8 @@ final class Sndh {
         return combine(core, set, tags, workspace);
     }
 
-    /** The core the switches select, and with {@code -link}, where the set
-     *  needs neither the deferred start nor the lookup, that core linked
-     *  for the blocks the set needs (doc/LINKER.md). */
+    /** The core the switches select, and with {@code -link} that core
+     *  linked for the blocks the set needs (doc/LINKER.md). */
     private static byte[] chosen(Options options, boolean pcrel, boolean defers, boolean maps,
                                  List<TuneFile> tunes) {
         Binaries.Binary binary = Binaries.binary(options.monitor(), options.lean(), pcrel,
@@ -730,9 +729,9 @@ final class Sndh {
      * read a row through the program counter (BINARIES.md 5.5). The three
      * are one switch each, and any two together select the core that is
      * both, so {@code -perf -lean} reads what a lean run costs. {@code
-     * -link} links the core for the subtunes where they need neither the
-     * deferred start nor the lookup: the handler kinds their sources run
-     * no source of are left out (doc/LINKER.md).
+     * -link} links the core for the subtunes: the blocks of the effects,
+     * the handler kinds and the lookup kinds the subtunes run are kept,
+     * and the rest left out (doc/LINKER.md).
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
@@ -821,14 +820,13 @@ final class Sndh {
         int carried = Binaries.core(monitor, lean, pcrel, defer, map).length;
         int core = carried;
         if (options.link() && Link.links(defer, map)) {
-            // the subtune table follows the linked core, on an even offset
-            // (BINARIES.md 3.1)
-            core = Tune.getLong(sndh, at + CORE_TABLE_AT);
             List<TuneFile> read = new ArrayList<>();
             for (byte[] tune : tunes) {
                 read.add(TuneFile.read(tune));
             }
-            List<String> out = Link.leftOut(Pieces.carried(binary), Link.blocks(read));
+            Pieces table = Pieces.carried(binary);
+            core = Link.link(Binaries.carried(binary.name()), table, Link.blocks(read)).length;
+            List<String> out = Link.leftOut(table, Link.blocks(read));
             report.say("the core: " + binary.name() + " linked for the set, "
                     + Report.count(core, "byte", "bytes") + " of " + carried
                     + (out.isEmpty() ? ", every block kept"

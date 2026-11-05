@@ -13,18 +13,20 @@ import (
 	"github.com/odipar/ymxr/go/ymxr"
 )
 
-// CoreTableAt is the offset of the core's subtune table offset, which a
-// linked core's report reads its length off (BINARIES.md 2.2, 3.1).
-const CoreTableAt = coreTableAt
-
 // Kinds are the handler kinds that are blocks: the general handler is in
 // each effect's block.
 var Kinds = []string{"square", "one", "counted", "two", "three", "envelope"}
 
+// Lookups are the lookup kinds, each a block on each effect: the general,
+// the counted, two columns, noise, buzzer, voice, the counted of two
+// columns and the counted on noise (68k/player/lookup_kinds.S).
+var Lookups = []string{"lk", "lc", "lt", "ln", "lb", "lv", "le", "lf"}
+
 // Blocks are the blocks a core's pieces belong to, in the order
 // doc/LINKER.md lists them: each handler kind, which init's loop over it
-// is, and its instance on each effect; the start of several columns; and
-// each effect's frame code and general handler.
+// is, and its instance on each effect; the start of several columns; each
+// effect's frame code and general handler; each lookup kind and its
+// instance on each effect; and align, the padding before the second bank.
 var Blocks = func() []string {
 	var all []string
 	for _, kind := range Kinds {
@@ -37,7 +39,13 @@ var Blocks = func() []string {
 	for i := 0; i < 4; i++ {
 		all = append(all, fmt.Sprintf("effect%d", i))
 	}
-	return all
+	for _, kind := range Lookups {
+		all = append(all, kind)
+		for i := 0; i < 4; i++ {
+			all = append(all, fmt.Sprintf("%s%d", kind, i))
+		}
+	}
+	return append(all, "align")
 }()
 
 // Piece is a run of bytes of a core a player linked for one song leaves
@@ -67,18 +75,36 @@ type Mask struct {
 	At     int
 }
 
-// Pieces is the table of a core: its pieces, its masks and its fields,
-// in the core's order.
+// Twin is a piece of the second bank, Copy, and the piece of the first it
+// copies, First: a link leaves both out or keeps both, at one length, and
+// a field's coefficient for the two is First's.
+type Twin struct {
+	Copy, First string
+}
+
+// Align is a piece of padding, Gap, whose length a link sets: the byte
+// Base past its end, linked, is the byte Add past Anchor, linked, modulo
+// 256. A lookup instance's page read is Base past the gap before it, and
+// its effect's reference is Add past ymxr_ref (68k/player/lookup_ref.S).
+type Align struct {
+	Gap               string
+	Base, Anchor, Add int
+}
+
+// Pieces is the table of a core: its pieces, its masks, its twins, its
+// aligns and its fields, in the core's order.
 type Pieces struct {
 	Pieces []Piece
 	Masks  []Mask
+	Twins  []Twin
+	Aligns []Align
 	Fields []Field
 }
 
 var move = regexp.MustCompile(`^([a-z][a-z0-9]*_[0-9]+)([+-][0-9]+)$`)
 
-// ReadPieces is the table in that text, a line a piece and then a line a
-// field.
+// ReadPieces is the table in that text: a line a piece, a mask, a twin,
+// an align and a field.
 func ReadPieces(text string) (Pieces, error) {
 	var table Pieces
 	for _, line := range strings.Split(text, "\n") {
@@ -97,6 +123,16 @@ func ReadPieces(text string) (Pieces, error) {
 				return Pieces{}, fmt.Errorf("a line of a table reads %s", line)
 			}
 			table.Masks = append(table.Masks, Mask{word[2], at})
+		case word[0] == "twin" && len(word) == 3:
+			table.Twins = append(table.Twins, Twin{word[1], word[2]})
+		case word[0] == "align" && len(word) == 5:
+			base, err1 := strconv.Atoi(word[2])
+			anchor, err2 := strconv.Atoi(word[3])
+			add, err3 := strconv.Atoi(word[4])
+			if err1 != nil || err2 != nil || err3 != nil {
+				return Pieces{}, fmt.Errorf("a line of a table reads %s", line)
+			}
+			table.Aligns = append(table.Aligns, Align{word[1], base, anchor, add})
 		case word[0] == "field" && len(word) >= 4:
 			at, err1 := strconv.Atoi(word[1])
 			width, err2 := strconv.Atoi(word[2])
@@ -129,6 +165,12 @@ func (t Pieces) Text() string {
 	for _, m := range t.Masks {
 		fmt.Fprintf(&out, "mask %d %s\n", m.At, m.Prefix)
 	}
+	for _, w := range t.Twins {
+		fmt.Fprintf(&out, "twin %s %s\n", w.Copy, w.First)
+	}
+	for _, a := range t.Aligns {
+		fmt.Fprintf(&out, "align %s %d %d %d\n", a.Gap, a.Base, a.Anchor, a.Add)
+	}
 	for _, f := range t.Fields {
 		fmt.Fprintf(&out, "field %d %d", f.At, f.Width)
 		names := make([]string, 0, len(f.Moves))
@@ -144,10 +186,10 @@ func (t Pieces) Text() string {
 	return out.String()
 }
 
-// Cuts is whether the build cuts a table from the core of that name: one
-// without the lookup.
+// Cuts is whether the build cuts a table from the core of that name: every
+// SNDH core.
 func Cuts(core string) bool {
-	return strings.HasPrefix(core, "YMXR_sndh") && !strings.Contains(core, "-map")
+	return strings.HasPrefix(core, "YMXR_sndh")
 }
 
 // CarriedPieces is the table carried beside the core of that name.
@@ -159,10 +201,10 @@ func CarriedPieces(core string) (Pieces, error) {
 	return ReadPieces(string(text))
 }
 
-// Links is whether a set of these effects links: one that needs no
-// lookup, with the deferred start or without it.
+// Links is whether a set of these effects links: every set does, on the
+// core its switches and its effects select.
 func Links(defers, maps bool) bool {
-	return !maps
+	return true
 }
 
 // Kind is the block of a source's handler kind, or general for the
@@ -189,11 +231,17 @@ func Kind(source *dtx.Table, counted bool) string {
 // BlocksOf is the blocks a set of tunes needs: the block of each effect
 // a tune runs, bits 0 to 3 of its effects byte; for each source an
 // effect's rows start, the instance of its handler kind on that effect
-// and the kind's loop of init; and several where a start is of a counted
-// source or one of several columns; in the order of Blocks.
+// and the kind's loop of init; several where a start is of a counted
+// source or one of several columns; the lookup instance of each kind an
+// effect maps a source through, and the kind's loop of init; and align,
+// the padding before the second bank; in the order of Blocks.
 func BlocksOf(tunes []ymxr.File) []string {
-	needed := map[string]bool{}
+	needed := map[string]bool{"align": true}
 	for _, tune := range tunes {
+		for _, lookup := range LookupsOf(tune) {
+			needed[lookup] = true
+			needed[lookup[:2]] = true
+		}
 		for i := 0; i < 4; i++ {
 			if tune.Effects&(1<<i) == 0 {
 				continue
@@ -219,6 +267,146 @@ func BlocksOf(tunes []ymxr.File) []string {
 		}
 	}
 	return ordered
+}
+
+// LookupsOf is the lookup instances a tune runs, as blocks such as lt1:
+// for each start of a source through a transformation, the kept mapping
+// not 0, and each remap of a running source to a transformation, the
+// lookup kind of the source on the target it started on. A square and a
+// source of one row keep their entries in the identity handler. The rows
+// are read as a player reads them, through the repeat row until each
+// effect's state there is one it has had before, as the pages are read;
+// a deferred start on a running timer adds its source to the ones a
+// remap reaches.
+func LookupsOf(tune ymxr.File) []string {
+	var out []string
+	if tune.Version != ymxr.Version {
+		return out
+	}
+	seen := map[string]bool{}
+	add := func(block string) {
+		if !seen[block] {
+			seen[block] = true
+			out = append(out, block)
+		}
+	}
+	var target, mapping [4]int
+	running := [4]map[int]bool{{}, {}, {}, {}}
+	table := tune.Table
+	for row := 0; row < table.Rows(); row++ {
+		lookupRow(tune, row, &target, &mapping, &running, add)
+	}
+	states := map[string]bool{}
+	for table.Repeat() < table.Rows() {
+		var state strings.Builder
+		for i := 0; i < 4; i++ {
+			fmt.Fprintf(&state, "%d %d -1", target[i], mapping[i])
+			for _, one := range sortedKeys(running[i]) {
+				fmt.Fprintf(&state, " %d", one)
+			}
+			state.WriteString(";")
+		}
+		if states[state.String()] {
+			break
+		}
+		states[state.String()] = true
+		for row := table.Repeat(); row < table.Rows(); row++ {
+			lookupRow(tune, row, &target, &mapping, &running, add)
+		}
+	}
+	return out
+}
+
+func sortedKeys(set map[int]bool) []int {
+	keys := make([]int, 0, len(set))
+	for k := range set {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	return keys
+}
+
+// lookupRow is one row's effect columns for LookupsOf: a running source is
+// kept with its target, its number times 64 plus the target.
+func lookupRow(tune ymxr.File, row int, target, mapping *[4]int, running *[4]map[int]bool,
+	add func(string)) {
+	for i := 0; i < 4; i++ {
+		if tune.Effects&(1<<i) == 0 {
+			continue
+		}
+		t := ymxr.Effect + 4*i
+		tg := int(tune.Table.Column(t)[row])
+		src := int(tune.Table.Column(t + 1)[row])
+		control := int(tune.Table.Column(t + 2)[row])
+		m := int(tune.Table.Column(ymxr.MappingColumn + i)[row])
+		if tg&0x80 != 0 {
+			target[i] = tg & 0x7F
+		}
+		if src&0x80 != 0 {
+			s := src & 0x7F
+			if s == 0 {
+				running[i] = map[int]bool{}
+				continue
+			}
+			if m&0x80 != 0 {
+				mapping[i] = m & 0x7F
+			}
+			if kind := Lookup(tune, s, target[i]); mapping[i] != 0 && kind != "" {
+				add(fmt.Sprintf("%s%d", kind, i))
+			}
+			deferred := control&0x80 != 0 && control&ymxr.Deferred != 0
+			if !deferred || len(running[i]) == 0 {
+				running[i] = map[int]bool{}
+			}
+			running[i][s*64+target[i]] = true
+		} else if m&0x80 != 0 {
+			mapping[i] = m & 0x7F
+			if mapping[i] != 0 {
+				for _, one := range sortedKeys(running[i]) {
+					if kind := Lookup(tune, one/64, one%64); kind != "" {
+						add(fmt.Sprintf("%s%d", kind, i))
+					}
+				}
+			}
+		}
+	}
+}
+
+// The first target that maps its first value, setNoiseA, and the target
+// of three columns that maps its last, setBuzzer (SPEC.md 1.10.1).
+const (
+	noise  = 22
+	buzzer = 21
+)
+
+// Lookup is the lookup kind of source s on that target, or "" for a square
+// or a source of one row (68k/player/lookup_start.S, .kind).
+func Lookup(tune ymxr.File, s, target int) string {
+	if s < 1 || s > len(tune.Sources) {
+		return ""
+	}
+	switch Kind(tune.Sources[s-1], tune.Counted[s-1]) {
+	case "square", "one":
+		return ""
+	case "general":
+		return "lk"
+	case "counted":
+		return "lc"
+	case "two":
+		if target >= noise {
+			return "ln"
+		}
+		return "lt"
+	case "three":
+		if target == buzzer {
+			return "lb"
+		}
+		return "lv"
+	}
+	if target >= noise {
+		return "lf"
+	}
+	return "le"
 }
 
 // Started is the sources effect i's rows start: a source column with its
@@ -262,28 +450,54 @@ func LeftOut(table Pieces, blocks []string) []string {
 }
 
 // Link is the core linked for the blocks named: every piece of another
-// block left out, every field in the bytes kept moved by -c times the
-// bytes of each piece left out it refers across, and each mask written
-// with the blocks kept (doc/LINKER.md, The link). A value that no longer
-// fits its field is an error.
+// block left out, each gap kept at the length its align sets, every field
+// in the bytes kept moved by -c times the bytes each piece it refers
+// across loses, and each mask written with the blocks kept
+// (doc/LINKER.md, The link). A value that no longer fits its field is an
+// error.
 func Link(core []byte, table Pieces, blocks []string) ([]byte, error) {
 	kept := map[string]bool{}
 	for _, block := range blocks {
 		kept[block] = true
 	}
-	size := map[string]int{}
-	left := 0
+	// the bytes each piece loses: all of a piece left out, and a kept
+	// gap's length less the length the alignment sets
+	lost := map[string]int{}
+	byName := map[string]Piece{}
 	for _, p := range table.Pieces {
+		byName[p.Name] = p
 		if !kept[p.Block()] {
-			size[p.Name] = p.To - p.From
-			left += p.To - p.From
+			lost[p.Name] = p.To - p.From
+		}
+	}
+	linked := func(at int) int {
+		by := 0
+		for _, p := range table.Pieces {
+			if p.To <= at {
+				by += lost[p.Name]
+			}
+		}
+		return at - by
+	}
+	for _, a := range table.Aligns {
+		gap, ok := byName[a.Gap]
+		if _, out := lost[a.Gap]; !ok || out {
+			continue
+		}
+		length := (linked(a.Anchor) + a.Add - linked(gap.From) - a.Base) & 255
+		lost[a.Gap] = (gap.To - gap.From) - length
+	}
+	for _, w := range table.Twins {
+		if lost[w.Copy] != lost[w.First] {
+			return nil, fmt.Errorf("piece %s loses %d bytes and %s, which it copies, %d",
+				w.Copy, lost[w.Copy], w.First, lost[w.First])
 		}
 	}
 	moved := append([]byte(nil), core...)
 	for _, f := range table.Fields {
 		by := 0
 		for name, c := range f.Moves {
-			by += c * size[name]
+			by += c * lost[name]
 		}
 		if by == 0 {
 			continue
@@ -312,13 +526,17 @@ func Link(core []byte, table Pieces, blocks []string) ([]byte, error) {
 		}
 		ymxr.PutWord(moved, m.At, bits)
 	}
-	linked := make([]byte, 0, len(core)-left)
+	out := make([]byte, 0, len(core))
 	from := 0
 	for _, p := range table.Pieces {
-		if _, out := size[p.Name]; out {
-			linked = append(linked, moved[from:p.From]...)
-			from = p.To
+		loses := lost[p.Name]
+		if loses == 0 {
+			continue
 		}
+		out = append(out, moved[from:p.From]...)
+		// a gap kept at its new length is zeros, as the assembler pads
+		out = append(out, make([]byte, (p.To-p.From)-loses)...)
+		from = p.To
 	}
-	return append(linked, moved[from:]...), nil
+	return append(out, moved[from:]...), nil
 }

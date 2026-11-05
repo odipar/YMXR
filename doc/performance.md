@@ -876,7 +876,7 @@ absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 17,364 bytes against 8,258,
-and 18,988 against 7,950 where a tick reads an absolute address; with the
-deferred start in as well, 27,470 against 12,638, and 30,618 against
+The lookup in, `YMXR_MAP=1`, makes the player 17,634 bytes against 8,258,
+and 19,258 against 7,950 where a tick reads an absolute address; with the
+deferred start in as well, 27,716 against 12,638, and 30,864 against
 12,478.

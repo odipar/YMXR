@@ -21,14 +21,19 @@ import java.util.stream.Stream;
  * The library of a core (doc/LINKER.md): its pieces, the runs of bytes a
  * player linked for one song leaves out, and its fields, the values that
  * move where a piece is left out. The build cuts a table from the
- * assembly of each core without the lookup, and
- * writes it beside the core as {@code <core>.pieces}.
+ * assembly of each core, and writes it beside the core as
+ * {@code <core>.pieces}.
  *
  * @param pieces the pieces in the core's order
  * @param masks the words a link writes the blocks it keeps into
+ * @param twins the pieces of the second bank, each with the piece of the
+ *        first it copies
+ * @param aligns the pieces whose length a link sets, each before a lookup
+ *        instance or the second bank
  * @param fields the fields in the core's order
  */
-record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
+record Pieces(List<Piece> pieces, List<Mask> masks, List<Twin> twins, List<Align> aligns,
+              List<Field> fields) {
 
     /** The suffix of a table beside its core. */
     static final String SUFFIX = ".pieces";
@@ -64,6 +69,24 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
     }
 
     /**
+     * A piece of the second bank, {@code copy}, and the piece of the first it
+     * copies, {@code first}: a link leaves both out or keeps both, at one
+     * length, and a field's coefficient for the two is {@code first}'s.
+     */
+    record Twin(String copy, String first) {
+    }
+
+    /**
+     * A piece of padding, {@code gap}, whose length a link sets: the byte
+     * {@code base} past its end, linked, is the byte {@code add} past
+     * {@code anchor}, linked, modulo 256. A lookup instance's page read is
+     * {@code base} past the gap before it, and its effect's reference is
+     * {@code add} past {@code ymxr_ref} (68k/player/lookup_ref.S).
+     */
+    record Align(String gap, int base, int anchor, int add) {
+    }
+
+    /**
      * A field: its offset, its width in bytes, and for each piece whose end
      * it refers across, the coefficient c: a link that leaves the piece out
      * moves the value by -c times the piece's bytes.
@@ -71,11 +94,9 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
     record Field(int at, int width, Map<String, Integer> moves) {
     }
 
-    /** Whether the build cuts a table from this core: one without the
-     *  lookup. */
+    /** Whether the build cuts a table from this core: every core. */
     static boolean cuts(Binaries.Binary binary) {
-        return binary.source().equals(Binaries.CORE.source())
-                && !binary.defines().contains("-dYMXR_MAP=1");
+        return binary.source().equals(Binaries.CORE.source());
     }
 
     /** The name a core's table is carried as. */
@@ -101,7 +122,8 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
         }
     }
 
-    /** The table as text, a line a piece and then a line a field. */
+    /** The table as text: a line a piece, a mask, a twin, an align and a
+     *  field. */
     String text() {
         StringBuilder out = new StringBuilder();
         for (Piece piece : pieces) {
@@ -110,6 +132,15 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
         }
         for (Mask mask : masks) {
             out.append("mask ").append(mask.at()).append(' ').append(mask.prefix())
+                    .append('\n');
+        }
+        for (Twin twin : twins) {
+            out.append("twin ").append(twin.copy()).append(' ').append(twin.first())
+                    .append('\n');
+        }
+        for (Align align : aligns) {
+            out.append("align ").append(align.gap()).append(' ').append(align.base())
+                    .append(' ').append(align.anchor()).append(' ').append(align.add())
                     .append('\n');
         }
         for (Field field : fields) {
@@ -133,6 +164,8 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
     static Pieces read(String text) {
         List<Piece> pieces = new ArrayList<>();
         List<Mask> masks = new ArrayList<>();
+        List<Twin> twins = new ArrayList<>();
+        List<Align> aligns = new ArrayList<>();
         List<Field> fields = new ArrayList<>();
         for (String line : text.split("\n")) {
             String[] word = line.split(" ");
@@ -141,6 +174,11 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
                         Integer.parseInt(word[3])));
             } else if (word[0].equals("mask") && word.length == 3) {
                 masks.add(new Mask(word[2], Integer.parseInt(word[1])));
+            } else if (word[0].equals("twin") && word.length == 3) {
+                twins.add(new Twin(word[1], word[2]));
+            } else if (word[0].equals("align") && word.length == 5) {
+                aligns.add(new Align(word[1], Integer.parseInt(word[2]),
+                        Integer.parseInt(word[3]), Integer.parseInt(word[4])));
             } else if (word[0].equals("field") && word.length >= 4) {
                 Map<String, Integer> moves = new TreeMap<>();
                 for (int i = 3; i < word.length; i++) {
@@ -155,7 +193,8 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
                 throw new IllegalArgumentException("a line of a table reads " + line);
             }
         }
-        return new Pieces(List.copyOf(pieces), List.copyOf(masks), List.copyOf(fields));
+        return new Pieces(List.copyOf(pieces), List.copyOf(masks), List.copyOf(twins),
+                List.copyOf(aligns), List.copyOf(fields));
     }
 
     /** One assembly: the bytes, and the labels of the text section with
@@ -184,7 +223,8 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
                 pieces.add(new Piece(name, label.getValue(), to));
             }
         }
-        pieces.sort(Comparator.comparingInt(Piece::from));
+        // a gap of 0 bytes before the piece at its end
+        pieces.sort(Comparator.comparingInt(Piece::from).thenComparingInt(Piece::to));
         List<Mask> masks = new ArrayList<>();
         for (Map.Entry<String, Integer> label : base.labels().entrySet()) {
             if (label.getKey().startsWith("ymxr_k_")) {
@@ -204,14 +244,21 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
         for (Piece piece : pieces) {
             twins.put(piece.name(), new ArrayList<>(List.of(piece)));
         }
+        Map<String, Piece> named = new LinkedHashMap<>();
         for (Piece piece : pieces) {
-            Integer of = base.labels().get("ymxr_t_" + piece.name());
-            if (of == null) {
+            named.put(piece.name(), piece);
+        }
+        for (String label : base.labels().keySet()) {
+            if (!label.startsWith("ymxr_t_")) {
                 continue;
             }
-            Piece first = pieces.stream().filter(one -> one.from() == of).findFirst()
-                    .orElseThrow(() -> new IllegalStateException(binary.name() + ": piece "
-                            + piece.name() + " copies no piece"));
+            String[] two = label.substring("ymxr_t_".length()).split("__");
+            Piece piece = named.get(two[0]);
+            Piece first = two.length == 2 ? named.get(two[1]) : null;
+            if (piece == null || first == null) {
+                throw new IllegalStateException(binary.name() + ": the twin label " + label
+                        + " names no two pieces");
+            }
             if (first.size() != piece.size()) {
                 throw new IllegalStateException(binary.name() + ": piece " + piece.name()
                         + " is " + piece.size() + " bytes, and " + first.name() + ", which it"
@@ -220,23 +267,47 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
             twins.computeIfAbsent(first.name(), k -> new ArrayList<>()).add(piece);
             copies.add(piece.name());
         }
+        // A core whose padding keeps an offset modulo 256, the lookup's, is
+        // padded 256 and 512 bytes, which leave that padding as it is: a
+        // field is then a word, its high byte the byte that moves.
+        List<Align> aligns = new ArrayList<>();
+        for (Piece piece : pieces) {
+            Integer at = base.labels().get("ymxr_a_" + piece.name());
+            Integer anchor = base.labels().get("ymxr_r_" + piece.name());
+            Integer add = base.labels().get("ymxr_n_" + piece.name());
+            if (at != null && anchor != null && add != null) {
+                aligns.add(new Align(piece.name(), at - piece.to(), anchor, add));
+            }
+        }
+        boolean aligned = !aligns.isEmpty();
+        int smallPad = aligned ? WIDE_PAD : PAD;
+        int widePad = aligned ? 2 * WIDE_PAD : WIDE_PAD;
         for (Piece piece : pieces) {
             if (copies.contains(piece.name())) {
                 continue;
             }
             List<Piece> padding = twins.getOrDefault(piece.name(), List.of(piece));
-            byte[] small = padded(rmac, sources, binary, padding, PAD, core.length);
-            byte[] wide = padded(rmac, sources, binary, padding, WIDE_PAD, core.length);
+            byte[] small = padded(rmac, sources, binary, padding, smallPad, core.length);
+            byte[] wide = padded(rmac, sources, binary, padding, widePad, core.length);
             boolean[] taken = new boolean[core.length];
             for (int i = 0; i < core.length; i++) {
                 if (small[i] == core[i] || taken[i]) {
                     continue;
                 }
                 // a word where the byte before it, or this byte, moves with
-                // the wide pad; a byte otherwise
+                // the wide pad; a byte otherwise; in an aligned core, a word
+                // at an even offset, whose high byte moves
                 int at;
                 int width;
-                if (i > 0 && wide[i - 1] != core[i - 1] && !taken[i - 1]) {
+                if (aligned) {
+                    if ((i & 1) != 0) {
+                        throw new IllegalStateException(binary.name() + ": the byte at " + i
+                                + " moves with a pad of " + smallPad + " past " + piece.name()
+                                + ", and a field of an aligned core is a word");
+                    }
+                    at = i;
+                    width = 2;
+                } else if (i > 0 && wide[i - 1] != core[i - 1] && !taken[i - 1]) {
                     at = i - 1;
                     width = 2;
                 } else if (wide[i] != core[i]) {
@@ -246,12 +317,16 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
                     at = i;
                     width = 1;
                 }
+                // a move read modulo the field's width: in a core past 32 KB
+                // a pad moves a field past the range of a signed word, and a
+                // link that leaves pieces out moves it back
                 int was = value(core, at, width);
-                int c = value(small, at, width) - was;
-                if (c % PAD != 0 || value(wide, at, width) - was != c / PAD * WIDE_PAD) {
+                int c = wrapped(value(small, at, width) - was, width);
+                int far = wrapped(value(wide, at, width) - was, width);
+                if (c % smallPad != 0 || far != c / smallPad * widePad) {
                     throw new IllegalStateException(binary.name() + ": the field at " + at
-                            + " moves " + c + " with a pad of " + PAD + " past " + piece.name()
-                            + " and " + (value(wide, at, width) - was) + " with " + WIDE_PAD);
+                            + " moves " + c + " with a pad of " + smallPad + " past "
+                            + piece.name() + " and " + far + " with " + widePad);
                 }
                 Integer known = widths.putIfAbsent(at, width);
                 if (known != null && known != width) {
@@ -259,7 +334,7 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
                             + " is " + known + " bytes past one piece and " + width
                             + " past " + piece.name());
                 }
-                moves.computeIfAbsent(at, k -> new TreeMap<>()).put(piece.name(), c / PAD);
+                moves.computeIfAbsent(at, k -> new TreeMap<>()).put(piece.name(), c / smallPad);
                 for (int j = at; j < at + width; j++) {
                     taken[j] = true;
                 }
@@ -267,8 +342,8 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
             for (int i = 0; i < core.length; i++) {
                 if (wide[i] != core[i] && !taken[i]) {
                     throw new IllegalStateException(binary.name() + ": the byte at " + i
-                            + " moves with a pad of " + WIDE_PAD + " past " + piece.name()
-                            + " and with " + PAD + " not");
+                            + " moves with a pad of " + widePad + " past " + piece.name()
+                            + " and with " + smallPad + " not");
                 }
             }
         }
@@ -277,7 +352,16 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
             fields.add(new Field(width.getKey(), width.getValue(),
                     new LinkedHashMap<>(moves.get(width.getKey()))));
         }
-        return new Pieces(List.copyOf(pieces), List.copyOf(masks), List.copyOf(fields));
+        List<Twin> twinned = new ArrayList<>();
+        for (Map.Entry<String, List<Piece>> twin : twins.entrySet()) {
+            for (Piece copy : twin.getValue()) {
+                if (!copy.name().equals(twin.getKey())) {
+                    twinned.add(new Twin(copy.name(), twin.getKey()));
+                }
+            }
+        }
+        return new Pieces(List.copyOf(pieces), List.copyOf(masks), List.copyOf(twinned),
+                List.copyOf(aligns), List.copyOf(fields));
     }
 
     /** The core assembled with a pad of {@code pad} bytes past each of the
@@ -309,6 +393,12 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
         }
         System.arraycopy(code, from, out, to, length - to);
         return out;
+    }
+
+    /** A difference of two values of a field, read as a signed value of the
+     *  field's width. */
+    private static int wrapped(int difference, int width) {
+        return width == 1 ? (byte) difference : (short) difference;
     }
 
     /** The signed value of a field. */
@@ -349,7 +439,9 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Field> fields) {
                 for (String line : Files.readAllLines(list, StandardCharsets.ISO_8859_1)) {
                     String[] part = line.trim().split("\\s+");
                     for (int i = 0; i + 2 < part.length; i += 3) {
-                        if (part[i + 2].equals("t") && part[i + 1].length() == 16) {
+                        boolean text = part[i + 2].equals("t");
+                        boolean added = part[i + 2].equals("a") && part[i].startsWith("ymxr_n_");
+                        if ((text || added) && part[i + 1].length() == 16) {
                             try {
                                 labels.putIfAbsent(part[i], (int) Long.parseLong(part[i + 1], 16));
                             } catch (NumberFormatException notOne) {

@@ -223,7 +223,7 @@ the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 `YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to
 version 10 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
-bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,124 bytes larger than
+bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 9,394 bytes larger than
 `YMXR_sndh.bin`. The field at 26 of a core with the lookup in is the
 offset of its first handler: every byte from there to the core's end is
 a handler, an installer or padding. The padding puts the displacement

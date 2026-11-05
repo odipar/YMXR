@@ -99,9 +99,6 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	}
 	core := len(whole)
 	if options.Link && sndh.Links(deferred, mapped) {
-		// the subtune table follows the linked core, on an even offset
-		// (BINARIES.md 3.1)
-		core = ymxr.GetLong(file, at+sndh.CoreTableAt)
 		var read []ymxr.File
 		for _, tune := range tunes {
 			one, err := ymxr.Read(tune)
@@ -114,6 +111,11 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 		if err != nil {
 			return
 		}
+		linked, err := sndh.Link(whole, table, sndh.BlocksOf(read))
+		if err != nil {
+			return
+		}
+		core = len(linked)
 		kept := ", every block kept"
 		if out := sndh.LeftOut(table, sndh.BlocksOf(read)); len(out) > 0 {
 			kept = ", the blocks left out: " + strings.Join(out, ", ")

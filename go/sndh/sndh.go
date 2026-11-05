@@ -652,9 +652,8 @@ func Clean(said string) string {
 	return string(out)
 }
 
-// chosen is the core the switches select, and with Link, where the set
-// needs neither the deferred start nor the lookup, that core linked for
-// the blocks the set needs (doc/LINKER.md).
+// chosen is the core the switches select, and with Link that core linked
+// for the blocks the set needs (doc/LINKER.md).
 func chosen(options Options, pcrel, defers, maps bool, tunes []ymxr.File) ([]byte, error) {
 	name := binaries.Named(options.Monitor, options.Lean, pcrel, defers, maps)
 	core, err := binaries.Read(name)

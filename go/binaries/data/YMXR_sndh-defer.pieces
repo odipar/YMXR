@@ -78,6 +78,34 @@ mask 13136 counted
 mask 13138 two
 mask 13140 three
 mask 13142 envelope
+twin effect0_3 effect0_2
+twin effect1_3 effect1_2
+twin effect2_3 effect2_2
+twin effect3_3 effect3_2
+twin square0_2 square0_1
+twin square1_2 square1_1
+twin square2_2 square2_1
+twin square3_2 square3_1
+twin one0_2 one0_1
+twin one1_2 one1_1
+twin one2_2 one2_1
+twin one3_2 one3_1
+twin counted0_2 counted0_1
+twin counted1_2 counted1_1
+twin counted2_2 counted2_1
+twin counted3_2 counted3_1
+twin two0_2 two0_1
+twin two1_2 two1_1
+twin two2_2 two2_1
+twin two3_2 two3_1
+twin three0_2 three0_1
+twin three1_2 three1_1
+twin three2_2 three2_1
+twin three3_2 three3_1
+twin envelope0_2 envelope0_1
+twin envelope1_2 envelope1_1
+twin envelope2_2 envelope2_1
+twin envelope3_2 envelope3_1
 field 294 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 636 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1
 field 690 2 counted_1+1 counted_2+1 envelope_1+1 one_1+1 square_1+1 three_1+1 two_1+1

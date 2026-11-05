@@ -111,104 +111,333 @@ ymxr_lhalt2     equ     ymxr_tick2_halt
 ymxr_lhalt3     equ     ymxr_tick3_halt
                 .endif
 ymxr_look:
+                PIECE   lt0_1
                 LPAD    KEY_LT,ymxr_ref0
+                ENDPIECE lt0_1
+                PIECE   lt0_2
                 TICKWL  ymxr_lt0,2,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lt0_end:
+ymxr_a_lt0_1 equ     ymxr_lt0_key+2
+ymxr_r_lt0_1 equ     ymxr_ref
+ymxr_n_lt0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lt0_2
+                PIECE   lt1_1
                 LPAD    KEY_LT,ymxr_ref1
+                ENDPIECE lt1_1
+                PIECE   lt1_2
                 TICKWL  ymxr_lt1,2,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lt1_end:
+ymxr_a_lt1_1 equ     ymxr_lt1_key+2
+ymxr_r_lt1_1 equ     ymxr_ref
+ymxr_n_lt1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lt1_2
+                PIECE   lt2_1
                 LPAD    KEY_LT,ymxr_ref2
+                ENDPIECE lt2_1
+                PIECE   lt2_2
                 TICKWL  ymxr_lt2,2,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lt2_end:
+ymxr_a_lt2_1 equ     ymxr_lt2_key+2
+ymxr_r_lt2_1 equ     ymxr_ref
+ymxr_n_lt2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lt2_2
+                PIECE   lt3_1
                 LPAD    KEY_LT,ymxr_ref3
+                ENDPIECE lt3_1
+                PIECE   lt3_2
                 TICKWL  ymxr_lt3,2,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lt3_end:
+ymxr_a_lt3_1 equ     ymxr_lt3_key+2
+ymxr_r_lt3_1 equ     ymxr_ref
+ymxr_n_lt3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lt3_2
+                PIECE   le0_1
                 LPAD    KEY_LE,ymxr_ref0
+                ENDPIECE le0_1
+                PIECE   le0_2
                 TICKWL  ymxr_le0,2,1,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_le0_end:
+ymxr_a_le0_1 equ     ymxr_le0_key+2
+ymxr_r_le0_1 equ     ymxr_ref
+ymxr_n_le0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE le0_2
+                PIECE   le1_1
                 LPAD    KEY_LE,ymxr_ref1
+                ENDPIECE le1_1
+                PIECE   le1_2
                 TICKWL  ymxr_le1,2,1,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_le1_end:
+ymxr_a_le1_1 equ     ymxr_le1_key+2
+ymxr_r_le1_1 equ     ymxr_ref
+ymxr_n_le1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE le1_2
+                PIECE   le2_1
                 LPAD    KEY_LE,ymxr_ref2
+                ENDPIECE le2_1
+                PIECE   le2_2
                 TICKWL  ymxr_le2,2,1,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_le2_end:
+ymxr_a_le2_1 equ     ymxr_le2_key+2
+ymxr_r_le2_1 equ     ymxr_ref
+ymxr_n_le2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE le2_2
+                PIECE   le3_1
                 LPAD    KEY_LE,ymxr_ref3
+                ENDPIECE le3_1
+                PIECE   le3_2
                 TICKWL  ymxr_le3,2,1,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_le3_end:
+ymxr_a_le3_1 equ     ymxr_le3_key+2
+ymxr_r_le3_1 equ     ymxr_ref
+ymxr_n_le3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE le3_2
+                PIECE   lf0_1
                 LPAD    KEY_LF,ymxr_ref0
+                ENDPIECE lf0_1
+                PIECE   lf0_2
                 TICKWL  ymxr_lf0,2,1,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lf0_end:
+ymxr_a_lf0_1 equ     ymxr_lf0_key+2
+ymxr_r_lf0_1 equ     ymxr_ref
+ymxr_n_lf0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lf0_2
+                PIECE   lf1_1
                 LPAD    KEY_LF,ymxr_ref1
+                ENDPIECE lf1_1
+                PIECE   lf1_2
                 TICKWL  ymxr_lf1,2,1,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lf1_end:
+ymxr_a_lf1_1 equ     ymxr_lf1_key+2
+ymxr_r_lf1_1 equ     ymxr_ref
+ymxr_n_lf1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lf1_2
+                PIECE   lf2_1
                 LPAD    KEY_LF,ymxr_ref2
+                ENDPIECE lf2_1
+                PIECE   lf2_2
                 TICKWL  ymxr_lf2,2,1,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lf2_end:
+ymxr_a_lf2_1 equ     ymxr_lf2_key+2
+ymxr_r_lf2_1 equ     ymxr_ref
+ymxr_n_lf2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lf2_2
+                PIECE   lf3_1
                 LPAD    KEY_LF,ymxr_ref3
+                ENDPIECE lf3_1
+                PIECE   lf3_2
                 TICKWL  ymxr_lf3,2,1,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lf3_end:
+ymxr_a_lf3_1 equ     ymxr_lf3_key+2
+ymxr_r_lf3_1 equ     ymxr_ref
+ymxr_n_lf3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lf3_2
+                PIECE   lk0_1
                 LPAD    KEY_LK,ymxr_ref0
+                ENDPIECE lk0_1
+                PIECE   lk0_2
                 TICKL   ymxr_lk0,0,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lk0_end:
+ymxr_a_lk0_1 equ     ymxr_lk0_key+2
+ymxr_r_lk0_1 equ     ymxr_ref
+ymxr_n_lk0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lk0_2
+                PIECE   lk1_1
                 LPAD    KEY_LK,ymxr_ref1
+                ENDPIECE lk1_1
+                PIECE   lk1_2
                 TICKL   ymxr_lk1,0,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lk1_end:
+ymxr_a_lk1_1 equ     ymxr_lk1_key+2
+ymxr_r_lk1_1 equ     ymxr_ref
+ymxr_n_lk1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lk1_2
+                PIECE   lk2_1
                 LPAD    KEY_LK,ymxr_ref2
+                ENDPIECE lk2_1
+                PIECE   lk2_2
                 TICKL   ymxr_lk2,0,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lk2_end:
+ymxr_a_lk2_1 equ     ymxr_lk2_key+2
+ymxr_r_lk2_1 equ     ymxr_ref
+ymxr_n_lk2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lk2_2
+                PIECE   lk3_1
                 LPAD    KEY_LK,ymxr_ref3
+                ENDPIECE lk3_1
+                PIECE   lk3_2
                 TICKL   ymxr_lk3,0,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lk3_end:
+ymxr_a_lk3_1 equ     ymxr_lk3_key+2
+ymxr_r_lk3_1 equ     ymxr_ref
+ymxr_n_lk3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lk3_2
+                PIECE   lb0_1
                 LPAD    KEY_LB,ymxr_ref0
+                ENDPIECE lb0_1
+                PIECE   lb0_2
                 TICKWL  ymxr_lb0,3,0,3,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lb0_end:
+ymxr_a_lb0_1 equ     ymxr_lb0_key+2
+ymxr_r_lb0_1 equ     ymxr_ref
+ymxr_n_lb0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lb0_2
+                PIECE   lb1_1
                 LPAD    KEY_LB,ymxr_ref1
+                ENDPIECE lb1_1
+                PIECE   lb1_2
                 TICKWL  ymxr_lb1,3,0,3,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lb1_end:
+ymxr_a_lb1_1 equ     ymxr_lb1_key+2
+ymxr_r_lb1_1 equ     ymxr_ref
+ymxr_n_lb1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lb1_2
+                PIECE   lb2_1
                 LPAD    KEY_LB,ymxr_ref2
+                ENDPIECE lb2_1
+                PIECE   lb2_2
                 TICKWL  ymxr_lb2,3,0,3,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lb2_end:
+ymxr_a_lb2_1 equ     ymxr_lb2_key+2
+ymxr_r_lb2_1 equ     ymxr_ref
+ymxr_n_lb2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lb2_2
+                PIECE   lb3_1
                 LPAD    KEY_LB,ymxr_ref3
+                ENDPIECE lb3_1
+                PIECE   lb3_2
                 TICKWL  ymxr_lb3,3,0,3,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lb3_end:
+ymxr_a_lb3_1 equ     ymxr_lb3_key+2
+ymxr_r_lb3_1 equ     ymxr_ref
+ymxr_n_lb3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lb3_2
+                PIECE   ln0_1
                 LPAD    KEY_LN,ymxr_ref0
+                ENDPIECE ln0_1
+                PIECE   ln0_2
                 TICKWL  ymxr_ln0,2,0,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_ln0_end:
+ymxr_a_ln0_1 equ     ymxr_ln0_key+2
+ymxr_r_ln0_1 equ     ymxr_ref
+ymxr_n_ln0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE ln0_2
+                PIECE   ln1_1
                 LPAD    KEY_LN,ymxr_ref1
+                ENDPIECE ln1_1
+                PIECE   ln1_2
                 TICKWL  ymxr_ln1,2,0,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_ln1_end:
+ymxr_a_ln1_1 equ     ymxr_ln1_key+2
+ymxr_r_ln1_1 equ     ymxr_ref
+ymxr_n_ln1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE ln1_2
+                PIECE   ln2_1
                 LPAD    KEY_LN,ymxr_ref2
+                ENDPIECE ln2_1
+                PIECE   ln2_2
                 TICKWL  ymxr_ln2,2,0,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_ln2_end:
+ymxr_a_ln2_1 equ     ymxr_ln2_key+2
+ymxr_r_ln2_1 equ     ymxr_ref
+ymxr_n_ln2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE ln2_2
+                PIECE   ln3_1
                 LPAD    KEY_LN,ymxr_ref3
+                ENDPIECE ln3_1
+                PIECE   ln3_2
                 TICKWL  ymxr_ln3,2,0,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_ln3_end:
+ymxr_a_ln3_1 equ     ymxr_ln3_key+2
+ymxr_r_ln3_1 equ     ymxr_ref
+ymxr_n_ln3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE ln3_2
+                PIECE   lc0_1
                 LPAD    KEY_LC,ymxr_ref0
+                ENDPIECE lc0_1
+                PIECE   lc0_2
                 TICKL   ymxr_lc0,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lc0_end:
+ymxr_a_lc0_1 equ     ymxr_lc0_key+2
+ymxr_r_lc0_1 equ     ymxr_ref
+ymxr_n_lc0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lc0_2
+                PIECE   lc1_1
                 LPAD    KEY_LC,ymxr_ref1
+                ENDPIECE lc1_1
+                PIECE   lc1_2
                 TICKL   ymxr_lc1,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lc1_end:
+ymxr_a_lc1_1 equ     ymxr_lc1_key+2
+ymxr_r_lc1_1 equ     ymxr_ref
+ymxr_n_lc1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lc1_2
+                PIECE   lc2_1
                 LPAD    KEY_LC,ymxr_ref2
+                ENDPIECE lc2_1
+                PIECE   lc2_2
                 TICKL   ymxr_lc2,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lc2_end:
+ymxr_a_lc2_1 equ     ymxr_lc2_key+2
+ymxr_r_lc2_1 equ     ymxr_ref
+ymxr_n_lc2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lc2_2
+                PIECE   lc3_1
                 LPAD    KEY_LC,ymxr_ref3
+                ENDPIECE lc3_1
+                PIECE   lc3_2
                 TICKL   ymxr_lc3,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lc3_end:
+ymxr_a_lc3_1 equ     ymxr_lc3_key+2
+ymxr_r_lc3_1 equ     ymxr_ref
+ymxr_n_lc3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lc3_2
+                PIECE   lv0_1
                 LPAD    KEY_LV,ymxr_ref0
+                ENDPIECE lv0_1
+                PIECE   lv0_2
                 TICKWL  ymxr_lv0,3,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lv0_end:
+ymxr_a_lv0_1 equ     ymxr_lv0_key+2
+ymxr_r_lv0_1 equ     ymxr_ref
+ymxr_n_lv0_1 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lv0_2
+                PIECE   lv1_1
                 LPAD    KEY_LV,ymxr_ref1
+                ENDPIECE lv1_1
+                PIECE   lv1_2
                 TICKWL  ymxr_lv1,3,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lv1_end:
+ymxr_a_lv1_1 equ     ymxr_lv1_key+2
+ymxr_r_lv1_1 equ     ymxr_ref
+ymxr_n_lv1_1 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lv1_2
+                PIECE   lv2_1
                 LPAD    KEY_LV,ymxr_ref2
+                ENDPIECE lv2_1
+                PIECE   lv2_2
                 TICKWL  ymxr_lv2,3,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lv2_end:
+ymxr_a_lv2_1 equ     ymxr_lv2_key+2
+ymxr_r_lv2_1 equ     ymxr_ref
+ymxr_n_lv2_1 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lv2_2
+                PIECE   lv3_1
                 LPAD    KEY_LV,ymxr_ref3
+                ENDPIECE lv3_1
+                PIECE   lv3_2
                 TICKWL  ymxr_lv3,3,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lv3_end:
+ymxr_a_lv3_1 equ     ymxr_lv3_key+2
+ymxr_r_lv3_1 equ     ymxr_ref
+ymxr_n_lv3_1 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lv3_2
                 .if     YMXR_DEFER
+                PIECE   align_1
                 ds.b    (ymxr_tick0-*)&255
+                ENDPIECE align_1
+ymxr_a_align_1 equ    ymxr_e_align_1
+ymxr_r_align_1 equ    ymxr_tick0
+ymxr_n_align_1 equ    0
                 .endif
 ymxr_bank0end:
                 .endif
@@ -304,102 +533,326 @@ ymxr_bank1:
                 TICKW   ymxr_env3b,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
                 ENDPIECE envelope3_2
                 .if     YMXR_MAP
+                PIECE2  lt0_3,lt0_1
                 LPAD    KEY_LT,ymxr_ref0
+                ENDPIECE lt0_3
+                PIECE2  lt0_4,lt0_2
                 TICKWL  ymxr_lt0b,2,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lt0b_end:
+ymxr_a_lt0_3 equ     ymxr_lt0b_key+2
+ymxr_r_lt0_3 equ     ymxr_ref
+ymxr_n_lt0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lt0_4
+                PIECE2  lt1_3,lt1_1
                 LPAD    KEY_LT,ymxr_ref1
+                ENDPIECE lt1_3
+                PIECE2  lt1_4,lt1_2
                 TICKWL  ymxr_lt1b,2,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lt1b_end:
+ymxr_a_lt1_3 equ     ymxr_lt1b_key+2
+ymxr_r_lt1_3 equ     ymxr_ref
+ymxr_n_lt1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lt1_4
+                PIECE2  lt2_3,lt2_1
                 LPAD    KEY_LT,ymxr_ref2
+                ENDPIECE lt2_3
+                PIECE2  lt2_4,lt2_2
                 TICKWL  ymxr_lt2b,2,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lt2b_end:
+ymxr_a_lt2_3 equ     ymxr_lt2b_key+2
+ymxr_r_lt2_3 equ     ymxr_ref
+ymxr_n_lt2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lt2_4
+                PIECE2  lt3_3,lt3_1
                 LPAD    KEY_LT,ymxr_ref3
+                ENDPIECE lt3_3
+                PIECE2  lt3_4,lt3_2
                 TICKWL  ymxr_lt3b,2,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lt3b_end:
+ymxr_a_lt3_3 equ     ymxr_lt3b_key+2
+ymxr_r_lt3_3 equ     ymxr_ref
+ymxr_n_lt3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lt3_4
+                PIECE2  le0_3,le0_1
                 LPAD    KEY_LE,ymxr_ref0
+                ENDPIECE le0_3
+                PIECE2  le0_4,le0_2
                 TICKWL  ymxr_le0b,2,1,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_le0b_end:
+ymxr_a_le0_3 equ     ymxr_le0b_key+2
+ymxr_r_le0_3 equ     ymxr_ref
+ymxr_n_le0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE le0_4
+                PIECE2  le1_3,le1_1
                 LPAD    KEY_LE,ymxr_ref1
+                ENDPIECE le1_3
+                PIECE2  le1_4,le1_2
                 TICKWL  ymxr_le1b,2,1,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_le1b_end:
+ymxr_a_le1_3 equ     ymxr_le1b_key+2
+ymxr_r_le1_3 equ     ymxr_ref
+ymxr_n_le1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE le1_4
+                PIECE2  le2_3,le2_1
                 LPAD    KEY_LE,ymxr_ref2
+                ENDPIECE le2_3
+                PIECE2  le2_4,le2_2
                 TICKWL  ymxr_le2b,2,1,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_le2b_end:
+ymxr_a_le2_3 equ     ymxr_le2b_key+2
+ymxr_r_le2_3 equ     ymxr_ref
+ymxr_n_le2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE le2_4
+                PIECE2  le3_3,le3_1
                 LPAD    KEY_LE,ymxr_ref3
+                ENDPIECE le3_3
+                PIECE2  le3_4,le3_2
                 TICKWL  ymxr_le3b,2,1,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_le3b_end:
+ymxr_a_le3_3 equ     ymxr_le3b_key+2
+ymxr_r_le3_3 equ     ymxr_ref
+ymxr_n_le3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE le3_4
+                PIECE2  lf0_3,lf0_1
                 LPAD    KEY_LF,ymxr_ref0
+                ENDPIECE lf0_3
+                PIECE2  lf0_4,lf0_2
                 TICKWL  ymxr_lf0b,2,1,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lf0b_end:
+ymxr_a_lf0_3 equ     ymxr_lf0b_key+2
+ymxr_r_lf0_3 equ     ymxr_ref
+ymxr_n_lf0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lf0_4
+                PIECE2  lf1_3,lf1_1
                 LPAD    KEY_LF,ymxr_ref1
+                ENDPIECE lf1_3
+                PIECE2  lf1_4,lf1_2
                 TICKWL  ymxr_lf1b,2,1,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lf1b_end:
+ymxr_a_lf1_3 equ     ymxr_lf1b_key+2
+ymxr_r_lf1_3 equ     ymxr_ref
+ymxr_n_lf1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lf1_4
+                PIECE2  lf2_3,lf2_1
                 LPAD    KEY_LF,ymxr_ref2
+                ENDPIECE lf2_3
+                PIECE2  lf2_4,lf2_2
                 TICKWL  ymxr_lf2b,2,1,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lf2b_end:
+ymxr_a_lf2_3 equ     ymxr_lf2b_key+2
+ymxr_r_lf2_3 equ     ymxr_ref
+ymxr_n_lf2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lf2_4
+                PIECE2  lf3_3,lf3_1
                 LPAD    KEY_LF,ymxr_ref3
+                ENDPIECE lf3_3
+                PIECE2  lf3_4,lf3_2
                 TICKWL  ymxr_lf3b,2,1,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lf3b_end:
+ymxr_a_lf3_3 equ     ymxr_lf3b_key+2
+ymxr_r_lf3_3 equ     ymxr_ref
+ymxr_n_lf3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lf3_4
+                PIECE2  lk0_3,lk0_1
                 LPAD    KEY_LK,ymxr_ref0
+                ENDPIECE lk0_3
+                PIECE2  lk0_4,lk0_2
                 TICKL   ymxr_lk0b,0,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lk0b_end:
+ymxr_a_lk0_3 equ     ymxr_lk0b_key+2
+ymxr_r_lk0_3 equ     ymxr_ref
+ymxr_n_lk0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lk0_4
+                PIECE2  lk1_3,lk1_1
                 LPAD    KEY_LK,ymxr_ref1
+                ENDPIECE lk1_3
+                PIECE2  lk1_4,lk1_2
                 TICKL   ymxr_lk1b,0,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lk1b_end:
+ymxr_a_lk1_3 equ     ymxr_lk1b_key+2
+ymxr_r_lk1_3 equ     ymxr_ref
+ymxr_n_lk1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lk1_4
+                PIECE2  lk2_3,lk2_1
                 LPAD    KEY_LK,ymxr_ref2
+                ENDPIECE lk2_3
+                PIECE2  lk2_4,lk2_2
                 TICKL   ymxr_lk2b,0,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lk2b_end:
+ymxr_a_lk2_3 equ     ymxr_lk2b_key+2
+ymxr_r_lk2_3 equ     ymxr_ref
+ymxr_n_lk2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lk2_4
+                PIECE2  lk3_3,lk3_1
                 LPAD    KEY_LK,ymxr_ref3
+                ENDPIECE lk3_3
+                PIECE2  lk3_4,lk3_2
                 TICKL   ymxr_lk3b,0,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lk3b_end:
+ymxr_a_lk3_3 equ     ymxr_lk3b_key+2
+ymxr_r_lk3_3 equ     ymxr_ref
+ymxr_n_lk3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lk3_4
+                PIECE2  lb0_3,lb0_1
                 LPAD    KEY_LB,ymxr_ref0
+                ENDPIECE lb0_3
+                PIECE2  lb0_4,lb0_2
                 TICKWL  ymxr_lb0b,3,0,3,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lb0b_end:
+ymxr_a_lb0_3 equ     ymxr_lb0b_key+2
+ymxr_r_lb0_3 equ     ymxr_ref
+ymxr_n_lb0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lb0_4
+                PIECE2  lb1_3,lb1_1
                 LPAD    KEY_LB,ymxr_ref1
+                ENDPIECE lb1_3
+                PIECE2  lb1_4,lb1_2
                 TICKWL  ymxr_lb1b,3,0,3,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lb1b_end:
+ymxr_a_lb1_3 equ     ymxr_lb1b_key+2
+ymxr_r_lb1_3 equ     ymxr_ref
+ymxr_n_lb1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lb1_4
+                PIECE2  lb2_3,lb2_1
                 LPAD    KEY_LB,ymxr_ref2
+                ENDPIECE lb2_3
+                PIECE2  lb2_4,lb2_2
                 TICKWL  ymxr_lb2b,3,0,3,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lb2b_end:
+ymxr_a_lb2_3 equ     ymxr_lb2b_key+2
+ymxr_r_lb2_3 equ     ymxr_ref
+ymxr_n_lb2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lb2_4
+                PIECE2  lb3_3,lb3_1
                 LPAD    KEY_LB,ymxr_ref3
+                ENDPIECE lb3_3
+                PIECE2  lb3_4,lb3_2
                 TICKWL  ymxr_lb3b,3,0,3,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lb3b_end:
+ymxr_a_lb3_3 equ     ymxr_lb3b_key+2
+ymxr_r_lb3_3 equ     ymxr_ref
+ymxr_n_lb3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lb3_4
+                PIECE2  ln0_3,ln0_1
                 LPAD    KEY_LN,ymxr_ref0
+                ENDPIECE ln0_3
+                PIECE2  ln0_4,ln0_2
                 TICKWL  ymxr_ln0b,2,0,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_ln0b_end:
+ymxr_a_ln0_3 equ     ymxr_ln0b_key+2
+ymxr_r_ln0_3 equ     ymxr_ref
+ymxr_n_ln0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE ln0_4
+                PIECE2  ln1_3,ln1_1
                 LPAD    KEY_LN,ymxr_ref1
+                ENDPIECE ln1_3
+                PIECE2  ln1_4,ln1_2
                 TICKWL  ymxr_ln1b,2,0,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_ln1b_end:
+ymxr_a_ln1_3 equ     ymxr_ln1b_key+2
+ymxr_r_ln1_3 equ     ymxr_ref
+ymxr_n_ln1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE ln1_4
+                PIECE2  ln2_3,ln2_1
                 LPAD    KEY_LN,ymxr_ref2
+                ENDPIECE ln2_3
+                PIECE2  ln2_4,ln2_2
                 TICKWL  ymxr_ln2b,2,0,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_ln2b_end:
+ymxr_a_ln2_3 equ     ymxr_ln2b_key+2
+ymxr_r_ln2_3 equ     ymxr_ref
+ymxr_n_ln2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE ln2_4
+                PIECE2  ln3_3,ln3_1
                 LPAD    KEY_LN,ymxr_ref3
+                ENDPIECE ln3_3
+                PIECE2  ln3_4,ln3_2
                 TICKWL  ymxr_ln3b,2,0,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_ln3b_end:
+ymxr_a_ln3_3 equ     ymxr_ln3b_key+2
+ymxr_r_ln3_3 equ     ymxr_ref
+ymxr_n_ln3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE ln3_4
+                PIECE2  lc0_3,lc0_1
                 LPAD    KEY_LC,ymxr_ref0
+                ENDPIECE lc0_3
+                PIECE2  lc0_4,lc0_2
                 TICKL   ymxr_lc0b,1,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lc0b_end:
+ymxr_a_lc0_3 equ     ymxr_lc0b_key+2
+ymxr_r_lc0_3 equ     ymxr_ref
+ymxr_n_lc0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lc0_4
+                PIECE2  lc1_3,lc1_1
                 LPAD    KEY_LC,ymxr_ref1
+                ENDPIECE lc1_3
+                PIECE2  lc1_4,lc1_2
                 TICKL   ymxr_lc1b,1,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lc1b_end:
+ymxr_a_lc1_3 equ     ymxr_lc1b_key+2
+ymxr_r_lc1_3 equ     ymxr_ref
+ymxr_n_lc1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lc1_4
+                PIECE2  lc2_3,lc2_1
                 LPAD    KEY_LC,ymxr_ref2
+                ENDPIECE lc2_3
+                PIECE2  lc2_4,lc2_2
                 TICKL   ymxr_lc2b,1,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lc2b_end:
+ymxr_a_lc2_3 equ     ymxr_lc2b_key+2
+ymxr_r_lc2_3 equ     ymxr_ref
+ymxr_n_lc2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lc2_4
+                PIECE2  lc3_3,lc3_1
                 LPAD    KEY_LC,ymxr_ref3
+                ENDPIECE lc3_3
+                PIECE2  lc3_4,lc3_2
                 TICKL   ymxr_lc3b,1,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lc3b_end:
+ymxr_a_lc3_3 equ     ymxr_lc3b_key+2
+ymxr_r_lc3_3 equ     ymxr_ref
+ymxr_n_lc3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lc3_4
+                PIECE2  lv0_3,lv0_1
                 LPAD    KEY_LV,ymxr_ref0
+                ENDPIECE lv0_3
+                PIECE2  lv0_4,lv0_2
                 TICKWL  ymxr_lv0b,3,0,2,ymxr_ref0,ymxr_lhalt0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
 ymxr_lv0b_end:
+ymxr_a_lv0_3 equ     ymxr_lv0b_key+2
+ymxr_r_lv0_3 equ     ymxr_ref
+ymxr_n_lv0_3 equ     ymxr_ref0-ymxr_ref
+                ENDPIECE lv0_4
+                PIECE2  lv1_3,lv1_1
                 LPAD    KEY_LV,ymxr_ref1
+                ENDPIECE lv1_3
+                PIECE2  lv1_4,lv1_2
                 TICKWL  ymxr_lv1b,3,0,2,ymxr_ref1,ymxr_lhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
 ymxr_lv1b_end:
+ymxr_a_lv1_3 equ     ymxr_lv1b_key+2
+ymxr_r_lv1_3 equ     ymxr_ref
+ymxr_n_lv1_3 equ     ymxr_ref1-ymxr_ref
+                ENDPIECE lv1_4
+                PIECE2  lv2_3,lv2_1
                 LPAD    KEY_LV,ymxr_ref2
+                ENDPIECE lv2_3
+                PIECE2  lv2_4,lv2_2
                 TICKWL  ymxr_lv2b,3,0,2,ymxr_ref2,ymxr_lhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
 ymxr_lv2b_end:
+ymxr_a_lv2_3 equ     ymxr_lv2b_key+2
+ymxr_r_lv2_3 equ     ymxr_ref
+ymxr_n_lv2_3 equ     ymxr_ref2-ymxr_ref
+                ENDPIECE lv2_4
+                PIECE2  lv3_3,lv3_1
                 LPAD    KEY_LV,ymxr_ref3
+                ENDPIECE lv3_3
+                PIECE2  lv3_4,lv3_2
                 TICKWL  ymxr_lv3b,3,0,2,ymxr_ref3,ymxr_lhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
 ymxr_lv3b_end:
+ymxr_a_lv3_3 equ     ymxr_lv3b_key+2
+ymxr_r_lv3_3 equ     ymxr_ref
+ymxr_n_lv3_3 equ     ymxr_ref3-ymxr_ref
+                ENDPIECE lv3_4
 ymxr_bank1end:
                 .endif
 

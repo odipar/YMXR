@@ -22,10 +22,22 @@ ymxr_k_envelope: dc.w   $000F
 ymxr_at_\kind:  dc.w    \{first}0-ymxr_at_\kind,\{first}1-ymxr_at_\kind
                 dc.w    \{first}2-ymxr_at_\kind,\{first}3-ymxr_at_\kind
                 .endm
-                .if     YMXR_DEFER
+                .if     YMXR_DEFER|YMXR_MAP
                 AT      tick,ymxr_tick
                 AT      square,ymxr_sq
                 AT      one,ymxr_one
+                .endif
+                .if     YMXR_MAP
+; The instances of each lookup kind a player has, a bit an effect, which
+; init links: a link writes the effects that map a source of the kind.
+ymxr_k_lk:      dc.w    $000F
+ymxr_k_lc:      dc.w    $000F
+ymxr_k_lt:      dc.w    $000F
+ymxr_k_ln:      dc.w    $000F
+ymxr_k_lb:      dc.w    $000F
+ymxr_k_lv:      dc.w    $000F
+ymxr_k_le:      dc.w    $000F
+ymxr_k_lf:      dc.w    $000F
                 .endif
 
 ; Each effect's timer, as a start reads it: its vector, by which a start
