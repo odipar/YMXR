@@ -121,9 +121,6 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
 .armlk:         moveq   #0,d5                   ; an arming of the general kind
                 bra.s   .kind
                 .endif
-; A kind's descriptor past ymxr_kinds.
-.kd:            dc.b    0,KD_SIZE,2*KD_SIZE,3*KD_SIZE
-                dc.b    4*KD_SIZE,5*KD_SIZE,6*KD_SIZE,7*KD_SIZE
 .tagged:        addq.l  #1,d0
                 beq     .square
                 addq.l  #1,d0
@@ -144,24 +141,28 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 addq.l  #1,d3
                 beq.s   .kind
                 moveq   #6,d5                   ; counted, of two
+                addq.l  #1,d3
+                beq.s   .two
+                moveq   #8,d5                   ; counted, of three
+                bra.s   .three
 .two:           cmp.b   #22,FX_TARGET(a3)       ; setNoiseX maps its first
                 bcs.s   .kind                   ; write, the volume, marked
                 addq.w  #1,d5                   ; or counted
                 bra.s   .kind
 .three:         cmp.b   #21,FX_TARGET(a3)       ; setVoiceX maps its middle
                 beq.s   .kind                   ; column, the volume
-                moveq   #5,d5
+                addq.w  #1,d5
 ; d5 the kind, d0 the loop cell, a4 the first row, and the stride in the
 ; high word of d1. The descriptor, the instance and the page byte of the
 ; effect's first fallback page for the instance into the record's cache.
-.kind:          moveq   #0,d3
-                move.b  .kd(pc,d5.w),d3
+.kind:          move.w  d5,d3
+                mulu    #KD_SIZE,d3
                 lea     ymxr_kinds(pc),a2
                 adda.w  d3,a2                   ; the descriptor
                 move.w  d4,d3
                 add.w   d3,d3
                 move.w  (a2,d3.w),d4            ; KD_AT, the effect's instance
-                lsl.w   #2,d3                   ; eight page bytes an effect,
+                mulu    #LOOK_KINDS/2,d3        ; page bytes of this effect,
                 add.w   d5,d3                   ; one a kind
                 .if     YMXR_DEFER
                 sf      FX_LBANK(a3)            ; bank 0, or an arming's
@@ -170,7 +171,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 tst.w   FX_ABANK(a3)
                 beq.s   .bank
                 add.w   #BANK,d4
-                add.w   #32,d3                  ; bank 1's page bytes
+                add.w   #4*LOOK_KINDS,d3                  ; bank 1's page bytes
                 move.b  #1,FX_LBANK(a3)
 .bank:
                 .endif

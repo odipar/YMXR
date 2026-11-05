@@ -287,7 +287,7 @@ q\{ct}:         bra.w   \{tick}_done
                 bra.w   \{tick}_start
 .look\~:        lea     \fx(a0),a3              ; the record, the effect's
                 lea     \lk(pc),a5              ; instance of the general
-                move.b  ymxr_htab+(8*((\fx-WS_FX)/FX_SIZE))(pc),d5 ; lookup kind, the page byte
+                move.b  ymxr_htab+(LOOK_KINDS*((\fx-WS_FX)/FX_SIZE))(pc),d5 ; lookup kind, the page byte
                 move.w  #\vector,d1             ; of its page 0 and the vector
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
                 bsr.w   ymxr_lstart

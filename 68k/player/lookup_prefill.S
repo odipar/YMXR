@@ -62,7 +62,8 @@ ymxr_prefill:   movem.l d1-d7/a0-a6,-(sp)
                 move.l  a2,d0                   ; the area, even and at or
                 btst    #0,d0                   ; past the player's end
                 bne     .bad
-                lea     ymxr_end(pc),a4
+                lea     ymxr_tick0(pc),a4
+                adda.w  #ymxr_end-ymxr_tick0,a4
                 cmpa.l  a4,a2
                 bcs     .bad
 ; Each entry: the pages of its effect, the effect's last entry plus 1 and
