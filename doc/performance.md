@@ -524,10 +524,10 @@ copy, for rows that start or remap one effect:
 
 | the row | one column | a square | a source of one row |
 |---|---|---|---|
-| a start at row 0 | 414 to 494 | 608 | 494 |
+| a start at row 0 | 414 to 494 | 574 | 462 |
 | a remap between two transformations | 202 to 236 | 766 to 786 | 588 |
-| a remap from the identity | 1452 to 1456 | 766 | 588 |
-| a remap to the identity | 1230 to 1234 | 548 to 566 | 440 |
+| a remap from the identity | 1408 | 766 | 588 |
+| a remap to the identity | 1186 | 548 to 566 | 440 |
 
 The ranges are the effect, a row that resets the timer, a source that
 plays once, the half a square is at and the cache the start finds. A
@@ -652,7 +652,7 @@ R4.5 counts them:
 | tune | the costliest call | the costliest, the starts and remaps apart |
 |---|---|---|
 | a fade on setR8 | 2388 | 1894 |
-| a fade of setVoiceA's volume | 3658 | 1894 |
+| a fade of setVoiceA's volume | 3482 | 1894 |
 | a mapped square and its remap | 2502 | 1894 |
 | a mapped source of one row and its remap | 2388 | 1894 |
 | a source remapped from the identity to T, to T' and back | 3094 | 2134 |
@@ -670,18 +670,18 @@ R4.5 counts them:
 | starts through a new mapping with placeReset clear while a source ticks | 2738 | 1894 |
 | a remap and a retune with timerReset on a running timer | 2420 | 1894 |
 | a remap and a retune with timerReset on a stopped timer, kept by a start | 2416 | 1938 |
-| a place's reset on a mapped square, loop and counted source, three effects | 5494 | 3104 |
-| one transformation through the mirror and through the plain fill | 2572 | 1894 |
-| a transformation of 32 entries through the mirror and through the plain fill | 2572 | 1894 |
+| a place's reset on a mapped square, loop and counted source, three effects | 5216 | 3104 |
+| one transformation through the mirror and through the plain fill | 2442 | 1894 |
+| a transformation of 32 entries through the mirror and through the plain fill | 2442 | 1894 |
 | squares and a loop started through a new mapping with placeReset clear | 2502 | 1894 |
-| starts with placeReset clear while a source of several columns runs | 3658 | 1894 |
+| starts with placeReset clear while a source of several columns runs | 3482 | 1894 |
 | remaps on Timers C and D, which share a control register, each idle while the other runs | 2928 | 2090 |
 | a remap and a retune with timerReset on a running square | 2502 | 1894 |
 | a stop row with the mapping column set, then a start with it unset | 2420 | 1928 |
 | a remap in the row that sets the target to setNoiseA | 3452 | 1946 |
 | a marked source on setEnvelope through T, a remap, a place's reset and a remap from the identity | 3280 | 2490 |
 | counted sources of two columns on setToneA and setNoiseA through T, a remap, a place's reset and a remap from the identity | 5764 | 3644 |
-| sources that play once on seven lookup kinds and loop on five, two effects | 5900 | 2472 |
+| sources that play once on seven lookup kinds and loop on five, two effects | 5596 | 2472 |
 | sources that play once on seven lookup kinds, one effect | 3540 | 1964 |
 | four sources through 256 entries remapped in one row | 8182 | 3750 |
 
