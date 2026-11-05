@@ -18,12 +18,12 @@ final class Link {
     /** The handler kinds that are blocks: the general handler is in each
      *  effect's block. */
     static final List<String> KINDS = List.of("square", "one", "counted", "two", "three",
-            "envelope");
+            "envelope", "countedthree");
 
     /** The lookup kinds, each a block on each effect: the general, the
      *  counted, two columns, noise, buzzer, voice, the counted of two
      *  columns and the counted on noise (68k/player/lookup_kinds.S). */
-    static final List<String> LOOKUPS = List.of("lk", "lc", "lt", "ln", "lb", "lv", "le", "lf");
+    static final List<String> LOOKUPS = List.of("lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh");
 
     /** The blocks a core's pieces belong to, in the order the document
      *  lists them: each handler kind, which init's loop over it is, and
@@ -250,6 +250,8 @@ final class Link {
                 return target >= NOISE ? "ln" : "lt";
             case "three":
                 return target == BUZZER ? "lb" : "lv";
+            case "countedthree":
+                return target == BUZZER ? "lg" : "lh";
             default:
                 return target >= NOISE ? "lf" : "le";
         }
@@ -280,7 +282,11 @@ final class Link {
      *  resolves the same shapes). */
     static String kind(Table source, boolean counted) {
         if (counted) {
-            return source.columns() == 1 ? "counted" : "envelope";
+            return switch (source.columns()) {
+                case 1 -> "counted";
+                case 2 -> "envelope";
+                default -> "countedthree";
+            };
         }
         if (source.columns() == 2) {
             return "two";

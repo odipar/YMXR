@@ -15,12 +15,12 @@ import (
 
 // Kinds are the handler kinds that are blocks: the general handler is in
 // each effect's block.
-var Kinds = []string{"square", "one", "counted", "two", "three", "envelope"}
+var Kinds = []string{"square", "one", "counted", "two", "three", "envelope", "countedthree"}
 
 // Lookups are the lookup kinds, each a block on each effect: the general,
 // the counted, two columns, noise, buzzer, voice, the counted of two
 // columns and the counted on noise (68k/player/lookup_kinds.S).
-var Lookups = []string{"lk", "lc", "lt", "ln", "lb", "lv", "le", "lf"}
+var Lookups = []string{"lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh"}
 
 // Blocks are the blocks a core's pieces belong to, in the order
 // doc/LINKER.md lists them: each handler kind, which init's loop over it
@@ -230,8 +230,10 @@ func Kind(source *dtx.Table, counted bool) string {
 	switch {
 	case counted && source.Columns() == 1:
 		return "counted"
-	case counted:
+	case counted && source.Columns() == 2:
 		return "envelope"
+	case counted:
+		return "countedthree"
 	case source.Columns() == 2:
 		return "two"
 	case source.Columns() == 3:
@@ -443,6 +445,11 @@ func Lookup(tune ymxr.File, s, target int) string {
 			return "lb"
 		}
 		return "lv"
+	case "countedthree":
+		if target == buzzer {
+			return "lg"
+		}
+		return "lh"
 	}
 	if target >= noise {
 		return "lf"

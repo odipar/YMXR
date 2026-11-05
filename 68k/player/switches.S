@@ -68,22 +68,12 @@ YMXR_MAP        equ     0
 YMXR_VERSION    equ     $000A           ; reads versions 7 to 10,
                                         ; including mapping columns
 YMXR_COLUMNS    equ     34
-                .if     YMXR_DEFER
-YMXR_SITES      equ     38              ; the other read sites (ymxr_sites)
-                .else
-YMXR_SITES      equ     30
-                .endif
                 .else
 YMXR_VERSION    equ     $0009           ; the version it reads, a bound tune
                                         ; whose table is DTX3 (SPEC.md 3.3.5),
                                         ; and 8, read as 9, and 7, whose
                                         ; control columns have bit 3 at 0
 YMXR_COLUMNS    equ     30
-                .if     YMXR_DEFER
-YMXR_SITES      equ     26              ; the other read sites (ymxr_sites)
-                .else
-YMXR_SITES      equ     22
-                .endif
                 .endif
 ; A tick reads its row through the program counter: the place is a
 ; displacement in the instruction that reads it, so the read costs 4

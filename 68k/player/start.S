@@ -229,12 +229,19 @@ ymxr_widereset:
                 cmp.b   #2,FX_SHAPE(a3)
                 beq.w   .two
                 cmp.b   #3,FX_SHAPE(a3)
-                beq.s   .three
+                beq.w   .three
                 cmp.b   #4,FX_SHAPE(a3)
                 beq.s   .counted
+                cmp.b   #6,FX_SHAPE(a3)
+                beq.s   .countedthree
                 WPLACE  FX_FIRST2,TWC_PTR2      ; a counted source of two
                 WPLACE  FX_FIRST,TWC_PTR1       ; columns: both places, and
                 move.w  FX_ROWS+2(a3),TWC_LEFT(a5) ; R rows left
+                bra.w   .reset
+.countedthree:  WPLACE  FX_FIRST3,TWCT_PTR3
+                WPLACE  FX_FIRST2,TWCT_PTR2
+                WPLACE  FX_FIRST,TWCT_PTR1
+                move.w  FX_ROWS+2(a3),TWCT_LEFT(a5)
                 bra.s   .reset
 .counted:       WPLACE  FX_FIRST,TICKC_PTR      ; the counted handler: the
                 move.w  FX_ROWS+2(a3),TICKC_LEFT(a5) ; place and R rows left
@@ -347,6 +354,8 @@ ymxr_widestart:
                 beq.w   .countedaim             ; its byte
                 cmp.w   #4,d4                   ; a counted source of two
                 beq.w   .envaim                 ; columns
+                cmp.w   #5,d4
+                beq.w   .cwideaim
                 moveq   #0,d5
                 move.b  FX_TARGET(a3),d5
                 sub.w   #14,d5                  ; the targets of several
@@ -399,9 +408,13 @@ ymxr_widestart:
 ; stride is read into the register that indexes the source's place in the
 ; workspace.
 .env:           moveq   #4,d4
-                move.w  -2(a2,d1.w),-(sp)       ; R, a pass through the source
-                move.w  -4(a2,d1.w),d1          ; the stride
                 lea     ymxr_at_envelope(pc),a5
+                addq.l  #1,d0
+                beq.s   .countrows
+                moveq   #5,d4
+                lea     ymxr_at_countedthree(pc),a5
+.countrows:     move.w  -2(a2,d1.w),-(sp)       ; R, a pass through the source
+                move.w  -4(a2,d1.w),d1          ; the stride
                 bra.w   .handler
 .countedaim:    lea     WS_WIDE(a0),a2
                 move.w  -4(a2,d1.w),d4          ; R, a pass through the source
@@ -456,6 +469,28 @@ ymxr_widestart:
                 sub.w   d5,d4
 .envonce:       move.w  d4,TWC_RELD(a5)
                 move.b  #5,FX_SHAPE(a3)
+                move.w  (sp)+,(sp)              ; the level pushed, over R
+                bra.w   .aimed
+.cwideaim:      moveq   #0,d5
+                move.b  FX_TARGET(a3),d5
+                sub.w   #14,d5                  ; the targets of several
+                lsl.w   #3,d5                   ; registers begin at 14
+                lea     ymxr_wide(pc),a2
+                adda.w  d5,a2
+                WSLOT   TWCT_SEL1,TWCT_PTR1,TWCT_CELLS,FX_FIRST,0
+                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_SIZE,FX_FIRST2,2
+                WSLOT   TWCT_SEL3,TWCT_PTR3,TWCT_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
+                move.w  2(sp),d4                ; R, under the level pushed
+                sub.w   d3,d4                   ; the rows from the place on
+                move.w  d4,TWCT_LEFT(a5)
+                move.w  2(sp),d4                ; the rows of a pass through
+                tst.l   d0                      ; the loop, R where the source
+                beq.s   .cwideonce                ; plays once
+                move.l  d0,d5
+                sub.l   a4,d5                   ; the row the cell is at
+                sub.w   d5,d4
+.cwideonce:     move.w  d4,TWCT_RELD(a5)
+                move.b  #6,FX_SHAPE(a3)
                 move.w  (sp)+,(sp)              ; the level pushed, over R
                 bra.w   .aimed
 

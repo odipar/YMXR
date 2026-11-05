@@ -15,6 +15,7 @@ ymxr_k_counted: dc.w    $000F
 ymxr_k_two:     dc.w    $000F
 ymxr_k_three:   dc.w    $000F
 ymxr_k_envelope: dc.w   $000F
+ymxr_k_countedthree: dc.w $000F
 ; The effects that keep the remap's piece and the deferred start's of
 ; their frame code, a bit an effect: init aims an effect's branches at the
 ; two where its bit is set and the tune maps a value or defers a start.
@@ -47,6 +48,8 @@ ymxr_k_lb:      dc.w    $000F
 ymxr_k_lv:      dc.w    $000F
 ymxr_k_le:      dc.w    $000F
 ymxr_k_lf:      dc.w    $000F
+ymxr_k_lg:      dc.w    $000F
+ymxr_k_lh:      dc.w    $000F
                 .endif
 
 ; Each effect's timer, as a start reads it: its vector, by which a start
@@ -87,6 +90,7 @@ ymxr_wide:      dc.b    0,0,  1,1,  0,0,  0,0   ; 14 setToneA:     R0 R1
                 AT      two,ymxr_two
                 AT      three,ymxr_three
                 AT      envelope,ymxr_env
+                AT      countedthree,ymxr_cwide
                 ENDPIECE several_2
 
 ; A parked place: a marker with no loop cell, so a tick of a timer no row

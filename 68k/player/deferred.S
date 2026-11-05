@@ -158,7 +158,7 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.b  FX_SHAPE(a3),d5         ; R of a running source of
                 cmp.b   #2,d5                   ; several columns, or of a
                 bcs.s   .header                 ; counted one, in the record;
-                cmp.b   #5,d5                   ; of any other, in the header
+                cmp.b   #6,d5                   ; of any other, in the header
                 bhi.s   .header                 ; before its first row
                 move.l  FX_ROWS(a3),d3
                 bra.s   .last
@@ -368,8 +368,13 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 lea     TICKC_LAST(a5),a2
                 move.w  #TICKC_HOOKW,d4
                 bra.s   .hook
-.h6:            lea     TWC_LAST(a5),a2
+.h6:            cmp.b   #6,d5
+                beq.s   .h7
+                lea     TWC_LAST(a5),a2
                 move.w  #TWC_HOOKW,d4
+                bra.s   .hook
+.h7:            lea     TWCT_LAST(a5),a2
+                move.w  #TWCT_HOOKW,d4
                 .endif
 .hook:          move.w  (a2),FX_HOOKW(a3)       ; the word as it is, written
                 move.w  (a2),INST_BACKW(a4)     ; back at the switch or the

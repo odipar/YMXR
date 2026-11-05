@@ -117,7 +117,7 @@ ymxr_return:
 ymxr_over:      moveq   #-1,d0
                 rts
 
-                .if     YMXR_PERF
+                .if     YMXR_PERF&(YMXR_MAP=0)
 ymxr_perf_acc:  dc.w    0                       ; the ticks' counted cost
                 .endif                          ; since the last call
 
@@ -133,10 +133,6 @@ ymxr_reads:
                 dc.w    c_21-ymxr_frame+2,c_22-ymxr_frame+2,c_23-ymxr_frame+2
                 dc.w    c_24-ymxr_frame+2,c_25-ymxr_frame+2,c_26-ymxr_frame+2
                 dc.w    c_27-ymxr_frame+2,c_28-ymxr_frame+2,c_29-ymxr_frame+2
-                .if     YMXR_MAP
-                dc.w    c_30-ymxr_frame+2,c_31-ymxr_frame+2,c_32-ymxr_frame+2
-                dc.w    c_33-ymxr_frame+2
-                .endif
 
 ; The four effects' heads, effect 3 first, as offsets into the frame.
 ymxr_overs:
@@ -186,8 +182,10 @@ ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
                 .endif
                 dc.w    ymxr_p_effect0_5-ymxr_e_effect0_1
 
-; The other sites a column is read at, each with its column: the effects'
-; one-pass tests, and the envelope period's plain path.
+; The other read sites, each with its column and the piece it needs.
+; The high byte is zero for a site in the effect's base code.
+SITE_MAP        equ     $0100
+SITE_DEFER      equ     $0200
 ymxr_sites:
                 dc.w    q_14-ymxr_frame+2,14,q_15-ymxr_frame+2,15
                 dc.w    q_16-ymxr_frame+2,16,q_17-ymxr_frame+2,17
@@ -203,14 +201,17 @@ ymxr_sites:
                 .if     YMXR_MAP
                 dc.w    q_30-ymxr_frame+2,30,q_31-ymxr_frame+2,31
                 dc.w    q_32-ymxr_frame+2,32,q_33-ymxr_frame+2,33
-                dc.w    m_30-ymxr_frame+2,30,m_31-ymxr_frame+2,31
-                dc.w    m_32-ymxr_frame+2,32,m_33-ymxr_frame+2,33
+                dc.w    c_30-ymxr_frame+2,SITE_MAP+30,c_31-ymxr_frame+2,SITE_MAP+31
+                dc.w    c_32-ymxr_frame+2,SITE_MAP+32,c_33-ymxr_frame+2,SITE_MAP+33
+                dc.w    m_30-ymxr_frame+2,SITE_MAP+30,m_31-ymxr_frame+2,SITE_MAP+31
+                dc.w    m_32-ymxr_frame+2,SITE_MAP+32,m_33-ymxr_frame+2,SITE_MAP+33
                 .endif
                 .if     YMXR_DEFER
-                dc.w    d_17-ymxr_frame+2,17,d_21-ymxr_frame+2,21
-                dc.w    d_25-ymxr_frame+2,25,d_29-ymxr_frame+2,29
+                dc.w    d_17-ymxr_frame+2,SITE_DEFER+17,d_21-ymxr_frame+2,SITE_DEFER+21
+                dc.w    d_25-ymxr_frame+2,SITE_DEFER+25,d_29-ymxr_frame+2,SITE_DEFER+29
                 .if     YMXR_MAP
-                dc.w    d_30-ymxr_frame+2,30,d_31-ymxr_frame+2,31
-                dc.w    d_32-ymxr_frame+2,32,d_33-ymxr_frame+2,33
+                dc.w    d_30-ymxr_frame+2,SITE_DEFER+30,d_31-ymxr_frame+2,SITE_DEFER+31
+                dc.w    d_32-ymxr_frame+2,SITE_DEFER+32,d_33-ymxr_frame+2,SITE_DEFER+33
                 .endif
                 .endif
+ymxr_sites_end:

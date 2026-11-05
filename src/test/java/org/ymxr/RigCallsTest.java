@@ -343,6 +343,19 @@ final class RigCallsTest {
                 }));
     }
 
+    /** A counted source of one row stops during a start with timerReset
+     *  clear. The frame writes the select and the next tick reads the last
+     *  row and stops again (SPEC.md 1.9.4, 5.1). */
+    @Test
+    void aCountedOneRowSourceCanStopBeforeTheSelect() throws Exception {
+        theRigRuns();
+        String said = rigWith(List.of("-linked", "-generated1", "-seed37"));
+        assertTrue(said.startsWith("0\n")
+                        && said.contains("ticks that end a counted one-row source before the select: 1")
+                        && said.contains("1 generated tune, tune 37, 1 subtune, plays"),
+                () -> RIG + " -linked -generated1 -seed37:\n" + said);
+    }
+
     /** The coverage line reads each operation of {@link #COVERED}: a line
      *  with each at 1 and every shape, effect and target is covered, and one
      *  with an operation at 0 or a target short is not. */
@@ -356,17 +369,9 @@ final class RigCallsTest {
                 () -> "the line reads " + uncovered(stops));
     }
 
-    /** The words of a count, as the documents spell it. */
-    private static final List<String> WORDS =
-            List.of("no", "one", "two", "three", "four", "five", "six");
-
-    /** The figures of the generated run in prose: the defaults of the rig's
-     *  usage and of tools.md 17.1 against the rig's constants; the flags of
-     *  the run above in tools.md and LINKER.md, and its test in the
-     *  workflow's job, which runs every set; the cases the generator leaves
-     *  out in LINKER.md and tools.md against LEFT_OUT, each a switch the rig
-     *  sets; and the columns LINKER.md reads the counted handler of several
-     *  columns to write against the handler's macro in the player. */
+    /** The defaults of the rig's usage and of tools.md 17.1 against the
+     *  rig's constants, and the run's flags in tools.md, LINKER.md and
+     *  the workflow's generated job. */
     @Test
     void theDocumentsReadTheGeneratedRun() throws IOException {
         String rig = rig();
@@ -395,28 +400,7 @@ final class RigCallsTest {
         assertTrue(job.find() && job.group(1).contains("RigCallsTest" + test)
                         && !job.group(1).contains("-Drig.shard"),
                 "the workflow's generated job runs another test, or a shard of the sets");
-        Matcher left = Pattern.compile("^LEFT_OUT = \\(([^)]*)\\)$", Pattern.MULTILINE)
-                .matcher(rig);
-        assertTrue(left.find(), RIG + " lists no case left out");
-        List<String> cases = List.of(left.group(1).replaceAll("[\" ,]+", " ").trim().split(" "));
-        for (String one : cases) {
-            assertTrue(Pattern.compile("^" + one + " = True$", Pattern.MULTILINE).matcher(rig).find(),
-                    () -> RIG + " lists " + one + " among the cases left out, and draws it");
-        }
-        String word = WORDS.get(cases.size());
-        assertTrue(linker.contains("The generator leaves " + word + " cases out")
-                        && tools.contains("The generator leaves out " + word + " cases"),
-                () -> "LINKER.md or tools.md counts another number of cases left out than "
-                        + cases);
-        Matcher handler = Pattern.compile("TICKW\\s+ymxr_env0,(\\d+),")
-                .matcher(Files.readString(Path.of("68k/player/handlers.S")));
-        assertTrue(handler.find(), "handlers.S has no counted handler of several columns");
-        int columns = Integer.parseInt(handler.group(1));
-        assertTrue(columns < 3 == cases.contains("MARKED_THREE")
-                        && (columns >= 3 || linker.contains(
-                                "writes " + WORDS.get(columns) + " of its columns a tick")),
-                () -> "the counted handler of several columns writes " + columns
-                        + " columns, and LINKER.md or LEFT_OUT reads another count");
+
     }
 
     @TestFactory

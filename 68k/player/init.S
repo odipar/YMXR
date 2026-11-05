@@ -156,7 +156,10 @@ YMXR_init:
                 moveq   #-5,d0
                 bra.s   .tagged
 .ccolumns:      move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R, beside the stride
-                moveq   #-6,d0
+                moveq   #-6,d0                  ; counted, two columns
+                cmp.w   #2,DT_COLUMNS(a3)
+                beq.s   .stride
+                moveq   #-7,d0                  ; counted, three columns
                 bra.s   .stride
 .resolved:
 
@@ -177,7 +180,7 @@ YMXR_init:
                 lea     ymxr_reads(pc),a3
                 lea     ymxr_frame(pc),a4
                 moveq   #0,d1
-                moveq   #YMXR_COLUMNS-1,d2
+                moveq   #30-1,d2
 .patch:         move.w  (a3)+,d4
                 move.w  d1,d0
                 bsr     ymxr_kept
@@ -187,13 +190,14 @@ YMXR_init:
 .apart:         addq.w  #1,d1
                 dbra    d2,.patch
                 lea     ymxr_sites(pc),a3
-                moveq   #YMXR_SITES-1,d2
+                moveq   #(ymxr_sites_end-ymxr_sites)/4-1,d2
 .site:          move.w  (a3)+,d4
                 move.w  (a3)+,d1
                 move.w  d1,d0
                 bsr     ymxr_kept
                 beq.s   .away
                 move.w  d1,d0
+                and.w   #$FF,d0
                 bsr     ymxr_col
 .away:          dbra    d2,.site
 
@@ -370,10 +374,42 @@ YMXR_init:
                 lea     TWC_LEFT(a5),a3
                 move.l  a3,TWC_CNT(a5)
                 move.l  a3,TWC_RELDA(a5)
+                move.l  a3,TWC_PARK(a5)
                 move.w  #1,TWC_LEFT(a5)
                 lea     TWC_SIZE(a5),a5
 .nolinkenv:     dbra    d2,.linkenv
                 ENDPIECE envelope_1
+                PIECE   countedthree_1
+                lea     ymxr_cwide0(pc),a5
+                adda.w  d6,a5
+                move.b  ymxr_k_countedthree+1(pc),d4
+                moveq   #3,d2
+.linkcwide:       lsr.b   #1,d4
+                bcc.s   .nolinkcwide
+                lea     TWCT_CELLS(a5),a3
+                move.l  a3,TWCT_LOOPT(a5)
+                move.l  a3,TWCT_LOOP1R(a5)
+                addq.l  #CELL_SIZE,a3
+                move.l  a3,TWCT_LOOP2R(a5)
+                addq.l  #CELL_SIZE,a3
+                move.l  a3,TWCT_LOOP3R(a5)
+                lea     TWCT_PTR1(a5),a3
+                move.l  a3,TWCT_STEP1(a5)
+                move.l  a3,TWCT_LOOP1W(a5)
+                lea     TWCT_PTR2(a5),a3
+                move.l  a3,TWCT_STEP2(a5)
+                move.l  a3,TWCT_LOOP2W(a5)
+                lea     TWCT_PTR3(a5),a3
+                move.l  a3,TWCT_STEP3(a5)
+                move.l  a3,TWCT_LOOP3W(a5)
+                lea     TWCT_LEFT(a5),a3
+                move.l  a3,TWCT_CNT(a5)
+                move.l  a3,TWCT_RELDA(a5)
+                move.l  a3,TWCT_PARK(a5)
+                move.w  #1,TWCT_LEFT(a5)
+                lea     TWCT_SIZE(a5),a5
+.nolinkcwide:     dbra    d2,.linkcwide
+                ENDPIECE countedthree_1
                 .if     YMXR_MAP
 ; Link lookup instances as above, selecting page 0 from the bank's
 ; page-byte table. Clearing the records below leaves every page
@@ -381,7 +417,7 @@ YMXR_init:
                 lea     ymxr_htab(pc),a4
                 tst.w   d6
                 beq.s   .htab
-                lea     32(a4),a4
+                lea     LOOK_KINDS*4(a4),a4
 .htab:
                 PIECE   lk_1                    ; with the level drop the
                 LINK1   LK,ymxr_k_lk,0,0,1      ; general handler has
@@ -407,6 +443,12 @@ YMXR_init:
                 PIECE   lf_1
                 LINKW   LF,ymxr_k_lf,7,0,1
                 ENDPIECE lf_1
+                PIECE   lg_1
+                LINKW   LG,ymxr_k_lg,8,1,1
+                ENDPIECE lg_1
+                PIECE   lh_1
+                LINKW   LH,ymxr_k_lh,9,1,1
+                ENDPIECE lh_1
                 .endif
                 .if     YMXR_DEFER
                 tst.w   d6
@@ -643,7 +685,8 @@ ymxr_inreach:   move.l  DT_ROWS(a3),d0
                 sub.l   a0,d0                   ; from the first handler
                 cmp.l   #32767,d0
                 bgt.s   .far
-                lea     ymxr_reach(pc),a0
+                lea     ymxr_tick0(pc),a0
+                adda.w  #ymxr_reach-ymxr_tick0,a0
                 move.l  a0,d0
                 sub.l   a5,d0                   ; to the source's first byte
                 cmp.l   #32768,d0
@@ -716,11 +759,10 @@ ymxr_col:       lea     (a4,d4.w),a5            ; the operand
                 move.w  d0,(a5)
                 rts
 
-; Z set where column d0 is of an effect whose frame code a link left out
-; (doc/LINKER.md): its target, source, control and count columns, 14 to
-; 29, and its mapping column, 30 to 33. A register's column is kept. d0
-; clobbered.
-ymxr_kept:      sub.w   #14,d0
+; Z set where a link left out the read site. The low byte of d1 is
+; the column, and the high byte marks an optional piece. d0 is scratch.
+ymxr_kept:      and.w   #$FF,d0
+                sub.w   #14,d0
                 bcs.s   .register
                 cmp.w   #16,d0
                 bcs.s   .effect
@@ -728,9 +770,23 @@ ymxr_kept:      sub.w   #14,d0
                 bra.s   .at
 .effect:        lsr.w   #2,d0
 .at:            btst    d0,ymxr_k_effect+1(pc)
+                beq.s   .done
+                .if     YMXR_MAP
+                btst    #8,d1
+                beq.s   .map_done
+                btst    d0,ymxr_k_map+1(pc)
                 rts
+.map_done:
+                .endif
+                .if     YMXR_DEFER
+                btst    #9,d1
+                beq.s   .kept
+                btst    d0,ymxr_k_defer+1(pc)
+                rts
+.kept:
+                .endif
 .register:      moveq   #1,d0
-                rts
+.done:          rts
 
 ; a5 a tick handler: its operands linked, its place parked.
 ymxr_link:
@@ -773,6 +829,7 @@ ymxr_linkc:
                 lea     TICKC_LEFT(a5),a3
                 move.l  a3,TICKC_CNTA(a5)
                 move.l  a3,TICKC_RELDA(a5)
+                move.l  a3,TICKC_PARK(a5)
                 move.w  #1,TICKC_LEFT(a5)
                 lea     ymxr_park(pc),a3
                 .if     YMXR_PCREL

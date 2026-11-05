@@ -1145,7 +1145,7 @@ class Machine:
         # the key byte of every lookup instance: its page read's
         # displacement, low byte
         self.keys = {CODE + at + 3 for name, at in symbols.items()
-                     if re.match(r"ymxr_l[kctnbvef][0-3]b?_key$", name)}
+                     if re.match(r"ymxr_l[a-z][0-3]b?_key$", name)}
         self.stale = False
         self.restart = None
         self.counter = None
@@ -1582,6 +1582,8 @@ def reaches(model, i, kind):
     if not (m & 0x7F if m & 0x80 else fx["mapping"]):
         return False
     at, R, RR, columns = model.tune.sources[source]
+    if kind == "window counted once":
+        return bool(r[t + 2] & 0x80) and model.tune.counted[source] and R == RR == 1
     shaped = not model.tune.counted[source] and len(columns) == 1 and R <= 2 and RR == 0
     # a marked source of one column starts in the window of the general
     # kind (ymxr_lkwindow), every other in the window of every kind
@@ -1621,6 +1623,9 @@ def inside(code, symbols, bound, tune, workspace):
                 if "ymxr_tick%d_rpage" % i in symbols:
                     at.append((i, i, CODE + symbols["ymxr_tick%d_rpage" % i], "page"))
                 at.append((i, i + 1, CODE + symbols["ymxr_lwindow"], "window"))
+                # A counted one-row source can stop the timer before
+                # the frame writes its select.
+                at.insert(0, (i, i + 1, CODE + symbols["ymxr_lwindow"], "window counted once"))
                 at.append((i, i + 1, CODE + symbols["ymxr_lkwindow"], "window one"))
                 at.append((i, i + 1, CODE + symbols["ymxr_rlevel"], "square"))
             if any(widens(tune, r, i) for r in tune.rows):
@@ -1681,7 +1686,8 @@ def inside(code, symbols, bound, tune, workspace):
                    until=None if kind in (None, "aim", "aim end") else
                    (lambda mu: mu.reg_read(UC_M68K_REG_A3) == record))
             level = (m.mu.reg_read(UC_M68K_REG_SR) >> 8) & 7
-            if kind in ("window", "window one", "square", "wide end", "aim end"):
+            if kind in ("window", "window counted once", "window one", "square",
+                        "wide end", "aim end"):
                 assert level == 7, \
                     "frame %d: effect %d's %s boundary is at level %d, not inside its window" % (
                         f, i, kind, level)
@@ -2380,12 +2386,12 @@ def mapped(code, symbols):
 # of effect 0's fallback at the frame, each the one start or remap of its
 # row: the start or the remap, and the entries of its transformation
 # (performance.md, A remap at the frame).
-_FALLBACK = []
+_FALLBACK = {}
 FALLBACK_FROM = 100
 FALLBACK_FILLS = (("remap", 16), ("remap", 32), ("start", 16), ("start", 32))
 
 
-def fallback_tune():
+def fallback_tune(compact=False):
     """A tune whose pages pass the reach of the first handler: effect 0
     remaps through 100 transformations of 16 entries, one a row, and
     effect 1 through 20 in rows 81 to 99, so init fills the first pages of
@@ -2393,19 +2399,23 @@ def fallback_tune():
     the same rows. From row FALLBACK_FROM, in every second row, effect 0
     alone runs a row of FALLBACK_FILLS, a start at row 0 or a remap,
     through a transformation of 16 or 32 entries that each row before it
-    leaves unused, and fills a page of its fallback at the frame."""
-    if _FALLBACK:
-        return _FALLBACK[0]
+    leaves unused, and fills a page of its fallback at the frame.
+    The compact fixture uses 16 and 8 transformations before those
+    starts and remaps, so the page area fits after the tune on a
+    larger core."""
+    if compact in _FALLBACK:
+        return _FALLBACK[compact]
+    first, second = (16, 8) if compact else (FALLBACK_FROM, 20)
     tables = [("T%d" % n, [(k * (2 * (n % 8) + 1) + n // 8 + 1) % 16 for k in range(16)])
-              for n in range(120)]
+              for n in range(first + second)]
     ramp = ("ramp", list(range(16)), 0)
     a = {0: ("start", 1, 8, 50, 100, 1, 1, 0, [1])}
-    a.update({r: ("remap", [1 + r]) for r in range(1, FALLBACK_FROM)})
-    d = {0: ("start", 1, 9, 50, 100, 1, 1, 0, [101])}
-    d.update({r: ("remap", [21 + r]) for r in range(81, FALLBACK_FROM)})
-    rows = FALLBACK_FROM
+    a.update({r: ("remap", [1 + r]) for r in range(1, first)})
+    d = {0: ("start", 1, 9, 50, 100, 1, 1, 0, [first + 1])}
+    d.update({r: ("remap", [second + 1 + r]) for r in range(first - second + 1, first)})
+    rows = first
     for what, entries in FALLBACK_FILLS:
-        # an even step, so each table differs from the 120 above
+        # an even step, so each table differs from the ones above
         n = len(tables) + 1
         tables.append(("W%d" % n, [(2 * k + n) % 16 for k in range(entries)]))
         a[rows] = ("remap", [n]) if what == "remap" else ("start", 1, 8, 50, 100, 1, 1, 0, [n])
@@ -2414,7 +2424,7 @@ def fallback_tune():
                         {"A": a, "D": d}, transformations=tables)
     at, version = built("fallbacks", tune)
     assert version == MAPPED, "the fallback's tune is of version %d" % version
-    _FALLBACK.append(at)
+    _FALLBACK[compact] = at
     return at
 
 
@@ -2422,8 +2432,9 @@ def fallbacks(code, symbols):
     """The tune of fallback_tune, every tick against the model and every
     frame against the reader's record (BINARIES.md 5.6). Then init
     reports -1 for a tune that maps a value with a2 at 0, with an area
-    below the player and without a list, and leaves the area below as it
-    was; and 0 for one whose list has no page, with a2 at 0 (5.1)."""
+    below the player, past its reach and without a list. It leaves the
+    area below as it was and reports 0 for a list of no page with a2
+    at 0 (5.1)."""
     global AREA_AFTER
     if "ymxr_look" not in symbols:
         code, symbols = build(switched(DEFINES, lookup=True))
@@ -2431,15 +2442,18 @@ def fallbacks(code, symbols):
     work = tempfile.mkdtemp()
     with open(at, "rb") as f:
         bound = bind(f.read(), work)
+    # The fixture fills the available page reach, so its source rows go
+    # before the area on PC-relative builds. On larger cores the compact
+    # fixture leaves room for the area and still makes both effects fall
+    # back.
+    after = (placed(len(code)) + len(bound) + 1) & ~1
+    if PCREL and area_of(bound, symbols, after) is None:
+        at = fallback_tune(compact=True)
+        with open(at, "rb") as f:
+            bound = bind(f.read(), work)
     count, entries = list_of(bound)
-    # on the build whose ticks read through a displacement, the area past
-    # the tune, so that the tune's sources are within the reach the area
-    # leaves of the first handler (BINARIES.md 5.5, 5.6); under -abs,
-    # whose ticks read an absolute address, the area right after the
-    # player and the tune past the reach
+    # Play every frame under -frames too, so both effects use a fallback.
     global MOST_FRAMES
-    # every frame of the tune played under -frames too: effect 0 reaches
-    # its fallback at its row k
     AREA_AFTER, most = PCREL, MOST_FRAMES
     MOST_FRAMES = None
     try:
@@ -2449,9 +2463,11 @@ def fallbacks(code, symbols):
 
 
 def refused(code, symbols, at, bound, count, entries, work):
-    """The rest of fallbacks, with the area past the tune."""
+    """Check fallback playback and the page areas init rejects."""
     m = Machine(code, symbols, bound)
-    k = plan_of(count, entries, m.reach, fallback_of(symbols))[0]
+    plan = plan_of(count, entries, m.reach, fallback_of(symbols))
+    assert plan is not None, "the fallback page area is past the player's reach"
+    k = plan[0]
     dropped = {e for e, _, _ in entries[k:]}
     assert dropped == {0, 1}, "init fills %d of %d pages, and effects %s fall back" % (
         k, len(entries), sorted(dropped))
@@ -2472,6 +2488,10 @@ def refused(code, symbols, at, bound, count, entries, work):
     assert m.call("init", a0=FILE, a1=workspace) == 0xFFFFFFFF, \
         "init took a page area below the player"
     assert bytes(m.mu.mem_read(below, 0x400)) == was, "init wrote below the player"
+    m = Machine(code, symbols, mapped_bound)
+    m.area = CODE + symbols["ymxr_tick0"] + 32768
+    assert m.call("init", a0=FILE, a1=workspace) == 0xFFFFFFFF, \
+        "init took a page area past the player's reach"
     block = struct.unpack(">i", mapped_bound[24:28])[0]
     count = struct.unpack(">H", mapped_bound[block:block + 2])[0]
     tag = block + 2 + 4 * count
@@ -2496,7 +2516,7 @@ def refused(code, symbols, at, bound, count, entries, work):
         "init rejected a tune that lists no page, with no area"
     return ("the fallback: %d of %d pages in the area and effects 0 and 1 through their"
             " fallback, %d frames, %d ticks; init reports -1 with no area, with one below the"
-            " player and without a list, and 0 for a list of no page with no area"
+            " player, past its reach and without a list, and 0 for a list of no page with no area"
             % (k, len(entries), frames, ticks))
 
 
@@ -2578,7 +2598,7 @@ def mapped_sizes():
                     .split("## A deferred start")[1].split())
     m = re.search(r"The lookup in, `YMXR_MAP=1`, makes the player ([\d,]+) bytes against"
                   r" ([\d,]+), and ([\d,]+) against ([\d,]+) where a tick reads an absolute"
-                  r" address; with the deferred start in as well, ([\d,]+) against ([\d,]+),"
+                  r" address\. With the deferred start in as well, ([\d,]+) against ([\d,]+),"
                   r" and ([\d,]+) against ([\d,]+)\.", said)
     counted = tuple(sizes[(pcrel, defer, look)] for defer in (False, True)
                     for pcrel in (True, False) for look in (True, False))
@@ -2896,7 +2916,7 @@ def wholebyte(code, symbols):
 
 def handler_at(m, symbols, name, i):
     """Resolve effect i's handler by shape name: tick, sq, one, cnt, two,
-    three or env; lookup kinds use lk, lc, lt, ln, lb, lv, le or lf.
+    three, env or cwide, or a lookup kind.
     Select the bank containing the vector, or bank 0 when neither
     matches (68k/player/handlers.S, BANK).
     """
@@ -2913,13 +2933,15 @@ def lookup_kind(model, i):
     start (68k/player/lookup_kinds.S, ymxr_kinds). One-column sources use lc
     when counted, otherwise lk. Two-column tone/envelope sources map the
     last write, lt marked or le counted; noise maps the first write, ln
-    marked or lf counted. Three-column buzzer maps the last write, lb; voice
-    maps the middle write, lv.
+    marked or lf counted. Three-column buzzer maps the last write, lb or
+    lg. Voice maps the middle write, lv or lh.
     """
     using = model.fx[i]["using"]
     columns = model.wide(i)
     first = using in (22, 23, 24)
     if model.counted(i):
+        if columns == 3:
+            return "lg" if using == 21 else "lh"
         return ("lf" if first else "le") if columns else "lc"
     if columns == 2:
         return "ln" if first else "lt"
@@ -3041,7 +3063,7 @@ def pairs(m, symbols):
     """
     count = 0
     for name, at in symbols.items():
-        one = re.match(r"ymxr_(l[kctnbvef])[0-3]b?$", name)
+        one = re.match(r"ymxr_(l[a-z])[0-3]b?$", name)
         if not one:
             continue
         key = CODE + at + symbols[one.group(1).upper() + "_KEY"]
@@ -3093,7 +3115,7 @@ def running(m, symbols, model, i, said, ticked=False):
         if fx["run"]:
             name = lookup_kind(model, i)
         elif model.counted(i):
-            name = "env" if model.wide(i) else "cnt"
+            name = {0: "cnt", 2: "env", 3: "cwide"}[model.wide(i)]
         else:
             name = {0: "tick", 2: "two", 3: "three"}[model.wide(i)]
         at = handler_at(m, symbols, name, i)
@@ -3101,8 +3123,8 @@ def running(m, symbols, model, i, said, ticked=False):
         assert m.place(at, TICK_PTR) == place, \
             "%seffect %d's place is %x, not %x" % (said, i, m.place(at, TICK_PTR), place)
         if model.counted(i):
-            left = symbols[name.upper() + "_LEFT"] if fx["run"] else (
-                TWC_LEFT if model.wide(i) else TICKC_LEFT)
+            offset = name.upper() if fx["run"] else {0: "TICKC", 2: "TWC", 3: "TWCT"}[model.wide(i)]
+            left = equate(offset + "_LEFT", symbols)
             assert m.word(at + left) == model.left(i), \
                 "%seffect %d has %d rows left, not %d" % (
                     said, i, m.word(at + left), model.left(i))
@@ -3536,6 +3558,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             else:
                 running(m, symbols, model, i, "frame %d: after a tick " % f, ticked=True)
     boundaries = inside(code, symbols, bound, tune, workspace)
+    if kinds is not None:
+        kinds["counted one-row race"] += boundaries.count("window counted once")
     m.call("stop", a0=workspace)
     timers.apply(m.mfp)
     for i in range(4):
@@ -3725,7 +3749,8 @@ def counted_read(code, symbols, cycles_of, general):
                          % (loop_more, ticked["loop"][1] - ticked["loop"][0]))
     wide_size = symbols["ymxr_env1"] - symbols["ymxr_env0"]
     marked_size = symbols["ymxr_two1"] - symbols["ymxr_two0"]
-    shapes = 4 * (symbols["ymxr_cnt1"] - symbols["ymxr_cnt0"]) + 4 * wide_size
+    shapes = 4 * sum(symbols["ymxr_%s1" % kind] - symbols["ymxr_%s0" % kind]
+                     for kind in ("cnt", "env", "cwide"))
     if DEFER or MAP:
         # the section's sizes are the player without the deferred start
         # and the lookup, and deferred_sizes and mapped_sizes read the
@@ -3734,10 +3759,10 @@ def counted_read(code, symbols, cycles_of, general):
     elif PCREL:
         sizes = re.search(r"(\d+) bytes an instance against (\d+)", said)
         player = re.search(r"The player is ([\d,]+) bytes, ([\d,]+) of them the counted shapes'"
-                           r" eight instances", said)
+                           r" twelve instances", said)
     else:
         sizes = re.search(r"instances of (\d+) bytes against the marked shape's (\d+)", said)
-        player = re.search(r"where a tick reads an absolute address, ([\d,]+) bytes and ([\d,]+),", said)
+        player = re.search(r"Where a tick reads an absolute address, ([\d,]+) bytes and ([\d,]+),", said)
     if DEFER or MAP:
         pass
     elif not sizes or (int(sizes.group(1)), int(sizes.group(2))) != (wide_size, marked_size):
@@ -3922,7 +3947,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         stale.append("performance.md has no row for the ticks %s" % unread)
     # each against the identity's tick of its shape
     more = re.search(r"Each figure is the tick of the identity's handler of that shape and (\d+)"
-                     r" cycles, and (\d+) on the path that loops",
+                     r" cycles, (\d+) on the path that loops, and (\d+) when a counted source stops",
                      " ".join(ticks_at.split()))
     paired = Counter()
     for kind, spent in sorted(ticked.items()):
@@ -3931,7 +3956,8 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                 or base.startswith(("square", "one")):
             continue
         loops = " loop" in kind
-        want = more and int(more.group(2 if loops else 1))
+        counted_stop = base.startswith("counted ") and " stop" in base
+        want = more and int(more.group(3 if counted_stop else 2 if loops else 1))
         if len(spent) != 1 or len(identity[base]) != 1 or \
                 next(iter(spent)) - next(iter(identity[base])) != want:
             stale.append("the tick %s is %s through a transformation and %s through the identity,"
@@ -5796,45 +5822,13 @@ LANES = {"low": ((1, 3, 5, 13), (15,), 16, 15),
 
 # The lanes whose sources the generator writes in the other form of
 # SPEC.md 3.1.6 at times: counted where the writer marks them, and on
-# setEnvelope marked, the form of 2.1.4, its high byte 0 to 127; and with
-# MARKED_THREE clear the lanes of three columns as well.
-REFORMED = ("tone", "noise")
+# setEnvelope marked, the form of 2.1.4, its high byte 0 to 127.
+REFORMED = ("tone", "noise", "voice", "buzzer")
 
 # The most ticks a second of a generated start or retune, but for a
 # divisor of 4, which counts its ten slowest counts and 0 alone, 2,497
 # ticks a second at most.
 GENERATED_RATE = 1000
-
-# The cases the generator leaves out, each for a fault of the player
-# (doc/LINKER.md, The check), and each a switch: False draws the case.
-#
-# With EVERY_BLOCK, each timer's first start in a subtune is deferred
-# where the subtune defers a start and maps through a transformation
-# where it maps a value, and in a set the first subtune that defers a
-# start, and the first that maps a value, runs every timer the set runs:
-# a player linked for the set keeps the deferred start and the remap of
-# each effect it runs (doc/LINKER.md, Blocks). Where the link leaves one
-# of the two out of an effect it keeps, init writes the read sites of
-# the block over the code of the next piece of the effect.
-#
-# With RESET_ONCE, a start of a counted source that plays once, of one
-# row or with placeReset clear, sets timerReset: the two starts whose
-# place can be the source's last row. Where the start leaves it clear
-# on a running timer, a tick after the start's window and before the
-# frame writes the rate can read that row: the tick stops the timer, the
-# select the frame writes starts it again (SPEC.md 1.9.4), and the next
-# tick of the player's counted handler writes the row again and leaves
-# the timer running, and the tick after it reads past the row, where
-# SPEC.md 5.1 step 3 reads row R - 1 as the last.
-#
-# With MARKED_THREE, a source of three columns is marked: the player's
-# counted handler of several columns writes two of its columns a tick,
-# where SPEC.md 5.1 writes the three.
-EVERY_BLOCK = True
-RESET_ONCE = True
-MARKED_THREE = True
-LEFT_OUT = ("EVERY_BLOCK", "RESET_ONCE", "MARKED_THREE")
-
 
 class Draws(random.Random):
     """random.Random with each draw made of random() alone, so a seed
@@ -5924,8 +5918,7 @@ def generated_tune(rng, title, maps, defers, letters):
     on the player and in the check alike: on a source that repeats, or
     with a deferred start of one pending. A source that plays once can end
     on the player before the row the check reckons it ends at (SPEC.md
-    6.4), and a retune there starts a timer with no source. LEFT_OUT names
-    the cases left out.
+    6.4), and a retune there starts a timer with no source.
 
     A row sets the target column alone at times, an edit of the tune
     file, to any target: the kept target, which the timer's next start
@@ -5934,7 +5927,6 @@ def generated_tune(rng, title, maps, defers, letters):
     setEnvelope marked on a lane that marks them all."""
     rows = 4 * rng.randint(2, 6)
     repeat = None if rng.random() < 0.25 else 4 * rng.randrange(rows // 4)
-    reformed_lanes = REFORMED + (() if MARKED_THREE else ("voice", "buzzer"))
 
     def writes(targets):
         return {register for target in targets for register, _ in TARGETS[target]}
@@ -5966,7 +5958,7 @@ def generated_tune(rng, title, maps, defers, letters):
         for k in range(len(pools[lane])):
             counted[(lane, k)] = (lane in ("keys", "bytes", "mixer")
                                   or (lane == "envelope" and not marked[lane])
-                                  or (lane in reformed_lanes and rng.random() < 1 / 3))
+                                  or (lane in REFORMED and rng.random() < 1 / 3))
         if maps:
             _, _, keys, top = LANES[lane]
             if marked[lane]:
@@ -6033,13 +6025,6 @@ def generated_tune(rng, title, maps, defers, letters):
                     one.update(by=s["rate"][0], count=s["rate"][1], tr=0, pr=0, deferred=0)
                     if rng.random() < 0.5:
                         one.update(target=s["target"], mapping=s["mapping"])
-                if EVERY_BLOCK and not s["started"]:
-                    one["deferred"] = int(defers)
-                    one["mapping"] = one["mapping"] or ((lane, 0) if maps else 0)
-                _, values, rr = source_of(one["source"])
-                if RESET_ONCE and counted[one["source"]] and rr is None \
-                        and (len(values) == 1 or not one["pr"]):
-                    one["tr"] = 1
                 if one["deferred"] and runs:
                     s["pending"] = one
                     effect["until"] = min(effect["until"], n + reckoned(
@@ -6050,7 +6035,8 @@ def generated_tune(rng, title, maps, defers, letters):
                 if one["deferred"]:
                     s["rate"], s["counting"] = None, False
                 else:
-                    s["rate"], s["counting"] = (one["by"], one["count"]), rr is not None
+                    s["rate"] = (one["by"], one["count"])
+                    s["counting"] = source_of(one["source"])[2] is not None
             elif kind == "retune":
                 by, count = drawn_rate(rng)
                 one = dict(kind=kind, by=by, count=count, tr=rng.randint(0, 1),
@@ -6138,14 +6124,6 @@ def generated_song(number):
     count = 1 if rng.random() < 0.7 else rng.randint(2, 3)
     drawn = [(rng.random() < 0.6, rng.random() < 0.5, set(rng.sample("ABCD", rng.randint(1, 4))))
              for _ in range(count)]
-    if EVERY_BLOCK:
-        # the first subtune that maps a value, and the first that defers a
-        # start, runs every timer of the set
-        every = set().union(*(letters for _, _, letters in drawn))
-        for flag in (0, 1):
-            some = [one for one in drawn if one[flag]]
-            if some:
-                some[0][2].update(every)
     titles = (["generated %d" % number] if count == 1
               else ["generated %d.%d" % (number, k + 1) for k in range(count)])
     return [(title,) + generated_tune(rng, title, maps, defers, letters)
@@ -6161,7 +6139,7 @@ KINDS = ("starts at the frame on an idle timer", "starts at the frame on a runni
          "retunes", "stops", "remaps between transformations", "remaps to the identity",
          "remaps from the identity", "rows that set the target column alone",
          "tunes that repeat to a row", "tunes that play once", "sets of several subtunes")
-SHAPES = ("square", "one", "general", "counted", "two", "three", "envelope")
+SHAPES = ("square", "one", "general", "counted", "two", "three", "envelope", "countedthree")
 
 
 def source_shape(tune, s):
@@ -6171,7 +6149,7 @@ def source_shape(tune, s):
     of several columns, the envelope's (doc/LINKER.md, Blocks)."""
     _, R, RR, columns = tune.sources[s]
     if tune.counted[s]:
-        return "counted" if len(columns) == 1 else "envelope"
+        return ("counted", "envelope", "countedthree")[len(columns) - 1]
     if len(columns) > 1:
         return "two" if len(columns) == 2 else "three"
     return "square" if (R, RR) == (2, 0) else "one" if (R, RR) == (1, 0) else "general"
@@ -6345,6 +6323,9 @@ def generated(count, seed, code, symbols):
                   " -generated1 -seed%d plays it alone" % (
                       "", folder, seed, PYTHON, number - seed, number))
     print(coverage(kinds))
+    if kinds["counted one-row race"]:
+        print("ticks that end a counted one-row source before the select: %d"
+              % kinds["counted one-row race"])
     for core, outs in sorted(kept.items()):
         every = {piece.rsplit("_", 1)[0] for piece, _, _ in pieces_of(core)[0]}
         out = sorted(set.intersection(*outs) & every)

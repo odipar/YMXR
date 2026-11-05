@@ -182,9 +182,12 @@
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_halt:   andi.b  #\keep,\ctrl.w
+\{name}_halt:
+\{name}_park:   addq.w  #1,($12345678).l        ; keep the last row for a
+                                                ; select after this tick
+                andi.b  #\keep,\ctrl.w
                 move.b  #255-(1<<\bit),(\ier+4).w
-                COUNT   PERF_STOP,0
+                COUNT   PERF_STOP+20,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
@@ -283,9 +286,17 @@
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_halt:   andi.b  #\keep,\ctrl.w
+\{name}_halt:
+                .if     \counted
+\{name}_park:   addq.w  #1,($12345678).l        ; keep the last row for a
+                .endif                          ; select after this tick
+                andi.b  #\keep,\ctrl.w
                 move.b  #255-(1<<\bit),(\ier+4).w
+                .if     \counted
+                COUNT   PERF_STOP+20,0
+                .else
                 COUNT   PERF_STOP,0
+                .endif
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif

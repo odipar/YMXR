@@ -137,7 +137,7 @@ ymxr_rmove      equ     *
                 .else
                 move.w  d6,d1
                 .endif
-                lsl.w   #3,d1
+                mulu    #LOOK_KINDS,d1
                 add.w   d2,d1
                 lea     ymxr_htab(pc),a4
                 move.b  (a4,d1.w),d5            ; the first fallback page's

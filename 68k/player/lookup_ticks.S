@@ -18,7 +18,7 @@
                 .else                           ; +4 the key's address
 \{name}_\{ptr}: move.b  ($12345678).l,($12345678).l ; +2 the place, +6 the
                 .endif                          ; key's address
-\{name}_key:    move.b  \page(pc),YM_SELECT+2.w ; +2 the page, +3 the key
+\{name}_key:    move.b  \{name}_key+2(pc),YM_SELECT+2.w ; init writes the page
                 .endm
 
 ; A column the instance writes as TICKW writes it.
@@ -60,11 +60,19 @@
 \{name}_mark:
                 .if     YMXR_PCREL
                 tst.w   ($12345678).l           ; +2: the loop cell
+                .if     \counted
+                beq.w   \{name}_park
+                .else
                 beq.w   \halt
+                .endif
 \{name}_loop:   move.w  ($12345678).l,($12345678).l ; +2 the cell, +6 the
                 .else                           ; place
                 tst.l   ($12345678).l
+                .if     \counted
+                beq.w   \{name}_park
+                .else
                 beq.w   \halt
+                .endif
 \{name}_loop:   move.l  ($12345678).l,($12345678).l
                 .endif
                 .if     \counted
@@ -75,6 +83,10 @@
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
+                .if     \counted
+\{name}_park:   addq.w  #1,($12345678).l
+                bra.w   \halt
+                .endif
 \{name}_cell:
                 .if     YMXR_PCREL
                 dc.w    0                       ; the loop cell
@@ -145,7 +157,11 @@
 \{name}_last:
                 .if     YMXR_PCREL
 \{name}_loopt:  tst.w   ($12345678).l
+                .if     \counted
+                beq.w   \{name}_park
+                .else
                 beq.w   \halt
+                .endif
 \{name}_loop1:  move.w  ($12345678).l,($12345678).l
 \{name}_loop2:  move.w  ($12345678).l,($12345678).l
                 .if     \columns=3
@@ -153,7 +169,11 @@
                 .endif
                 .else
 \{name}_loopt:  tst.l   ($12345678).l
+                .if     \counted
+                beq.w   \{name}_park
+                .else
                 beq.w   \halt
+                .endif
 \{name}_loop1:  move.l  ($12345678).l,($12345678).l
 \{name}_loop2:  move.l  ($12345678).l,($12345678).l
                 .if     \columns=3
@@ -168,6 +188,10 @@
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
+                .if     \counted
+\{name}_park:   addq.w  #1,($12345678).l
+                bra.w   \halt
+                .endif
 \{name}_cells:
                 .if     YMXR_PCREL
                 dc.w    0,0,0
@@ -189,12 +213,12 @@
                 ds.b    (\page-(*+\key))&255
                 .endm
 
-; Monitor halt at the marker: one per effect, shared by its eight lookup
-; kinds.
-                .macro  LHALT   name,eoi,eoir,ctrl,keep,ier,bit
+; Halt a lookup instance at the end of a source. Counted instances
+; restore their counter before they reach the halt.
+                .macro  LHALT   name,eoi,eoir,ctrl,keep,ier,bit,extra
 \name:          andi.b  #\keep,\ctrl.w
                 move.b  #255-(1<<\bit),(\ier+4).w
-                COUNT   PERF_STOP,0
+                COUNT   PERF_STOP+\extra,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
@@ -207,7 +231,7 @@
 ; key addresses patched, the counter at 1, and the page byte of page 0
 ; computed from the instance's address and its effect's reference and
 ; written into the instance and into the page-byte table at \kind(a4),
-; eight bytes an effect. d0 to d2, a1 to a3 and a5 clobbered.
+; LOOK_KINDS bytes an effect. d0 to d2, a1 to a3 and a5 clobbered.
                 .macro  LINKKEY p
                 lea     \{p}_KEY(a5),a3
                 move.l  a3,\{p}_KEYA(a5)
@@ -239,13 +263,14 @@
                 lea     \{p}_LEFT(a5),a3
                 move.l  a3,\{p}_CNTA(a5)
                 move.l  a3,\{p}_RELDA(a5)
+                move.l  a3,\{p}_PARK(a5)
                 move.w  #1,\{p}_LEFT(a5)
                 .endif
                 .if     \drop&YMXR_NEST
                 move.l  d3,\{p}_SR(a5)
                 .endif
                 LINKKEY \p
-.n\~:           addq.l  #8,a2
+.n\~:           lea     LOOK_KINDS(a2),a2
                 addq.w  #1,d2
                 cmp.w   #4,d2
                 bne.w   .l\~
@@ -281,10 +306,11 @@
                 lea     \{p}_LEFT(a5),a3
                 move.l  a3,\{p}_CNT(a5)
                 move.l  a3,\{p}_RELDA(a5)
+                move.l  a3,\{p}_PARK(a5)
                 move.w  #1,\{p}_LEFT(a5)
                 .endif
                 LINKKEY \p
-.n\~:           addq.l  #8,a2
+.n\~:           lea     LOOK_KINDS(a2),a2
                 addq.w  #1,d2
                 cmp.w   #4,d2
                 bne.w   .l\~
@@ -329,6 +355,7 @@ KD_SIZE         equ     32
 \{p}_CNTA       equ     \{name}_cnt-\name+2
 \{p}_RELD       equ     \{name}_reld-\name+2
 \{p}_RELDA      equ     \{name}_reld-\name+4
+\{p}_PARK       equ     \{name}_park-\name+2
 \{p}_LEFT       equ     \{name}_left-\name
                 .endif
                 LOOKAT  \p,\name
@@ -360,6 +387,7 @@ KD_SIZE         equ     32
 \{p}_CNT        equ     \{name}_cnt-\name+2
 \{p}_RELD       equ     \{name}_reld-\name+2
 \{p}_RELDA      equ     \{name}_reld-\name+4
+\{p}_PARK       equ     \{name}_park-\name+2
 \{p}_LEFT       equ     \{name}_left-\name
                 .endif
                 LOOKAT  \p,\name
@@ -385,8 +413,8 @@ KD_SIZE         equ     32
                 .if     (\{p}_KEY-1)<>KEY_\{p}
                 .error  "a lookup instance reads its page at another offset than its KEY_ equate"
                 .endif
-                .if     \{p}_SIZE>LOOK_STRIDE
-                .error  "a lookup instance is larger than LOOK_STRIDE"
+                .if     \{p}_SIZE>256
+                .error  "a lookup instance is larger than a page"
                 .endif
                 .endm
 
@@ -395,9 +423,6 @@ KD_SIZE         equ     32
                 .macro  LCHECK  inst,page,lo,hi
                 .if     ((\page-(\{inst}_key+2))&255)<>0
                 .error  "a lookup instance reads its page off the residue"
-                .endif
-                .if     ((\{inst}_key+2)-\page)>32768
-                .error  "a lookup instance is past the reach of its pages"
                 .endif
                 .if     (\inst<\lo)|(\{inst}_end>\hi)
                 .error  "a lookup instance is outside its bank"
@@ -428,6 +453,9 @@ KEY_LV          equ     LOOK_MK+6+LOOK_RD+6+LOOK_KW+2
 KEY_LE          equ     LOOK_MK+6+LOOK_RD+6+LOOK_KW+2
 KEY_LF          equ     LOOK_MK+6+LOOK_KW+2
 KEY_LB          equ     LOOK_MK+6+LOOK_RD+6+LOOK_RD+6+LOOK_KW+2
+KEY_LG          equ     KEY_LB
+KEY_LH          equ     KEY_LV
+LOOK_KINDS      equ     10
 ; The step between the effects' references modulo 256, the size of an
 ; instance of three columns: the gap before each instance puts its page
 ; read e * LOOK_STRIDE past effect 0's modulo 256, matching effect e's

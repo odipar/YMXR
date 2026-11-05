@@ -11,6 +11,8 @@
                 LOOKATW LV,ymxr_lv0,1,0
                 LOOKATW LE,ymxr_le0,0,1
                 LOOKATW LF,ymxr_lf0,0,1
+                LOOKATW LG,ymxr_lg0,1,1
+                LOOKATW LH,ymxr_lh0,1,1
                 .if     YMXR_DEFER
 ; Hook words for lookup kinds, equivalent to HOOKW for identity
 ; handlers.
@@ -22,11 +24,13 @@
                 HOOKW   LV
                 HOOKW   LE
                 HOOKW   LF
+                HOOKW   LG
+                HOOKW   LH
                 .endif
                 .if     (LOOK_STRIDE<>LB_SIZE)|(LOOK_STRIDE<>LV_SIZE)
                 .error  "LOOK_STRIDE is apart from the size of the kinds of three columns"
                 .endif
-; The first register of each of the thirteen kinds is at TICK_SEL, where
+; The first register of every kind is at TICK_SEL, where
 ; ymxr_kindof and ymxr_remap read the running source's.
                 .if     (TICKC_SEL<>TICK_SEL)|(TW2_SEL1<>TICK_SEL)|(TW3_SEL1<>TICK_SEL)|(TWC_SEL1<>TICK_SEL)
                 .error  "a handler of the identity has its first register at another offset than TICK_SEL"
@@ -74,6 +78,14 @@
                 LCHECK  ymxr_lf1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
                 LCHECK  ymxr_lf2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
                 LCHECK  ymxr_lf3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lg0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lg1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lg2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lg3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lh0,ymxr_ref0,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lh1,ymxr_ref1,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lh2,ymxr_ref2,ymxr_tick0,ymxr_bank0end
+                LCHECK  ymxr_lh3,ymxr_ref3,ymxr_tick0,ymxr_bank0end
                 .if     YMXR_DEFER
                 LCHECK  ymxr_lk0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lk0
@@ -139,4 +151,20 @@
                 LTWIN   ymxr_lf2
                 LCHECK  ymxr_lf3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lf3
+                LCHECK  ymxr_lg0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lg0
+                LCHECK  ymxr_lg1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lg1
+                LCHECK  ymxr_lg2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lg2
+                LCHECK  ymxr_lg3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lg3
+                LCHECK  ymxr_lh0b,ymxr_ref0,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lh0
+                LCHECK  ymxr_lh1b,ymxr_ref1,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lh1
+                LCHECK  ymxr_lh2b,ymxr_ref2,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lh2
+                LCHECK  ymxr_lh3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
+                LTWIN   ymxr_lh3
                 .endif
