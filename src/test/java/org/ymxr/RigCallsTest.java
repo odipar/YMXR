@@ -216,6 +216,58 @@ final class RigCallsTest {
                 "none is no core, and an absent shard every core");
     }
 
+    /** The switches a linked player is linked under, the eight sets of
+     *  {@code -perf}, {@code -lean} and {@code -abs}: ymxr-sndh -link picks
+     *  the deferred start and the lookup by the tunes' effects. */
+    private static final List<List<String>> LINKED = linked();
+
+    private static List<List<String>> linked() {
+        List<List<String>> out = new ArrayList<>();
+        for (List<String> core : CORES) {
+            if (!core.contains("-defer") && !core.contains("-map")) {
+                out.add(core);
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    @Test
+    void theFourShardsAreEverySetOfLinkedSwitchesOnce() {
+        List<List<String>> joined = new ArrayList<>();
+        for (int k = 0; k < 4; k++) {
+            List<List<String>> one = shard(LINKED, k + "/4");
+            assertTrue(one.size() == 2, () -> "shard has " + one.size() + " sets, not 2");
+            joined.addAll(one);
+        }
+        assertTrue(LINKED.size() == 8 && joined.size() == 8 && joined.containsAll(LINKED),
+                () -> "the four shards are " + joined + ", not " + LINKED);
+    }
+
+    /** The conformance kit's tunes, the 20 of the check of deferred starts
+     *  and the 33 of the check of tunes that map a value, each on the player
+     *  ymxr-sndh -link links for it, under each set of switches: the tool's
+     *  core against the rig's link of the assembled core, and every tick
+     *  against the model (doc/LINKER.md, The check). The workflow runs the
+     *  sets in the four jobs of cores. */
+    @TestFactory
+    Stream<DynamicTest> theRigPlaysOnLinkedPlayersOfEverySetOfSwitches() {
+        return shard(LINKED, System.getProperty(SHARD)).stream().map(core -> DynamicTest.dynamicTest(
+                core.isEmpty() ? "the plain switches" : String.join(" ", core), () -> {
+                    theRigRuns();
+                    List<String> argv = new ArrayList<>(List.of("-linked", "-kit", "-defer",
+                            "-map", FRAMES));
+                    argv.addAll(core);
+                    String said = rigWith(argv);
+                    assertTrue(said.startsWith("0\n")
+                                    && said.contains("16 tunes play as the specification reads")
+                                    && said.contains("deferred starts: 20 tunes")
+                                    && said.contains("tunes that map a value: 33 tunes")
+                                    && said.contains("linked, "),
+                            () -> RIG + " " + String.join(" ", argv) + " does not play on"
+                                    + " linked players:\n" + said);
+                }));
+    }
+
     @TestFactory
     Stream<DynamicTest> theRigPlaysTheBuiltTunesOnEveryCore() {
         return shard(CORES, System.getProperty(SHARD)).stream().map(core -> DynamicTest.dynamicTest(

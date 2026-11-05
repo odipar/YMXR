@@ -145,9 +145,16 @@ final class Sndh {
     /** The tag block's text: the title, the composer where there is one,
      *  and a name a subtune where the caller names them; and the core the
      *  file uses, which {@code monitor} and {@code lean} select a switch
-     *  of and {@code ticks} the third. */
+     *  of and {@code ticks} the third; and with {@code link}, the core
+     *  linked for the set, its blocks the subtunes need (doc/LINKER.md). */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor, boolean lean, Ticks ticks, Asked asked) {
+            boolean monitor, boolean lean, Ticks ticks, Asked asked, boolean link) {
+
+        /** The core as carried, not linked for the set. */
+        Options(String title, @Nullable String composer, @Nullable List<String> names,
+                boolean monitor, boolean lean, Ticks ticks, Asked asked) {
+            this(title, composer, names, monitor, lean, ticks, asked, false);
+        }
 
         /** The two switches the tag block reads, the third chosen, and the
          *  clock tag left to the set. */
@@ -205,6 +212,7 @@ final class Sndh {
         int claimed = 0;
         boolean defers = false;
         boolean maps = false;
+        List<TuneFile> read = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             TuneFile tune;
             try {
@@ -225,6 +233,7 @@ final class Sndh {
                         + tune.frameRate() + " Hz and subtune 1 at " + rate + ": an SNDH file"
                         + " records one rate");
             }
+            read.add(tune);
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
@@ -252,11 +261,11 @@ final class Sndh {
             pcrel = (Tune.getWord(core, CORE_FLAGS_AT) & CORE_PCREL) != 0;
         }
         if (core == null) {
-            core = Binaries.core(options.monitor(), options.lean(), pcrel, defers, maps);
+            core = chosen(options, pcrel, defers, maps, read);
             if (pcrel && options.ticks() == Ticks.CHOSEN
                     && tunesEnd(core, set, tags) > PCREL_REACH) {
                 pcrel = false;
-                core = Binaries.core(options.monitor(), options.lean(), false, defers, maps);
+                core = chosen(options, false, defers, maps, read);
             }
         }
         checkCore(core, options.monitor(), options.lean(), pcrel, defers, maps,
@@ -294,6 +303,19 @@ final class Sndh {
         }
         int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
         return combine(core, set, tags, workspace);
+    }
+
+    /** The core the switches select, and with {@code -link} that core
+     *  linked for the blocks the set needs (doc/LINKER.md). */
+    private static byte[] chosen(Options options, boolean pcrel, boolean defers, boolean maps,
+                                 List<TuneFile> tunes) {
+        Binaries.Binary binary = Binaries.binary(options.monitor(), options.lean(), pcrel,
+                defers, maps);
+        byte[] core = Binaries.carried(binary.name());
+        if (options.link() && Link.links(defers, maps)) {
+            core = Link.link(core, Pieces.carried(binary), Link.blocks(tunes));
+        }
+        return core;
     }
 
     /**
@@ -684,6 +706,18 @@ final class Sndh {
         return out.toString();
     }
 
+    /** The flag that links the core for the set, which {@code ymxr-sndh},
+     *  {@code ymxs-to-sndh} and {@code ymxs-to-prg} read beside the tags
+     *  (doc/LINKER.md). */
+    static final String[] LINKS = {"-link"};
+
+    /** Two lists of flags as one. */
+    private static String[] read(String[] some, String[] more) {
+        String[] all = Arrays.copyOf(some, some.length + more.length);
+        System.arraycopy(more, 0, all, some.length, more.length);
+        return all;
+    }
+
     /**
      * {@code ymxr-sndh}: a tune file or a multi file (doc/BINARIES.md 0)
      * on standard input, an SNDH file on standard output. A multi file's
@@ -695,16 +729,20 @@ final class Sndh {
      * in there, for reading a run, and {@code -pcrel} the core whose ticks
      * read a row through the program counter (BINARIES.md 5.5). The three
      * are one switch each, and any two together select the core that is
-     * both, so {@code -perf -lean} reads what a lean run costs.
+     * both, so {@code -perf -lean} reads what a lean run costs. {@code
+     * -link} links the core for the subtunes: the blocks of the effects,
+     * the handler kinds and the lookup kinds the subtunes run are kept,
+     * and the rest left out (doc/LINKER.md).
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
-        Tool tool = Tool.of("ymxr-sndh", flags, Ymxs.TAGS);
-        Ymxs.only(tool, flags, Ymxs.TAGS);
+        Tool tool = Tool.of("ymxr-sndh", flags, read(Ymxs.TAGS, LINKS));
+        Ymxs.only(tool, flags, Ymxs.TAGS, LINKS);
         @Nullable String title = null;
         @Nullable String composer = null;
         boolean monitor = false;
         boolean lean = false;
+        boolean link = false;
         Asked asked = Ymxs.asked(tool, flags);
         Ticks ticks = Ticks.CHOSEN;
         for (String flag : flags) {
@@ -716,6 +754,8 @@ final class Sndh {
                 ticks = Ticks.PCREL;
             } else if (flag.equals("-abs")) {
                 ticks = Ticks.ABSOLUTE;
+            } else if (flag.equals("-link")) {
+                link = true;
             } else if (flag.startsWith("-copies")) {
                 throw tool.usage("not a flag of the tool: " + flag
                         + "; a tune file is packed already");
@@ -749,7 +789,7 @@ final class Sndh {
             title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
         Options options = new Options(title, composer,
-                tunes.size() > 1 ? names : null, monitor, lean, ticks, asked);
+                tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link);
         byte[] sndh;
         try {
             sndh = of(tunes, options);
@@ -778,8 +818,24 @@ final class Sndh {
         boolean defer = (flags & CORE_DEFER) != 0;
         boolean map = (flags & CORE_MAP) != 0;
         Binaries.Binary binary = Binaries.binary(monitor, lean, pcrel, defer, map);
-        int core = Binaries.core(monitor, lean, pcrel, defer, map).length;
-        report.say("the core: " + binary.name() + ", " + Report.count(core, "byte", "bytes"));
+        int carried = Binaries.core(monitor, lean, pcrel, defer, map).length;
+        int core = carried;
+        if (options.link() && Link.links(defer, map)) {
+            List<TuneFile> read = new ArrayList<>();
+            for (byte[] tune : tunes) {
+                read.add(TuneFile.read(tune));
+            }
+            Pieces table = Pieces.carried(binary);
+            core = Link.link(Binaries.carried(binary.name()), table, Link.blocks(read)).length;
+            List<String> out = Link.leftOut(table, Link.blocks(read));
+            report.say("the core: " + binary.name() + " linked for the set, "
+                    + Report.count(core, "byte", "bytes") + " of " + carried
+                    + (out.isEmpty() ? ", every block kept"
+                    : ", the blocks left out: " + String.join(", ", out)));
+        } else {
+            report.say("the core: " + binary.name() + ", "
+                    + Report.count(core, "byte", "bytes"));
+        }
         List<String> switches = new ArrayList<>();
         if (monitor) {
             switches.add("-perf, the raster monitor in");

@@ -524,10 +524,10 @@ copy, for rows that start or remap one effect:
 
 | the row | one column | a square | a source of one row |
 |---|---|---|---|
-| a start at row 0 | 414 to 494 | 608 | 494 |
+| a start at row 0 | 414 to 494 | 574 | 462 |
 | a remap between two transformations | 202 to 236 | 766 to 786 | 588 |
-| a remap from the identity | 1452 to 1456 | 766 | 588 |
-| a remap to the identity | 1230 to 1234 | 548 to 566 | 440 |
+| a remap from the identity | 1408 | 766 | 588 |
+| a remap to the identity | 1186 | 548 to 566 | 440 |
 
 The ranges are the effect, a row that resets the timer, a source that
 plays once, the half a square is at and the cache the start finds. A
@@ -652,7 +652,7 @@ R4.5 counts them:
 | tune | the costliest call | the costliest, the starts and remaps apart |
 |---|---|---|
 | a fade on setR8 | 2388 | 1894 |
-| a fade of setVoiceA's volume | 3658 | 1894 |
+| a fade of setVoiceA's volume | 3482 | 1894 |
 | a mapped square and its remap | 2502 | 1894 |
 | a mapped source of one row and its remap | 2388 | 1894 |
 | a source remapped from the identity to T, to T' and back | 3094 | 2134 |
@@ -670,18 +670,18 @@ R4.5 counts them:
 | starts through a new mapping with placeReset clear while a source ticks | 2738 | 1894 |
 | a remap and a retune with timerReset on a running timer | 2420 | 1894 |
 | a remap and a retune with timerReset on a stopped timer, kept by a start | 2416 | 1938 |
-| a place's reset on a mapped square, loop and counted source, three effects | 5494 | 3104 |
-| one transformation through the mirror and through the plain fill | 2572 | 1894 |
-| a transformation of 32 entries through the mirror and through the plain fill | 2572 | 1894 |
+| a place's reset on a mapped square, loop and counted source, three effects | 5216 | 3104 |
+| one transformation through the mirror and through the plain fill | 2442 | 1894 |
+| a transformation of 32 entries through the mirror and through the plain fill | 2442 | 1894 |
 | squares and a loop started through a new mapping with placeReset clear | 2502 | 1894 |
-| starts with placeReset clear while a source of several columns runs | 3658 | 1894 |
+| starts with placeReset clear while a source of several columns runs | 3482 | 1894 |
 | remaps on Timers C and D, which share a control register, each idle while the other runs | 2928 | 2090 |
 | a remap and a retune with timerReset on a running square | 2502 | 1894 |
 | a stop row with the mapping column set, then a start with it unset | 2420 | 1928 |
 | a remap in the row that sets the target to setNoiseA | 3452 | 1946 |
 | a marked source on setEnvelope through T, a remap, a place's reset and a remap from the identity | 3280 | 2490 |
 | counted sources of two columns on setToneA and setNoiseA through T, a remap, a place's reset and a remap from the identity | 5764 | 3644 |
-| sources that play once on seven lookup kinds and loop on five, two effects | 5900 | 2472 |
+| sources that play once on seven lookup kinds and loop on five, two effects | 5596 | 2472 |
 | sources that play once on seven lookup kinds, one effect | 3540 | 1964 |
 | four sources through 256 entries remapped in one row | 8182 | 3750 |
 
@@ -722,9 +722,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 8,152 bytes, 896 of them the counted shapes' eight
+The player is 8,258 bytes, 896 of them the counted shapes' eight
 instances, four of one column and four of two; where a tick reads an
-absolute address, 7,844 bytes and 952, instances of 138 bytes against the
+absolute address, 7,950 bytes and 952, instances of 138 bytes against the
 marked shape's 122.
 
 ## A tick through an absolute address
@@ -792,7 +792,7 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 7,844 bytes against 8,152. Two figures
+assembles this build, which is 7,950 bytes against 8,258. Two figures
 move against each other: a place is a word where it was a long, which
 shortens a timer's handlers by 40 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
@@ -870,13 +870,13 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 12,508
-bytes against 8,152, and 12,348 against 7,844 where a tick reads an
+The second bank, the installers and the stubs make the player 12,638
+bytes against 8,258, and 12,478 against 7,950 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 132 bytes against 128, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 17,252 bytes against 8,152,
-and 18,876 against 7,844 where a tick reads an absolute address; with the
-deferred start in as well, 27,334 against 12,508, and 30,482 against
-12,348.
+The lookup in, `YMXR_MAP=1`, makes the player 17,634 bytes against 8,258,
+and 19,258 against 7,950 where a tick reads an absolute address; with the
+deferred start in as well, 27,716 against 12,638, and 30,864 against
+12,478.

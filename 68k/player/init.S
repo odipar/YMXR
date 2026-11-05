@@ -154,7 +154,9 @@ YMXR_init:
 ; the pointer, and a constant column is its value. Every read site is
 ; written whole, an immediate of the value where its column is constant:
 ; a set inits one loaded copy for each subtune, and a column live in one
-; tune is constant in another.
+; tune is constant in another. A player linked for a song has the frame
+; code of the effects the song runs, and the sites of the others are
+; left as they are (ymxr_kept).
                 movea.l WS_IMAGE(a6),a0
                 adda.l  TF_TABLE(a1),a0
                 lea     DT_PAYLOAD(a0),a0       ; the table's payload
@@ -167,15 +169,22 @@ YMXR_init:
                 moveq   #YMXR_COLUMNS-1,d2
 .patch:         move.w  (a3)+,d4
                 move.w  d1,d0
+                bsr     ymxr_kept
+                beq.s   .apart
+                move.w  d1,d0
                 bsr     ymxr_col
-                addq.w  #1,d1
+.apart:         addq.w  #1,d1
                 dbra    d2,.patch
                 lea     ymxr_sites(pc),a3
                 moveq   #YMXR_SITES-1,d2
 .site:          move.w  (a3)+,d4
-                move.w  (a3)+,d0
+                move.w  (a3)+,d1
+                move.w  d1,d0
+                bsr     ymxr_kept
+                beq.s   .away
+                move.w  d1,d0
                 bsr     ymxr_col
-                dbra    d2,.site
+.away:          dbra    d2,.site
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
@@ -185,11 +194,13 @@ YMXR_init:
                 .if     YMXR_NEST
 ; A tune that runs one effect has no second timer to nest inside a tick,
 ; so the level that tick drops buys it no safety: two nops are where the
-; drop would, in all three of that effect's handlers. A tune running two
-; or more keeps the drop, and one running none skips the handlers. Every
-; handler's word is written on every init: a set inits one loaded copy
-; for each subtune, and a subtune that ran one effect alone left its nops
-; where the next, running that effect beside another, needs the drop.
+; drop would be. A tune running two or more keeps the drop. The word is
+; written into the general handler, the square's and the one-row
+; source's of every effect: a timer the tune does not run is left
+; unclaimed, and its handlers do not run. Every handler's word is
+; written on every init: a set inits one loaded copy for each subtune,
+; and a subtune that ran one effect alone left its nops where the next,
+; running that effect beside another, needs the drop.
                 move.l  #$46FC2500,d3           ; move.w #$2500,sr, the drop,
                 move.b  WS_EFFECTS(a6),d0       ; which a handler keeps unless
                 and.b   #$0F,d0                 ; its effect runs alone
@@ -211,73 +222,83 @@ YMXR_init:
 ; The tick handlers: each one's step and loop operands name a
 ; separate pair of cells, its place is parked on a marker until a start,
 ; and the register it selects is R0 until a start aims it (SPEC.md 5.2.1).
+; Each loop below walks the instances of one kind the player has, a bit
+; an effect in the kind's mask: a player linked for a song has the
+; instances of the effects that start a source of the kind, one after
+; the other (doc/LINKER.md).
                 lea     ymxr_tick0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_effect+1(pc),d4
                 moveq   #3,d2
-.link:          bsr     ymxr_link
+.link:          lsr.b   #1,d4
+                bcc.s   .nolink
+                bsr     ymxr_link
+                .if     YMXR_NEST
+                move.l  d3,TICK_SR(a5)
+                .endif
                 lea     TICK_SIZE(a5),a5
-                dbra    d2,.link
+.nolink:        dbra    d2,.link
+                PIECE   counted_1
                 lea     ymxr_cnt0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_counted+1(pc),d4
                 moveq   #3,d2
-.linkc:         bsr     ymxr_linkc
+.linkc:         lsr.b   #1,d4
+                bcc.s   .nolinkc
+                bsr     ymxr_linkc
                 lea     TICKC_SIZE(a5),a5
-                dbra    d2,.linkc
+.nolinkc:       dbra    d2,.linkc
+                ENDPIECE counted_1
 
                 .if     YMXR_NEST
-                lea     ymxr_tick0(pc),a5
+                PIECE   one_1
+                lea     ymxr_one0(pc),a5
                 adda.w  d6,a5
-                lea     ymxr_sq0(pc),a4
-                adda.w  d6,a4
-                lea     ymxr_one0(pc),a3
-                adda.w  d6,a3
-                .if     YMXR_MAP
-                lea     ymxr_lk0(pc),a1         ; and the general lookup
-                adda.w  d6,a1                   ; instance's
-                .endif
-                moveq   #0,d4
+                move.b  ymxr_k_one+1(pc),d4
                 moveq   #3,d2
-.each:          move.l  #$46FC2500,d0           ; a handler the tune does not
-                btst    d4,WS_EFFECTS(a6)       ; run keeps the drop, and one
-                beq.s   .word                   ; it runs is written d3
-                move.l  d3,d0
-.word:          move.l  d0,TICK_SR(a5)
-                move.l  d0,SQ_SR(a4)
-                move.l  d0,ONE_SR(a3)
-                .if     YMXR_MAP
-                move.l  d0,LK_SR(a1)
-                lea     LOOK_STRIDE(a1),a1
-                .endif
-                lea     TICK_SIZE(a5),a5
-                lea     SQ_SIZE(a4),a4
-                lea     ONE_SIZE(a3),a3
-                addq.w  #1,d4
-                dbra    d2,.each
+.one:           lsr.b   #1,d4
+                bcc.s   .noone
+                move.l  d3,ONE_SR(a5)
+                lea     ONE_SIZE(a5),a5
+.noone:         dbra    d2,.one
+                ENDPIECE one_1
                 .endif
 
 ; A square's handler names the row it is at in the one instruction
 ; that moves between the two, and so does the copy of that instruction in
 ; its hook (4.8).
+                PIECE   square_1
                 lea     ymxr_sq0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_square+1(pc),d4
                 moveq   #3,d2
-.sq:            lea     SQ_VAL(a5),a3
+.sq:            lsr.b   #1,d4
+                bcc.s   .nosq
+                lea     SQ_VAL(a5),a3
                 move.l  a3,SQ_PTR(a5)
+                .if     YMXR_NEST
+                move.l  d3,SQ_SR(a5)
+                .endif
                 .if     YMXR_DEFER
                 move.l  a3,SQ_HPTR(a5)
                 .endif
                 lea     SQ_SIZE(a5),a5
-                dbra    d2,.sq
+.nosq:          dbra    d2,.sq
+                ENDPIECE square_1
 
 ; The handlers of several columns: the loop cells they read and the
 ; places they step are in the handler, so one link writes every address
 ; the loop path and the step read, as a general handler's link does. A
 ; start writes the values, and no timer reaches one of these handlers
 ; before a start has aimed its vector there.
+                PIECE   two_1
                 lea     ymxr_two0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_two+1(pc),d4
                 moveq   #3,d2
-.linktwo:       lea     TW2_CELLS(a5),a3
+.linktwo:       lsr.b   #1,d4
+                bcc.s   .nolinktwo
+                lea     TW2_CELLS(a5),a3
                 move.l  a3,TW2_LOOPT(a5)
                 move.l  a3,TW2_LOOP1R(a5)
                 addq.l  #CELL_SIZE,a3
@@ -289,11 +310,16 @@ YMXR_init:
                 move.l  a3,TW2_STEP2(a5)
                 move.l  a3,TW2_LOOP2W(a5)
                 lea     TW2_SIZE(a5),a5
-                dbra    d2,.linktwo
+.nolinktwo:     dbra    d2,.linktwo
+                ENDPIECE two_1
+                PIECE   three_1
                 lea     ymxr_three0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_three+1(pc),d4
                 moveq   #3,d2
-.linkthree:     lea     TW3_CELLS(a5),a3
+.linkthree:     lsr.b   #1,d4
+                bcc.s   .nolinkthree
+                lea     TW3_CELLS(a5),a3
                 move.l  a3,TW3_LOOPT(a5)
                 move.l  a3,TW3_LOOP1R(a5)
                 addq.l  #CELL_SIZE,a3
@@ -310,11 +336,16 @@ YMXR_init:
                 move.l  a3,TW3_STEP3(a5)
                 move.l  a3,TW3_LOOP3W(a5)
                 lea     TW3_SIZE(a5),a5
-                dbra    d2,.linkthree
+.nolinkthree:   dbra    d2,.linkthree
+                ENDPIECE three_1
+                PIECE   envelope_1
                 lea     ymxr_env0(pc),a5
                 adda.w  d6,a5
+                move.b  ymxr_k_envelope+1(pc),d4
                 moveq   #3,d2
-.linkenv:       lea     TWC_CELLS(a5),a3
+.linkenv:       lsr.b   #1,d4
+                bcc.s   .nolinkenv
+                lea     TWC_CELLS(a5),a3
                 move.l  a3,TWC_LOOPT(a5)
                 move.l  a3,TWC_LOOP1R(a5)
                 addq.l  #CELL_SIZE,a3
@@ -330,7 +361,8 @@ YMXR_init:
                 move.l  a3,TWC_RELDA(a5)
                 move.w  #1,TWC_LEFT(a5)
                 lea     TWC_SIZE(a5),a5
-                dbra    d2,.linkenv
+.nolinkenv:     dbra    d2,.linkenv
+                ENDPIECE envelope_1
                 .if     YMXR_MAP
 ; Link lookup instances as above, selecting page 0 from the bank's
 ; page-byte table. Clearing the records below leaves every page
@@ -339,14 +371,31 @@ YMXR_init:
                 tst.w   d6
                 beq.s   .htab
                 lea     32(a4),a4
-.htab:          LINK1   LK,ymxr_lk0,0,0
-                LINK1   LC,ymxr_lc0,1,1
-                LINKW   LT,ymxr_lt0,2,0,0
-                LINKW   LN,ymxr_ln0,3,0,0
-                LINKW   LB,ymxr_lb0,4,1,0
-                LINKW   LV,ymxr_lv0,5,1,0
-                LINKW   LE,ymxr_le0,6,0,1
-                LINKW   LF,ymxr_lf0,7,0,1
+.htab:
+                PIECE   lk_1                    ; with the level drop the
+                LINK1   LK,ymxr_k_lk,0,0,1      ; general handler has
+                ENDPIECE lk_1
+                PIECE   lc_1
+                LINK1   LC,ymxr_k_lc,1,1,0
+                ENDPIECE lc_1
+                PIECE   lt_1
+                LINKW   LT,ymxr_k_lt,2,0,0
+                ENDPIECE lt_1
+                PIECE   ln_1
+                LINKW   LN,ymxr_k_ln,3,0,0
+                ENDPIECE ln_1
+                PIECE   lb_1
+                LINKW   LB,ymxr_k_lb,4,1,0
+                ENDPIECE lb_1
+                PIECE   lv_1
+                LINKW   LV,ymxr_k_lv,5,1,0
+                ENDPIECE lv_1
+                PIECE   le_1
+                LINKW   LE,ymxr_k_le,6,0,1
+                ENDPIECE le_1
+                PIECE   lf_1
+                LINKW   LF,ymxr_k_lf,7,0,1
+                ENDPIECE lf_1
                 .endif
                 .if     YMXR_DEFER
                 tst.w   d6
@@ -421,10 +470,14 @@ YMXR_init:
                 lea     ymxr_frame(pc),a4
                 lea     ymxr_overs(pc),a3
                 lea     ymxr_resets(pc),a2
-                lea     ymxr_tick3_done(pc),a5
+                lea     ymxr_regs(pc),a5        ; past effect 3's frame code
                 moveq   #3,d2
 .over:          move.w  (a3)+,d4
-                lea     (a4,d4.w),a1
+                btst    d2,ymxr_k_effect+1(pc)  ; an effect the link left
+                bne.s   .linked                 ; out: no head, and its reset
+                addq.l  #2,a2                   ; is not there
+                bra.w   .unlinked
+.linked:        lea     (a4,d4.w),a1
                 btst    d2,WS_EFFECTS(a6)
                 beq.s   .skip
                 movea.l a1,a5                   ; the effect's first read
@@ -494,7 +547,7 @@ YMXR_init:
                 .endif
 .mapsnext:
                 .endif
-                dbra    d2,.over
+.unlinked:      dbra    d2,.over
 
 ; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body is two bytes past the slot
@@ -632,6 +685,22 @@ ymxr_col:       lea     (a4,d4.w),a5            ; the operand
                 move.w  d0,(a5)
                 rts
 
+; Z set where column d0 is of an effect whose frame code a link left out
+; (doc/LINKER.md): its target, source, control and count columns, 14 to
+; 29, and its mapping column, 30 to 33. A register's column is kept. d0
+; clobbered.
+ymxr_kept:      sub.w   #14,d0
+                bcs.s   .register
+                cmp.w   #16,d0
+                bcs.s   .effect
+                sub.w   #16,d0                  ; a mapping column's effect
+                bra.s   .at
+.effect:        lsr.w   #2,d0
+.at:            btst    d0,ymxr_k_effect+1(pc)
+                rts
+.register:      moveq   #1,d0
+                rts
+
 ; a5 a tick handler: its operands linked, its place parked.
 ymxr_link:
                 lea     TICK_PTR(a5),a3
@@ -654,6 +723,7 @@ ymxr_link:
                 clr.b   TICK_SEL(a5)            ; R0, the register of the kept
                 rts                             ; target init leaves (SPEC.md 5.2.1)
 
+                PIECE   counted_2
 ; a5 a counted handler, the same way: its operands linked, its counter
 ; at 1 and its cell at 0, so a tick before the first start writes the
 ; parked marker and stops the timer, as the handler above does.
@@ -683,3 +753,4 @@ ymxr_linkc:
                 .endif
                 clr.b   TICKC_SEL(a5)           ; R0, as init leaves the kept
                 rts                             ; target (SPEC.md 5.2.1)
+                ENDPIECE counted_2

@@ -201,23 +201,35 @@
                 rte
                 .endm
 
-; Link four instances of a lookup kind at init in bank d6. Patch step,
-; loop and key addresses, initialize the counter to 1, and select page 0
-; from the page-byte table at \kind(a4), eight bytes per effect.
+; Link the instances of a lookup kind the player has at init, in bank d6,
+; a bit an effect in the kind's mask (doc/LINKER.md): each instance's
+; address out of the kind's descriptor, \kind in ymxr_kinds; step, loop and
+; key addresses patched, the counter at 1, and the page byte of page 0
+; computed from the instance's address and its effect's reference and
+; written into the instance and into the page-byte table at \kind(a4),
+; eight bytes an effect. d0 to d2, a1 to a3 and a5 clobbered.
                 .macro  LINKKEY p
                 lea     \{p}_KEY(a5),a3
                 move.l  a3,\{p}_KEYA(a5)
-                move.b  (a2),\{p}_PAGE(a5)
-                addq.l  #8,a2
-                lea     LOOK_STRIDE(a5),a5
+                lea     \{p}_PAGE(a5),a3
+                bsr     ymxr_page0
                 .endm
 
-                .macro  LINK1   p,first,kind,counted
-                lea     \first(pc),a5
-                adda.w  d6,a5
+; The head of a loop over a kind's instances: a5 the instance of effect
+; d2 where the mask has its bit, and a branch past where it has not.
+                .macro  LEACH   kind,mask,next
+                btst    d2,\mask+1(pc)
+                beq.w   \next
+                bsr     ymxr_inst
+                .endm
+
+                .macro  LINK1   p,mask,kind,counted,drop
+                lea     ymxr_kinds(pc),a1       ; the kind's descriptor: rmac
+                adda.w  #\kind*KD_SIZE,a1       ; reads left to right
                 lea     \kind(a4),a2
-                moveq   #3,d2
-.l\~:           lea     \{p}_PTR(a5),a3
+                moveq   #0,d2
+.l\~:           LEACH   \kind,\mask,.n\~
+                lea     \{p}_PTR(a5),a3
                 move.l  a3,\{p}_STEP(a5)
                 move.l  a3,\{p}_LOOPW(a5)
                 lea     \{p}_CELL(a5),a3
@@ -229,16 +241,23 @@
                 move.l  a3,\{p}_RELDA(a5)
                 move.w  #1,\{p}_LEFT(a5)
                 .endif
+                .if     \drop&YMXR_NEST
+                move.l  d3,\{p}_SR(a5)
+                .endif
                 LINKKEY \p
-                dbra    d2,.l\~
+.n\~:           addq.l  #8,a2
+                addq.w  #1,d2
+                cmp.w   #4,d2
+                bne.w   .l\~
                 .endm
 
-                .macro  LINKW   p,first,kind,three,counted
-                lea     \first(pc),a5
-                adda.w  d6,a5
+                .macro  LINKW   p,mask,kind,three,counted
+                lea     ymxr_kinds(pc),a1       ; the kind's descriptor: rmac
+                adda.w  #\kind*KD_SIZE,a1       ; reads left to right
                 lea     \kind(a4),a2
-                moveq   #3,d2
-.l\~:           lea     \{p}_CELLS(a5),a3
+                moveq   #0,d2
+.l\~:           LEACH   \kind,\mask,.n\~
+                lea     \{p}_CELLS(a5),a3
                 move.l  a3,\{p}_LOOPT(a5)
                 move.l  a3,\{p}_LOOP1R(a5)
                 addq.l  #CELL_SIZE,a3
@@ -265,27 +284,32 @@
                 move.w  #1,\{p}_LEFT(a5)
                 .endif
                 LINKKEY \p
-                dbra    d2,.l\~
+.n\~:           addq.l  #8,a2
+                addq.w  #1,d2
+                cmp.w   #4,d2
+                bne.w   .l\~
                 .endm
 
-; Stepping-handler descriptor: effect-0 offset from ymxr_tick0, effect
-; stride, column count minus 1, first loop cell, remaining/pass counters
-; (0 when absent), page byte (0 for identity), shape, fill kind, then
-; register and place offsets per column.
-KD_BASE         equ     0
-KD_STEP         equ     2
-KD_COLS         equ     4
-KD_CELLS        equ     6
-KD_LEFT         equ     8
-KD_RELD         equ     10
-KD_PAGE         equ     12
-KD_SHAPE        equ     14
-KD_FILL         equ     15
-KD_SEL          equ     16              ; column 1's, then 2's and 3's, four
-KD_PTR          equ     18              ; bytes a column
-KD_SIZE         equ     28
-                .macro  KIND    base,step,cols,cells,left,reld,page,shape,fill,s1,p1,s2,p2,s3,p3
-                dc.w    \base-ymxr_tick0,\step,\cols-1,\cells,\left,\reld,\page
+; Stepping-handler descriptor: each effect's instance from ymxr_tick0, a
+; word an effect, which a link moves as it leaves instances out
+; (doc/LINKER.md); column count minus 1, first loop cell,
+; remaining/pass counters (0 when absent), page byte (0 for identity),
+; shape, fill kind, then register and place offsets per column.
+KD_AT           equ     0
+KD_COLS         equ     8
+KD_CELLS        equ     10
+KD_LEFT         equ     12
+KD_RELD         equ     14
+KD_PAGE         equ     16
+KD_SHAPE        equ     18
+KD_FILL         equ     19
+KD_SEL          equ     20              ; column 1's, then 2's and 3's, four
+KD_PTR          equ     22              ; bytes a column
+KD_SIZE         equ     32
+                .macro  KIND    first,cols,cells,left,reld,page,shape,fill,s1,p1,s2,p2,s3,p3
+                dc.w    \{first}0-ymxr_tick0,\{first}1-ymxr_tick0
+                dc.w    \{first}2-ymxr_tick0,\{first}3-ymxr_tick0
+                dc.w    \cols-1,\cells,\left,\reld,\page
                 dc.b    \shape,\fill
                 dc.w    \s1,\p1,\s2,\p2,\s3,\p3
                 .endm
@@ -387,12 +411,6 @@ KD_SIZE         equ     28
                 .endif
                 .endm
 
-; A kind's four instances LOOK_STRIDE apart.
-                .macro  LSTRIDE k
-                .if     ((\{k}1-\{k}0)<>LOOK_STRIDE)|((\{k}2-\{k}1)<>LOOK_STRIDE)|((\{k}3-\{k}2)<>LOOK_STRIDE)
-                .error  "a lookup kind has its instances apart from LOOK_STRIDE"
-                .endif
-                .endm
 
                 .if     YMXR_MAP
 ; The displacement word of the page read, from the first byte of an
@@ -410,8 +428,9 @@ KEY_LV          equ     LOOK_MK+6+LOOK_RD+6+LOOK_KW+2
 KEY_LE          equ     LOOK_MK+6+LOOK_RD+6+LOOK_KW+2
 KEY_LF          equ     LOOK_MK+6+LOOK_KW+2
 KEY_LB          equ     LOOK_MK+6+LOOK_RD+6+LOOK_RD+6+LOOK_KW+2
-; Common lookup-instance stride, sized for three columns. Effect e's
-; page read is e * LOOK_STRIDE past effect 0's modulo 256, matching that
-; effect's pages.
+; The step between the effects' references modulo 256, the size of an
+; instance of three columns: the gap before each instance puts its page
+; read e * LOOK_STRIDE past effect 0's modulo 256, matching effect e's
+; pages.
 LOOK_STRIDE     equ     114+(4*YMXR_NEST)+(12*(1-YMXR_AEOI))+(42*YMXR_PERF)+(12*(1-YMXR_PCREL))+(4*YMXR_DEFER)
                 .endif

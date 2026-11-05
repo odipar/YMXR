@@ -13,7 +13,7 @@ import (
 
 func Main() {
 	t, args := tool.Of("ymxs-to-sndh", os.Args[1:], flags.PackingFlags...)
-	flags.Only(t, args, flags.PackingFlags, flags.Tags)
+	flags.Only(t, args, flags.PackingFlags, flags.Tags, flags.Links)
 	said := report.Of(t.Reports())
 	multi := flags.Read(t)
 	t.WriteBytes(flags.SndhOf(t, multi, args, said))

@@ -1,10 +1,8 @@
 ; lookup_checks.S - the offsets of the lookup kinds, the words their hooks
-; write, and the checks of each instance's page residue, reach, bank and
-; stride.
+; write, and the checks of each instance's page residue, reach and bank.
 
 ; Lookup-kind offsets relative to effect 0. Assert each read's page
-; residue and reach, bank bounds, BANK spacing between banks and
-; LOOK_STRIDE spacing between effects.
+; residue and reach, bank bounds and BANK spacing between banks.
                 LOOKAT1 LK,ymxr_lk0,0
                 LOOKAT1 LC,ymxr_lc0,1
                 LOOKATW LT,ymxr_lt0,0,0
@@ -142,11 +140,3 @@
                 LCHECK  ymxr_lf3b,ymxr_ref3,ymxr_bank1,ymxr_bank1end
                 LTWIN   ymxr_lf3
                 .endif
-                LSTRIDE ymxr_lk
-                LSTRIDE ymxr_lc
-                LSTRIDE ymxr_lt
-                LSTRIDE ymxr_ln
-                LSTRIDE ymxr_lb
-                LSTRIDE ymxr_lv
-                LSTRIDE ymxr_le
-                LSTRIDE ymxr_lf

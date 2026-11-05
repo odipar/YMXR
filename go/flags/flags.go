@@ -46,6 +46,10 @@ var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl", "-tc
 // Rows is the row count a program stops after.
 var Rows = []string{"-r"}
 
+// Links is the flag that links the core for the set, which ymxr-sndh,
+// ymxs-to-sndh and ymxs-to-prg read beside the tags (doc/LINKER.md).
+var Links = []string{"-link"}
+
 // Clocks are the clocks ymxr-prg reads, each over the clock the file
 // names.
 var Clocks = []string{"-vbl", "-tc"}
@@ -271,6 +275,8 @@ func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 			options.Monitor = true
 		case flag == "-lean":
 			options.Lean = true
+		case flag == "-link":
+			options.Link = true
 		case flag == "-pcrel":
 			options.Ticks = sndh.Pcrel
 		case flag == "-abs":

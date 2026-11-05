@@ -67,14 +67,14 @@ its noun, singular for a count of 1 and plural for any other: `1 row`,
 | `ym-to-ymxr` | a dump | a tune file (SPEC.md 3.3) | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ym-to-ymxs` | a dump | a structure of one tune | `-rRR`, `-r` |
 | `ymxs-to-ymxr` | a structure | a tune file, or a multi file (BINARIES.md 0) of several | `-kK`, `-mN`, `-copies[S]` |
-| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
+| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-link` |
 | `ymxs-to-prg` | a structure | a TOS program (BINARIES.md 4) | the flags of `ymxs-to-sndh` and `-rROWS` |
 | `ymxr-check` | a dump or a tune file, or the files named | one verdict a file, on standard output | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
 | `ymxr-layout` | a multi file, a bound tune, an SNDH file or a program | the record of BINARIES.md 6 | - |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
 | `ymxr-multi` | the tune files named | a multi file | `-nNAME`, `-mN`, `-copies[S]` |
-| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl` |
+| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-link` |
 | `ymxr-prg` | an SNDH file | a TOS program | `-rROWS`, `-vbl` |
 
 **2.1** Each tool is written twice, under one name, in the two trees of
@@ -379,11 +379,12 @@ the summary line is `ymxs-to-ymxr: N tunes in a multi file, B bytes`,
 and a multi of 100 tunes or more is the error of 11.2, exit 1.
 
 **7.5 `ymxs-to-sndh`.** The flags are those of 7.4 and `-tTITLE`,
-`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`. The
-output is the SNDH file of section 12 around the tune files of 7.3, one
-subtune a tune in the multi's order, with: the title `-tTITLE`, or the
-first tune's title, `(untitled)` where blank; the composer `-cCOMPOSER`,
-or the first tune's where present after stripping; the subtune names the
+`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` and
+`-link`, which links the core for the set as 12.1 defines. The output
+is the SNDH file of section 12 around the tune files of 7.3, one subtune
+a tune in the multi's order, with: the title `-tTITLE`, or the first
+tune's title, `(untitled)` where blank; the composer `-cCOMPOSER`, or
+the first tune's where present after stripping; the subtune names the
 titles, `(untitled)` where blank, where the multi has more than one
 tune. The errors of 12.2 are exit 1. The report is that of 7.3 alone;
 the tool omits a summary line.
@@ -608,23 +609,25 @@ its field at 26, where its handlers begin (BINARIES.md 2.2): within
 and further off the core that reads an address. Deferred-start support
 is selected when any subtune sets effects bit 4; lookup support is
 selected when any subtune sets bit 5. Other files use the smaller cores
-without those features (BINARIES.md 2.1). On a core with the lookup the
-tool reserves the page area right after the core, the largest a
-subtune's list needs within the reach of the core's first handler: a
-table of T bytes for each effect and form of the list, T the
-transformations, 256 bytes for each page it fills and for each page of
-the fallbacks of the effects whose pages pass the reach, and 255 more;
-and patches the core's field at 36 with its offset (BINARIES.md 3.1,
-5.6). The clock tag names Timer C, or the VBL where `-vbl` or `-perf` is
-passed: the raster monitor paints one frame of calls, which reads
-against the raster where the tick comes from the VBL (BINARIES.md 3.2,
-performance.md). `-tc` names Timer C over `-perf`, and `-vbl` and `-tc`
-together are `-vbl and -tc name two clocks`, exit 2. A set that claims
-Timer C names the VBL, and `-tc` with such a set is the error of 12.2.
-The title is `-tTITLE`, else the first name, `(untitled)` where a tune
-file was read or the name is blank; the composer `-cCOMPOSER`, or
-absent. In the tags (BINARIES.md 3) each text is reduced to its
-characters $20 to $7E; the report of 12.4 prints the text as passed.
+without those features (BINARIES.md 2.1). `-link` links the core for
+the set: the pieces of each block the set does not need are left out
+(LINKER.md). On a core with the lookup the tool reserves the page area
+right after the core, the largest a subtune's list needs within the
+reach of the core's first handler: a table of T bytes for each effect
+and form of the list, T the transformations, 256 bytes for each page it
+fills and for each page of the fallbacks of the effects whose pages
+pass the reach, and 255 more; and patches the core's field at 36 with
+its offset (BINARIES.md 3.1, 5.6). The clock tag names Timer C, or the
+VBL where `-vbl` or `-perf` is passed: the raster monitor paints one
+frame of calls, which reads against the raster where the tick comes
+from the VBL (BINARIES.md 3.2, performance.md). `-tc` names Timer C
+over `-perf`, and `-vbl` and `-tc` together are `-vbl and -tc name two
+clocks`, exit 2. A set that claims Timer C names the VBL, and `-tc`
+with such a set is the error of 12.2. The title is `-tTITLE`, else the
+first name, `(untitled)` where a tune file was read or the name is
+blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
+3) each text is reduced to its characters $20 to $7E; the report of
+12.4 prints the text as passed.
 
 **12.2 Errors**, each exit 1:
 
@@ -652,29 +655,32 @@ tick asked for needs bit 1 set`, `... the row read through the program
 counter asked for needs bit 2 set`, `... a subtune that defers a start
 needs bit 3 set`, or `... a subtune that maps a value needs bit 4 set`.
 
-**12.4 The report:** the heading `the core: <file>, B bytes` with the
-row `the switches`, of `-perf, the raster monitor in` and `-lean, ticks
-that neither drop the interrupt level nor write an end of interrupt`
-where those were passed, and then one of `ticks that read a row through
-the program counter`, `-abs, ticks that read a row through an absolute
-address` where that was passed, and `ticks that read a row through an
-absolute address: the tunes end past the 32767 bytes a displacement
-reaches` where the tool chose it (12.1), `the deferred start in: a
-subtune defers a start` where the core has it, and `the lookup in: a
-subtune maps a value` where the core has it, joined by `; `; the
-heading `the tags: TITL <title>`, then `, COMM <composer>` where
-present, `, <clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N
-names` for several subtunes; a row a subtune, its name or `the tune`, `B
-bytes bound to B2, its table in image I`, B the tune file's bytes, B2
-the bound tune's, I the number of its image from 1; the heading `the
-images: N images of B bytes, DTX's reader once a set of tunes that share
-one` with a row an image, `image I`, `<shape>, N tunes`, the shape `DTX3
-at unit K, values of W`, W the width of a value in bytes, and `DTX3 at
-unit K, 34 columns, values of W` for a table of 34 columns (BINARIES.md
-1.4); the heading `the file: B bytes, the core C, the images I, the
-tunes T, the workspace and the rest W`, C, I, T and W the bytes of the
-core, the images, the bound tunes, and the remainder. The summary line
-is `ymxr-sndh: B bytes, N subtunes`.
+**12.4 The report:** the heading `the core: <file>, B bytes`, or with
+`-link` on a core it links `the core: <file> linked for the set, B bytes
+of C` and then `, the blocks left out: <blocks>` or `, every block
+kept`, C the bytes of the core as carried, with the row `the switches`,
+of `-perf, the raster monitor in` and `-lean, ticks that neither drop
+the interrupt level nor write an end of interrupt` where those were
+passed, and then one of `ticks that read a row through the program
+counter`, `-abs, ticks that read a row through an absolute address`
+where that was passed, and `ticks that read a row through an absolute
+address: the tunes end past the 32767 bytes a displacement reaches`
+where the tool chose it (12.1), `the deferred start in: a subtune defers
+a start` where the core has it, and `the lookup in: a subtune maps a
+value` where the core has it, joined by `; `; the heading `the tags:
+TITL <title>`, then `, COMM <composer>` where present, `, <clock><rate>`
+and `, FLAG ~<letters>`, then `, !#SN with N names` for several
+subtunes; a row a subtune, its name or `the tune`, `B bytes bound to B2,
+its table in image I`, B the tune file's bytes, B2 the bound tune's, I
+the number of its image from 1; the heading `the images: N images of B
+bytes, DTX's reader once a set of tunes that share one` with a row an
+image, `image I`, `<shape>, N tunes`, the shape `DTX3 at unit K, values
+of W`, W the width of a value in bytes, and `DTX3 at unit K, 34 columns,
+values of W` for a table of 34 columns (BINARIES.md 1.4); the heading
+`the file: B bytes, the core C, the images I, the tunes T, the workspace
+and the rest W`, C, I, T and W the bytes of the core, the images, the
+bound tunes, and the remainder. The summary line is `ymxr-sndh: B bytes,
+N subtunes`.
 
 ---
 
@@ -775,38 +781,39 @@ SNDH core performs it.
 
 ## 16. The scripts
 
-**16.1 `ym/play.sh [options] tune [more ...] [out.wav]`** converts, combines
-and runs under Hatari with the emulator's sound on. The first name is a dump
-or a tune file; a later name ending `.ym` or `.ymxr` in either case is
-another, one subtune each in the order named, each named by its file; any
-other name records the run instead: Hatari writes an AVI, `ym/avi.py` reads
-its sound out as that WAV and its last frame as a PNG of the same stem. The
-options `-kK`, `-mN`, `-rRR`, `-r`, `-copies[S]` reach `ym-to-ymxr`, and
-with a tune file among the names are the error
-`ym/play.sh: <name> is a tune file, and -k, -m and -r pack one`, exit 2;
-where several names are a set, `-mN` reaches `ymxr-multi` beside
-`ym-to-ymxr`, and `-copies[S]` reaches `ymxr-multi` in place of it;
-`-tTITLE` and `-cCOMPOSER`, `-perf`, `-lean`, `-vbl` and `-tc` reach
-`ymxr-sndh`, the title the first name's stem by default; `-vN` stops the run
-after N frames, and `-vbl` is read as the clock before it; `-silent` reaches
-every tool; `-h` prints the head of the script, exit 0, and a call with zero
-names prints it, exit 2. Several tunes go through `ymxr-multi`, each named
-by its stem, and the program picks between them as 13.1 defines. The script
-writes `TUNE.SND` and `TUNE.PRG` under a temporary directory:
-`ym/play.sh: TUNE.SND and TUNE.PRG are under <dir>` on standard error. A
-second name to record to is the error
-`ym/play.sh: <a> and <b> both name a file to record to`, exit 2; an option
-outside these is `ym/play.sh does not read <option>`, exit 2.
+**16.1 `ym/play.sh [options] tune [more ...] [out.wav]`** converts,
+combines and runs under Hatari with the emulator's sound on. The first
+name is a dump or a tune file; a later name ending `.ym` or `.ymxr` in
+either case is another, one subtune each in the order named, each named
+by its file; any other name records the run instead: Hatari writes an
+AVI, `ym/avi.py` reads its sound out as that WAV and its last frame as a
+PNG of the same stem. The options `-kK`, `-mN`, `-rRR`, `-r`,
+`-copies[S]` reach `ym-to-ymxr`, and with a tune file among the names
+are the error `ym/play.sh: <name> is a tune file, and -k, -m and -r pack
+one`, exit 2; where several names are a set, `-mN` reaches `ymxr-multi`
+beside `ym-to-ymxr`, and `-copies[S]` reaches `ymxr-multi` in place of
+it; `-tTITLE` and `-cCOMPOSER`, `-perf`, `-lean`, `-vbl`, `-tc` and
+`-link` reach `ymxr-sndh`, the title the first name's stem by default;
+`-vN` stops the run after N frames, and `-vbl` is read as the clock
+before it; `-silent` reaches every tool; `-h` prints the head of the
+script, exit 0, and a call with zero names prints it, exit 2. Several
+tunes go through `ymxr-multi`, each named by its stem, and the program
+picks between them as 13.1 defines. The script writes `TUNE.SND` and
+`TUNE.PRG` under a temporary directory: `ym/play.sh: TUNE.SND and
+TUNE.PRG are under <dir>` on standard error. A second name to record to
+is the error `ym/play.sh: <a> and <b> both name a file to record to`,
+exit 2; an option outside these is `ym/play.sh does not read <option>`,
+exit 2.
 
 **16.2 `ym/play-ymxs.sh [options] [tune.ymxs] [out.wav]`** runs
 `ymxs-to-prg` on the file named, or on standard input otherwise, and the
 program under Hatari as 16.1 runs one; `-rROWS`, `-vN`, `-silent`, `-h`
 are the script's, and `-kK`, `-mN`, `-copies[S]`, `-tTITLE`,
-`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` reach
-`ymxs-to-prg`, and `-vbl` is read as the clock before `-vN`. A name
-ending `.ymxs` or `.json` is the structure; a second is the error `<a>
-and <b> both name a structure; a multi's tunes are its subtunes`, exit
-2.
+`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`, `-link`
+reach `ymxs-to-prg`, and `-vbl` is read as the clock before `-vN`. A
+name ending `.ymxs` or `.json` is the structure; a second is the error
+`<a> and <b> both name a structure; a multi's tunes are its subtunes`,
+exit 2.
 
 **16.3 `ym/hatari.sh WORK [VBLS] [out.wav]`** runs `TUNE.PRG` under `WORK`
 with `--tos $TOS --machine st --cpuclock 8 --cpu-exact on --compatible on
@@ -852,7 +859,7 @@ converter:
 | `-mN` | `ym-to-ymxr` and `ymxr-multi` (4.2, 11.1) |
 | `-copies[S]` | `ymxr-multi`, which packs each table again through the set's ring (4.3, 4.7) |
 | `-nNAME`, the i-th naming the i-th dump | `ymxr-multi` (11.1) |
-| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` | `ymxr-sndh` (12) |
+| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`, `-link` | `ymxr-sndh` (12) |
 | `-rowsN`, the rows the program plays | `ymxr-prg` as `-rN` (13.1) |
 | `-silent` | every tool (3.3) |
 
@@ -917,6 +924,7 @@ figure are read exactly.
 | `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-map` | every tune on the player assembled with `YMXR_MAP=1`, against the model; without it, a tune whose effects byte sets bit 5 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
+| `-linked` | each tune on the player `ymxr-sndh -link` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. Of the checks the run makes before the tunes it runs the deferred starts' and the tunes that map a value alone, each of their tunes on the player linked for it |
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
 program of twelve subtunes, each writing the number it is to R0, starts
@@ -930,27 +938,31 @@ outlives it is killed. `--keep` leaves the work directory, and `HATARI` and
 `TOS` name the emulator and a TOS image as 16.3 reads them; a missing one is
 exit 2, a key that lands on another subtune exit 1.
 
-`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs three things
-on every build: the two built tunes at `-frames24` on each of the
+`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs four
+things on every build: the two built tunes at `-frames24` on each of the
 thirty-two cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map`
-alone and together and the plain core; the conformance kit at `-frames24`
-under `-kit`; and `-refill` over `Turrican 2 - world completed 1` whole,
-which reads the tune's row of performance.md and a refill of a tune with a
-source. The workflow runs `-refill` over the eleven fixtures whole as a step
-after the suite, which reads the sentences over the set, and `-cycles -abs`
-over them, which reads the absolute build's tables. The workflow then runs
-`-stub`, `-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari 2.6.1,
-built from its tag, and the PAL image of EmuTOS 1.4, which boots the ST at
-the 50 Hz the two modes require; a caller runs them under TOS 2.06, which
-`TOS` names. Each mode starts Hatari with `--fast-boot on`: TOS 2.06 then
-skips its test of the memory, which with fast boot off in the emulator's
-configuration outlasts the VBLs a run allows before the program starts. Both
-floppy drives are off (`--drive-a off --drive-b off`), so TOS addresses no
-disk; Hatari quits with no confirmation (`--confirm-quit off`) and opens a
-dialog only for a fatal message (`--alert-level fatal`). Where
-`SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` are unset, Hatari runs headless and
-silent, with SDL's dummy video and audio drivers. Its input is closed, and a
-time limit ends a run that waits on a dialog.
+alone and together and the plain core; the conformance kit at
+`-frames24` under `-kit`; the kit and the checks of deferred starts and
+of tunes that map a value at `-frames24` under `-linked -kit -defer
+-map`, with each of the eight sets of `-abs`, `-lean` and `-perf`; and
+`-refill` over `Turrican 2 - world completed 1` whole, which reads the
+tune's row of performance.md and a refill of a tune with a source. The
+workflow runs `-refill` over the eleven fixtures whole as a step after
+the suite, which reads the sentences over the set, and `-cycles -abs`
+over them, which reads the absolute build's tables. The workflow then
+runs `-stub`, `-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari
+2.6.1, built from its tag, and the PAL image of EmuTOS 1.4, which boots
+the ST at the 50 Hz the two modes require; a caller runs them under TOS
+2.06, which `TOS` names. Each mode starts Hatari with `--fast-boot on`:
+TOS 2.06 then skips its test of the memory, which with fast boot off in
+the emulator's configuration outlasts the VBLs a run allows before the
+program starts. Both floppy drives are off (`--drive-a off --drive-b
+off`), so TOS addresses no disk; Hatari quits with no confirmation
+(`--confirm-quit off`) and opens a dialog only for a fatal message
+(`--alert-level fatal`). Where `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER`
+are unset, Hatari runs headless and silent, with SDL's dummy video and
+audio drivers. Its input is closed, and a time limit ends a run that
+waits on a dialog.
 
 ---
 
@@ -1057,21 +1069,23 @@ off the path or the Java tree is unbuilt.
 | `ymxr-check` on several files | read in parallel | read in order |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |
 
-**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the suite of
-19.2 on the caller's machine. A skipped test is a check that did not run, so
-the script requires go on the path, python3 with unicorn in it, rmac on the
-path or at `RMAC`, DTX's packer on the path or at `DTX_WRITE`, a built DTX
-checkout at `DTX_REPO`, and a YMXS checkout at `YMXS_REPO`, whose
-conformance kit ParityTest runs through both trees, exit 2 where one of them
-is absent; it reads `gofmt -l go` beside them and ends with 2 where a file
-would be rewritten, and runs `go test ./...` in `go`, exit 1 where a Go test
-fails. After the run it reads the count of skipped tests, exit 1 and the
-lines that report it where the count is above 0. `pom.xml` requires one
-release of DTX and one of YMXS, and the messages name them: another release
-of DTX's packer is another set of bytes. The maven argument `-Drig.shard=k/n`
-runs RigCallsTest's matrix on the cores whose index leaves k after a
-division by n, `-Drig.shard=none` on no core, and the matrix runs on all
-thirty-two without it.
+**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the
+suite of 19.2 on the caller's machine. A skipped test is a check that
+did not run, so the script requires go on the path, python3 with unicorn
+in it, rmac on the path or at `RMAC`, DTX's packer on the path or at
+`DTX_WRITE`, a built DTX checkout at `DTX_REPO`, and a YMXS checkout at
+`YMXS_REPO`, whose conformance kit ParityTest runs through both trees,
+exit 2 where one of them is absent; it reads `gofmt -l go` beside them
+and ends with 2 where a file would be rewritten, and runs `go test
+./...` in `go`, exit 1 where a Go test fails. After the run it reads the
+count of skipped tests, exit 1 and the lines that report it where the
+count is above 0. `pom.xml` requires one release of DTX and one of YMXS,
+and the messages name them: another release of DTX's packer is another
+set of bytes. The maven argument `-Drig.shard=k/n` runs RigCallsTest's
+matrix on the cores whose index leaves k after a division by n, and its
+linked runs on the sets of switches whose index does, `-Drig.shard=none`
+on none, and the matrix runs on all thirty-two cores and all eight sets
+without it.
 
 ---
 

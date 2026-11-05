@@ -203,7 +203,9 @@ final class Binaries {
     /**
      * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the thirty-two cores
      * and the stub assembled and written into each directory named, one line
-     * each with its bytes. The assembler is {@code rmac} on the path unless
+     * each with its bytes, and beside each core without the deferred start
+     * and the lookup, the table of its pieces the build cuts from it
+     * (doc/LINKER.md). The assembler is {@code rmac} on the path unless
      * {@code -a} names another, and the sources are under {@code 68k}
      * unless {@code -s} names another directory. A failure to assemble
      * stops the build with the message.
@@ -247,6 +249,23 @@ final class Binaries {
                 Files.write(at.resolve(binary.name()), code);
             }
             System.out.printf("%-38s %5d bytes%n", binary.name(), code.length);
+            if (Pieces.cuts(binary)) {
+                Pieces table;
+                try {
+                    table = Pieces.cut(rmac, sources, binary);
+                } catch (IllegalStateException failed) {
+                    System.err.println("binaries: no table cut from " + binary.name() + ": "
+                            + failed.getMessage());
+                    System.exit(1);
+                    return;
+                }
+                for (Path at : into) {
+                    Files.writeString(at.resolve(Pieces.name(binary)), table.text(),
+                            StandardCharsets.US_ASCII);
+                }
+                System.out.printf("%-38s %5d pieces, %d fields%n", Pieces.name(binary),
+                        table.pieces().size(), table.fields().size());
+            }
         }
     }
 

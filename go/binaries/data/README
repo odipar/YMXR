@@ -1,5 +1,7 @@
 The thirty-three 68000 binaries a standalone build contains: the
-thirty-two cores and the program stub.
+thirty-two cores and the program stub; and beside each of the eight
+cores without the deferred start and the lookup, the table of its pieces
+the linker reads (doc/LINKER.md).
 
 The Maven build writes them here, as it writes them into the classes the
 jar is made of, and they are committed: a Go module fetched by its import

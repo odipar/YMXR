@@ -59,6 +59,9 @@
 # The two are a switch each: both together select the core that is both,
 # and the bars a run paints are then the lean ticks'.
 #
+#   -link      the core linked for the tunes: the blocks no subtune runs
+#              left out (LINKER.md)
+#
 # The run:
 #
 #   -vN        stop after N frames; the tune plays on without it
@@ -120,6 +123,7 @@ help=
 perf=
 lean=
 clock=
+link=
 silent=
 vbls=
 # The flags read off, and the names left in the positional parameters:
@@ -135,6 +139,7 @@ while [ "$left" -gt 0 ]; do
         -perf) perf=-perf ;;
         -lean) lean=-lean ;;
         -vbl|-tc) clock=$arg ;;
+        -link) link=-link ;;
         -silent) silent=-silent ;;
         -k*) unit=$arg ;;
         -m*) ring=$arg ;;
@@ -259,7 +264,7 @@ if [ "$tunes" -gt 1 ]; then
 else
     cp "$1" "$work/TUNE.YMXR"
 fi
-"$here/bin/ymxr-sndh" $perf $lean $clock $silent "-t${title:-$stem}" \
+"$here/bin/ymxr-sndh" $perf $lean $clock $link $silent "-t${title:-$stem}" \
     ${composer:+"-c$composer"} < "$work/TUNE.YMXR" > "$work/TUNE.SND"
 "$here/bin/ymxr-prg" $silent < "$work/TUNE.SND" > "$work/TUNE.PRG"
 "$here/ym/hatari.sh" "$work" "$vbls" "$out"

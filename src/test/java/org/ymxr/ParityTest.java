@@ -590,6 +590,56 @@ final class ParityTest {
         }
     }
 
+    /**
+     * A core linked for the set (doc/LINKER.md) is the same in both trees,
+     * and so is the report of its blocks: each tune of the conformance
+     * kit, a multi file of two that need other blocks, and each switch on
+     * one tune; and through ymxs-to-sndh and ymxs-to-prg, whose -link
+     * writes the core ymxr-sndh -link writes for the same tune.
+     */
+    @Test
+    void aLinkedCoreIsTheSameInBothTrees() throws Exception {
+        Path kit = Path.of("doc/conformance/tunes");
+        List<Path> tunes;
+        try (Stream<Path> at = Files.list(kit)) {
+            tunes = at.filter(one -> one.toString().endsWith(".ymxr")
+                    && !one.getFileName().toString().equals("wrong-version.ymxr")).sorted()
+                    .toList();
+        }
+        for (Path tune : tunes) {
+            same("ymxr-sndh", Files.readAllBytes(tune), "-link");
+        }
+        byte[] voices = Files.readAllBytes(kit.resolve("voices.ymxr"));
+        for (String[] flags : new String[][] {{"-perf"}, {"-lean"}, {"-abs"},
+                {"-perf", "-lean", "-abs"}}) {
+            List<String> argv = new ArrayList<>(List.of("-link"));
+            argv.addAll(List.of(flags));
+            same("ymxr-sndh", voices, argv.toArray(new String[0]));
+        }
+        Ran set = ran(Path.of("bin"), "ymxr-multi", new byte[0], "-silent",
+                kit.resolve("counted.ymxr").toString(), kit.resolve("voices.ymxr").toString());
+        assertEquals(0, set.exit(), set.said());
+        same("ymxr-sndh", set.out(), "-link");
+        byte[] mapped = json(ConformanceTest.mapped());
+        same("ymxs-to-prg", mapped, "-link");
+        byte[] linked = both("ymxs-to-sndh", mapped, "-silent", "-link");
+        assertTrue(linked.length < both("ymxs-to-sndh", mapped, "-silent").length,
+                "ymxs-to-sndh -link writes a shorter file");
+        byte[] direct = both("ymxr-sndh", Files.readAllBytes(kit.resolve("mapped.ymxr")),
+                "-silent", "-link");
+        int at = Sndh.even(Tune.getWord(linked, 2) + 2);
+        int from = Sndh.even(Tune.getWord(direct, 2) + 2);
+        // the core and the page area, the patched longs at 28 to 40 aside
+        int table = Tune.getLong(linked, at + Sndh.CORE_TABLE_AT);
+        assertEquals(table, Tune.getLong(direct, from + Sndh.CORE_TABLE_AT),
+                "the subtune table follows the same linked core");
+        assertArrayEquals(Arrays.copyOfRange(direct, from, from + Sndh.CORE_TABLE_AT),
+                Arrays.copyOfRange(linked, at, at + Sndh.CORE_TABLE_AT));
+        assertArrayEquals(Arrays.copyOfRange(direct, from + 40, from + table),
+                Arrays.copyOfRange(linked, at + 40, at + table),
+                "ymxs-to-sndh -link writes the core ymxr-sndh -link writes");
+    }
+
     @Test
     void theFlagsReadTheSameInBothTrees() throws Exception {
         byte[] dump = Files.readAllBytes(Path.of("ym/test/Turrican - world 4-3.ym"));
