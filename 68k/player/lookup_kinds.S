@@ -105,8 +105,10 @@ ymxr_hooks:     dc.w    LK_LAST,LK_HOOKW,LC_LAST,LC_HOOKW,LT_LAST,LT_HOOKW
                 dc.w    TWC_LAST,TWC_HOOKW
                 .endif
 
-; Each effect's fallback pages, from the fallback's first byte.
-ymxr_refat:      dc.w    0,ymxr_ref1-ymxr_ref,ymxr_ref2-ymxr_ref,ymxr_ref3-ymxr_ref
+; Each effect's reference past ymxr_ref, a word an effect, which a link
+; writes with the reference it picks (doc/LINKER.md).
+ymxr_refat:     dc.w    ymxr_ref0-ymxr_ref,ymxr_ref1-ymxr_ref
+                dc.w    ymxr_ref2-ymxr_ref,ymxr_ref3-ymxr_ref
 ; The table of a fill kind without pages: 0 for every transformation,
 ; each page to the fallback (ymxr_prefill).
 ymxr_nomap:     dcb.b   128,0

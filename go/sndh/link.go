@@ -85,10 +85,12 @@ type Twin struct {
 // Align is a piece of padding, Gap, whose length a link sets: the byte
 // Base past its end, linked, is the byte Add past Anchor, linked, modulo
 // 256. A lookup instance's page read is Base past the gap before it, and
-// its effect's reference is Add past ymxr_ref (68k/player/lookup_ref.S).
+// its effect's reference is Add past ymxr_ref (68k/player/lookup_ref.S),
+// the word at Word, which a link writes with the reference it picks; -1
+// where Add is a constant.
 type Align struct {
-	Gap               string
-	Base, Anchor, Add int
+	Gap                     string
+	Base, Anchor, Add, Word int
 }
 
 // Pieces is the table of a core: its pieces, its masks, its twins, its
@@ -125,14 +127,18 @@ func ReadPieces(text string) (Pieces, error) {
 			table.Masks = append(table.Masks, Mask{word[2], at})
 		case word[0] == "twin" && len(word) == 3:
 			table.Twins = append(table.Twins, Twin{word[1], word[2]})
-		case word[0] == "align" && len(word) == 5:
+		case word[0] == "align" && (len(word) == 5 || len(word) == 6):
 			base, err1 := strconv.Atoi(word[2])
 			anchor, err2 := strconv.Atoi(word[3])
 			add, err3 := strconv.Atoi(word[4])
-			if err1 != nil || err2 != nil || err3 != nil {
+			at, err4 := -1, error(nil)
+			if len(word) == 6 {
+				at, err4 = strconv.Atoi(word[5])
+			}
+			if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
 				return Pieces{}, fmt.Errorf("a line of a table reads %s", line)
 			}
-			table.Aligns = append(table.Aligns, Align{word[1], base, anchor, add})
+			table.Aligns = append(table.Aligns, Align{word[1], base, anchor, add, at})
 		case word[0] == "field" && len(word) >= 4:
 			at, err1 := strconv.Atoi(word[1])
 			width, err2 := strconv.Atoi(word[2])
@@ -169,7 +175,11 @@ func (t Pieces) Text() string {
 		fmt.Fprintf(&out, "twin %s %s\n", w.Copy, w.First)
 	}
 	for _, a := range t.Aligns {
-		fmt.Fprintf(&out, "align %s %d %d %d\n", a.Gap, a.Base, a.Anchor, a.Add)
+		fmt.Fprintf(&out, "align %s %d %d %d", a.Gap, a.Base, a.Anchor, a.Add)
+		if a.Word >= 0 {
+			fmt.Fprintf(&out, " %d", a.Word)
+		}
+		out.WriteString("\n")
 	}
 	for _, f := range t.Fields {
 		fmt.Fprintf(&out, "field %d %d", f.At, f.Width)
@@ -409,6 +419,71 @@ func Lookup(tune ymxr.File, s, target int) string {
 	return "le"
 }
 
+// gaps writes into lost the bytes each gap the link keeps loses: a gap's
+// length puts the byte its align names on the offset modulo 256 of its
+// anchor and add, the add of an instance's gap its effect's reference.
+// Where pick, the link picks an effect's reference on its first gap it
+// keeps: the reference that gap is 0 bytes for, or 2 bytes on from it
+// where another effect's reference is on that offset.
+func gaps(table Pieces, byName map[string]Piece, lost map[string]int, references map[int]int,
+	pick bool) {
+	linked := func(at int) int {
+		by := 0
+		for _, p := range table.Pieces {
+			if p.To <= at {
+				by += lost[p.Name]
+			}
+		}
+		return at - by
+	}
+	for _, a := range table.Aligns {
+		gap, ok := byName[a.Gap]
+		if _, out := lost[a.Gap]; !ok || out {
+			continue
+		}
+		from, anchor, add := linked(gap.From), linked(a.Anchor), a.Add
+		if a.Word >= 0 {
+			if _, chosen := references[a.Word]; pick && !chosen {
+				references[a.Word] = free(references, (from+a.Base-anchor)&255)
+			}
+			add = references[a.Word]
+		}
+		length := (anchor + add - from - a.Base) & 255
+		lost[a.Gap] = (gap.To - gap.From) - length
+	}
+}
+
+// free is the first offset modulo 256 from at on, 2 bytes a step, that no
+// reference picked is on.
+func free(references map[int]int, at int) int {
+	for {
+		taken := false
+		for _, n := range references {
+			taken = taken || n == at
+		}
+		if !taken {
+			return at
+		}
+		at = (at + 2) & 255
+	}
+}
+
+func copyLost(lost map[string]int) map[string]int {
+	out := make(map[string]int, len(lost))
+	for k, v := range lost {
+		out[k] = v
+	}
+	return out
+}
+
+func sum(lost map[string]int) int {
+	total := 0
+	for _, v := range lost {
+		total += v
+	}
+	return total
+}
+
 // Started is the sources effect i's rows start: a source column with its
 // bit 7 set and a number from 1 up (SPEC.md 1.8.3), a number of a source
 // the tune has, in order.
@@ -470,22 +545,31 @@ func Link(core []byte, table Pieces, blocks []string) ([]byte, error) {
 			lost[p.Name] = p.To - p.From
 		}
 	}
-	linked := func(at int) int {
-		by := 0
-		for _, p := range table.Pieces {
-			if p.To <= at {
-				by += lost[p.Name]
-			}
-		}
-		return at - by
-	}
+	// the gaps on the references as carried, and on the references
+	// picked; the link keeps the shorter, and the carried on a tie
+	carried := map[int]int{}
+	var words []int
 	for _, a := range table.Aligns {
-		gap, ok := byName[a.Gap]
-		if _, out := lost[a.Gap]; !ok || out {
-			continue
+		if _, seen := carried[a.Word]; a.Word >= 0 && !seen {
+			carried[a.Word] = int(int16(ymxr.GetWord(core, a.Word)))
+			words = append(words, a.Word)
 		}
-		length := (linked(a.Anchor) + a.Add - linked(gap.From) - a.Base) & 255
-		lost[a.Gap] = (gap.To - gap.From) - length
+	}
+	asCarried := copyLost(lost)
+	gaps(table, byName, asCarried, carried, false)
+	references := map[int]int{}
+	picked := copyLost(lost)
+	gaps(table, byName, picked, references, true)
+	for _, at := range words {
+		if _, chosen := references[at]; !chosen {
+			references[at] = free(references, carried[at])
+		}
+	}
+	if sum(picked) <= sum(asCarried) {
+		references = carried
+		lost = asCarried
+	} else {
+		lost = picked
 	}
 	for _, w := range table.Twins {
 		if lost[w.Copy] != lost[w.First] {
@@ -525,6 +609,9 @@ func Link(core []byte, table Pieces, blocks []string) ([]byte, error) {
 			}
 		}
 		ymxr.PutWord(moved, m.At, bits)
+	}
+	for _, at := range words {
+		ymxr.PutWord(moved, at, references[at])
 	}
 	out := make([]byte, 0, len(core))
 	from := 0

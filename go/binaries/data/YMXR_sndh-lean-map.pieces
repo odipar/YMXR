@@ -125,38 +125,38 @@ mask 8212 lb
 mask 8214 lv
 mask 8216 le
 mask 8218 lf
-align lt0_1 28 11650 0
-align lt1_1 28 11650 114
-align lt2_1 28 11650 228
-align lt3_1 28 11650 86
-align le0_1 28 11650 0
-align le1_1 28 11650 114
-align le2_1 28 11650 228
-align le3_1 28 11650 86
-align lf0_1 16 11650 0
-align lf1_1 16 11650 114
-align lf2_1 16 11650 228
-align lf3_1 16 11650 86
-align lk0_1 16 11650 0
-align lk1_1 16 11650 114
-align lk2_1 16 11650 228
-align lk3_1 16 11650 86
-align lb0_1 40 11650 0
-align lb1_1 40 11650 114
-align lb2_1 40 11650 228
-align lb3_1 40 11650 86
-align ln0_1 16 11650 0
-align ln1_1 16 11650 114
-align ln2_1 16 11650 228
-align ln3_1 16 11650 86
-align lc0_1 16 11650 0
-align lc1_1 16 11650 114
-align lc2_1 16 11650 228
-align lc3_1 16 11650 86
-align lv0_1 28 11650 0
-align lv1_1 28 11650 114
-align lv2_1 28 11650 228
-align lv3_1 28 11650 86
+align lt0_1 28 11650 0 11514
+align lt1_1 28 11650 114 11516
+align lt2_1 28 11650 228 11518
+align lt3_1 28 11650 86 11520
+align le0_1 28 11650 0 11514
+align le1_1 28 11650 114 11516
+align le2_1 28 11650 228 11518
+align le3_1 28 11650 86 11520
+align lf0_1 16 11650 0 11514
+align lf1_1 16 11650 114 11516
+align lf2_1 16 11650 228 11518
+align lf3_1 16 11650 86 11520
+align lk0_1 16 11650 0 11514
+align lk1_1 16 11650 114 11516
+align lk2_1 16 11650 228 11518
+align lk3_1 16 11650 86 11520
+align lb0_1 40 11650 0 11514
+align lb1_1 40 11650 114 11516
+align lb2_1 40 11650 228 11518
+align lb3_1 40 11650 86 11520
+align ln0_1 16 11650 0 11514
+align ln1_1 16 11650 114 11516
+align ln2_1 16 11650 228 11518
+align ln3_1 16 11650 86 11520
+align lc0_1 16 11650 0 11514
+align lc1_1 16 11650 114 11516
+align lc2_1 16 11650 228 11518
+align lc3_1 16 11650 86 11520
+align lv0_1 28 11650 0 11514
+align lv1_1 28 11650 114 11516
+align lv2_1 28 11650 228 11518
+align lv3_1 28 11650 86 11520
 field 26 2 counted_1+1 counted_2+1 effect0_1+1 effect1_1+1 effect2_1+1 effect3_1+1 envelope_1+1 lb_1+1 lc_1+1 le_1+1 lf_1+1 lk_1+1 ln_1+1 lt_1+1 lv_1+1 several_1+1 several_2+1 square_1+1 three_1+1 two_1+1
 field 312 2 counted_1+1 counted_2+1 envelope_1+1 lb_1+1 lc_1+1 le_1+1 lf_1+1 lk_1+1 ln_1+1 lt_1+1 lv_1+1 square_1+1 three_1+1 two_1+1
 field 654 2 counted_1+1 counted_2+1 envelope_1+1 lb_1+1 lc_1+1 le_1+1 lf_1+1 lk_1+1 ln_1+1 lt_1+1 lv_1+1 square_1+1 three_1+1 two_1+1

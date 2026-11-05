@@ -393,6 +393,7 @@ final class LinkTest {
                 + (instances.size() - keptInstances) + " instances and the "
                 + (kinds.size() - keptKinds) + " loops of init it leaves out are "
                 + String.format("%,d", out) + " bytes, and the gaps it keeps are "
-                + (linked - (core.length - left)) + " bytes longer than in the core.";
+                + String.format("%,d", Math.abs(linked - (core.length - left))) + " bytes "
+                + (linked >= core.length - left ? "longer" : "shorter") + " than in the core.";
     }
 }

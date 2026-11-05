@@ -287,15 +287,30 @@ final class Link {
         for (Pieces.Piece piece : table.pieces()) {
             byName.put(piece.name(), piece);
         }
+        // the gaps on the references as carried, and on the references
+        // picked; the link keeps the shorter, and the carried on a tie
+        Map<Integer, Integer> carried = new java.util.LinkedHashMap<>();
         for (Pieces.Align align : table.aligns()) {
-            Pieces.Piece gap = byName.get(align.gap());
-            if (gap == null || lost.containsKey(gap.name())) {
-                continue;
+            if (align.word() >= 0) {
+                carried.put(align.word(), Pieces.value(core, align.word(), 2));
             }
-            int from = linked(table, lost, gap.from());
-            int anchor = linked(table, lost, align.anchor()) + align.add();
-            int length = Math.floorMod(anchor - from - align.base(), 256);
-            lost.put(gap.name(), gap.size() - length);
+        }
+        Map<String, Integer> asCarried = new java.util.HashMap<>(lost);
+        gaps(table, byName, asCarried, carried, false);
+        Map<Integer, Integer> references = new java.util.LinkedHashMap<>();
+        Map<String, Integer> picked = new java.util.HashMap<>(lost);
+        gaps(table, byName, picked, references, true);
+        for (Pieces.Align align : table.aligns()) {
+            if (align.word() >= 0 && !references.containsKey(align.word())) {
+                references.put(align.word(), free(references,
+                        carried.getOrDefault(align.word(), 0)));
+            }
+        }
+        if (sum(picked) <= sum(asCarried)) {
+            references = carried;
+            lost.putAll(asCarried);
+        } else {
+            lost.putAll(picked);
         }
         for (Pieces.Twin twin : table.twins()) {
             int copy = lost.getOrDefault(twin.copy(), 0);
@@ -339,6 +354,9 @@ final class Link {
             }
             Tune.putWord(moved, mask.at(), bits);
         }
+        for (Map.Entry<Integer, Integer> reference : references.entrySet()) {
+            Tune.putWord(moved, reference.getKey(), reference.getValue());
+        }
         java.io.ByteArrayOutputStream linked = new java.io.ByteArrayOutputStream();
         int from = 0;
         for (Pieces.Piece piece : table.pieces()) {
@@ -353,6 +371,55 @@ final class Link {
         }
         linked.write(moved, from, core.length - from);
         return linked.toByteArray();
+    }
+
+    /**
+     * The bytes each gap the link keeps loses, into {@code lost}: a gap's
+     * length puts the byte its align names on the offset modulo 256 of its
+     * anchor and add, the add of an instance's gap its effect's reference.
+     * Where {@code pick}, the link picks an effect's reference on its first
+     * gap it keeps: the reference that gap is 0 bytes for, or 2 bytes on
+     * from it where another effect's reference is on that offset.
+     */
+    private static void gaps(Pieces table, Map<String, Pieces.Piece> byName,
+                             Map<String, Integer> lost, Map<Integer, Integer> references,
+                             boolean pick) {
+        for (Pieces.Align align : table.aligns()) {
+            Pieces.Piece gap = byName.get(align.gap());
+            if (gap == null || lost.containsKey(gap.name())) {
+                continue;
+            }
+            int from = linked(table, lost, gap.from());
+            int anchor = linked(table, lost, align.anchor());
+            int add = align.add();
+            if (align.word() >= 0) {
+                if (pick && !references.containsKey(align.word())) {
+                    int least = Math.floorMod(from + align.base() - anchor, 256);
+                    references.put(align.word(), free(references, least));
+                }
+                add = references.getOrDefault(align.word(), align.add());
+            }
+            int length = Math.floorMod(anchor + add - from - align.base(), 256);
+            lost.put(gap.name(), gap.size() - length);
+        }
+    }
+
+    private static int sum(Map<String, Integer> lost) {
+        int sum = 0;
+        for (int one : lost.values()) {
+            sum += one;
+        }
+        return sum;
+    }
+
+    /** The first offset modulo 256 from {@code at} on, 2 bytes a step, that
+     *  no reference picked is on. */
+    private static int free(Map<Integer, Integer> references, int at) {
+        int offset = at;
+        while (references.containsValue(offset)) {
+            offset = (offset + 2) & 255;
+        }
+        return offset;
     }
 
     /** Where a byte of the core is in the linked core: its offset less the

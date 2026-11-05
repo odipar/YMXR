@@ -162,24 +162,26 @@ effect a tune does not run reaches the next effect the tune runs, or
 the register steps past the last.
 
 A lookup instance reads its pages at an offset modulo 256 that its
-effect's reference sets (BINARIES.md 5.6). Each instance is two pieces of
-its block: the gap before it, `lt0_1`, zero bytes that put the
+effect's reference sets (BINARIES.md 5.6). Each instance is two pieces
+of its block: the gap before it, `lt0_1`, zero bytes that put the
 instance's page read on that offset, and the instance, `lt0_2`. A link
 keeps the gap of an instance it keeps at the length that puts the page
-read on the offset in the linked player. Init links each lookup kind in
-a loop over its four instances, a piece of the kind's block: it reads
-each instance's distance from the first handler out of the kind's
-descriptor in `ymxr_kinds`, a word an effect, which the link moves,
-links the instance where the effect's bit in the kind's mask,
-`ymxr_k_lt` for two columns, is set, and computes the page byte of the
-instance's page 0 from the instance's address and its effect's
-reference. A start and a remap read the instance out of the same
-descriptor, and a square's or a one-row source's out of `ymxr_at_square`
-and `ymxr_at_one`. In a core with the deferred start, each gap and each
-instance of the second bank is a twin of the first bank's, and
-`align_1`, the gap before the second bank, puts its first handler on the
-offset modulo 256 of the first bank's: BANK is a multiple of 256, and the
-two banks read their pages at one offset.
+read on the offset in the linked player, and can pick each effect's
+reference: init and the page routines read the four out of `ymxr_refat`,
+a word an effect past `ymxr_ref`. Init links each lookup kind in a loop
+over its four instances, a piece of the kind's block: it reads each
+instance's distance from the first handler out of the kind's descriptor
+in `ymxr_kinds`, a word an effect, which the link moves, links the
+instance where the effect's bit in the kind's mask, `ymxr_k_lt` for two
+columns, is set, and computes the page byte of the instance's page 0
+from the instance's address and its effect's reference. A start and a
+remap read the instance out of the same descriptor, and a square's or a
+one-row source's out of `ymxr_at_square` and `ymxr_at_one`. In a core
+with the deferred start, each gap and each instance of the second bank
+is a twin of the first bank's, and `align_1`, the gap before the second
+bank, puts its first handler on the offset modulo 256 of the first
+bank's: BANK is a multiple of 256, and the two banks read their pages at
+one offset.
 
 ## The library
 
@@ -208,8 +210,9 @@ link sets, and three numbers B, A and N: the byte B past the gap's end
 is N bytes past the byte at offset A, modulo 256, in the core and in a
 linked core. For a lookup instance's gap B is the distance from the
 gap's end to the base of the instance's page read, A the offset of
-`ymxr_ref` and N its effect's reference past it; for `align_1` B is 0, A
-the offset of the first handler and N 0. A `field` line is a value of
+`ymxr_ref` and N its effect's reference past it, and a fifth number W is
+the offset of the word of `ymxr_refat` that is N; for `align_1` B is 0,
+A the offset of the first handler and N 0. A `field` line is a value of
 the core that moves where a piece is left out: its offset, its width in
 bytes, a word or a byte, and for each piece whose end it refers across,
 the piece's name and the coefficient c. The value is signed, and a link
@@ -273,6 +276,20 @@ loses its length in the core less its length linked, which can be less
 than 0. A piece of the second bank loses what its twin loses, and the
 link fails where it does not.
 
+The link sets the gaps twice, and keeps the setting with fewer bytes,
+the first on a tie:
+
+1. on each effect's reference as the core has it, N of each align line;
+2. on each effect's reference picked at the first gap of a W the link
+   keeps, in the core's order: the N that gap is 0 bytes for, or the
+   first 2 bytes on from it, modulo 256, that no reference picked
+   before is on. A W of no gap the link keeps is the core's N, or the
+   first 2 bytes on from it that no reference picked is on.
+
+The link writes each W with the N of the setting it keeps. The four
+references are on four offsets modulo 256, as the page area places the
+effects' pages by them (BINARIES.md 5.6).
+
 Pieces leave and none moves, so a field refers to the same label it did,
 or for a label in a piece left out, to the byte that follows the piece.
 The link fails where a value no longer fits its field. A field in a piece
@@ -303,7 +320,7 @@ the core with the lookup and the deferred start in, of 28,418 bytes.
 | `envelope.ymxr` | plain | two, two0, several, effect0 | 4,620 |
 | `fine-zero.ymxr` | plain | none | 2,676 |
 | `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,458 |
-| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, lk, lk0, lk2, lc, lc1, lt, lt3, align | 16,362 |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,370 |
 | `plays-once.ymxr` | plain | none | 2,676 |
 | `preempt.ymxr` | plain | square, square0, effect0, effect1 | 4,074 |
 | `retune.ymxr` | plain | one, one0, effect0 | 3,382 |
@@ -316,9 +333,9 @@ A tune of general sources alone, with no effect, links 2,676 bytes, 30%
 of the core: the blocks are 6,266 bytes of it. The kit's largest,
 `voices.ymxr`, runs all four effects, keeps a handler of two or three
 columns on each and the start of several columns, and links 7,108.
-`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 16,362
+`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 15,370
 bytes of 28,418: the 28 instances and the 5 loops of init it leaves out
-are 8,128 bytes, and the gaps it keeps are 252 bytes longer than in the
+are 8,128 bytes, and the gaps it keeps are 740 bytes shorter than in the
 core.
 
 ## The check
@@ -364,8 +381,7 @@ core.
    an effect, the masks and init's loops make `YMXR_sndh-map.bin` as
    carried 270 bytes larger than with the instances LOOK_STRIDE apart,
    and the instances and their gaps 4,188 bytes, as before.
-7. The stages that follow:
-   - an order of the lookup instances that shortens the gaps a link
-     keeps;
-   - `-link` as the tools' default, with RigCallsTest's matrix on linked
-     cores.
+7. Each effect's reference picked by the link, so the first instance
+   of each effect it keeps needs no gap. Done.
+8. The stage that follows: `-link` as the tools' default, with
+   RigCallsTest's matrix on linked cores.

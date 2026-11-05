@@ -120,6 +120,7 @@ ymxr_lt0_end:
 ymxr_a_lt0_1 equ     ymxr_lt0_key+2
 ymxr_r_lt0_1 equ     ymxr_ref
 ymxr_n_lt0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lt0_1 equ     ymxr_refat+0
                 ENDPIECE lt0_2
                 PIECE   lt1_1
                 LPAD    KEY_LT,ymxr_ref1
@@ -130,6 +131,7 @@ ymxr_lt1_end:
 ymxr_a_lt1_1 equ     ymxr_lt1_key+2
 ymxr_r_lt1_1 equ     ymxr_ref
 ymxr_n_lt1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lt1_1 equ     ymxr_refat+2
                 ENDPIECE lt1_2
                 PIECE   lt2_1
                 LPAD    KEY_LT,ymxr_ref2
@@ -140,6 +142,7 @@ ymxr_lt2_end:
 ymxr_a_lt2_1 equ     ymxr_lt2_key+2
 ymxr_r_lt2_1 equ     ymxr_ref
 ymxr_n_lt2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lt2_1 equ     ymxr_refat+4
                 ENDPIECE lt2_2
                 PIECE   lt3_1
                 LPAD    KEY_LT,ymxr_ref3
@@ -150,6 +153,7 @@ ymxr_lt3_end:
 ymxr_a_lt3_1 equ     ymxr_lt3_key+2
 ymxr_r_lt3_1 equ     ymxr_ref
 ymxr_n_lt3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lt3_1 equ     ymxr_refat+6
                 ENDPIECE lt3_2
                 PIECE   le0_1
                 LPAD    KEY_LE,ymxr_ref0
@@ -160,6 +164,7 @@ ymxr_le0_end:
 ymxr_a_le0_1 equ     ymxr_le0_key+2
 ymxr_r_le0_1 equ     ymxr_ref
 ymxr_n_le0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_le0_1 equ     ymxr_refat+0
                 ENDPIECE le0_2
                 PIECE   le1_1
                 LPAD    KEY_LE,ymxr_ref1
@@ -170,6 +175,7 @@ ymxr_le1_end:
 ymxr_a_le1_1 equ     ymxr_le1_key+2
 ymxr_r_le1_1 equ     ymxr_ref
 ymxr_n_le1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_le1_1 equ     ymxr_refat+2
                 ENDPIECE le1_2
                 PIECE   le2_1
                 LPAD    KEY_LE,ymxr_ref2
@@ -180,6 +186,7 @@ ymxr_le2_end:
 ymxr_a_le2_1 equ     ymxr_le2_key+2
 ymxr_r_le2_1 equ     ymxr_ref
 ymxr_n_le2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_le2_1 equ     ymxr_refat+4
                 ENDPIECE le2_2
                 PIECE   le3_1
                 LPAD    KEY_LE,ymxr_ref3
@@ -190,6 +197,7 @@ ymxr_le3_end:
 ymxr_a_le3_1 equ     ymxr_le3_key+2
 ymxr_r_le3_1 equ     ymxr_ref
 ymxr_n_le3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_le3_1 equ     ymxr_refat+6
                 ENDPIECE le3_2
                 PIECE   lf0_1
                 LPAD    KEY_LF,ymxr_ref0
@@ -200,6 +208,7 @@ ymxr_lf0_end:
 ymxr_a_lf0_1 equ     ymxr_lf0_key+2
 ymxr_r_lf0_1 equ     ymxr_ref
 ymxr_n_lf0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lf0_1 equ     ymxr_refat+0
                 ENDPIECE lf0_2
                 PIECE   lf1_1
                 LPAD    KEY_LF,ymxr_ref1
@@ -210,6 +219,7 @@ ymxr_lf1_end:
 ymxr_a_lf1_1 equ     ymxr_lf1_key+2
 ymxr_r_lf1_1 equ     ymxr_ref
 ymxr_n_lf1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lf1_1 equ     ymxr_refat+2
                 ENDPIECE lf1_2
                 PIECE   lf2_1
                 LPAD    KEY_LF,ymxr_ref2
@@ -220,6 +230,7 @@ ymxr_lf2_end:
 ymxr_a_lf2_1 equ     ymxr_lf2_key+2
 ymxr_r_lf2_1 equ     ymxr_ref
 ymxr_n_lf2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lf2_1 equ     ymxr_refat+4
                 ENDPIECE lf2_2
                 PIECE   lf3_1
                 LPAD    KEY_LF,ymxr_ref3
@@ -230,6 +241,7 @@ ymxr_lf3_end:
 ymxr_a_lf3_1 equ     ymxr_lf3_key+2
 ymxr_r_lf3_1 equ     ymxr_ref
 ymxr_n_lf3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lf3_1 equ     ymxr_refat+6
                 ENDPIECE lf3_2
                 PIECE   lk0_1
                 LPAD    KEY_LK,ymxr_ref0
@@ -240,6 +252,7 @@ ymxr_lk0_end:
 ymxr_a_lk0_1 equ     ymxr_lk0_key+2
 ymxr_r_lk0_1 equ     ymxr_ref
 ymxr_n_lk0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lk0_1 equ     ymxr_refat+0
                 ENDPIECE lk0_2
                 PIECE   lk1_1
                 LPAD    KEY_LK,ymxr_ref1
@@ -250,6 +263,7 @@ ymxr_lk1_end:
 ymxr_a_lk1_1 equ     ymxr_lk1_key+2
 ymxr_r_lk1_1 equ     ymxr_ref
 ymxr_n_lk1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lk1_1 equ     ymxr_refat+2
                 ENDPIECE lk1_2
                 PIECE   lk2_1
                 LPAD    KEY_LK,ymxr_ref2
@@ -260,6 +274,7 @@ ymxr_lk2_end:
 ymxr_a_lk2_1 equ     ymxr_lk2_key+2
 ymxr_r_lk2_1 equ     ymxr_ref
 ymxr_n_lk2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lk2_1 equ     ymxr_refat+4
                 ENDPIECE lk2_2
                 PIECE   lk3_1
                 LPAD    KEY_LK,ymxr_ref3
@@ -270,6 +285,7 @@ ymxr_lk3_end:
 ymxr_a_lk3_1 equ     ymxr_lk3_key+2
 ymxr_r_lk3_1 equ     ymxr_ref
 ymxr_n_lk3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lk3_1 equ     ymxr_refat+6
                 ENDPIECE lk3_2
                 PIECE   lb0_1
                 LPAD    KEY_LB,ymxr_ref0
@@ -280,6 +296,7 @@ ymxr_lb0_end:
 ymxr_a_lb0_1 equ     ymxr_lb0_key+2
 ymxr_r_lb0_1 equ     ymxr_ref
 ymxr_n_lb0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lb0_1 equ     ymxr_refat+0
                 ENDPIECE lb0_2
                 PIECE   lb1_1
                 LPAD    KEY_LB,ymxr_ref1
@@ -290,6 +307,7 @@ ymxr_lb1_end:
 ymxr_a_lb1_1 equ     ymxr_lb1_key+2
 ymxr_r_lb1_1 equ     ymxr_ref
 ymxr_n_lb1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lb1_1 equ     ymxr_refat+2
                 ENDPIECE lb1_2
                 PIECE   lb2_1
                 LPAD    KEY_LB,ymxr_ref2
@@ -300,6 +318,7 @@ ymxr_lb2_end:
 ymxr_a_lb2_1 equ     ymxr_lb2_key+2
 ymxr_r_lb2_1 equ     ymxr_ref
 ymxr_n_lb2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lb2_1 equ     ymxr_refat+4
                 ENDPIECE lb2_2
                 PIECE   lb3_1
                 LPAD    KEY_LB,ymxr_ref3
@@ -310,6 +329,7 @@ ymxr_lb3_end:
 ymxr_a_lb3_1 equ     ymxr_lb3_key+2
 ymxr_r_lb3_1 equ     ymxr_ref
 ymxr_n_lb3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lb3_1 equ     ymxr_refat+6
                 ENDPIECE lb3_2
                 PIECE   ln0_1
                 LPAD    KEY_LN,ymxr_ref0
@@ -320,6 +340,7 @@ ymxr_ln0_end:
 ymxr_a_ln0_1 equ     ymxr_ln0_key+2
 ymxr_r_ln0_1 equ     ymxr_ref
 ymxr_n_ln0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_ln0_1 equ     ymxr_refat+0
                 ENDPIECE ln0_2
                 PIECE   ln1_1
                 LPAD    KEY_LN,ymxr_ref1
@@ -330,6 +351,7 @@ ymxr_ln1_end:
 ymxr_a_ln1_1 equ     ymxr_ln1_key+2
 ymxr_r_ln1_1 equ     ymxr_ref
 ymxr_n_ln1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_ln1_1 equ     ymxr_refat+2
                 ENDPIECE ln1_2
                 PIECE   ln2_1
                 LPAD    KEY_LN,ymxr_ref2
@@ -340,6 +362,7 @@ ymxr_ln2_end:
 ymxr_a_ln2_1 equ     ymxr_ln2_key+2
 ymxr_r_ln2_1 equ     ymxr_ref
 ymxr_n_ln2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_ln2_1 equ     ymxr_refat+4
                 ENDPIECE ln2_2
                 PIECE   ln3_1
                 LPAD    KEY_LN,ymxr_ref3
@@ -350,6 +373,7 @@ ymxr_ln3_end:
 ymxr_a_ln3_1 equ     ymxr_ln3_key+2
 ymxr_r_ln3_1 equ     ymxr_ref
 ymxr_n_ln3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_ln3_1 equ     ymxr_refat+6
                 ENDPIECE ln3_2
                 PIECE   lc0_1
                 LPAD    KEY_LC,ymxr_ref0
@@ -360,6 +384,7 @@ ymxr_lc0_end:
 ymxr_a_lc0_1 equ     ymxr_lc0_key+2
 ymxr_r_lc0_1 equ     ymxr_ref
 ymxr_n_lc0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lc0_1 equ     ymxr_refat+0
                 ENDPIECE lc0_2
                 PIECE   lc1_1
                 LPAD    KEY_LC,ymxr_ref1
@@ -370,6 +395,7 @@ ymxr_lc1_end:
 ymxr_a_lc1_1 equ     ymxr_lc1_key+2
 ymxr_r_lc1_1 equ     ymxr_ref
 ymxr_n_lc1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lc1_1 equ     ymxr_refat+2
                 ENDPIECE lc1_2
                 PIECE   lc2_1
                 LPAD    KEY_LC,ymxr_ref2
@@ -380,6 +406,7 @@ ymxr_lc2_end:
 ymxr_a_lc2_1 equ     ymxr_lc2_key+2
 ymxr_r_lc2_1 equ     ymxr_ref
 ymxr_n_lc2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lc2_1 equ     ymxr_refat+4
                 ENDPIECE lc2_2
                 PIECE   lc3_1
                 LPAD    KEY_LC,ymxr_ref3
@@ -390,6 +417,7 @@ ymxr_lc3_end:
 ymxr_a_lc3_1 equ     ymxr_lc3_key+2
 ymxr_r_lc3_1 equ     ymxr_ref
 ymxr_n_lc3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lc3_1 equ     ymxr_refat+6
                 ENDPIECE lc3_2
                 PIECE   lv0_1
                 LPAD    KEY_LV,ymxr_ref0
@@ -400,6 +428,7 @@ ymxr_lv0_end:
 ymxr_a_lv0_1 equ     ymxr_lv0_key+2
 ymxr_r_lv0_1 equ     ymxr_ref
 ymxr_n_lv0_1 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lv0_1 equ     ymxr_refat+0
                 ENDPIECE lv0_2
                 PIECE   lv1_1
                 LPAD    KEY_LV,ymxr_ref1
@@ -410,6 +439,7 @@ ymxr_lv1_end:
 ymxr_a_lv1_1 equ     ymxr_lv1_key+2
 ymxr_r_lv1_1 equ     ymxr_ref
 ymxr_n_lv1_1 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lv1_1 equ     ymxr_refat+2
                 ENDPIECE lv1_2
                 PIECE   lv2_1
                 LPAD    KEY_LV,ymxr_ref2
@@ -420,6 +450,7 @@ ymxr_lv2_end:
 ymxr_a_lv2_1 equ     ymxr_lv2_key+2
 ymxr_r_lv2_1 equ     ymxr_ref
 ymxr_n_lv2_1 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lv2_1 equ     ymxr_refat+4
                 ENDPIECE lv2_2
                 PIECE   lv3_1
                 LPAD    KEY_LV,ymxr_ref3
@@ -430,6 +461,7 @@ ymxr_lv3_end:
 ymxr_a_lv3_1 equ     ymxr_lv3_key+2
 ymxr_r_lv3_1 equ     ymxr_ref
 ymxr_n_lv3_1 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lv3_1 equ     ymxr_refat+6
                 ENDPIECE lv3_2
                 .if     YMXR_DEFER
                 PIECE   align_1
@@ -542,6 +574,7 @@ ymxr_lt0b_end:
 ymxr_a_lt0_3 equ     ymxr_lt0b_key+2
 ymxr_r_lt0_3 equ     ymxr_ref
 ymxr_n_lt0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lt0_3 equ     ymxr_refat+0
                 ENDPIECE lt0_4
                 PIECE2  lt1_3,lt1_1
                 LPAD    KEY_LT,ymxr_ref1
@@ -552,6 +585,7 @@ ymxr_lt1b_end:
 ymxr_a_lt1_3 equ     ymxr_lt1b_key+2
 ymxr_r_lt1_3 equ     ymxr_ref
 ymxr_n_lt1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lt1_3 equ     ymxr_refat+2
                 ENDPIECE lt1_4
                 PIECE2  lt2_3,lt2_1
                 LPAD    KEY_LT,ymxr_ref2
@@ -562,6 +596,7 @@ ymxr_lt2b_end:
 ymxr_a_lt2_3 equ     ymxr_lt2b_key+2
 ymxr_r_lt2_3 equ     ymxr_ref
 ymxr_n_lt2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lt2_3 equ     ymxr_refat+4
                 ENDPIECE lt2_4
                 PIECE2  lt3_3,lt3_1
                 LPAD    KEY_LT,ymxr_ref3
@@ -572,6 +607,7 @@ ymxr_lt3b_end:
 ymxr_a_lt3_3 equ     ymxr_lt3b_key+2
 ymxr_r_lt3_3 equ     ymxr_ref
 ymxr_n_lt3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lt3_3 equ     ymxr_refat+6
                 ENDPIECE lt3_4
                 PIECE2  le0_3,le0_1
                 LPAD    KEY_LE,ymxr_ref0
@@ -582,6 +618,7 @@ ymxr_le0b_end:
 ymxr_a_le0_3 equ     ymxr_le0b_key+2
 ymxr_r_le0_3 equ     ymxr_ref
 ymxr_n_le0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_le0_3 equ     ymxr_refat+0
                 ENDPIECE le0_4
                 PIECE2  le1_3,le1_1
                 LPAD    KEY_LE,ymxr_ref1
@@ -592,6 +629,7 @@ ymxr_le1b_end:
 ymxr_a_le1_3 equ     ymxr_le1b_key+2
 ymxr_r_le1_3 equ     ymxr_ref
 ymxr_n_le1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_le1_3 equ     ymxr_refat+2
                 ENDPIECE le1_4
                 PIECE2  le2_3,le2_1
                 LPAD    KEY_LE,ymxr_ref2
@@ -602,6 +640,7 @@ ymxr_le2b_end:
 ymxr_a_le2_3 equ     ymxr_le2b_key+2
 ymxr_r_le2_3 equ     ymxr_ref
 ymxr_n_le2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_le2_3 equ     ymxr_refat+4
                 ENDPIECE le2_4
                 PIECE2  le3_3,le3_1
                 LPAD    KEY_LE,ymxr_ref3
@@ -612,6 +651,7 @@ ymxr_le3b_end:
 ymxr_a_le3_3 equ     ymxr_le3b_key+2
 ymxr_r_le3_3 equ     ymxr_ref
 ymxr_n_le3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_le3_3 equ     ymxr_refat+6
                 ENDPIECE le3_4
                 PIECE2  lf0_3,lf0_1
                 LPAD    KEY_LF,ymxr_ref0
@@ -622,6 +662,7 @@ ymxr_lf0b_end:
 ymxr_a_lf0_3 equ     ymxr_lf0b_key+2
 ymxr_r_lf0_3 equ     ymxr_ref
 ymxr_n_lf0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lf0_3 equ     ymxr_refat+0
                 ENDPIECE lf0_4
                 PIECE2  lf1_3,lf1_1
                 LPAD    KEY_LF,ymxr_ref1
@@ -632,6 +673,7 @@ ymxr_lf1b_end:
 ymxr_a_lf1_3 equ     ymxr_lf1b_key+2
 ymxr_r_lf1_3 equ     ymxr_ref
 ymxr_n_lf1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lf1_3 equ     ymxr_refat+2
                 ENDPIECE lf1_4
                 PIECE2  lf2_3,lf2_1
                 LPAD    KEY_LF,ymxr_ref2
@@ -642,6 +684,7 @@ ymxr_lf2b_end:
 ymxr_a_lf2_3 equ     ymxr_lf2b_key+2
 ymxr_r_lf2_3 equ     ymxr_ref
 ymxr_n_lf2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lf2_3 equ     ymxr_refat+4
                 ENDPIECE lf2_4
                 PIECE2  lf3_3,lf3_1
                 LPAD    KEY_LF,ymxr_ref3
@@ -652,6 +695,7 @@ ymxr_lf3b_end:
 ymxr_a_lf3_3 equ     ymxr_lf3b_key+2
 ymxr_r_lf3_3 equ     ymxr_ref
 ymxr_n_lf3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lf3_3 equ     ymxr_refat+6
                 ENDPIECE lf3_4
                 PIECE2  lk0_3,lk0_1
                 LPAD    KEY_LK,ymxr_ref0
@@ -662,6 +706,7 @@ ymxr_lk0b_end:
 ymxr_a_lk0_3 equ     ymxr_lk0b_key+2
 ymxr_r_lk0_3 equ     ymxr_ref
 ymxr_n_lk0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lk0_3 equ     ymxr_refat+0
                 ENDPIECE lk0_4
                 PIECE2  lk1_3,lk1_1
                 LPAD    KEY_LK,ymxr_ref1
@@ -672,6 +717,7 @@ ymxr_lk1b_end:
 ymxr_a_lk1_3 equ     ymxr_lk1b_key+2
 ymxr_r_lk1_3 equ     ymxr_ref
 ymxr_n_lk1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lk1_3 equ     ymxr_refat+2
                 ENDPIECE lk1_4
                 PIECE2  lk2_3,lk2_1
                 LPAD    KEY_LK,ymxr_ref2
@@ -682,6 +728,7 @@ ymxr_lk2b_end:
 ymxr_a_lk2_3 equ     ymxr_lk2b_key+2
 ymxr_r_lk2_3 equ     ymxr_ref
 ymxr_n_lk2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lk2_3 equ     ymxr_refat+4
                 ENDPIECE lk2_4
                 PIECE2  lk3_3,lk3_1
                 LPAD    KEY_LK,ymxr_ref3
@@ -692,6 +739,7 @@ ymxr_lk3b_end:
 ymxr_a_lk3_3 equ     ymxr_lk3b_key+2
 ymxr_r_lk3_3 equ     ymxr_ref
 ymxr_n_lk3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lk3_3 equ     ymxr_refat+6
                 ENDPIECE lk3_4
                 PIECE2  lb0_3,lb0_1
                 LPAD    KEY_LB,ymxr_ref0
@@ -702,6 +750,7 @@ ymxr_lb0b_end:
 ymxr_a_lb0_3 equ     ymxr_lb0b_key+2
 ymxr_r_lb0_3 equ     ymxr_ref
 ymxr_n_lb0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lb0_3 equ     ymxr_refat+0
                 ENDPIECE lb0_4
                 PIECE2  lb1_3,lb1_1
                 LPAD    KEY_LB,ymxr_ref1
@@ -712,6 +761,7 @@ ymxr_lb1b_end:
 ymxr_a_lb1_3 equ     ymxr_lb1b_key+2
 ymxr_r_lb1_3 equ     ymxr_ref
 ymxr_n_lb1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lb1_3 equ     ymxr_refat+2
                 ENDPIECE lb1_4
                 PIECE2  lb2_3,lb2_1
                 LPAD    KEY_LB,ymxr_ref2
@@ -722,6 +772,7 @@ ymxr_lb2b_end:
 ymxr_a_lb2_3 equ     ymxr_lb2b_key+2
 ymxr_r_lb2_3 equ     ymxr_ref
 ymxr_n_lb2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lb2_3 equ     ymxr_refat+4
                 ENDPIECE lb2_4
                 PIECE2  lb3_3,lb3_1
                 LPAD    KEY_LB,ymxr_ref3
@@ -732,6 +783,7 @@ ymxr_lb3b_end:
 ymxr_a_lb3_3 equ     ymxr_lb3b_key+2
 ymxr_r_lb3_3 equ     ymxr_ref
 ymxr_n_lb3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lb3_3 equ     ymxr_refat+6
                 ENDPIECE lb3_4
                 PIECE2  ln0_3,ln0_1
                 LPAD    KEY_LN,ymxr_ref0
@@ -742,6 +794,7 @@ ymxr_ln0b_end:
 ymxr_a_ln0_3 equ     ymxr_ln0b_key+2
 ymxr_r_ln0_3 equ     ymxr_ref
 ymxr_n_ln0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_ln0_3 equ     ymxr_refat+0
                 ENDPIECE ln0_4
                 PIECE2  ln1_3,ln1_1
                 LPAD    KEY_LN,ymxr_ref1
@@ -752,6 +805,7 @@ ymxr_ln1b_end:
 ymxr_a_ln1_3 equ     ymxr_ln1b_key+2
 ymxr_r_ln1_3 equ     ymxr_ref
 ymxr_n_ln1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_ln1_3 equ     ymxr_refat+2
                 ENDPIECE ln1_4
                 PIECE2  ln2_3,ln2_1
                 LPAD    KEY_LN,ymxr_ref2
@@ -762,6 +816,7 @@ ymxr_ln2b_end:
 ymxr_a_ln2_3 equ     ymxr_ln2b_key+2
 ymxr_r_ln2_3 equ     ymxr_ref
 ymxr_n_ln2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_ln2_3 equ     ymxr_refat+4
                 ENDPIECE ln2_4
                 PIECE2  ln3_3,ln3_1
                 LPAD    KEY_LN,ymxr_ref3
@@ -772,6 +827,7 @@ ymxr_ln3b_end:
 ymxr_a_ln3_3 equ     ymxr_ln3b_key+2
 ymxr_r_ln3_3 equ     ymxr_ref
 ymxr_n_ln3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_ln3_3 equ     ymxr_refat+6
                 ENDPIECE ln3_4
                 PIECE2  lc0_3,lc0_1
                 LPAD    KEY_LC,ymxr_ref0
@@ -782,6 +838,7 @@ ymxr_lc0b_end:
 ymxr_a_lc0_3 equ     ymxr_lc0b_key+2
 ymxr_r_lc0_3 equ     ymxr_ref
 ymxr_n_lc0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lc0_3 equ     ymxr_refat+0
                 ENDPIECE lc0_4
                 PIECE2  lc1_3,lc1_1
                 LPAD    KEY_LC,ymxr_ref1
@@ -792,6 +849,7 @@ ymxr_lc1b_end:
 ymxr_a_lc1_3 equ     ymxr_lc1b_key+2
 ymxr_r_lc1_3 equ     ymxr_ref
 ymxr_n_lc1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lc1_3 equ     ymxr_refat+2
                 ENDPIECE lc1_4
                 PIECE2  lc2_3,lc2_1
                 LPAD    KEY_LC,ymxr_ref2
@@ -802,6 +860,7 @@ ymxr_lc2b_end:
 ymxr_a_lc2_3 equ     ymxr_lc2b_key+2
 ymxr_r_lc2_3 equ     ymxr_ref
 ymxr_n_lc2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lc2_3 equ     ymxr_refat+4
                 ENDPIECE lc2_4
                 PIECE2  lc3_3,lc3_1
                 LPAD    KEY_LC,ymxr_ref3
@@ -812,6 +871,7 @@ ymxr_lc3b_end:
 ymxr_a_lc3_3 equ     ymxr_lc3b_key+2
 ymxr_r_lc3_3 equ     ymxr_ref
 ymxr_n_lc3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lc3_3 equ     ymxr_refat+6
                 ENDPIECE lc3_4
                 PIECE2  lv0_3,lv0_1
                 LPAD    KEY_LV,ymxr_ref0
@@ -822,6 +882,7 @@ ymxr_lv0b_end:
 ymxr_a_lv0_3 equ     ymxr_lv0b_key+2
 ymxr_r_lv0_3 equ     ymxr_ref
 ymxr_n_lv0_3 equ     ymxr_ref0-ymxr_ref
+ymxr_w_lv0_3 equ     ymxr_refat+0
                 ENDPIECE lv0_4
                 PIECE2  lv1_3,lv1_1
                 LPAD    KEY_LV,ymxr_ref1
@@ -832,6 +893,7 @@ ymxr_lv1b_end:
 ymxr_a_lv1_3 equ     ymxr_lv1b_key+2
 ymxr_r_lv1_3 equ     ymxr_ref
 ymxr_n_lv1_3 equ     ymxr_ref1-ymxr_ref
+ymxr_w_lv1_3 equ     ymxr_refat+2
                 ENDPIECE lv1_4
                 PIECE2  lv2_3,lv2_1
                 LPAD    KEY_LV,ymxr_ref2
@@ -842,6 +904,7 @@ ymxr_lv2b_end:
 ymxr_a_lv2_3 equ     ymxr_lv2b_key+2
 ymxr_r_lv2_3 equ     ymxr_ref
 ymxr_n_lv2_3 equ     ymxr_ref2-ymxr_ref
+ymxr_w_lv2_3 equ     ymxr_refat+4
                 ENDPIECE lv2_4
                 PIECE2  lv3_3,lv3_1
                 LPAD    KEY_LV,ymxr_ref3
@@ -852,6 +915,7 @@ ymxr_lv3b_end:
 ymxr_a_lv3_3 equ     ymxr_lv3b_key+2
 ymxr_r_lv3_3 equ     ymxr_ref
 ymxr_n_lv3_3 equ     ymxr_ref3-ymxr_ref
+ymxr_w_lv3_3 equ     ymxr_refat+6
                 ENDPIECE lv3_4
 ymxr_bank1end:
                 .endif

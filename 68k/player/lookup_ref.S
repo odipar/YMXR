@@ -13,7 +13,9 @@
 
 ; Each effect's reference: e * LOOK_STRIDE modulo 256 past ymxr_ref, the
 ; offset modulo 256 its lookup reads match, and the page a page byte of
-; ymxr_htab selects. The pages are in the page area after the player
+; ymxr_htab selects. Init and the page routines read it out of
+; ymxr_refat, which a link writes where it picks another reference
+; (doc/LINKER.md). The pages are in the page area after the player
 ; (ymxr_prefill), each a multiple of 256 bytes from its effect's
 ; reference.
 FB_AT1          equ     (1*LOOK_STRIDE)&255

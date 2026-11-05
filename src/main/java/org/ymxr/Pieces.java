@@ -81,9 +81,11 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Twin> twins, List<Align
      * {@code base} past its end, linked, is the byte {@code add} past
      * {@code anchor}, linked, modulo 256. A lookup instance's page read is
      * {@code base} past the gap before it, and its effect's reference is
-     * {@code add} past {@code ymxr_ref} (68k/player/lookup_ref.S).
+     * {@code add} past {@code ymxr_ref} (68k/player/lookup_ref.S), the word
+     * at {@code word}, which a link writes with the reference it picks; -1
+     * where {@code add} is a constant.
      */
-    record Align(String gap, int base, int anchor, int add) {
+    record Align(String gap, int base, int anchor, int add, int word) {
     }
 
     /**
@@ -140,8 +142,11 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Twin> twins, List<Align
         }
         for (Align align : aligns) {
             out.append("align ").append(align.gap()).append(' ').append(align.base())
-                    .append(' ').append(align.anchor()).append(' ').append(align.add())
-                    .append('\n');
+                    .append(' ').append(align.anchor()).append(' ').append(align.add());
+            if (align.word() >= 0) {
+                out.append(' ').append(align.word());
+            }
+            out.append('\n');
         }
         for (Field field : fields) {
             out.append("field ").append(field.at()).append(' ').append(field.width());
@@ -176,9 +181,10 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Twin> twins, List<Align
                 masks.add(new Mask(word[2], Integer.parseInt(word[1])));
             } else if (word[0].equals("twin") && word.length == 3) {
                 twins.add(new Twin(word[1], word[2]));
-            } else if (word[0].equals("align") && word.length == 5) {
+            } else if (word[0].equals("align") && (word.length == 5 || word.length == 6)) {
                 aligns.add(new Align(word[1], Integer.parseInt(word[2]),
-                        Integer.parseInt(word[3]), Integer.parseInt(word[4])));
+                        Integer.parseInt(word[3]), Integer.parseInt(word[4]),
+                        word.length == 6 ? Integer.parseInt(word[5]) : -1));
             } else if (word[0].equals("field") && word.length >= 4) {
                 Map<String, Integer> moves = new TreeMap<>();
                 for (int i = 3; i < word.length; i++) {
@@ -275,8 +281,10 @@ record Pieces(List<Piece> pieces, List<Mask> masks, List<Twin> twins, List<Align
             Integer at = base.labels().get("ymxr_a_" + piece.name());
             Integer anchor = base.labels().get("ymxr_r_" + piece.name());
             Integer add = base.labels().get("ymxr_n_" + piece.name());
+            Integer word = base.labels().get("ymxr_w_" + piece.name());
             if (at != null && anchor != null && add != null) {
-                aligns.add(new Align(piece.name(), at - piece.to(), anchor, add));
+                aligns.add(new Align(piece.name(), at - piece.to(), anchor, add,
+                        word == null ? -1 : word));
             }
         }
         boolean aligned = !aligns.isEmpty();

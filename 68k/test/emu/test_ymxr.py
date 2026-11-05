@@ -275,7 +275,7 @@ def page_at(symbols, area, tune, effect, form, run, reach):
     fallback = fallback_of(symbols)
     k = plan_of(count, entries, reach, fallback)[0]
     base = area + count * len({(e, f) for e, f, _ in entries})
-    ref = [CODE + symbols["ymxr_ref"] + (symbols["FB_AT%d" % e] if e else 0) for e in range(4)]
+    ref = [CODE + symbols["ymxr_ref%d" % e] for e in range(4)]
     off = [(ref[e] - base) & 0xFF for e in range(4)]
     placed = [sum(1 for e_, _, _ in entries[:k] if e_ == e) for e in range(4)]
     falls = [any(e_ == e for e_, _, _ in entries[k:]) for e in range(4)]
@@ -5528,8 +5528,9 @@ def pieces_of(name):
     """The table of a core's pieces, masks, twins, aligns and fields, as the
     build cut it beside the core in go/binaries/data (doc/LINKER.md, The
     library): (name, first byte, byte past the last) a piece, (offset,
-    prefix) a mask, (copy, first) a twin, (gap, base, anchor, add) an
-    align, and (offset, width, {piece: c}) a field."""
+    prefix) a mask, (copy, first) a twin, (gap, base, anchor, add, word)
+    an align, word -1 where add is a constant, and (offset, width, {piece:
+    c}) a field."""
     pieces, masks, twins, aligns, fields = [], [], [], [], []
     with open(os.path.join(ROOT, "go", "binaries", "data",
                            name.replace(".bin", ".pieces"))) as f:
@@ -5542,7 +5543,8 @@ def pieces_of(name):
             elif word and word[0] == "twin":
                 twins.append((word[1], word[2]))
             elif word and word[0] == "align":
-                aligns.append((word[1], int(word[2]), int(word[3]), int(word[4])))
+                aligns.append((word[1], int(word[2]), int(word[3]), int(word[4]),
+                               int(word[5]) if len(word) == 6 else -1))
             elif word and word[0] == "field":
                 moves = {}
                 for one in word[3:]:
@@ -5564,14 +5566,44 @@ def link(core, table, blocks_out):
             if name.rsplit("_", 1)[0] in blocks_out}
     where = {name: (at, to) for name, at, to in pieces}
 
-    def linked(x):
-        return x - sum(lost.get(name, 0) for name, _, to in pieces if to <= x)
-    for gap, base, anchor, add in aligns:
-        if gap in lost:
-            continue
-        at, to = where[gap]
-        length = (linked(anchor) + add - linked(at) - base) % 256
-        lost[gap] = (to - at) - length
+    def free(references, offset):
+        while offset in references.values():
+            offset = (offset + 2) & 255
+        return offset
+
+    def gaps(lost, references, pick):
+        # each gap's length on its effect's reference; where pick, an
+        # effect's reference on the first gap the link keeps of it: the one
+        # that gap is 0 bytes for, or 2 bytes on where another's is there
+        def linked(x):
+            return x - sum(lost.get(name, 0) for name, _, to in pieces if to <= x)
+        for gap, base, anchor, add, word in aligns:
+            if gap in lost:
+                continue
+            at, to = where[gap]
+            if word >= 0:
+                if pick and word not in references:
+                    references[word] = free(references,
+                                            (linked(at) + base - linked(anchor)) & 255)
+                add = references[word]
+            length = (linked(anchor) + add - linked(at) - base) % 256
+            lost[gap] = (to - at) - length
+    # the gaps on the references as carried and on the references picked:
+    # the link keeps the shorter, and the carried on a tie
+    carried = {}
+    for one in aligns:
+        if one[4] >= 0:
+            carried.setdefault(one[4], struct.unpack(">h", core[one[4]:one[4] + 2])[0])
+    as_carried, picked, references = dict(lost), dict(lost), {}
+    gaps(as_carried, carried, False)
+    gaps(picked, references, True)
+    for word in carried:
+        if word not in references:
+            references[word] = free(references, carried[word])
+    if sum(picked.values()) <= sum(as_carried.values()):
+        lost, references = as_carried, carried
+    else:
+        lost = picked
     for copy, first in twins:
         assert lost.get(copy, 0) == lost.get(first, 0), \
             "piece %s loses %d bytes and %s, which it copies, %d" % (
@@ -5586,6 +5618,8 @@ def link(core, table, blocks_out):
     for at, prefix in masks:
         moved[at:at + 2] = struct.pack(">H", sum(1 << i for i in range(16)
                                                  if "%s%d" % (prefix, i) in kept))
+    for at, offset in references.items():
+        moved[at:at + 2] = struct.pack(">H", offset)
     out, start = bytearray(), 0
     for name, at, to in pieces:
         if lost.get(name, 0):
@@ -5633,7 +5667,8 @@ def linked_player(ym, defines):
     code, symbols = build(flagged(flags))
     first = core_symbols["YMXR_init"] - symbols["YMXR_init"]
     assert core_code[first:] == code, "the player in %s is not the player assembled" % name
-    out = [(name, a, to) for name, a, to in table[0] if lost.get(name, 0) == to - a]
+    # the pieces of the blocks left out; a gap kept is kept at 0 bytes too
+    out = [(name, a, to) for name, a, to in table[0] if name.rsplit("_", 1)[0] in blocks_out]
     moved = Symbols()
     for sym, value in symbols.items():
         if sym not in symbols.text:
@@ -5647,6 +5682,12 @@ def linked_player(ym, defines):
             continue
         moved[sym] = value - sum(lost.get(name, 0) for name, _, to in table[0]
                                  if to <= first + value)
+    # each effect's reference, which the link picks, out of ymxr_refat
+    if "ymxr_refat" in moved:
+        for e in range(4):
+            at = moved["ymxr_refat"] + 2 * e
+            moved["ymxr_ref%d" % e] = moved["ymxr_ref"] + struct.unpack(
+                ">H", ours[first + at:first + at + 2])[0]
     moved.text = frozenset(sym for sym in symbols.text if sym in moved)
     return ours[first:], moved, "%s linked, %d bytes of %d, %s left out" % (
         name, len(ours), len(core_code), ", ".join(blocks_out) or "no block")
