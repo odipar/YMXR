@@ -263,14 +263,18 @@ final class LinkTest {
     }
 
     /** LINKER.md's tables of the kinds: each handler's bytes in the plain
-     *  core, and each lookup instance's and its loop of init's in the core
-     *  with the lookup in. */
+     *  core and its start's in each effect's frame code, and each lookup
+     *  instance's and its loop of init's in the core with the lookup in. */
     @Test
     void theDocumentReadsTheSizesOfTheKinds() throws IOException {
         String doc = Files.readString(Path.of("doc/LINKER.md"));
         java.util.Map<String, Integer> plain = sizes(Pieces.carried(Binaries.CORE));
         for (String kind : Link.KINDS) {
-            String row = "| `" + kind + "` | " + plain.get(kind + "0_1") + " | ";
+            // a square's and a source of one row's start is a piece of the
+            // handler's block in each effect's frame code
+            Integer start = plain.get(kind + "0_3");
+            String row = "| `" + kind + "` | " + plain.get(kind + "0_1") + " | "
+                    + (start == null ? "in `several`" : start) + " | ";
             assertTrue(doc.contains("\n" + row), "LINKER.md has no row starting " + row);
         }
         java.util.Map<String, Integer> mapped =

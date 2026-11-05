@@ -1,9 +1,46 @@
 ; effect.S - EFFECT, the four columns of one effect at the frame, which
 ; play.S expands once an effect.
 
+; A piece of an effect's frame code that a source of one kind runs: the
+; piece \{kind}<e>_3 of effect e, whose record is at \fx (doc/LINKER.md).
+                .macro  EPIECE  kind,fx
+                .if     (\fx-WS_FX)=0
+                PIECE   \{kind}0_3
+                .endif
+                .if     (\fx-WS_FX)=FX_SIZE
+                PIECE   \{kind}1_3
+                .endif
+                .if     (\fx-WS_FX)=(2*FX_SIZE)
+                PIECE   \{kind}2_3
+                .endif
+                .if     (\fx-WS_FX)=(3*FX_SIZE)
+                PIECE   \{kind}3_3
+                .endif
+                .endm
+                .macro  EENDPIECE kind,fx
+                .if     (\fx-WS_FX)=0
+                ENDPIECE \{kind}0_3
+                .endif
+                .if     (\fx-WS_FX)=FX_SIZE
+                ENDPIECE \{kind}1_3
+                .endif
+                .if     (\fx-WS_FX)=(2*FX_SIZE)
+                ENDPIECE \{kind}2_3
+                .endif
+                .if     (\fx-WS_FX)=(3*FX_SIZE)
+                ENDPIECE \{kind}3_3
+                .endif
+                .endm
+
 ; One effect: the target kept, the source started or stopped, the timer's
-; count and select written, with the timer's and the place's reset.
-                .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,two,three,vector,lk
+; count and select written, with the timer's and the place's reset. Its
+; frame code is four pieces: the head, \{eff}_1, up to the branch that
+; tells the shapes apart; the start of a square, square<e>_3; the start
+; of a source of one row, one<e>_3; and the rest, \{eff}_5, which play.S
+; ends. A link leaves a start out where the effect starts no source of its
+; kind, and init reads the bytes of the two the effect keeps out of
+; ymxr_resets wherever a branch it aims reaches past them.
+                .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,eff,vector,lk
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
 ; that separates them, and the word after it has the read's
@@ -142,13 +179,17 @@ q\{ct}:         bra.w   \{tick}_done
 
 ; The cell separates the two shapes: -1 two rows alternating, -2 one
 ; row repeating. Init drops this test where the tune uses one of the two
-; and not the other, the branch above going straight to that shape.
+; and not the other, the branch above going straight to that shape. The
+; branch is a word: it reaches the start of a source of one row past the
+; square's, which a link can leave out.
 \{tick}_shaped: addq.l  #1,d0
-\{tick}_wide:   bne.s   \{tick}_one
+\{tick}_wide:   bne.w   \{tick}_one
+                ENDPIECE \{eff}_1
 ; A square: the two rows into the handler's immediate and the difference
 ; of the two into the one instruction that moves between them. The row the
 ; immediate is at is the place, and a start that moves no place leaves
 ; the half it is in, which bit 7 marks.
+                EPIECE  square,\fx
 \{tick}_square: lea     \sq(pc),a5
                 move.b  (a4),d3                 ; the first row
                 move.b  1(a4),d4                ; the marker
@@ -207,9 +248,11 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 bclr    #5,d2
                 bra.w   \{tick}_rate
+                EENDPIECE square,\fx
 
 ; A source of one row: the row into the handler's immediate. The
 ; handler moves no place, so a start resets none.
+                EPIECE  one,\fx
 \{tick}_one:    lea     \one(pc),a5
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
@@ -221,6 +264,8 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  #1,\fx+FX_SHAPE(a0)
                 bclr    #5,d2
                 bra.w   \{tick}_rate
+                EENDPIECE one,\fx
+                PIECE   \{eff}_5
                 .if     YMXR_MAP
 ; Start with optional lookup support (SPEC.md 1.10.2). Init redirects
 ; _now here. A set mapping column replaces kept; an unset column reuses
