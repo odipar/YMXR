@@ -1,45 +1,49 @@
 ; effect.S - EFFECT, the four columns of one effect at the frame, which
 ; play.S expands once an effect.
 
-; A piece of an effect's frame code that a source of one kind runs: the
-; piece \{kind}<e>_3 of effect e, whose record is at \fx (doc/LINKER.md).
-                .macro  EPIECE  kind,fx
+; A piece of an effect's frame code that some songs run alone: the piece
+; \{kind}<e>\n of effect e, whose record is at \fx, \n the piece's number
+; after its underscore, as _3 (doc/LINKER.md).
+                .macro  EPIECE  kind,n,fx
                 .if     (\fx-WS_FX)=0
-                PIECE   \{kind}0_3
+                PIECE   \{kind}0\n
                 .endif
                 .if     (\fx-WS_FX)=FX_SIZE
-                PIECE   \{kind}1_3
+                PIECE   \{kind}1\n
                 .endif
                 .if     (\fx-WS_FX)=(2*FX_SIZE)
-                PIECE   \{kind}2_3
+                PIECE   \{kind}2\n
                 .endif
                 .if     (\fx-WS_FX)=(3*FX_SIZE)
-                PIECE   \{kind}3_3
+                PIECE   \{kind}3\n
                 .endif
                 .endm
-                .macro  EENDPIECE kind,fx
+                .macro  EENDPIECE kind,n,fx
                 .if     (\fx-WS_FX)=0
-                ENDPIECE \{kind}0_3
+                ENDPIECE \{kind}0\n
                 .endif
                 .if     (\fx-WS_FX)=FX_SIZE
-                ENDPIECE \{kind}1_3
+                ENDPIECE \{kind}1\n
                 .endif
                 .if     (\fx-WS_FX)=(2*FX_SIZE)
-                ENDPIECE \{kind}2_3
+                ENDPIECE \{kind}2\n
                 .endif
                 .if     (\fx-WS_FX)=(3*FX_SIZE)
-                ENDPIECE \{kind}3_3
+                ENDPIECE \{kind}3\n
                 .endif
                 .endm
 
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset. Its
-; frame code is four pieces: the head, \{eff}_1, up to the branch that
-; tells the shapes apart; the start of a square, square<e>_3; the start
-; of a source of one row, one<e>_3; and the rest, \{eff}_5, which play.S
-; ends. A link leaves a start out where the effect starts no source of its
-; kind, and init reads the bytes of the two the effect keeps out of
-; ymxr_resets wherever a branch it aims reaches past them.
+; frame code is pieces: the head, \{eff}_1, up to the branch that tells
+; the shapes apart; the start of a square, square<e>_3; the start of a
+; source of one row, one<e>_3; with the lookup in, the start through a
+; transformation and the remap, map<e>_1; with the deferred start in,
+; the paths that arm and read a pending start, defer<e>_1; and the rest,
+; \{eff}_5, which play.S ends. A link leaves a piece out where the
+; effect runs none of it, and init reads the bytes of the pieces the
+; effect keeps out of ymxr_resets wherever a branch it aims reaches past
+; them.
                 .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,eff,vector,lk
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
@@ -189,7 +193,7 @@ q\{ct}:         bra.w   \{tick}_done
 ; of the two into the one instruction that moves between them. The row the
 ; immediate is at is the place, and a start that moves no place leaves
 ; the half it is in, which bit 7 marks.
-                EPIECE  square,\fx
+                EPIECE  square,_3,\fx
 \{tick}_square: lea     \sq(pc),a5
                 move.b  (a4),d3                 ; the first row
                 move.b  1(a4),d4                ; the marker
@@ -248,11 +252,11 @@ q\{ct}:         bra.w   \{tick}_done
                 .endif
                 bclr    #5,d2
                 bra.w   \{tick}_rate
-                EENDPIECE square,\fx
+                EENDPIECE square,_3,\fx
 
 ; A source of one row: the row into the handler's immediate. The
 ; handler moves no place, so a start resets none.
-                EPIECE  one,\fx
+                EPIECE  one,_3,\fx
 \{tick}_one:    lea     \one(pc),a5
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
@@ -264,9 +268,9 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  #1,\fx+FX_SHAPE(a0)
                 bclr    #5,d2
                 bra.w   \{tick}_rate
-                EENDPIECE one,\fx
-                PIECE   \{eff}_5
+                EENDPIECE one,_3,\fx
                 .if     YMXR_MAP
+                EPIECE  map,_1,\fx
 ; Start with optional lookup support (SPEC.md 1.10.2). Init redirects
 ; _now here. A set mapping column replaces kept; an unset column reuses
 ; it. Identity uses the start above; a transformation uses the shared
@@ -380,8 +384,10 @@ q\{ct}:         bra.w   \{tick}_done
                 bne.w   \{tick}_kept
                 .endif
                 bra.w   \{tick}_rstop
+                EENDPIECE map,_1,\fx
                 .endif
                 .if     YMXR_DEFER
+                EPIECE  defer,_1,\fx
 ; A tune whose rows defer a start (SPEC.md 3.3, 4.8) has init aim three
 ; branches of each effect here: the timer's reset, which a deferred start
 ; makes at the switch; a start or a stop, with a start pending or one to
@@ -444,8 +450,10 @@ q\{ct}:         bra.w   \{tick}_done
                 moveq   #0,d5
                 bsr.w   ymxr_pend
                 bra.w   \{tick}_rate
+                EENDPIECE defer,_1,\fx
                 .endif
 
+                PIECE   \{eff}_5
 \{tick}_stop:   andi.b  #\keep,\ctrl.w          ; select 0: the timer stops
                 move.b  #255-(1<<\bit),(\ier+4).w ; and drops its latched tick
 \{tick}_rate:   READ    \cn

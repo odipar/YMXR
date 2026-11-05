@@ -1604,7 +1604,10 @@ def inside(code, symbols, bound, tune, workspace):
             # them. The head of an effect the tune does not run is branched
             # over; the point after effect 3 is reached on every row.
             if "ymxr_look" in symbols and tune.version == MAPPED:
-                at.append((i, i, CODE + symbols["ymxr_tick%d_rpage" % i], "page"))
+                # the remap's piece of the effect's frame code, which a
+                # linked player keeps where the effect maps a value
+                if "ymxr_tick%d_rpage" % i in symbols:
+                    at.append((i, i, CODE + symbols["ymxr_tick%d_rpage" % i], "page"))
                 at.append((i, i + 1, CODE + symbols["ymxr_lwindow"], "window"))
                 at.append((i, i + 1, CODE + symbols["ymxr_lkwindow"], "window one"))
                 at.append((i, i + 1, CODE + symbols["ymxr_rlevel"], "square"))
@@ -2904,10 +2907,12 @@ def lookup_regions(symbols):
     at = {name: CODE + symbols[name] for name in (
         "ymxr_page", "ymxr_lfill", "ymxr_tab", "ymxr_fill", "ymxr_runrow",
         "ymxr_move", "ymxr_widereset", "ymxr_widestart")}
-    # the page byte's write of each effect's remap, in its frame code
+    # the page byte's write of each effect's remap, in its frame code: in
+    # the remap's piece, which a linked player keeps where the effect maps
+    # a value (doc/LINKER.md)
     switches = {"switch%d" % i: (CODE + symbols["ymxr_tick%d_rpage" % i],
                                  CODE + symbols["ymxr_tick%d_remapped" % i])
-                for i in range(4)}
+                for i in range(4) if "ymxr_tick%d_rpage" % i in symbols}
     return dict(switches, **{
         "page": (at["ymxr_page"], at["ymxr_tab"]),
         "fill": (at["ymxr_lfill"], at["ymxr_page"]),

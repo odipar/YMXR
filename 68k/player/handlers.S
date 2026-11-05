@@ -926,19 +926,21 @@ ymxr_bank1end:
 ; the timer is stopped where the start sets timerReset, the count and the
 ; select are written, and the vector is aimed at the armed handler, whose
 ; next tick reads the new source (SPEC.md 4.8). Every operand is patched
-; at the frame that arms the start.
-                PIECE   effect0_4
+; at the frame that arms the start. Each is a piece of its effect's
+; deferred start's block, defer<e>_2, as a hook reaches it where the
+; effect defers a start alone (doc/LINKER.md).
+                PIECE   defer0_2
                 INSTALL ymxr_inst0,$FFFFFA19,$FFFFFA1F,$F0,$FFFFFA07,5,0,0,$134,$DF,$FFFFFA0F
-                ENDPIECE effect0_4
-                PIECE   effect1_4
+                ENDPIECE defer0_2
+                PIECE   defer1_2
                 INSTALL ymxr_inst1,$FFFFFA1D,$FFFFFA25,$F0,$FFFFFA09,4,0,1,$110,$EF,$FFFFFA11
-                ENDPIECE effect1_4
-                PIECE   effect2_4
+                ENDPIECE defer1_2
+                PIECE   defer2_2
                 INSTALL ymxr_inst2,$FFFFFA1B,$FFFFFA21,$F0,$FFFFFA07,0,0,0,$120,$FE,$FFFFFA0F
-                ENDPIECE effect2_4
-                PIECE   effect3_4
+                ENDPIECE defer2_2
+                PIECE   defer3_2
                 INSTALL ymxr_inst3,$FFFFFA1D,$FFFFFA23,$0F,$FFFFFA09,5,4,1,$114,$DF,$FFFFFA11
-                ENDPIECE effect3_4
+                ENDPIECE defer3_2
                 .endif
 ymxr_reach:                             ; past the last handler, which the
                                         ; reach init measures runs to

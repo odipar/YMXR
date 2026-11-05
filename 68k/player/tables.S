@@ -15,6 +15,15 @@ ymxr_k_counted: dc.w    $000F
 ymxr_k_two:     dc.w    $000F
 ymxr_k_three:   dc.w    $000F
 ymxr_k_envelope: dc.w   $000F
+; The effects that keep the remap's piece and the deferred start's of
+; their frame code, a bit an effect: init aims an effect's branches at the
+; two where its bit is set and the tune maps a value or defers a start.
+                .if     YMXR_MAP
+ymxr_k_map:     dc.w    $000F
+                .endif
+                .if     YMXR_DEFER
+ymxr_k_defer:   dc.w    $000F
+                .endif
 
 ; Each effect's handler of a kind, from the kind's table: a start reads
 ; the instance there, which a link moves as it leaves instances out.

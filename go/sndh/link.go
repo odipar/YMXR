@@ -25,8 +25,9 @@ var Lookups = []string{"lk", "lc", "lt", "ln", "lb", "lv", "le", "lf"}
 // Blocks are the blocks a core's pieces belong to, in the order
 // doc/LINKER.md lists them: each handler kind, which init's loop over it
 // is, and its instance on each effect; the start of several columns; each
-// effect's frame code and general handler; each lookup kind and its
-// instance on each effect; and align, the padding before the second bank.
+// effect's frame code and general handler; each effect's remap and
+// deferred start; each lookup kind and its instance on each effect; and
+// align, the padding before the second bank.
 var Blocks = func() []string {
 	var all []string
 	for _, kind := range Kinds {
@@ -38,6 +39,11 @@ var Blocks = func() []string {
 	all = append(all, "several")
 	for i := 0; i < 4; i++ {
 		all = append(all, fmt.Sprintf("effect%d", i))
+	}
+	for _, part := range []string{"map", "defer"} {
+		for i := 0; i < 4; i++ {
+			all = append(all, fmt.Sprintf("%s%d", part, i))
+		}
 	}
 	for _, kind := range Lookups {
 		all = append(all, kind)
@@ -239,7 +245,10 @@ func Kind(source *dtx.Table, counted bool) string {
 }
 
 // BlocksOf is the blocks a set of tunes needs: the block of each effect
-// a tune runs, bits 0 to 3 of its effects byte; for each source an
+// a tune runs, bits 0 to 3 of its effects byte, and its remap where the
+// tune maps a value and a row sets the effect's mapping column, and its
+// deferred start where the tune defers a start and a row of the effect
+// does; for each source an
 // effect's rows start, the instance of its handler kind on that effect
 // and the kind's loop of init; several where a start is of a counted
 // source or one of several columns; the lookup instance of each kind an
@@ -257,6 +266,12 @@ func BlocksOf(tunes []ymxr.File) []string {
 				continue
 			}
 			needed[fmt.Sprintf("effect%d", i)] = true
+			if tune.Effects&ymxr.Maps != 0 && sets(tune, ymxr.MappingColumn+i, 0) {
+				needed[fmt.Sprintf("map%d", i)] = true
+			}
+			if tune.Effects&ymxr.Defers != 0 && sets(tune, ymxr.Effect+4*i+2, ymxr.Deferred) {
+				needed[fmt.Sprintf("defer%d", i)] = true
+			}
 			for _, s := range Started(tune, i) {
 				source := tune.Sources[s-1]
 				kind := Kind(source, tune.Counted[s-1])
@@ -277,6 +292,22 @@ func BlocksOf(tunes []ymxr.File) []string {
 		}
 	}
 	return ordered
+}
+
+// sets is whether a row of the tune sets column c, bit 7, with the bits of
+// bits set too: the remap's piece of an effect's frame code runs where its
+// mapping column is set, and the deferred start's where its control column
+// defers a start.
+func sets(tune ymxr.File, c int, bits byte) bool {
+	if c >= tune.Table.Columns() {
+		return false
+	}
+	for _, b := range tune.Table.Column(c) {
+		if b&0x80 != 0 && b&bits == bits {
+			return true
+		}
+	}
+	return false
 }
 
 // LookupsOf is the lookup instances a tune runs, as blocks such as lt1:
