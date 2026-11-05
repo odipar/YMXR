@@ -62,7 +62,18 @@ Usage: test_ymxr.py [tune.ym ...]      the fixtures under ym/test by default
                                        -link links for it (doc/LINKER.md),
                                        the tool's core against the rig's
                                        link; combines with the switches
-                                       above and -kit
+                                       above, -kit, -corpus and -generated
+       test_ymxr.py -generated[N]      N tunes of the generator in place of
+                                       the fixtures, 20 unless N sets it,
+                                       each subtune against the model and
+                                       the reader's record, the checks
+                                       before the tunes left out; the run
+                                       prints the coverage of its rows,
+                                       and a tune that fails is written to
+                                       a folder, whose path the run prints
+       test_ymxr.py -seedS             with -generated, the tunes from tune
+                                       S on, 0 unless S sets it: tune I of
+                                       the run is tune S + I
        test_ymxr.py -xpatch           the real-ST program of 68k/test/st
                                        under Hatari: each case's line of
                                        the XPATCH.TXT it writes against
@@ -101,6 +112,7 @@ real-ST program under -xpatch.
 import copy
 import json, os
 from collections import Counter
+import random
 import re
 import struct
 import subprocess
@@ -1640,14 +1652,23 @@ def inside(code, symbols, bound, tune, workspace):
             # a boundary inside a step is reached in a pass and a loop or
             # not at all
             left = [one for one in left if one[3] is None]
-        if not left:
+        # past the last row of a tune that plays once the call reports the
+        # end (4.6), and the model has no row to read
+        if not left or model.row == tune.R:
             break
         # the first boundary left whose effect this row moves: where the
         # row leaves every one of them as it is, the two readings at
-        # each boundary are one and the row plays as a frame of a run
+        # each boundary are one and the row plays as a frame of a run. A
+        # remap writes its page byte at the page switch where the effect's
+        # record has its cache in force, FX_LOK, and runs ymxr_remap
+        # otherwise, as after the arming of a deferred start; the rig reads
+        # FX_LOK off the player, and the model tracks no cache
         pick = next(((one, moves) for one in left
                      for moves in [model.moved(one[0])]
-                     if moves and reaches(model, one[0], one[3])), None)
+                     if moves and reaches(model, one[0], one[3])
+                     and (one[3] != "page" or m.byte(
+                         workspace + equate("WS_FX", symbols) + one[0] * equate(
+                             "FX_SIZE", symbols) + equate("FX_LOK", symbols)))), None)
         if pick is None:
             d0 = m.call("play", a0=workspace)
             want = model.frame()
@@ -1671,10 +1692,16 @@ def inside(code, symbols, bound, tune, workspace):
             model.begin()
             for j in range(step):
                 model.step(j)
-            write, _ = model.tick(i)    # the place stepped, as a tick steps it
+            write, ended = model.tick(i)    # the place stepped, as a tick steps it
             assert write == (was if step <= i else then), \
                 "frame %d: the model reads effect %d at boundary %d as %s, not %s" % (
                     f, i, step, write, (was, then))
+            if kind is not None and step > i and ended == "stop" and model.fx[i]["selected"]:
+                # a tick inside the step, after the start and before the
+                # rate's writes, that ends a source that plays once: the
+                # select the step writes after it starts the timer again,
+                # its place at the last row (SPEC.md 1.9.4, 5.1 step 5)
+                model.fx[i]["running"] = True
             before = len(m.psg)
             m.fire(TIMER[i]["vector"])
             assert masked(m.psg[before:]) == masked(write), \
@@ -1692,6 +1719,8 @@ def inside(code, symbols, bound, tune, workspace):
             break                       # the tune has ended (4.6)
         timers.apply(m.mfp)
         for k in timers.due(clocks):
+            assert model.fx[k]["running"], \
+                "frame %d: a tick of effect %d with no source running" % (f, k)
             write, _ = model.tick(k)
             m.interrupt(TIMER[k]["vector"])
             assert masked(m.psg) == masked(write), \
@@ -1700,13 +1729,17 @@ def inside(code, symbols, bound, tune, workspace):
     return fired
 
 
-def built(name, tune):
+def built(name, tune, checked=False):
     """A tune written here through YMXS's form rather than converted from a
     dump, as a file to play: ymxs-to-ymxr converts it, and the version word
-    of the file comes back beside its path (SPEC.md 3.3.5)."""
+    of the file comes back beside its path (SPEC.md 3.3.5). With checked,
+    the tool reports no warning: YMXS's check of the writing rules finds
+    none (YMXS, SPEC.md 6.3; tools.md 7.2)."""
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxs-to-ymxr"), "-silent"],
                        input=json.dumps(tune).encode(), capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
+    warned = [line for line in r.stderr.decode().splitlines() if ": warning: " in line]
+    assert not checked or not warned, "%s: %s" % (name, warned[0])
     at = os.path.join(tempfile.mkdtemp(), name + ".ymxr")
     with open(at, "wb") as f:
         f.write(r.stdout)
@@ -1780,7 +1813,8 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
             "rate": 50, "rows": rows, "repeat": repeat,
             "sources": [{"name": name, "repeat": rr, "values": values}
                         for name, values, rr in sources],
-            "registers": registers or {"r7": [56] + [-1] * (rows - 1)}}
+            "registers": ({"r7": [56] + [-1] * (rows - 1)} if registers is None
+                          else registers)}
     if transformations:
         tune["transformations"] = [{"name": name, "entries": list(entries)}
                                    for name, entries in transformations]
@@ -3127,7 +3161,7 @@ def pages(m, symbols, model, i, at, name, said):
 
 
 def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
-          ticked=None, spans=None):
+          ticked=None, spans=None, kinds=None):
     """The tune on the player, against the model frame by frame and tick
     by tick; with kit, each frame against the reader's entry as well,
     and a tune that plays once to the call that reports its end. With
@@ -3141,7 +3175,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
 
     With parts, the counter splits ST4's decoder out of the advance and
     counts the operations each refill parses, so one pass over the frames
-    reads the table's figures and the parts below it (refills)."""
+    reads the table's figures and the parts below it (refills). With
+    kinds, a Counter, each row's operations are added to it as row_kinds
+    reads them."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
     workspace = WORK + 0x100
@@ -3408,6 +3444,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         if looking:
             shapes = [(shape_of(model, i), model.fx[i]["run"]) for i in range(4)]
             row = model.tune.rows[model.row]
+        if kinds is not None:
+            kinds.update(row_kinds(model))
         want = model.frame()
         if looking:
             spent = dict(cycles.spent, routine=routine["cycles"])
@@ -5635,14 +5673,22 @@ def link(core, table, blocks_out):
 
 
 def linked_player(ym, defines):
-    """The player ymxr-sndh -link links for one tune, cut out of the SNDH
-    file it writes, and its symbols as the link moved them; and the line
-    the run prints of it. The rig links the assembled core with the
-    blocks the tool reports left out and requires the same bytes, its
-    patched longs aside, and the player in the core to be the player
-    assembled alone (doc/LINKER.md, The check)."""
+    """The player ymxr-sndh -link links for one tune, or for the set of
+    the tune files a list names, which ymxr-multi joins in its order, cut
+    out of the SNDH file it writes, and its symbols as the link moved
+    them; the line the run prints of it; and the core's name and the
+    blocks left out. The rig links the assembled core with the blocks the
+    tool reports left out and requires the same bytes, its patched longs
+    aside, and the player in the core to be the player assembled alone
+    (doc/LINKER.md, The check)."""
     work = tempfile.mkdtemp()
-    file, _ = convert(ym, work)
+    if isinstance(ym, list):
+        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-multi"), "-silent"] + ym,
+                           capture_output=True)
+        assert r.returncode == 0, r.stderr.decode()
+        file = r.stdout
+    else:
+        file, _ = convert(ym, work)
     bits = asked(defines)
     r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-link"]
                        + (["-perf"] if bits & 1 else []) + (["-lean"] if bits & 2 else [])
@@ -5695,7 +5741,8 @@ def linked_player(ym, defines):
                 ">H", ours[first + at:first + at + 2])[0]
     moved.text = frozenset(sym for sym in symbols.text if sym in moved)
     return ours[first:], moved, "%s linked, %d bytes of %d, %s left out" % (
-        name, len(ours), len(core_code), ", ".join(blocks_out) or "no block")
+        name, len(ours), len(core_code), ", ".join(blocks_out) or "no block"), \
+        (name, set(blocks_out) - {""})
 
 
 # The labels at a piece's first byte that name the first byte the link
@@ -5719,6 +5766,601 @@ def played_on(at, code, symbols):
 # The checks before the tunes that play their tunes through played_on, so
 # a run under -linked plays them on linked players.
 LINKABLE = ("deferred", "mapped")
+
+# The tunes of -generated: tune N is drawn from a generator seeded with N,
+# so tune I of a run from seed S is tune S + I, and -generated1 -seedN
+# plays tune N alone. A run draws GENERATED_TUNES tunes where no count
+# follows the flag, from seed GENERATED_SEED where -seed is absent.
+GENERATED_TUNES = 20
+GENERATED_SEED = 0
+
+# The lanes of a generated tune, a lane the targets one timer runs on:
+# the targets, the most of each value of a source's row (YMXS, SPEC.md
+# 2.1), and the keys of a transformation of the last value and the most
+# of its entries (3.6). The targets of a lane read one width and their
+# sources are of one form (SPEC.md 2.1, rules 2(d) and 2(f)), so each
+# source of a lane runs on each target of it through each transformation
+# of it. A source of `keys` is one column with a key of 128 or more, and
+# every start maps it through 256 entries, so the writer writes it
+# counted (SPEC.md 3.1.6).
+LANES = {"low": ((1, 3, 5, 13), (15,), 16, 15),
+         "volume": ((6, 8, 9, 10), (31,), 32, 31),
+         "keys": ((6, 8, 9, 10), (255,), 256, 31),
+         "bytes": ((0, 2, 4, 11, 12), (255,), 256, 255),
+         "mixer": ((7,), (63,), 64, 63),
+         "tone": ((14, 15, 16), (255, 15), 16, 15),
+         "noise": ((22, 23, 24), (31, 31), 32, 31),
+         "envelope": ((20,), (255, 255), 256, 255),
+         "voice": ((17, 18, 19), (255, 15, 31), 32, 31),
+         "buzzer": ((21,), (255, 255, 15), 16, 15)}
+
+# The lanes whose sources the generator writes in the other form of
+# SPEC.md 3.1.6 at times: counted where the writer marks them, and on
+# setEnvelope marked, the form of 2.1.4, its high byte 0 to 127; and with
+# MARKED_THREE clear the lanes of three columns as well.
+REFORMED = ("tone", "noise")
+
+# The most ticks a second of a generated start or retune, but for a
+# divisor of 4, which counts its ten slowest counts and 0 alone, 2,497
+# ticks a second at most.
+GENERATED_RATE = 1000
+
+# The cases the generator leaves out, each for a fault of the player
+# (doc/LINKER.md, The check), and each a switch: False draws the case.
+#
+# With EVERY_BLOCK, each timer's first start in a subtune is deferred
+# where the subtune defers a start and maps through a transformation
+# where it maps a value, and in a set the first subtune that defers a
+# start, and the first that maps a value, runs every timer the set runs:
+# a player linked for the set keeps the deferred start and the remap of
+# each effect it runs (doc/LINKER.md, Blocks). Where the link leaves one
+# of the two out of an effect it keeps, init writes the read sites of
+# the block over the code of the next piece of the effect.
+#
+# With RESET_ONCE, a start of a counted source that plays once, of one
+# row or with placeReset clear, sets timerReset: the two starts whose
+# place can be the source's last row. Where the start leaves it clear
+# on a running timer, a tick after the start's window and before the
+# frame writes the rate can read that row: the tick stops the timer, the
+# select the frame writes starts it again (SPEC.md 1.9.4), and the next
+# tick of the player's counted handler writes the row again and leaves
+# the timer running, and the tick after it reads past the row, where
+# SPEC.md 5.1 step 3 reads row R - 1 as the last.
+#
+# With MARKED_THREE, a source of three columns is marked: the player's
+# counted handler of several columns writes two of its columns a tick,
+# where SPEC.md 5.1 writes the three.
+EVERY_BLOCK = True
+RESET_ONCE = True
+MARKED_THREE = True
+LEFT_OUT = ("EVERY_BLOCK", "RESET_ONCE", "MARKED_THREE")
+
+
+class Draws(random.Random):
+    """random.Random with each draw made of random() alone, so a seed
+    draws one sequence in every version of Python 3: random() and the
+    seeding of a whole number are fixed, and choice, randrange and sample
+    have changed between versions."""
+
+    def randrange(self, start, stop=None):
+        if stop is None:
+            start, stop = 0, start
+        return start + int(self.random() * (stop - start))
+
+    def randint(self, a, b):
+        return self.randrange(a, b + 1)
+
+    def choice(self, seq):
+        return seq[self.randrange(len(seq))]
+
+    def sample(self, population, k):
+        pool, out = list(population), []
+        for _ in range(k):
+            out.append(pool.pop(self.randrange(len(pool))))
+        return out
+
+
+def reckoned(rows, by, count, rate=50):
+    """The frames a source of `rows` rows that plays once runs for from
+    its start at divisor `by` and count `count`, as YMXS's check reckons
+    them (YMXS, SPEC.md 6.4)."""
+    return (rows * by * (count or 256) * rate + 153600 + 2457599) // 2457600
+
+
+def drawn_rate(rng):
+    """A divisor and a count of GENERATED_RATE ticks a second or fewer, or
+    of a divisor of 4, drawn once in thirteen."""
+    by = rng.choice((4, 10, 10, 16, 16, 50, 50, 64, 64, 100, 100, 200, 200))
+    least = min(-(-MFP_CLOCK // (GENERATED_RATE * by)), 246)
+    return by, rng.choice([0] + list(range(least, 256)))
+
+
+def drawn_source(rng, lane, name, marked):
+    """A source of a lane: on the lanes of one marked column a square, a
+    source of one row or rows of another shape, and on the others 1 to 6
+    rows, repeating to a row or playing once. With marked, the high byte
+    of each row of a source of setEnvelope is 0 to 127."""
+    _, most, _, _ = LANES[lane]
+    shape = rng.choice(("square", "one", "rows")) if lane in ("low", "volume") else "rows"
+    if shape == "square":
+        count, repeat = 2, 0
+    elif shape == "one":
+        count, repeat = 1, 0
+    else:
+        count = rng.randint(1, 6)
+        repeat = rng.choice(list(range(count)) + [None])
+    highs = [127 if marked and c == 1 else most[c] for c in range(len(most))]
+    rows = [[rng.randint(0, high) for high in highs] for _ in range(count)]
+    if lane == "keys" and all(row[0] < 128 for row in rows):
+        rows[rng.randrange(count)][0] = rng.randint(128, 255)
+    return name, [row[0] if len(row) == 1 else row for row in rows], repeat
+
+
+def generated_tune(rng, title, maps, defers, letters):
+    """A tune of the generator on the timers `letters` names: (its
+    structure, the edits of its rows, the forms of its sources), for
+    effects_tune, edited and reformed. With maps its starts and remaps
+    map through transformations at times, and with defers its starts are
+    deferred at times.
+
+    R rows, 8 to 24, at 50 Hz, R and the repeat row multiples of 4, so the
+    writer pads no table (tools.md 4.4) and an edit of row N lands on row
+    N; or a tune that plays once. Each timer on a lane whose registers no
+    other timer of the tune writes, so the tune follows rules 1 and 2 with
+    each register column unset but R7's at row 0 and a few of the
+    registers no lane writes; each register is the target of a lane of
+    one register, so a timer finds a lane while a register is free for
+    each timer after it. A timer's first start is in the first half of
+    the rows, and each row after it performs an operation on the timer at
+    times: a start of any source of the lane, at its frame or deferred, on
+    a timer idle or running, at times at the running rate with both
+    resets clear, and then at times with the kept target and mapping, so
+    the row sets the source column alone (SPEC.md 1.8.4); a retune and a
+    remap through the lane's transformations or to the identity, where
+    the check of YMXS reads the effect running; and a stop, where the
+    check's model has an effect (YMXS, SPEC.md 6.3 and 6.4). The repeat
+    row starts or stops every timer, so the wrap resumes from a setting it
+    defines (rule 1(d)). A retune and a remap come where the effect runs
+    on the player and in the check alike: on a source that repeats, or
+    with a deferred start of one pending. A source that plays once can end
+    on the player before the row the check reckons it ends at (SPEC.md
+    6.4), and a retune there starts a timer with no source. LEFT_OUT names
+    the cases left out.
+
+    A row sets the target column alone at times, an edit of the tune
+    file, to any target: the kept target, which the timer's next start
+    sets again, so the start runs as the structure reads (SPEC.md 1.8.2,
+    rule 2(c)). A source of REFORMED is counted at times, and a source of
+    setEnvelope marked on a lane that marks them all."""
+    rows = 4 * rng.randint(2, 6)
+    repeat = None if rng.random() < 0.25 else 4 * rng.randrange(rows // 4)
+    reformed_lanes = REFORMED + (() if MARKED_THREE else ("voice", "buzzer"))
+
+    def writes(targets):
+        return {register for target in targets for register, _ in TARGETS[target]}
+    claimed, lanes = set(), {}
+    letters = sorted(letters)
+    for at, letter in enumerate(letters):
+        after = len(letters) - at - 1
+        for lane in rng.sample(sorted(LANES), len(LANES)):
+            if lane == "keys" and not maps:
+                continue
+            free = [t for t in LANES[lane][0] if not writes([t]) & claimed]
+            kept = rng.sample(free, rng.randint(1, len(free))) if free else []
+            # a register free for each timer after this one
+            while kept and 14 - len(claimed | writes(kept)) < after:
+                kept = kept[:-1]
+            if kept:
+                claimed |= writes(kept)
+                lanes[letter] = (lane, kept)
+                break
+        assert letter in lanes, "%s: Timer %s finds no lane" % (title, letter)
+    pools, tables, marked, counted = {}, {}, {}, {}
+    for lane in sorted({lane for lane, _ in lanes.values()}):
+        marked[lane] = lane == "envelope" and rng.random() < 0.5
+        pools[lane] = [drawn_source(rng, lane, "%s %d" % (lane, k), marked[lane])
+                       for k in range(rng.randint(1, 3))]
+        # the form of each source: counted where the writer writes it so,
+        # and a source of the reformed lanes counted at times (SPEC.md
+        # 3.1.6)
+        for k in range(len(pools[lane])):
+            counted[(lane, k)] = (lane in ("keys", "bytes", "mixer")
+                                  or (lane == "envelope" and not marked[lane])
+                                  or (lane in reformed_lanes and rng.random() < 1 / 3))
+        if maps:
+            _, _, keys, top = LANES[lane]
+            if marked[lane]:
+                keys, top = 128, 127
+            tables[lane] = [("%s T%d" % (lane, k), [rng.randint(0, top) for _ in range(keys)])
+                            for k in range(rng.randint(1, 3))]
+
+    def mapping(lane):
+        # 0, the identity, or a transformation of the lane
+        if lane not in tables or (lane != "keys" and rng.random() < 0.35):
+            return 0
+        return (lane, rng.randrange(len(tables[lane])))
+
+    def source_of(key):
+        return pools[key[0]][key[1]]
+
+    def run_of(start, n):
+        # the effect of the check's model: its source, its rate and the row
+        # its source has run out from
+        _, values, rr = source_of(start["source"])
+        return dict(source=start["source"], by=start["by"], count=start["count"],
+                    until=float("inf") if rr is not None
+                    else n + reckoned(len(values), start["by"], start["count"]))
+    # each timer in the check's model, and in the writer's reading: the
+    # kept rate, whether the timer counts at it, the kept target and the
+    # kept mapping (SPEC.md rules 2(c), 2(g) and 4(e))
+    state = {letter: dict(effect=None, pending=None, started=False, rate=None,
+                          counting=False, target=None, mapping=0) for letter in lanes}
+    first = {letter: rng.randrange(rows // 2) for letter in lanes}
+    ops = {letter: {} for letter in lanes}
+    aimed = []
+    for n in range(rows):
+        for letter in sorted(lanes):
+            s = state[letter]
+            if s["pending"] and s["effect"]["until"] <= n:
+                s["effect"], s["pending"] = run_of(s["pending"], n), None
+        for letter in sorted(lanes):
+            lane, targets = lanes[letter]
+            s = state[letter]
+            effect = s["effect"]
+            runs = effect is not None and n < effect["until"]
+            sure = runs and source_of((s["pending"] or effect)["source"])[2] is not None
+            if n == repeat:
+                kinds = ["start"] if n == first[letter] else ["start", "stop"]
+            elif n == first[letter] and not s["started"]:
+                kinds = ["start"]
+            elif s["started"] and rng.random() < 0.3:
+                kinds = (["start"] * 3 + ["retune"] * 2 * sure
+                         + ["remap"] * 3 * (sure and lane in tables)
+                         + ["stop"] * (effect is not None))
+            else:
+                kinds = []
+            kind = rng.choice(kinds) if kinds else None
+            if kind == "start":
+                by, count = drawn_rate(rng)
+                one = dict(kind=kind, source=(lane, rng.randrange(len(pools[lane]))),
+                           target=rng.choice(targets), by=by, count=count,
+                           tr=rng.randint(0, 1) if sure else 1,
+                           pr=rng.randint(0, 1) if s["started"] else 1,
+                           deferred=int(defers and rng.random() < 0.4), mapping=mapping(lane))
+                if sure and s["counting"] and rng.random() < 0.3:
+                    # the running rate again, both resets clear, and at
+                    # times the kept target and mapping as well
+                    one.update(by=s["rate"][0], count=s["rate"][1], tr=0, pr=0, deferred=0)
+                    if rng.random() < 0.5:
+                        one.update(target=s["target"], mapping=s["mapping"])
+                if EVERY_BLOCK and not s["started"]:
+                    one["deferred"] = int(defers)
+                    one["mapping"] = one["mapping"] or ((lane, 0) if maps else 0)
+                _, values, rr = source_of(one["source"])
+                if RESET_ONCE and counted[one["source"]] and rr is None \
+                        and (len(values) == 1 or not one["pr"]):
+                    one["tr"] = 1
+                if one["deferred"] and runs:
+                    s["pending"] = one
+                    effect["until"] = min(effect["until"], n + reckoned(
+                        len(source_of(effect["source"])[1]), effect["by"], effect["count"]))
+                else:
+                    s["effect"], s["pending"], s["started"] = run_of(one, n), None, True
+                s["target"], s["mapping"] = one["target"], one["mapping"]
+                if one["deferred"]:
+                    s["rate"], s["counting"] = None, False
+                else:
+                    s["rate"], s["counting"] = (one["by"], one["count"]), rr is not None
+            elif kind == "retune":
+                by, count = drawn_rate(rng)
+                one = dict(kind=kind, by=by, count=count, tr=rng.randint(0, 1),
+                           pr=rng.randint(0, 1))
+                s["rate"] = (by, count)
+            elif kind == "remap":
+                one = dict(kind=kind, mapping=mapping(lane))
+                s["mapping"] = one["mapping"]
+            elif kind == "stop":
+                one = dict(kind=kind)
+                s["effect"], s["pending"], s["counting"] = None, None, False
+            if kind:
+                ops[letter][n] = one
+            if kind in (None, "retune", "remap") and rng.random() < 0.1:
+                aimed.append((n, letter, rng.randrange(25)))
+    # the sources in first-start order and the transformations in order of
+    # first use (YMXS, SPEC.md 1.9), as the structure lists them (json.md
+    # 3.4, 3.8)
+    order, used = [], []
+    for n in range(rows):
+        for letter in sorted(ops):
+            one = ops[letter].get(n)
+            if one and one["kind"] == "start" and one["source"] not in order:
+                order.append(one["source"])
+            if one and one["kind"] in ("start", "remap") and one["mapping"] \
+                    and one["mapping"] not in used:
+                used.append(one["mapping"])
+
+    def parts(lane, m):
+        width = len(LANES[lane][1])
+        return [0] * (width - 1) + [used.index(m) + 1] if m else 0
+    timers = {}
+    for letter, by_row in ops.items():
+        lane = lanes[letter][0]
+        timers[letter] = {}
+        for n, one in by_row.items():
+            if one["kind"] == "start":
+                timers[letter][n] = ("start", order.index(one["source"]) + 1, one["target"],
+                                     one["by"], one["count"], one["tr"], one["pr"],
+                                     one["deferred"], parts(lane, one["mapping"]))
+            elif one["kind"] == "retune":
+                timers[letter][n] = ("retune", one["by"], one["count"], one["tr"], one["pr"])
+            elif one["kind"] == "remap":
+                timers[letter][n] = ("remap", parts(lane, one["mapping"]))
+            else:
+                timers[letter][n] = ("stop",)
+    free = sorted(set(range(14)) - claimed)
+    registers = {}
+    if 7 in free:
+        registers["r7"] = [56] + [-1] * (rows - 1)
+    for _ in range(rng.randint(0, 3) if free else 0):
+        register = rng.choice(free)
+        registers.setdefault("r%d" % register, [-1] * rows)[rng.randrange(rows)] = \
+            rng.randint(0, 63 if register == 7 else FITS[register])
+    tune = effects_tune(title, rows, [source_of(key) for key in order], timers,
+                        registers=registers, repeat=repeat,
+                        transformations=[tables[lane][k] for lane, k in used] or None)
+    # each row that sets the target column alone, and the next start of
+    # its timer, which sets it again
+    edits = {}
+    for n, letter, target in aimed:
+        # effects 0 to 3 are Timers A, D, B and C (SPEC.md 2.3)
+        column = EFFECT + 4 * "ADBC".index(letter)
+        edits[(n, column)] = 0x80 | target
+        after = [at for at in sorted(ops[letter]) if at > n and ops[letter][at]["kind"] == "start"]
+        if after:
+            edits[(after[0], column)] = 0x80 | ops[letter][after[0]]["target"]
+    forms = {}
+    for number, (lane, k) in enumerate(order, 1):
+        marker = TARGETS[LANES[lane][0][0]][-1][1]
+        if lane in REFORMED and counted[(lane, k)]:
+            forms[number] = (marker, True)
+        elif marked[lane]:
+            forms[number] = (marker, False)
+    return tune, edits, forms
+
+
+def generated_song(number):
+    """Tune `number` of the generator, drawn from a generator seeded with
+    the number alone: a tune, or a set of two or three subtunes, each
+    drawn to map a value or not and to defer a start or not. Each is (its
+    title, its structure, the edits of its rows, the forms of its
+    sources)."""
+    rng = Draws(number)
+    count = 1 if rng.random() < 0.7 else rng.randint(2, 3)
+    drawn = [(rng.random() < 0.6, rng.random() < 0.5, set(rng.sample("ABCD", rng.randint(1, 4))))
+             for _ in range(count)]
+    if EVERY_BLOCK:
+        # the first subtune that maps a value, and the first that defers a
+        # start, runs every timer of the set
+        every = set().union(*(letters for _, _, letters in drawn))
+        for flag in (0, 1):
+            some = [one for one in drawn if one[flag]]
+            if some:
+                some[0][2].update(every)
+    titles = (["generated %d" % number] if count == 1
+              else ["generated %d.%d" % (number, k + 1) for k in range(count)])
+    return [(title,) + generated_tune(rng, title, maps, defers, letters)
+            for title, (maps, defers, letters) in zip(titles, drawn)]
+
+
+# The operations of the issue's list (#341), by the names the coverage
+# line of -generated prints them under, and the shapes of the sources a
+# start runs, by the names of their handler kinds (doc/LINKER.md, Blocks).
+KINDS = ("starts at the frame on an idle timer", "starts at the frame on a running timer",
+         "deferred starts on an idle timer", "deferred starts on a running timer",
+         "starts that set the source column alone", "starts at the running rate",
+         "retunes", "stops", "remaps between transformations", "remaps to the identity",
+         "remaps from the identity", "rows that set the target column alone",
+         "tunes that repeat to a row", "tunes that play once", "sets of several subtunes")
+SHAPES = ("square", "one", "general", "counted", "two", "three", "envelope")
+
+
+def source_shape(tune, s):
+    """The shape of source s: a square, a source of one row and the
+    general handler's of one marked column, a counted source of one
+    column, a marked source of two or three columns, and a counted source
+    of several columns, the envelope's (doc/LINKER.md, Blocks)."""
+    _, R, RR, columns = tune.sources[s]
+    if tune.counted[s]:
+        return "counted" if len(columns) == 1 else "envelope"
+    if len(columns) > 1:
+        return "two" if len(columns) == 2 else "three"
+    return "square" if (R, RR) == (2, 0) else "one" if (R, RR) == (1, 0) else "general"
+
+
+def row_kinds(model):
+    """The operations of the row the model plays next, read with each
+    effect's state before it: a name of KINDS an operation, and for each
+    start ("shape", the shape), ("effect", i), ("pair", i, the shape) and
+    ("target", the target). A start at the running rate is one on a
+    running timer whose row leaves the control and count columns unset;
+    a row sets the source column alone where it leaves the target, the
+    control, the count and the mapping columns unset as well."""
+    tune, r = model.tune, model.tune.rows[model.row]
+    out = []
+    for i in range(4):
+        if not tune.effects & 1 << i:
+            continue
+        t = EFFECT + 4 * i
+        fx = model.fx[i]
+        m = r[C + i] if len(r) > C else 0
+        rate = bool(r[t + 2] & 0x80 or r[t + 3])
+        if r[t + 1] & 0x80 and r[t + 1] & 0x7F:
+            s = r[t + 1] & 0x7F
+            where = "on a running timer" if fx["running"] else "on an idle timer"
+            if r[t + 2] & 0x88 == 0x88:
+                out.append("deferred starts " + where)
+            else:
+                out.append("starts at the frame " + where)
+            if fx["running"] and not rate:
+                out.append("starts at the running rate")
+                if not r[t] & 0x80 and not m & 0x80:
+                    out.append("starts that set the source column alone")
+            shape = source_shape(tune, s)
+            out += [("shape", shape), ("effect", i), ("pair", i, shape),
+                    ("target", r[t] & 0x7F if r[t] & 0x80 else fx["target"])]
+        elif r[t + 1] & 0x80:
+            out.append("stops")
+        elif m & 0x80:
+            run, to = fx["run"], m & 0x7F
+            if run and to and run != to:
+                out.append("remaps between transformations")
+            elif run and not to:
+                out.append("remaps to the identity")
+            elif to and not run:
+                out.append("remaps from the identity")
+        elif rate:
+            out.append("retunes")
+        elif r[t] & 0x80:
+            out.append("rows that set the target column alone")
+    return out
+
+
+def coverage(kinds):
+    """The coverage line of a run of -generated: the count of each name of
+    KINDS, the shapes of SHAPES started, the effects started, the pairs of
+    a shape and an effect, and the targets started, 0 to 24."""
+    pairs = sum(1 for key in kinds if key[0] == "pair")
+    return ("coverage: %s; starts of %d shapes of %d, on %d effects of 4, %d pairs of a shape"
+            " and an effect of %d, of %d targets of 25" % (
+                ", ".join("%d %s" % (kinds[name], name) for name in KINDS),
+                sum(1 for shape in SHAPES if kinds[("shape", shape)]), len(SHAPES),
+                sum(1 for i in range(4) if kinds[("effect", i)]), pairs, 4 * len(SHAPES),
+                sum(1 for target in range(25) if kinds[("target", target)])))
+
+
+def generated_files(song, work):
+    """The tune files of a song of the generator, written under work: each
+    structure through ymxs-to-ymxr, its rows edited and its sources
+    reformed after."""
+    paths = []
+    for k, (title, tune, edits, forms) in enumerate(song, 1):
+        at, _ = built(re.sub(r"[^a-z0-9]+", "-", title), tune, checked=True)
+        with open(at, "rb") as f:
+            file = f.read()
+        rows = tune["tunes"][0]["rows"]
+        assert long_at(file, long_at(file, 12) + 4) == rows, \
+            "%s: the writer padded the table of %d rows" % (title, rows)
+        if edits:
+            file = edited(file, edits)
+        if forms:
+            file = reformed(file, forms)
+        paths.append(os.path.join(work, "%d.ymxr" % k))
+        with open(paths[-1], "wb") as f:
+            f.write(file)
+    return paths
+
+
+# The folder a failing generated tune is written to: the one
+# YMXR_GENERATED names, and the system's temporary folder where it is
+# unset.
+GENERATED_FOLDER = os.environ.get("YMXR_GENERATED") or tempfile.gettempdir()
+
+# The version of Python a run is under, which each line naming a seed
+# names beside it.
+PYTHON = "%d.%d.%d" % sys.version_info[:3]
+
+
+def plural(n, one, many):
+    return "%d %s" % (n, one if n == 1 else many)
+
+
+def generated(count, seed, code, symbols):
+    """Tunes seed to seed + count - 1 of the generator, each subtune every
+    tick against the model and every frame against the reader's record:
+    under -linked on the player ymxr-sndh -link links for the tune, a set
+    of several subtunes linked as one, and otherwise on the player
+    assembled, or the one with the switches its effects need (check).
+    -frames caps each subtune, and each subtune plays one pass and one
+    loop at most, the ticks inside a frame among them (inside). The run
+    prints the coverage line of its rows (coverage) and under -linked a
+    line a core. A tune that fails is written to a new folder under
+    GENERATED_FOLDER whose path the run prints with the tune's number:
+    each subtune's structure as JSON, its tune file, and the edits and
+    forms of its rows and sources, which the structure leaves out."""
+    global MOST_FRAMES
+    most = MOST_FRAMES
+    wrong, subtunes, kept, kinds = [], 0, {}, Counter()
+    for number in range(seed, seed + count):
+        song = generated_song(number)
+        work = tempfile.mkdtemp()
+        drawn = Counter()
+        try:
+            paths = generated_files(song, work)
+            name = "tune %d" % number + (", %d subtunes" % len(song) if len(song) > 1 else "")
+            playing = (code, symbols)
+            if LINKED:
+                playing = linked_player(paths if len(paths) > 1 else paths[0], DEFINES)
+                print("%-45s %s" % (name, playing[2]))
+                core, out = playing[3]
+                kept.setdefault(core, []).append(out)
+            for (title, tune, _, _), path in zip(song, paths):
+                rows, repeat = tune["tunes"][0]["rows"], tune["tunes"][0]["repeat"]
+                whole = rows + 1 if repeat is None else rows + rows - repeat
+                MOST_FRAMES = min(most or whole, whole)
+                ticked = []
+                try:
+                    frames = check(path, playing[0], playing[1], kit=True, ticked=ticked,
+                                   kinds=drawn)[0]
+                finally:
+                    MOST_FRAMES = most
+                drawn["tunes that play once" if repeat is None
+                      else "tunes that repeat to a row"] += 1
+                print("%-45s %6d frames, %6d ticks, the player's frames are the reader's"
+                      " entries" % (title, frames, len(ticked)))
+            drawn["sets of several subtunes"] += len(song) > 1
+            subtunes += len(song)
+            kinds.update(drawn)
+        except Exception as failed:
+            # an error of the rig as well as a tune the player plays wrong,
+            # so the tune of either is written out
+            os.makedirs(GENERATED_FOLDER, exist_ok=True)
+            folder = tempfile.mkdtemp(prefix="ymxr-generated-%d-" % number, dir=GENERATED_FOLDER)
+            for k, (title, tune, edits, forms) in enumerate(song, 1):
+                with open(os.path.join(folder, "%d.json" % k), "w") as f:
+                    json.dump(tune, f, indent=1)
+                with open(os.path.join(folder, "%d.edits.json" % k), "w") as f:
+                    json.dump({"edits": [[n, c, b] for (n, c), b in sorted(edits.items())],
+                               "forms": [[n, c, counted] for n, (c, counted)
+                                         in sorted(forms.items())]}, f)
+                if os.path.exists(os.path.join(work, "%d.ymxr" % k)):
+                    with open(os.path.join(work, "%d.ymxr" % k), "rb") as f, \
+                            open(os.path.join(folder, "%d.ymxr" % k), "wb") as out:
+                        out.write(f.read())
+            wrong.append(number)
+            said = str(failed).strip().split("\n")[0]
+            if not isinstance(failed, AssertionError):
+                said = "%s: %s" % (type(failed).__name__, said)
+            print("%-45s FAILED: %s" % ("tune %d" % number, said[:120]))
+            print("%-45s written to %s, seed %d under Python %s, tune %d of the run:"
+                  " -generated1 -seed%d plays it alone" % (
+                      "", folder, seed, PYTHON, number - seed, number))
+    print(coverage(kinds))
+    for core, outs in sorted(kept.items()):
+        every = {piece.rsplit("_", 1)[0] for piece, _, _ in pieces_of(core)[0]}
+        out = sorted(set.intersection(*outs) & every)
+        print("%s: %s, %d of its %d blocks kept by one or more%s" % (
+            core, plural(len(outs), "tune", "tunes"), len(every) - len(out), len(every),
+            ", %s left out by every tune" % ", ".join(out) if out else ""))
+    if wrong:
+        raise SystemExit("%d of %s failed, seed %d under Python %s: %s" % (
+            len(wrong), plural(count, "generated tune", "generated tunes"), seed, PYTHON,
+            ", ".join("tune %d" % n for n in wrong)))
+    return "%s, %s, %s, %s as the specification reads%s, seed %d under Python %s" % (
+        plural(count, "generated tune", "generated tunes"),
+        "tune %d" % seed if count == 1 else "tunes %d to %d" % (seed, seed + count - 1),
+        plural(subtunes, "subtune", "subtunes"), "plays" if count == 1 else "play",
+        (" on the player linked for it" if count == 1 else " on the players linked for them")
+        if LINKED else "", seed, PYTHON)
 
 
 def core_name(flags):
@@ -5978,7 +6620,14 @@ def main():
     if "-xpatch" in sys.argv:
         print(xpatch())
         return
-    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    # the count of -corpus and -generated and the seed of -seed, after the
+    # flag or the next argument
+    argv = list(sys.argv[1:])
+    for flag in ("-corpus", "-generated", "-seed"):
+        at = argv.index(flag) if flag in argv else -1
+        if 0 <= at < len(argv) - 1 and argv[at + 1].isdigit():
+            argv[at:at + 2] = [flag + argv[at + 1]]
+    args = [a for a in argv if not a.startswith("-")]
     count = "-cycles" in sys.argv
     parts = "-refill" in sys.argv
     real = "-hatari" in sys.argv
@@ -5987,7 +6636,7 @@ def main():
     global PCREL, FILE
     PCREL = "-abs" not in sys.argv
     perf = PERF
-    wide = next((a for a in sys.argv[1:] if a.startswith("-corpus")), None)
+    wide = next((a for a in argv if a.startswith("-corpus")), None)
     picked = next((a for a in sys.argv[1:] if a.startswith("-only")), None)
     only = None
     if picked is not None:
@@ -6003,6 +6652,20 @@ def main():
             raise SystemExit("-frames reads a count of 1 or more and not " + said)
         global MOST_FRAMES
         MOST_FRAMES = int(said)
+    drawn = next((a for a in argv if a.startswith("-generated")), None)
+    seeded = next((a for a in argv if a.startswith("-seed")), None)
+    if drawn is not None:
+        drawing = drawn[len("-generated"):]
+        if drawing and (not drawing.isdigit() or int(drawing) < 1):
+            raise SystemExit("-generated reads a count of 1 or more and not " + drawing)
+        if args or wide is not None or kit or only is not None:
+            raise SystemExit("-generated plays the tunes it draws, without a tune named,"
+                             " -corpus, -kit or -only")
+    if seeded is not None:
+        if drawn is None:
+            raise SystemExit("-seed is read with -generated")
+        if seeded[len("-seed"):] and not seeded[len("-seed"):].isdigit():
+            raise SystemExit("-seed reads a whole number and not " + seeded[len("-seed"):])
     if kit:
         where = os.path.join(ROOT, "doc", "conformance", "tunes")
         tunes = args or sorted(os.path.join(where, f) for f in os.listdir(where)
@@ -6081,6 +6744,11 @@ def main():
         ", the lean tick" if LEAN else "",
         ", the deferred start in" if DEFER else "",
         ", the lookup in" if MAP else "", FILE))
+    if drawn is not None:
+        print(generated(int(drawing or GENERATED_TUNES),
+                        int(seeded[len("-seed"):] or GENERATED_SEED) if seeded else GENERATED_SEED,
+                        code, symbols))
+        return
     # The checks below read one tune of the list, and a dump of another
     # format is outside a run (convert): the first the converter reads
     # represents them, and the run reports the rest as it reaches them.

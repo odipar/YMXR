@@ -1,7 +1,8 @@
 # The Java suite and the Python rigs, run by hand, in parallel jobs: the
-# suite but the matrix of thirty-two cores, the matrix in four jobs of
-# eight cores, the three runs that read performance.md back, a job each,
-# and the runs under Hatari. doc/tools.md 19.2 lists them.
+# suite but the matrix of thirty-two cores and the generated tunes, the
+# matrix in four jobs of eight cores, the generated tunes, the three runs
+# that read performance.md back, a job each, and the runs under Hatari.
+# doc/tools.md 19.2 lists them.
 name: test
 
 # Off by default: no push and no pull request starts it. A caller starts
@@ -14,14 +15,14 @@ jobs:
   # is green and asleep. bin/suite (doc/tools.md 19.6) requires what the
   # skipping tests need, reads gofmt -l go and runs go test beside them,
   # runs the suite and ends with 1 where the count is above 0. Here it
-  # runs every test but the matrix of RigCallsTest, which the four jobs
-  # of cores run.
+  # runs every test but the matrix of RigCallsTest and its generated
+  # tunes, which the four jobs of cores and the generated job run.
   suite:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - name: the suite but the matrix of cores, and no skip
+      - name: the suite but the matrix of cores and the generated tunes, and no skip
         run: bin/suite -Drig.shard=none
 
   # The matrix of RigCallsTest, the thirty-two cores, in four shards of
@@ -42,6 +43,29 @@ jobs:
         run: >-
           bin/suite '-Dtest=RigCallsTest#theRigPlaysTheBuiltTunesOnEveryCore+theRigPlaysOnLinkedPlayersOfEverySetOfSwitches'
           -Drig.shard=${{ matrix.shard }}/4
+
+  # The rig's generated tunes on the players linked for them, with each of
+  # the eight sets of switches of linked players: RigCallsTest's run of
+  # the generator, which the suite job's shard of none leaves out
+  # (doc/LINKER.md, The check). The rig writes a tune that fails to the
+  # folder YMXR_GENERATED names, which the job keeps as an artifact.
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: the generated tunes on linked players, and no skip
+        env:
+          YMXR_GENERATED: ${{ runner.temp }}/generated
+        run: >-
+          bin/suite '-Dtest=RigCallsTest#theRigPlaysGeneratedTunesOnLinkedPlayersOfEverySetOfSwitches'
+      - name: the generated tunes that fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated
+          path: ${{ runner.temp }}/generated
+          if-no-files-found: ignore
 
   # performance.md's sentences over the whole set. -refill reads which
   # tunes fit the ring, a refill's cost outside and inside the decoder,

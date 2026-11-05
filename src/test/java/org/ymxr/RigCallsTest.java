@@ -26,6 +26,7 @@ import org.junit.jupiter.api.TestFactory;
  * <p>Run each combination of source addressing, lean ticks, monitoring,
  * deferred starts and optional lookups. Conformance tunes add multi-column
  * targets, counted sources and mapped deferred starts absent from dumps.
+ * Linked players play those tunes and the tunes the rig's generator draws.
  * A complete refill run on one source tune checks reader-image bounds
  * against performance.md.
  *
@@ -266,6 +267,156 @@ final class RigCallsTest {
                             () -> RIG + " " + String.join(" ", argv) + " does not play on"
                                     + " linked players:\n" + said);
                 }));
+    }
+
+    /** The run of the rig's generator here: the count of tunes and the
+     *  seed. Tune i of the run is tune SEED + i of the generator. */
+    static final int GENERATED = 20;
+    static final int SEED = 0;
+
+    /** The flags of that run, as the documents name them. */
+    static final String DRAWN = "-generated" + GENERATED + " -seed" + SEED;
+
+    /** The operations of issue #341's list, by the names of the rig's
+     *  coverage line: the run requires each of them at least once, so a
+     *  change of the generator that leaves one out fails here. */
+    private static final List<String> COVERED = List.of(
+            "starts at the frame on an idle timer", "starts at the frame on a running timer",
+            "deferred starts on an idle timer", "deferred starts on a running timer",
+            "starts that set the source column alone", "starts at the running rate",
+            "retunes", "stops", "remaps between transformations", "remaps to the identity",
+            "remaps from the identity", "rows that set the target column alone",
+            "tunes that repeat to a row", "tunes that play once", "sets of several subtunes");
+
+    /** The operations of {@link #COVERED} the coverage line counts none of,
+     *  and the shapes, effects and targets it finds short of all. */
+    static List<String> uncovered(String said) {
+        List<String> out = new ArrayList<>();
+        Matcher line = Pattern.compile("^coverage: (.*)$", Pattern.MULTILINE).matcher(said);
+        if (!line.find()) {
+            return List.of("the coverage line");
+        }
+        String covered = line.group(1);
+        for (String kind : COVERED) {
+            Matcher count = Pattern.compile("(?:^|, )(\\d+) " + Pattern.quote(kind) + "[,;]")
+                    .matcher(covered);
+            if (!count.find() || Integer.parseInt(count.group(1)) == 0) {
+                out.add(kind);
+            }
+        }
+        for (String all : List.of("starts of (\\d+) shapes of (\\d+)",
+                "on (\\d+) effects of (\\d+)", "of (\\d+) targets of (\\d+)")) {
+            Matcher of = Pattern.compile(all).matcher(covered);
+            if (!of.find() || !of.group(1).equals(of.group(2))) {
+                out.add(all.replace("(\\d+)", "N"));
+            }
+        }
+        return out;
+    }
+
+    /** The generator's tunes of {@link #DRAWN}, each on the player
+     *  ymxr-sndh -link links for it, under each set of switches: the tool's
+     *  core against the rig's link of the assembled core, every tick against
+     *  the model and every frame against the reader's record (doc/LINKER.md,
+     *  The check), and each operation of {@link #COVERED}, each shape, each
+     *  effect and each target in the run. The workflow runs the eight sets
+     *  in a separate job, and its suite job none. */
+    @TestFactory
+    Stream<DynamicTest> theRigPlaysGeneratedTunesOnLinkedPlayersOfEverySetOfSwitches() {
+        return shard(LINKED, System.getProperty(SHARD)).stream().map(core -> DynamicTest.dynamicTest(
+                core.isEmpty() ? "the plain switches" : String.join(" ", core), () -> {
+                    theRigRuns();
+                    List<String> argv = new ArrayList<>(List.of("-linked"));
+                    argv.addAll(List.of(DRAWN.split(" ")));
+                    argv.addAll(core);
+                    String said = rigWith(argv);
+                    String played = GENERATED + " generated tunes, tunes " + SEED + " to "
+                            + (SEED + GENERATED - 1) + ", ";
+                    assertTrue(said.startsWith("0\n") && said.contains(played)
+                                    && said.contains("play as the specification reads on the"
+                                            + " players linked for them"),
+                            () -> RIG + " " + String.join(" ", argv) + " does not play the"
+                                    + " generated tunes on linked players:\n" + said);
+                    List<String> missing = uncovered(said);
+                    assertTrue(missing.isEmpty(), () -> RIG + " " + String.join(" ", argv)
+                            + " draws none of " + missing + ":\n" + said);
+                }));
+    }
+
+    /** The coverage line reads each operation of {@link #COVERED}: a line
+     *  with each at 1 and every shape, effect and target is covered, and one
+     *  with an operation at 0 or a target short is not. */
+    @Test
+    void theCoverageLineReadsEachOperation() {
+        String all = "coverage: 1 " + String.join(", 1 ", COVERED) + "; starts of 7 shapes of 7,"
+                + " on 4 effects of 4, 20 pairs of a shape and an effect of 28, of 25 targets of 25";
+        assertTrue(uncovered(all).isEmpty(), () -> "the line reads " + uncovered(all));
+        String stops = all.replace("1 stops,", "0 stops,").replace("25 targets", "24 targets");
+        assertTrue(uncovered(stops).equals(List.of("stops", "of N targets of N")),
+                () -> "the line reads " + uncovered(stops));
+    }
+
+    /** The words of a count, as the documents spell it. */
+    private static final List<String> WORDS =
+            List.of("no", "one", "two", "three", "four", "five", "six");
+
+    /** The figures of the generated run in prose: the defaults of the rig's
+     *  usage and of tools.md 17.1 against the rig's constants; the flags of
+     *  the run above in tools.md and LINKER.md, and its test in the
+     *  workflow's job, which runs every set; the cases the generator leaves
+     *  out in LINKER.md and tools.md against LEFT_OUT, each a switch the rig
+     *  sets; and the columns LINKER.md reads the counted handler of several
+     *  columns to write against the handler's macro in the player. */
+    @Test
+    void theDocumentsReadTheGeneratedRun() throws IOException {
+        String rig = rig();
+        Matcher tunes = Pattern.compile("^GENERATED_TUNES = (\\d+)$", Pattern.MULTILINE)
+                .matcher(rig);
+        Matcher seed = Pattern.compile("^GENERATED_SEED = (\\d+)$", Pattern.MULTILINE)
+                .matcher(rig);
+        assertTrue(tunes.find() && seed.find(), RIG + " has no default count or seed");
+        String usage = rig.replaceAll("\\s+", " ");
+        assertTrue(usage.contains("the fixtures, " + tunes.group(1) + " unless N sets it")
+                        && usage.contains("S on, " + seed.group(1) + " unless S sets it"),
+                () -> RIG + "'s usage reads another default count or seed than "
+                        + tunes.group(1) + " and " + seed.group(1));
+        String tools = Files.readString(Path.of("doc/tools.md")).replaceAll("\\s+", " ");
+        assertTrue(tools.contains("; " + tunes.group(1) + " with N absent")
+                        && tools.contains("; " + seed.group(1) + " with S absent"),
+                "tools.md 17.1 reads another default count or seed than the rig's");
+        String linker = Files.readString(Path.of("doc/LINKER.md")).replaceAll("\\s+", " ");
+        String workflow = Files.readString(Path.of(".github/workflows/test.yml"));
+        String test = "#theRigPlaysGeneratedTunesOnLinkedPlayersOfEverySetOfSwitches";
+        assertTrue(tools.contains("`-linked " + DRAWN + "`")
+                        && linker.contains("`-linked " + DRAWN + "`"),
+                () -> "tools.md or LINKER.md names another run than -linked " + DRAWN);
+        Matcher job = Pattern.compile("^  generated:\\n(.*?)(?=^  [#a-z])",
+                Pattern.MULTILINE | Pattern.DOTALL).matcher(workflow);
+        assertTrue(job.find() && job.group(1).contains("RigCallsTest" + test)
+                        && !job.group(1).contains("-Drig.shard"),
+                "the workflow's generated job runs another test, or a shard of the sets");
+        Matcher left = Pattern.compile("^LEFT_OUT = \\(([^)]*)\\)$", Pattern.MULTILINE)
+                .matcher(rig);
+        assertTrue(left.find(), RIG + " lists no case left out");
+        List<String> cases = List.of(left.group(1).replaceAll("[\" ,]+", " ").trim().split(" "));
+        for (String one : cases) {
+            assertTrue(Pattern.compile("^" + one + " = True$", Pattern.MULTILINE).matcher(rig).find(),
+                    () -> RIG + " lists " + one + " among the cases left out, and draws it");
+        }
+        String word = WORDS.get(cases.size());
+        assertTrue(linker.contains("The generator leaves " + word + " cases out")
+                        && tools.contains("The generator leaves out " + word + " cases"),
+                () -> "LINKER.md or tools.md counts another number of cases left out than "
+                        + cases);
+        Matcher handler = Pattern.compile("TICKW\\s+ymxr_env0,(\\d+),")
+                .matcher(Files.readString(Path.of("68k/player/handlers.S")));
+        assertTrue(handler.find(), "handlers.S has no counted handler of several columns");
+        int columns = Integer.parseInt(handler.group(1));
+        assertTrue(columns < 3 == cases.contains("MARKED_THREE")
+                        && (columns >= 3 || linker.contains(
+                                "writes " + WORDS.get(columns) + " of its columns a tick")),
+                () -> "the counted handler of several columns writes " + columns
+                        + " columns, and LINKER.md or LEFT_OUT reads another count");
     }
 
     @TestFactory

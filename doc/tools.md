@@ -909,7 +909,9 @@ figure are read exactly.
 | mode | reads |
 |---|---|
 | absent | the dumps named, or the eleven under `ym/test` |
-| `-corpus[N]` | N tunes spread over the corpus, `YM_CORPUS`: of its F files by name, every (F divided by N)-th, the first N of those; 40 with N absent |
+| `-corpus[N]` | N tunes spread over the corpus, `YM_CORPUS`: of its F files by name, every (F divided by N)-th, the first N of those; 40 with N absent. N follows the flag or is the argument after it, as for `-generated` and `-seed` |
+| `-generated[N]` | N tunes the rig's generator draws, in place of the fixtures, the checks before the tunes left out; 20 with N absent. Tune T is drawn from a generator seeded with T, each draw made of Python's `random()` alone: a tune, or a set of subtunes, each mapping a value or not and deferring a start or not, of rows repeating to a row or playing once, written through `ymxs-to-ymxr` and following every rule of YMXS's check of the writing rules (7.2), its rows edited and its sources reformed after. Each timer of a tune runs on targets of one width, with registers no other timer of the tune writes, and its rows perform starts of each source shape at the frame and deferred, on an idle timer and a running one, at times at the running rate with both resets clear and setting the source column alone; retunes, stops, and remaps between transformations and to and from the identity; a row sets the target column alone at times, and the repeat row starts or stops every timer. Each subtune plays one pass and one loop at most, which `-framesN` caps, every tick against the model and every frame against the reader's record, ticks inside a frame among them, and the run prints its frames and ticks on a line. Under `-linked` each tune plays on the player `ymxr-sndh -link` links for it, a set linked as one, a line before its subtunes naming the core and the blocks left out. The run then prints its coverage line: the count of each operation of the rows played, of the tunes that repeat and that play once and of the sets, and the shapes, the effects and the targets started; under `-linked` a line a core, the tunes linked from it and the blocks every one of them leaves out; and last the count of the tunes and the subtunes that play as the specification reads, with the seed and the version of Python. The generator leaves out three cases, each a fault of the player (LINKER.md, The check). A tune that fails is written to a new folder, its name beginning `ymxr-generated-T-`, in the folder `YMXR_GENERATED` names, or in the system's temporary folder where it is unset: each subtune's structure, its tune file and the edits and forms of its rows and sources. The run prints the folder's path, the seed, the version of Python and the tune's place in the run, and `-generated1 -seedT` plays it alone. A tune named, `-corpus`, `-kit` and `-only` with it are an error |
+| `-seedS` | with `-generated`, the tunes from tune S on: tune I of the run is tune S + I; 0 with S absent |
 | `-framesN` | each tune for N frames at most |
 | `-onlyNAMES` | the checks NAMES names alone, a comma between two, after one build of the player and with no tune played: of `cores`, `sets`, `unplaced`, `deferred`, `mapped`, `fallbacks`, `deferred_sizes`, `mapped_sizes`, `absolute_sizes`, `halves`, `voices`, `widekept`, `envelope`, `wholebyte` and `outofreach`, in that order; another name is an error |
 | `-cycles` | the play call, DTX's advance and the tick handlers counted with DTX's cycle counter under `DTX_REPO/68k/test/emu`, against performance.md's figures; the frame procedure's effect steps and register steps counted apart, frame by frame, against dense register columns: fourteen writes of a set column's form, and the effects' steps behind the test of a column's set bit on the rows whose effect columns are all clear. A run of the eleven fixtures reads what the columns cost and save a frame, the write, the test and the test the player had before, against the section on YMX; and it plays the kit's `envelope`, `envelope-counted` and `counted` tunes, counting the marked and the counted ticks, against the section on a counted tick of two columns, the columns of the build assembled, with the handlers' sizes and the player's. `-cycles -abs` reads the absolute build's tables the same way. `-cycles -map` plays the fixtures on the player with the lookup in, against the section on a remap at the frame, and the tunes that map a value, their ticks against the section on a tick through a transformation, the column of the build assembled, as it is, `-lean` or `-abs`; on the player as it is it reads the row's read, the routines of a start and a remap with the page, the copy and the switch, the starts and remaps that copy a page at the frame in a tune whose pages pass the reach, a start of another copy of a source at the running source's row on the players without the lookup, with the deferred start in and without it, and each tune's costliest call, period and unit against the sections on a remap at the frame and the cost of 34 columns. A run of the fixtures also walks each row through the frame procedure's register steps, the player's instructions counted with the same table and equal to the rig's count on every frame, and reads plan.md against the walk over 40,000 rows a tune: the groups a row leaves unset, the three gates, and a sample's tick in parts |
@@ -924,7 +926,7 @@ figure are read exactly.
 | `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-map` | every tune on the player assembled with `YMXR_MAP=1`, against the model; without it, a tune whose effects byte sets bit 5 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
-| `-linked` | each tune on the player `ymxr-sndh -link` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. Of the checks the run makes before the tunes it runs the deferred starts' and the tunes that map a value alone, each of their tunes on the player linked for it |
+| `-linked` | each tune on the player `ymxr-sndh -link` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. Of the checks the run makes before the tunes it runs the deferred starts' and the tunes that map a value alone, each of their tunes on the player linked for it. With `-corpus` the dumps of the corpus play the same way, and with `-generated` the generator's tunes |
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
 program of twelve subtunes, each writing the number it is to R0, starts
@@ -938,31 +940,32 @@ outlives it is killed. `--keep` leaves the work directory, and `HATARI` and
 `TOS` name the emulator and a TOS image as 16.3 reads them; a missing one is
 exit 2, a key that lands on another subtune exit 1.
 
-`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs four
-things on every build: the two built tunes at `-frames24` on each of the
-thirty-two cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map`
-alone and together and the plain core; the conformance kit at
-`-frames24` under `-kit`; the kit and the checks of deferred starts and
-of tunes that map a value at `-frames24` under `-linked -kit -defer
--map`, with each of the eight sets of `-abs`, `-lean` and `-perf`; and
+`YMXR_FLAGS` adds flags to the conversion. `RigCallsTest` runs, on every
+build, the two built tunes at `-frames24` on each of the thirty-two
+cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map` alone and
+together and the plain core; the conformance kit at `-frames24` under
+`-kit`; the kit and the checks of deferred starts and of tunes that map
+a value at `-frames24` under `-linked -kit -defer -map`, with each of
+the eight sets of `-abs`, `-lean` and `-perf`; the generator's tunes
+under `-linked -generated20 -seed0`, with each of the eight sets; and
 `-refill` over `Turrican 2 - world completed 1` whole, which reads the
 tune's row of performance.md and a refill of a tune with a source. The
-workflow runs `-refill` over the eleven fixtures whole as a step after
-the suite, which reads the sentences over the set, and `-cycles -abs`
-over them, which reads the absolute build's tables. The workflow then
-runs `-stub`, `-hatari`, `-clock`, `-cost` and `-xpatch` under Hatari
-2.6.1, built from its tag, and the PAL image of EmuTOS 1.4, which boots
-the ST at the 50 Hz the two modes require; a caller runs them under TOS
-2.06, which `TOS` names. Each mode starts Hatari with `--fast-boot on`:
-TOS 2.06 then skips its test of the memory, which with fast boot off in
-the emulator's configuration outlasts the VBLs a run allows before the
-program starts. Both floppy drives are off (`--drive-a off --drive-b
-off`), so TOS addresses no disk; Hatari quits with no confirmation
-(`--confirm-quit off`) and opens a dialog only for a fatal message
-(`--alert-level fatal`). Where `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER`
-are unset, Hatari runs headless and silent, with SDL's dummy video and
-audio drivers. Its input is closed, and a time limit ends a run that
-waits on a dialog.
+workflow runs the generator's tunes in a separate job, `-refill` over
+the eleven fixtures whole as a step after the suite, which reads the
+sentences over the set, and `-cycles -abs` over them, which reads the
+absolute build's tables. The workflow then runs `-stub`, `-hatari`,
+`-clock`, `-cost` and `-xpatch` under Hatari 2.6.1, built from its tag,
+and the PAL image of EmuTOS 1.4, which boots the ST at the 50 Hz the two
+modes require; a caller runs them under TOS 2.06, which `TOS` names.
+Each mode starts Hatari with `--fast-boot on`: TOS 2.06 then skips its
+test of the memory, which with fast boot off in the emulator's
+configuration outlasts the VBLs a run allows before the program starts.
+Both floppy drives are off (`--drive-a off --drive-b off`), so TOS
+addresses no disk; Hatari quits with no confirmation (`--confirm-quit
+off`) and opens a dialog only for a fatal message (`--alert-level
+fatal`). Where `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` are unset, Hatari
+runs headless and silent, with SDL's dummy video and audio drivers. Its
+input is closed, and a time limit ends a run that waits on a dialog.
 
 ---
 
@@ -1032,14 +1035,15 @@ and YMXS `0.7.1` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on GitHub runners, in jobs
 that run at once, each with Go, rmac, unicorn and DTX's `dtx-write` on it so
 that no check skips: `bin/suite` (19.6) with `-Drig.shard=none`, every test
-but the matrix of RigCallsTest; that matrix of thirty-two cores in four jobs,
-`bin/suite` with `-Drig.shard=k/4` for k from 0 to 3; `test_ymxr.py -refill`
-over the eleven fixtures whole, which reads performance.md's sentences over
-the set, `-cycles -abs`, which reads the absolute build's tables, and `-cycles
--map`, which reads the lookup's, a job each; and `-stub`, `-hatari`, `-clock`,
-`-cost` and `-xpatch` under Hatari and EmuTOS (17), in one job. No push
-starts it: a caller starts it from the Actions tab or by `gh workflow run
-test.yml`.
+but the matrix of RigCallsTest and its generated tunes; that matrix of
+thirty-two cores in four jobs, `bin/suite` with `-Drig.shard=k/4` for k from
+0 to 3; the generated tunes on linked players, `bin/suite` with that test of
+RigCallsTest alone; `test_ymxr.py -refill` over the eleven fixtures whole,
+which reads performance.md's sentences over the set, `-cycles -abs`, which
+reads the absolute build's tables, and `-cycles -map`, which reads the
+lookup's, a job each; and `-stub`, `-hatari`, `-clock`, `-cost` and
+`-xpatch` under Hatari and EmuTOS (17), in one job. No push starts it: a
+caller starts it from the Actions tab or by `gh workflow run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
 ./cmd/...`, with the thirty-three 68000 binaries and DTX's forty images
@@ -1176,6 +1180,7 @@ and call the tools.
 | `YMXR_68K` | a directory of the thirty-three binaries in place of the embedded ones | the Go tools |
 | `YMXR_FLAGS` | flags added to the rig's conversions | `test_ymxr.py` |
 | `YMXR_TICKS` | set, each frame whose tick count differs from the rates' by more than 1 is printed | `test_ymxr.py -hatari` |
+| `YMXR_GENERATED` | the folder a failing tune of the generator is written to, the system's temporary folder by default | `test_ymxr.py -generated` |
 | `COMMIT` | the source commit recorded, `HEAD` by default | `release/manifest.sh` |
 | `TARGETS`, `OUT` | 20.1 | `release/publish.sh` |
 | `YM_CORPUS` | the corpus directory | `test_ymxr.py -corpus`, `ym/convert.py`, `ym/measure.py` |
