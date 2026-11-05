@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.ymxs.tool.Tool;
 
 /**
@@ -33,6 +34,7 @@ final class Prg {
     static final byte[] STUB_MAGIC = {'Y', 'M', 'X', 'T'};
     static final int STUB_MAGIC_AT = 4;
     static final int STUB_VERSION = 2;
+    static final int MIXED_STUB_VERSION = 3;
     static final int STUB_VERSION_AT = 8;
     static final int STUB_SUBTUNES_AT = 10;
     static final int STUB_FLAGS_AT = 12;
@@ -66,7 +68,7 @@ final class Prg {
 
     /** The ticks a second the timer is armed at, at most: twice the
      *  operating system's clock. */
-    private static final int MOST_TICKS = 400;
+    static final int MOST_TICKS = 400;
 
     /** The operating system's clock, which the stub arms where the MFP
      *  counts no multiple of the rate: 2,457,600 / 64 / 192. */
@@ -134,7 +136,7 @@ final class Prg {
      *     clock tag and its claims, at the file's rate
      */
     static byte[] of(byte[] sndh, long rows, Sndh.Asked asked) {
-        return of(Binaries.stub(), sndh, rows, asked);
+        return of(null, sndh, rows, asked);
     }
 
     /** The same, from the stub named. */
@@ -143,12 +145,31 @@ final class Prg {
     }
 
     /** The same, from the stub named, a clock asked for or read. */
-    static byte[] of(byte[] stub, byte[] sndh, long rows, Sndh.Asked asked) {
-        checkStub(stub);
+    static byte[] of(byte @Nullable [] stub, byte[] sndh,
+                     long rows, Sndh.Asked asked) {
+        if (stub != null) {
+            checkStub(stub);
+        }
         if (rows < 0 || rows > 0xFFFFFFFFL) {
             throw new IllegalArgumentException("rows " + rows + " does not fit a long");
         }
         Tags tags = tags(sndh);
+        int entries = Sndh.even(tags.end() + 4);
+        boolean mixed = Sndh.mixed(sndh, entries);
+        if (stub == null) {
+            stub = Binaries.carried(mixed ? Binaries.MIXED_STUB.name() : Binaries.STUB.name());
+            checkStub(stub);
+        }
+        if (mixed != (Tune.getWord(stub, STUB_VERSION_AT) == MIXED_STUB_VERSION)) {
+            throw new IllegalArgumentException("the program stub and SNDH file use different clocks");
+        }
+        if (mixed && (asked == Sndh.Asked.VBL || !tags.clock().equals(Sndh.TIMER_C_CLOCK)
+                || tags.flag().indexOf('c') >= 0)) {
+            throw new IllegalArgumentException("mixed-rate subtunes need Timer C for playback");
+        }
+        if (mixed && tags.rate() != Tune.getWord(sndh, entries + Sndh.CLOCK_RATE_AT)) {
+            throw new IllegalArgumentException("the SNDH callback rate differs from the clock tag");
+        }
         // The file leaves the stub the VBL where its clock tag names the
         // VBL and where its set claims Timer C; a clock asked for is
         // over either (BINARIES.md 4.3).
@@ -192,15 +213,19 @@ final class Prg {
         }
         Tags tags = tags(sndh);
         int flags = Tune.getWord(prg, HEADER + STUB_FLAGS_AT);
+        boolean mixed = Sndh.mixed(sndh, Sndh.even(tags.end() + 4));
         report.say("the SNDH file: " + Report.count(sndh.length, "byte", "bytes") + ", "
-                + Report.count(tags.subtunes(), "subtune", "subtunes") + " at " + tags.rate()
+                + Report.count(tags.subtunes(), "subtune", "subtunes")
+                + (mixed ? ", Timer C callbacks at " : " at ") + tags.rate()
                 + " Hz, FLAG " + tags.flag());
-        report.say("the stub: " + Report.count(Binaries.stub().length, "byte", "bytes")
+        int stub = Tune.getLong(prg, 2) - sndh.length;
+        report.say("the stub: " + Report.count(stub, "byte", "bytes")
                 + ", patched");
         report.row("the subtunes", String.valueOf(tags.subtunes()));
         report.row("the rows to play", rows == 0 ? "0, until a key stops it"
                 : String.valueOf(rows));
-        report.row("it plays from", from(tags, flags, asked));
+        report.row("it plays from", mixed ? "Timer C at the subtunes\047 rates"
+                : from(tags, flags, asked));
         report.row("the screen", "cleared before the banner");
         report.say("the program: " + Report.count(prg.length, "byte", "bytes"));
     }
@@ -234,9 +259,9 @@ final class Prg {
             throw new IllegalArgumentException("not a program stub: no YMXT at " + STUB_MAGIC_AT);
         }
         int version = Tune.getWord(stub, STUB_VERSION_AT);
-        if (version != STUB_VERSION) {
+        if (version != STUB_VERSION && version != MIXED_STUB_VERSION) {
             throw new IllegalArgumentException("the stub's descriptor is version " + version
-                    + ", and this writes " + STUB_VERSION);
+                    + ", and this writes " + STUB_VERSION + " or " + MIXED_STUB_VERSION);
         }
         if ((stub.length & 1) != 0) {
             throw new IllegalArgumentException("the stub is " + stub.length + " bytes, odd:"
@@ -362,9 +387,8 @@ final class Prg {
 
     /**
      * Where the core begins: its YMXS, past the tags, less the magic's
-     * offset. The entry triple's first bra.w reaches the core's first
-     * byte, or the file is not one {@link Sndh} wrote, and the core's
-     * descriptor is whole in the file, since this reads its flags.
+     * offset. The first entry must reach the core or the mixed-rate
+     * clock immediately before it. The core's descriptor fits in the file.
      */
     static int core(byte[] sndh, int from) {
         int at = find(sndh, new String(Sndh.CORE_MAGIC, StandardCharsets.ISO_8859_1), from,
@@ -376,7 +400,7 @@ final class Prg {
         int core = at - Sndh.CORE_MAGIC_AT;
         int reached = Tune.getWord(sndh, 0) == Sndh.BRA_W
                 ? 2 + (short) Tune.getWord(sndh, 2) : -1;
-        if (core < from || reached != core) {
+        if (reached < from || Sndh.coreAt(sndh, reached) != core) {
             throw new IllegalArgumentException("the core begins at " + core + ", and the"
                     + " entry triple reaches " + reached);
         }

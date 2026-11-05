@@ -668,6 +668,26 @@ final class ParityTest {
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-perf"), "-silent", "-tc");
     }
 
+    @Test
+    void aMixedRateStructurePlaysAtBothRatesInBothTrees() throws Exception {
+        org.ymxs.YMXS.Tune fifty = YmxsTest.fade();
+        org.ymxs.YMXS.Tune sixty = new org.ymxs.YMXS.Tune("Sixty", fifty.composer(),
+                fifty.writer(), 60, fifty.table());
+        byte[] json = org.ymxs.Text.write(new org.ymxs.YMXS.Multi(List.of(fifty, sixty)))
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] packed = both("ymxs-to-ymxr", json, "-silent");
+        byte[] sndh = both("ymxr-sndh", packed, "-silent");
+        assertEquals(300, Prg.tags(sndh).rate());
+        byte[] direct = both("ymxs-to-sndh", json, "-silent");
+        assertEquals(300, Prg.tags(direct).rate());
+        byte[] program = both("ymxr-prg", sndh, "-r20");
+        assertEquals(Prg.MIXED_STUB_VERSION, Tune.getWord(program, Prg.HEADER + Prg.STUB_VERSION_AT));
+        assertArrayEquals(both("ymxr-prg", direct, "-silent", "-r20"),
+                both("ymxs-to-prg", json, "-silent", "-r20"));
+        both("ymxr-layout", sndh);
+        both("ymxr-layout", program);
+    }
+
     /**
      * The TIME tag of a tune that plays once, in both trees. Every dump
      * under ym/test repeats, so the cases above write 0 alone: the kit's

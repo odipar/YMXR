@@ -129,6 +129,7 @@ jobs:
           python3 68k/test/emu/test_ymxr.py -stub
           python3 68k/test/emu/test_ymxr.py -hatari
           python3 68k/test/emu/test_ymxr.py -clock
+          python3 68k/test/emu/test_ymxr.py -mixed-clock
           python3 68k/test/emu/test_ymxr.py -cost
       - name: the patched displacement read under Hatari
         env:

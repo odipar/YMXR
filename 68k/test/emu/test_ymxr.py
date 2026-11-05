@@ -4600,6 +4600,63 @@ def under_hatari(work, name, vbls, trace_kinds="psg_write,video_vbl"):
     return writes, at
 
 
+def mixed_clock():
+    """The SNDH entries under a host clock, then the program under Hatari."""
+    with tempfile.TemporaryDirectory(prefix="ymxr-mixed") as work:
+        def tool(name, *args, data=None):
+            run = subprocess.run([os.path.join(ROOT, "bin", name), "-silent", *args],
+                                 input=data, capture_output=True)
+            assert run.returncode == 0, run.stderr.decode()
+            return run.stdout
+
+        fixture = os.path.join(ROOT, "doc", "conformance", "tunes", "plays-once.ymxr")
+        with open(fixture, "rb") as f:
+            first = f.read()
+        second = bytearray(first)
+        struct.pack_into(">H", second, 6, 60)
+        path = os.path.join(work, "sixty.ymxr")
+        with open(path, "wb") as f:
+            f.write(second)
+        packed = tool("ymxr-multi", fixture, path)
+        sndh = tool("ymxr-sndh", "-carried", data=packed)
+        assert b"TC300\0" in sndh[:sndh.index(b"HDNS")]
+        code, symbols = assemble("YMXR_sndh.S")
+        core = sndh.index(b"YMXS", sndh.index(b"HDNS")) - 12
+        assert sndh[core:core + 28] == code[:28]
+        rows = [163, 142, 251, 89]
+
+        machine = Machine(sndh, {}, b"")
+        for number, interval in ((1, 6), (2, 5), (1, 6)):
+            machine.call("core-init", d0=number)
+            for tick in range(1, interval * len(rows) + 1):
+                machine.call("core-play")
+                wrote = [value for reg, value in machine.psg if reg == 0]
+                expect = [rows[tick // interval - 1]] if tick % interval == 0 else []
+                assert wrote == expect, "subtune %d, callback %d: %s" % (number, tick, wrote)
+        machine.call("core-exit")
+
+        def in_program(name, *args):
+            with open(os.path.join(work, name), "wb") as f:
+                f.write(tool("ymxr-prg", *args, data=sndh))
+            writes, loaded = under_hatari(work, name, 500)
+            frame = (loaded + core + symbols["ymxr_frame"],
+                     loaded + core + symbols["ymxr_reads"])
+            return [(value, cycle) for _, reg, value, pc, cycle in writes
+                    if reg == 0 and frame[0] <= pc < frame[1]]
+
+        played = in_program("MIXED.PRG", "-r5")
+        assert [value for value, _ in played[:8]] == rows * 2, played[:8]
+        for rate, at in ((50, 0), (60, 4)):
+            # The console writes the playing line as each subtune starts.
+            cycles = [cycle for _, cycle in played[at + 1:at + 4]]
+            gaps = [right - left for left, right in zip(cycles, cycles[1:])]
+            assert all(abs(gap - CPU_CLOCK / rate) < CPU_CLOCK / rate * 0.02 for gap in gaps), \
+                "%d Hz has these row gaps: %s" % (rate, gaps)
+        limited = in_program("LIMIT.PRG", "-r3")
+        assert [value for value, _ in limited] == rows[:3], limited
+    return "mixed subtunes at 50 and 60 Hz, under an SNDH host and on Timer C under Hatari"
+
+
 def clocks(ym, code, symbols):
     """The stub's two clocks over one SNDH file (BINARIES.md 4.3, 4.7):
     the program plays from Timer C, which the file's clock tag names, and
@@ -6593,6 +6650,9 @@ def core(defines, ym):
 
 
 def main():
+    if "-mixed-clock" in sys.argv:
+        print(mixed_clock())
+        return
     if "-clock" in sys.argv:
         print(clock())
         return

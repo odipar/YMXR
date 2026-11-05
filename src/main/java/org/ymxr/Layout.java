@@ -167,7 +167,7 @@ final class Layout {
         }
         out.append("]}\n");
         int hdns = tags(out, file, from);
-        int core = Sndh.even(hdns + 4);
+        int core = Sndh.coreAt(file, Sndh.even(hdns + 4));
         int table = core + Tune.getLong(file, core + 28);
         int work = core + Tune.getLong(file, core + 32);
         out.append("{\"part\":\"core\",\"at\":").append(core)
@@ -254,7 +254,8 @@ final class Layout {
                 out.append("{\"part\":\"tag\",\"name\":\"FRMS\",\"at\":").append(at)
                         .append(",\"frames\":[");
                 for (int i = 0; i < subtunes; i++) {
-                    out.append(i == 0 ? "" : ",").append(Tune.getLong(file, at + 4 + 4 * i));
+                    out.append(i == 0 ? "" : ",")
+                            .append(Integer.toUnsignedLong(Tune.getLong(file, at + 4 + 4 * i)));
                 }
                 out.append("]}\n");
                 at += 4 + 4 * subtunes;

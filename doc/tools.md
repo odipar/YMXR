@@ -620,13 +620,14 @@ reach of the core's first handler: a table of T bytes for each effect
 and form of the list, T the transformations, 256 bytes for each page it
 fills and for each page of the fallbacks of the effects whose pages
 pass the reach, and 255 more; and patches the core's field at 36 with
-its offset (BINARIES.md 3.1, 5.6). The clock tag names Timer C, or the
-VBL where `-vbl` or `-perf` is passed: the raster monitor paints one
-frame of calls, which reads against the raster where the tick comes
-from the VBL (BINARIES.md 3.2, performance.md). `-tc` names Timer C
-over `-perf`, and `-vbl` and `-tc` together are `-vbl and -tc name two
-clocks`, exit 2. A set that claims Timer C names the VBL, and `-tc`
-with such a set is the error of 12.2. The title is `-tTITLE`, else the
+its offset (BINARIES.md 3.1, 5.6). A set of several 50 Hz subtunes
+defaults to the VBL. `-tc` selects Timer C where the set leaves it
+free. A mixed-rate set uses one Timer C callback rate and advances
+each subtune at its recorded rate (BINARIES.md 3.4). A single tune with
+`-perf` defaults to the VBL for the raster monitor (performance.md).
+`-vbl` and `-tc` together are `-vbl and -tc name two clocks`, exit 2.
+A set of one rate that claims Timer C names the VBL, and `-tc` with
+such a set is the error of 12.2. The title is `-tTITLE`, else the
 first name, `(untitled)` where a tune file was read or the name is
 blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
 3) each text is reduced to its characters $20 to $7E; the report of
@@ -640,8 +641,8 @@ blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
 | zero tune files | `no tune files: an SNDH file has one subtune at least` |
 | more than 99 | `N tune files: the '##' tag's two digits count at most 99 subtunes` |
 | subtune N fails to read | `subtune N: <message>` |
-| subtune 1 has a rate of 0 | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
-| subtune N has a rate other than subtune 1's | `subtune N plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
+| subtune N has a rate of 0 | `subtune N plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
+| a mixed-rate set claims Timer C, uses `-vbl`, has a rate above 400 Hz or exceeds the `FRMS` count | the line of BINARIES.md 3.3 |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
 | Timer C is asked for and the claims byte of the set has it | `the set claims Timer C and the clock asked for is Timer C: the player's handler has that timer` |
 | the core's descriptor fails its check (12.3) | the line of 12.3 |
@@ -699,6 +700,8 @@ passed where `-vbl` or `-tc` names one (BINARIES.md 4.3); `-vbl` and
 rows and stops, or plays on until SPACE or ESC for ROWS 0; lists the
 subtunes; selects one on LEFT, RIGHT, UP, DOWN or a typed number; and
 starts the next subtune where a subtune that plays once has ended.
+A mixed-rate program runs from Timer C and counts rows played toward
+`-rROWS`. Timer C callbacks with no row leave the count as it is.
 
 **13.2 Errors**, each exit 1: the lines of BINARIES.md 4's tag reader
 for a file outside the layout (`not an SNDH file: no SNDH at 12`, `the
@@ -834,7 +837,7 @@ the background colour, and `ym/cost.py` on the trace, one line a tune. An
 option outside the two is `ym/cost.sh does not read <option>`, exit 2.
 
 **16.5 `Binaries DIR... [-aRMAC] [-sSOURCES]`**, class
-`org.ymxr.Binaries`, assembles the thirty-two cores and the stub with
+`org.ymxr.Binaries`, assembles the cores, stubs and clock with
 `rmac -m68000 -fr -i68k <defines> -o` into each directory named, one
 line each `%-38s %5d bytes`; the assembler is `rmac` on the path or
 `-aRMAC`, the sources `68k` or `-sSOURCES`. A failure is `binaries: no
@@ -921,6 +924,7 @@ figure are read exactly.
 | `-refill` | `-cycles` and the advance's parts off one pass: what a refill spends outside ST4's decoder and inside it, and the operations it parses, against the figures of performance.md's play-call section that its table does not carry. A run of the eleven fixtures reads the claims over the set, and a tune that plays fewer frames than the period of its image apart; a run of other tunes reads each tune alone |
 | `-hatari` | each tune, at 50 Hz alone, through `ymxr-sndh -vbl` and `ymxr-prg` with 2,000 rows, run under Hatari, the trace of every chip write cut into frames at the VBL and read against the model; `-vbl` names the VBL as the clock the program plays from (BINARIES.md 4.3), which the frames are cut at; a run that names no tune plays the conformance kit's `voices`, `counted`, `envelope-counted` and `deferred` after the fixtures, since no dump converts to a target of several registers, a counted source or a deferred start. A tune whose effects byte sets bit 4 plays on the core with the deferred start in, the installer's timer writes counted from the tick that runs it |
 | `-stub` | each tune, at 50 Hz alone, through `ymxr-sndh` and then `ymxr-prg` twice, 600 rows each: one program playing from Timer C, which the file's clock tag names, and one from the VBL, which `-vbl` names. Both run under Hatari, and the writes the frame procedure makes are one stream in one order under either clock, over the same frames but for the phase of the first row and the last. A tick's writes are counted apart: an effect's handler writes the chip from its timer, which the two clocks interleave among the rows differently. Then the same tune at 60 Hz, a rate no multiple of the operating system's clock: the tool arms 240 ticks a second (BINARIES.md 4.10), and the gaps between the in-service bit the stub's handler clears read that period on Hatari's MFP, 4.167 ms, against the 5 ms of the 200 Hz clock |
+| `-mixed-clock` | a 50/60 Hz set on the SNDH play entries at 300 callbacks a second and in a program under Hatari. The rig checks each rate, the change of subtune and the row limit |
 | `-clock` | the stub's Timer C handler under Hatari's profiler: `Circus Attractions 2` in a program at 50 Hz and at 60 Hz, a row every third tick and every fourth, 1,000 VBLs each; each run measures the handler's cycles a tick and the routine around the play call's a row, which performance.md's section on the program's clock reads within a cycle, and the two runs together solve for a tick without a row, which it reads as one of two figures |
 | `-cost` | the raster monitor's runs of performance.md, as `ym/cost.sh` builds them, run with both floppy drives off: `Synergy Credits` and `Turrican - world 4-3` on the monitor's core over the VBLs the section against YMX names, the first calls, as many as the section counts, on average, at the 99th in a hundred and at most against the table's YMXR rows, and `Synergy Credits` packed at unit 1 over the same run against its figure at most, an average within 2 cycles and a single call within 64: a tick's entry and `rte` fall inside a call or outside it by where the tick lands, which moves with the operating system `TOS` names; then `DBA 2` on the plain core, played from the VBL, the least cycles from the VBL to the frame procedure's first chip write over the frames the raster monitor's paragraph names, which that paragraph reads within one of the shifter's bus slots, 4 cycles: the least moves with the phase the VBL lands at |
 | `-xpatch` | the real-ST program of `68k/test/st`, built by its `build.py` and run twice in one folder under Hatari on an ST at 8 MHz, cycle-exact, under the TOS image `TOS` names, the first run creating `XPATCH.TXT` and the second appending to it: each case's line of the file, a case at a level with its counts N, O and X, against the table of `68k/test/st/README.md`, a run's first line and a case's line as that file quotes them, and each run's console lines against that run's lines in the file |
@@ -1049,7 +1053,7 @@ lookup's, a job each; and `-stub`, `-hatari`, `-clock`, `-cost` and
 caller starts it from the Actions tab or by `gh workflow run test.yml`.
 
 **19.3 A Go tool** is one executable, built from `go/` by `go build
-./cmd/...`, with the thirty-three 68000 binaries and DTX's forty images
+./cmd/...`, with the 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go
 v0.7.1`, which a build fetches.
@@ -1106,7 +1110,7 @@ and for `wasm` the WebAssembly module of 20.5 and its scripts in
 `ymxr-tools-wasm-v<version>.zip`. The version is the argument, or the first
 `<version>` of `pom.xml`. `TARGETS`, a space-separated list, limits the seven;
 `OUT` replaces `dist`. A target outside the seven is `publish: <target> is not
-a platform this builds`, exit 1. The thirty-three binaries it requires under
+a platform this builds`, exit 1. The binaries it requires under
 `go/binaries/data` are the ones `go/binaries/binaries.go` names, so the two
 lists agree: a missing one is `publish: <path> is not built: run mvn
 process-classes` and a Go file naming none is `publish:
@@ -1180,7 +1184,7 @@ and call the tools.
 
 | variable | names | read by |
 |---|---|---|
-| `YMXR_68K` | a directory of the thirty-three binaries in place of the embedded ones | the Go tools |
+| `YMXR_68K` | a directory of binaries in place of the embedded ones | the Go tools |
 | `YMXR_FLAGS` | flags added to the rig's conversions | `test_ymxr.py` |
 | `YMXR_TICKS` | set, each frame whose tick count differs from the rates' by more than 1 is printed | `test_ymxr.py -hatari` |
 | `YMXR_GENERATED` | the folder a failing tune of the generator is written to, the system's temporary folder by default | `test_ymxr.py -generated` |

@@ -4,7 +4,7 @@
 {"part":"tag","name":"COMM","at":24,"text":"Jochen Hippel"}
 {"part":"tag","name":"CONV","at":42,"text":"YMXR (ym-to-ymxr)"}
 {"part":"tag","name":"##","at":64,"count":2}
-{"part":"tag","name":"TC","at":69,"rate":50}
+{"part":"tag","name":"!V","at":69,"rate":50}
 {"part":"tag","name":"FLAG","at":74,"text":"~y"}
 {"part":"tag","name":"FRMS","at":82,"frames":[0,4]}
 {"part":"tag","name":"!#SN","at":94,"names":["Circus","Once"]}

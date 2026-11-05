@@ -8,7 +8,6 @@ import (
 
 	"github.com/odipar/ymxs/go/tool"
 
-	"github.com/odipar/ymxr/go/binaries"
 	"github.com/odipar/ymxr/go/flags"
 	"github.com/odipar/ymxr/go/report"
 	"github.com/odipar/ymxr/go/sndh"
@@ -45,22 +44,28 @@ func made(said *report.Report, file, prg []byte, rows int64, asked sndh.Asked) {
 	if err != nil {
 		return
 	}
-	said.Say(fmt.Sprintf("the SNDH file: %s, %s at %d Hz, FLAG %s",
-		report.Count(len(file), "byte", "bytes"), report.Count(tags.Subtunes, "subtune",
-			"subtunes"), tags.Rate, tags.Flag))
-	stub, err := binaries.Read(binaries.Stub)
-	if err != nil {
-		return
+	mixed := sndh.Mixed(file, tags.End+4)
+	rate := " at "
+	if mixed {
+		rate = ", Timer C callbacks at "
 	}
+	said.Say(fmt.Sprintf("the SNDH file: %s, %s%s%d Hz, FLAG %s",
+		report.Count(len(file), "byte", "bytes"), report.Count(tags.Subtunes, "subtune",
+			"subtunes"), rate, tags.Rate, tags.Flag))
+	stub := ymxr.GetLong(prg, 2) - len(file)
 	flags := ymxr.GetWord(prg, sndh.Header+sndh.StubFlagsAt)
-	said.Say("the stub: " + report.Count(len(stub), "byte", "bytes") + ", patched")
+	said.Say("the stub: " + report.Count(stub, "byte", "bytes") + ", patched")
 	said.Row("the subtunes", fmt.Sprintf("%d", tags.Subtunes))
 	if rows == 0 {
 		said.Row("the rows to play", "0, until a key stops it")
 	} else {
 		said.Row("the rows to play", fmt.Sprintf("%d", rows))
 	}
-	said.Row("it plays from", from(tags, flags, asked))
+	if mixed {
+		said.Row("it plays from", "Timer C at the subtunes' rates")
+	} else {
+		said.Row("it plays from", from(tags, flags, asked))
+	}
 	said.Row("the screen", "cleared before the banner")
 	said.Say("the program: " + report.Count(len(prg), "byte", "bytes"))
 }

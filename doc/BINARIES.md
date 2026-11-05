@@ -365,15 +365,17 @@ file (3) and reports the first condition met:
 ## 3. The SNDH file
 
 **3.1 Layout.** T is the tag block's bytes, from `SNDH` at 12 through
-the last byte of `HDNS`; H = even(12 + T), L the
-core's bytes, `N` the subtunes. Offsets under *from the core* count from
-the core's first byte, at H.
+the last byte of `HDNS`. E = even(12 + T), L is the core's size, and
+`N` is the number of subtunes. H = E for one rate. For mixed rates H
+follows the clock code of 3.4. Offsets under *from the core* count
+from H.
 
 | part | at | bytes |
 |---|---|---|
-| the entry triple | 0, 4, 8 | three `bra.w`: the word $6000, then the displacement H - 2, to the same entry of the core's triple (2.2) |
+| the entry triple | 0, 4, 8 | three `bra.w`: the word $6000, then the displacement E - 2, to the same entry of the core (2.2) or clock (3.4) |
 | the tag block | 12 | 3.2 |
 | a pad | 12 + T | a zero byte where 12 + T is odd |
+| the mixed-rate clock | E | present where the subtunes have different rates (3.4) |
 | the core | H | the core (2), its field at 28 patched with U below, its field at 32 with W below, and with the lookup in its field at 36 with even(L) where A is above 0 |
 | the page area | even(L) from the core | A zero bytes: the largest area of 5.6 a subtune's list needs (1.1), its reach 32,767 less even(L) less the core's field at 26, and 0 where no list counts a page or the core is without the lookup |
 | the subtune table | U = even(even(L) + A) from the core | the word `N`, then `N` longs, each a bound tune's offset from the core (2.5) |
@@ -410,14 +412,14 @@ $20 to $7E, the others dropped. `TIME` is in the block from release
 | `COMM`, the composer, a zero byte | where the composer is other than the empty text |
 | `CONV`, `YMXR (ym-to-ymxr)`, a zero byte | the converter |
 | `##`, two decimal digits, a zero byte | `N`, 01 to 99 |
-| `TC`, the rate in decimal, a zero byte | the rate of the set, in Hz, where the block names Timer C |
+| `TC`, the rate in decimal, a zero byte | the callback rate in Hz, where the block names Timer C |
 | `!V`, the rate in decimal, a zero byte | the rate of the set, in Hz, where the block names the VBL |
 | `FLAG`, `~`, letters, `y`, a zero byte | the letters `a` to `d` of the timers in the claims byte of the set, in that order |
 | a zero byte | where the bytes so far are odd |
-| `FRMS`, `N` longs | subtune 1 to `N`: `R` for a tune that plays once, 0 for one that repeats |
+| `FRMS`, `N` longs | one count a subtune. `R` for a tune that plays once at the callback rate. For other rates, round up `R` times the callback rate divided by the tune rate. A tune that repeats has 0 |
 | `!#SN`, `N` words, `N` names each with a zero byte | where `N` is above 1: word i is the offset of name i from the tag's first byte, word 1 being 4 + 2`N`; the names of the set: the multi file's (0.3), or of a YMXS multi its tunes' titles, `(untitled)` for a blank one |
 | a zero byte | where the bytes so far are odd |
-| `TIME`, `N` words | subtune 1 to `N`: for a tune that plays once, `R` divided by the rate of the set and rounded up, or 65,535 where that is more; 0 for one that repeats |
+| `TIME`, `N` words | subtune 1 to `N`: for a tune that plays once, `R` divided by the subtune rate and rounded up, or 65,535 where that is more; 0 for one that repeats |
 | `HDNS` | |
 
 The claims byte of the set is the claims bytes of its tunes ORed. One of
@@ -435,14 +437,15 @@ unread.
 1. Check the core (2.10).
 2. Report the first condition met of the table's first three rows.
 3. For subtune i from 1 to `N`: read tune file i as SPEC.md 3.3 defines,
-   an error reported as `subtune i: ` and that reader's line; then
-   report the table's fourth or fifth condition where it is met.
+   an error reported as `subtune i: ` and that reader's line. Report a
+   zero rate as listed below.
 4. Bind the set (1.4).
-5. Write the tag block (3.2), its clock tag `!V` where the claims byte of
-   the set has Timer C, whose handler is then the player's, or where the
-   VBL is asked for, and `TC` otherwise. Where Timer C is asked for and
-   the claims byte has it, report `the set claims Timer C and the clock
-   asked for is Timer C: the player's handler has that timer`.
+5. Write the tag block (3.2). A mixed-rate set uses `TC` (3.4).
+   A set of several subtunes at 50 Hz uses `!V` by default. Other
+   sets of one rate use the clock passed or `TC` by default. A
+   single tune with the raster monitor uses `!V` by default.
+   A set that claims Timer C uses `!V`, or reports the clock conflict
+   if Timer C was selected explicitly.
 6. Lay the file out as 3.1, reporting the table's last condition where
    it is met.
 
@@ -451,9 +454,31 @@ unread.
 | zero tune files | `no tune files: an SNDH file has one subtune at least` |
 | N tune files, N above 99 | an error naming N and the 99 subtunes the two digits of `##` number |
 | N names for M tune files, N other than M | `N names for M subtunes` |
-| subtune 1 is at 0 Hz | `subtune 1 plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
-| subtune i, i above 1, is at H Hz and subtune 1 at R, H other than R | `subtune i plays at H Hz and subtune 1 at R: an SNDH file records one rate` |
-| H - 2 is above 32,767, the tag block being B bytes | `the tag block is B bytes, and a bra.w reaches 32767` |
+| subtune i is at 0 Hz | `subtune i plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
+| a mixed-rate set claims Timer C | `mixed-rate subtunes need Timer C for playback and a subtune claims it for an effect` |
+| the VBL was selected for a mixed-rate set | `mixed-rate subtunes need Timer C for playback` |
+| a mixed-rate set has a rate above 400 Hz | `mixed-rate subtunes need rates at or below 400 Hz` |
+| a subtune's callback count exceeds an unsigned long | `subtune i exceeds the FRMS callback count` |
+| E - 2 is above 32,767, the tag block being B bytes | `the tag block is B bytes, and a bra.w reaches 32767` |
+
+**3.4 Mixed rates.** The Timer C callback rate is the lowest common
+multiple of the subtune rates at or below 400 Hz that Timer C generates
+exactly (4.10). If no such multiple exists, use 200 Hz when every subtune
+is at or below 200 Hz and 400 Hz otherwise. The bound tunes retain their
+rates. A set with rates 50 and 60 Hz uses `TC300`.
+
+The clock code starts at E. Its first three `bra.w` are init, exit and
+play. The bytes at 12 are `YMXC`. The word at 16 is the offset to the
+core from E. The word at 18 is the callback rate. The byte two bytes
+before the core marks whether the most recent callback called the
+core's play entry.
+
+Init clears the phase, reads the selected bound tune's rate and calls
+the core's init. Exit calls the core's exit. Play adds the subtune
+rate to the phase. When the phase reaches the callback rate, play
+subtracts that rate, sets the mark and calls the core's play once.
+On other calls it clears the mark. A host calls the same three entries
+as for a file of one rate (5.4).
 
 ---
 
@@ -469,10 +494,10 @@ the SNDH file begins at the byte after the stub's last.
 |---|---|---|
 | 0 | 4 | `bra.w` to the program (4.6) |
 | 4 | 4 | `YMXT` |
-| 8 | 2 | the descriptor's version, 2 |
+| 8 | 2 | 2 for one rate, or 3 for a mixed-rate file |
 | 10 | 2 | the subtunes: patched from the `##` tag |
 | 12 | 2 | flags: patched; the word of 4.3 |
-| 14 | 2 | the rate, rows a second: patched from the clock tag |
+| 14 | 2 | the callback rate in Hz, patched from the clock tag |
 | 16 | 4 | the rows to play: patched; 0 plays until a key stops it |
 | 20 | 4 | the core's offset from the SNDH file's first byte: patched |
 | 24 | 2 | the prescaler: patched; TCDCR's nibble, 1 to 7, the divisors 4, 10, 16, 50, 64, 100 and 200 (SPEC.md 1.9.2) |
@@ -503,7 +528,7 @@ table is empty since every address in the stub and the file is relative.
 
 **4.5 Reading the SNDH file.** In order:
 
-1. Check the stub and `rows`, the table's first four conditions.
+1. Check the supplied stub if any, then check `rows` against the table.
 2. Read `SNDH` at 12, then the tags from 16 to `HDNS`: a zero byte where
    a tag name would begin is a pad of one byte; `##` is 4 bytes and a
    zero byte, its two digits `N`; the clock tag, `TC` or `!V`, runs to
@@ -512,8 +537,9 @@ table is empty since every address in the stub and the file is relative.
    `~` kept, or the whole text where `~` is absent; `FRMS` is 4 + 4`N`
    bytes; `TIME` is 4 + 2`N` bytes; `!#SN` is 4 + 2`N` bytes then `N`
    texts each to its zero byte.
-3. Where the clock tag is `!V` or the `FLAG` letters contain `c`, check
-   the rate.
+3. Check the stub. A mixed-rate file uses stub version 3, the `TC`
+   clock and the rate in the clock code. For other files, check the
+   rate where the clock tag is `!V` or the `FLAG` letters contain `c`.
 4. C is where `YMXS` first is from the byte after `HDNS`, less 12;
    R is 2 + the word at 2 where the word at 0 is $6000, else -1.
 
@@ -523,7 +549,7 @@ tags are:
 | condition | reported as |
 |---|---|
 | the stub is under 30 bytes, or its bytes 4 to 7 are other than `YMXT` | `not a program stub: no YMXT at 4` |
-| the stub's field at 8 is V, other than 2 | `the stub's descriptor is version V, and this writes 2` |
+| the stub's field at 8 is V, other than 2 or 3 | `the stub's descriptor is version V, and this writes 2 or 3` |
 | the stub's length B is odd | `the stub is B bytes, odd: the SNDH file after it would load on an odd address` |
 | `rows` N is outside 0 to 4,294,967,295 | `rows N does not fit a long` |
 | bytes 12 to 15 of the file are other than `SNDH` | `not an SNDH file: no SNDH at 12` |
@@ -536,7 +562,7 @@ tags are:
 | the tags end and the clock tag is absent | `the SNDH file's tags have no TC or !V rate` |
 | the clock tag is `!V` or the `FLAG` letters contain `c`, the rate H is other than 50, and the caller leaves the clock to the file | `the file plays from the VBL at H Hz: the stub's VBL is a 50 Hz clock, so this set needs a separate host or the VBL asked for` |
 | `YMXS` is absent past `HDNS` | `the SNDH file has no core: no YMXS past its tags` |
-| C is before the byte after `HDNS`, or R is other than C | `the core begins at C, and the entry triple reaches R` |
+| R is before the byte after `HDNS`, or its entry triple does not reach C as defined by 3.1 and 3.4 | `the core begins at C, and the entry triple reaches R` |
 | C plus 36 is past the file, B bytes remaining from C | `the core begins at C and the file ends B bytes on, short of the core's descriptor, 36 bytes` |
 
 A reader of 6.1 reports a condition of this table that reads the SNDH
@@ -636,7 +662,10 @@ The tick, in order:
 5. Where `N` is above 1, read the core's state byte through its field at
    24; where bit 1 is set, set *over*.
 
-Every register is kept.
+Version 3 calls the mixed-rate play entry first. It checks the
+clock mark before updating the pause and row count. A call that
+marks the tune ended sets *over* without counting a row. Every
+register is kept.
 
 **4.9 The playing line**: a carriage return, `playing `, the subtune in
 two digits, `/`, `N` in two digits, two spaces, and the name of 4.6 step
@@ -701,12 +730,13 @@ with `d0.w` the subtune, 1 to `N`, calls play at the rate of the clock
 tag, and calls exit at the end; it reads the end of a tune that plays
 once in the state byte (2.4). The clock tag names the clock an SNDH host
 under TOS calls play from: `TC` Timer C, and `!V` the VBL, written where
-the set claims Timer C or the VBL is asked for (3.2, 3.3 step 5). The
+the set claims Timer C, every subtune of a set is at 50 Hz, or the
+VBL is selected (3.2, 3.3 step 5). The
 `FLAG` letters list the timers the set claims, and a host that ticks
 from a timer selects one outside them. Under `TC` the program of 4
 writes Timer C's vector with a separate handler, arms the timer at the
 `ticks` of 4.10, adds the rate to an accumulator on each tick and plays
-a row for each `ticks` the accumulator reaches (4.7, 4.8), and restores
+the play entry for each `ticks` the accumulator reaches (4.7, 4.8), and restores
 the vector at the end (4.6 step 6); under `!V` it plays from the VBL
 (4.3).
 
@@ -839,7 +869,7 @@ report that line alone and stop.
   unsigned; and `{"part":"tag","name":"HDNS","at":A}`, last.
 - `{"part":"core","at":H,"version":V,"binds":R,"fixed":F,"flags":G,
   "state":S,"subtunetable":U,"work":W}`, H the core's first byte,
-  even(12 + T) of 3.1 with T the tag block's bytes, the fields at 16,
+  as 3.1 defines, the fields at 16,
   18, 20, 22, 24, 28 and 32 (2.2), S, U and W each plus H. Where bit 4
   of the flags is set, `,"pages":P` ends the line before the brace, P
   the field at 36 plus H, or 0 where the field is 0.

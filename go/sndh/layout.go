@@ -150,7 +150,7 @@ func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 	}
 	out.WriteString("]}\n")
 	hdns := layoutTags(out, file, from)
-	core := even(hdns + 4)
+	core := CoreAt(file, even(hdns+4))
 	table := core + ymxr.GetLong(file, core+28)
 	work := core + ymxr.GetLong(file, core+32)
 	fmt.Fprintf(out, "{\"part\":\"core\",\"at\":%d,\"version\":%d,\"binds\":%d,"+
@@ -247,7 +247,7 @@ func layoutTags(out *bytes.Buffer, file []byte, from int) int {
 				if i > 0 {
 					out.WriteString(",")
 				}
-				fmt.Fprintf(out, "%d", ymxr.GetLong(file, at+4+4*i))
+				fmt.Fprintf(out, "%d", uint32(ymxr.GetLong(file, at+4+4*i)))
 			}
 			out.WriteString("]}\n")
 			at += 4 + 4*subtunes

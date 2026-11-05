@@ -1,13 +1,13 @@
 {"kind":"program","bytes":10514}
 {"part":"prg","text":10482}
-{"part":"stub","at":28,"bytes":1770,"version":2,"subtunes":2,"flags":0,"rate":50,"rows":2000,"core":1924,"prescaler":5,"count":0,"ticks":150}
+{"part":"stub","at":28,"bytes":1770,"version":2,"subtunes":2,"flags":2,"rate":50,"rows":2000,"core":1924,"prescaler":5,"count":0,"ticks":150}
 {"part":"sndh","at":1798}
 {"part":"entry","to":[1924,1928,1932]}
 {"part":"tag","name":"TITL","at":1814,"text":"Two"}
 {"part":"tag","name":"COMM","at":1822,"text":"Jochen Hippel"}
 {"part":"tag","name":"CONV","at":1840,"text":"YMXR (ym-to-ymxr)"}
 {"part":"tag","name":"##","at":1862,"count":2}
-{"part":"tag","name":"TC","at":1867,"rate":50}
+{"part":"tag","name":"!V","at":1867,"rate":50}
 {"part":"tag","name":"FLAG","at":1872,"text":"~y"}
 {"part":"tag","name":"FRMS","at":1880,"frames":[0,4]}
 {"part":"tag","name":"!#SN","at":1892,"names":["Circus","Once"]}

@@ -184,7 +184,8 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		return nil, fmt.Errorf("%d names for %d subtunes", len(options.Names), n)
 	}
 	frames := make([]int, n)
-	rate := 0
+	rates := make([]int, n)
+	mixed := false
 	claimed := 0
 	defers := false
 	maps := false
@@ -195,17 +196,11 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 			return nil, fmt.Errorf("subtune %d: %w", i+1, err)
 		}
 		read = append(read, tune)
-		if i == 0 {
-			rate = tune.FrameRate
-			// TIME divides the frames by the rate
-			if rate == 0 {
-				return nil, errors.New("subtune 1 plays at 0" +
-					" Hz: an SNDH file records a rate of 1 Hz or more")
-			}
-		} else if tune.FrameRate != rate {
-			return nil, fmt.Errorf("subtune %d plays at %d Hz and subtune 1 at %d: an"+
-				" SNDH file records one rate", i+1, tune.FrameRate, rate)
+		rates[i] = tune.FrameRate
+		if rates[i] == 0 {
+			return nil, fmt.Errorf("subtune %d plays at 0 Hz: an SNDH file records a rate of 1 Hz or more", i+1)
 		}
+		mixed = mixed || rates[i] != rates[0]
 		if tune.Table.Repeat() >= tune.Table.Rows() {
 			frames[i] = tune.Table.Rows()
 		}
@@ -226,7 +221,16 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 			state = at
 		}
 	}
-	tags, err := Tags(options, rate, n, frames, claimed)
+	rate := rates[0]
+	var nativeRates []int
+	if mixed {
+		rate, err = mixedRate(rates, claimed, options.Asked)
+		if err != nil {
+			return nil, err
+		}
+		nativeRates = rates
+	}
+	tags, err := tagsOf(options, rate, n, frames, claimed, nativeRates)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +295,15 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 			handlers, PageReach)
 	}
 	workspace := ymxr.Align(ymxr.GetWord(core, CoreFixedAt)+state) + WorkRounding
-	return Combine(core, set, tags, workspace)
+	var clock []byte
+	if mixed {
+		clock, err = binaries.Read(binaries.Clock)
+		if err != nil {
+			return nil, err
+		}
+		ymxr.PutWord(clock, clockRateAt, rate)
+	}
+	return combine(core, set, tags, workspace, clock)
 }
 
 // The page area's bytes for a list of P pages besides its tables: 256
@@ -464,6 +476,56 @@ func AskedOf(options Options) Asked {
 	return options.Asked
 }
 
+const (
+	clockMagic   = 0x594D5843 // YMXC
+	clockMagicAt = 12
+	clockCoreAt  = 16
+	clockRateAt  = 18
+)
+
+// Mixed reports whether the file has mixed-rate entries at at.
+func Mixed(file []byte, at int) bool {
+	return at >= 0 && at <= len(file)-clockRateAt-2 && ymxr.GetLong(file, at+clockMagicAt) == clockMagic
+}
+
+// CoreAt is the core's start after the entries at at.
+func CoreAt(file []byte, at int) int {
+	if Mixed(file, at) {
+		return at + ymxr.GetWord(file, at+clockCoreAt)
+	}
+	return at
+}
+
+// mixedRate is the Timer C callback rate shared by the subtunes.
+func mixedRate(rates []int, claimed int, asked Asked) (int, error) {
+	if claimed&TimerC != 0 {
+		return 0, errors.New("mixed-rate subtunes need Timer C for playback and a subtune claims it for an effect")
+	}
+	if asked == AskedVBL {
+		return 0, errors.New("mixed-rate subtunes need Timer C for playback")
+	}
+	fastest := 0
+	for _, rate := range rates {
+		fastest = max(fastest, rate)
+	}
+	if fastest > mostTicks {
+		return 0, fmt.Errorf("mixed-rate subtunes need rates at or below %d Hz", mostTicks)
+	}
+	for rate := fastest; rate <= mostTicks; rate++ {
+		common := true
+		for _, one := range rates {
+			common = common && rate%one == 0
+		}
+		if common && TimerFor(rate).Ticks == rate {
+			return rate, nil
+		}
+	}
+	if fastest <= OSClock.Ticks {
+		return OSClock.Ticks, nil
+	}
+	return mostTicks, nil
+}
+
 // Tags is the tag block, 'SNDH' through 'HDNS': TITL, COMM where there is
 // a composer, CONV, '##' and two digits, the clock tag and the rate, FLAG,
 // each text ended by a zero byte, a pad to an even length, FRMS with a
@@ -475,6 +537,10 @@ func AskedOf(options Options) Asked {
 // frame of calls (performance.md), so a core with it in names the VBL as
 // the clock.
 func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, error) {
+	return tagsOf(options, rate, n, frames, claimed, nil)
+}
+
+func tagsOf(options Options, rate, n int, frames []int, claimed int, rates []int) ([]byte, error) {
 	var out bytes.Buffer
 	text(&out, "SNDH")
 	tag(&out, "TITL", Clean(options.Title))
@@ -483,7 +549,16 @@ func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, erro
 	}
 	tag(&out, "CONV", Converter)
 	tag(&out, fmt.Sprintf("##%02d", n), "")
-	clock, err := Clock(claimed, rate, AskedOf(options))
+	asked := AskedOf(options)
+	if rates != nil {
+		asked = AskedTimerC
+	} else if n > 1 && options.Asked == AskedChosen {
+		asked = AskedChosen
+		if rate == 50 {
+			asked = AskedVBL
+		}
+	}
+	clock, err := Clock(claimed, rate, asked)
 	if err != nil {
 		return nil, err
 	}
@@ -491,8 +566,15 @@ func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, erro
 	tag(&out, "FLAG", Flag(claimed))
 	pad(&out)
 	text(&out, "FRMS")
-	for _, f := range frames {
-		out.Write([]byte{byte(f >> 24), byte(f >> 16), byte(f >> 8), byte(f)})
+	for i, f := range frames {
+		calls := int64(f)
+		if rates != nil {
+			calls = (calls*int64(rate) + int64(rates[i]) - 1) / int64(rates[i])
+		}
+		if calls > 0xFFFFFFFF {
+			return nil, fmt.Errorf("subtune %d exceeds the FRMS callback count", i+1)
+		}
+		out.Write([]byte{byte(calls >> 24), byte(calls >> 16), byte(calls >> 8), byte(calls)})
 	}
 	if options.Names != nil {
 		text(&out, "!#SN")
@@ -508,8 +590,12 @@ func Tags(options Options, rate, n int, frames []int, claimed int) ([]byte, erro
 	}
 	pad(&out)
 	text(&out, "TIME")
-	for _, f := range frames {
-		s := seconds(f, rate)
+	for i, f := range frames {
+		native := rate
+		if rates != nil {
+			native = rates[i]
+		}
+		s := seconds(f, native)
 		out.Write([]byte{byte(s >> 8), byte(s)})
 	}
 	text(&out, "HDNS")
@@ -535,9 +621,14 @@ func seconds(frames, rate int) int {
 // follow the images. Patch each tune's ImageAt and
 // BoundTransformationsAt relative to that tune (doc/BINARIES.md 3.1).
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
+	return combine(core, set, tags, workspace, nil)
+}
+
+func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]byte, error) {
 	tunes := set.Tunes
-	header := even(12 + len(tags))
-	if header-2 > 32767 {
+	entries := even(12 + len(tags))
+	header := entries + len(clock)
+	if entries-2 > 32767 {
 		return nil, fmt.Errorf("the tag block is %d bytes, and a bra.w reaches %d",
 			len(tags), 32767)
 	}
@@ -584,9 +675,10 @@ func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	file := make([]byte, header+workAt+workspace)
 	for entry := 0; entry < 12; entry += 4 {
 		ymxr.PutWord(file, entry, braW)
-		ymxr.PutWord(file, entry+2, header-2)
+		ymxr.PutWord(file, entry+2, entries-2)
 	}
 	copy(file[12:], tags)
+	copy(file[entries:], clock)
 	copy(file[header:], core)
 	ymxr.PutLong(file, header+coreTableAt, tableAt)
 	ymxr.PutLong(file, header+coreWorkAt, workAt)

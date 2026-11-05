@@ -83,7 +83,7 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if !said.Says() {
 		return
 	}
-	at := even(int(ymxr.GetWord(file, 2)) + 2)
+	at := sndh.CoreAt(file, even(ymxr.GetWord(file, 2)+2))
 	flags := ymxr.GetWord(file, at+sndh.CoreFlagsAt)
 	monitor, lean := flags&1 != 0, flags&2 != 0
 	pcrel, deferred := flags&4 != 0, flags&8 != 0
