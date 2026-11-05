@@ -2386,12 +2386,12 @@ def mapped(code, symbols):
 # of effect 0's fallback at the frame, each the one start or remap of its
 # row: the start or the remap, and the entries of its transformation
 # (performance.md, A remap at the frame).
-_FALLBACK = []
+_FALLBACK = {}
 FALLBACK_FROM = 100
 FALLBACK_FILLS = (("remap", 16), ("remap", 32), ("start", 16), ("start", 32))
 
 
-def fallback_tune():
+def fallback_tune(compact=False):
     """A tune whose pages pass the reach of the first handler: effect 0
     remaps through 100 transformations of 16 entries, one a row, and
     effect 1 through 20 in rows 81 to 99, so init fills the first pages of
@@ -2399,19 +2399,23 @@ def fallback_tune():
     the same rows. From row FALLBACK_FROM, in every second row, effect 0
     alone runs a row of FALLBACK_FILLS, a start at row 0 or a remap,
     through a transformation of 16 or 32 entries that each row before it
-    leaves unused, and fills a page of its fallback at the frame."""
-    if _FALLBACK:
-        return _FALLBACK[0]
+    leaves unused, and fills a page of its fallback at the frame.
+    The compact fixture uses 16 and 8 transformations before those
+    starts and remaps, so the page area fits after the tune on a
+    larger core."""
+    if compact in _FALLBACK:
+        return _FALLBACK[compact]
+    first, second = (16, 8) if compact else (FALLBACK_FROM, 20)
     tables = [("T%d" % n, [(k * (2 * (n % 8) + 1) + n // 8 + 1) % 16 for k in range(16)])
-              for n in range(120)]
+              for n in range(first + second)]
     ramp = ("ramp", list(range(16)), 0)
     a = {0: ("start", 1, 8, 50, 100, 1, 1, 0, [1])}
-    a.update({r: ("remap", [1 + r]) for r in range(1, FALLBACK_FROM)})
-    d = {0: ("start", 1, 9, 50, 100, 1, 1, 0, [101])}
-    d.update({r: ("remap", [21 + r]) for r in range(81, FALLBACK_FROM)})
-    rows = FALLBACK_FROM
+    a.update({r: ("remap", [1 + r]) for r in range(1, first)})
+    d = {0: ("start", 1, 9, 50, 100, 1, 1, 0, [first + 1])}
+    d.update({r: ("remap", [second + 1 + r]) for r in range(first - second + 1, first)})
+    rows = first
     for what, entries in FALLBACK_FILLS:
-        # an even step, so each table differs from the 120 above
+        # an even step, so each table differs from the ones above
         n = len(tables) + 1
         tables.append(("W%d" % n, [(2 * k + n) % 16 for k in range(entries)]))
         a[rows] = ("remap", [n]) if what == "remap" else ("start", 1, 8, 50, 100, 1, 1, 0, [n])
@@ -2420,7 +2424,7 @@ def fallback_tune():
                         {"A": a, "D": d}, transformations=tables)
     at, version = built("fallbacks", tune)
     assert version == MAPPED, "the fallback's tune is of version %d" % version
-    _FALLBACK.append(at)
+    _FALLBACK[compact] = at
     return at
 
 
@@ -2428,8 +2432,9 @@ def fallbacks(code, symbols):
     """The tune of fallback_tune, every tick against the model and every
     frame against the reader's record (BINARIES.md 5.6). Then init
     reports -1 for a tune that maps a value with a2 at 0, with an area
-    below the player and without a list, and leaves the area below as it
-    was; and 0 for one whose list has no page, with a2 at 0 (5.1)."""
+    below the player, past its reach and without a list. It leaves the
+    area below as it was and reports 0 for a list of no page with a2
+    at 0 (5.1)."""
     global AREA_AFTER
     if "ymxr_look" not in symbols:
         code, symbols = build(switched(DEFINES, lookup=True))
@@ -2437,15 +2442,18 @@ def fallbacks(code, symbols):
     work = tempfile.mkdtemp()
     with open(at, "rb") as f:
         bound = bind(f.read(), work)
+    # The fixture fills the available page reach, so its source rows go
+    # before the area on PC-relative builds. On larger cores the compact
+    # fixture leaves room for the area and still makes both effects fall
+    # back.
+    after = (placed(len(code)) + len(bound) + 1) & ~1
+    if PCREL and area_of(bound, symbols, after) is None:
+        at = fallback_tune(compact=True)
+        with open(at, "rb") as f:
+            bound = bind(f.read(), work)
     count, entries = list_of(bound)
-    # on the build whose ticks read through a displacement, the area past
-    # the tune, so that the tune's sources are within the reach the area
-    # leaves of the first handler (BINARIES.md 5.5, 5.6); under -abs,
-    # whose ticks read an absolute address, the area right after the
-    # player and the tune past the reach
+    # Play every frame under -frames too, so both effects use a fallback.
     global MOST_FRAMES
-    # every frame of the tune played under -frames too: effect 0 reaches
-    # its fallback at its row k
     AREA_AFTER, most = PCREL, MOST_FRAMES
     MOST_FRAMES = None
     try:
@@ -2455,9 +2463,11 @@ def fallbacks(code, symbols):
 
 
 def refused(code, symbols, at, bound, count, entries, work):
-    """The rest of fallbacks, with the area past the tune."""
+    """Check fallback playback and the page areas init rejects."""
     m = Machine(code, symbols, bound)
-    k = plan_of(count, entries, m.reach, fallback_of(symbols))[0]
+    plan = plan_of(count, entries, m.reach, fallback_of(symbols))
+    assert plan is not None, "the fallback page area is past the player's reach"
+    k = plan[0]
     dropped = {e for e, _, _ in entries[k:]}
     assert dropped == {0, 1}, "init fills %d of %d pages, and effects %s fall back" % (
         k, len(entries), sorted(dropped))
@@ -2478,6 +2488,10 @@ def refused(code, symbols, at, bound, count, entries, work):
     assert m.call("init", a0=FILE, a1=workspace) == 0xFFFFFFFF, \
         "init took a page area below the player"
     assert bytes(m.mu.mem_read(below, 0x400)) == was, "init wrote below the player"
+    m = Machine(code, symbols, mapped_bound)
+    m.area = CODE + symbols["ymxr_tick0"] + 32768
+    assert m.call("init", a0=FILE, a1=workspace) == 0xFFFFFFFF, \
+        "init took a page area past the player's reach"
     block = struct.unpack(">i", mapped_bound[24:28])[0]
     count = struct.unpack(">H", mapped_bound[block:block + 2])[0]
     tag = block + 2 + 4 * count
@@ -2502,7 +2516,7 @@ def refused(code, symbols, at, bound, count, entries, work):
         "init rejected a tune that lists no page, with no area"
     return ("the fallback: %d of %d pages in the area and effects 0 and 1 through their"
             " fallback, %d frames, %d ticks; init reports -1 with no area, with one below the"
-            " player and without a list, and 0 for a list of no page with no area"
+            " player, past its reach and without a list, and 0 for a list of no page with no area"
             % (k, len(entries), frames, ticks))
 
 
