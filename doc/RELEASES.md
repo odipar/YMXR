@@ -10,7 +10,7 @@ below it.
 
 - one zip a platform, over six: Windows, macOS and Linux, each on x64 and
   arm64. A zip contains the twelve tools as executables, and each
-  executable contains the thirty-three 68000 binaries of BINARIES.md and
+  executable contains the 68000 binaries of BINARIES.md and
   DTX's forty images, so one converts a dump and writes a program on a
   machine where neither this repository nor a toolchain is installed
 - one zip of the twelve tools and YMXS's `ymxs-check` as one
@@ -22,7 +22,7 @@ below it.
 The version names every file. It is read out of `pom.xml`, or is
 the script's one argument.
 
-The thirty-three binaries are assembled from `68k/` by rmac on the machine
+The binaries are assembled from `68k/` by rmac on the machine
 that cuts the release, so the caller's machine has an assembler to install
 or not as it pleases. They are committed under `go/binaries/data`: a Go
 module fetched by its import path contains the files a commit has in it,

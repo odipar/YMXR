@@ -668,6 +668,68 @@ final class ParityTest {
         both("ymxr-prg", both("ymxr-sndh", tune, "-silent", "-perf"), "-silent", "-tc");
     }
 
+    @Test
+    void theClockFlagsForMultipleSubtunesReadTheSameInBothTrees() throws Exception {
+        byte[] fifty = Files.readAllBytes(Path.of("doc/conformance/tunes/plays-once.ymxr"));
+        byte[] sixty = fifty.clone();
+        Tune.putWord(sixty, Tune.FRAME_RATE_AT, 60);
+        byte[] allFifty = multiOf(List.of(fifty, fifty), "-silent");
+        byte[] vbl = both("ymxr-sndh", allFifty, "-vbl");
+        byte[] timer = both("ymxr-sndh", allFifty, "-tc");
+        assertEquals("!V", Prg.tags(vbl).clock());
+        assertEquals("TC", Prg.tags(timer).clock());
+        assertArrayEquals(timer, both("ymxr-sndh", allFifty));
+        byte[] watched = both("ymxr-sndh", allFifty, "-perf");
+        assertEquals("!V", Prg.tags(watched).clock());
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(both("ymxr-prg", watched),
+                Prg.HEADER + Prg.STUB_FLAGS_AT));
+        assertEquals("TC", Prg.tags(both("ymxr-sndh", allFifty, "-perf", "-tc")).clock());
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(both("ymxr-prg", timer, "-vbl"),
+                Prg.HEADER + Prg.STUB_FLAGS_AT));
+        assertEquals(0, Tune.getWord(both("ymxr-prg", vbl, "-tc"),
+                Prg.HEADER + Prg.STUB_FLAGS_AT));
+
+        for (List<byte[]> tunes : List.of(List.of(fifty, sixty), List.of(sixty, sixty))) {
+            byte[] multi = multiOf(tunes, "-silent");
+            byte[] sndh = both("ymxr-sndh", multi, "-tc");
+            assertEquals("TC", Prg.tags(sndh).clock());
+            assertArrayEquals(sndh, both("ymxr-sndh", multi));
+            for (String[] flags : List.of(new String[] {"-perf"}, new String[] {"-perf", "-tc"})) {
+                Ran perf = same("ymxr-sndh", multi, flags);
+                assertEquals(1, perf.exit(), perf.said());
+                assertTrue(perf.said().contains("-perf requires every subtune in a set"
+                        + " to play at 50 Hz"), perf.said());
+            }
+            Ran writer = same("ymxr-sndh", multi, "-vbl");
+            Ran wrapper = same("ymxr-prg", sndh, "-vbl");
+            for (Ran run : List.of(writer, wrapper)) {
+                assertEquals(1, run.exit(), run.said());
+                assertTrue(run.said().contains("-vbl requires every subtune in a set"
+                        + " to play at 50 Hz"), run.said());
+            }
+        }
+    }
+
+    @Test
+    void aMixedRateStructurePlaysAtBothRatesInBothTrees() throws Exception {
+        org.ymxs.YMXS.Tune fifty = YmxsTest.fade();
+        org.ymxs.YMXS.Tune sixty = new org.ymxs.YMXS.Tune("Sixty", fifty.composer(),
+                fifty.writer(), 60, fifty.table());
+        byte[] json = org.ymxs.Text.write(new org.ymxs.YMXS.Multi(List.of(fifty, sixty)))
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] packed = both("ymxs-to-ymxr", json, "-silent");
+        byte[] sndh = both("ymxr-sndh", packed, "-silent");
+        assertEquals(300, Prg.tags(sndh).rate());
+        byte[] direct = both("ymxs-to-sndh", json, "-silent");
+        assertEquals(300, Prg.tags(direct).rate());
+        byte[] program = both("ymxr-prg", sndh, "-r20");
+        assertEquals(Prg.MIXED_STUB_VERSION, Tune.getWord(program, Prg.HEADER + Prg.STUB_VERSION_AT));
+        assertArrayEquals(both("ymxr-prg", direct, "-silent", "-r20"),
+                both("ymxs-to-prg", json, "-silent", "-r20"));
+        both("ymxr-layout", sndh);
+        both("ymxr-layout", program);
+    }
+
     /**
      * The TIME tag of a tune that plays once, in both trees. Every dump
      * under ym/test repeats, so the cases above write 0 alone: the kit's

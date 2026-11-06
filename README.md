@@ -60,7 +60,9 @@ player, and a TOS program plays the SNDH file on a bare machine.
 The tools link the player for the subtunes by default. Pass `-carried`
 to write the full core selected by the switches ([LINKER.md](doc/LINKER.md)).
 [`bin/ymxr-set`](bin/ymxr-set) runs those calls over a set of dumps with
-the Go tools ([tools.md](doc/tools.md) 16.6).
+the Go tools ([tools.md](doc/tools.md) 16.6). Timer C is the default
+where the tunes leave it free. `-perf` defaults to VBL. A set with a
+non-50 Hz subtune requires Timer C and cannot use `-perf`.
 
 `ymxr-check` compares a converted tune with its dump, and reads the source
 and mapping columns of a tune file alone against rule 2(b) and the mapping

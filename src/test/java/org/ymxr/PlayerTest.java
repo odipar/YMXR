@@ -306,17 +306,18 @@ final class PlayerTest {
         String binaries = Files.readString(BINARIES);
         Map<String, Integer> said = layout(binaries, "4. The program stub");
         assertEquals(Prg.STUB_MAGIC_AT, row(said, "`YMXT`").getValue());
-        assertEquals(Prg.STUB_VERSION_AT, row(said, "the descriptor's version").getValue());
+        Map.Entry<String, Integer> version = row(said, "the descriptor's version");
+        assertEquals(Prg.STUB_VERSION_AT, version.getValue());
+        assertEquals(List.of(Prg.STUB_VERSION, Prg.MIXED_STUB_VERSION), figures(version.getKey()),
+                "4.2 lists the two versions the tool writes");
         assertEquals(Prg.STUB_SUBTUNES_AT, row(said, "the subtunes").getValue());
         assertEquals(Prg.STUB_FLAGS_AT, row(said, "flags").getValue());
-        assertEquals(Prg.STUB_RATE_AT, row(said, "the rate, rows a second").getValue());
+        assertEquals(Prg.STUB_RATE_AT, row(said, "the callback rate").getValue());
         assertEquals(Prg.STUB_ROWS_AT, row(said, "the rows to play").getValue());
         assertEquals(Prg.STUB_CORE_AT, row(said, "the core's offset").getValue());
         assertEquals(Prg.STUB_PRESCALER_AT, row(said, "the prescaler").getValue());
         assertEquals(Prg.STUB_COUNT_AT, row(said, "the timer's count").getValue());
         assertEquals(Prg.STUB_TICKS_AT, row(said, "the timer's rate").getValue());
-        assertEquals(Prg.STUB_VERSION, version(binaries, "4. The program stub"),
-                "4.2 reads the version the tool writes");
         Map<String, Integer> bits = flags(binaries, "4. The program stub", 2);
         assertEquals(Prg.FLAG_VBL, 1 << row(bits, "the clock tag is `!V`").getValue());
     }

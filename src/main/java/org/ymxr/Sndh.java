@@ -180,7 +180,7 @@ final class Sndh {
      * using a transformation enables lookups.
      *
      * @throws IllegalArgumentException for unreadable tune files,
-     * incompatible core versions, differing frame rates or too many
+     * incompatible core versions, clock conflicts or too many
      * subtunes for the '##' tag
      */
     static byte[] of(List<byte[]> tuneFiles, Options options) {
@@ -208,7 +208,8 @@ final class Sndh {
             throw new IllegalArgumentException(names.size() + " names for " + n + " subtunes");
         }
         int[] frames = new int[n];
-        int rate = 0;
+        int[] rates = new int[n];
+        boolean mixed = false;
         int claimed = 0;
         boolean defers = false;
         boolean maps = false;
@@ -221,24 +222,29 @@ final class Sndh {
                 throw new IllegalArgumentException("subtune " + (i + 1) + ": "
                         + wrong.getMessage(), wrong);
             }
-            if (i == 0) {
-                rate = tune.frameRate();
-                // TIME divides the frames by the rate
-                if (rate == 0) {
-                    throw new IllegalArgumentException("subtune 1 plays at 0"
-                            + " Hz: an SNDH file records a rate of 1 Hz or more");
-                }
-            } else if (tune.frameRate() != rate) {
-                throw new IllegalArgumentException("subtune " + (i + 1) + " plays at "
-                        + tune.frameRate() + " Hz and subtune 1 at " + rate + ": an SNDH file"
-                        + " records one rate");
+            rates[i] = tune.frameRate();
+            if (rates[i] == 0) {
+                throw new IllegalArgumentException("subtune " + (i + 1) + " plays at 0"
+                        + " Hz: an SNDH file records a rate of 1 Hz or more");
             }
+            mixed |= rates[i] != rates[0];
             read.add(tune);
             Table table = tune.table();
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
             defers |= (tune.effects() & Columns.DEFERS) != 0;
             maps |= (tune.effects() & Columns.MAPS) != 0;
+        }
+        checkVbl(options.asked(), n, rates[0], mixed);
+        if (n > 1 && (mixed || rates[0] != 50)) {
+            if (options.monitor()) {
+                throw new IllegalArgumentException("-perf requires every subtune in a set"
+                        + " to play at 50 Hz");
+            }
+            if ((claimed & TIMER_C) != 0) {
+                throw new IllegalArgumentException("a set with a non-50 Hz subtune needs Timer C"
+                        + " for playback and a subtune claims it for an effect");
+            }
         }
         // The tunes are bound as a set, so those that agree on what an
         // image fixes once share one and the reader's code appears once for
@@ -248,7 +254,8 @@ final class Sndh {
         for (byte[] b : set.tunes()) {
             state = Math.max(state, Tune.getLong(b, Bound.STATE_AT));
         }
-        byte[] tags = tags(options, rate, n, frames, claimed);
+        int rate = mixed ? mixedRate(rates) : rates[0];
+        byte[] tags = tags(options, rate, n, frames, claimed, mixed ? rates : null);
         // Which core is under the tunes: the one the caller named, or
         // the one the switches select, which reads a row through the
         // program counter unless the file's tunes end past the reach
@@ -302,7 +309,51 @@ final class Sndh {
                     + PAGE_REACH);
         }
         int workspace = Tune.align(Tune.getWord(core, CORE_FIXED_AT) + state) + WORK_ROUNDING;
-        return combine(core, set, tags, workspace);
+        byte[] clock = mixed ? Binaries.carried(Binaries.CLOCK.name()) : new byte[0];
+        if (mixed) {
+            Tune.putWord(clock, CLOCK_RATE_AT, rate);
+        }
+        return combine(core, set, tags, workspace, clock);
+    }
+
+    private static final int CLOCK_MAGIC = 0x594D5843; // YMXC
+    private static final int CLOCK_MAGIC_AT = 12;
+    private static final int CLOCK_CORE_AT = 16;
+    static final int CLOCK_RATE_AT = 18;
+
+    static boolean mixed(byte[] file, int at) {
+        return at >= 0 && at <= file.length - CLOCK_RATE_AT - 2
+                && Tune.getLong(file, at + CLOCK_MAGIC_AT) == CLOCK_MAGIC;
+    }
+
+    static int coreAt(byte[] file, int at) {
+        return mixed(file, at) ? at + Tune.getWord(file, at + CLOCK_CORE_AT) : at;
+    }
+
+    static void checkVbl(Asked asked, int subtunes, int rate, boolean mixed) {
+        if (asked == Asked.VBL && (mixed || (subtunes > 1 && rate != 50))) {
+            throw new IllegalArgumentException("-vbl requires every subtune in a set"
+                    + " to play at 50 Hz");
+        }
+    }
+
+    /** A common Timer C callback rate. Use an exact multiple of each
+     *  subtune's rate where the timer can generate it, or count each
+     *  subtune's phase against 200 or 400 callbacks a second. */
+    private static int mixedRate(int[] rates) {
+        int fastest = Arrays.stream(rates).max().orElseThrow();
+        if (fastest > Prg.MOST_TICKS) {
+            throw new IllegalArgumentException("mixed-rate subtunes need rates at or below "
+                    + Prg.MOST_TICKS + " Hz");
+        }
+        for (int rate = fastest; rate <= Prg.MOST_TICKS; rate++) {
+            int candidate = rate;
+            if (Arrays.stream(rates).allMatch(one -> candidate % one == 0)
+                    && Prg.timer(rate).ticks() == rate) {
+                return rate;
+            }
+        }
+        return fastest <= Prg.OS_CLOCK.ticks() ? Prg.OS_CLOCK.ticks() : Prg.MOST_TICKS;
     }
 
     /** The core the switches select, linked for the blocks the set needs
@@ -513,6 +564,11 @@ final class Sndh {
      * it in names the VBL as the clock.
      */
     static byte[] tags(Options options, int rate, int n, int[] frames, int claimed) {
+        return tags(options, rate, n, frames, claimed, null);
+    }
+
+    private static byte[] tags(Options options, int rate, int n, int[] frames, int claimed,
+                               int @Nullable [] rates) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         text(out, "SNDH");
         tag(out, "TITL", clean(options.title()));
@@ -522,11 +578,19 @@ final class Sndh {
         }
         tag(out, "CONV", CONVERTER);
         tag(out, String.format(Locale.ROOT, "##%02d", n), "");
-        tag(out, clock(claimed, rate, asked(options)), "");
+        Asked clock = rates == null ? asked(options) : Asked.TIMER_C;
+        tag(out, clock(claimed, rate, clock), "");
         tag(out, "FLAG", flag(claimed));
         pad(out);
         text(out, "FRMS");
-        for (int f : frames) {
+        for (int i = 0; i < n; i++) {
+            long calls = rates == null ? frames[i]
+                    : ((long) frames[i] * rate + rates[i] - 1) / rates[i];
+            if (calls > 0xFFFFFFFFL) {
+                throw new IllegalArgumentException("subtune " + (i + 1)
+                        + " exceeds the FRMS callback count");
+            }
+            int f = (int) calls;
             out.write(f >>> 24);
             out.write(f >>> 16);
             out.write(f >>> 8);
@@ -548,8 +612,8 @@ final class Sndh {
         }
         pad(out);
         text(out, "TIME");
-        for (int f : frames) {
-            int s = seconds(f, rate);
+        for (int i = 0; i < n; i++) {
+            int s = seconds(frames[i], rates == null ? rate : rates[i]);
             out.write(s >>> 8);
             out.write(s);
         }
@@ -589,9 +653,15 @@ final class Sndh {
      * image and block.
      */
     static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace) {
+        return combine(core, set, tags, workspace, new byte[0]);
+    }
+
+    private static byte[] combine(byte[] core, Bound.Set set, byte[] tags, int workspace,
+                                  byte[] clock) {
         List<byte[]> tunes = set.tunes();
-        int header = even(12 + tags.length);
-        if (header - 2 > Short.MAX_VALUE) {
+        int entries = even(12 + tags.length);
+        int header = entries + clock.length;
+        if (entries - 2 > Short.MAX_VALUE) {
             throw new IllegalArgumentException("the tag block is " + tags.length
                     + " bytes, and a bra.w reaches " + Short.MAX_VALUE);
         }
@@ -639,9 +709,10 @@ final class Sndh {
         byte[] file = new byte[header + workAt + workspace];
         for (int entry = 0; entry < 12; entry += 4) {
             Tune.putWord(file, entry, BRA_W);
-            Tune.putWord(file, entry + 2, header - 2);
+            Tune.putWord(file, entry + 2, entries - 2);
         }
         System.arraycopy(tags, 0, file, 12, tags.length);
+        System.arraycopy(clock, 0, file, entries, clock.length);
         System.arraycopy(core, 0, file, header, core.length);
         Tune.putLong(file, header + CORE_TABLE_AT, tableAt);
         Tune.putLong(file, header + CORE_WORK_AT, workAt);
@@ -808,7 +879,7 @@ final class Sndh {
         if (!report.says()) {
             return;
         }
-        int at = even(Tune.getWord(sndh, 2) + 2);
+        int at = coreAt(sndh, even(Tune.getWord(sndh, 2) + 2));
         int flags = Tune.getWord(sndh, at + CORE_FLAGS_AT);
         boolean monitor = (flags & CORE_MONITOR) != 0;
         boolean lean = (flags & CORE_LEAN) != 0;

@@ -28,18 +28,19 @@ import (
 var stubMagic = []byte{'Y', 'M', 'X', 'T'}
 
 const (
-	stubMagicAt     = 4
-	stubVersion     = 2
-	stubVersionAt   = 8
-	stubSubtunesAt  = 10
-	StubFlagsAt     = 12
-	stubRateAt      = 14
-	stubRowsAt      = 16
-	stubCoreAt      = 20
-	stubPrescalerAt = 24
-	stubCountAt     = 26
-	stubTicksAt     = 28
-	stubLength      = 30
+	stubMagicAt      = 4
+	stubVersion      = 2
+	mixedStubVersion = 3
+	stubVersionAt    = 8
+	stubSubtunesAt   = 10
+	StubFlagsAt      = 12
+	stubRateAt       = 14
+	stubRowsAt       = 16
+	stubCoreAt       = 20
+	stubPrescalerAt  = 24
+	stubCountAt      = 26
+	stubTicksAt      = 28
+	stubLength       = 30
 )
 
 // Timer is the timer the stub arms for a rate (BINARIES.md 4.10): the
@@ -119,17 +120,15 @@ type Tagged struct {
 // playing on where rows is 0, from the clock the file names. A clock
 // asked for is over that one, at the file's rate.
 func Program(sndh []byte, rows int64, asked Asked) ([]byte, error) {
-	stub, err := binaries.Read(binaries.Stub)
-	if err != nil {
-		return nil, err
-	}
-	return ProgramWith(stub, sndh, rows, asked)
+	return ProgramWith(nil, sndh, rows, asked)
 }
 
 // ProgramWith is the same, from the stub named.
 func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
-	if err := CheckStub(stub); err != nil {
-		return nil, err
+	if stub != nil {
+		if err := CheckStub(stub); err != nil {
+			return nil, err
+		}
 	}
 	if rows < 0 || rows > 0xFFFFFFFF {
 		return nil, fmt.Errorf("rows %d does not fit a long", rows)
@@ -137,6 +136,33 @@ func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	tags, err := ReadTags(sndh)
 	if err != nil {
 		return nil, err
+	}
+	entries := even(tags.End + 4)
+	mixed := Mixed(sndh, entries)
+	if stub == nil {
+		name := binaries.Stub
+		if mixed {
+			name = binaries.MixedStub
+		}
+		stub, err = binaries.Read(name)
+		if err != nil {
+			return nil, err
+		}
+		if err := CheckStub(stub); err != nil {
+			return nil, err
+		}
+	}
+	if mixed != (ymxr.GetWord(stub, stubVersionAt) == mixedStubVersion) {
+		return nil, fmt.Errorf("the program stub and SNDH file use different clocks")
+	}
+	if err := checkVbl(asked, tags.Subtunes, tags.Rate, mixed); err != nil {
+		return nil, err
+	}
+	if mixed && (tags.Clock != ClockTimerC || strings.ContainsRune(tags.Flag, 'c')) {
+		return nil, fmt.Errorf("mixed-rate subtunes need Timer C for playback")
+	}
+	if mixed && tags.Rate != ymxr.GetWord(sndh, entries+clockRateAt) {
+		return nil, fmt.Errorf("the SNDH callback rate differs from the clock tag")
 	}
 	// The file leaves the stub the VBL where its clock tag names the VBL
 	// and where its set claims Timer C; a clock asked for is over
@@ -149,9 +175,12 @@ func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	}
 	vbl := asked == AskedVBL || (asked == AskedChosen && named)
 	if named && asked == AskedChosen && tags.Rate != 50 {
+		override := ""
+		if tags.Subtunes <= 1 {
+			override = " or the VBL asked for"
+		}
 		return nil, fmt.Errorf("the file plays from the VBL at %d Hz: the stub's VBL is"+
-			" a 50 Hz clock, so this set needs a separate host or the VBL asked for",
-			tags.Rate)
+			" a 50 Hz clock, so this set needs a separate host%s", tags.Rate, override)
 	}
 	core, err := Core(sndh, tags.End+4)
 	if err != nil {
@@ -185,9 +214,9 @@ func CheckStub(stub []byte) error {
 		return fmt.Errorf("not a program stub: no YMXT at %d", stubMagicAt)
 	}
 	version := ymxr.GetWord(stub, stubVersionAt)
-	if version != stubVersion {
-		return fmt.Errorf("the stub's descriptor is version %d, and this writes %d",
-			version, stubVersion)
+	if version != stubVersion && version != mixedStubVersion {
+		return fmt.Errorf("the stub's descriptor is version %d, and this writes %d or %d",
+			version, stubVersion, mixedStubVersion)
 	}
 	if len(stub)&1 != 0 {
 		return fmt.Errorf("the stub is %d bytes, odd: the SNDH file after it would load"+
@@ -323,9 +352,8 @@ func noEnd() error {
 }
 
 // Core is where the core begins: its YMXS, past the tags, less the magic's
-// offset. The entry triple's first bra.w reaches the core's first byte, or
-// the file is not one this wrote, and the core's descriptor is whole
-// in the file, since this reads its flags.
+// offset. The first entry must reach the core or the mixed-rate clock
+// immediately before it. The core's descriptor fits in the file.
 func Core(sndh []byte, from int) (int, error) {
 	at := find(sndh, string(coreMagic), from, len(sndh))
 	if at < 0 {
@@ -336,7 +364,7 @@ func Core(sndh []byte, from int) (int, error) {
 	if ymxr.GetWord(sndh, 0) == braW {
 		reached = 2 + int(int16(ymxr.GetWord(sndh, 2)))
 	}
-	if core < from || reached != core {
+	if reached < from || CoreAt(sndh, reached) != core {
 		return 0, fmt.Errorf("the core begins at %d, and the entry triple reaches %d",
 			core, reached)
 	}

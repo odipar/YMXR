@@ -21,8 +21,8 @@ runs:
     - uses: actions/setup-node@v4
       with:
         node-version: '22'
-    # The build assembles the thirty-three binaries of BINARIES.md at
-    # process-classes, thirty-two cores and the program stub, and
+    # The build assembles the cores, stubs and clock of BINARIES.md at
+    # process-classes, and
     # BinariesTest reads the copies under go/binaries/data against that
     # assembly. The version is pinned: another rmac writes other bytes and
     # a red run.

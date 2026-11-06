@@ -280,7 +280,7 @@ func TestTheReachCountsFromTheFirstHandler(t *testing.T) {
 
 func TestTheCoresAreNamedByTheFiveSwitches(t *testing.T) {
 	all := binaries.All()
-	if len(all) != 33 || all[32] != binaries.Stub {
+	if len(all) != 35 || all[32] != binaries.Stub || all[33] != binaries.MixedStub || all[34] != binaries.Clock {
 		t.Fatalf("the binaries are %d, the last %s", len(all), all[len(all)-1])
 	}
 	i := 0

@@ -86,7 +86,11 @@ SAYING_LESS     equ     16
 
 stub:           bra.w   main
                 dc.b    'YMXT'
+                .if     ^^defined YMXR_MIXED
+                dc.w    3
+                .else
                 dc.w    2
+                .endif
 subtunes:       dc.w    1
 flags:          dc.w    0
 rate:           dc.w    50
@@ -590,14 +594,30 @@ vbl:
 ; doc/performance.md) on the screen this program clears every run.
 tick:
                 movem.l d0-d7/a0-a6,-(sp)
+                .if     ^^defined YMXR_MIXED
+                move.b  done(pc),d0
+                bne.s   .done
+                lea     sndh(pc),a1
+                jsr     8(a1)
+                adda.l  core(pc),a1
+                tst.b   -2(a1)                  ; the clock called play
+                beq.s   .done
+                move.w  24(a1),d0
+                btst    #1,(a1,d0.w)             ; the tune ended on the prior row
+                bne.s   .over
+                .endif
                 lea     waiting(pc),a0          ; the pause after a digit,
                 tst.w   (a0)                    ; which the key loop reads
                 beq.s   .counted
                 subq.w  #1,(a0)
-.counted:       move.b  done(pc),d0
+.counted:
+                .if     ^^defined YMXR_MIXED
+                .else
+                move.b  done(pc),d0
                 bne.s   .done
                 lea     sndh(pc),a1
                 jsr     8(a1)
+                .endif
                 lea     rows_left(pc),a0
                 move.l  (a0),d0
                 beq.s   .ended                  ; no count asked for
@@ -612,14 +632,19 @@ tick:
 ; and starts the next subtune, since starting one calls the core's exit
 ; and init and arms the clock, which no handler does to itself. A set of
 ; one has no next, so its tune goes quiet where it ends.
-.ended:         move.w  subtunes(pc),d0
+.ended:
+                .if     ^^defined YMXR_MIXED
+                bra.s   .done
+                .else
+                move.w  subtunes(pc),d0
                 cmp.w   #1,d0
                 bls.s   .done
                 adda.l  core(pc),a1
                 move.w  24(a1),d0
                 btst    #1,(a1,d0.w)
                 beq.s   .done
-                lea     over(pc),a0
+                .endif
+.over:          lea     over(pc),a0
                 st      (a0)
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts

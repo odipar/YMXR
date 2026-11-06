@@ -41,8 +41,9 @@
 #
 #   -perf      the core with the raster monitor in, so the run paints
 #              what each call costs (performance.md, Measure)
-#   -vbl       the VBL as the clock the program plays from, and -tc
-#              Timer C, which -perf would otherwise name the VBL over
+#              With a set, every subtune must be at 50 Hz.
+#   -vbl       VBL playback. Every subtune in a set must be at 50 Hz.
+#   -tc        Timer C playback, where the tunes leave the timer free.
 #   -lean      the core whose ticks neither drop the interrupt level nor
 #              write an end of interrupt (performance.md, BINARIES.md)
 #   -pcrel     the core whose ticks read a row through the program

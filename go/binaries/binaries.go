@@ -27,11 +27,13 @@ var data embed.FS
 // The core with no switch set, and the stub, by the file each is carried
 // as.
 const (
-	Core = "YMXR_sndh.bin"
-	Stub = "YMXR_prg.bin"
+	Core      = "YMXR_sndh.bin"
+	Stub      = "YMXR_prg.bin"
+	MixedStub = "YMXR_prg-mixed.bin"
+	Clock     = "YMXR_clock.bin"
 )
 
-// all is the thirty-three by name, so release/publish.sh reads the list
+// all lists the binaries by name, so release/publish.sh reads the list
 // off this file.
 var all = []string{
 	Core, "YMXR_sndh-perf.bin", "YMXR_sndh-lean.bin", "YMXR_sndh-perf-lean.bin",
@@ -48,11 +50,11 @@ var all = []string{
 	"YMXR_sndh-lean-defer-map.bin", "YMXR_sndh-perf-lean-defer-map.bin",
 	"YMXR_sndh-abs-defer-map.bin", "YMXR_sndh-perf-abs-defer-map.bin",
 	"YMXR_sndh-lean-abs-defer-map.bin", "YMXR_sndh-perf-lean-abs-defer-map.bin",
-	Stub,
+	Stub, MixedStub, Clock,
 }
 
-// All returns thirty-three binaries in build order: sixteen cores
-// without lookup support, sixteen with it, then the program stub.
+// All returns the thirty-two cores in build order, then the two
+// program stubs and the mixed-rate clock.
 func All() []string {
 	return append([]string(nil), all...)
 }

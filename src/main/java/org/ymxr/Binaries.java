@@ -36,13 +36,16 @@ final class Binaries {
     static final Binary CORE = binary(false, false, true, false, false);
 
     static final Binary STUB = new Binary("YMXR_prg.bin", "YMXR_prg.S", List.of());
+    static final Binary MIXED_STUB = new Binary("YMXR_prg-mixed.bin", "YMXR_prg.S",
+            List.of("-dYMXR_MIXED=1"));
+    static final Binary CLOCK = new Binary("YMXR_clock.bin", "YMXR_clock.S", List.of());
 
     private Binaries() {
     }
 
     /**
-     * All thirty-three binaries in build order: sixteen cores without
-     * lookup support, sixteen with it, then the program stub.
+     * The thirty-two cores in build order, then the two program stubs and
+     * the mixed-rate clock.
      */
     static List<Binary> all() {
         List<Binary> all = new ArrayList<>();
@@ -58,6 +61,8 @@ final class Binaries {
             }
         }
         all.add(STUB);
+        all.add(MIXED_STUB);
+        all.add(CLOCK);
         return all;
     }
 
@@ -202,7 +207,7 @@ final class Binaries {
 
     /**
      * {@code Binaries DIR... [-aRMAC] [-sSOURCES]}: the thirty-two cores
-     * and the stub assembled and written into each directory named, one line
+     * and the stubs and clock written into each directory named, one line
      * each with its bytes, and beside each core without the deferred start
      * and the lookup, the table of its pieces the build cuts from it
      * (doc/LINKER.md). The assembler is {@code rmac} on the path unless

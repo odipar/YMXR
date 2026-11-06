@@ -22,7 +22,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * The thirty-three binaries as the build assembled them, and what the
+ * The binaries as the build assembled them, and what the
  * tools make of them: each of the thirty-two cores' descriptors and the
  * stub's as BINARIES.md defines them, an SNDH file from the kit's tunes
  * read back tag by tag and part by part, and a program around it.
@@ -146,7 +146,7 @@ final class BinariesTest {
         }
         assertEquals(32, named.size(), "the thirty-two settings are thirty-two binaries: "
                 + named);
-        assertEquals(33, Binaries.all().size(), "the thirty-two cores and the stub");
+        assertEquals(35, Binaries.all().size(), "the thirty-two cores, the stubs and the clock");
         List<String> order = new ArrayList<>();
         for (Binaries.Binary binary : Binaries.all()) {
             order.add(binary.name());
@@ -236,7 +236,7 @@ final class BinariesTest {
         }
     }
 
-    /** The Go tree lists the thirty-three by name, which release/publish.sh
+    /** The Go tree lists the binaries by name, which release/publish.sh
      *  reads, and its list is the build's, in the build's order. */
     @Test
     void theGoTreeListsTheBinariesTheBuildWrites() throws IOException {
@@ -252,12 +252,14 @@ final class BinariesTest {
         }
         assertEquals(new LinkedHashSet<>(written), listed,
                 "go/binaries/binaries.go lists another set of binaries");
-        // the list All returns, its two constants by the names they are
+        // the list All returns, with the names of its constants
         int at = go.indexOf("var all = []string{");
         assertTrue(at >= 0, "go/binaries/binaries.go has no list of all");
         String all = go.substring(at, go.indexOf('}', at))
                 .replace("Core,", "\"" + Binaries.CORE.name() + "\",")
-                .replace("Stub,", "\"" + Binaries.STUB.name() + "\",");
+                .replace("MixedStub,", "\"" + Binaries.MIXED_STUB.name() + "\",")
+                .replace("Stub,", "\"" + Binaries.STUB.name() + "\",")
+                .replace("Clock,", "\"" + Binaries.CLOCK.name() + "\",");
         List<String> order = new ArrayList<>();
         Matcher one = Pattern.compile("\"(YMXR_[A-Za-z0-9_-]*\\.bin)\"").matcher(all);
         while (one.find()) {
@@ -473,7 +475,10 @@ final class BinariesTest {
         Tags tags = tags(sndh);
         assertEquals(List.of("TITL", "COMM", "CONV", "##", "TC", "FLAG", "FRMS", "!#SN", "TIME",
                 "HDNS"), tags.order());
-        assertEquals("TC", tags.clock(), "neither tune claims Timer C");
+        assertEquals("TC", tags.clock(), "the set leaves Timer C free");
+        Sndh.Options timer = new Sndh.Options("Timer C", null, null, false, false,
+                Sndh.Ticks.CHOSEN, Sndh.Asked.TIMER_C);
+        assertEquals("TC", tags(Sndh.of(files, timer)).clock(), "the explicit override");
         assertEquals("Two of the kit", tags.text().get("TITL"));
         assertEquals("Jochen Hippel", tags.text().get("COMM"));
         assertEquals(Sndh.CONVERTER, tags.text().get("CONV"));
@@ -484,6 +489,56 @@ final class BinariesTest {
         assertArrayEquals(new int[] {0, 0}, tags.seconds(), "both tunes repeat");
         assertEquals(List.of("Chambers", "Circus"), tags.names());
         assertCombined(Binaries.core(false, false, true), sndh, files, tags);
+    }
+
+    @Test
+    void mixedRatesWriteOneTimerClockAndKeepEachBoundRate() throws IOException {
+        byte[] slow = tune("plays-once");
+        byte[] fast = slow.clone();
+        Tune.putWord(fast, Tune.FRAME_RATE_AT, 60);
+        Sndh.Options options = new Sndh.Options("Two rates", null, null, false, false);
+        byte[] sndh = Sndh.of(List.of(slow, fast), options);
+        Tags tags = tags(sndh);
+        assertEquals("TC", tags.clock());
+        assertEquals(300, tags.rate());
+        assertArrayEquals(new int[] {24, 20}, tags.frames());
+        assertArrayEquals(new int[] {1, 1}, tags.seconds());
+        int entries = Sndh.even(tags.end());
+        assertTrue(Sndh.mixed(sndh, entries));
+        int core = Sndh.coreAt(sndh, entries);
+        int table = core + Tune.getLong(sndh, core + Sndh.CORE_TABLE_AT);
+        assertEquals(50, Tune.getWord(sndh,
+                core + Tune.getLong(sndh, table + 2) + Tune.FRAME_RATE_AT));
+        assertEquals(60, Tune.getWord(sndh,
+                core + Tune.getLong(sndh, table + 6) + Tune.FRAME_RATE_AT));
+        byte[] prg = Prg.of(sndh, 4);
+        assertEquals(Prg.MIXED_STUB_VERSION, Tune.getWord(prg, Prg.HEADER + Prg.STUB_VERSION_AT));
+        assertEquals(0, Tune.getWord(prg, Prg.HEADER + Prg.STUB_FLAGS_AT));
+        assertEquals(300, Tune.getWord(prg, Prg.HEADER + Prg.STUB_TICKS_AT));
+        assertEquals(core, Tune.getLong(prg, Prg.HEADER + Prg.STUB_CORE_AT));
+        assertThrows(IllegalArgumentException.class, () -> Prg.of(sndh, 0, Sndh.Asked.VBL));
+
+        Tune.putWord(fast, Tune.FRAME_RATE_AT, 61);
+        Tags fractional = tags(Sndh.of(List.of(slow, fast), options));
+        assertEquals(200, fractional.rate());
+        assertArrayEquals(new int[] {16, 14}, fractional.frames());
+        Tune.putWord(fast, Tune.FRAME_RATE_AT, 250);
+        assertEquals(400, tags(Sndh.of(List.of(slow, fast), options)).rate());
+        Tune.putWord(fast, Tune.FRAME_RATE_AT, 401);
+        assertThrows(IllegalArgumentException.class, () -> Sndh.of(List.of(slow, fast), options));
+    }
+
+    @Test
+    void aSetWithAnotherRateReservesTimerCForPlayback() throws IOException {
+        byte[] slow = tune("plays-once");
+        byte[] claims = tune("four-timers");
+        Sndh.Options options = new Sndh.Options("Set", null, null, false, false);
+        for (List<byte[]> tunes : List.of(List.of(slow, claims), List.of(claims, claims))) {
+            IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                    () -> Sndh.of(tunes, options));
+            assertEquals("a set with a non-50 Hz subtune needs Timer C for playback"
+                    + " and a subtune claims it for an effect", wrong.getMessage());
+        }
     }
 
     @Test
@@ -558,10 +613,12 @@ final class BinariesTest {
 
     @Test
     void theFlagTagListsTheTimersTheSetClaims() throws IOException {
-        Tags tags = tags(Sndh.of(List.of(tune("four-timers"), tune("four-timers")),
+        byte[] file = tune("four-timers");
+        Tune.putWord(file, Tune.FRAME_RATE_AT, 50);
+        Tags tags = tags(Sndh.of(List.of(file, file),
                 new Sndh.Options("Four", null, null, false, false)));
         assertEquals("abcdy", tags.flag());
-        assertEquals(60, tags.rate());
+        assertEquals(50, tags.rate());
         assertEquals(List.of("TITL", "CONV", "##", "!V", "FLAG", "FRMS", "TIME", "HDNS"),
                 tags.order(), "the clock tag is where TC would be");
         // effects 0 to 3 run Timers A, D, B and C
@@ -680,14 +737,6 @@ final class BinariesTest {
     }
 
     @Test
-    void twoRatesInOneSetAreRejected() throws IOException {
-        List<byte[]> files = List.of(tune("four-timers"), tune("chambers"));
-        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(files, new Sndh.Options("Mixed", null, null, false, false)));
-        assertTrue(said(wrong).contains("50 Hz") && said(wrong).contains("60"), said(wrong));
-    }
-
-    @Test
     void moreSubtunesThanTheCountNumbersAreRejected() throws IOException {
         List<byte[]> files = Collections.nCopies(Sndh.MAX_SUBTUNES + 1, tune("circus"));
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
@@ -724,7 +773,7 @@ final class BinariesTest {
         assertEquals("YMXT", ascii(patched, 4, 4));
         assertEquals(2, Tune.getWord(patched, Prg.STUB_SUBTUNES_AT));
         assertEquals(0, Tune.getWord(patched, Prg.STUB_FLAGS_AT),
-                "no Timer C claimed: the stub plays at the screen's rate");
+                "the set leaves Timer C free");
         assertEquals(50, Tune.getWord(patched, Prg.STUB_RATE_AT));
         assertEquals(0, Tune.getLong(patched, Prg.STUB_ROWS_AT));
         int core = Tune.getLong(patched, Prg.STUB_CORE_AT);
@@ -741,7 +790,8 @@ final class BinariesTest {
 
         byte[] counted = Prg.of(sndh, 2000);
         assertEquals(2000, Tune.getLong(counted, 28 + Prg.STUB_ROWS_AT));
-        assertEquals(0, Tune.getWord(counted, 28 + Prg.STUB_FLAGS_AT), "the rows are no flag");
+        assertEquals(0, Tune.getWord(counted, 28 + Prg.STUB_FLAGS_AT),
+                "the row limit leaves the clock flag as it is");
     }
 
     @Test

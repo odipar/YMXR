@@ -12,8 +12,7 @@ lock=$root/target/.building
 
 # Whether a build is owed: no build yet, no classpath written, a core not
 # assembled, or a source newer than the last build. A tool is asked for any
-# of the thirty-two cores and for the stub, so all thirty-three are looked
-# for.
+# of the thirty-two cores, the two stubs and the mixed-rate clock.
 owed() {
     for core in "" -perf -lean -perf-lean -abs -perf-abs -lean-abs \
                 -perf-lean-abs; do
@@ -24,7 +23,9 @@ owed() {
             done
         done
     done
-    [ -f "$classes/org/ymxr/68k/YMXR_prg.bin" ] || return 0
+    for binary in YMXR_prg.bin YMXR_prg-mixed.bin YMXR_clock.bin; do
+        [ -f "$classes/org/ymxr/68k/$binary" ] || return 0
+    done
     [ ! -f "$built" ] || [ ! -f "$path" ] \
         || [ -n "$(find "$root/src/main/java" "$root/pom.xml" \
         "$root"/68k/*.S "$root/68k/player" -newer "$built" -print -quit \
