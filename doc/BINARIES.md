@@ -235,7 +235,7 @@ core's last byte (3.1).
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
-through the program counter for a file whose bound tunes and sources end within
+through the program counter when the bound tunes and sources end within
 32,767 bytes of the core's first byte plus its field at 26, 0 in a core
 without the lookup, and the core that reads an absolute address for a
 file whose tunes end further off (5.5). A caller that names the third
