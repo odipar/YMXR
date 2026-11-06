@@ -235,7 +235,7 @@ core's last byte (3.1).
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
-through the program counter for a file whose last bound tune ends within
+through the program counter for a file whose bound tunes and sources end within
 32,767 bytes of the core's first byte plus its field at 26, 0 in a core
 without the lookup, and the core that reads an absolute address for a
 file whose tunes end further off (5.5). A caller that names the third
@@ -271,7 +271,7 @@ in. The patched offsets count from the core's first byte and are even.
 |---|---|---|
 | 0 | the player's raster monitor (`YMXR_PERF=1`): play and each tick handler write the background colour register as performance.md defines | a screen on which those writes are read |
 | 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires with `YMXR_NEST=0`; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
-| 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose last bound tune ends within 32,767 bytes of the core's first byte plus its field at 26 (2.1), which the tool that writes it reads (2.10, 5.5) |
+| 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose bound tunes and sources end within 32,767 bytes of the core's first byte plus its field at 26 (2.1), which the tool that writes it reads (2.10, 5.5) |
 | 3 | the deferred start (`YMXR_DEFER=1`, performance.md): the frame arms the start of SPEC.md 4.8, and the tick that reads the running source's last row performs it | this core under a tune whose effects byte sets bit 4, which init of a core with bit 3 clear reports -1 for (1.5) |
 | 4 | the lookup (`YMXR_MAP=1`, SPEC.md 1.10): the player reads bound tunes to version 10, and a tick of a source through a transformation writes the transformation's entry for the source's key | this core under a tune whose effects byte sets bit 5, a tune of version 10, which init of a core with bit 4 clear reports -1 for (1.5) |
 
@@ -356,8 +356,8 @@ file (3) and reports the first condition met:
 | the row read through the program counter is selected and bit 2 of the flags word F is clear | `the core's flags at 22 read F, and the row read through the program counter asked for needs bit 2 set` |
 | the effects byte of a subtune sets bit 4 and bit 3 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that defers a start needs bit 3 set` |
 | the effects byte of a subtune sets bit 5 and bit 4 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that maps a value needs bit 4 set` |
-| the row read through the program counter is selected, the core's field at 26 is 0, and the file's last bound tune ends B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
-| the row read through the program counter is selected, the core's field at 26 is F, above 0, and the file's last bound tune ends B bytes past the core's first byte plus F, B above 32,767 (2.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
+| the row read through the program counter is selected, the core's field at 26 is 0, and the file's bound tunes and sources end B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
+| the row read through the program counter is selected, the core's field at 26 is F, above 0, and the file's bound tunes and sources end B bytes past the core's first byte plus F, B above 32,767 (2.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
 | the core has the lookup in, its field at 26 is F, and a subtune's list needs an area of 5.6 that ends past the reach with its tables and the fallback of each effect of the list alone, B bytes past the core's first byte plus F | `the page area ends B bytes past the core's first handler, at F, and a tick's page read reaches 32767` |
 
 ---
@@ -380,8 +380,9 @@ from H.
 | the page area | even(L) from the core | A zero bytes: the largest area of 5.6 a subtune's list needs (1.1), its reach 32,767 less even(L) less the core's field at 26, and 0 where no list counts a page or the core is without the lookup |
 | the subtune table | U = even(even(L) + A) from the core | the word `N`, then `N` longs, each a bound tune's offset from the core (2.5) |
 | the bound tunes | subtune 1 at U + 2 + 4`N`, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset |
-| the images | from even(the end of the last bound tune), each on a long, from the core | the images of the set (1.4), in group order |
-| the transformation blocks | from the end of the last image, each on a long, from the core | the block of each subtune of version 10 (1.1), in subtune order, the subtune's field at 24 patched with its block's offset less its offset |
+| the shared source tables | after the bound tune headers, each on a long, from the core | present when at least two subtunes share a DTX1 table |
+| the images | after the bound tunes and sources, each on a long, from the core | the images of the set (1.4), in group order |
+| the transformation blocks | from the end of the last image, each on a long, from the core | one copy of each distinct block (1.1), in first-use order, each subtune's field at 24 patched with its block's offset less its offset |
 | the workspace | W = even(the end of the last block, or of the last image where no subtune is of version 10), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
 
 The page area is right after the core, whose last bytes are its lookup
@@ -396,6 +397,14 @@ subtunes end past it is on the core that reads an absolute address. The
 subtunes come before the images so that a subtune's sources are within
 reach of the core: a player whose ticks read a row through a
 displacement reaches 32,767 bytes (5.5).
+
+Where at least two subtunes have byte-identical DTX1 tables, the bound
+tunes end at their source indices. The shared source tables follow in
+first-use order, one copy of each distinct table. Each source index entry
+keeps bit 31 and records its table's offset from the start of that bound
+tune in bits 30 to 0. Otherwise the DTX1 tables follow each tune's source
+index as in 1.2. Transformation blocks share an offset only if the
+transformation data and the page list are byte-identical.
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
@@ -886,9 +895,13 @@ report that line alone and stop.
   subtune table, plus H, the fields of 1.2 read at A as 6.3 reads them,
   `transformations` among them where V is 10, its image and
   transformations lines left out, and B the bytes to the next subtune,
-  or, for the last, to the image at the lowest offset; then a line a
+  or, for the last, to the first shared source table where present and
+  to the first image otherwise; then a line a
   source of that subtune, as 6.3 defines them, each `at` bits 30 to 0 of
   the index entry plus A.
+- `{"part":"sourcepool","at":P,"bytes":B}` where a source index entry
+  of a subtune before the last points at or past the next subtune. P is
+  the lowest such offset and B counts to the first image.
 - a line an image: `{"part":"image","number":i,"at":I}`, one line for
   each distinct offset the subtunes name, in increasing order of offset,
   i counting from 1.

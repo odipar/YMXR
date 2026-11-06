@@ -368,17 +368,20 @@ func Fallback(core []byte) int {
 	return 2
 }
 
-// TunesEnd returns the last bound tune's end relative to the first
-// handler, at the core's field 26 (BINARIES.md 2.1, 3.1).
+// TunesEnd returns the end of the bound tunes and their sources relative
+// to the first handler, at the core's field 26 (BINARIES.md 2.1, 3.1).
 // Program-counter displacements are measured from there. Cores without
 // lookups have field 26 set to 0, so their reach is measured from the
 // core's first byte.
 func TunesEnd(core []byte, set Set, tags []byte) int {
 	at := even(even(len(core))+max(0, Area(core, set))) + 2 + 4*len(set.Tunes)
 	end := at
-	for _, tune := range set.Tunes {
-		end = at + len(tune)
+	for i := range set.Tunes {
+		end = at + set.TuneBytes(i)
 		at = even(end)
+	}
+	if set.sources.bytes > 0 {
+		end = ymxr.Align(at) + set.sources.bytes
 	}
 	return end - ymxr.GetWord(core, coreHandlers)
 }
@@ -625,7 +628,7 @@ func seconds(frames, rate int) int {
 // bound tunes and workspace. Each entry branches to the corresponding core
 // entry. Bound tunes start at even addresses.
 //
-// Shared images follow the tunes; version 10 transformation blocks
+// Shared source tables follow the tunes, then the images. Transformation blocks
 // follow the images. Patch each tune's ImageAt and
 // BoundTransformationsAt relative to that tune (doc/BINARIES.md 3.1).
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
@@ -655,7 +658,12 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 	offsets := make([]int, n)
 	for i := 0; i < n; i++ {
 		offsets[i] = at
-		at = even(at + len(tunes[i]))
+		at = even(at + set.TuneBytes(i))
+	}
+	poolAt := 0
+	if set.sources.bytes > 0 {
+		poolAt = ymxr.Align(at)
+		at = poolAt + set.sources.bytes
 	}
 	// Then the images, each on a long: the reader's code appears once a
 	// set of tunes that agree on what an image fixes once (DTX abi.md 1),
@@ -666,17 +674,21 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 		imageAt[i] = at
 		at += len(set.Images[i])
 	}
-	// Transformation blocks follow the images, aligned to four bytes, in
-	// subtune order. Frames read these tables; ticks use prepared lookup
-	// pages, so the blocks need not fit the source-read displacement
-	// (BINARIES.md 3.1).
+	// Frames read the transformation blocks, including each lookup page
+	// list. Identical blocks share an offset past the images.
 	blockAt := make([]int, n)
-	for i := 0; i < n && i < len(set.Blocks); i++ {
-		if set.Blocks[i] != nil {
-			at = ymxr.Align(at)
-			blockAt[i] = at
-			at += len(set.Blocks[i])
+	blocks := make(map[string]int)
+	for i, block := range set.Blocks {
+		if len(block) == 0 {
+			continue
 		}
+		where, found := blocks[string(block)]
+		if !found {
+			where = ymxr.Align(at)
+			blocks[string(block)] = where
+			at = where + len(block)
+		}
+		blockAt[i] = where
 	}
 	at = even(at)
 	workAt := at
@@ -694,12 +706,29 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 		ymxr.PutLong(file, header+CorePagesAt, pagesAt)
 	}
 	ymxr.PutWord(file, header+tableAt, n)
+	at = header + poolAt
+	for _, table := range set.sources.tables {
+		copy(file[at:], table)
+		at += ymxr.Align(len(table))
+	}
+	for block, where := range blocks {
+		copy(file[header+where:], block)
+	}
 	for i := range imageAt {
 		copy(file[header+imageAt[i]:], set.Images[i])
 	}
 	for i := 0; i < n; i++ {
 		ymxr.PutLong(file, header+tableAt+2+4*i, offsets[i])
-		copy(file[header+offsets[i]:], tunes[i])
+		tune := file[header+offsets[i]:]
+		copy(tune, tunes[i][:set.TuneBytes(i)])
+		if poolAt > 0 {
+			index := BoundIndex(ymxr.GetWord(tune, 4))
+			for j, offset := range set.sources.offsets[i] {
+				entry := index + 4*j
+				counted := ymxr.GetLong(tune, entry) & ymxr.Counted
+				ymxr.PutLong(tune, entry, (poolAt+offset-offsets[i])|counted)
+			}
+		}
 		if len(imageAt) > 0 {
 			// The bound tune reaches its image from its first byte, and
 			// the images are after it.
@@ -707,7 +736,6 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 				imageAt[set.Image[i]]-offsets[i])
 		}
 		if blockAt[i] > 0 {
-			copy(file[header+blockAt[i]:], set.Blocks[i])
 			ymxr.PutLong(file, header+offsets[i]+BoundTransformationsAt,
 				blockAt[i]-offsets[i])
 		}

@@ -155,7 +155,7 @@ final class WriterTest {
         assertEquals(Tune.align(last + ten.length - lastFile), bound.length,
                 "the bound tune ends at its last source");
         // the SNDH file: the block after the images on a long, the field
-        // at 24 patched to reach it, and the version 9 tunes as bound;
+        // at 24 patched to reach it, and source references in both versions;
         // every offset here counts from the core's first byte
         byte[] core = new byte[64];
         byte[] file = Sndh.combine(core, set, new byte[] {0}, 16);
@@ -165,19 +165,37 @@ final class WriterTest {
         for (int i = 0; i < 3; i++) {
             tune[i] = Tune.getLong(file, header + table + 2 + 4 * i);
         }
-        int image = Tune.align(Sndh.even(tune[2] + set.tunes().get(2).length));
+        int pool = Tune.align(tune[2] + set.tuneBytes(2));
+        int image = Tune.align(pool + set.sources().bytes());
         image = Tune.align(image + set.images().get(0).length);
         int at = Tune.align(image + set.images().get(1).length);
         assertEquals(at - tune[1], Tune.getLong(file, header + tune[1] + Bound.TRANSFORMATIONS_AT),
                 "the field at 24 reaches the block, on a long after the last image");
         byte[] block = Bound.block(ten);
         assertArrayEquals(block, Arrays.copyOfRange(file, header + at, header + at + block.length));
-        for (int i : new int[] {0, 2}) {
+        for (int i = 0; i < tune.length; i++) {
             byte[] one = set.tunes().get(i);
-            assertArrayEquals(Arrays.copyOfRange(one, Bound.TABLE_AT, one.length),
-                    Arrays.copyOfRange(file, header + tune[i] + Bound.TABLE_AT,
-                            header + tune[i] + one.length),
-                    "subtune " + (i + 1) + " from the field at 20");
+            int index = Bound.indexAt(Tune.getWord(one, 4));
+            assertEquals(Tune.getLong(one, Bound.TABLE_AT),
+                    Tune.getLong(file, header + tune[i] + Bound.TABLE_AT));
+            int sources = one[Tune.COUNT_AT] & 0xff;
+            for (int j = 0; j < sources; j++) {
+                int entry = Tune.getLong(one, index + 4 * j);
+                int out = Tune.getLong(file, header + tune[i] + index + 4 * j);
+                int source = entry & ~Tune.COUNTED;
+                int end = j + 1 < sources
+                        ? Tune.getLong(one, index + 4 * (j + 1)) & ~Tune.COUNTED
+                        : one.length;
+                int placed = tune[i] + (out & ~Tune.COUNTED);
+                assertEquals(entry & Tune.COUNTED, out & Tune.COUNTED);
+                assertTrue(placed >= pool);
+                assertArrayEquals(Arrays.copyOfRange(one, source, end),
+                        Arrays.copyOfRange(file, header + placed, header + placed + end - source));
+                if (i == 2) {
+                    int first = Tune.getLong(file, header + tune[0] + index + 4 * j);
+                    assertEquals(tune[0] + (first & ~Tune.COUNTED), placed);
+                }
+            }
         }
         assertEquals(Sndh.even(at + block.length), Tune.getLong(file, header + Sndh.CORE_WORK_AT),
                 "the workspace follows the block");

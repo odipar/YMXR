@@ -1,12 +1,15 @@
 package org.ymxr;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.dtx.Table;
 import org.jspecify.annotations.Nullable;
 import org.ymxs.tool.Tool;
@@ -408,8 +411,8 @@ final class Sndh {
     }
 
     /**
-     * The last bound tune's end relative to the first handler, at the
-     * core's field 26 (BINARIES.md 2.1, 3.1). Program-counter
+     * The end of the bound tunes and their sources relative to the first
+     * handler, at the core's field 26 (BINARIES.md 2.1, 3.1). Program-counter
      * displacements are measured from there. Cores without lookups have
      * field 26 set to 0, so their reach is measured from the core's
      * first byte.
@@ -418,9 +421,12 @@ final class Sndh {
         int at = even(even(core.length) + Math.max(0, area(core, set))) + 2
                 + 4 * set.tunes().size();
         int end = at;
-        for (byte[] tune : set.tunes()) {
-            end = at + tune.length;
+        for (int i = 0; i < set.tunes().size(); i++) {
+            end = at + set.tuneBytes(i);
             at = even(end);
+        }
+        if (set.sources().bytes() > 0) {
+            end = Tune.align(at) + set.sources().bytes();
         }
         return end - Tune.getWord(core, CORE_HANDLERS_AT);
     }
@@ -646,9 +652,9 @@ final class Sndh {
 
     /**
      * Combines a set with shared images: the page area follows the core,
-     * bound tunes follow the subtune table, images follow the tunes, and
-     * version 10 transformation blocks follow the images. Patch each tune's {@code IMAGE_AT} and,
-     * in version 10, {@code TRANSFORMATIONS_AT} relative to that tune.
+     * bound tunes follow the subtune table, then shared source tables,
+     * images and transformation blocks. Patch each tune's offsets
+     * relative to that tune.
      * A tune without a shared image is packaged separately with its
      * image and block.
      */
@@ -680,7 +686,12 @@ final class Sndh {
         int[] offsets = new int[n];
         for (int i = 0; i < n; i++) {
             offsets[i] = at;
-            at = even(at + tunes.get(i).length);
+            at = even(at + set.tuneBytes(i));
+        }
+        int poolAt = 0;
+        if (set.sources().bytes() > 0) {
+            poolAt = Tune.align(at);
+            at = poolAt + set.sources().bytes();
         }
         // Then the images, each on a long: the reader's code appears once a
         // set of tunes that agree on what an image fixes once (DTX abi.md
@@ -691,18 +702,23 @@ final class Sndh {
             imageAt[i] = at;
             at += set.images().get(i).length;
         }
-        // Transformation blocks follow the images, aligned to four
-        // bytes, in subtune order. Frames read these tables; ticks use
-        // prepared lookup pages, so the blocks need not fit the
-        // source-read displacement (BINARIES.md 3.1).
+        // Frames read the transformation blocks, including each lookup
+        // page list. Identical blocks share an offset past the images.
         int[] blockAt = new int[n];
+        Map<ByteBuffer, Integer> blocks = new HashMap<>();
         for (int i = 0; i < n; i++) {
             byte[] block = set.blocks().get(i);
-            if (block.length > 0) {
-                at = Tune.align(at);
-                blockAt[i] = at;
-                at += block.length;
+            if (block.length == 0) {
+                continue;
             }
+            ByteBuffer key = ByteBuffer.wrap(block);
+            Integer where = blocks.get(key);
+            if (where == null) {
+                where = Tune.align(at);
+                blocks.put(key, where);
+                at = where + block.length;
+            }
+            blockAt[i] = where;
         }
         at = even(at);
         int workAt = at;
@@ -720,13 +736,32 @@ final class Sndh {
             Tune.putLong(file, header + CORE_PAGES_AT, pagesAt);
         }
         Tune.putWord(file, header + tableAt, n);
+        at = header + poolAt;
+        for (ByteBuffer source : set.sources().tables()) {
+            source.get(source.position(), file, at, source.remaining());
+            at += Tune.align(source.remaining());
+        }
+        for (Map.Entry<ByteBuffer, Integer> entry : blocks.entrySet()) {
+            ByteBuffer block = entry.getKey();
+            block.get(0, file, header + entry.getValue(), block.remaining());
+        }
         for (int i = 0; i < imageAt.length; i++) {
             System.arraycopy(set.images().get(i), 0, file, header + imageAt[i],
                     set.images().get(i).length);
         }
         for (int i = 0; i < n; i++) {
             Tune.putLong(file, header + tableAt + 2 + 4 * i, offsets[i]);
-            System.arraycopy(tunes.get(i), 0, file, header + offsets[i], tunes.get(i).length);
+            int tune = header + offsets[i];
+            System.arraycopy(tunes.get(i), 0, file, tune, set.tuneBytes(i));
+            if (poolAt > 0) {
+                int index = tune + Bound.indexAt(Tune.getWord(file, tune + 4));
+                int[] offsetsInPool = set.sources().offsets()[i];
+                for (int j = 0; j < offsetsInPool.length; j++) {
+                    int entry = index + 4 * j;
+                    int counted = Tune.getLong(file, entry) & Tune.COUNTED;
+                    Tune.putLong(file, entry, (poolAt + offsetsInPool[j] - offsets[i]) | counted);
+                }
+            }
             if (imageAt.length > 0) {
                 // The bound tune reaches its image from its first byte,
                 // and the images are after it.
@@ -734,8 +769,6 @@ final class Sndh {
                         imageAt[set.image()[i]] - offsets[i]);
             }
             if (blockAt[i] > 0) {
-                byte[] block = set.blocks().get(i);
-                System.arraycopy(block, 0, file, header + blockAt[i], block.length);
                 Tune.putLong(file, header + offsets[i] + Bound.TRANSFORMATIONS_AT,
                         blockAt[i] - offsets[i]);
             }
@@ -936,19 +969,22 @@ final class Sndh {
                 + (options.names() == null ? ""
                 : ", !#SN with " + Report.count(options.names().size(), "name", "names")));
         Bound.Set set = Bound.of(tunes);
-        int bound = 0;
+        int bound = set.sources().bytes();
         int images = 0;
         for (byte[] image : set.images()) {
             images += image.length;
         }
         for (int i = 0; i < tunes.size(); i++) {
-            byte[] b = set.tunes().get(i);
-            bound += b.length;
+            int bytes = set.tuneBytes(i);
+            bound += bytes;
             // A subtune is called by the name the multi file records for
             // it; a tune file records none, and one tune is one subtune.
             report.row(names.get(i).isBlank() ? "the tune" : names.get(i),
-                    Report.count(tunes.get(i).length, "byte", "bytes") + " bound to " + b.length
+                    Report.count(tunes.get(i).length, "byte", "bytes") + " bound to " + bytes
                     + ", its table in image " + (set.image()[i] + 1));
+        }
+        if (set.sources().bytes() > 0) {
+            report.row("the shared sources", Report.count(set.sources().bytes(), "byte", "bytes"));
         }
         report.say("the images: " + Report.count(set.images().size(), "image", "images")
                 + " of " + Report.count(images, "byte", "bytes")

@@ -168,19 +168,23 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if err != nil {
 		return
 	}
-	bound := 0
+	bound := set.SharedSourceBytes()
 	images := 0
 	for _, image := range set.Images {
 		images += len(image)
 	}
-	for i, one := range set.Tunes {
-		bound += len(one)
+	for i := range set.Tunes {
+		bytes := set.TuneBytes(i)
+		bound += bytes
 		named := names[i]
 		if strings.TrimSpace(named) == "" {
 			named = "the tune"
 		}
 		said.Row(named, fmt.Sprintf("%s bound to %d, its table in image %d",
-			report.Count(len(tunes[i]), "byte", "bytes"), len(one), set.Image[i]+1))
+			report.Count(len(tunes[i]), "byte", "bytes"), bytes, set.Image[i]+1))
+	}
+	if bytes := set.SharedSourceBytes(); bytes > 0 {
+		said.Row("the shared sources", report.Count(bytes, "byte", "bytes"))
 	}
 	said.Say(fmt.Sprintf("the images: %s of %s, DTX's reader once a set of tunes that"+
 		" share one", report.Count(len(set.Images), "image", "images"),
