@@ -372,3 +372,50 @@ export async function run(module, tool, flags = [], { input = new Uint8Array(0),
   }
   return { exitCode, output: concat(output), report: concat(report) };
 }
+
+// The Go writer prepares and assembles PRG exports. Workers pack groups
+// of columns between those steps, with one compiled module for the run.
+
+const packedFile = "/.ymxr-packed-columns";
+
+function columnBatches(plan, size) {
+  const parts = Array.from({ length: size }, () => []);
+  const lengths = new DataView(plan.buffer, plan.byteOffset, plan.byteLength);
+  for (let at = 0, index = 0; at < plan.length; index++) {
+    if (at + 4 > plan.length) throw new Error("short column job length");
+    const end = at + 4 + lengths.getUint32(at);
+    if (end > plan.length) throw new Error("short column job");
+    parts[index % size].push(plan.subarray(at, end));
+    at = end;
+  }
+  return parts.filter(part => part.length).map(part => ({ input: concat(part), jobs: part.length }));
+}
+
+export async function runParallel(run, pack, size, tool, flags, options, onProgress) {
+  const ordinary = () => run(tool, flags, options);
+  if (tool !== "ymxs-to-prg" || size < 2 || options.input.byteLength < 4096) return ordinary();
+
+  const planned = await run("_ymxr-plan-prg", [...flags, "-silent"], { input: options.input });
+  if (planned.exitCode !== 0 || planned.output.length < 32768) return ordinary();
+  const batches = columnBatches(planned.output, size);
+  if (batches.length < 2) return ordinary();
+
+  const total = batches.reduce((sum, batch) => sum + batch.jobs, 0);
+  let done = 0;
+  const progress = () => {
+    if (!flags.includes("-silent")) {
+      onProgress?.(`  packing the columns ${done} of ${total} (${Math.floor(100 * done / total)}%)`);
+    }
+  };
+  progress();
+  const packed = await Promise.all(batches.map(async batch => {
+    const result = await pack(batch.input, planned.module);
+    done += batch.jobs;
+    progress();
+    return result;
+  }));
+  if (packed.some(result => result.exitCode !== 0)) return ordinary();
+
+  const files = { ...options.files, [packedFile]: concat(packed.map(result => result.output)) };
+  return run("_ymxr-assemble-prg", flags, { ...options, files });
+}

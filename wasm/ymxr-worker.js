@@ -8,10 +8,10 @@ import { run } from "./ymxr-wasi.js";
 
 let compiled;
 
-self.onmessage = async ({ data }) => {
+async function handle(data, post) {
   const { id, wasm, tool, flags, input, files } = data;
   try {
-    compiled ??= WebAssembly.compileStreaming(fetch(wasm));
+    compiled ??= data.module ?? WebAssembly.compileStreaming(fetch(wasm));
     const module = await compiled;
     const decoder = new TextDecoder();
     let pending = "";
@@ -22,19 +22,27 @@ self.onmessage = async ({ data }) => {
         pending += decoder.decode(chunk, { stream: true });
         let end;
         while ((end = pending.indexOf("\n")) >= 0) {
-          self.postMessage({ id, line: pending.slice(0, end).replace(/\r$/, "") });
+          post({ id, line: pending.slice(0, end).replace(/\r$/, "") });
           pending = pending.slice(end + 1);
         }
       },
     });
     if (pending !== "") {
-      self.postMessage({ id, line: pending });
+      post({ id, line: pending });
     }
-    self.postMessage(
-      { id, exitCode: result.exitCode, output: result.output, report: new TextDecoder().decode(result.report) },
-      [result.output.buffer],
-    );
+    const message = {
+      id, exitCode: result.exitCode, output: result.output, report: new TextDecoder().decode(result.report),
+    };
+    if (tool === "_ymxr-plan-prg" && result.exitCode === 0) message.module = module;
+    post(message, [result.output.buffer]);
   } catch (thrown) {
-    self.postMessage({ id, error: String(thrown && thrown.stack ? thrown.stack : thrown) });
+    post({ id, error: String(thrown && thrown.stack ? thrown.stack : thrown) });
   }
-};
+}
+
+if (typeof self === "undefined") {
+  const { parentPort } = await import("node:worker_threads");
+  parentPort.on("message", data => handle(data, (message, transfer) => parentPort.postMessage(message, transfer)));
+} else {
+  self.onmessage = ({ data }) => handle(data, (message, transfer) => self.postMessage(message, transfer));
+}

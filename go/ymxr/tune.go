@@ -292,30 +292,9 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 	}
 	frames := len(columns.Column[0])
 	repeat := columns.Repeat
-	// PadToUnit runs before this in every tool (SPEC.md 6, rule 6), so a
-	// table reaching here divides; one from a caller that skipped it packs
-	// at unit 1, which the note reports.
-	if unit > 1 && (frames%unit != 0 || (repeat < frames && repeat%unit != 0)) {
-		what := fmt.Sprintf("the repeat row %d", repeat)
-		if frames%unit != 0 {
-			what = fmt.Sprintf("the row count %d", frames)
-		}
-		said.Note(fmt.Sprintf("packed at unit 1: %s does not divide by %d", what, unit))
-		unit = 1
-	}
 	live := Live(columns.Column)
 	columnCount := len(columns.Column)
-	var rings []int
-	if ring == Choose {
-		rings = RingsOf(live, columnCount)
-	} else {
-		at := RingOf(ring, live, columnCount)
-		if at != ring {
-			said.Note("the ring is " + report.Count(at, "byte", "bytes") +
-				": a multiple of the period within the player's reach")
-		}
-		rings = append(rings, at)
-	}
+	unit, rings := packingRings(frames, repeat, unit, ring, live, columnCount, said)
 	// The copies search is the most of a packing's time, so every ring is
 	// tried with the first packer alone, and the two that come to the least
 	// with every packer, where there is a second.
@@ -544,11 +523,7 @@ func WithTable(file, table []byte) []byte {
 // packTable is the columns as a DTX3 file, packed.
 func packTable(column [][]byte, frames, repeat, unit, ring int,
 	packers []dtx.Packer) ([]byte, error) {
-	rr := repeat
-	if rr > frames {
-		rr = frames
-	}
-	table, err := dtx.NewTable(frames, rr, 1, column)
+	table, err := dtx.NewTable(frames, min(repeat, frames), 1, column)
 	if err != nil {
 		return nil, err
 	}
@@ -570,14 +545,72 @@ func State(table []byte) (int, error) {
 func Live(column [][]byte) int {
 	live := 0
 	for _, c := range column {
-		for _, b := range c {
-			if b != c[0] {
-				live++
-				break
-			}
+		if liveColumn(c) {
+			live++
 		}
 	}
 	return live
+}
+
+func liveColumn(column []byte) bool {
+	for _, b := range column {
+		if b != column[0] {
+			return true
+		}
+	}
+	return false
+}
+
+// packingRings selects the unit and the rings for a tune.
+func packingRings(frames, repeat, unit, ring, live, columns int, said *report.Report) (int, []int) {
+	// The tools pad before this step (SPEC.md 6, rule 6). A table that
+	// does not divide packs at unit 1.
+	if unit > 1 && (frames%unit != 0 || (repeat < frames && repeat%unit != 0)) {
+		what := fmt.Sprintf("the repeat row %d", repeat)
+		if frames%unit != 0 {
+			what = fmt.Sprintf("the row count %d", frames)
+		}
+		said.Note(fmt.Sprintf("packed at unit 1: %s does not divide by %d", what, unit))
+		unit = 1
+	}
+	if ring == Choose {
+		return unit, RingsOf(live, columns)
+	}
+	at := RingOf(ring, live, columns)
+	if at != ring {
+		said.Note("the ring is " + report.Count(at, "byte", "bytes") +
+			": a multiple of the period within the player's reach")
+	}
+	return unit, []int{at}
+}
+
+// PlainJobs visits the live columns at the rings the tune writer tries.
+// The callback receives the same arguments as a DTX packer.
+func PlainJobs(columns Columns, unit, ring int, visit func([]byte, int, int, int) error) error {
+	frames := len(columns.Column[0])
+	unit, rings := packingRings(frames, columns.Repeat, unit, ring,
+		Live(columns.Column), len(columns.Column), report.Of(false))
+	if unit != 1 && unit != 2 && unit != 4 {
+		return fmt.Errorf("unsupported packing unit %d", unit)
+	}
+	table, err := dtx.NewTable(frames, min(columns.Repeat, frames), 1, columns.Column)
+	if err != nil {
+		return err
+	}
+	loop, err := dtx.Loop(table, unit)
+	if err != nil {
+		return err
+	}
+	for _, column := range columns.Column {
+		if liveColumn(column) {
+			for _, ring := range rings {
+				if err := visit(column, unit, ring, loop); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // ReachOf is the widest ring the player reaches with live live columns: the

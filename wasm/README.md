@@ -41,10 +41,11 @@ bytes, for the two tools that read files by name; and `signal`, an
 `AbortSignal` that stops the run and rejects its `Promise` with an
 `AbortError`.
 
-Runs go to one worker, one at a time in the order they are asked for,
-and the worker compiles `ymxr.wasm` once. A run blocks the worker and
-leaves the page's thread free, so a page stays responsive while a tool
-packs.
+Runs go to one worker in the order they are asked for. It compiles
+`ymxr.wasm` once and leaves the page's thread free. A large
+`ymxs-to-prg` export passes its column jobs to up to four workers when
+the host has at least two cores. The Node runner uses worker threads for
+the same jobs. The exporter chooses the ring and assembles the result.
 
 The calls a page makes to write a file of a structure:
 

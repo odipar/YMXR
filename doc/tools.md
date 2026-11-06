@@ -1146,9 +1146,9 @@ YMXS's `ymxs-check` in one WASI preview 1 command module, built from
 `go/wasm` with `GOOS=wasip1 GOARCH=wasm`: its first argument names the
 tool and the arguments after it are that tool's, read as the executable
 reads them. It reads standard input, writes standard output and standard
-error, and exits with the tool's exit code. A first argument outside the
-thirteen is `ymxr: the first argument names a tool: ` and the thirteen
-names, exit 2. `ymxs-check` is the main of YMXS's command at the version
+error, and exits with the tool's exit code. An unknown first argument is
+`ymxr: the first argument names a tool: ` and the thirteen names, exit 2.
+`ymxs-check` is the main of YMXS's command at the version
 go.mod requires, over the same packages, for a page to check a structure
 before writing a file of it; the zips of executables leave it out, and
 YMXS's releases ship it. The tools write the same bytes, report and exit
@@ -1168,17 +1168,18 @@ missing file among them, is the WASI runtime's, which writes
 | script | what it is |
 |---|---|
 | `ymxr-wasi.js` | the 21 WASI functions the module imports, standard input from a buffer, standard output and standard error to buffers, and a read-only directory of the files a caller passes, open as `/`; it runs in a Web Worker and under Node |
-| `ymxr-worker.js` | the Web Worker a page runs the tools in: it compiles the module once, and sends each line of standard error as the tool writes it |
+| `ymxr-worker.js` | the worker that runs the tools in a page and packs groups of columns under the page and Node runners |
 | `ymxr.js` | the page's interface, an ES module: `run(tool, flags, input, options)` resolves to `{ exitCode, output, report }`, the options `onReport`, `files` and `signal`; `runTool(tool, flags, input, onReport)` is the same with the callback as an argument; `stop()` stops the run in progress as its signal would |
 | `ymxr-node.mjs` | a tool run under Node as its executable runs, the module beside it or at `YMXR_WASM`; an argument naming a file or a directory puts it in the tool's directory |
 
-A page runs one tool at a time in one worker, in the order the runs are
-asked for; a run stopped through its signal or `stop()` ends the worker,
-and the next run starts another. `src/test/js/ymxr.test.mjs` runs
-`ymxr.js` under Node, with a thread of `worker_threads` for the Web
-Worker, and `WasmTest` runs it: a run against the same run without the
-worker, the order of the queue, the lines of standard error, a wrong
-call, `stop()` and a signal.
+A page runs one tool at a time in the order the runs are asked for.
+For a large `ymxs-to-prg` export, the page and Node runners send live
+columns to up to four workers. The writer chooses the ring and assembles
+the program from the packed columns. A page run stopped through its
+signal or `stop()` ends the workers, and the next run starts a worker
+again. `src/test/js/ymxr.test.mjs` runs the page script under Node
+with threads for its workers and checks output, reports, queue order,
+invalid calls and cancellation.
 
 **20.7 The zip** `ymxr-tools-wasm-v<version>.zip` has `ymxr.wasm`, the
 four scripts and `README.md`, which tells a page how to serve the folder

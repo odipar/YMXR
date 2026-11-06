@@ -31,6 +31,7 @@ type Packing struct {
 	Ring    int
 	Copies  bool
 	Seconds float64
+	plain   dtx.Packer
 }
 
 // Unit is the unit the table packs at by default.
@@ -96,10 +97,16 @@ func PackingOf(t *tool.Tool, args []string) Packing {
 // Packers packs a live column under this packing: without copies, or under
 // -copies with copies and without, the smaller kept.
 func (p Packing) Packers() []dtx.Packer {
+	var packers []dtx.Packer
 	if !p.Copies {
-		return ymxr.Plain()
+		packers = ymxr.Plain()
+	} else {
+		packers = ymxr.Packers(p.Seconds)
 	}
-	return ymxr.Packers(p.Seconds)
+	if p.plain != nil {
+		packers[0] = p.plain
+	}
+	return packers
 }
 
 // Only reads every argument against the flags the tool reads: a call that
@@ -179,11 +186,7 @@ func TuneFiles(t *tool.Tool, multi ymxs.Multi, packing Packing,
 	made := make([]schema.Made, len(multi.Tunes))
 	written := make([]ymxr.Written, len(multi.Tunes))
 	for i, tune := range multi.Tunes {
-		padded, frames := ymxr.PadToUnit(tune, packing.Unit, said)
-		one, err := schema.Padded(padded, frames)
-		if err != nil {
-			t.Wrong(tool.Wrong, err.Error())
-		}
+		one := PreparedTune(t, tune, packing.Unit, said)
 		// without copies: the set's choice packs with them through the
 		// ring it chooses
 		packed, err := ymxr.Pack(one.Columns, one.Sources, one.Rate, packing.Unit,
@@ -214,11 +217,7 @@ func TuneFiles(t *tool.Tool, multi ymxs.Multi, packing Packing,
 // packed.
 func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	said *report.Report) []byte {
-	padded, frames := ymxr.PadToUnit(tune, packing.Unit, said)
-	made, err := schema.Padded(padded, frames)
-	if err != nil {
-		t.Wrong(tool.Wrong, err.Error())
-	}
+	made := PreparedTune(t, tune, packing.Unit, said)
 	written, err := ymxr.WriteNamed(made.Columns, made.Sources, made.Rate,
 		packing.Unit, packing.Ring, packing.Packers(), said, tune.Title)
 	if err != nil {
@@ -226,6 +225,16 @@ func TuneFile(t *tool.Tool, tune ymxs.Tune, packing Packing,
 	}
 	row(said, tune, made, written.File)
 	return written.File
+}
+
+// PreparedTune pads a tune to the unit and maps it to the player columns.
+func PreparedTune(t *tool.Tool, tune ymxs.Tune, unit int, said *report.Report) schema.Made {
+	padded, frames := ymxr.PadToUnit(tune, unit, said)
+	made, err := schema.Padded(padded, frames)
+	if err != nil {
+		t.Wrong(tool.Wrong, err.Error())
+	}
+	return made
 }
 
 // row is a tune's row of the report (tools.md 7.3).
@@ -267,6 +276,12 @@ func decimal(t *tool.Tool, said, flag string) float64 {
 // several.
 func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 	said *report.Report) []byte {
+	return SndhWithPacker(t, multi, args, said, nil)
+}
+
+// SndhWithPacker writes the same SNDH with the supplied plain packer.
+func SndhWithPacker(t *tool.Tool, multi ymxs.Multi, args []string, said *report.Report,
+	plain dtx.Packer) []byte {
 	options := sndh.Options{Asked: AskedOf(t, args), Link: true}
 	title, composer := "", ""
 	for _, flag := range args {
@@ -303,7 +318,9 @@ func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 	for _, tune := range multi.Tunes {
 		names = append(names, Title(tune))
 	}
-	tunes := TuneFiles(t, multi, PackingOf(t, args), said)
+	packing := PackingOf(t, args)
+	packing.plain = plain
+	tunes := TuneFiles(t, multi, packing, said)
 	if len(tunes) > 1 {
 		options.Names = names
 	}
