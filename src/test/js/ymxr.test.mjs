@@ -1,5 +1,5 @@
 // wasm/ymxr.js as a page runs it, under Node (doc/tools.md 20.6). The
-// three scripts and the module go into a directory of their own, as a page
+// scripts and the module go into a directory of their own, as a page
 // serves them, and the Web Worker ymxr.js starts is a thread of
 // worker_threads with the self, postMessage and fetch a page's worker has.
 // WasmTest runs this with YMXR_WASM naming the module it built:
@@ -37,9 +37,13 @@ await import(workerData.script);
 for (const data of early) self.onmessage({ data });
 `);
 
-// The Web Worker ymxr.js starts, on a thread.
+// The Web Workers ymxr.js starts, one per thread.
+Object.defineProperty(globalThis, "navigator", { value: { hardwareConcurrency: 12 } });
+let started = 0;
+let terminated = 0;
 globalThis.Worker = class {
   constructor(script) {
+    started++;
     this.thread = new Thread(pathToFileURL(prelude), { workerData: { script: String(script) } });
     // the page's worker lives as long as the page: here the tests end the process
     this.thread.unref();
@@ -49,15 +53,18 @@ globalThis.Worker = class {
     this.thread.postMessage(message, transfer);
   }
   addEventListener(type, listener) {
-    const heard = (data) => listener({ data });
-    this.listening.set(listener, heard);
+    const heard = (data) => listener(type === "message" ? { data } : data);
+    if (!this.listening.has(type)) this.listening.set(type, new Map());
+    this.listening.get(type).set(listener, heard);
     this.thread.on(type, heard);
   }
   removeEventListener(type, listener) {
-    this.thread.off(type, this.listening.get(listener));
-    this.listening.delete(listener);
+    const heard = this.listening.get(type)?.get(listener);
+    if (heard) this.thread.off(type, heard);
+    this.listening.get(type)?.delete(listener);
   }
   terminate() {
+    terminated++;
     this.thread.terminate();
   }
 };
@@ -113,6 +120,32 @@ test("a wrong call exits 2 as the executable does", async () => {
   const ran = await page.run("ymxs-to-sndh", ["-z"], structure);
   assert.equal(ran.exitCode, 2);
   assert.equal(ran.output.length, 0);
+});
+
+test("PRG workers preserve the selected ring, output and report", async () => {
+  for (const flags of [[], ["-m960"]]) {
+    const before = started;
+    const lines = [];
+    const ran = await page.run("ymxs-to-prg", flags, structure, { onReport: line => lines.push(line) });
+    const expected = await direct("ymxs-to-prg", flags, structure);
+    assert.equal(started - before, 8);
+    assert.equal(ran.exitCode, 0);
+    assert.deepEqual(ran.output, expected.output);
+    assert.equal(steady(ran.report), steady(expected.report));
+    assert.equal(lines.join("\n") + "\n", ran.report);
+  }
+});
+
+test("stopping a parallel export ends its workers", async () => {
+  const before = terminated;
+  const stopped = page.run("ymxs-to-prg", [], structure, {
+    onReport: line => {
+      if (/packing the columns 0 of /.test(line)) setTimeout(() => page.stop(), 10);
+    },
+  });
+  await assert.rejects(stopped, { name: "AbortError" });
+  assert.equal(terminated - before, 9);
+  assert.equal((await page.run("ymxs-to-prg", ["-silent", "-m960"], structure)).exitCode, 0);
 });
 
 test("stop() ends the run in progress, and the run after it starts another worker", async () => {

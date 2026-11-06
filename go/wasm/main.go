@@ -48,6 +48,9 @@ var tools = map[string]func(){
 }
 
 func main() {
+	if len(os.Args) > 1 && columnTool(os.Args[1]) {
+		return
+	}
 	if len(os.Args) < 2 || tools[os.Args[1]] == nil {
 		names := make([]string, 0, len(tools))
 		for name := range tools {

@@ -12,8 +12,10 @@
 // ymxr.wasm is read beside this file, or from YMXR_WASM where that is set.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { join } from "node:path";
-import { run } from "./ymxr-wasi.js";
+import { Worker } from "node:worker_threads";
+import { run, runParallel } from "./ymxr-wasi.js";
 
 const [tool, ...flags] = process.argv.slice(2);
 const files = {};
@@ -53,10 +55,24 @@ async function standardInput() {
 
 const wasm = process.env.YMXR_WASM ?? new URL("./ymxr.wasm", import.meta.url);
 const module = await WebAssembly.compile(readFileSync(wasm));
-const result = await run(module, tool ?? "", flags, {
+const invoke = (tool, flags, options) => run(module, tool, flags, options);
+const pack = async input => {
+  const worker = new Worker(new URL("./ymxr-worker.js", import.meta.url));
+  try {
+    return await new Promise((resolve, reject) => {
+      worker.once("message", data => data.error ? reject(new Error(data.error)) : resolve(data));
+      worker.once("error", reject);
+      worker.once("exit", code => reject(new Error(`column worker exited with code ${code}`)));
+      worker.postMessage({ module, tool: "_ymxr-pack-columns", flags: [], input }, [input.buffer]);
+    });
+  } finally {
+    await worker.terminate();
+  }
+};
+const result = await runParallel(invoke, pack, availableParallelism(), tool ?? "", flags, {
   input: named ? new Uint8Array(0) : await standardInput(),
   files,
   onReport: (chunk) => process.stderr.write(chunk),
-});
+}, line => process.stderr.write(line + "\n"));
 process.stdout.write(result.output);
 process.exitCode = result.exitCode;
