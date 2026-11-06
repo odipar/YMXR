@@ -74,6 +74,52 @@ with a JSON syntax error. This is a file interoperability case.
 JSON input. Keep U+FEFF inside fields and cover both forms in the
 Go and Java command tests.
 
+## A PRG row limit restarts at each subtune
+
+Export two four-row tunes that each play once with `ymxs-to-prg -r8`.
+Hatari plays both tunes and then repeats them past the limit. Over the
+250-VBL run, the 50/50 Hz set wrote 120 tune rows, and the 50/60 Hz
+set wrote 126. With `-r3` or `-r4`, both sets stopped after the requested
+number of rows in the first subtune. Go and Java emitted identical
+programs, and 0.13.0 reproduced the same output bytes.
+
+In [YMXR_prg.S](../68k/YMXR_prg.S), automatic advance calls `start`,
+which resets `rows_left` to the original limit. The limit therefore
+never reaches zero where every subtune ends before it. The tool
+documents `-rROWS` as the number of rows the program plays in
+[tools.md, section 13](tools.md#13-ymxr-prg).
+
+**Proposed fix.** Initialize the row budget once per program run and
+preserve it when changing subtunes. Count only rows that the player
+writes. Add regression cases for two four-row subtunes at 50/50 and
+50/60 Hz, with a limit before, at, and beyond the first subtune's end.
+
+To reproduce, create the two versions of the set and open the PRGs in
+Hatari. The first tune writes R0 values 64 through 67 and the second
+writes 96 through 99. Both programs should end after one pass through
+those eight values.
+
+~~~sh
+work=$(mktemp -d)
+for rate in 50 60; do
+    python3 -B - "$rate" <<'PY' >"$work/set.json"
+import json
+import sys
+
+def tune(title, rate, first):
+    return dict(title=title, composer="", writer="", rate=rate, rows=4,
+                repeat=None, sources=[], transformations=[],
+                registers=dict(r0=list(range(first, first + 4))))
+
+print(json.dumps(dict(format="ymxs", version=7, tunes=[
+    tune("First", 50, 64), tune("Second", int(sys.argv[1]), 96),
+])))
+PY
+    ymxs-to-prg -silent -r8 <"$work/set.json" >"$work/RATE$rate.PRG"
+done
+printf '%s\n' "$work"
+~~~
+
 ## Reproduce the long sources
 
 Run from the YMXR root with the released YMXS and YMXR tools on the path.
