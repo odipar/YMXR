@@ -48,6 +48,20 @@ source. To support longer sources, keep the full column offsets through
 init and the start routines. The absolute handlers already read from
 per-column addresses, so the wider offset can be resolved before ticks.
 
+## Chunked playback for long sources
+
+As another way to support long sources, YMXR could split any sample or
+wavetable of one, two, or three columns at whole-row boundaries. Size
+each chunk to fit the handler's row counter and padded column stride.
+Keep one logical source so the columns advance together and loop
+points, position resets, and remaps use the original row numbers.
+
+At a chunk boundary, the timer handler would switch the row addresses
+so the next tick reads the next row at the same rate. The timer keeps
+running through the switch. Sources that fit in one chunk could use the
+existing handler. Check playback across chunk boundaries, including
+loops, position resets, and remaps.
+
 ## A UTF-8 signature blocks ordinary file imports
 
 An unchanged tune is accepted by the Go and Java tools. Add a UTF-8
