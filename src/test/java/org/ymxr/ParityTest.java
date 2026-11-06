@@ -373,6 +373,50 @@ final class ParityTest {
                 + " counter reaches 32767\n"), asked.said());
     }
 
+    @Test
+    void sharedSourcesAreCountedOnceForReachInBothTrees() throws Exception {
+        byte[] first = BinariesTest.longMapped(20000);
+        byte[] second = first.clone();
+        Tune.putWord(second, Tune.FRAME_RATE_AT, 60);
+        int entry = Tune.indexAt(Tune.VERSION);
+        Tune.putLong(second, entry, Tune.getLong(first, entry) ^ Tune.COUNTED);
+        byte[] multi = multiOf(List.of(first, second, first));
+        byte[] sndh = both("ymxr-sndh", multi, "-carried");
+        int core = Sndh.coreAt(sndh, Sndh.even(Tune.getWord(sndh, 2) + 2));
+        assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP,
+                Tune.getWord(sndh, core + Sndh.CORE_FLAGS_AT));
+        assertArrayEquals(sndh, both("ymxr-sndh", multi, "-carried", "-pcrel", "-silent"));
+        int table = core + Tune.getLong(sndh, core + Sndh.CORE_TABLE_AT);
+        int a = core + Tune.getLong(sndh, table + 2);
+        int b = core + Tune.getLong(sndh, table + 6);
+        int c = core + Tune.getLong(sndh, table + 10);
+        int index = Bound.indexAt(Tune.VERSION);
+        int aEntry = Tune.getLong(sndh, a + index);
+        int bEntry = Tune.getLong(sndh, b + index);
+        assertEquals(Tune.COUNTED, (aEntry ^ bEntry) & Tune.COUNTED);
+        int source = a + (aEntry & ~Tune.COUNTED);
+        assertEquals(source, b + (bEntry & ~Tune.COUNTED));
+        assertEquals(source, c + (Tune.getLong(sndh, c + index) & ~Tune.COUNTED));
+        int transformations = a + Tune.getLong(sndh, a + Bound.TRANSFORMATIONS_AT);
+        assertEquals(transformations, c + Tune.getLong(sndh, c + Bound.TRANSFORMATIONS_AT));
+        assertTrue(transformations != b + Tune.getLong(sndh, b + Bound.TRANSFORMATIONS_AT),
+                "the counted source uses a different page list");
+        assertTrue(new String(both("ymxr-layout", sndh), StandardCharsets.US_ASCII)
+                .contains("{\"part\":\"sourcepool\",\"at\":" + source + ","));
+        both("ymxr-prg", sndh);
+
+        byte[] large = BinariesTest.longMapped(48000);
+        byte[] sharedLarge = multiOf(List.of(large, large));
+        for (byte[] input : List.of(large, sharedLarge)) {
+            byte[] chosen = both("ymxr-sndh", input, "-carried", "-silent");
+            int start = Sndh.even(Tune.getWord(chosen, 2) + 2);
+            assertEquals(Sndh.CORE_MAP, Tune.getWord(chosen, start + Sndh.CORE_FLAGS_AT));
+            Ran strict = same("ymxr-sndh", input, "-carried", "-pcrel", "-silent");
+            assertEquals(1, strict.exit());
+            assertTrue(strict.said().contains("reaches 32767"), strict.said());
+        }
+    }
+
     /**
      * Offsets inside the transformation index are accepted and copied
      * through the index end. Layout also reads a negative bound block
