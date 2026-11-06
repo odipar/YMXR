@@ -37,6 +37,24 @@ rather than either.
 
 ## Published
 
+### 0.12.0, 2026-11-06
+
+<https://github.com/odipar/YMXR/releases/tag/v0.12.0>, built from the commit
+tagged `v0.12.0`.
+
+A set can contain subtunes with different frame rates. SNDH files use a
+shared Timer C callback and play each subtune at its frame rate. The
+standalone Atari program counts the rows played when it stops a subtune
+or advances to the next one.
+
+- **Sets at 50 Hz** use the single-tune defaults. Timer C is the default
+  when free. An effect that claims Timer C or the `-perf` option selects
+  VBL by default. `-vbl` and `-tc` select the clock explicitly when
+  available.
+- **Sets with a subtune at another rate** require Timer C and reject
+  `-vbl` and `-perf`. A set that uses different rates supports frame rates
+  up to 400 Hz.
+
 ### 0.11.0, 2026-11-05
 
 <https://github.com/odipar/YMXR/releases/tag/v0.11.0>, built from the commit
