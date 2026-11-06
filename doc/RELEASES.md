@@ -37,6 +37,21 @@ rather than either.
 
 ## Published
 
+### 0.13.0, 2026-11-06
+
+<https://github.com/odipar/YMXR/releases/tag/v0.13.0>, built from the commit
+tagged `v0.13.0`.
+
+Large `ymxs-to-prg` exports in WebAssembly pack live columns in up to
+eight workers in the browser and under Node. The writer still chooses
+the ring and assembles the program through DTX. The pool runs the plain
+packing pass. With `-copies`, the copies search runs in the export
+worker. Stopping a browser export ends its packing workers.
+
+In Chrome on an Apple M2, Knucklebusters exported in 13.68 seconds with
+eight workers and 16.88 seconds with four, using the default ring
+search. The two runs wrote the same PRG.
+
 ### 0.12.0, 2026-11-06
 
 <https://github.com/odipar/YMXR/releases/tag/v0.12.0>, built from the commit
