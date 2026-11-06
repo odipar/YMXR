@@ -495,7 +495,7 @@ the SNDH file begins at the byte after the stub's last.
 |---|---|---|
 | 0 | 4 | `bra.w` to the program (4.6) |
 | 4 | 4 | `YMXT` |
-| 8 | 2 | 2 for one rate, or 3 for a mixed-rate file |
+| 8 | 2 | the descriptor's version, 2 for one rate or 3 for a mixed-rate file |
 | 10 | 2 | the subtunes: patched from the `##` tag |
 | 12 | 2 | flags: patched; the word of 4.3 |
 | 14 | 2 | the callback rate in Hz, patched from the clock tag |
