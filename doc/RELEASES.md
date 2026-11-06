@@ -37,6 +37,23 @@ rather than either.
 
 ## Published
 
+### 0.14.0, 2026-11-06
+
+<https://github.com/odipar/YMXR/releases/tag/v0.14.0>, built from the commit
+tagged `v0.14.0`.
+
+Multi-tune SNDH files and Atari programs share byte-identical sample and
+wavetable data across subtunes. They also share transformation blocks
+whose lookup page lists match. The exporters check PC-relative reach
+after placing the shared data and select absolute addressing when
+the sources exceed that reach.
+
+A six-subtune fixture used 26,778 bytes of loaded PRG text, down from
+50,538 in 0.13.0. Its 6,360 measured timer ticks had identical 68000
+cycle counts before and after pooling. In five default PRG export
+workloads, median times stayed within 5% in native Go, Java, and
+Chrome WebAssembly.
+
 ### 0.13.0, 2026-11-06
 
 <https://github.com/odipar/YMXR/releases/tag/v0.13.0>, built from the commit
