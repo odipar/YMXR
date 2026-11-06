@@ -163,7 +163,8 @@ final class Prg {
         if (mixed != (Tune.getWord(stub, STUB_VERSION_AT) == MIXED_STUB_VERSION)) {
             throw new IllegalArgumentException("the program stub and SNDH file use different clocks");
         }
-        if (mixed && (asked == Sndh.Asked.VBL || !tags.clock().equals(Sndh.TIMER_C_CLOCK)
+        Sndh.checkVbl(asked, tags.subtunes(), tags.rate(), mixed);
+        if (mixed && (!tags.clock().equals(Sndh.TIMER_C_CLOCK)
                 || tags.flag().indexOf('c') >= 0)) {
             throw new IllegalArgumentException("mixed-rate subtunes need Timer C for playback");
         }
@@ -182,9 +183,10 @@ final class Prg {
         boolean vbl = asked == Sndh.Asked.VBL
                 || (asked == Sndh.Asked.CHOSEN && named);
         if (named && asked == Sndh.Asked.CHOSEN && tags.rate() != 50) {
+            String override = tags.subtunes() > 1 ? "" : " or the VBL asked for";
             throw new IllegalArgumentException("the file plays from the VBL at " + tags.rate()
                     + " Hz: the stub's VBL is a 50 Hz clock, so this set needs a separate host"
-                    + " or the VBL asked for");
+                    + override);
         }
         int core = core(sndh, tags.end() + 4);
         byte[] prg = new byte[HEADER + stub.length + sndh.length + 4];

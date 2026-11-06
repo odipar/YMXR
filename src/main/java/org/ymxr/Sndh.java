@@ -235,6 +235,7 @@ final class Sndh {
             defers |= (tune.effects() & Columns.DEFERS) != 0;
             maps |= (tune.effects() & Columns.MAPS) != 0;
         }
+        checkVbl(options.asked(), n, rates[0], mixed);
         // The tunes are bound as a set, so those that agree on what an
         // image fixes once share one and the reader's code appears once for
         // them (DTX abi.md 1, doc/BINARIES.md 2).
@@ -243,7 +244,7 @@ final class Sndh {
         for (byte[] b : set.tunes()) {
             state = Math.max(state, Tune.getLong(b, Bound.STATE_AT));
         }
-        int rate = mixed ? mixedRate(rates, claimed, options.asked()) : rates[0];
+        int rate = mixed ? mixedRate(rates, claimed) : rates[0];
         byte[] tags = tags(options, rate, n, frames, claimed, mixed ? rates : null);
         // Which core is under the tunes: the one the caller named, or
         // the one the switches select, which reads a row through the
@@ -319,16 +320,20 @@ final class Sndh {
         return mixed(file, at) ? at + Tune.getWord(file, at + CLOCK_CORE_AT) : at;
     }
 
+    static void checkVbl(Asked asked, int subtunes, int rate, boolean mixed) {
+        if (asked == Asked.VBL && (mixed || (subtunes > 1 && rate != 50))) {
+            throw new IllegalArgumentException("-vbl requires every subtune in a set"
+                    + " to play at 50 Hz");
+        }
+    }
+
     /** A common Timer C callback rate. Use an exact multiple of each
      *  subtune's rate where the timer can generate it, or count each
      *  subtune's phase against 200 or 400 callbacks a second. */
-    private static int mixedRate(int[] rates, int claimed, Asked asked) {
+    private static int mixedRate(int[] rates, int claimed) {
         if ((claimed & TIMER_C) != 0) {
             throw new IllegalArgumentException("mixed-rate subtunes need Timer C for playback"
                     + " and a subtune claims it for an effect");
-        }
-        if (asked == Asked.VBL) {
-            throw new IllegalArgumentException("mixed-rate subtunes need Timer C for playback");
         }
         int fastest = Arrays.stream(rates).max().orElseThrow();
         if (fastest > Prg.MOST_TICKS) {

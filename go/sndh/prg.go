@@ -155,7 +155,10 @@ func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	if mixed != (ymxr.GetWord(stub, stubVersionAt) == mixedStubVersion) {
 		return nil, fmt.Errorf("the program stub and SNDH file use different clocks")
 	}
-	if mixed && (asked == AskedVBL || tags.Clock != ClockTimerC || strings.ContainsRune(tags.Flag, 'c')) {
+	if err := checkVbl(asked, tags.Subtunes, tags.Rate, mixed); err != nil {
+		return nil, err
+	}
+	if mixed && (tags.Clock != ClockTimerC || strings.ContainsRune(tags.Flag, 'c')) {
 		return nil, fmt.Errorf("mixed-rate subtunes need Timer C for playback")
 	}
 	if mixed && tags.Rate != ymxr.GetWord(sndh, entries+clockRateAt) {
@@ -172,9 +175,12 @@ func ProgramWith(stub, sndh []byte, rows int64, asked Asked) ([]byte, error) {
 	}
 	vbl := asked == AskedVBL || (asked == AskedChosen && named)
 	if named && asked == AskedChosen && tags.Rate != 50 {
+		override := ""
+		if tags.Subtunes <= 1 {
+			override = " or the VBL asked for"
+		}
 		return nil, fmt.Errorf("the file plays from the VBL at %d Hz: the stub's VBL is"+
-			" a 50 Hz clock, so this set needs a separate host or the VBL asked for",
-			tags.Rate)
+			" a 50 Hz clock, so this set needs a separate host%s", tags.Rate, override)
 	}
 	core, err := Core(sndh, tags.End+4)
 	if err != nil {

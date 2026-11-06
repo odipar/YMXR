@@ -15,9 +15,8 @@
 #
 # Several tunes go into one file, a subtune each in the order named, and
 # the program picks between them with the arrow keys or a number typed,
-# one digit or two (BINARIES.md 4.6). Each is named by its file, and an
-# SNDH file records one rate, so a set whose tunes do not share one gets a
-# line on stderr and no file.
+# one digit or two (BINARIES.md 4.6). Each is named by its file.
+# A set of 50 Hz subtunes defaults to VBL. Mixed rates use Timer C.
 #
 # The converter's options, which a tune file is packed already and needs
 # none of:
@@ -47,8 +46,8 @@
 #   -perf      the core with the raster monitor in, so the run paints
 #              what each call costs on the screen the program clears
 #              (performance.md, Measure)
-#   -vbl       the VBL as the clock the program plays from, and -tc
-#              Timer C, which -perf would otherwise name the VBL over
+#   -vbl       VBL playback. Every subtune in a set must be at 50 Hz.
+#   -tc        Timer C playback, where the tunes leave the timer free.
 #   -lean      the core whose ticks neither drop the interrupt level nor
 #              write an end of interrupt, 32 cycles cheaper on a
 #              tick that writes a row and 16 on one that ends a source,
@@ -138,7 +137,13 @@ while [ "$left" -gt 0 ]; do
         -h|-help|--help) help=1 ;;
         -perf) perf=-perf ;;
         -lean) lean=-lean ;;
-        -vbl|-tc) clock=$arg ;;
+        -vbl|-tc)
+            if [ -n "$clock" ] && [ "$clock" != "$arg" ]; then
+                echo "$0: -vbl and -tc name two clocks" >&2
+                exit 2
+            fi
+            clock=$arg
+            ;;
         -carried) carried=-carried ;;
         -link) ;;
         -silent) silent=-silent ;;

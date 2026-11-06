@@ -621,9 +621,10 @@ and form of the list, T the transformations, 256 bytes for each page it
 fills and for each page of the fallbacks of the effects whose pages
 pass the reach, and 255 more; and patches the core's field at 36 with
 its offset (BINARIES.md 3.1, 5.6). A set of several 50 Hz subtunes
-defaults to the VBL. `-tc` selects Timer C where the set leaves it
-free. A mixed-rate set uses one Timer C callback rate and advances
-each subtune at its recorded rate (BINARIES.md 3.4). A single tune with
+defaults to the VBL. `-vbl` requires every subtune in a set to play
+at 50 Hz. `-tc` selects Timer C where the set leaves it free.
+A mixed-rate set uses one Timer C callback rate and advances each
+subtune at its recorded rate (BINARIES.md 3.4). A single tune with
 `-perf` defaults to the VBL for the raster monitor (performance.md).
 `-vbl` and `-tc` together are `-vbl and -tc name two clocks`, exit 2.
 A set of one rate that claims Timer C names the VBL, and `-tc` with
@@ -642,7 +643,7 @@ blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
 | more than 99 | `N tune files: the '##' tag's two digits count at most 99 subtunes` |
 | subtune N fails to read | `subtune N: <message>` |
 | subtune N has a rate of 0 | `subtune N plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
-| a mixed-rate set claims Timer C, uses `-vbl`, has a rate above 400 Hz or exceeds the `FRMS` count | the line of BINARIES.md 3.3 |
+| `-vbl` was passed for a set with a subtune at a rate other than 50 Hz, or a mixed-rate set claims Timer C, has a rate above 400 Hz or exceeds the `FRMS` count | the line of BINARIES.md 3.3 |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
 | Timer C is asked for and the claims byte of the set has it | `the set claims Timer C and the clock asked for is Timer C: the player's handler has that timer` |
 | the core's descriptor fails its check (12.3) | the line of 12.3 |
@@ -700,6 +701,7 @@ passed where `-vbl` or `-tc` names one (BINARIES.md 4.3); `-vbl` and
 rows and stops, or plays on until SPACE or ESC for ROWS 0; lists the
 subtunes; selects one on LEFT, RIGHT, UP, DOWN or a typed number; and
 starts the next subtune where a subtune that plays once has ended.
+The `-vbl` override requires every subtune in a set to play at 50 Hz.
 A mixed-rate program runs from Timer C and counts rows played toward
 `-rROWS`. Timer C callbacks with no row leave the count as it is.
 
@@ -716,8 +718,11 @@ bytes`); `rows N does not fit a long` for ROWS outside 0 to
 4,294,967,295; and `the file plays from the VBL at H Hz: the stub's VBL
 is a 50 Hz clock, so this set needs a separate host or the VBL asked
 for` where the clock tag is `!V` or the FLAG letters have `c`, the rate
-is other than 50, and the clock is left to the file; and `the set claims
-Timer C and the clock asked for is Timer C: the player's handler has
+is other than 50, and the clock is left to the file. With several
+subtunes the line ends at `separate host`. A `-vbl` override on a set
+with another rate reports the line of BINARIES.md 4.5.
+The tool reports `the set claims Timer C and the clock asked for is
+Timer C: the player's handler has
 that timer` where `-tc` is passed and the FLAG letters have `c`.
 
 **13.3 The report:** the heading `the SNDH file: B bytes, N subtunes

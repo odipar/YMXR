@@ -456,7 +456,7 @@ unread.
 | N names for M tune files, N other than M | `N names for M subtunes` |
 | subtune i is at 0 Hz | `subtune i plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
 | a mixed-rate set claims Timer C | `mixed-rate subtunes need Timer C for playback and a subtune claims it for an effect` |
-| the VBL was selected for a mixed-rate set | `mixed-rate subtunes need Timer C for playback` |
+| `-vbl` was passed and at least one subtune in the set plays at a rate other than 50 Hz | `-vbl requires every subtune in a set to play at 50 Hz` |
 | a mixed-rate set has a rate above 400 Hz | `mixed-rate subtunes need rates at or below 400 Hz` |
 | a subtune's callback count exceeds an unsigned long | `subtune i exceeds the FRMS callback count` |
 | E - 2 is above 32,767, the tag block being B bytes | `the tag block is B bytes, and a bra.w reaches 32767` |
@@ -560,7 +560,8 @@ tags are:
 | a tag name or a zero byte is read past the file's end | `not an SNDH file: no HDNS ends its tags` |
 | the tags end and `##` is absent | `the SNDH file's tags have no '##' subtune count` |
 | the tags end and the clock tag is absent | `the SNDH file's tags have no TC or !V rate` |
-| the clock tag is `!V` or the `FLAG` letters contain `c`, the rate H is other than 50, and the caller leaves the clock to the file | `the file plays from the VBL at H Hz: the stub's VBL is a 50 Hz clock, so this set needs a separate host or the VBL asked for` |
+| `-vbl` was passed and at least one subtune in the set plays at a rate other than 50 Hz | `-vbl requires every subtune in a set to play at 50 Hz` |
+| the clock tag is `!V` or the `FLAG` letters contain `c`, the rate H is other than 50, and the caller leaves the clock to the file | `the file plays from the VBL at H Hz: the stub's VBL is a 50 Hz clock, so this set needs a separate host`, with ` or the VBL asked for` appended for a single tune |
 | `YMXS` is absent past `HDNS` | `the SNDH file has no core: no YMXS past its tags` |
 | R is before the byte after `HDNS`, or its entry triple does not reach C as defined by 3.1 and 3.4 | `the core begins at C, and the entry triple reaches R` |
 | C plus 36 is past the file, B bytes remaining from C | `the core begins at C and the file ends B bytes on, short of the core's descriptor, 36 bytes` |

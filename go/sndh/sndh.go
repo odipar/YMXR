@@ -208,6 +208,9 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		defers = defers || tune.Effects&ymxr.Defers != 0
 		maps = maps || tune.Effects&ymxr.Maps != 0
 	}
+	if err := checkVbl(options.Asked, n, rates[0], mixed); err != nil {
+		return nil, err
+	}
 	// The tunes are bound as a set, so those that agree on what an image
 	// fixes once share one and the reader's code appears once for them
 	// (DTX abi.md 1, doc/BINARIES.md 2).
@@ -224,7 +227,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 	rate := rates[0]
 	var nativeRates []int
 	if mixed {
-		rate, err = mixedRate(rates, claimed, options.Asked)
+		rate, err = mixedRate(rates, claimed)
 		if err != nil {
 			return nil, err
 		}
@@ -496,13 +499,17 @@ func CoreAt(file []byte, at int) int {
 	return at
 }
 
+func checkVbl(asked Asked, subtunes, rate int, mixed bool) error {
+	if asked == AskedVBL && (mixed || (subtunes > 1 && rate != 50)) {
+		return errors.New("-vbl requires every subtune in a set to play at 50 Hz")
+	}
+	return nil
+}
+
 // mixedRate is the Timer C callback rate shared by the subtunes.
-func mixedRate(rates []int, claimed int, asked Asked) (int, error) {
+func mixedRate(rates []int, claimed int) (int, error) {
 	if claimed&TimerC != 0 {
 		return 0, errors.New("mixed-rate subtunes need Timer C for playback and a subtune claims it for an effect")
-	}
-	if asked == AskedVBL {
-		return 0, errors.New("mixed-rate subtunes need Timer C for playback")
 	}
 	fastest := 0
 	for _, rate := range rates {
