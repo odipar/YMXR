@@ -138,7 +138,7 @@ func mappingCore(t *testing.T) []byte {
 	return core
 }
 
-func TestAnSndhFilePlacesEachBlockAfterTheImages(t *testing.T) {
+func TestAnSndhFileSharesBlocksAfterTheImages(t *testing.T) {
 	nine, ten := files(t)
 	tunes := [][]byte{ten, nine, ten}
 	file, err := sndh.With(mappingCore(t), tunes, sndh.Options{Title: "set"})
@@ -167,14 +167,14 @@ func TestAnSndhFilePlacesEachBlockAfterTheImages(t *testing.T) {
 		}
 	}
 	want := block(t, ten)
-	end := last
+	where := core + ymxr.Align(last-core)
+	end := where + len(want)
 	for _, i := range []int{0, 2} {
 		at := tune(i) + ymxr.GetLong(file, tune(i)+sndh.BoundTransformationsAt)
-		if at != core+ymxr.Align(end-core) || !bytes.Equal(file[at:at+len(want)], want) {
+		if at != where || !bytes.Equal(file[at:at+len(want)], want) {
 			t.Fatalf("subtune %d's block is at %d, and the part before it ends at %d", i+1,
-				at, end)
+				at, last)
 		}
-		end = at + len(want)
 		if !strings.Contains(record, fmt.Sprintf("\"transformations\":%d}", at)) {
 			t.Fatalf("the record of subtune %d reads no block at %d:\n%s", i+1, at, record)
 		}

@@ -1,9 +1,12 @@
 package org.ymxr;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import org.dtx.Dtx;
 import org.dtx.Packager;
 import org.jspecify.annotations.Nullable;
@@ -85,7 +88,61 @@ final class Bound {
      * 10
      */
     record Set(List<byte[]> images, List<String> shapes, List<byte[]> tunes,
-            int[] image, int[] table, List<byte[]> blocks) {
+            int[] image, int[] table, List<byte[]> blocks, SourcePool sources) {
+        Set(List<byte[]> images, List<String> shapes, List<byte[]> tunes,
+                int[] image, int[] table, List<byte[]> blocks) {
+            this(images, shapes, tunes, image, table, blocks, SourcePool.EMPTY);
+        }
+
+        int tuneBytes(int i) {
+            byte[] tune = tunes.get(i);
+            return sources.bytes() == 0 ? tune.length
+                    : indexAt(Tune.getWord(tune, 4)) + 4 * sources.offsets()[i].length;
+        }
+    }
+
+    record SourcePool(List<ByteBuffer> tables, int[][] offsets, int bytes) {
+        static final SourcePool EMPTY = new SourcePool(List.of(), new int[0][], 0);
+    }
+
+    /**
+     * Whole DTX1 tables in first-use order, where at least two tunes share
+     * a table. The counted bit belongs to the index entry.
+     */
+    private static SourcePool poolSources(List<byte[]> tunes) {
+        if (tunes.size() < 2) {
+            return SourcePool.EMPTY;
+        }
+        record Location(int tune, int offset) {
+        }
+        Map<ByteBuffer, Location> seen = new HashMap<>();
+        List<ByteBuffer> tables = new ArrayList<>();
+        int[][] offsets = new int[tunes.size()][];
+        int bytes = 0;
+        boolean shared = false;
+        for (int i = 0; i < tunes.size(); i++) {
+            byte[] tune = tunes.get(i);
+            int index = indexAt(Tune.getWord(tune, 4));
+            int count = tune[Tune.COUNT_AT] & 0xff;
+            offsets[i] = new int[count];
+            for (int j = 0; j < count; j++) {
+                int at = Tune.getLong(tune, index + 4 * j) & ~Tune.COUNTED;
+                int end = j + 1 < count
+                        ? Tune.getLong(tune, index + 4 * (j + 1)) & ~Tune.COUNTED
+                        : tune.length;
+                ByteBuffer table = ByteBuffer.wrap(tune, at, end - at);
+                Location where = seen.get(table);
+                if (where == null) {
+                    where = new Location(i, bytes);
+                    seen.put(table, where);
+                    tables.add(table);
+                    bytes = Tune.align(bytes + table.remaining());
+                }
+                shared |= where.tune() != i;
+                offsets[i][j] = where.offset();
+            }
+        }
+        return shared ? new SourcePool(tables, offsets, bytes) : SourcePool.EMPTY;
     }
 
     /** The set of tunes bound with as few images as the figures allow. */
@@ -127,7 +184,7 @@ final class Bound {
                     Tune.getLong(images.get(image[i]), FORMAT_AT + FORMAT_STATE_AT)));
             blocks.add(block(tuneFiles.get(i)));
         }
-        return new Set(images, keys, tunes, image, table, blocks);
+        return new Set(images, keys, tunes, image, table, blocks, poolSources(tunes));
     }
 
     /** What an image fixes once, as a key two tables are grouped by and as

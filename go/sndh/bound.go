@@ -89,6 +89,70 @@ type Set struct {
 	// Blocks contains each tune's transformation block, nil below version
 	// 10.
 	Blocks [][]byte
+
+	sources sourcePool
+}
+
+type sourcePool struct {
+	tables  [][]byte
+	offsets [][]int
+	bytes   int
+}
+
+// TuneBytes is the number of bytes placed for tune i before any shared
+// source tables.
+func (set Set) TuneBytes(i int) int {
+	tune := set.Tunes[i]
+	if set.sources.bytes == 0 {
+		return len(tune)
+	}
+	return BoundIndex(ymxr.GetWord(tune, 4)) + 4*len(set.sources.offsets[i])
+}
+
+// SharedSourceBytes is the size of the shared source tables, including
+// padding between tables.
+func (set Set) SharedSourceBytes() int {
+	return set.sources.bytes
+}
+
+// poolSources places whole DTX1 tables in first-use order when at least
+// two tunes share a table. The counted bit belongs to the index entry.
+func poolSources(tunes [][]byte) sourcePool {
+	if len(tunes) < 2 {
+		return sourcePool{}
+	}
+	type location struct {
+		tune, offset int
+	}
+	seen := make(map[string]location)
+	pool := sourcePool{offsets: make([][]int, len(tunes))}
+	shared := false
+	for i, tune := range tunes {
+		index := BoundIndex(ymxr.GetWord(tune, 4))
+		count := int(tune[ymxr.CountAt])
+		pool.offsets[i] = make([]int, count)
+		for j := 0; j < count; j++ {
+			at := ymxr.GetLong(tune, index+4*j) &^ ymxr.Counted
+			end := len(tune)
+			if j+1 < count {
+				end = ymxr.GetLong(tune, index+4*(j+1)) &^ ymxr.Counted
+			}
+			table := tune[at:end]
+			where, found := seen[string(table)]
+			if !found {
+				where = location{tune: i, offset: pool.bytes}
+				seen[string(table)] = where
+				pool.tables = append(pool.tables, table)
+				pool.bytes = ymxr.Align(pool.bytes + len(table))
+			}
+			shared = shared || where.tune != i
+			pool.offsets[i][j] = where.offset
+		}
+	}
+	if !shared {
+		return sourcePool{}
+	}
+	return pool
 }
 
 // Bind is the set of tunes bound with as few images as the figures allow.
@@ -155,7 +219,7 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 		blocks[i] = Block(file)
 	}
 	return Set{Images: images, Shapes: keys, Tunes: tunes, Image: image, Table: table,
-		Blocks: blocks}, nil
+		Blocks: blocks, sources: poolSources(tunes)}, nil
 }
 
 // shape is the values an image fixes once, as a key two tables are

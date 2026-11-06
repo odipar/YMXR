@@ -137,8 +137,8 @@ func layoutProgram(out *bytes.Buffer, file []byte) {
 }
 
 // layoutSndh is 6.4: the entry triple, the tags, the core, the subtune
-// table, a subtune and its sources a line each, a line an image, and the
-// workspace. The SNDH file runs from `from` to `ends`, and every offset
+// table, subtunes and their sources, the shared source tables, images,
+// and the workspace. The SNDH file runs from `from` to `ends`, and every offset
 // counts from the file's first byte.
 func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 	out.WriteString("{\"part\":\"entry\",\"to\":[")
@@ -196,14 +196,29 @@ func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 		}
 	}
 	sort.Ints(images)
+	poolAt := images[0]
+	for i := 0; i+1 < n; i++ {
+		at := tunes[i]
+		index := at + BoundIndex(ymxr.GetWord(file, at+4))
+		for j := 0; j < int(file[at+9]); j++ {
+			source := at + (ymxr.GetLong(file, index+4*j) &^ ymxr.Counted)
+			if source >= tunes[i+1] && source < poolAt {
+				poolAt = source
+			}
+		}
+	}
 	for i, at := range tunes {
-		upto := images[0]
+		upto := poolAt
 		if i+1 < n {
 			upto = tunes[i+1]
 		}
 		fmt.Fprintf(out, "{\"part\":\"tune\",\"number\":%d,\"at\":%d,\"bytes\":%d%s}\n",
 			i+1, at, upto-at, boundFields(file, at))
 		layoutSources(out, file, at)
+	}
+	if poolAt < images[0] {
+		fmt.Fprintf(out, "{\"part\":\"sourcepool\",\"at\":%d,\"bytes\":%d}\n",
+			poolAt, images[0]-poolAt)
 	}
 	for i, at := range images {
 		fmt.Fprintf(out, "{\"part\":\"image\",\"number\":%d,\"at\":%d}\n", i+1, at)

@@ -156,8 +156,8 @@ final class Layout {
     }
 
     /** 6.4: the entry triple, the tags, the core, the subtune table, a
-     *  subtune and its sources a line each, a line an image, and the
-     *  workspace. The SNDH file runs from {@code from} to {@code ends},
+     *  subtunes and their sources, the shared source tables, images,
+     *  and the workspace. The SNDH file runs from {@code from} to {@code ends},
      *  and every offset counts from the file's first byte. */
     private static void sndh(StringBuilder out, byte[] file, int from, int ends) {
         out.append("{\"part\":\"entry\",\"to\":[");
@@ -204,14 +204,29 @@ final class Layout {
         for (int at : tunes) {
             images.add(at + Tune.getLong(file, at + 16));
         }
+        int poolAt = images.first();
+        for (int i = 0; i + 1 < n; i++) {
+            int at = tunes.get(i);
+            int index = at + Bound.indexAt(word(file, at + 4));
+            for (int j = 0; j < (file[at + 9] & 0xff); j++) {
+                int source = at + (Tune.getLong(file, index + 4 * j) & ~Tune.COUNTED);
+                if (source >= tunes.get(i + 1) && source < poolAt) {
+                    poolAt = source;
+                }
+            }
+        }
         for (int i = 0; i < n; i++) {
             int at = tunes.get(i);
-            int upto = i + 1 < n ? tunes.get(i + 1) : images.first();
+            int upto = i + 1 < n ? tunes.get(i + 1) : poolAt;
             out.append("{\"part\":\"tune\",\"number\":").append(i + 1)
                     .append(",\"at\":").append(at)
                     .append(",\"bytes\":").append(upto - at)
                     .append(fields(file, at)).append("}\n");
             sources(out, file, at);
+        }
+        if (poolAt < images.first()) {
+            out.append("{\"part\":\"sourcepool\",\"at\":").append(poolAt)
+                    .append(",\"bytes\":").append(images.first() - poolAt).append("}\n");
         }
         int number = 1;
         for (int image : images) {
