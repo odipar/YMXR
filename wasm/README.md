@@ -43,7 +43,7 @@ bytes, for the two tools that read files by name; and `signal`, an
 
 Runs go to one worker in the order they are asked for. It compiles
 `ymxr.wasm` once and leaves the page's thread free. A large
-`ymxs-to-prg` export passes its column jobs to up to four workers when
+`ymxs-to-prg` export passes its column jobs to up to eight workers when
 the host has at least two cores. The Node runner uses worker threads for
 the same jobs. The exporter chooses the ring and assembles the result.
 

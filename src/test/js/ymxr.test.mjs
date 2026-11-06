@@ -38,7 +38,7 @@ for (const data of early) self.onmessage({ data });
 `);
 
 // The Web Workers ymxr.js starts, one per thread.
-Object.defineProperty(globalThis, "navigator", { value: { hardwareConcurrency: 4 } });
+Object.defineProperty(globalThis, "navigator", { value: { hardwareConcurrency: 12 } });
 let started = 0;
 let terminated = 0;
 globalThis.Worker = class {
@@ -128,7 +128,7 @@ test("PRG workers preserve the selected ring, output and report", async () => {
     const lines = [];
     const ran = await page.run("ymxs-to-prg", flags, structure, { onReport: line => lines.push(line) });
     const expected = await direct("ymxs-to-prg", flags, structure);
-    assert.equal(started - before, 4);
+    assert.equal(started - before, 8);
     assert.equal(ran.exitCode, 0);
     assert.deepEqual(ran.output, expected.output);
     assert.equal(steady(ran.report), steady(expected.report));
@@ -144,7 +144,7 @@ test("stopping a parallel export ends its workers", async () => {
     },
   });
   await assert.rejects(stopped, { name: "AbortError" });
-  assert.equal(terminated - before, 5);
+  assert.equal(terminated - before, 9);
   assert.equal((await page.run("ymxs-to-prg", ["-silent", "-m960"], structure)).exitCode, 0);
 });
 

@@ -1174,7 +1174,7 @@ missing file among them, is the WASI runtime's, which writes
 
 A page runs one tool at a time in the order the runs are asked for.
 For a large `ymxs-to-prg` export, the page and Node runners send live
-columns to up to four workers. The writer chooses the ring and assembles
+columns to up to eight workers. The writer chooses the ring and assembles
 the program from the packed columns. A page run stopped through its
 signal or `stop()` ends the workers, and the next run starts a worker
 again. `src/test/js/ymxr.test.mjs` runs the page script under Node

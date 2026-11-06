@@ -391,7 +391,8 @@ function columnBatches(plan, size) {
   return parts.filter(part => part.length).map(part => ({ input: concat(part), jobs: part.length }));
 }
 
-export async function runParallel(run, pack, size, tool, flags, options, onProgress) {
+export async function runParallel(run, pack, cores, tool, flags, options, onProgress) {
+  const size = Math.min(cores, 8);
   const ordinary = () => run(tool, flags, options);
   if (tool !== "ymxs-to-prg" || size < 2 || options.input.byteLength < 4096) return ordinary();
 

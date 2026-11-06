@@ -115,7 +115,7 @@ export function run(tool, flags = [], input = new Uint8Array(0), { onReport, fil
     signal?.addEventListener("abort", stop, { once: true });
     try {
       const cores = globalThis.navigator?.hardwareConcurrency ?? 1;
-      const { exitCode, output, report } = await runParallel(invoke, pack, Math.min(cores, 4),
+      const { exitCode, output, report } = await runParallel(invoke, pack, cores,
         tool, flags, { input: bytes, files, onReport }, line => {
           progress.push(line + "\n");
           onReport?.(line);

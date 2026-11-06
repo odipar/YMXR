@@ -69,7 +69,7 @@ const pack = async input => {
     await worker.terminate();
   }
 };
-const result = await runParallel(invoke, pack, Math.min(availableParallelism(), 4), tool ?? "", flags, {
+const result = await runParallel(invoke, pack, availableParallelism(), tool ?? "", flags, {
   input: named ? new Uint8Array(0) : await standardInput(),
   files,
   onReport: (chunk) => process.stderr.write(chunk),
