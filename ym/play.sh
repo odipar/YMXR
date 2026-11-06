@@ -16,7 +16,8 @@
 # Several tunes go into one file, a subtune each in the order named, and
 # the program picks between them with the arrow keys or a number typed,
 # one digit or two (BINARIES.md 4.6). Each is named by its file.
-# A set of 50 Hz subtunes defaults to VBL. Mixed rates use Timer C.
+# Timer C is the default where the tunes leave it free. With -perf,
+# the default is VBL. A set with a non-50 Hz subtune requires Timer C.
 #
 # The converter's options, which a tune file is packed already and needs
 # none of:
@@ -46,6 +47,7 @@
 #   -perf      the core with the raster monitor in, so the run paints
 #              what each call costs on the screen the program clears
 #              (performance.md, Measure)
+#              With a set, every subtune must be at 50 Hz.
 #   -vbl       VBL playback. Every subtune in a set must be at 50 Hz.
 #   -tc        Timer C playback, where the tunes leave the timer free.
 #   -lean      the core whose ticks neither drop the interrupt level nor

@@ -236,6 +236,16 @@ final class Sndh {
             maps |= (tune.effects() & Columns.MAPS) != 0;
         }
         checkVbl(options.asked(), n, rates[0], mixed);
+        if (n > 1 && (mixed || rates[0] != 50)) {
+            if (options.monitor()) {
+                throw new IllegalArgumentException("-perf requires every subtune in a set"
+                        + " to play at 50 Hz");
+            }
+            if ((claimed & TIMER_C) != 0) {
+                throw new IllegalArgumentException("a set with a non-50 Hz subtune needs Timer C"
+                        + " for playback and a subtune claims it for an effect");
+            }
+        }
         // The tunes are bound as a set, so those that agree on what an
         // image fixes once share one and the reader's code appears once for
         // them (DTX abi.md 1, doc/BINARIES.md 2).
@@ -244,7 +254,7 @@ final class Sndh {
         for (byte[] b : set.tunes()) {
             state = Math.max(state, Tune.getLong(b, Bound.STATE_AT));
         }
-        int rate = mixed ? mixedRate(rates, claimed) : rates[0];
+        int rate = mixed ? mixedRate(rates) : rates[0];
         byte[] tags = tags(options, rate, n, frames, claimed, mixed ? rates : null);
         // Which core is under the tunes: the one the caller named, or
         // the one the switches select, which reads a row through the
@@ -330,11 +340,7 @@ final class Sndh {
     /** A common Timer C callback rate. Use an exact multiple of each
      *  subtune's rate where the timer can generate it, or count each
      *  subtune's phase against 200 or 400 callbacks a second. */
-    private static int mixedRate(int[] rates, int claimed) {
-        if ((claimed & TIMER_C) != 0) {
-            throw new IllegalArgumentException("mixed-rate subtunes need Timer C for playback"
-                    + " and a subtune claims it for an effect");
-        }
+    private static int mixedRate(int[] rates) {
         int fastest = Arrays.stream(rates).max().orElseThrow();
         if (fastest > Prg.MOST_TICKS) {
             throw new IllegalArgumentException("mixed-rate subtunes need rates at or below "
@@ -572,12 +578,7 @@ final class Sndh {
         }
         tag(out, "CONV", CONVERTER);
         tag(out, String.format(Locale.ROOT, "##%02d", n), "");
-        Asked clock = asked(options);
-        if (rates != null) {
-            clock = Asked.TIMER_C;
-        } else if (n > 1 && options.asked() == Asked.CHOSEN) {
-            clock = rate == 50 ? Asked.VBL : Asked.CHOSEN;
-        }
+        Asked clock = rates == null ? asked(options) : Asked.TIMER_C;
         tag(out, clock(claimed, rate, clock), "");
         tag(out, "FLAG", flag(claimed));
         pad(out);

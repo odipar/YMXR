@@ -678,6 +678,12 @@ final class ParityTest {
         byte[] timer = both("ymxr-sndh", allFifty, "-tc");
         assertEquals("!V", Prg.tags(vbl).clock());
         assertEquals("TC", Prg.tags(timer).clock());
+        assertArrayEquals(timer, both("ymxr-sndh", allFifty));
+        byte[] watched = both("ymxr-sndh", allFifty, "-perf");
+        assertEquals("!V", Prg.tags(watched).clock());
+        assertEquals(Prg.FLAG_VBL, Tune.getWord(both("ymxr-prg", watched),
+                Prg.HEADER + Prg.STUB_FLAGS_AT));
+        assertEquals("TC", Prg.tags(both("ymxr-sndh", allFifty, "-perf", "-tc")).clock());
         assertEquals(Prg.FLAG_VBL, Tune.getWord(both("ymxr-prg", timer, "-vbl"),
                 Prg.HEADER + Prg.STUB_FLAGS_AT));
         assertEquals(0, Tune.getWord(both("ymxr-prg", vbl, "-tc"),
@@ -687,6 +693,13 @@ final class ParityTest {
             byte[] multi = multiOf(tunes, "-silent");
             byte[] sndh = both("ymxr-sndh", multi, "-tc");
             assertEquals("TC", Prg.tags(sndh).clock());
+            assertArrayEquals(sndh, both("ymxr-sndh", multi));
+            for (String[] flags : List.of(new String[] {"-perf"}, new String[] {"-perf", "-tc"})) {
+                Ran perf = same("ymxr-sndh", multi, flags);
+                assertEquals(1, perf.exit(), perf.said());
+                assertTrue(perf.said().contains("-perf requires every subtune in a set"
+                        + " to play at 50 Hz"), perf.said());
+            }
             Ran writer = same("ymxr-sndh", multi, "-vbl");
             Ran wrapper = same("ymxr-prg", sndh, "-vbl");
             for (Ran run : List.of(writer, wrapper)) {

@@ -620,15 +620,16 @@ reach of the core's first handler: a table of T bytes for each effect
 and form of the list, T the transformations, 256 bytes for each page it
 fills and for each page of the fallbacks of the effects whose pages
 pass the reach, and 255 more; and patches the core's field at 36 with
-its offset (BINARIES.md 3.1, 5.6). A set of several 50 Hz subtunes
-defaults to the VBL. `-vbl` requires every subtune in a set to play
-at 50 Hz. `-tc` selects Timer C where the set leaves it free.
-A mixed-rate set uses one Timer C callback rate and advances each
-subtune at its recorded rate (BINARIES.md 3.4). A single tune with
-`-perf` defaults to the VBL for the raster monitor (performance.md).
+its offset (BINARIES.md 3.1, 5.6). The clock defaults to Timer C
+where the tunes leave it free. `-perf` defaults to the VBL for the
+raster monitor (performance.md). `-vbl` or `-tc` selects the clock
+explicitly. On a set of several subtunes, `-vbl` and `-perf` require
+every subtune to play at 50 Hz. A set with another rate needs Timer C
+free for playback. A mixed-rate set uses one Timer C callback rate
+and advances each subtune at its recorded rate (BINARIES.md 3.4).
 `-vbl` and `-tc` together are `-vbl and -tc name two clocks`, exit 2.
-A set of one rate that claims Timer C names the VBL, and `-tc` with
-such a set is the error of 12.2. The title is `-tTITLE`, else the
+A single tune or all-50 Hz set that claims Timer C names the VBL.
+With `-tc` it reports the error of 12.2. The title is `-tTITLE`, else the
 first name, `(untitled)` where a tune file was read or the name is
 blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
 3) each text is reduced to its characters $20 to $7E; the report of
@@ -643,7 +644,7 @@ blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
 | more than 99 | `N tune files: the '##' tag's two digits count at most 99 subtunes` |
 | subtune N fails to read | `subtune N: <message>` |
 | subtune N has a rate of 0 | `subtune N plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
-| `-vbl` was passed for a set with a subtune at a rate other than 50 Hz, or a mixed-rate set claims Timer C, has a rate above 400 Hz or exceeds the `FRMS` count | the line of BINARIES.md 3.3 |
+| a set has a non-50 Hz subtune and uses `-vbl`, uses `-perf` or claims Timer C, or a mixed-rate set has a rate above 400 Hz or exceeds the `FRMS` count | the line of BINARIES.md 3.3 |
 | the tag block exceeds a `bra.w` | `the tag block is B bytes, and a bra.w reaches 32767` |
 | Timer C is asked for and the claims byte of the set has it | `the set claims Timer C and the clock asked for is Timer C: the player's handler has that timer` |
 | the core's descriptor fails its check (12.3) | the line of 12.3 |

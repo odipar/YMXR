@@ -473,9 +473,9 @@ final class BinariesTest {
         byte[] sndh = Sndh.of(files, new Sndh.Options("Two of the kit", "Jochen Hippel",
                 List.of("Chambers", "Circus"), false, false));
         Tags tags = tags(sndh);
-        assertEquals(List.of("TITL", "COMM", "CONV", "##", "!V", "FLAG", "FRMS", "!#SN", "TIME",
+        assertEquals(List.of("TITL", "COMM", "CONV", "##", "TC", "FLAG", "FRMS", "!#SN", "TIME",
                 "HDNS"), tags.order());
-        assertEquals("!V", tags.clock(), "an all-50 Hz set plays from the VBL");
+        assertEquals("TC", tags.clock(), "the set leaves Timer C free");
         Sndh.Options timer = new Sndh.Options("Timer C", null, null, false, false,
                 Sndh.Ticks.CHOSEN, Sndh.Asked.TIMER_C);
         assertEquals("TC", tags(Sndh.of(files, timer)).clock(), "the explicit override");
@@ -529,19 +529,16 @@ final class BinariesTest {
     }
 
     @Test
-    void aMixedRateSetReservesTimerCForPlayback() throws IOException {
+    void aSetWithAnotherRateReservesTimerCForPlayback() throws IOException {
         byte[] slow = tune("plays-once");
         byte[] claims = tune("four-timers");
-        Sndh.Options options = new Sndh.Options("Two rates", null, null, false, false);
-        IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
-                () -> Sndh.of(List.of(slow, claims), options));
-        assertEquals("mixed-rate subtunes need Timer C for playback"
-                + " and a subtune claims it for an effect", wrong.getMessage());
-        byte[] fast = slow.clone();
-        Tune.putWord(fast, Tune.FRAME_RATE_AT, 60);
-        Sndh.Options vbl = new Sndh.Options("Two rates", null, null, false, false,
-                Sndh.Ticks.CHOSEN, Sndh.Asked.VBL);
-        assertThrows(IllegalArgumentException.class, () -> Sndh.of(List.of(slow, fast), vbl));
+        Sndh.Options options = new Sndh.Options("Set", null, null, false, false);
+        for (List<byte[]> tunes : List.of(List.of(slow, claims), List.of(claims, claims))) {
+            IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
+                    () -> Sndh.of(tunes, options));
+            assertEquals("a set with a non-50 Hz subtune needs Timer C for playback"
+                    + " and a subtune claims it for an effect", wrong.getMessage());
+        }
     }
 
     @Test
@@ -616,10 +613,12 @@ final class BinariesTest {
 
     @Test
     void theFlagTagListsTheTimersTheSetClaims() throws IOException {
-        Tags tags = tags(Sndh.of(List.of(tune("four-timers"), tune("four-timers")),
+        byte[] file = tune("four-timers");
+        Tune.putWord(file, Tune.FRAME_RATE_AT, 50);
+        Tags tags = tags(Sndh.of(List.of(file, file),
                 new Sndh.Options("Four", null, null, false, false)));
         assertEquals("abcdy", tags.flag());
-        assertEquals(60, tags.rate());
+        assertEquals(50, tags.rate());
         assertEquals(List.of("TITL", "CONV", "##", "!V", "FLAG", "FRMS", "TIME", "HDNS"),
                 tags.order(), "the clock tag is where TC would be");
         // effects 0 to 3 run Timers A, D, B and C
@@ -773,8 +772,8 @@ final class BinariesTest {
         byte[] patched = Arrays.copyOfRange(prg, 28, 28 + stub.length);
         assertEquals("YMXT", ascii(patched, 4, 4));
         assertEquals(2, Tune.getWord(patched, Prg.STUB_SUBTUNES_AT));
-        assertEquals(Prg.FLAG_VBL, Tune.getWord(patched, Prg.STUB_FLAGS_AT),
-                "an all-50 Hz set plays from the VBL");
+        assertEquals(0, Tune.getWord(patched, Prg.STUB_FLAGS_AT),
+                "the set leaves Timer C free");
         assertEquals(50, Tune.getWord(patched, Prg.STUB_RATE_AT));
         assertEquals(0, Tune.getLong(patched, Prg.STUB_ROWS_AT));
         int core = Tune.getLong(patched, Prg.STUB_CORE_AT);
@@ -791,7 +790,7 @@ final class BinariesTest {
 
         byte[] counted = Prg.of(sndh, 2000);
         assertEquals(2000, Tune.getLong(counted, 28 + Prg.STUB_ROWS_AT));
-        assertEquals(Prg.FLAG_VBL, Tune.getWord(counted, 28 + Prg.STUB_FLAGS_AT),
+        assertEquals(0, Tune.getWord(counted, 28 + Prg.STUB_FLAGS_AT),
                 "the row limit leaves the clock flag as it is");
     }
 

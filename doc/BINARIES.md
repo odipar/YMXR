@@ -441,11 +441,11 @@ unread.
    zero rate as listed below.
 4. Bind the set (1.4).
 5. Write the tag block (3.2). A mixed-rate set uses `TC` (3.4).
-   A set of several subtunes at 50 Hz uses `!V` by default. Other
-   sets of one rate use the clock passed or `TC` by default. A
-   single tune with the raster monitor uses `!V` by default.
-   A set that claims Timer C uses `!V`, or reports the clock conflict
-   if Timer C was selected explicitly.
+   For one rate, use the clock passed or `TC` by default. The raster
+   monitor defaults to `!V`. A set of several subtunes with a rate
+   other than 50 Hz requires Timer C and omits the raster monitor.
+   In the other cases, a set that claims Timer C uses `!V`, or reports
+   the clock conflict if Timer C was selected explicitly.
 6. Lay the file out as 3.1, reporting the table's last condition where
    it is met.
 
@@ -455,7 +455,8 @@ unread.
 | N tune files, N above 99 | an error naming N and the 99 subtunes the two digits of `##` number |
 | N names for M tune files, N other than M | `N names for M subtunes` |
 | subtune i is at 0 Hz | `subtune i plays at 0 Hz: an SNDH file records a rate of 1 Hz or more` |
-| a mixed-rate set claims Timer C | `mixed-rate subtunes need Timer C for playback and a subtune claims it for an effect` |
+| a set with several subtunes has a non-50 Hz subtune and uses `-perf` | `-perf requires every subtune in a set to play at 50 Hz` |
+| a set with several subtunes has a non-50 Hz subtune and claims Timer C | `a set with a non-50 Hz subtune needs Timer C for playback and a subtune claims it for an effect` |
 | `-vbl` was passed and at least one subtune in the set plays at a rate other than 50 Hz | `-vbl requires every subtune in a set to play at 50 Hz` |
 | a mixed-rate set has a rate above 400 Hz | `mixed-rate subtunes need rates at or below 400 Hz` |
 | a subtune's callback count exceeds an unsigned long | `subtune i exceeds the FRMS callback count` |
@@ -731,9 +732,9 @@ with `d0.w` the subtune, 1 to `N`, calls play at the rate of the clock
 tag, and calls exit at the end; it reads the end of a tune that plays
 once in the state byte (2.4). The clock tag names the clock an SNDH host
 under TOS calls play from: `TC` Timer C, and `!V` the VBL, written where
-the set claims Timer C, every subtune of a set is at 50 Hz, or the
-VBL is selected (3.2, 3.3 step 5). The `FLAG` letters list the timers
-the set claims. A host that ticks from a timer selects one outside
+the set claims Timer C or the VBL is selected (3.2, 3.3 step 5).
+The `FLAG` letters list the timers the set claims. A host that ticks
+from a timer selects one outside
 those claims. Under `TC` the program of 4 installs a Timer C handler
 and arms the timer at the `ticks` of 4.10. It adds the rate to an
 accumulator on each tick and calls play for each `ticks` the

@@ -35,6 +35,7 @@
 #   -tTITLE    the title, the first subtune's name by default
 #   -cCOMPOSER the composer
 #   -perf      the core with the raster monitor in
+#              With a set, every subtune must be at 50 Hz.
 #   -lean      the core whose ticks neither drop the interrupt level nor
 #              write an end of interrupt
 #   -pcrel     the core whose ticks read a row through the program
