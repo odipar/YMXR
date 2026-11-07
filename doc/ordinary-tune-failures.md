@@ -120,6 +120,83 @@ done
 printf '%s\n' "$work"
 ~~~
 
+## A title can hide the subtune names
+
+A set with the titles `HDNS Intro` and `Outro` exports with both names
+in the SNDH `!#SN` table. The standalone program in Hatari lists
+`HDNS Intro` for both subtunes. The same set with `Intro` or
+`XHDNS Intro` as its first title lists `Outro` correctly.
+
+The `names` routine in [YMXR_prg.S](../68k/YMXR_prg.S) checks every even
+offset for `!#SN` and `HDNS`. The first title starts at offset 20, so the
+letters `HDNS` there end the search. The fallback uses the file title for
+every subtune.
+
+**Proposed fix.** Read the tag block from one tag boundary to the next,
+using each field's length or terminator. Bound the search by the start
+of the core. Test titles containing `HDNS` and `!#SN` at both alignments.
+
+## Automatic advance discards a digit
+
+Start the second cue in a set of twelve 50 Hz cues and press `1` while
+it plays. The player waits 25 rows for a second digit because the set
+includes 10, 11, and 12. If the cue ends after 16 rows, the player
+advances to cues 3 and 4. With the same cue set to repeat, the pause
+ends and the player selects cue 1.
+
+In [YMXR_prg.S](../68k/YMXR_prg.S), automatic advance calls `start`,
+which clears both the digit and its timeout. The key loop therefore
+loses the digit before it can select the subtune.
+
+**Proposed fix.** Preserve the digit and the time left on its timeout
+when a tune ends. Clear them when a manual selection starts a tune.
+Test both a single digit and a two-digit selection that spans a change
+of cue.
+
+## Reproduce the subtune menu failures
+
+Run with the released YMXR tools on the path. The first group of
+programs shows the titles on startup. For the second group, open each
+program in Hatari, press Right to start cue 2, then immediately press
+`1`. Wait about half a second. The repeating set returns to cue 1 and
+the set of one-shot cues continues to advance.
+
+~~~sh
+work=$(mktemp -d)
+python3 -B - "$work" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+
+def tune(title, rows, repeat, r0):
+    return dict(title=title, composer="", writer="", rate=50, rows=rows,
+                repeat=repeat, sources=[], transformations=[],
+                registers=dict(r0=[r0] + [-1] * (rows - 1)))
+
+def write(name, tunes):
+    (root / (name + ".json")).write_text(
+        json.dumps(dict(format="ymxs", version=7, tunes=tunes)))
+
+for name, title in (("EVEN", "HDNS Intro"), ("ODD", "XHDNS Intro"),
+                    ("PLAIN", "Intro")):
+    write(name, [tune(title, 4, 0, 64), tune("Outro", 4, 0, 96)])
+
+for name, repeat in (("SHORT", None), ("LOOP", 0)):
+    write(name, [tune(f"Cue {i}", 180 if i == 1 else 16, repeat, 30 + i)
+                 for i in range(1, 13)])
+PY
+for name in EVEN ODD PLAIN; do
+    ymxs-to-prg -silent -r4 <"$work/$name.json" >"$work/$name.PRG"
+done
+for name in SHORT LOOP; do
+    ymxs-to-prg -silent <"$work/$name.json" >"$work/$name.PRG"
+done
+ymxr-layout -silent <"$work/EVEN.PRG"
+printf '%s\n' "$work"
+~~~
+
 ## Reproduce the long sources
 
 Run from the YMXR root with the released YMXS and YMXR tools on the path.
@@ -206,3 +283,11 @@ ymxs-to-prg -silent <"$work/bom.json" >/dev/null
   described in [tools.md](tools.md).
 - The linked emulator rig played 60 corpus tunes for up to 64 frames
   each, and generated seeds 20 to 119 covered 140 subtunes.
+- The linked absolute player matched the reference on 120 generated
+  tunes, covering 164 subtunes. A separate linked run matched through
+  seed 167. At seed 168 the test generator stopped with a
+  `KeyError: 'mapping'` before exporting the tune.
+- For 11 YM fixtures, direct export to YMXR and export through YMXS
+  produced identical bytes with each of `-k1`, `-k2`, and `-k4`.
+  Three multitune or conformance fixtures produced identical native
+  and WebAssembly PRGs with each of `-k1`, `-k4`, and `-m960`.
