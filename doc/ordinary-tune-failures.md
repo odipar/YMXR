@@ -263,6 +263,14 @@ overhead. Include the affected subtune and row in the warning and
 allow export for faster machines. Test the two measured rates and
 the same tune with only one timer.
 
+At 8 MHz the 15,360 Hz control also stalls when exported with
+`-perf`. The plain `-vbl` export writes all 20 markers. The raster
+version keeps writing tone periods but never writes the first frame
+marker. The monitor adds 96 cycles per effect tick, so the two
+handlers and their interrupt overhead require about 9.58 million
+cycles a second at that rate. Include the raster build in the
+combined load warning.
+
 ## Reproduce the timer issues
 
 Export the three tunes below. In Hatari, run `CLAIMC.PRG` on an 8 MHz
@@ -270,7 +278,8 @@ ST with `--monitor rgb` and `--monitor mono`. Trace
 `psg_write,video_vbl` and compare the time spanned by the 40 R0 writes.
 For `P32.PRG` and `P40.PRG`, use the RGB monitor and trace R6. The low
 five bits should count from 1 to 20. At 8 MHz only `P40.PRG` writes
-those values. At 16 MHz both programs write them.
+those values. At 16 MHz both programs write them. Export `P40.json`
+with `-vbl -r20` and `-perf -r20` to compare the two builds at 8 MHz.
 
 ~~~sh
 work=$(mktemp -d)
@@ -317,6 +326,84 @@ for name in P32 P40; do
 done
 printf '%s\n' "$work"
 ~~~
+
+## The yellow raster bar undercounts wide effects
+
+Three 50 Hz tunes each run one looping wavetable on Timer A at 600 Hz.
+They write one, two or three registers per tick. The yellow bars in
+Hatari all average about 1,530 cycles after the first frame. The green
+tick bands average 144, 216 and 280 cycles respectively.
+
+The 68000 instruction counter measured these costs on a tick that
+advances the source. The handler cost excludes interrupt entry and
+return, which the bar also leaves out.
+
+| Registers | Plain handler | Raster handler | Cycles charged to the bar |
+|---:|---:|---:|---:|
+| 1 | 88 | 184 | 100 |
+| 2 | 152 | 248 | 100 |
+| 3 | 208 | 304 | 100 |
+
+The wide handlers in [ticks.S](../68k/player/ticks.S) charge the same
+`PERF_ON` value as the one-column handler. The wide lookup handlers in
+[lookup_ticks.S](../68k/player/lookup_ticks.S) do the same. The bar for
+a three-column source charges about half the plain handler's cost.
+
+**Proposed fix.** Set the raster count for each handler path from its
+measured cost, including source width, lookup and addressing mode.
+Compare the counter with measured instruction cycles for row writes,
+wraps and stops. Keep the cycle counts in the raster build.
+
+To reproduce, use a looping 128-row waveform with Timer A at divisor
+64 and count 64. Use `setR8`, `setToneA` and `setVoiceA` in separate
+tunes. Export with `-perf -r40` and trace `video_color` under Hatari.
+Compare the green and yellow spans after the first frame.
+
+## The raster monitor's cost
+
+Three songs from `ym/test` ran for 400 rows each in cycle-exact
+Hatari on a PAL 8 MHz ST. Both builds used the VBL. A test stub
+wrote the same palette markers before and after the SNDH play call
+in both runs. The elapsed cycles include the wait for the display
+and any effect interrupts during the call.
+
+| Tune | Plain cycles | Raster cycles | Extra cycles | Increase |
+|---|---:|---:|---:|---:|
+| DBA 2 | 1,669 | 33,527 | 31,858 | 1,909% |
+| Synergy Credits | 2,095 | 34,405 | 32,310 | 1,542% |
+| Turrican - world 4-3 | 2,009 | 34,782 | 32,773 | 1,631% |
+
+The extra time occupies about 20% of a 160,256-cycle PAL frame.
+About 31,900 cycles elapse before the red mark, chiefly while the
+player polls for the display beam. The marks and counter add
+96 cycles per effect tick. With entry and return included, the
+three ticks in the previous section cost 152, 216 and 272 cycles
+without the monitor, so the increases are 63%, 44% and 35%.
+
+## Shift can stay active after playback ends
+
+Press left Shift, start a 40-row PRG from TOS, and release the key
+while the tune plays. In Hatari with EmuTOS, the caller's BIOS
+`Kbshift(-1)` reports left Shift still down after the PRG exits and
+again two seconds later. If the key stays down until the PRG exits,
+releasing it then clears the bit.
+
+The trace shows TOS reading the press byte `$2A` and the PRG reading
+the release byte `$AA`. The key loop in
+[YMXR_prg.S](../68k/YMXR_prg.S) reads the keyboard directly with the
+TOS keyboard interrupt masked. The press changes the BIOS modifier
+state and the release never reaches the BIOS handler.
+
+**Proposed fix.** Keep the TOS keyboard interrupt active during
+playback and read selections through the BIOS keyboard queue.
+Test modifier keys pressed before entry and released during playback.
+
+To reproduce, export a looping 50 Hz tune with `-r40`. From a TOS
+launcher, wait until bit 1 of `Kbshift(-1)` is set, then start the
+PRG with GEMDOS `Pexec`. Release Shift after the playing line appears.
+Read bit 1 again after `Pexec` returns. Repeat with the release after
+`Pexec` returns for the control. Hatari's `ikbd_acia` trace shows which
+program reads each scan code.
 
 ## Reproduce the long sources
 
