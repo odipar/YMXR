@@ -153,6 +153,21 @@ when a tune ends. Clear them when a manual selection starts a tune.
 Test both a single digit and a two-digit selection that spans a change
 of cue.
 
+## The number entry timeout depends on the tune rate
+
+In a set of twelve repeating cues, select cue 2 and type `1` and `2`
+180 ms apart. With cue 2 at 50 Hz the player selects cue 12. With cue 2
+at 200 Hz it selects cue 1 and then cue 2. Both cues repeat, so this
+happens during one manual selection.
+
+The key loop in [YMXR_prg.S](../68k/YMXR_prg.S) waits 25 played rows
+after the first digit. This is 500 ms at 50 Hz and 125 ms at 200 Hz.
+
+**Proposed fix.** Measure the pause in elapsed time. Use the playback
+clock before it is divided down to the tune rate, with the timeout
+scaled to the clock frequency. Preserve the time left across automatic
+advance. Test digit pairs on both rates with the same interval.
+
 ## Reproduce the subtune menu failures
 
 Run with the released YMXR tools on the path. The first group of
@@ -160,6 +175,10 @@ programs shows the titles on startup. For the second group, open each
 program in Hatari, press Right to start cue 2, then immediately press
 `1`. Wait about half a second. The repeating set returns to cue 1 and
 the set of one-shot cues continues to advance.
+
+For the timeout, open `LOOP.PRG` and then `FAST.PRG`. In each, use Right
+to select cue 2, then type `1` and `2` about 180 ms apart. `LOOP.PRG`
+selects cue 12. `FAST.PRG` selects cue 1 and then cue 2.
 
 ~~~sh
 work=$(mktemp -d)
@@ -186,14 +205,116 @@ for name, title in (("EVEN", "HDNS Intro"), ("ODD", "XHDNS Intro"),
 for name, repeat in (("SHORT", None), ("LOOP", 0)):
     write(name, [tune(f"Cue {i}", 180 if i == 1 else 16, repeat, 30 + i)
                  for i in range(1, 13)])
+fast = [tune(f"Cue {i}", 180 if i == 1 else 16, 0, 30 + i)
+        for i in range(1, 13)]
+fast[1]["rate"] = 200
+write("FAST", fast)
 PY
 for name in EVEN ODD PLAIN; do
     ymxs-to-prg -silent -r4 <"$work/$name.json" >"$work/$name.PRG"
 done
-for name in SHORT LOOP; do
+for name in SHORT LOOP FAST; do
     ymxs-to-prg -silent <"$work/$name.json" >"$work/$name.PRG"
 done
 ymxr-layout -silent <"$work/EVEN.PRG"
+printf '%s\n' "$work"
+~~~
+
+## A 50 Hz tune speeds up on a monochrome ST
+
+A 50 Hz tune uses Timer C to play a four-row volume waveform at
+2,560 ticks a second. Its standalone export uses the VBL for tune
+rows because the effect claims Timer C. In Hatari the rows play at
+about 50 Hz with the color monitor and 71.5 Hz with the monochrome
+monitor. The Timer C effect still runs at 2,560 Hz in monochrome.
+The same 50 Hz tune without the effect uses Timer C for its rows
+and plays at 50 Hz on both monitors.
+
+The VBL handler in [YMXR_prg.S](../68k/YMXR_prg.S) plays one row at
+each display refresh. The 50 Hz assumption also affects an explicit
+`-vbl` export and a 50 Hz export with `-perf`.
+
+**Proposed fix.** Check the display refresh when the program selects
+the VBL. For fixed-rate playback on a display with a different
+refresh, use a free MFP timer when one is available. Report a rate
+mismatch where VBL timing is required and the requested rate cannot
+be met. Test 50 Hz rows with Timer C in use on both monitor types.
+
+## Two fast tone effects can stall an 8 MHz ST
+
+A 50 Hz tune starts two 16-row tone wavetables on Timers A and D.
+Each timer runs at 19,200 Hz. YMXS accepts the tune and reports that
+it satisfies the tune rules. YMXR exports a PRG. On an 8 MHz ST in
+Hatari, the timer handlers write their tone periods throughout the
+run and the first frame never reaches its R6 write. The same PRG at
+16 MHz writes all 20 frame markers and exits. At 8 MHz, reducing
+both timers to 15,360 Hz also lets the program finish.
+
+The two-column handler spends 152 cycles on an ordinary row before
+interrupt entry and return. With those 64 cycles, the two timers
+already require about 8.29 million cycles a second, before loop
+boundaries and frame processing. See [performance.md](performance.md).
+The default PRG export has no check for that combined load.
+
+**Proposed fix.** Warn during PRG export when simultaneous effect
+rates exceed the stock ST's cycle budget. Estimate load from the
+chosen handler, source shape and timer rate, including interrupt
+overhead. Include the affected subtune and row in the warning and
+allow export for faster machines. Test the two measured rates and
+the same tune with only one timer.
+
+## Reproduce the timer issues
+
+Export the three tunes below. In Hatari, run `CLAIMC.PRG` on an 8 MHz
+ST with `--monitor rgb` and `--monitor mono`. Trace
+`psg_write,video_vbl` and compare the time spanned by the 40 R0 writes.
+For `P32.PRG` and `P40.PRG`, use the RGB monitor and trace R6. The low
+five bits should count from 1 to 20. At 8 MHz only `P40.PRG` writes
+those values. At 16 MHz both programs write them.
+
+~~~sh
+work=$(mktemp -d)
+python3 -B - "$work" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+
+def tune(title, rows, registers):
+    return dict(title=title, composer="", writer="", rate=50, rows=rows,
+                repeat=0, sources=[], transformations=[],
+                registers=registers)
+
+def start(t, timer, target, count, values):
+    n = len(t["sources"]) + 1
+    name = "Steps" if target == 8 else f"Wave {n}"
+    t["sources"].append(dict(name=name, repeat=0, values=values))
+    op = dict(shape=0, source=n, target=target, prescaler=4, count=count,
+              timerReset=1, placeReset=1, deferred=0, mapping=0)
+    t["timer" + timer] = {k: [v] + [-1] * (t["rows"] - 1)
+                          for k, v in op.items()}
+
+def write(name, t):
+    (root / (name + ".json")).write_text(
+        json.dumps(dict(format="ymxs", version=7, tunes=[t])))
+
+t = tune("Timer C effect", 48, dict(r0=list(range(30, 78))))
+start(t, "C", 8, 240, [1, 2, 3, 4])
+write("CLAIMC", t)
+
+for count in (32, 40):
+    t = tune("L32AD", 20, dict(r6=list(range(1, 21))))
+    for i, timer in enumerate("AD"):
+        start(t, timer, 14 + i, count, [[30 + i + j, 1 + i]
+                                       for j in range(16)])
+    write(f"P{count}", t)
+PY
+ymxs-to-prg -silent -r40 <"$work/CLAIMC.json" >"$work/CLAIMC.PRG"
+for name in P32 P40; do
+    ymxs-check <"$work/$name.json" >/dev/null
+    ymxs-to-prg -silent -r20 <"$work/$name.json" >"$work/$name.PRG"
+done
 printf '%s\n' "$work"
 ~~~
 
@@ -291,3 +412,9 @@ ymxs-to-prg -silent <"$work/bom.json" >/dev/null
   produced identical bytes with each of `-k1`, `-k2`, and `-k4`.
   Three multitune or conformance fixtures produced identical native
   and WebAssembly PRGs with each of `-k1`, `-k4`, and `-m960`.
+- A linked run from seeds 169 to 319 matched the reference on 214
+  subtunes, including 555 retunes and 833 stops. The mixed-rate
+  regression passed with SNDH callbacks and in Hatari. Hatari also
+  wrote all 48 rows in order on each side of the 50/59 and 50/240 Hz
+  test sets. Go and Java produced identical PRGs for the monochrome,
+  timer load and 200 Hz number entry examples.
