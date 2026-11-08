@@ -358,6 +358,23 @@ For a single effect, check whether the handler can keep level 6
 throughout. Test overload for one and two timers and verify that
 the stack stays bounded. Report an over-budget rate separately.
 
+For the raster build, one absolute `add.w` to the counter can replace
+the save, address load, add, and restore. It saves 24 cycles. Raising
+the mask before the MFP write costs 16, so the guarded tick saves
+8 cycles and still permits nesting during the handler's work. The
+prototype filled in the counter's address at the known Hatari load
+address. A production build would resolve the operand during init.
+Both overload examples kept a bounded stack for 350 VBLs with this
+prototype. The two-register tick measured 304 cycles including
+interrupt entry and return, down from 312.
+
+For a single effect, two NOPs in place of the interrupt level drop
+also kept the stack bounded and saved 8 cycles on the tested wide
+handler. The existing `-perf -lean` export ran both cases with a
+bounded stack. It uses automatic end of interrupt and keeps the
+mask at level 6 for the whole tick. It saved 32 cycles on the tested
+row path. The timer load still stalled frame playback in these runs.
+
 To reproduce, run the timer example above to obtain `P40.json`. Create
 the two cases below in the same working directory. Run `DUAL.PRG`
 on a cycle-exact 8 MHz PAL ST with 4 MiB, and `SINGLE.PRG` with
