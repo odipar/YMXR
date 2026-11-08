@@ -329,13 +329,22 @@ printf '%s\n' "$work"
 
 ## A fast effect can overflow the supervisor stack
 
-A 50 Hz VBL export with `-perf` can crash with one or more fast
-effects. One 30.72 kHz two-register effect produced a bus error in
-Hatari on a 512 KiB ST. Two 15.36 kHz effects produced an address error
-at an interrupt return on a 4 MiB ST. The plain VBL controls wrote all
-32 frame markers. The raster handlers and their interrupt overhead
-alone need about 191,700 cycles per frame at either load, against the
-160,256-cycle PAL frame.
+A 50 Hz export can crash with one or more fast effects. With
+`-perf` and VBL, one 30.72 kHz two-register effect produced a bus
+error in Hatari on a 512 KiB ST. Two 15.36 kHz effects produced an
+address error at an interrupt return on a 4 MiB ST. The plain VBL
+controls at those rates wrote all 32 frame markers. The raster
+handlers and their interrupt overhead alone need about 191,700
+cycles per frame at either load, against the 160,256-cycle PAL frame.
+
+In the plain build, one 38.4 kHz two-register effect produced a bus
+error with VBL and an address error with the default Timer C clock.
+Two 19.2 kHz effects produced an illegal-instruction exception with
+both clocks. At either load, plain effect interrupts alone require
+about 165,900 cycles per frame. In the single-effect VBL case, the
+supervisor stack pointer dropped by 29,766 bytes per 5,000 Timer A
+entries. The trace shows Timer A interrupting the preceding tick at
+its `RTE`.
 
 A wide effect handler lowers the interrupt mask from level 6 to 5.
 It clears the MFP in-service bit while still at level 5, leaving a
@@ -375,12 +384,20 @@ bounded stack. It uses automatic end of interrupt and keeps the
 mask at level 6 for the whole tick. It saved 32 cycles on the tested
 row path. The timer load still stalled frame playback in these runs.
 
+With rasters off, the two-NOP prototype also kept the stack bounded
+at 38.4 kHz and stalled after one frame. The plain `-lean` exports
+wrote all 32 rows at 38.4 kHz on one timer and 19.2 kHz on each of
+two timers. One 51.2 kHz two-register effect with `-lean` stalled
+with a bounded stack during the 360-VBL run.
+
 To reproduce, run the timer example above to obtain `P40.json`. Create
 the two cases below in the same working directory. Run `DUAL.PRG`
 on a cycle-exact 8 MHz PAL ST with 4 MiB, and `SINGLE.PRG` with
 512 KiB. Trace `cpu_exception,psg_write,video_vbl`. Compare each
 with its plain VBL export. The single-timer run needs about 350 VBLs
-including boot with EmuTOS 1.4.
+including boot with EmuTOS 1.4. For the plain cases, run `PLAIN1V`
+and `PLAIN1T` with 512 KiB, then `PLAIN2V` and `PLAIN2T` with
+4 MiB. The suffix V uses the VBL and T uses Timer C.
 
 ~~~sh
 python3 -B - "$work" <<'PY'
@@ -406,10 +423,22 @@ for name, title, rows in (("DUAL", "Two tone effects", 32),
         for col in tune.get(timer, {}).values():
             col.extend([-1] * (rows - len(col)))
     (root / (name + ".json")).write_text(json.dumps(doc))
+for name, original, count in (("PLAIN1", "SINGLE", 16),
+                              ("PLAIN2", "DUAL", 32)):
+    doc = json.loads((root / (original + ".json")).read_text())
+    tune = doc["tunes"][0]
+    for timer in ("timerA", "timerD"):
+        if timer in tune:
+            tune[timer]["count"][0] = count
+    (root / (name + ".json")).write_text(json.dumps(doc))
 PY
 for name in DUAL SINGLE; do
     ymxs-to-prg -silent -perf -r32 <"$work/$name.json" >"$work/$name.PRG"
     ymxs-to-prg -silent -vbl -r32 <"$work/$name.json" >"$work/${name}N.PRG"
+done
+for name in PLAIN1 PLAIN2; do
+    ymxs-to-prg -silent -vbl -r32 <"$work/$name.json" >"$work/${name}V.PRG"
+    ymxs-to-prg -silent -r32 <"$work/$name.json" >"$work/${name}T.PRG"
 done
 ~~~
 
