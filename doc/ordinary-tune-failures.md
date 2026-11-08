@@ -327,6 +327,75 @@ done
 printf '%s\n' "$work"
 ~~~
 
+## A fast effect can overflow the supervisor stack
+
+A 50 Hz VBL export with `-perf` can crash with one or more fast
+effects. One 30.72 kHz two-register effect produced a bus error in
+Hatari on a 512 KiB ST. Two 15.36 kHz effects produced an address error
+at an interrupt return on a 4 MiB ST. The plain VBL controls wrote all
+32 frame markers. The raster handlers and their interrupt overhead
+alone need about 191,700 cycles per frame at either load, against the
+160,256-cycle PAL frame.
+
+A wide effect handler lowers the interrupt mask from level 6 to 5.
+It clears the MFP in-service bit while still at level 5, leaving a
+window before `RTE`. If another timer interrupt is already pending,
+the CPU can enter it in that window. The interrupt can come from
+the same timer. Sustained reentry adds six-byte exception frames
+faster than returns remove them. See [ticks.S](../68k/player/ticks.S).
+
+With two timers, the first Timer A entry used supervisor stack
+pointer `$694E`. Samples at each thousandth entry read `$5394`,
+`$3E10`, `$28BC`, and `$131C` before the fault. With one timer,
+a temporary test core that raised the mask to level 6 before clearing
+the MFP bit kept the sampled stack pointer at `$77F5C`. It completed
+one frame and stalled under the same timer load. The 350-VBL run
+showed no bus or address errors after launch.
+
+**Proposed fix.** Mask MFP interrupts before clearing the in-service
+bit and keep them masked until `RTE` restores the previous level.
+For a single effect, check whether the handler can keep level 6
+throughout. Test overload for one and two timers and verify that
+the stack stays bounded. Report an over-budget rate separately.
+
+To reproduce, run the timer example above to obtain `P40.json`. Create
+the two cases below in the same working directory. Run `DUAL.PRG`
+on a cycle-exact 8 MHz PAL ST with 4 MiB, and `SINGLE.PRG` with
+512 KiB. Trace `cpu_exception,psg_write,video_vbl`. Compare each
+with its plain VBL export. The single-timer run needs about 350 VBLs
+including boot with EmuTOS 1.4.
+
+~~~sh
+python3 -B - "$work" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+fixture = (root / "P40.json").read_text()
+for name, title, rows in (("DUAL", "Two tone effects", 32),
+                          ("SINGLE", "One 2 column effect", 40)):
+    doc = json.loads(fixture)
+    tune = doc["tunes"][0]
+    tune.update(title=title, rows=rows,
+                registers=dict(r6=list(range(32)) + [0] * (rows - 32)))
+    if name == "SINGLE":
+        del tune["timerD"]
+        tune["timerA"]["count"][0] = 20
+        tune["sources"] = [dict(name="Wave", repeat=0,
+                                values=[[30 + i % 16, 1]
+                                        for i in range(128)])]
+    for timer in ("timerA", "timerD"):
+        for col in tune.get(timer, {}).values():
+            col.extend([-1] * (rows - len(col)))
+    (root / (name + ".json")).write_text(json.dumps(doc))
+PY
+for name in DUAL SINGLE; do
+    ymxs-to-prg -silent -perf -r32 <"$work/$name.json" >"$work/$name.PRG"
+    ymxs-to-prg -silent -vbl -r32 <"$work/$name.json" >"$work/${name}N.PRG"
+done
+~~~
+
 ## The yellow raster bar undercounts wide effects
 
 Three 50 Hz tunes each run one looping wavetable on Timer A at 600 Hz.
