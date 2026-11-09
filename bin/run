@@ -65,4 +65,8 @@ fi
 
 class=$1
 shift
-exec java -ea -cp "$classes:$(cat "$path")" "$class" "$@"
+# YMXR_JVM_FLAGS, where set, adds JVM flags to the run, each a word.
+# JAVA_TOOL_OPTIONS does the same and writes a line on standard error,
+# which a caller reads as the tool's report.
+# shellcheck disable=SC2086
+exec java -ea $YMXR_JVM_FLAGS -cp "$classes:$(cat "$path")" "$class" "$@"

@@ -114,6 +114,7 @@ import json, os
 from collections import Counter
 import random
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -128,6 +129,27 @@ from unicorn.m68k_const import (UC_CPU_M68K_M68000, UC_M68K_REG_D0,
                                 UC_M68K_REG_A3, UC_M68K_REG_A6,
                                 UC_M68K_REG_A7,
                                 UC_M68K_REG_PC, UC_M68K_REG_SR)
+
+def spawned(argv, **kw):
+    """subprocess.run of argv, the child started by posix_spawn under the
+    conditions CPython requires for it: close_fds false, a path to the
+    executable, and no working directory. Under any other, CPython forks
+    on macOS, and a fork of this process, which maps the emulator's
+    memory, costs some 0.3 s, where a run of the rig starts some 200
+    children. Python opens every descriptor non-inheritable (PEP 446), so
+    a child has the descriptors under close_fds=False that it has under
+    close_fds=True."""
+    if kw.get("cwd") is None:
+        kw.setdefault("close_fds", False)
+        if not os.path.dirname(argv[0]):
+            argv = [shutil.which(argv[0]) or argv[0]] + list(argv[1:])
+    return subprocess.run(argv, **kw)
+
+
+
+# The tools a run starts are short, and a JVM that compiles with C1 alone
+# runs one in about half the time of the default (bin/run).
+os.environ.setdefault("YMXR_JVM_FLAGS", "-XX:TieredStopAtLevel=1")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
@@ -525,7 +547,7 @@ def assemble(source="YMXR.S", defines=()):
     player's, or the SNDH core's, which includes the player."""
     work = tempfile.mkdtemp()
     out, lst = os.path.join(work, "code.bin"), os.path.join(work, "code.lst")
-    r = subprocess.run([RMAC, "-m68000", "-fr", "-l*" + lst, "-i" + os.path.join(ROOT, "68k")]
+    r = spawned([RMAC, "-m68000", "-fr", "-l*" + lst, "-i" + os.path.join(ROOT, "68k")]
                        + list(defines) + ["-o", out, os.path.join(ROOT, "68k", source)],
                        capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
@@ -608,7 +630,7 @@ def convert(ym, work):
     if ym.endswith(".ymxr"):
         return open(ym, "rb").read(), ""
     flags = os.environ.get("YMXR_FLAGS", "").split()
-    r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
+    r = spawned([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
                        stdin=open(ym, "rb"), capture_output=True)
     if r.returncode != 0 and "not a YM3!/YM3b/YM5!/YM6! file" in r.stderr.decode():
         raise AnotherFormat(r.stderr.decode().strip().splitlines()[-1])
@@ -629,7 +651,7 @@ def bind(file, work):
     """The bound tune of a tune file, through bin/ymxr-bind; None where the
     binder rejects the file, which it reports on a separate line."""
     if file not in _BOUND:
-        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-bind"), "-silent"],
+        r = spawned([os.path.join(ROOT, "bin", "ymxr-bind"), "-silent"],
                            input=file, capture_output=True)
         if r.returncode == 1 and r.stderr.startswith(b"ymxr-bind: "):
             _BOUND[file] = None
@@ -642,7 +664,7 @@ def bind(file, work):
 def trace(file, work, calls):
     """What the Java reader reports of a tune file, one entry a call
     (SPEC.md 7), through bin/ymxr-trace."""
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-trace"), "-r%d" % calls, "-silent"],
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-trace"), "-r%d" % calls, "-silent"],
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     return [json.loads(line) for line in r.stdout.decode().splitlines() if line]
@@ -739,7 +761,7 @@ class Tune:
         # dtx-write reads its input on standard input and writes its
         # output on standard output (DTX, doc/tools.md).
         if image[table_at:] not in _TEXT:
-            r = subprocess.run([DTX_WRITE, "-text"], input=image[table_at:],
+            r = spawned([DTX_WRITE, "-text"], input=image[table_at:],
                                capture_output=True)
             assert r.returncode == 0, r.stderr.decode()
             _TEXT[image[table_at:]] = r.stdout
@@ -1741,7 +1763,7 @@ def built(name, tune, checked=False):
     of the file comes back beside its path (SPEC.md 3.3.5). With checked,
     the tool reports no warning: YMXS's check of the writing rules finds
     none (YMXS, SPEC.md 6.3; tools.md 7.2)."""
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxs-to-ymxr"), "-silent"],
+    r = spawned([os.path.join(ROOT, "bin", "ymxs-to-ymxr"), "-silent"],
                        input=json.dumps(tune).encode(), capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     warned = [line for line in r.stderr.decode().splitlines() if ": warning: " in line]
@@ -1964,7 +1986,7 @@ def edited(file, edits):
     entries = [long_at(file, index_at + 4 * n) for n in range(count)]
     starts = [entry & ~COUNTED for entry in entries]
     table = file[table_at:starts[0] if count else len(file)]
-    r = subprocess.run([DTX_WRITE, "-text"], input=table, capture_output=True)
+    r = spawned([DTX_WRITE, "-text"], input=table, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     lines = r.stdout.decode().splitlines()
     rows = [line.split(",") for line in lines if line and line[0].isdigit()]
@@ -1973,7 +1995,7 @@ def edited(file, edits):
     text = "\n".join([line for line in lines if not line or not line[0].isdigit()]
                      + [",".join(row) for row in rows]) + "\n"
     ring = struct.unpack(">H", table[16:18])[0]
-    r = subprocess.run([DTX_WRITE, "-v3", "-k%d" % table[18], "-m%d" % ring]
+    r = spawned([DTX_WRITE, "-v3", "-k%d" % table[18], "-m%d" % ring]
                        + (["-copies"] if table[19] & 1 else []),
                        input=text.encode(), capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
@@ -4559,7 +4581,7 @@ def under_hatari(work, name, vbls, trace_kinds="psg_write,video_vbl"):
     order, each with the VBL it lands in, the cycle of the run it lands
     at and the address that wrote it, and where the SNDH file loaded."""
     trace = os.path.join(work, name + ".trace")
-    r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+    r = spawned([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
                         *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
@@ -4604,7 +4626,7 @@ def mixed_clock():
     """The SNDH entries under a host clock, then the program under Hatari."""
     with tempfile.TemporaryDirectory(prefix="ymxr-mixed") as work:
         def tool(name, *args, data=None):
-            run = subprocess.run([os.path.join(ROOT, "bin", name), "-silent", *args],
+            run = spawned([os.path.join(ROOT, "bin", name), "-silent", *args],
                                  input=data, capture_output=True)
             assert run.returncode == 0, run.stderr.decode()
             return run.stdout
@@ -4671,7 +4693,7 @@ def clocks(ym, code, symbols):
     assert bound is not None, "the binder rejected the tune"
     rate = Tune(bound, work).rate
     assert rate == 50, "-stub requires tunes at 50 Hz, and this one plays at %d" % rate
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried",
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried",
                         "-t" + os.path.basename(ym)] + ([] if PCREL else ["-abs"]),
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
@@ -4680,7 +4702,7 @@ def clocks(ym, code, symbols):
     assert b"TC" in tags, "the file names Timer C: " + repr(tags)
     played = {}
     for name, asked in (("TIMERC.PRG", False), ("VBL.PRG", True)):
-        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
+        r = spawned([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
                             "-r%d" % STUB_CLOCKS] + (["-vbl"] if asked else []),
                            input=sndh_bytes, capture_output=True)
         assert r.returncode == 0, r.stderr.decode()
@@ -4732,10 +4754,10 @@ def evenness(ym, work, code, symbols):
     file, report = convert(ym, work)
     at = bytearray(file)
     at[6], at[7] = 0, 60                # the frame rate, a word at 6
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-tSixty"]
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-tSixty"]
                        + ([] if PCREL else ["-abs"]), input=bytes(at), capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
                         "-r%d" % STUB_CLOCKS], input=r.stdout, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     prg = r.stdout
@@ -4773,10 +4795,10 @@ def clock_program(work, rate):
     file, report = convert(CLOCK_TUNE, work)
     at = bytearray(file)
     at[6], at[7] = 0, rate              # the frame rate, a word at 6
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-tClock"],
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-tClock"],
                        input=bytes(at), capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent"],
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent"],
                        input=r.stdout, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     prg = r.stdout
@@ -4792,7 +4814,7 @@ def clock_run(work, vbls, script=None):
     and the debugger's where a script of its commands is named. Its
     input is empty, so the debugger reads the script alone."""
     out = os.path.join(work, "out.txt")
-    subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+    spawned([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                     "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
                     *HATARI_FLAGS,
                     "--sound", "off", "--conout", "2", "--fast-forward", "on",
@@ -4893,12 +4915,12 @@ FIRST_TUNE = "DBA 2"
 def cost_program(file, work, name, flags):
     """A tune file in COST.PRG, as ym/cost.sh builds it: bin/ymxr-sndh with
     the flags named, then bin/ymxr-prg."""
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried", "-t" + name]
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried", "-t" + name]
                        + flags,
                        input=file, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     sndh = r.stdout
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent"],
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent"],
                        input=sndh, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     open(os.path.join(work, "COST.PRG"), "wb").write(r.stdout)
@@ -4910,7 +4932,7 @@ def cost_run(work, vbls, kinds):
     both floppy drives off, which starts the program sooner and fits more
     calls into the run: what the program printed, and the trace of
     `kinds`."""
-    r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+    r = spawned([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
                         *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
@@ -4932,7 +4954,7 @@ def calls(ym, vbls, first, unit=None):
     import cost as raster
     work = tempfile.mkdtemp(prefix="ymxr68")
     flags = ["-k%d" % unit] if unit else []
-    r = subprocess.run([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
+    r = spawned([os.path.join(ROOT, "bin", "ym-to-ymxr")] + flags,
                        stdin=open(ym, "rb"), capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     cost_program(r.stdout, work, os.path.basename(ym)[:-3], ["-perf"])
@@ -5121,13 +5143,13 @@ def xpatch():
     text, iterations, table = xpatch_table()
     work = tempfile.mkdtemp(prefix="xpatch")
     program = os.path.join(work, "XPATCH.PRG")
-    built = subprocess.run([sys.executable, os.path.join(XPATCH_DIR, "build.py"), program],
+    built = spawned([sys.executable, os.path.join(XPATCH_DIR, "build.py"), program],
                            capture_output=True)
     assert built.returncode == 0, built.stdout.decode() + built.stderr.decode()
     before = b""
     for run in (1, 2):
         console = os.path.join(work, "console%d.txt" % run)
-        subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+        spawned([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
                         *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
@@ -5214,7 +5236,7 @@ def hatari(ym, code, symbols, perf=False):
     # missed here fails there rather than running the plain core. The tool
     # reads a row through the program counter unasked, so a run under
     # -abs passes -abs for the core the rig assembled.
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried", "-vbl",
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried", "-vbl",
                         "-t" + os.path.basename(ym)] + (["-perf"] if perf else [])
                        + (["-lean"] if LEAN else [])
                        + ([] if PCREL else ["-abs"]),
@@ -5223,7 +5245,7 @@ def hatari(ym, code, symbols, perf=False):
     sndh_bytes = r.stdout
     open(sndh, "wb").write(sndh_bytes)
     prg = os.path.join(work, "YMXR.PRG")
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-prg"), "-silent",
                         "-r%d" % STUB_FRAMES], input=sndh_bytes, capture_output=True)
     assert r.returncode == 0, r.stderr.decode()
     open(prg, "wb").write(r.stdout)
@@ -5233,7 +5255,7 @@ def hatari(ym, code, symbols, perf=False):
         and sndh_bytes[core + 36:core + len(code)] == code[36:], \
         "the core in the file is not the one assembled, its two patched longs aside"
     trace = os.path.join(work, "trace.txt")
-    r = subprocess.run([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
+    r = spawned([HATARI, "--tos", TOS, "--machine", "st", "--cpuclock", "8",
                         "--cpu-exact", "on", "--compatible", "on", "--memsize", "4",
                         *HATARI_FLAGS,
                         "--sound", "off", "--conout", "2", "--fast-forward", "on",
@@ -5767,14 +5789,14 @@ def linked_player(ym, defines):
     (doc/LINKER.md, The check)."""
     work = tempfile.mkdtemp()
     if isinstance(ym, list):
-        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-multi"), "-silent"] + ym,
+        r = spawned([os.path.join(ROOT, "bin", "ymxr-multi"), "-silent"] + ym,
                            capture_output=True)
         assert r.returncode == 0, r.stderr.decode()
         file = r.stdout
     else:
         file, _ = convert(ym, work)
     bits = asked(defines)
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh")]
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-sndh")]
                        + (["-perf"] if bits & 1 else []) + (["-lean"] if bits & 2 else [])
                        + (["-pcrel"] if bits & 4 else ["-abs"]),
                        input=file, capture_output=True)
@@ -6429,14 +6451,14 @@ def sndh_of(files, defines, work):
             paths.append(os.path.join(work, "%d.ymxr" % (n + 1)))
             with open(paths[-1], "wb") as f:
                 f.write(file)
-        r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-multi"), "-silent"] + paths,
+        r = spawned([os.path.join(ROOT, "bin", "ymxr-multi"), "-silent"] + paths,
                            capture_output=True)
         assert r.returncode == 0, r.stderr.decode()
         file = r.stdout
     else:
         file = files[0]
     bits = asked(defines)
-    r = subprocess.run([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried"]
+    r = spawned([os.path.join(ROOT, "bin", "ymxr-sndh"), "-silent", "-carried"]
                        + (["-perf"] if bits & 1 else []) + (["-lean"] if bits & 2 else [])
                        + (["-pcrel"] if bits & 4 else ["-abs"]),
                        input=file, capture_output=True)
@@ -6722,7 +6744,7 @@ def main():
         for one in left:
             with open(one, "rb") as f:
                 file = f.read()
-            said = subprocess.run(
+            said = spawned(
                 [os.path.join(ROOT, "bin", "ymxr-trace"), "-silent"],
                 input=file, capture_output=True)
             assert said.returncode != 0 and not said.stdout, \
@@ -7093,7 +7115,7 @@ def assemble_text(text):
     work = tempfile.mkdtemp()
     source, out = os.path.join(work, "part.S"), os.path.join(work, "part.bin")
     open(source, "w").write(text)
-    r = subprocess.run([RMAC, "-m68000", "-fr", "-o", out, source], capture_output=True)
+    r = spawned([RMAC, "-m68000", "-fr", "-o", out, source], capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     return open(out, "rb").read()
 
