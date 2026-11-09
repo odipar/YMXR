@@ -8,8 +8,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
@@ -32,6 +37,9 @@ import org.junit.jupiter.api.TestFactory;
  *
  * <p>Hatari modes require a TOS image and run separately. Missing local
  * tools skip these tests; bin/suite requires them.
+ *
+ * <p>A factory starts its rig runs together, at most {@link #parallel()}
+ * at a time, and each of its tests waits for its run.
  */
 final class RigCallsTest {
 
@@ -129,14 +137,105 @@ final class RigCallsTest {
     /** What the rig runs: python3 with unicorn, rmac, DTX's dtx-write and
      *  the tools this repository builds. */
     private static void theRigRuns() {
-        Assumptions.assumeTrue(runs("python3", "--version"), "no python3");
-        Assumptions.assumeTrue(runs("python3", "-c", "import unicorn"),
-                "no unicorn for python3");
-        Assumptions.assumeTrue(runs(named("RMAC", "rmac"), "-v"), "no rmac");
-        Assumptions.assumeTrue(runs(named("DTX_WRITE", "dtx-write"), "-help"),
-                "no dtx-write: DTX_WRITE names it");
-        Assumptions.assumeTrue(Files.exists(Path.of("target/classes/org/ymxr/Tune.class")),
-                "the tools are not built");
+        String missing = missing();
+        Assumptions.assumeTrue(missing == null, missing);
+    }
+
+    /** The first of the rig's programs absent here, or null where each is
+     *  present. */
+    private static @Nullable String missing() {
+        if (!runs("python3", "--version")) {
+            return "no python3";
+        }
+        if (!runs("python3", "-c", "import unicorn")) {
+            return "no unicorn for python3";
+        }
+        if (!runs(named("RMAC", "rmac"), "-v")) {
+            return "no rmac";
+        }
+        if (!runs(named("DTX_WRITE", "dtx-write"), "-help")) {
+            return "no dtx-write: DTX_WRITE names it";
+        }
+        if (!Files.exists(Path.of("target/classes/org/ymxr/Tune.class"))) {
+            return "the tools are not built";
+        }
+        return null;
+    }
+
+    /** The property that sets how many rig runs a factory has going at
+     *  once. */
+    static final String PARALLEL = "rig.parallel";
+
+    /** The rig runs a factory has going at once: {@link #PARALLEL}, or the
+     *  processors the JVM counts. A run is python3 and the tools it starts,
+     *  and it waits on those for most of its time. */
+    static int parallel() {
+        String named = System.getProperty(PARALLEL);
+        int count = named == null || named.isEmpty()
+                ? Runtime.getRuntime().availableProcessors() : Integer.parseInt(named);
+        if (count < 1) {
+            throw new IllegalArgumentException(PARALLEL + " reads a count of 1 or more, and not "
+                    + named);
+        }
+        return count;
+    }
+
+    /**
+     * The rig run with each argv, started together, {@link #parallel()} at a
+     * time, each run's output in its future in the order of {@code argvs}.
+     * One tool call goes first: after a clean build {@code bin/run} builds the
+     * classes on the first call, under a lock another call waits three
+     * minutes on at most. Where a program of the rig is absent, the futures
+     * stay unstarted, and each test skips in {@link #theRigRuns()} before it
+     * reads one.
+     */
+    private static List<CompletableFuture<String>> started(List<List<String>> argvs) {
+        List<CompletableFuture<String>> out = new ArrayList<>();
+        if (missing() != null) {
+            for (int i = 0; i < argvs.size(); i++) {
+                out.add(new CompletableFuture<>());
+            }
+            return out;
+        }
+        runs("bin/ymxr-bind", "-h");
+        ExecutorService pool = Executors.newFixedThreadPool(parallel(), task -> {
+            Thread thread = new Thread(task, "rig");
+            thread.setDaemon(true);
+            return thread;
+        });
+        for (List<String> argv : argvs) {
+            out.add(CompletableFuture.supplyAsync(() -> {
+                try {
+                    return rigWith(argv);
+                } catch (Exception failed) {
+                    throw new IllegalStateException(RIG + " " + String.join(" ", argv)
+                            + " did not run", failed);
+                }
+            }, pool));
+        }
+        pool.shutdown();
+        return out;
+    }
+
+    /** What a test reads of its rig run: the arguments of the run, and
+     *  what it printed. */
+    private interface Checked {
+        void check(List<String> argv, String said);
+    }
+
+    /** A test each set of switches, named by them or {@code plain} for the
+     *  empty set: the rig run with {@code argvOf} the set, started with the
+     *  other runs of the factory ({@link #started}), and {@code checked} on
+     *  what it printed. */
+    private static Stream<DynamicTest> played(List<List<String>> sets, String plain,
+            Function<List<String>, List<String>> argvOf, Checked checked) {
+        List<List<String>> argvs = sets.stream().map(argvOf).toList();
+        List<CompletableFuture<String>> runs = started(argvs);
+        return IntStream.range(0, sets.size()).mapToObj(i -> DynamicTest.dynamicTest(
+                sets.get(i).isEmpty() ? plain : String.join(" ", sets.get(i)), () -> {
+                    theRigRuns();
+                    checked.check(argvs.get(i), runs.get(i).join());
+                }));
     }
 
     /** The rig run with {@code argv} after its name, and what it printed. */
@@ -252,21 +351,18 @@ final class RigCallsTest {
      *  sets in the four jobs of cores. */
     @TestFactory
     Stream<DynamicTest> theRigPlaysOnLinkedPlayersOfEverySetOfSwitches() {
-        return shard(LINKED, System.getProperty(SHARD)).stream().map(core -> DynamicTest.dynamicTest(
-                core.isEmpty() ? "the plain switches" : String.join(" ", core), () -> {
-                    theRigRuns();
-                    List<String> argv = new ArrayList<>(List.of("-linked", "-kit", "-defer",
-                            "-map", FRAMES));
-                    argv.addAll(core);
-                    String said = rigWith(argv);
-                    assertTrue(said.startsWith("0\n")
-                                    && said.contains("16 tunes play as the specification reads")
-                                    && said.contains("deferred starts: 20 tunes")
-                                    && said.contains("tunes that map a value: 33 tunes")
-                                    && said.contains("linked, "),
-                            () -> RIG + " " + String.join(" ", argv) + " does not play on"
-                                    + " linked players:\n" + said);
-                }));
+        return played(shard(LINKED, System.getProperty(SHARD)), "the plain switches", core -> {
+            List<String> argv = new ArrayList<>(List.of("-linked", "-kit", "-defer", "-map",
+                    FRAMES));
+            argv.addAll(core);
+            return argv;
+        }, (argv, said) -> assertTrue(said.startsWith("0\n")
+                        && said.contains("16 tunes play as the specification reads")
+                        && said.contains("deferred starts: 20 tunes")
+                        && said.contains("tunes that map a value: 33 tunes")
+                        && said.contains("linked, "),
+                () -> RIG + " " + String.join(" ", argv) + " does not play on"
+                        + " linked players:\n" + said));
     }
 
     /** The run of the rig's generator here: the count of tunes and the
@@ -323,24 +419,23 @@ final class RigCallsTest {
      *  in a separate job, and its suite job none. */
     @TestFactory
     Stream<DynamicTest> theRigPlaysGeneratedTunesOnLinkedPlayersOfEverySetOfSwitches() {
-        return shard(LINKED, System.getProperty(SHARD)).stream().map(core -> DynamicTest.dynamicTest(
-                core.isEmpty() ? "the plain switches" : String.join(" ", core), () -> {
-                    theRigRuns();
-                    List<String> argv = new ArrayList<>(List.of("-linked"));
-                    argv.addAll(List.of(DRAWN.split(" ")));
-                    argv.addAll(core);
-                    String said = rigWith(argv);
-                    String played = GENERATED + " generated tunes, tunes " + SEED + " to "
-                            + (SEED + GENERATED - 1) + ", ";
-                    assertTrue(said.startsWith("0\n") && said.contains(played)
-                                    && said.contains("play as the specification reads on the"
-                                            + " players linked for them"),
-                            () -> RIG + " " + String.join(" ", argv) + " does not play the"
-                                    + " generated tunes on linked players:\n" + said);
-                    List<String> missing = uncovered(said);
-                    assertTrue(missing.isEmpty(), () -> RIG + " " + String.join(" ", argv)
-                            + " draws none of " + missing + ":\n" + said);
-                }));
+        return played(shard(LINKED, System.getProperty(SHARD)), "the plain switches", core -> {
+            List<String> argv = new ArrayList<>(List.of("-linked"));
+            argv.addAll(List.of(DRAWN.split(" ")));
+            argv.addAll(core);
+            return argv;
+        }, (argv, said) -> {
+            String played = GENERATED + " generated tunes, tunes " + SEED + " to "
+                    + (SEED + GENERATED - 1) + ", ";
+            assertTrue(said.startsWith("0\n") && said.contains(played)
+                            && said.contains("play as the specification reads on the"
+                                    + " players linked for them"),
+                    () -> RIG + " " + String.join(" ", argv) + " does not play the"
+                            + " generated tunes on linked players:\n" + said);
+            List<String> missing = uncovered(said);
+            assertTrue(missing.isEmpty(), () -> RIG + " " + String.join(" ", argv)
+                    + " draws none of " + missing + ":\n" + said);
+        });
     }
 
     /** A counted source of one row stops during a start with timerReset
@@ -405,18 +500,15 @@ final class RigCallsTest {
 
     @TestFactory
     Stream<DynamicTest> theRigPlaysTheBuiltTunesOnEveryCore() {
-        return shard(CORES, System.getProperty(SHARD)).stream().map(core -> DynamicTest.dynamicTest(
-                core.isEmpty() ? "the plain core" : String.join(" ", core), () -> {
-                    theRigRuns();
-                    List<String> argv = new ArrayList<>(core);
-                    argv.add(FRAMES);
-                    argv.addAll(TUNES);
-                    String said = rigWith(argv);
-                    assertTrue(said.startsWith("0\n")
-                                    && said.contains("2 tunes play as the specification reads"),
-                            () -> RIG + " " + String.join(" ", core)
-                                    + " does not play the built tunes:\n" + said);
-                }));
+        return played(shard(CORES, System.getProperty(SHARD)), "the plain core", core -> {
+            List<String> argv = new ArrayList<>(core);
+            argv.add(FRAMES);
+            argv.addAll(TUNES);
+            return argv;
+        }, (argv, said) -> assertTrue(said.startsWith("0\n")
+                        && said.contains("2 tunes play as the specification reads"),
+                () -> RIG + " " + String.join(" ", argv)
+                        + " does not play the built tunes:\n" + said));
     }
 
     /** The conformance kit's tunes, capped: the player's frames against

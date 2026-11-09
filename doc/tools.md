@@ -1105,7 +1105,9 @@ set of bytes. The maven argument `-Drig.shard=k/n` runs RigCallsTest's
 matrix on the cores whose index leaves k after a division by n, and its
 linked runs on the sets of switches whose index does, `-Drig.shard=none`
 on none, and the matrix runs on all thirty-two cores and all eight sets
-without it.
+without it. `-Drig.parallel=N` runs at most N of a factory's rig runs of
+RigCallsTest at once, and as many as the processors the JVM counts
+without it; each test of the factory reads the output of its run.
 
 ---
 
@@ -1196,6 +1198,7 @@ and call the tools.
 |---|---|---|
 | `YMXR_68K` | a directory of binaries in place of the embedded ones | the Go tools |
 | `YMXR_FLAGS` | flags added to the rig's conversions | `test_ymxr.py` |
+| `YMXR_JVM_FLAGS` | JVM flags added to each run of a Java tool, empty by default; `test_ymxr.py` sets `-XX:TieredStopAtLevel=1` for the tools it starts where it is unset | `bin/run` |
 | `YMXR_TICKS` | set, each frame whose tick count differs from the rates' by more than 1 is printed | `test_ymxr.py -hatari` |
 | `YMXR_GENERATED` | the folder a failing tune of the generator is written to, the system's temporary folder by default | `test_ymxr.py -generated` |
 | `COMMIT` | the source commit recorded, `HEAD` by default | `release/manifest.sh` |
