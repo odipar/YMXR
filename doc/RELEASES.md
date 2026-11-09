@@ -37,6 +37,33 @@ rather than either.
 
 ## Published
 
+### 0.15.0, 2026-11-09
+
+<https://github.com/odipar/YMXR/releases/tag/v0.15.0>, built from the commit
+tagged `v0.15.0`.
+
+The SNDH core's play ends the host's Timer C interrupt before it calls the
+player (BINARIES.md 2.9). A host that calls play from its Timer C handler in
+software end-of-interrupt mode, as SND Player 1.51 does, left Timer C's
+in-service bit set for the length of the call, and the MFP delayed Timer D
+until the host's handler cleared it: a tune whose effect runs Timer D fast
+crackled under such a host and played cleanly as a program. Play now writes
+$DF to ISRB first, 6 bytes in every core and 16 cycles a call. Over the
+eleven dumps under `ym/test`, the SNDH files come to 163,156 bytes, 72 more
+than under 0.14.0, 4 to 8 a file.
+
+Under Hatari, Synergy Credits on a host that calls play from Timer C at
+level 3 and leaves the bit to the operating system: under 0.14.0, 0 Timer D
+ticks ended inside a call and 126 within 400 cycles after the bit was
+cleared; under 0.15.0, 22 and 12. Timer A, which ranks above Timer C, ended
+41 and 42 ticks inside a call.
+
+The CONV tag is the text of a new flag, `-wWRITER`, of `ymxr-sndh`,
+`ymxs-to-sndh`, `ymxs-to-prg` and `bin/ymxr-set`; otherwise, of a YMXS
+structure, the first tune's writer; and `YMXR (ym-to-ymxr)` where both are
+blank (BINARIES.md 3.2). `ymxs-to-sndh` wrote `YMXR (ym-to-ymxr)` into every
+file before. The tune file and the bound tune are 0.14.0's.
+
 ### 0.14.0, 2026-11-06
 
 <https://github.com/odipar/YMXR/releases/tag/v0.14.0>, built from the commit
