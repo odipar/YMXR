@@ -2,9 +2,10 @@
 // and writes an SNDH file on standard output.
 //
 // Every tune of the multi is a subtune, 1 upward in its order, behind one
-// core (doc/BINARIES.md 2). The title and the composer are the first
-// tune's unless -t and -c name others, and a tune's title names its
-// subtune where the multi has several.
+// core (doc/BINARIES.md 2). The title, the composer and the writer are
+// the first tune's unless -t, -c and -w name others, the writer the CONV
+// tag's text, and a tune's title names its subtune where the multi has
+// several.
 //
 // -perf selects the core with the raster monitor in and -lean the core
 // whose ticks neither drop the interrupt level nor write an end of

@@ -114,8 +114,8 @@ final class Sndh {
      *  address, and init rounds the workspace's address up to a long. */
     static final int WORK_ROUNDING = 2;
 
-    /** The CONV tag's text: the player, and the converter that writes its
-     *  tune files. */
+    /** The CONV tag's text where the caller names no converter: the
+     *  player, and the converter that writes its tune files. */
     static final String CONVERTER = "YMXR (ym-to-ymxr)";
 
     /** The timer each of the four effects runs, a bit a timer, A to D:
@@ -149,9 +149,17 @@ final class Sndh {
      *  and a name a subtune where the caller names them; and the core the
      *  file uses, which {@code monitor} and {@code lean} select a switch
      *  of and {@code ticks} the third; and with {@code link}, the core
-     *  linked for the set, its blocks the subtunes need (doc/LINKER.md). */
+     *  linked for the set, its blocks the subtunes need (doc/LINKER.md);
+     *  and the converter, {@link #CONVERTER} where it is null or blank. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor, boolean lean, Ticks ticks, Asked asked, boolean link) {
+            boolean monitor, boolean lean, Ticks ticks, Asked asked, boolean link,
+            @Nullable String converter) {
+
+        /** The CONV tag's text, {@link #CONVERTER} by default. */
+        Options(String title, @Nullable String composer, @Nullable List<String> names,
+                boolean monitor, boolean lean, Ticks ticks, Asked asked, boolean link) {
+            this(title, composer, names, monitor, lean, ticks, asked, link, null);
+        }
 
         /** The core as carried, not linked for the set. */
         Options(String title, @Nullable String composer, @Nullable List<String> names,
@@ -170,6 +178,13 @@ final class Sndh {
         Options(String title, @Nullable String composer, @Nullable List<String> names,
                 boolean monitor, boolean lean, Ticks ticks) {
             this(title, composer, names, monitor, lean, ticks, Asked.CHOSEN);
+        }
+
+        /** The CONV tag's text before cleaning: the converter named, or
+         *  {@link #CONVERTER} where it is null or blank. */
+        String conv() {
+            String named = converter();
+            return named == null || named.isBlank() ? CONVERTER : named;
         }
     }
 
@@ -582,7 +597,7 @@ final class Sndh {
         if (composer != null && !composer.isEmpty()) {
             tag(out, "COMM", clean(composer));
         }
-        tag(out, "CONV", CONVERTER);
+        tag(out, "CONV", clean(options.conv()));
         tag(out, String.format(Locale.ROOT, "##%02d", n), "");
         Asked clock = rates == null ? asked(options) : Asked.TIMER_C;
         tag(out, clock(claimed, rate, clock), "");
@@ -826,15 +841,17 @@ final class Sndh {
      * on standard input, an SNDH file on standard output. A multi file's
      * tunes are subtunes 1 up in its order, each named by the name the
      * multi file records for it. The title is the first tune's name unless
-     * {@code -tTITLE} names another. {@code -lean} puts the core whose
-     * ticks neither drop the interrupt level nor write an end of interrupt
-     * under the tunes, {@code -perf} puts the core with the raster monitor
-     * in there, for reading a run, and {@code -pcrel} the core whose ticks
-     * read a row through the program counter (BINARIES.md 5.5). The three
-     * are one switch each, and any two together select the core that is
-     * both, so {@code -perf -lean} reads what a lean run costs. The core
-     * is linked for the subtunes by default (doc/LINKER.md).
-     * {@code -carried} writes the full core selected by the switches.
+     * {@code -tTITLE} names another, and the CONV tag's text is
+     * {@link #CONVERTER} unless {@code -wWRITER} names another.
+     * {@code -lean} puts the core whose ticks neither drop the interrupt
+     * level nor write an end of interrupt under the tunes, {@code -perf}
+     * puts the core with the raster monitor in there, for reading a run,
+     * and {@code -pcrel} the core whose ticks read a row through the
+     * program counter (BINARIES.md 5.5). The three are one switch each,
+     * and any two together select the core that is both, so
+     * {@code -perf -lean} reads what a lean run costs. The core is linked
+     * for the subtunes by default (doc/LINKER.md). {@code -carried} writes
+     * the full core selected by the switches.
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
@@ -842,6 +859,7 @@ final class Sndh {
         Ymxs.only(tool, flags, Ymxs.TAGS, LINKS);
         @Nullable String title = null;
         @Nullable String composer = null;
+        @Nullable String writer = null;
         boolean monitor = false;
         boolean lean = false;
         boolean link = true;
@@ -868,6 +886,8 @@ final class Sndh {
                 title = flag.substring(2);
             } else if (flag.startsWith("-c")) {
                 composer = flag.substring(2);
+            } else if (flag.startsWith("-w")) {
+                writer = flag.substring(2);
             }
         }
         Report report = new Report(tool.reports());
@@ -891,7 +911,7 @@ final class Sndh {
             title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
         Options options = new Options(title, composer,
-                tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link);
+                tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link, writer);
         byte[] sndh;
         try {
             sndh = of(tunes, options);
@@ -965,7 +985,7 @@ final class Sndh {
         Prg.Tags tags = Prg.tags(sndh);
         report.say("the tags: TITL " + options.title()
                 + (options.composer() == null ? "" : ", COMM " + options.composer())
-                + ", " + tags.clock() + tags.rate() + ", FLAG ~" + tags.flag()
+                + ", CONV " + options.conv() + ", " + tags.clock() + tags.rate() + ", FLAG ~" + tags.flag()
                 + (options.names() == null ? ""
                 : ", !#SN with " + Report.count(options.names().size(), "name", "names")));
         Bound.Set set = Bound.of(tunes);

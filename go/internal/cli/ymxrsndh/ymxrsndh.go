@@ -41,6 +41,8 @@ func Main() {
 			options.Title = flag[2:]
 		case strings.HasPrefix(flag, "-c"):
 			options.Composer = flag[2:]
+		case strings.HasPrefix(flag, "-w"):
+			options.Converter = flag[2:]
 		}
 	}
 	said := report.Of(t.Reports())
@@ -162,8 +164,8 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 	if err != nil {
 		return
 	}
-	said.Say(fmt.Sprintf("the tags: TITL %s%s, %s%d, FLAG ~%s%s", options.Title, composer,
-		tags.Clock, tags.Rate, tags.Flag, named))
+	said.Say(fmt.Sprintf("the tags: TITL %s%s, CONV %s, %s%d, FLAG ~%s%s", options.Title,
+		composer, sndh.Conv(options), tags.Clock, tags.Rate, tags.Flag, named))
 	set, err := sndh.Bind(tunes)
 	if err != nil {
 		return

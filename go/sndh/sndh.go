@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/odipar/ymxr/go/binaries"
 	"github.com/odipar/ymxr/go/ymxr"
@@ -96,8 +97,8 @@ const braW = 0x6000
 // even address, and init rounds the workspace's address up to a long.
 const WorkRounding = 2
 
-// Converter is the CONV tag's text: the player, and the converter that
-// writes its tune files.
+// Converter is the CONV tag's text where the caller names no converter:
+// the player, and the converter that writes its tune files.
 const Converter = "YMXR (ym-to-ymxr)"
 
 // timerOfEffect is the timer each of the four effects runs, a bit a timer,
@@ -142,17 +143,18 @@ const (
 )
 
 // Options is the tag block's text: the title, the composer where there is
-// one, and a name a subtune where the caller names them; and the core the
-// file uses, which Monitor and Lean select a switch of and Ticks the
-// third.
+// one, a name a subtune where the caller names them, and the converter,
+// Converter where it is blank; and the core the file uses, which Monitor
+// and Lean select a switch of and Ticks the third.
 type Options struct {
-	Title    string
-	Composer string
-	Names    []string
-	Monitor  bool
-	Lean     bool
-	Ticks    Ticks
-	Asked    Asked
+	Title     string
+	Composer  string
+	Converter string
+	Names     []string
+	Monitor   bool
+	Lean      bool
+	Ticks     Ticks
+	Asked     Asked
 	// Link links the core for the set, its blocks the subtunes need
 	// (doc/LINKER.md).
 	Link bool
@@ -542,6 +544,15 @@ func mixedRate(rates []int) (int, error) {
 	return mostTicks, nil
 }
 
+// Conv is the CONV tag's text before cleaning: the converter named, or
+// Converter where it is blank.
+func Conv(options Options) string {
+	if strings.TrimSpace(options.Converter) == "" {
+		return Converter
+	}
+	return options.Converter
+}
+
 // Tags is the tag block, 'SNDH' through 'HDNS': TITL, COMM where there is
 // a composer, CONV, '##' and two digits, the clock tag and the rate, FLAG,
 // each text ended by a zero byte, a pad to an even length, FRMS with a
@@ -563,7 +574,7 @@ func tagsOf(options Options, rate, n int, frames []int, claimed int, rates []int
 	if options.Composer != "" {
 		tag(&out, "COMM", Clean(options.Composer))
 	}
-	tag(&out, "CONV", Converter)
+	tag(&out, "CONV", Clean(Conv(options)))
 	tag(&out, fmt.Sprintf("##%02d", n), "")
 	asked := AskedOf(options)
 	if rates != nil {

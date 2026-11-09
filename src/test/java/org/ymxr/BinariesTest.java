@@ -491,6 +491,22 @@ final class BinariesTest {
         assertCombined(Binaries.core(false, false, true), sndh, files, tags);
     }
 
+    /** The CONV tag is the converter the options name, reduced to $20 to
+     *  $7E, and {@link Sndh#CONVERTER} where it is null or blank. */
+    @Test
+    void theConvTagIsTheConverterNamed() throws IOException {
+        List<byte[]> files = List.of(tune("plays-once"));
+        for (String[] pair : new String[][] {{"RhYMe 0.8.76", "RhYMe 0.8.76"},
+                {"Na\u00efve", "Nave"}, {"  ", Sndh.CONVERTER}, {"", Sndh.CONVERTER}}) {
+            Sndh.Options options = new Sndh.Options("Once", null, null, false, false,
+                    Sndh.Ticks.CHOSEN, Sndh.Asked.CHOSEN, true, pair[0]);
+            assertEquals(pair[1], tags(Sndh.of(files, options)).text().get("CONV"), pair[0]);
+        }
+        Sndh.Options unnamed = new Sndh.Options("Once", null, null, false, false,
+                Sndh.Ticks.CHOSEN, Sndh.Asked.CHOSEN, true);
+        assertEquals(Sndh.CONVERTER, tags(Sndh.of(files, unnamed)).text().get("CONV"));
+    }
+
     @Test
     void mixedRatesWriteOneTimerClockAndKeepEachBoundRate() throws IOException {
         byte[] slow = tune("plays-once");

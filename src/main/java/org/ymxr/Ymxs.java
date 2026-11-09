@@ -149,7 +149,7 @@ final class Ymxs {
     /** The tags {@code ymxs-to-sndh} reads, the switches that select the
      *  core among the thirty-two (BINARIES.md 2.1), and the clock asked
      *  for. */
-    static final String[] TAGS = {"-t", "-c", "-perf", "-lean", "-pcrel", "-abs",
+    static final String[] TAGS = {"-t", "-c", "-w", "-perf", "-lean", "-pcrel", "-abs",
         "-vbl", "-tc"};
 
     /** The row count {@code ymxs-to-prg} reads. */

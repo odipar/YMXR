@@ -775,6 +775,40 @@ final class ParityTest {
     }
 
     /**
+     * The CONV tag in both trees (BINARIES.md 3.2): the converter
+     * {@code -wWRITER} names, or the writer of a structure's first tune,
+     * and {@code YMXR (ym-to-ymxr)} where both are blank; and the text
+     * {@code ymxr-sndh} reports among the tags (tools.md 12.4).
+     */
+    @Test
+    void theConverterIsTheSameInBothTrees() throws Exception {
+        org.ymxs.YMXS.Tune fade = YmxsTest.fade();
+        assertEquals("YmxsTest", fade.writer());
+        byte[] json = org.ymxs.Text.write(new org.ymxs.YMXS.Multi(List.of(fade)))
+                .getBytes(StandardCharsets.UTF_8);
+        assertEquals("YmxsTest", conv(both("ymxs-to-sndh", json, "-silent")));
+        assertEquals("RhYMe 0.8", conv(both("ymxs-to-sndh", json, "-silent", "-wRhYMe 0.8")));
+        org.ymxs.YMXS.Tune blank = new org.ymxs.YMXS.Tune(fade.title(), fade.composer(), "",
+                fade.rate(), fade.table());
+        byte[] none = org.ymxs.Text.write(new org.ymxs.YMXS.Multi(List.of(blank)))
+                .getBytes(StandardCharsets.UTF_8);
+        assertEquals(Sndh.CONVERTER, conv(both("ymxs-to-sndh", none, "-silent")));
+        byte[] program = both("ymxs-to-prg", json, "-silent", "-wRhYMe 0.8");
+        assertTrue(new String(program, StandardCharsets.ISO_8859_1).contains("CONVRhYMe 0.8\0"),
+                "the program has the SNDH file's CONV tag");
+        byte[] tune = both("ymxs-to-ymxr", json, "-silent");
+        assertEquals(Sndh.CONVERTER, conv(both("ymxr-sndh", tune, "-silent")));
+        assertEquals(Sndh.CONVERTER, conv(both("ymxr-sndh", tune, "-silent", "-w  ")));
+        Ran named = same("ymxr-sndh", tune, "-wRhYMe 0.8");
+        assertEquals("RhYMe 0.8", conv(named.out()));
+        assertTrue(named.said().contains(", CONV RhYMe 0.8, "), named.said());
+    }
+
+    private static @Nullable String conv(byte[] sndh) {
+        return BinariesTest.tags(sndh).text().get("CONV");
+    }
+
+    /**
      * The TIME tag of a tune that plays once, in both trees. Every dump
      * under ym/test repeats, so the cases above write 0 alone: the kit's
      * set has a subtune that repeats and one of 4 frames at 50 Hz, rounded

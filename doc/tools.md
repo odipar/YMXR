@@ -67,14 +67,14 @@ its noun, singular for a count of 1 and plural for any other: `1 row`,
 | `ym-to-ymxr` | a dump | a tune file (SPEC.md 3.3) | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ym-to-ymxs` | a dump | a structure of one tune | `-rRR`, `-r` |
 | `ymxs-to-ymxr` | a structure | a tune file, or a multi file (BINARIES.md 0) of several | `-kK`, `-mN`, `-copies[S]` |
-| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-carried` |
+| `ymxs-to-sndh` | a structure | an SNDH file (BINARIES.md 3) | `-kK`, `-mN`, `-copies[S]`, `-tTITLE`, `-cCOMPOSER`, `-wWRITER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-carried` |
 | `ymxs-to-prg` | a structure | a TOS program (BINARIES.md 4) | the flags of `ymxs-to-sndh` and `-rROWS` |
 | `ymxr-check` | a dump or a tune file, or the files named | one verdict a file, on standard output | `-kK`, `-mN`, `-copies[S]`, `-rRR`, `-r` |
 | `ymxr-trace` | a tune file | the record of SPEC.md 7 | `-rROWS` |
 | `ymxr-layout` | a multi file, a bound tune, an SNDH file or a program | the record of BINARIES.md 6 | - |
 | `ymxr-bind` | a tune file | a bound tune (BINARIES.md 1) | - |
 | `ymxr-multi` | the tune files named | a multi file | `-nNAME`, `-mN`, `-copies[S]` |
-| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-carried` |
+| `ymxr-sndh` | a tune file or a multi file | an SNDH file | `-tTITLE`, `-cCOMPOSER`, `-wWRITER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-carried` |
 | `ymxr-prg` | an SNDH file | a TOS program | `-rROWS`, `-vbl` |
 
 **2.1** Each tool is written twice, under one name, in the two trees of
@@ -379,15 +379,17 @@ the summary line is `ymxs-to-ymxr: N tunes in a multi file, B bytes`,
 and a multi of 100 tunes or more is the error of 11.2, exit 1.
 
 **7.5 `ymxs-to-sndh`.** The flags are those of 7.4 and `-tTITLE`,
-`-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc` and
-`-carried`, which writes the full core as 12.1 defines. The output is
-the SNDH file of section 12 around the tune files of 7.3, one subtune
-a tune in the multi's order, with: the title `-tTITLE`, or the first
-tune's title, `(untitled)` where blank; the composer `-cCOMPOSER`, or
-the first tune's where present after stripping; the subtune names the
-titles, `(untitled)` where blank, where the multi has more than one
-tune. The errors of 12.2 are exit 1. The report is that of 7.3 alone;
-the tool omits a summary line.
+`-cCOMPOSER`, `-wWRITER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`,
+`-tc` and `-carried`, which writes the full core as 12.1 defines. The
+output is the SNDH file of section 12 around the tune files of 7.3, one
+subtune a tune in the multi's order, with: the title `-tTITLE`, or the
+first tune's title, `(untitled)` where blank; the composer `-cCOMPOSER`,
+or the first tune's where present after stripping; the converter
+`-wWRITER`, or the first tune's writer where present after stripping,
+the default of 12.1 where both are blank; the subtune names the titles,
+`(untitled)` where blank, where the multi has more than one tune. The
+errors of 12.2 are exit 1. The report is that of 7.3 alone; the tool
+omits a summary line.
 
 **7.6 `ymxs-to-prg`.** The flags are those of 7.5 and `-rROWS`, ROWS the
 rows the program plays, 0 by default. The output is the program of
@@ -631,9 +633,10 @@ and advances each subtune at its recorded rate (BINARIES.md 3.4).
 A single tune or all-50 Hz set that claims Timer C names the VBL.
 With `-tc` it reports the error of 12.2. The title is `-tTITLE`, else the
 first name, `(untitled)` where a tune file was read or the name is
-blank; the composer `-cCOMPOSER`, or absent. In the tags (BINARIES.md
-3) each text is reduced to its characters $20 to $7E; the report of
-12.4 prints the text as passed.
+blank; the composer `-cCOMPOSER`, or absent; the converter `-wWRITER`,
+or `YMXR (ym-to-ymxr)` where it is absent or blank. In the tags
+(BINARIES.md 3) each text is reduced to its characters $20 to $7E; the
+report of 12.4 prints the text as passed.
 
 **12.2 Errors**, each exit 1:
 
@@ -674,19 +677,19 @@ address: the tunes end past the 32767 bytes a displacement reaches`
 where the tool chose it (12.1), `the deferred start in: a subtune defers
 a start` where the core has it, and `the lookup in: a subtune maps a
 value` where the core has it, joined by `; `; the heading `the tags:
-TITL <title>`, then `, COMM <composer>` where present, `, <clock><rate>`
-and `, FLAG ~<letters>`, then `, !#SN with N names` for several
-subtunes; a row a subtune, its name or `the tune`, `B bytes bound to B2,
-its table in image I`, B the tune file's bytes, B2 the bound tune's, I
-the number of its image from 1; the heading `the images: N images of B
-bytes, DTX's reader once a set of tunes that share one` with a row an
-image, `image I`, `<shape>, N tunes`, the shape `DTX3 at unit K, values
-of W`, W the width of a value in bytes, and `DTX3 at unit K, 34 columns,
-values of W` for a table of 34 columns (BINARIES.md 1.4); the heading
-`the file: B bytes, the core C, the images I, the tunes T, the workspace
-and the rest W`, C, I, T and W the bytes of the core, the images, the
-bound tunes, and the remainder. The summary line is `ymxr-sndh: B bytes,
-N subtunes`.
+TITL <title>`, then `, COMM <composer>` where present, `, CONV
+<converter>`, `, <clock><rate>` and `, FLAG ~<letters>`, then `, !#SN
+with N names` for several subtunes; a row a subtune, its name or `the
+tune`, `B bytes bound to B2, its table in image I`, B the tune file's
+bytes, B2 the bound tune's, I the number of its image from 1; the
+heading `the images: N images of B bytes, DTX's reader once a set of
+tunes that share one` with a row an image, `image I`, `<shape>, N
+tunes`, the shape `DTX3 at unit K, values of W`, W the width of a value
+in bytes, and `DTX3 at unit K, 34 columns, values of W` for a table of
+34 columns (BINARIES.md 1.4); the heading `the file: B bytes, the core
+C, the images I, the tunes T, the workspace and the rest W`, C, I, T and
+W the bytes of the core, the images, the bound tunes, and the remainder.
+The summary line is `ymxr-sndh: B bytes, N subtunes`.
 
 ---
 
@@ -871,7 +874,7 @@ converter:
 | `-mN` | `ym-to-ymxr` and `ymxr-multi` (4.2, 11.1) |
 | `-copies[S]` | `ymxr-multi`, which packs each table again through the set's ring (4.3, 4.7) |
 | `-nNAME`, the i-th naming the i-th dump | `ymxr-multi` (11.1) |
-| `-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`, `-carried` | `ymxr-sndh` (12) |
+| `-tTITLE`, `-cCOMPOSER`, `-wWRITER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, `-tc`, `-carried` | `ymxr-sndh` (12) |
 | `-rowsN`, the rows the program plays | `ymxr-prg` as `-rN` (13.1) |
 | `-silent` | every tool (3.3) |
 
