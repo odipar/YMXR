@@ -432,7 +432,7 @@ $20 to $7E, the others dropped. `TIME` is in the block from release
 | `SNDH` | |
 | `TITL`, the title, a zero byte | the title |
 | `COMM`, the composer, a zero byte | where the composer is other than the empty text |
-| `CONV`, `YMXR (ym-to-ymxr)`, a zero byte | the converter |
+| `CONV`, the converter, a zero byte | the converter, `YMXR (ym-to-ymxr)` where the tool's is absent or blank |
 | `##`, two decimal digits, a zero byte | `N`, 01 to 99 |
 | `TC`, the rate in decimal, a zero byte | the callback rate in Hz, where the block names Timer C |
 | `!V`, the rate in decimal, a zero byte | the rate of the set, in Hz, where the block names the VBL |
@@ -446,13 +446,14 @@ $20 to $7E, the others dropped. `TIME` is in the block from release
 
 The claims byte of the set is the claims bytes of its tunes ORed. One of
 `TC` and `!V` is in the block, the clock tag: it names the clock a
-host calls play from (5.4). The title and the composer are the tool's
-(tools.md); where the tool leaves the title to the file, of a multi file
-it is name 1, and `(untitled)` where name 1 is the empty text, and of a
-YMXS multi it is the first tune's title, and the composer the first
-tune's composer where that is other than blank. A tune file read alone
-has the empty name; the tool leaves its recorded name (SPEC.md 3.3)
-unread.
+host calls play from (5.4). The title, the composer and the converter
+are the tool's (tools.md); where the tool leaves the title to the file,
+of a multi file it is name 1, and `(untitled)` where name 1 is the empty
+text, and of a YMXS multi it is the first tune's title, the composer the
+first tune's composer where that is other than blank, and the converter
+the first tune's writer where that is other than blank. A tune file read
+alone has the empty name; the tool leaves its recorded name (SPEC.md
+3.3) unread.
 
 **3.3 Writing.** A tool with a core and `N` tune files, in order:
 

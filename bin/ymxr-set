@@ -34,6 +34,7 @@
 #
 #   -tTITLE    the title, the first subtune's name by default
 #   -cCOMPOSER the composer
+#   -wWRITER   the converter, YMXR (ym-to-ymxr) by default
 #   -perf      the core with the raster monitor in
 #              With a set, every subtune must be at 50 Hz.
 #   -lean      the core whose ticks neither drop the interrupt level nor
@@ -73,6 +74,7 @@ repeat=
 copies=
 title=
 composer=
+writer=
 perf=
 lean=
 ticks=
@@ -112,6 +114,7 @@ while [ "$left" -gt 0 ]; do
         -r*) repeat=$arg ;;
         -t*) title=${arg#-t} ;;
         -c*) composer=${arg#-c} ;;
+        -w*) writer=${arg#-w} ;;
         -n*) set -- "$@" "$arg" ;;
         -*) echo "bin/ymxr-set does not read $arg" >&2; exit 2 ;;
         *) set -- "$@" "$arg" ;;
@@ -183,5 +186,6 @@ done < "$work/names"
 "$tools/ymxr-multi" "$@" ${ring:+"$ring"} ${copies:+"$copies"} $silent \
     > "$work/SET.YMXR"
 "$tools/ymxr-sndh" $perf $lean $ticks $clock $carried $silent ${title:+"-t$title"} \
-    ${composer:+"-c$composer"} < "$work/SET.YMXR" > "$work/SET.SND"
+    ${composer:+"-c$composer"} ${writer:+"-w$writer"} < "$work/SET.YMXR" \
+    > "$work/SET.SND"
 exec "$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"
