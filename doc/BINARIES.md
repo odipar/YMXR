@@ -340,8 +340,21 @@ sets a rate other than the host's; a host that requires a timer's rate
 back writes the count it knows.
 
 **2.9 Play**; every register is kept. Where the state byte has bit 0
-clear, return; otherwise call the player's play with `a0` the workspace
-(5.1), and where it reports -1, set bit 1 of the state byte.
+clear, return; otherwise:
+
+1. Write $DF to ISRB: Timer C's in-service bit, bit 5, cleared, and
+   every other bit as it is (SPEC.md 2.3.2).
+2. Call the player's play with `a0` the workspace (5.1), and where it
+   reports -1, set bit 1 of the state byte.
+
+Note: a host that calls play from its Timer C handler, with the MFP in
+software end-of-interrupt mode, leaves bit 5 set until that handler
+ends, and the MFP serves Timer D, which ranks below Timer C, once the
+bit is clear. Step 1 ends the host's interrupt, so a tick of Timer D
+runs during the row, as does any other MFP interrupt of the host that
+ranks below Timer C. A host whose handler clears the bit after play
+writes a bit already clear, and under a host that calls play from the
+VBL the bit is already clear.
 
 **2.10 Errors of a core.** A tool reads a core before it writes an SNDH
 file (3) and reports the first condition met:

@@ -352,34 +352,34 @@ measures it against the linked core.
 
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
-10,138 bytes, the core with the deferred start in, of 15,320 bytes, or
-the core with the lookup and the deferred start in, of 36,610 bytes.
+10,144 bytes, the core with the deferred start in, of 15,326 bytes, or
+the core with the lookup and the deferred start in, of 36,616 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
-| `chambers.ymxr` | plain | none | 2,746 |
-| `circus.ymxr` | plain | none | 2,746 |
-| `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,862 |
-| `deferred.ymxr` | the deferred start | effect0, effect3, defer0, defer3 | 5,216 |
-| `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0 | 4,876 |
-| `envelope.ymxr` | plain | two, two0, several, effect0 | 4,832 |
-| `fine-zero.ymxr` | plain | none | 2,746 |
-| `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,032 |
-| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,046 |
-| `plays-once.ymxr` | plain | none | 2,746 |
-| `preempt.ymxr` | plain | square, square0, effect0, effect1 | 3,936 |
-| `retune.ymxr` | plain | one, one0, effect0 | 3,330 |
-| `synergy.ymxr` | plain | square, square0, square1, effect0, effect1 | 4,088 |
-| `turrican-2.ymxr` | plain | effect1 | 3,256 |
-| `turrican.ymxr` | plain | effect1 | 3,256 |
-| `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3 | 6,822 |
+| `chambers.ymxr` | plain | none | 2,752 |
+| `circus.ymxr` | plain | none | 2,752 |
+| `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,868 |
+| `deferred.ymxr` | the deferred start | effect0, effect3, defer0, defer3 | 5,222 |
+| `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0 | 4,882 |
+| `envelope.ymxr` | plain | two, two0, several, effect0 | 4,838 |
+| `fine-zero.ymxr` | plain | none | 2,752 |
+| `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,038 |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,052 |
+| `plays-once.ymxr` | plain | none | 2,752 |
+| `preempt.ymxr` | plain | square, square0, effect0, effect1 | 3,942 |
+| `retune.ymxr` | plain | one, one0, effect0 | 3,336 |
+| `synergy.ymxr` | plain | square, square0, square1, effect0, effect1 | 4,094 |
+| `turrican-2.ymxr` | plain | effect1 | 3,262 |
+| `turrican.ymxr` | plain | effect1 | 3,262 |
+| `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3 | 6,828 |
 
-A tune of general sources alone, with no effect, links 2,746 bytes, 27%
+A tune of general sources alone, with no effect, links 2,752 bytes, 27%
 of the core: the blocks are 7,392 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
-start of several columns, and links 6,822.
-`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 15,046
-bytes of 36,610: the 36 instances and the 7 loops of init it leaves out
+start of several columns, and links 6,828.
+`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 15,052
+bytes of 36,616: the 36 instances and the 7 loops of init it leaves out
 are 14,158 bytes, and the gaps it keeps are 544 bytes shorter than in the
 core.
 

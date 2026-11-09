@@ -227,11 +227,19 @@ sndh_workspace:
 
 ; ------------------------------------------------------------------ play
 
+; A host that calls play from its Timer C handler in software
+; end-of-interrupt mode leaves Timer C's in-service bit set until that
+; handler ends, and the MFP serves Timer D, which ranks below Timer C,
+; once the bit is clear. Play clears the bit first, so that Timer D ticks
+; through the row; $DF clears bit 5 of ISRB, and a 1 written to an
+; in-service bit leaves it as it is. A host that clears the bit after
+; play writes a bit already clear.
 sndh_play:
                 movem.l d0-d7/a0-a6,-(sp)
                 lea     sndh_state(pc),a6
                 btst    #0,(a6)
                 beq.s   .done
+                move.b  #$DF,$FFFFFA11.w
                 bsr     sndh_workspace
                 movea.l a1,a0
                 bsr     YMXR_play

@@ -185,7 +185,7 @@ build for reading a run rather than one to play a tune with.
 A call writes the row the call before it read, and reads the next once its
 writes are made (68k/YMXR.S), so a row's refill comes after that row's
 writes. Measured on DBA 2 over 3,000 frames,
-the call's first register write is at least 752 cycles after the VBL.
+the call's first register write is at least 772 cycles after the VBL.
 YMX writes its fourteen registers before it decodes for the same reason.
 
 Measure from the VBL, at the tune's rate. Where the program plays from Timer
