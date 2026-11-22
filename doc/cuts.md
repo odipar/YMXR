@@ -99,9 +99,9 @@ The header of version 11 against version 10:
 
 The offset of the source index follows the version alone, as it does
 today: I of 3.1.1 is 16, 20 in version 10 and 24 in version 11. A reader
-reads versions 7 to 11. Init of a core assembled without the cut,
-`YMXR_CUT`, reports -1 for a tune whose effects byte sets bit 6, as a
-core without the lookup reports it for bit 5 (BINARIES.md 1.5).
+reads versions 7 to 11. The lookup cores, `YMXR_MAP=1`, read version 11
+too, and init of every other core reports -1 for a tune whose effects byte
+sets bit 6, as it does for bit 5 (BINARIES.md 1.5, 2.1).
 
 The errors of the file (3.3.4) gain these, U the cut count, Q where the
 cut index is, and G and L the first and the last row of cut N:
@@ -235,14 +235,14 @@ of version 10 changed:
 | the check | `Check` | `check/check.go` |
 | the bound tune, the core, the link and the multi file | `Binaries`, `Sndh`, `Link`, `Multi` | `sndh/sndh.go`, `sndh/link.go`, `internal/built/built.go` |
 
-The player, under `68k/player/`: `equates.S`, the record's fields and
-`YMXR_CUT`; `effect.S`, the cut column read beside the mapping column in
-a piece `cut<e>_1`, which a link leaves out of a tune that cuts no
-source (doc/LINKER.md); `start.S`, the start, the place's reset and the
-recut under a cut; `deferred.S`, the pending start's cut; `init.S` and
-`switches.S`, the branches init aims in a tune of version 11; `play.S`,
-`YMXR.S` and `YMXR_sndh.S`, the flag. The handlers are the counted ones
-of today.
+The player, under `68k/player/`: `equates.S`, the record's fields;
+`effect.S`, the cut column read beside the mapping column in a piece
+`cut<e>_1`, which a link leaves out of a tune that cuts no source
+(doc/LINKER.md); `start.S`, the start, the place's reset and the recut
+under a cut; `deferred.S`, the pending start's cut; `init.S` and
+`switches.S`, the branches init aims in a tune of version 11. The cut is
+assembled where `YMXR_MAP` is 1, and the handlers are the counted ones of
+today.
 
 The rig's model (`68k/test/emu/test_ymxr.py`, `Model`) gains the kept,
 the running and the pending cut of each effect; `counted(i)` is true
@@ -251,10 +251,10 @@ pass at L and loops to the row of the cut.
 
 The documents: SPEC.md, the clauses above, and 8.5 gains a cut column
 above U; BINARIES.md, a field of the bound tune where the cut index
-begins, the source index 4 bytes on as version 10 moved it, bit 5 of the
-flags word (2.3) for `YMXR_CUT`, and the multi file of version 11;
-doc/ymxs.md; glossary.md, *cut*, *kept cut* and *recut*; performance.md;
-RELEASES.md.
+begins, the source index 4 bytes on as version 10 moved it, the lookup
+cores reading version 11 (2.1 to 2.3), and the multi file of version 11;
+glossary.md, the terms of a cut; doc/ymxs.md and tools.md, with the tools
+that write and read a cut; performance.md; RELEASES.md.
 
 The conformance kit gains the tune files of YMXS's `doc/tunes/cut.json`
 and of the YMXS kit's `cuts.json`, with their records.
@@ -287,15 +287,24 @@ case failed on main until the bump.
 
 - [x] The dependency at YMXS 0.8.0 in both trees: the build, `mvn test`
       and the rig, and every file the tests compare as it is
-- [ ] SPEC.md, BINARIES.md, doc/ymxs.md and glossary.md define the
-      column, the index, version 11, the tick under a cut and the record
-- [ ] Java: the converter, the tune file, the record and the check, and
-      the kit's tunes under a cut
+- [x] SPEC.md, BINARIES.md and glossary.md define the column, the
+      index, version 11, the tick under a cut and the record
+- [ ] Java: the converter, the tune file, the record and the check;
+      doc/ymxs.md and tools.md; the rings of a table of 38 columns in
+      SPEC.md 3.3.3; and the kit's tunes under a cut, SPEC.md 7.6
 - [ ] Go, byte for byte with Java
-- [ ] The player: `YMXR_CUT`, the cut column, and the start, the recut
-      and the deferred start under a cut on the counted handler; the rig
-      plays a moved window against the model
+- [ ] The player, in the lookup cores: the cut column, and the start,
+      the recut and the deferred start under a cut on the counted
+      handler; the rig plays a moved window against the model
 - [ ] performance.md: a tick under a cut and a frame of a recut,
       measured on the rig, and the bytes of the core with the cut in
 - [ ] This document goes, and YMXS's doc/cuts.md ticks its two YMXR
       items
+
+## Settled
+
+- A table has a group of four columns where the tune uses it: the cut
+  columns at 30 to 33 where the tune maps no value, and at 34 to 37 after
+  the mapping columns where it maps one.
+- The lookup cores, `YMXR_MAP=1`, read version 11, and the release keeps
+  32 cores; a separate switch would make 64.
