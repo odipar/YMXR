@@ -548,6 +548,22 @@ final class ParityTest {
         }
     }
 
+    /**
+     * A tune that cuts a source is one error in both trees until the
+     * columns encode a cut (doc/cuts.md), and a recut on a timer outside
+     * the tune converts to one file in both.
+     */
+    @Test
+    void aCutIsTheSameErrorInBothTrees() throws Exception {
+        assertWrong(YmxsTest.cut(), "row 0: Timer A starts a source of 32 rows under the cut"
+                + " of rows 0 to 15, and this version encodes the whole table alone");
+        assertWrong(YmxsTest.recut(org.ymxs.YMXS.Timer.A), "row 1: Timer A recuts to rows 16"
+                + " to 31, and this version encodes the whole table alone");
+        both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                YmxsTest.recut(org.ymxs.YMXS.Timer.D))).getBytes(StandardCharsets.UTF_8),
+                "-silent");
+    }
+
     private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
                 .getBytes(StandardCharsets.UTF_8);

@@ -262,11 +262,15 @@ and of the YMXS kit's `cuts.json`, with their records.
 ## The dependency
 
 `pom.xml` reads `org.ymx:ymxs` 0.8.0 and `go/go.mod`
-`github.com/odipar/ymxs/go` v0.8.0. ParityTest's case of the YMXS kit,
+`github.com/odipar/ymxs/go` v0.8.0. Until the columns encode a cut, the
+converter reports a `Start` under a cut other than the whole table of its
+source, and a `Recut` on a timer of the tune, as an error (doc/ymxs.md),
+and leaves out a `Recut` on a timer outside the tune, as it leaves out a
+`Remap` there. ParityTest's case of the YMXS kit,
 `everyTuneOfTheYmxsKitConvertsTheSameInBothTrees`, reads the kit of the
 YMXS checkout beside this one; that kit is version 8 since YMXS 0.8.0,
-and the 0.7.1 this repository reads converts none of it, so the case
-fails on main today and the bump fixes it.
+and the 0.7.1 this repository read before converts none of it, so the
+case failed on main until the bump.
 
 ## Open for review
 
@@ -281,7 +285,7 @@ fails on main today and the bump fixes it.
 
 ## Milestones
 
-- [ ] The dependency at YMXS 0.8.0 in both trees: the build, `mvn test`
+- [x] The dependency at YMXS 0.8.0 in both trees: the build, `mvn test`
       and the rig, and every file the tests compare as it is
 - [ ] SPEC.md, BINARIES.md, doc/ymxs.md and glossary.md define the
       column, the index, version 11, the tick under a cut and the record

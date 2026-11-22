@@ -209,7 +209,7 @@ final class ConformanceTest {
     /** A start of {@code source} on {@code register} with both resets. */
     private static Start start(Register register, Single source, int by, int count,
                                Mapping mapping) {
-        return new Start(new OneConnection(Tunes.setting(register), source),
+        return Tunes.start(new OneConnection(Tunes.setting(register), source),
                 new Timing(Chip.prescaler(by), count, true, true), false, mapping);
     }
 
@@ -255,7 +255,7 @@ final class ConformanceTest {
             raised.add(Math.min(k + 1, 15));
         }
         Mapping up = Tunes.mapping(Tunes.IDENTITY, new Transformation("coarse up", raised));
-        Start tone = new Start(new TwoConnection(new SetTone(Voice.C), arpeggio),
+        Start tone = Tunes.start(new TwoConnection(new SetTone(Voice.C), arpeggio),
                 new Timing(Chip.prescaler(200), 100, true, true), false, up);
         Start fading = start(Register.R8, pulse, 50, 100, Tunes.mapping(volume(15)));
         Start loud = start(Register.R9, square, 50, 140, Tunes.mapping(volume(10)));
@@ -281,7 +281,7 @@ final class ConformanceTest {
         effects.get(4).put(Timer.C, tone);
         effects.get(FALL).put(Timer.B, start(Register.R9, fall, 200, 150,
                 Tunes.mapping(volume(5))));
-        effects.get(8).put(Timer.B, new Start(new OneConnection(Tunes.setting(Register.R9),
+        effects.get(8).put(Timer.B, Tunes.start(new OneConnection(Tunes.setting(Register.R9),
                 square), new Timing(Chip.prescaler(50), 140, false, true), true,
                 Tunes.mapping(volume(10))));
         effects.get(PENDING).put(Timer.B, new Remap(Tunes.mapping(volume(12))));

@@ -66,7 +66,8 @@ func struck(t *testing.T, register ymxs.Register, source ymxs.Single,
 func started(t *testing.T, target ymxs.Target, source ymxs.Source, deferred bool,
 	mapping ymxs.Mapping) ymxs.Start {
 	t.Helper()
-	start, err := ymxs.Starting(target, source, timing(t), deferred, mapping)
+	start, err := ymxs.Starting(target, source, timing(t), deferred, mapping,
+		ymxs.Whole(source))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -695,7 +696,7 @@ func startAt(t *testing.T, register ymxs.Register, source ymxs.Single, timing ym
 	deferred bool) ymxs.Start {
 	t.Helper()
 	start, err := ymxs.Starting(ymxs.Setting(register), source, timing, deferred,
-		ymxs.Mapping{})
+		ymxs.Mapping{}, ymxs.Whole(source))
 	if err != nil {
 		t.Fatal(err)
 	}

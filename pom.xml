@@ -40,7 +40,7 @@
                  through, and its JSON form (doc/ymxs.md) -->
             <groupId>org.ymx</groupId>
             <artifactId>ymxs</artifactId>
-            <version>0.7.1</version>
+            <version>0.8.0</version>
         </dependency>
         <dependency>
             <groupId>org.jspecify</groupId>

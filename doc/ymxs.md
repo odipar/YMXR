@@ -44,6 +44,7 @@ assignments.
 | the `mapping` of a `Start` | the mapping column, the number of its last part, where it differs from the kept mapping (1.10; SPEC.md 6, rule 2(g)) |
 | `Remap` on a timer of the tune | the mapping column with the source column unset, where the effect may run through another mapping (1.10; SPEC.md 6, rule 2(g)) |
 | `Remap` on a timer outside the tune | every column left unset (SPEC.md 6, rule 2(a)) |
+| `Recut` on a timer outside the tune | every column left unset, as for a `Remap` there (SPEC.md 6, rule 2(a)) |
 | the tune's transformations | numbered 1 upward in the order of YMXS, SPEC.md 1.9, in a tune file of version 10 where a row sets a mapping column to one (3.3.5, 3.4) |
 | a source | a column a register of its target (3.1.3), repeating at its repeat row: bit 7 of the marker's column set on the last row (3.2), or, where that register reads its whole byte, rows a player counts and bit 31 of the index entry (3.1.6) |
 | a source of one column every `Start` maps through a transformation, with a key of 128 or more | rows a player counts and bit 31 of the index entry (3.1.6) |
@@ -140,6 +141,7 @@ row or the source and exits 1.
 | a value past 127 in the marker's column of a marked source | bit 7 of that column is the marker (3.2) |
 | a key past 63 of a source a start on `setR7` maps through a transformation | bits 7 and 6 of each row are the two port directions (SPEC.md 6, rule 2(f)) |
 | a value past 255 | a column of a source is one byte (3.1.3) |
+| a `Start` under a cut other than the whole table of its source, or a `Recut` on a timer of the tune | the columns encode the whole table of each source; doc/cuts.md plans the encoding of a cut |
 
 ## The tools
 

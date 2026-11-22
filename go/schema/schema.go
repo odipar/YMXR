@@ -189,7 +189,23 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		kept.keep(i, one)
 		maps.stop(i)
 		return 0, nil
+	case ymxs.Recut:
+		// A recut on a timer outside the tune leaves every column unset, as
+		// a remap there does (SPEC.md 6, rule 2(a)). The columns of this
+		// version encode the whole table of each source alone, and
+		// doc/cuts.md plans the cut.
+		if !maps.claimed[i] {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("row %d: Timer %s recuts to rows %d to %d, and this version"+
+			" encodes the whole table alone", at, Timer(i), e.Cut.First, e.Cut.Last)
 	case ymxs.Start:
+		started := ymxs.ConnectionSource(e.Connection)
+		if e.Cut != ymxs.Whole(started) {
+			return 0, fmt.Errorf("row %d: Timer %s starts a source of %d rows under the cut"+
+				" of rows %d to %d, and this version encodes the whole table alone", at,
+				Timer(i), ymxs.SourceSize(started), e.Cut.First, e.Cut.Last)
+		}
 		runs := ymxs.ConnectionTarget(e.Connection)
 		mapping, err := maps.number(e.Mapping, runs, at)
 		if err != nil {

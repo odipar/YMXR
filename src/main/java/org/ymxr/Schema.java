@@ -8,11 +8,13 @@ import java.util.Set;
 import java.util.stream.IntStream;
 import org.ymxs.Chip;
 import org.ymxs.Tunes;
+import org.ymxs.YMXS.Cut;
 import org.ymxs.YMXS.Effect;
 import org.ymxs.YMXS.Identity;
 import org.ymxs.YMXS.Mapping;
 import org.ymxs.YMXS.Part;
 import org.ymxs.YMXS.Prescaler;
+import org.ymxs.YMXS.Recut;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Remap;
 import org.ymxs.YMXS.Retune;
@@ -208,6 +210,8 @@ final class Schema {
                 case Stop ignored -> counting[i] = false;
                 case Remap ignored -> {
                 }
+                case Recut ignored -> {
+                }
             }
         }
 
@@ -393,7 +397,29 @@ final class Schema {
                 kept.running[i] = kept.pending[i] == NONE || kept.pending[i] == m ? m : OPEN;
                 return 0;
             }
+            case Recut recut -> {
+                // A recut on a timer outside the tune leaves every column
+                // unset, as a remap there does (SPEC.md 6, rule 2(a)).
+                // The columns of this version encode the whole table of
+                // each source alone, and doc/cuts.md plans the cut.
+                if (!kept.claimed[i]) {
+                    return 0;
+                }
+                throw new IllegalArgumentException("row " + at + ": Timer " + TIMERS[i]
+                        + " recuts to rows " + recut.cut().first() + " to "
+                        + recut.cut().last() + ", and this version encodes the whole"
+                        + " table alone");
+            }
             case Start start -> {
+                Source started = Tunes.source(start.connection());
+                Cut cut = start.cut();
+                if (!cut.equals(Tunes.whole(started))) {
+                    throw new IllegalArgumentException("row " + at + ": Timer " + TIMERS[i]
+                            + " starts a source of " + Tunes.size(started)
+                            + " rows under the cut of rows " + cut.first() + " to "
+                            + cut.last() + ", and this version encodes the whole table"
+                            + " alone");
+                }
                 Target on = Tunes.target(start.connection());
                 int m = mapped(start.mapping(), on, kept.list, at);
                 kept.runs[i] = on;
