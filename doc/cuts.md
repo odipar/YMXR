@@ -293,11 +293,25 @@ case failed on main until the bump.
       doc/ymxs.md and tools.md; the rings of a table of 38 columns in
       SPEC.md 3.3.3; and the kit's tunes under a cut, SPEC.md 7.6
 - [x] Go, byte for byte with Java
-- [ ] The player, in the lookup cores: the cut column, and the start,
-      the recut and the deferred start under a cut on the counted
-      handler; the rig plays a moved window against the model;
-      BINARIES.md 1.5 and 2, and LINKER.md's table of the kit's tunes of
-      version 11
+- [ ] The player, in the lookup cores, in four steps, each green on the
+      rig and the suite:
+  - [ ] a source of one column through the identity: init reads version
+        11, the cut column's read sites, the kept and the running cut in
+        the effect's record, and the start, the recut and the place's
+        reset under a cut on the counted handler of one column; the
+        rig's model of the tick under a cut, and the kit's `cut` on the
+        lookup cores
+  - [ ] the deferred start under a cut: the arming captures the cut, the
+        installer places at L + 1 of the cut that ended, and a recut while
+        a start is pending moves the running handler and the armed place;
+        the kit's `cuts`
+  - [ ] sources of two and three columns, and a source through a
+        transformation, on the counted instances; the rig's generator
+        draws starts under a cut and recuts
+  - [ ] the link and the tools: the cut's pieces, which a link keeps for
+        a song that cuts a source alone, the SNDH tools' core for bit 6,
+        BINARIES.md 1.5 and 2, and LINKER.md's table of the kit's tunes of
+        version 11
 - [ ] performance.md: a tick under a cut and a frame of a recut,
       measured on the rig, and the bytes of the core with the cut in
 - [ ] This document goes, and YMXS's doc/cuts.md ticks its two YMXR
