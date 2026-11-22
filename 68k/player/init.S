@@ -17,8 +17,8 @@ YMXR_init:
                 bne     .bad
                 move.w  TF_VERSION(a0),d0               ; version 7 to 9, a
                 .if     YMXR_MAP                        ; DTX3 table (SPEC.md
-                subq.w  #7,d0                           ; 3.3.5), and 10
-                cmp.w   #3,d0
+                subq.w  #7,d0                           ; 3.3.5), and 10 and
+                cmp.w   #4,d0                           ; 11
                 .else
                 subq.w  #YMXR_VERSION-2,d0
                 cmp.w   #2,d0
@@ -40,20 +40,32 @@ YMXR_init:
                 .endif
                 .if     YMXR_MAP
 ; Version 10 bound layout: signed transformation-block offset at 24,
-; source index at 28 (BINARIES.md 1.2). Earlier versions use identity
-; and a zero block pointer. Effects bit 5 marks version 10 (SPEC.md
-; 3.3.5).
+; source index at 28 (BINARIES.md 1.2). Version 11: the block at 24, or 0
+; where the tune maps no value, the cut index at 28 and the source index
+; at 32. Earlier versions use identity and a zero block pointer. Effects
+; bit 5 marks the mapping columns, and bit 6 the cut columns of version
+; 11 (SPEC.md 3.3.5).
                 moveq   #0,d1
                 subq.w  #3,d0                   ; the version less 10
-                bne.s   .v9
-                move.l  a0,d1
+                bmi.s   .v9
+                beq.s   .block
+                tst.l   TF_TRANS(a0)
+                beq.s   .v9
+.block:         move.l  a0,d1
                 add.l   TF_TRANS(a0),d1
 .v9:            move.l  d1,WS_TRANS(a6)
                 btst    #5,WS_EFFECTS(a6)
                 beq.s   .v10
                 tst.l   d1
                 beq     .bad6
-.v10:
+.v10:           btst    #6,WS_EFFECTS(a6)       ; bit 6 in version 11, and
+                beq.s   .uncut                  ; clear in every other
+                subq.w  #1,d0
+                bne     .bad6
+                bra.s   .cut
+.uncut:         subq.w  #1,d0
+                beq     .bad6
+.cut:
                 .endif
                 cmp.b   #3,IM_VARIANT(a2)       ; a DTX3 image: its rows come
                 bne     .bad6                   ; round by themselves
@@ -89,9 +101,11 @@ YMXR_init:
                 lea     WS_SOURCES(a6),a4
                 moveq   #0,d4
                 .if     YMXR_MAP
-                tst.l   WS_TRANS(a6)            ; version 10: the index at 28
-                beq.s   .source
-                moveq   #4,d4
+                move.w  TF_VERSION(a1),d4       ; the index at 28 in version
+                sub.w   #9,d4                   ; 10, and at 32 in 11
+                bgt.s   .later
+                moveq   #0,d4
+.later:         lsl.w   #2,d4
                 .endif
 .source:        movea.l a1,a3
                 move.l  TF_INDEX(a3,d4.w),d0
@@ -198,6 +212,9 @@ YMXR_init:
                 beq.s   .away
                 move.w  d1,d0
                 and.w   #$FF,d0
+                .if     YMXR_MAP
+                bsr     ymxr_xcol
+                .endif
                 bsr     ymxr_col
 .away:          dbra    d2,.site
 
@@ -512,6 +529,12 @@ YMXR_init:
                 beq.s   .aims                   ; lie elsewhere where it has
                 move.l  #((WIDE_WIDEN&$FFFF)<<16)|(RESET_WIDE&$FF),d0
 .aims:
+                .if     YMXR_MAP
+                btst    #6,WS_EFFECTS(a6)       ; a tune that cuts a source
+                beq.s   .uncuts                 ; runs the counted handler at
+                move.b  #RESET_X&$FF,d0         ; any shape, whose place's
+.uncuts:                                        ; reset reads the running cut
+                .endif
 
 ; The effects the tune runs are read every row; the others are jumped
 ; over by the branch at each macro's head, where the tune does not run
@@ -588,8 +611,22 @@ YMXR_init:
 ; the tune also defers starts. That path updates the record after a tick
 ; installs a pending start; other tunes continue directly to rate
 ; processing.
-                btst    d2,ymxr_k_map+1(pc)     ; an effect that keeps the
-                beq.s   .identity               ; paths, which maps one
+;
+; For effects bit 6, version 11, the start and the unset source are aimed
+; at the paths that read the cut column first (_xnow, _xunset), and the
+; timer's reset as for bit 5, at the path that keeps the control byte
+; before the reset in d3 for the recut (_rmk). The head ors the column at
+; 30 + i, the cut column where the tune maps no value; where it maps one,
+; the head's branch on the set bits is aimed past the count at the or of
+; the cut column at 34 + i (_xhead).
+                move.w  #HEAD_SOME,HEAD_AT(a1)
+                move.b  WS_EFFECTS(a6),d4
+                and.b   #$60,d4
+                cmp.b   #$60,d4
+                bne.s   .head
+                move.w  #HEAD_X,HEAD_AT(a1)
+.head:          btst    d2,ymxr_k_map+1(pc)     ; an effect that keeps the
+                beq.w   .identity               ; paths, which maps one
                 .if     YMXR_DEFER
                 move.w  RES_MAP(a2),d4          ; the remap's exit, in its
                 lea     (a1,d4.w),a0            ; piece, to the rate past the
@@ -598,11 +635,17 @@ YMXR_init:
                 add.w   #REMAP_RATE,d4
                 move.w  d4,REMAP_AT(a0)
                 .endif
-                btst    #5,WS_EFFECTS(a6)
+                move.b  WS_EFFECTS(a6),d4
+                and.b   #$60,d4
                 beq.s   .identity
+                btst    #6,d4
+                bne.s   .cuts
                 AIM     NOW_MAP,NOW_AT,RES_MAP
                 AIM     UNSET_MAP,UNSET_AT,RES_MAP
-                move.w  #$6000,RS_AT(a1)        ; bra.w
+                bra.s   .reset
+.cuts:          AIM     NOW_X,NOW_AT,RES_MAP
+                AIM     UNSET_X,UNSET_AT,RES_MAP
+.reset:         move.w  #$6000,RS_AT(a1)        ; bra.w
                 AIM     RS_MAP,RS_AT+2,RES_MAP
                 .if     YMXR_DEFER
                 btst    #4,WS_EFFECTS(a6)
@@ -759,6 +802,29 @@ ymxr_col:       lea     (a4,d4.w),a5            ; the operand
                 move.w  d0,(a5)
                 rts
 
+                .if     YMXR_MAP
+; The column a site reads in a tune of version 11 (SPEC.md 3.3.5): a cut
+; column, 34 + i in the table of sites, is at 30 + i where the tune maps
+; no value, and a mapping column's site then reads the constant 0, past
+; the table's columns. The head's or of the column at 30 + i, an entry
+; without a piece's mark, reads that column: the cut column there. d0 the
+; column, d1 the site's entry.
+ymxr_xcol:      cmp.w   #30,d0
+                bcs.s   .done                   ; a column of every version
+                btst    #6,WS_EFFECTS(a6)
+                beq.s   .done
+                btst    #5,WS_EFFECTS(a6)
+                bne.s   .done
+                subq.w  #4,d0
+                cmp.w   #30,d0
+                bcc.s   .done                   ; a cut column, at 30 + i
+                addq.w  #4,d0
+                cmp.w   #$100,d1
+                bcs.s   .done                   ; the head's or
+                move.w  #$FF,d0                 ; a mapping column
+.done:          rts
+                .endif
+
 ; Z set where a link left out the read site. The low byte of d1 is
 ; the column, and the high byte marks an optional piece. d0 is scratch.
 ymxr_kept:      and.w   #$FF,d0
@@ -767,6 +833,9 @@ ymxr_kept:      and.w   #$FF,d0
                 cmp.w   #16,d0
                 bcs.s   .effect
                 sub.w   #16,d0                  ; a mapping column's effect
+                .if     YMXR_MAP
+                and.w   #3,d0                   ; or a cut column's
+                .endif
                 bra.s   .at
 .effect:        lsr.w   #2,d0
 .at:            btst    d0,ymxr_k_effect+1(pc)

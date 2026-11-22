@@ -74,6 +74,27 @@ RS_MAP          equ     ymxr_e_effect0_1-ymxr_tick0_rs-2+ymxr_tick0_rmk-ymxr_p_m
                 .if     (ymxr_e_effect3_1-ymxr_tick3_rs-2+ymxr_tick3_rmk-ymxr_p_map3_1)<>RS_MAP
                 .error  "effect 3 lays its remap's reset out apart from effect 0"
                 .endif
+; A tune of version 11 aims the start and the unset source at the paths
+; that read the cut column first, and, where the tune maps a value, the
+; head's branch on the set bits past the count at the or of the cut column
+; (init.S).
+NOW_X           equ     ymxr_e_effect0_1-ymxr_tick0_now-2+ymxr_tick0_xnow-ymxr_p_map0_1         ; RES_MAP
+UNSET_X         equ     ymxr_e_effect0_1-ymxr_tick0_unset-2+ymxr_tick0_xunset-ymxr_p_map0_1     ; RES_MAP
+HEAD_AT         equ     ymxr_tick0_head-ymxr_tick0_over
+HEAD_SOME       equ     $6B00|((ymxr_tick0_some-ymxr_tick0_head-2)&$FF)     ; bmi.s _some
+HEAD_X          equ     $6000|((ymxr_tick0_xhead-ymxr_tick0_head-2)&$FF)    ; bra.s _xhead
+                .if     (ymxr_e_effect3_1-ymxr_tick3_now-2+ymxr_tick3_xnow-ymxr_p_map3_1)<>NOW_X
+                .error  "effect 3 lays its start of version 11 out apart from effect 0"
+                .endif
+                .if     (ymxr_e_effect3_1-ymxr_tick3_unset-2+ymxr_tick3_xunset-ymxr_p_map3_1)<>UNSET_X
+                .error  "effect 3 lays its recut out apart from effect 0"
+                .endif
+                .if     ((ymxr_tick3_head-ymxr_tick3_over)<>HEAD_AT)|((ymxr_tick3_xhead-ymxr_tick3_head)<>(ymxr_tick0_xhead-ymxr_tick0_head))|((ymxr_tick3_some-ymxr_tick3_head)<>(ymxr_tick0_some-ymxr_tick0_head))
+                .error  "effect 3 lays its head out apart from effect 0"
+                .endif
+                .if     (((ymxr_tick0_some-ymxr_tick0_head-2+128)|(ymxr_tick0_xhead-ymxr_tick0_head-2+128))&$FFFFFF00)<>0
+                .error  "the head's branch is past a byte's displacement"
+                .endif
                 .endif
                 .if     YMXR_MAP&YMXR_DEFER
 ; Remap exit for an unset mapping column: displacements to ordinary rate
@@ -105,10 +126,14 @@ SET_DEFER       equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_check-ymxr_
                 .endif
 RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .if     YMXR_MAP
+RESET_X         equ     ymxr_tick0_xrow-ymxr_tick0_reset-2
 ; Init branch bytes for the larger effect record used with lookup
 ; support.
-                .if     (((RESET_DONE+128)|(RESET_WIDE+128))&$FFFFFF00)<>0
+                .if     (((RESET_DONE+128)|(RESET_WIDE+128)|(RESET_X+128))&$FFFFFF00)<>0
                 .error  "a branch init writes is past a byte's displacement"
+                .endif
+                .if     (ymxr_tick3_xrow-ymxr_tick3_reset-2)<>RESET_X
+                .error  "effect 3 lays its reset of a cut out apart from effect 0"
                 .endif
                 .endif
 

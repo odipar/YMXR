@@ -295,7 +295,7 @@ case failed on main until the bump.
 - [x] Go, byte for byte with Java
 - [ ] The player, in the lookup cores, in four steps, each green on the
       rig and the suite:
-  - [ ] a source of one column through the identity: init reads version
+  - [x] a source of one column through the identity: init reads version
         11, the cut column's read sites, the kept and the running cut in
         the effect's record, and the start, the recut and the place's
         reset under a cut on the counted handler of one column; the
@@ -324,3 +324,13 @@ case failed on main until the bump.
   the mapping columns where it maps one.
 - The lookup cores, `YMXR_MAP=1`, read version 11, and the release keeps
   32 cores; a separate switch would make 64.
+- A tune of versions 7 to 10 runs the frame code of today on the lookup
+  cores: init aims the branches at the paths that read the cut column
+  where the effects byte sets bit 6. The head ors the column at 30 + i,
+  the cut column where the tune maps no value; where it maps one, init
+  aims the head's branch on the set bits at a fifth or.
+- A recut from cut 0 to cut 0 leaves the handler as it is; every other
+  recut aims the counted handler, and a recut to cut 0 keeps it there
+  until the next start.
+- The core's descriptor records version 10 until the last step, so the
+  SNDH tools bind a tune of version 11 once a link keeps the cut's code.

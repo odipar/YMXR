@@ -25,10 +25,10 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,628 | 2,938 |
+| init | 1,628 | 3,100 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
-| the frame | 2,784 | 3,720 |
-| the frame's read-site tables | 180 | 236 |
+| the frame | 2,784 | 4,224 |
+| the frame's read-site tables | 180 | 300 |
 | the general handler, four effects | 320 | 320 |
 | the square's | 112 | 112 |
 | the one-row source's | 80 | 80 |
@@ -44,8 +44,9 @@ player and of the player with the lookup in:
 | the tables of the instances of the general handler, the square and the one-row source | | 24 |
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
 | the lookup's routines | | 3,430 |
-| the lookup instances and the gaps before them, ten kinds | | 6,902 |
-| the player | 9,454 | 21,966 |
+| the cut's routines | | 560 |
+| the lookup instances and the gaps before them, ten kinds | | 6,854 |
+| the player | 9,454 | 23,208 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -354,7 +355,7 @@ The blocks of its core each tune of the conformance kit to version 10
 keeps, the core it links, and the bytes of that core linked for it: the
 plain core, of 10,144 bytes, the core with the deferred start in, of
 15,326 bytes, or the core with the lookup and the deferred start in, of
-36,616 bytes.
+37,858 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
@@ -366,7 +367,7 @@ plain core, of 10,144 bytes, the core with the deferred start in, of
 | `envelope.ymxr` | plain | two, two0, several, effect0 | 4,838 |
 | `fine-zero.ymxr` | plain | none | 2,752 |
 | `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,038 |
-| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,052 |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 16,370 |
 | `plays-once.ymxr` | plain | none | 2,752 |
 | `preempt.ymxr` | plain | square, square0, effect0, effect1 | 3,942 |
 | `retune.ymxr` | plain | one, one0, effect0 | 3,336 |
@@ -379,9 +380,9 @@ A tune of general sources alone, with no effect, links 2,752 bytes, 27%
 of the core: the blocks are 7,392 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
 start of several columns, and links 6,828.
-`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 15,052
-bytes of 36,616: the 36 instances and the 7 loops of init it leaves out
-are 14,158 bytes, and the gaps it keeps are 544 bytes shorter than in the
+`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 16,370 bytes
+of 37,858: the 36 instances and the 7 loops of init it leaves out are
+14,006 bytes, and the gaps it keeps are 620 bytes shorter than in the
 core.
 
 ## The check

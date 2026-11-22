@@ -58,6 +58,11 @@ TF_INDEX        equ     24
 TF_TRANS        equ     24              ; version 10: the transformations'
                                         ; block, a signed long from the
                                         ; bound tune's first byte, and the
+                                        ; source index 4 bytes on;
+                                        ; version 11: the block, or 0
+TF_CUTS         equ     28              ; version 11: the cut index, a
+                                        ; signed long from the bound
+                                        ; tune's first byte, and the
                                         ; source index 4 bytes on
                 .endif
 
@@ -184,6 +189,8 @@ FX_LLAST        equ     83
 FX_LMAPS        equ     84              ; the three fill kinds' tables
 FX_LCUR         equ     96              ; the page byte a start writes
 FX_LFB          equ     97              ; the page of the first fallback
+FX_CUT          equ     98              ; the kept cut
+FX_CRUN         equ     99              ; the running cut
 FX_SIZE         equ     100
 WS_TRANS        equ     2456            ; the transformations' block, a long
 YMXR_FIXED      equ     2460
@@ -206,6 +213,8 @@ FX_LLAST        equ     39
 FX_LMAPS        equ     40
 FX_LCUR         equ     52
 FX_LFB          equ     53
+FX_CUT          equ     54
+FX_CRUN         equ     55
 FX_SIZE         equ     56
 WS_TRANS        equ     2280
 YMXR_FIXED      equ     2284

@@ -25,16 +25,16 @@ YMXR_play:
 ymxr_frame:
 ; 1 to 3: the effects, each its four columns.
                 PIECE   effect0_1
-                EFFECT  WS_FX,_14,_15,_16,_17,_30,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,effect0,$134,ymxr_lk0
+                EFFECT  WS_FX,_14,_15,_16,_17,_30,$FFFFFA19,$FFFFFA1F,$FFFFFA07,5,$F0,0,0,ymxr_tick0,ymxr_sq0,ymxr_one0,effect0,$134,ymxr_lk0,_34
                 ENDPIECE effect0_5
                 PIECE   effect1_1
-                EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,_31,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,effect1,$110,ymxr_lk1
+                EFFECT  WS_FX+FX_SIZE,_18,_19,_20,_21,_31,$FFFFFA1D,$FFFFFA25,$FFFFFA09,4,$F0,0,1,ymxr_tick1,ymxr_sq1,ymxr_one1,effect1,$110,ymxr_lk1,_35
                 ENDPIECE effect1_5
                 PIECE   effect2_1
-                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,_32,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,effect2,$120,ymxr_lk2
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE,_22,_23,_24,_25,_32,$FFFFFA1B,$FFFFFA21,$FFFFFA07,0,$F0,0,0,ymxr_tick2,ymxr_sq2,ymxr_one2,effect2,$120,ymxr_lk2,_36
                 ENDPIECE effect2_5
                 PIECE   effect3_1
-                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,_33,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,effect3,$114,ymxr_lk3
+                EFFECT  WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,_26,_27,_28,_29,_33,$FFFFFA1D,$FFFFFA23,$FFFFFA09,5,$0F,4,1,ymxr_tick3,ymxr_sq3,ymxr_one3,effect3,$114,ymxr_lk3,_37
                 ENDPIECE effect3_5
 ; 4: the tone periods. Steps 4 to 8 are between this label and
 ; ymxr_played, where the rig counts what the register columns cost.
@@ -205,6 +205,14 @@ ymxr_sites:
                 dc.w    c_32-ymxr_frame+2,SITE_MAP+32,c_33-ymxr_frame+2,SITE_MAP+33
                 dc.w    m_30-ymxr_frame+2,SITE_MAP+30,m_31-ymxr_frame+2,SITE_MAP+31
                 dc.w    m_32-ymxr_frame+2,SITE_MAP+32,m_33-ymxr_frame+2,SITE_MAP+33
+                dc.w    r_30-ymxr_frame+2,SITE_MAP+30,r_31-ymxr_frame+2,SITE_MAP+31
+                dc.w    r_32-ymxr_frame+2,SITE_MAP+32,r_33-ymxr_frame+2,SITE_MAP+33
+                dc.w    q_34-ymxr_frame+2,34,q_35-ymxr_frame+2,35
+                dc.w    q_36-ymxr_frame+2,36,q_37-ymxr_frame+2,37
+                dc.w    c_34-ymxr_frame+2,SITE_MAP+34,c_35-ymxr_frame+2,SITE_MAP+35
+                dc.w    c_36-ymxr_frame+2,SITE_MAP+36,c_37-ymxr_frame+2,SITE_MAP+37
+                dc.w    m_34-ymxr_frame+2,SITE_MAP+34,m_35-ymxr_frame+2,SITE_MAP+35
+                dc.w    m_36-ymxr_frame+2,SITE_MAP+36,m_37-ymxr_frame+2,SITE_MAP+37
                 .endif
                 .if     YMXR_DEFER
                 dc.w    d_17-ymxr_frame+2,SITE_DEFER+17,d_21-ymxr_frame+2,SITE_DEFER+21

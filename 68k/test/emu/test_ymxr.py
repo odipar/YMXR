@@ -178,12 +178,14 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 10, which a writer writes where a row maps a value, 9,
-# which it writes otherwise, 8, read as 9, and 7, whose control columns
-# have bit 3 at 0, each a tune whose table is DTX3, which a reader reads.
-TUNE_VERSIONS = (10, 9, 8, 7)
+# (BINARIES.md 1): 11, which a writer writes where a row cuts a source,
+# 10, which it writes where a row maps a value, 9, which it writes
+# otherwise, 8, read as 9, and 7, whose control columns have bit 3 at 0,
+# each a tune whose table is DTX3, which a reader reads.
+TUNE_VERSIONS = (11, 10, 9, 8, 7)
 WRITTEN = 9
 MAPPED = 10
+CUT = 11
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
@@ -191,10 +193,12 @@ COUNTED = 1 << 31
 
 
 def bound_versions(symbols):
-    """Supported bound versions: 7 to 10 with lookup support, 7 to 9
-    without it (BINARIES.md 1.5; YMXR_MAP).
+    """Supported bound versions: 7 to 11 with lookup support, 7 to 9
+    without it (BINARIES.md 1.5; YMXR_MAP). The descriptor of a core with
+    the lookup records 10 until a link keeps the cut's code
+    (68k/player/switches.S).
     """
-    return (7, 8, 9, 10) if "ymxr_look" in symbols else (7, 8, 9)
+    return (7, 8, 9, 10, 11) if "ymxr_look" in symbols else (7, 8, 9)
 
 
 # The video address counter's low byte, which the raster monitor waits on,
@@ -239,7 +243,7 @@ def list_of(tune_bytes):
     """A bound tune's transformation count and its list's entries, (effect,
     form, transformation) each; None for a tune of no block, and entries of
     None where no list follows the block (BINARIES.md 1.1)."""
-    if tune_bytes[:4] != b"YMXB" or struct.unpack(">H", tune_bytes[4:6])[0] != MAPPED:
+    if tune_bytes[:4] != b"YMXB" or struct.unpack(">H", tune_bytes[4:6])[0] < MAPPED:
         return None
     block = struct.unpack(">i", tune_bytes[24:28])[0]
     if block <= 0:
@@ -430,9 +434,10 @@ def deferring(defines):
 
 def needs(effects):
     """Required switches from the effects byte: bit 4 for deferred starts,
-    bit 5 for lookups (BINARIES.md 2.1).
+    bit 5 for lookups, and bit 6, the cuts of version 11, for the lookup
+    core too (BINARIES.md 2.1; doc/cuts.md).
     """
-    return bool(effects & 0x10), bool(effects & 0x20)
+    return bool(effects & 0x10), bool(effects & 0x60)
 
 
 # A cycle figure the documents read is true where it is within this share
@@ -597,7 +602,7 @@ MOST_FRAMES = None
 # The checks a run makes after it builds the player and before it plays the
 # tunes, in their order, by the names -only reads: the SNDH cores, the two
 # sets of subtunes, and one each of the functions below.
-CHECKS = ("cores", "sets", "unplaced", "deferred", "mapped", "fallbacks",
+CHECKS = ("cores", "sets", "unplaced", "deferred", "cutting", "mapped", "fallbacks",
           "deferred_sizes", "mapped_sizes", "absolute_sizes", "halves", "voices", "widekept",
           "envelope", "wholebyte", "outofreach")
 
@@ -689,9 +694,12 @@ def entry(model, writes):
         one["timer"] = bool(fx["bits"] & 0x40)
         one["place"] = bool(fx["bits"] & 0x20)
         one["deferred"] = bool(fx["bits"] & 0x08)
-        if model.tune.version == MAPPED:
+        if model.tune.version >= MAPPED:
             # the kept mapping after the row (SPEC.md 7.3)
             one["mapping"] = fx["mapping"]
+        if model.tune.version == CUT:
+            # the kept cut after the row (7.3)
+            one["cut"] = fx["cut"]
         e[str(i)] = one
     return {"result": 0, "w": w, "e": e}
 
@@ -728,10 +736,27 @@ class Tune:
         # last transformation: (effect, form, transformation) a page, the
         # forms 0 plain, 1 marked and 2 setR7's ports (BINARIES.md 1.2)
         self.pages = []
+        # Version 11 has the block at 24, or 0 where the tune maps no
+        # value, the cut index at 28 and the source index at 32: a word U,
+        # then a long first row and a long last row a cut. Cut n is
+        # cuts[n - 1], (F, L) (BINARIES.md 1.2, SPEC.md 3.5).
+        self.cuts = []
+        # Where a row's mapping columns and cut columns begin, or None:
+        # mapping columns at 30 in version 10 and in version 11 where bit
+        # 5 is 1, and cut columns in version 11 at 30, or at 34 after the
+        # mapping columns (SPEC.md 3.3.5).
+        self.mapping_at = C if self.version == MAPPED or (
+            self.version == CUT and self.effects & 0x20) else None
+        self.cut_at = (C + 4 if self.effects & 0x20 else C) if self.version == CUT else None
         index_at, end = 24, len(file)
-        if self.version == MAPPED:
-            block = struct.unpack(">i", file[24:28])[0]
-            index_at, end = 28, block
+        block = struct.unpack(">i", file[24:28])[0] if self.version >= MAPPED else 0
+        if self.version == CUT:
+            index_at = 32
+            at = struct.unpack(">i", file[28:32])[0]
+            self.cuts = [(long_at(file, at + 2 + 8 * k), long_at(file, at + 6 + 8 * k))
+                         for k in range(struct.unpack(">H", file[at:at + 2])[0])]
+        if block:
+            index_at, end = (28 if self.version == MAPPED else 32), block
             t = struct.unpack(">H", file[block:block + 2])[0]
             last = block + 2 + 4 * t
             for n in range(t):
@@ -802,10 +827,29 @@ class Model:
         # target is kept for later starts; using is the running target.
         # pending is an armed deferred start or None. mapping is kept
         # for later starts; run is used by current ticks. Mapping 0 is
-        # identity; n selects transformation n (SPEC.md 1.10, 4.8).
+        # identity; n selects transformation n (SPEC.md 1.10, 4.8). cut is
+        # the kept cut and crun the running cut, 0 the whole table and n
+        # cut n (1.11.3); counting marks the player's counted handler on
+        # a source of any shape, which a start under a cut and a recut
+        # aim (68k/player/cut.S).
         self.fx = [dict(target=0, using=0, source=0, select=0, count=0, place=None,
-                        running=False, pending=None, mapping=0, run=0)
+                        running=False, pending=None, mapping=0, run=0, cut=0, crun=0,
+                        counting=False)
                    for _ in range(4)]
+
+    def rows_of(self, cut, R):
+        """The first and the last row of a cut of a source of R rows:
+        0 and R - 1 under cut 0 (SPEC.md 1.11.4)."""
+        return (0, R - 1) if cut == 0 else self.tune.cuts[cut - 1]
+
+    def loop_row(self, i):
+        """The row after the last of effect i's running cut, where its
+        source repeats: RR where the cut includes it, and its first row
+        where it excludes it (SPEC.md 1.11.4)."""
+        fx = self.fx[i]
+        at, R, RR, columns = self.tune.sources[fx["source"]]
+        F, L = self.rows_of(fx["crun"], R)
+        return RR if F <= RR <= L else F
 
     def frame(self):
         """(the chip writes in order, the effects' state after the row)."""
@@ -829,9 +873,12 @@ class Model:
         r = self.playing
         t = EFFECT + 4 * i
         fx = self.fx[i]
-        # Version 10 has 34 columns, including mapping columns.
+        # Version 10 has 34 columns, including mapping columns, and
+        # version 11 a cut column an effect besides (SPEC.md 3.3.5).
         # Thirty-column tables use identity throughout (SPEC.md 1.10.1).
-        m = r[C + i] if len(r) > C else 0
+        tune = self.tune
+        m = r[tune.mapping_at + i] if tune.mapping_at is not None else 0
+        x = r[tune.cut_at + i] if tune.cut_at is not None else 0
         if r[t] & 0x80:
             fx["target"] = r[t] & 0x7F
         fx["restart"] = False
@@ -840,7 +887,7 @@ class Model:
         # a stopped timer on the select alone.
         fx["selected"] = False
         fx["reset_place"] = False
-        fx["set"] = bool((r[t] | r[t + 1] | r[t + 2] | m) & 0x80) or r[t + 3] != 0
+        fx["set"] = bool((r[t] | r[t + 1] | r[t + 2] | m | x) & 0x80) or r[t + 3] != 0
         if not r[t + 1] & 0x80 and m & 0x80:
             # Remap changes kept and running mappings, preserving
             # source, place and rate. Use timer state before any reset
@@ -854,6 +901,26 @@ class Model:
             # A start can replace kept mapping. A stop ignores its
             # mapping column (SPEC.md 1.10.3).
             fx["mapping"] = m & 0x7F
+        if not r[t + 1] & 0x80 and x & 0x80:
+            # A recut, after the remap: the kept cut, and on a running
+            # timer the running cut, the place moved to the cut's first
+            # row where the cut excludes it. A stopped timer keeps its
+            # running cut and its place; a pending start keeps the cut of
+            # its row (SPEC.md 4.3.2). The player aims its counted
+            # handler at any cut but a recut from cut 0 to cut 0, which
+            # leaves the handler as it is (68k/player/cut.S, ymxr_recut).
+            fx["cut"] = x & 0x7F
+            if fx["running"]:
+                if fx["crun"] or fx["cut"]:
+                    fx["counting"] = True
+                fx["crun"] = fx["cut"]
+                F, L = self.rows_of(fx["crun"], tune.sources[fx["source"]][1])
+                if not F <= fx["place"] <= L:
+                    fx["place"] = F
+        elif r[t + 1] & 0x7F and x & 0x80:
+            # a start's cut column replaces the kept cut; a stop ignores
+            # it (4.3.2)
+            fx["cut"] = x & 0x7F
         # What the reader records of the row (SPEC.md 7.3): the source the
         # last row that set the column named, the kept select and count,
         # and the control bits the row sets. A deferred start's are the
@@ -874,18 +941,17 @@ class Model:
             if r[t + 2] & 0x80 and r[t + 2] & 0x08 and source and fx["running"]:
                 # A deferred start on a running timer is armed: the row
                 # leaves the timer, its source, its rate and its place as
-                # they are, and the tick that reads the running source's
-                # last row performs it, at row 0 with bit 5 and otherwise
-                # at the running source's R modulo R of this source, the
-                # count of the rows the running source played (SPEC.md 4.8).
-                was = self.tune.sources[fx["source"]][1]
-                R = self.tune.sources[source][1]
+                # they are, and the tick that reads the last row of the
+                # running cut performs it, at the first row of its cut with
+                # bit 5 and otherwise at L + 1 of the running cut modulo R
+                # of this source, the first row of its cut where that row
+                # is outside it; under cut 0, L + 1 is the running source's
+                # R, the count of the rows it played (SPEC.md 4.8).
                 fx["pending"] = dict(
-                    source=source, using=fx["target"],
-                    place=0 if r[t + 2] & 0x20 else was % R,
+                    source=source, using=fx["target"], reset=bool(r[t + 2] & 0x20),
                     select=r[t + 2] & 7,
                     count=r[t + 3] if r[t + 3] or r[t + 2] & 0x10 else fx["count"],
-                    mapping=fx["mapping"])
+                    mapping=fx["mapping"], cut=fx["cut"])
                 return
             # a stop and a start at the frame drop a pending start (4.8)
             fx["pending"] = None
@@ -896,13 +962,20 @@ class Model:
                 fx["running"] = False
             else:
                 at, R, RR, columns = self.tune.sources[source]
-                # row 0 where the row sets bit 5 of the control column, and
-                # where it does not, the row number already in the place
-                # modulo R of this source (SPEC.md 1.8.4)
-                if r[t + 2] & 0x20 or fx["place"] is None:
-                    fx["place"] = 0
+                # the first row of the kept cut, row 0 under cut 0, where
+                # the row sets bit 5 of the control column, and where it
+                # does not, the row number already in the place modulo R
+                # of this source, the cut's first row where that row is
+                # outside the cut (SPEC.md 1.8.4, 4.3 step 3)
+                fx["crun"] = fx["cut"]
+                fx["counting"] = fx["crun"] != 0
+                F, L = self.rows_of(fx["crun"], R)
+                if r[t + 2] & 0x20:
+                    fx["place"] = F
                 else:
-                    fx["place"] %= R
+                    fx["place"] = (fx["place"] or 0) % R
+                    if not F <= fx["place"] <= L:
+                        fx["place"] = F
                 fx["using"] = fx["target"]
                 # Use the explicit mapping or reuse kept when its column
                 # is unset (SPEC.md 1.10.2).
@@ -924,8 +997,10 @@ class Model:
             fx["select"] = r[t + 2] & 7
             fx["selected"] = bool(r[t + 2] & 7)
             if r[t + 2] & 0x20:
+                # the first row of the running cut, of the source last
+                # started (4.3 step 6)
                 fx["reset_place"] = True
-                fx["place"] = 0
+                fx["place"] = tune.cuts[fx["crun"] - 1][0] if fx["crun"] else 0
         elif r[t + 3]:
             fx["count"] = r[t + 3]
 
@@ -969,28 +1044,35 @@ class Model:
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
         write = self.ticking(i)
-        # A source whose column fills its byte ends on the row its count
+        # Under a cut 1 to 127 the source ends on the cut's last row L. A
+        # source whose column fills its byte ends on the row its count
         # runs out at; every other ends on the marker, bit 7 of the
         # column written last, the marker's column of the row (SPEC.md
-        # 3.2, 5.1).
-        if self.tune.counted[fx["source"]]:
-            last = fx["place"] == R - 1
+        # 3.2, 5.1 step 3).
+        F, L = self.rows_of(fx["crun"], R)
+        if fx["crun"] or self.tune.counted[fx["source"]]:
+            last = fx["place"] == L
         else:
             last = bool(columns[TARGETS[fx["using"]][-1][1]][fx["place"]] & 0x80)
         if last:
             pending = fx["pending"]
             if pending:
-                # At the last source row, install a pending start even
-                # for a repeating source. The next tick reads the new
-                # source through its captured mapping; kept mapping
-                # remains unchanged (SPEC.md 4.8, 1.10.3).
+                # At the last row of the running cut, install a pending
+                # start even for a repeating source. The next tick reads
+                # the new source through its captured mapping, under its
+                # captured cut; the kept mapping and the kept cut remain
+                # unchanged (SPEC.md 4.8, 1.10.3, 1.11.3).
+                R2 = self.tune.sources[pending["source"]][1]
+                F2, L2 = self.rows_of(pending["cut"], R2)
+                place = F2 if pending["reset"] else (L + 1) % R2
                 fx.update(source=pending["source"], using=pending["using"],
-                          place=pending["place"], select=pending["select"],
-                          count=pending["count"], running=True, pending=None,
-                          run=pending["mapping"])
+                          place=place if F2 <= place <= L2 else F2,
+                          select=pending["select"], count=pending["count"], running=True,
+                          pending=None, run=pending["mapping"], crun=pending["cut"],
+                          counting=pending["cut"] != 0)
                 return write, "switch"
             if RR < R:
-                fx["place"] = RR
+                fx["place"] = self.loop_row(i)
                 return write, "loop"
             fx["running"] = False
             return write, "stop"
@@ -1067,12 +1149,18 @@ class Model:
         fx = self.fx[i]
         return fx["source"] != 0 and self.tune.counted[fx["source"]]
 
+    def counting(self, i):
+        """Whether effect i runs the player's counted handler: on a
+        counted source, and on a source of any shape that a start under a
+        cut or a recut aimed it at (68k/player/cut.S)."""
+        return self.counted(i) or (self.fx[i]["source"] != 0 and self.fx[i]["counting"])
+
     def square(self, i):
         """Whether effect i's source is two rows repeating to row 0, which
         the player's square handler uses (68k/player/ticks.S, SQUARE). A
         counted source runs the counted handler at any shape."""
         fx = self.fx[i]
-        if fx["source"] == 0 or self.counted(i):
+        if fx["source"] == 0 or self.counting(i):
             return False
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return len(columns) == 1 and R == 2 and RR == 0
@@ -1081,7 +1169,7 @@ class Model:
         """Whether effect i's source is one row repeating, which the
         player's one-row handler uses (68k/player/ticks.S, ONEROW)."""
         fx = self.fx[i]
-        if fx["source"] == 0 or self.counted(i):
+        if fx["source"] == 0 or self.counting(i):
             return False
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return len(columns) == 1 and R == 1 and RR == 0
@@ -1107,10 +1195,11 @@ class Model:
 
     def left(self, i):
         """The rows a counted handler has left: from the row its place
-        is at to the end of the source (68k/player/ticks.S, TICKC)."""
+        is at to the last row of the running cut, the end of the source
+        under cut 0 (68k/player/ticks.S, TICKC)."""
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
-        return R - fx["place"]
+        return self.rows_of(fx["crun"], R)[1] - fx["place"] + 1
 
     def place_address(self, i):
         """The address the running handler's place is at: the row it
@@ -1217,8 +1306,8 @@ class Machine:
         if tune_bytes[:4] == b"YMXB":
             image_at = struct.unpack(">i", tune_bytes[16:20])[0]
             end = len(tune_bytes)
-            if struct.unpack(">H", tune_bytes[4:6])[0] == MAPPED:
-                end = struct.unpack(">i", tune_bytes[24:28])[0]
+            if struct.unpack(">H", tune_bytes[4:6])[0] >= MAPPED:
+                end = struct.unpack(">i", tune_bytes[24:28])[0] or end
             if image_at > 0:
                 self.images.append((at + image_at, at + end))
 
@@ -1575,17 +1664,21 @@ def reaches(model, i, kind):
         return True
     r = model.tune.rows[model.row]
     t = EFFECT + 4 * i
+    at = model.tune.mapping_at
+    m = r[at + i] if at is not None else 0
     if kind in ("wide", "wide end", "aim", "aim end"):
-        # a start through a transformation runs ymxr_lstart in its place
-        if model.tune.version == MAPPED:
-            m = r[C + i]
-            if m & 0x7F if m & 0x80 else model.fx[i]["mapping"]:
+        # a start through a transformation runs ymxr_lstart in its place,
+        # and a start under a cut ymxr_xstart (68k/player/cut.S)
+        if m & 0x7F if m & 0x80 else model.fx[i]["mapping"]:
+            return False
+        if model.tune.cut_at is not None:
+            x = r[model.tune.cut_at + i]
+            if x & 0x7F if x & 0x80 else model.fx[i]["cut"]:
                 return False
         if kind in ("aim", "aim end"):
             return aims(model.tune, r, i)
         return widens(model.tune, r, i)
     fx = model.fx[i]
-    m = r[C + i]
     if r[t + 2] & 0x80 and r[t + 2] & 0x40:
         return False
     if kind in ("page", "square"):
@@ -1639,7 +1732,7 @@ def inside(code, symbols, bound, tune, workspace):
             # The boundaries inside a step first, since a few rows reach
             # them. The head of an effect the tune does not run is branched
             # over; the point after effect 3 is reached on every row.
-            if "ymxr_look" in symbols and tune.version == MAPPED:
+            if "ymxr_look" in symbols and tune.effects & 0x20:
                 # the remap's piece of the effect's frame code, which a
                 # linked player keeps where the effect maps a value
                 if "ymxr_tick%d_rpage" % i in symbols:
@@ -1801,7 +1894,7 @@ def unplaced(code, symbols):
 
 
 def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
-                 transformations=None):
+                 transformations=None, cuts=False):
     """Build YMXS JSON from timer operations. Each timer maps row numbers
     to start, retune or stop tuples; sources are numbered from 1 and
     contain name, values and repeat position.
@@ -1810,10 +1903,13 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
     tables, emit version 7: starts append a mapping after deferred, and
     ("remap", mapping) changes it. Mapping 0 is identity; a nonempty
     mapping lists one part per target value, 0 for identity or a table
-    number (YMXS, json.md 6.7).
+    number (YMXS, json.md 6.7). With cuts, emit version 8: a start's
+    tuple has its cut, (first, last), after its mapping, the whole table
+    where it is absent, and ("recut", first, last) recuts (json.md 6.1).
     """
     keys = ("shape", "target", "source", "prescaler", "count", "timerReset",
-            "placeReset", "deferred") + (("mapping",) if transformations else ())
+            "placeReset", "deferred") + (("mapping",) if transformations or cuts else ()) \
+        + (("first", "last") if cuts else ())
 
     def timer(ops):
         columns = {key: [-1] * rows for key in keys}
@@ -1824,8 +1920,15 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
                                    ("prescaler", by), ("count", count), ("timerReset", tr),
                                    ("placeReset", pr), ("deferred", deferred)):
                     columns[key][at] = value
-                if transformations:
+                if transformations or cuts:
                     columns["mapping"][at] = op[8] if len(op) > 8 else 0
+                if cuts:
+                    whole = (0, len(sources[source - 1][1]) - 1)
+                    columns["first"][at], columns["last"][at] = \
+                        op[9] if len(op) > 9 and op[9] else whole
+            elif op[0] == "recut":
+                columns["shape"][at] = 4
+                columns["first"][at], columns["last"][at] = op[1], op[2]
             elif op[0] == "retune":
                 _, by, count, tr, pr = op
                 for key, value in (("shape", 1), ("prescaler", by), ("count", count),
@@ -1843,12 +1946,84 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
                         for name, values, rr in sources],
             "registers": ({"r7": [56] + [-1] * (rows - 1)} if registers is None
                           else registers)}
-    if transformations:
+    if transformations or cuts:
         tune["transformations"] = [{"name": name, "entries": list(entries)}
-                                   for name, entries in transformations]
+                                   for name, entries in transformations or ()]
     for letter, ops in timers.items():
         tune["timer" + letter] = timer(ops)
-    return {"format": "ymxs", "version": 7 if transformations else 5, "tunes": [tune]}
+    return {"format": "ymxs", "version": 8 if cuts else 7 if transformations else 5,
+            "tunes": [tune]}
+
+
+def cutting(code, symbols):
+    """Check starts, recuts and places' resets under a cut, tick by tick
+    and every frame against the reader's record (SPEC.md 1.11, 4.3.2,
+    5.1): a cut whose first row is past row 0 and which excludes its
+    source's repeat row; a start at the running row, inside a cut and
+    outside it; a source that plays once, stopped at the cut's last row
+    and started again at that row by a select; a square, a source of one
+    row and a counted source under a cut, recut to the whole table and
+    back; a recut on a stopped timer, read by the start after it; starts
+    under the whole table after a cut, and a place's reset after each; and
+    the timers that share a control register. The third retunes an idle
+    timer and the fifth recuts one, which YMXS's check of the writing
+    rules warns of (YMXS, SPEC.md 6.3), and every other follows the
+    rules."""
+    loop = ("loop of eight", [15, 14, 13, 12, 11, 10, 9, 8], 2)
+    fall = ("fall", list(range(15, -1, -1)), None)
+    six = ("six", [1, 2, 3, 4, 5, 6], 0)
+    square = ("square", [15, 0], 0)
+    held = ("one row", [11], 0)
+    counted = ("counted", [200, 150, 100, 50, 25], 1)
+    slow, quick = (200, 200), (50, 100)
+
+    def start(source, cut=None, target=8, rate=slow, tr=1, pr=1):
+        return ("start", source, target, rate[0], rate[1], tr, pr, 0, 0, cut)
+
+    def recut(first, last):
+        return ("recut", first, last)
+    cases = [
+        ("a cut past row 0 that excludes the repeat row, its place reset", [loop],
+         {"A": {0: start(1, (3, 6)), 5: ("retune", 200, 200, 0, 1), 7: recut(1, 5),
+                11: ("retune", 200, 200, 0, 1), 14: recut(0, 7)}}),
+        ("starts at the running row, inside a cut and outside it", [loop, six],
+         {"A": {0: start(1), 3: start(2, (1, 4), pr=0), 6: start(1, (5, 7), pr=0),
+                9: start(2, (0, 2), pr=0)}}),
+        ("a source that plays once under a cut, started again by a select", [fall],
+         {"A": {0: start(1, (4, 9), rate=quick), 8: ("retune", 50, 100, 1, 0),
+                12: recut(2, 12), 13: ("retune", 50, 100, 1, 0)}}, "warned"),
+        ("a square, one row and a counted source under a cut, recut to the whole table",
+         [square, held, counted],
+         {"A": {0: start(1, (1, 1)), 3: recut(0, 1), 6: recut(0, 0), 9: recut(1, 1)},
+          "B": {0: start(3, (2, 4), target=11), 4: recut(0, 4), 8: recut(1, 3)},
+          "D": {0: start(2, (0, 0), target=9), 5: recut(0, 0)}}),
+        ("a recut on a stopped timer, read by the start after it", [loop, six],
+         {"A": {0: start(1, (2, 5)), 3: ("stop",), 5: recut(1, 3), 7: start(2, (1, 3)),
+                10: start(1, (4, 7), pr=0)}}, "warned"),
+        ("starts under the whole table after a cut, each place reset after",
+         [loop, held, counted],
+         {"A": {0: start(1, (3, 6)), 4: start(1), 6: ("retune", 200, 200, 0, 1)},
+          "B": {0: start(3, (2, 4), target=11), 4: start(3, target=11),
+                7: ("retune", 200, 200, 0, 1)},
+          "D": {0: start(2, (0, 0), target=9), 3: start(2, target=9),
+                5: ("retune", 200, 200, 0, 1)}}),
+        ("recuts on the timers that share a control register", [loop, six],
+         {"C": {0: start(1, (3, 7), target=9), 4: recut(2, 4)},
+          "D": {0: start(2, (1, 5), target=10, rate=quick), 3: recut(0, 2), 6: recut(3, 5)}}),
+    ]
+    played = 0
+    for title, sources, timers, *warned in cases:
+        tune = effects_tune(title, 18, sources, timers, cuts=True)
+        at, version = built(re.sub(r"[^a-z0-9]+", "-", title), tune, checked=not warned)
+        assert version == CUT, "%s: ymxs-to-ymxr wrote version %d" % (title, version)
+        try:
+            frames, ticks = check(at, code, symbols, kit=True)[:2]
+        except AssertionError as e:
+            raise AssertionError("%s: %s" % (title, e))
+        assert ticks, "%s: no tick" % title
+        played += 1
+    return ("cuts: %d tunes, every tick against the model and every frame against the"
+            " reader's record" % played)
 
 
 def deferred(code, symbols):
@@ -2961,7 +3136,7 @@ def lookup_kind(model, i):
     using = model.fx[i]["using"]
     columns = model.wide(i)
     first = using in (22, 23, 24)
-    if model.counted(i):
+    if model.counting(i):
         if columns == 3:
             return "lg" if using == 21 else "lh"
         return ("lf" if first else "le") if columns else "lc"
@@ -3044,7 +3219,7 @@ def lookup_events(model, before, row):
     events = []
     for i in range(4):
         t = EFFECT + 4 * i
-        mapping = row[C + i] if len(row) > C else 0
+        mapping = row[model.tune.mapping_at + i] if model.tune.mapping_at is not None else 0
         fx = model.fx[i]
         shape, ran = before[i]
         if row[t + 1] & 0x80:
@@ -3136,7 +3311,7 @@ def running(m, symbols, model, i, said, ticked=False):
         # lookup_checks.S, the assertions after it)
         if fx["run"]:
             name = lookup_kind(model, i)
-        elif model.counted(i):
+        elif model.counting(i):
             name = {0: "cnt", 2: "env", 3: "cwide"}[model.wide(i)]
         else:
             name = {0: "tick", 2: "two", 3: "three"}[model.wide(i)]
@@ -3144,7 +3319,7 @@ def running(m, symbols, model, i, said, ticked=False):
         place = model.place_address(i)
         assert m.place(at, TICK_PTR) == place, \
             "%seffect %d's place is %x, not %x" % (said, i, m.place(at, TICK_PTR), place)
-        if model.counted(i):
+        if model.counting(i):
             offset = name.upper() if fx["run"] else {0: "TICKC", 2: "TWC", 3: "TWCT"}[model.wide(i)]
             left = equate(offset + "_LEFT", symbols)
             assert m.word(at + left) == model.left(i), \
@@ -3429,9 +3604,12 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                  "sources": [{"rows": [c[r] for r in range(r_) for c in columns],
                               "repeat": rr}
                              for _, r_, rr, columns in tune.sources[1:]]}
-        if tune.version == MAPPED:
+        if tune.effects & 0x20:
             # each transformation's entries, transformation 1 first (7.2)
             first["transformations"] = tune.transformations
+        if tune.version == CUT:
+            # each cut's first and last row, cut 1 first (7.2)
+            first["cuts"] = [{"first": f, "last": l} for f, l in tune.cuts]
         assert entries[0] == first, "the reader's first line is %s, the tune header is %s" % (entries[0], first)
         entries = entries[1:]
     cost = []
@@ -3556,7 +3734,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     kind = "square"
                 elif model.onerow(i):
                     kind = "one"
-                elif model.counted(i):
+                elif model.counting(i):
                     # a counted handler, of one column or of several
                     kind = ("counted wide " if model.wide(i) else "counted ") + then
                 elif model.wide(i) == 3:
@@ -6250,7 +6428,7 @@ def row_kinds(model):
             continue
         t = EFFECT + 4 * i
         fx = model.fx[i]
-        m = r[C + i] if len(r) > C else 0
+        m = r[tune.mapping_at + i] if tune.mapping_at is not None else 0
         rate = bool(r[t + 2] & 0x80 or r[t + 3])
         if r[t + 1] & 0x80 and r[t + 1] & 0x7F:
             s = r[t + 1] & 0x7F
@@ -6543,7 +6721,9 @@ def patched_code_follows_the_subtune(defines, tunes):
         except AnotherFormat:
             continue
         bound = bind(file, work)
-        if bound is None:
+        # a tune of version 11 is outside an SNDH file until a link keeps
+        # the cut's code (68k/player/switches.S)
+        if bound is None or struct.unpack(">H", file[4:6])[0] == CUT:
             continue
         rate = rate or file[6:8]
         if file[6:8] != rate:
@@ -6753,18 +6933,22 @@ def main():
                 "%s: the binder bound a tune of another version" % os.path.basename(one)
             print("%-45s the binder and the reader reject it"
                   % os.path.basename(one))
-        # A tune of version 11 cuts a source, which the reader reads and
-        # the player reads once the cut is in it (doc/cuts.md): until then
-        # it is named and left out of the tunes played.
+        # The kit's cuts.ymxr defers a start under a cut, which the
+        # player reads once the deferred start under a cut is in it, and
+        # a link keeps the cut's code once its pieces are defined
+        # (doc/cuts.md): until then each is named and left out of the
+        # tunes played.
         later = []
         for one in tunes:
             with open(one, "rb") as f:
-                if f.read(6)[4:6] == b"\x00\x0b":
+                if f.read(6)[4:6] == b"\x00\x0b" and (
+                        LINKED or os.path.basename(one) == "cuts.ymxr"):
                     later.append(one)
         tunes = [one for one in tunes if one not in later]
         for one in later:
-            print("%-45s version 11, which this player does not read"
-                  % os.path.basename(one))
+            print("%-45s %s" % (os.path.basename(one), "version 11, which a link leaves out"
+                                if LINKED else "a deferred start under a cut, which this"
+                                " player does not read"))
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():
@@ -6832,8 +7016,12 @@ def main():
     first = None
     for one in tunes:
         try:
-            convert(one, opens)
+            file, _ = convert(one, opens)
         except AnotherFormat:
+            continue
+        # a tune of version 11 is outside an SNDH file until a link keeps
+        # the cut's code (68k/player/switches.S)
+        if struct.unpack(">H", file[4:6])[0] == CUT:
             continue
         first = one
         break
@@ -6855,6 +7043,7 @@ def main():
                 defines, [at for _, at, kinds in lookup][:SET_MAPPED] + tunes))
         for name, run in (("unplaced", lambda: unplaced(code, symbols)),
                           ("deferred", lambda: deferred(*deferring(defines))),
+                          ("cutting", lambda: cutting(code, symbols)),
                           ("mapped", lambda: mapped(code, symbols)),
                           ("fallbacks", lambda: fallbacks(code, symbols)),
                           ("deferred_sizes", deferred_sizes),
