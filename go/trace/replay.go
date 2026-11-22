@@ -21,8 +21,9 @@ import (
 // Effect records one effect after a frame: Source 0 means idle. Set
 // marks an effect-column write; Timer, Place and Deferred record
 // control bits 6, 5 and 3. Mapping is the kept mapping, initially 0 for
-// identity. A deferred start can run through a different captured
-// mapping (SPEC.md 1.10.3, 7.3).
+// identity, and Cut the kept cut, initially 0 for the whole table. A
+// deferred start can run through a different captured mapping and cut
+// (SPEC.md 1.10.3, 1.11.3, 7.3).
 type Effect struct {
 	Target   int
 	Source   int
@@ -34,6 +35,7 @@ type Effect struct {
 	Place    bool
 	Deferred bool
 	Mapping  int
+	Cut      int
 }
 
 // Replay is the model over one table.
@@ -45,11 +47,15 @@ type Replay struct {
 
 	table *dtx.Table
 	row   int
+
+	// effects is the effects used, whose bits 5 and 6 lay out the columns
+	// after 29 (SPEC.md 3.3.5).
+	effects int
 }
 
-// Of is a model at the table's first row.
-func Of(table *dtx.Table) *Replay {
-	out := &Replay{table: table}
+// Of is a model at the first row of a table of that effects byte.
+func Of(table *dtx.Table, effects int) *Replay {
+	out := &Replay{table: table, effects: effects}
 	for i := range out.Registers {
 		out.Registers[i] = -1
 	}
@@ -114,18 +120,27 @@ func (m *Replay) Step() {
 			place = r[t+2]&0x20 != 0
 			deferred = r[t+2]&ymxr.Deferred != 0
 		}
-		// A start or remap can replace the kept mapping. A remap preserves
-		// the source. A stop ignores its mapping column; the check reports
-		// that invalid combination (SPEC.md 1.10, 6.4).
+		// A start or remap can replace the kept mapping, and a start or
+		// recut the kept cut. A remap and a recut preserve the source. A
+		// stop ignores its mapping and cut columns; the check reports that
+		// invalid combination (SPEC.md 1.10, 1.11, 6.4).
+		mc := ymxr.MappingColumnOf(m.effects, i)
+		xc := ymxr.CutColumnOf(m.effects, i)
+		mapped := mc >= 0 && r[mc]&0x80 != 0
+		cut := xc >= 0 && r[xc]&0x80 != 0
+		stop := r[t+1] == 0x80
 		mapping := was.Mapping
-		mapped := columns == ymxr.Mapped && r[ymxr.MappingColumn+i]&0x80 != 0
-		if mapped && r[t+1] != 0x80 {
-			mapping = int(r[ymxr.MappingColumn+i]) & 0x7F
+		if mapped && !stop {
+			mapping = int(r[mc]) & 0x7F
 		}
-		set := (r[t]|r[t+1]|r[t+2])&0x80 != 0 || r[t+3] != 0 || mapped
+		kept := was.Cut
+		if cut && !stop {
+			kept = int(r[xc]) & 0x7F
+		}
+		set := (r[t]|r[t+1]|r[t+2])&0x80 != 0 || r[t+3] != 0 || mapped || cut
 		m.Effect[i] = Effect{Target: target, Source: source, Select: selects,
 			Count: count, Started: started, Set: set, Timer: timer, Place: place,
-			Deferred: deferred, Mapping: mapping}
+			Deferred: deferred, Mapping: mapping, Cut: kept}
 	}
 	m.EnvelopeWritten = false
 	for i := range m.Written {

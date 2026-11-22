@@ -77,7 +77,7 @@ func Of(song ym.Song, args []string) []string {
 	if len(wrong) > 0 {
 		return wrong
 	}
-	model := trace.Of(tune.Table)
+	model := trace.Of(tune.Table, tune.Effects)
 	drumEnd := [2]int{-1, -1}
 	calls := trace.Calls(tune.Table)
 	quiet := report.Quiet()
@@ -219,36 +219,66 @@ func min(a, b int) int {
 }
 
 // Places reports source numbers above the file's source count,
-// transformation numbers above its transformation count, and stops with
-// a set mapping column (SPEC.md 6.4). A stop ignores that column.
-// Starts without place reset use their current row number modulo the
-// source length (1.8.4).
+// transformation numbers above its transformation count, cut numbers above
+// its cut count, stops with a set mapping or cut column, and a start or a
+// recut under a cut that ends past the last row of the source it runs
+// (SPEC.md 6.4, rules 2(b), 2(i), 3(c)). A stop ignores those two columns.
 func Places(file ymxr.File) []string {
 	var lines []string
-	mapped := file.Table.Columns() == ymxr.Mapped
+	sources := len(file.Sources)
+	// the kept cut of each effect after the row, and the source last
+	// started on it, 0 before the first start (SPEC.md 1.11.3)
+	var kept, last [4]int
 	for r := 0; r < file.Table.Rows(); r++ {
 		for i := 0; i < 4; i++ {
 			source := int(file.Table.Column(ymxr.Effect + 4*i + 1)[r])
-			if source&0x80 != 0 && source&0x7F > len(file.Sources) {
+			if source&0x80 != 0 && source&0x7F > sources {
 				lines = append(lines, fmt.Sprintf("%d: effect %d starts source %d", r, i,
 					source&0x7F)+", and the file has "+
-					report.Count(len(file.Sources), "source", "sources"))
+					report.Count(sources, "source", "sources"))
 			}
-			if !mapped {
-				continue
+			mapping := 0
+			if m := file.Mapping(i); m >= 0 {
+				mapping = int(file.Table.Column(m)[r])
 			}
-			mapping := int(file.Table.Column(ymxr.MappingColumn + i)[r])
-			if mapping&0x80 == 0 {
-				continue
-			}
-			if source == 0x80 {
+			if mapping&0x80 != 0 && source == 0x80 {
 				lines = append(lines, fmt.Sprintf("%d: effect %d stops and sets its mapping"+
 					" column, and a stop leaves the mapping as it is", r, i))
-			} else if mapping&0x7F > len(file.Transformations) {
+			} else if mapping&0x80 != 0 && mapping&0x7F > len(file.Transformations) {
 				lines = append(lines, fmt.Sprintf("%d: effect %d maps through transformation"+
 					" %d", r, i, mapping&0x7F)+", and the file has "+
 					report.Count(len(file.Transformations), "transformation",
 						"transformations"))
+			}
+			starts := source&0x80 != 0 && source&0x7F >= 1 && source&0x7F <= sources
+			if starts {
+				last[i] = source & 0x7F
+			}
+			cut := 0
+			if x := file.CutColumn(i); x >= 0 {
+				cut = int(file.Table.Column(x)[r])
+			}
+			switch {
+			case cut&0x80 != 0 && source == 0x80:
+				lines = append(lines, fmt.Sprintf("%d: effect %d stops and sets its cut column,"+
+					" and a stop leaves the cut as it is", r, i))
+			case cut&0x80 != 0 && cut&0x7F > len(file.Cuts):
+				lines = append(lines, fmt.Sprintf("%d: effect %d runs under cut %d", r, i,
+					cut&0x7F)+", and the file has "+report.Count(len(file.Cuts), "cut", "cuts"))
+			default:
+				if cut&0x80 != 0 {
+					kept[i] = cut & 0x7F
+				}
+				recuts := source&0x80 == 0 && cut&0x80 != 0
+				if (starts || recuts) && kept[i] > 0 && last[i] > 0 {
+					under := file.Cuts[kept[i]-1]
+					rows := file.Sources[last[i]-1].Rows()
+					if under.Last >= rows {
+						lines = append(lines, fmt.Sprintf("%d: effect %d runs source %d of %s"+
+							" under cut %d, rows %d to %d", r, i, last[i],
+							report.Count(rows, "row", "rows"), kept[i], under.First, under.Last))
+					}
+				}
 			}
 		}
 	}

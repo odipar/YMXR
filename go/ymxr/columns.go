@@ -17,6 +17,74 @@ const Mapped = 34
 // transformation block are present (SPEC.md 3.3).
 const Maps = 0x20
 
+// Cuts is effects-used bit 6: version 11, its cut columns and cut index
+// (SPEC.md 3.3).
+const Cuts = 0x40
+
+// CutColumn is the first cut column where the tune maps a value, and All
+// the column count of a table that maps a value and cuts a source
+// (SPEC.md 3.3.5). Where the tune maps none, the cut columns are 30 to 33.
+const (
+	CutColumn = 34
+	All       = 38
+)
+
+// MostCuts is the cut limit: cut numbers 1 to 127 select a cut of the
+// index; 0 is the whole table (SPEC.md 1.11).
+const MostCuts = 127
+
+// Cut is a cut of the index: its first row and its last row (SPEC.md
+// 3.5).
+type Cut struct {
+	First, Last int
+}
+
+// HasMapping is whether the effects byte marks the mapping columns, bit 5.
+func HasMapping(effects int) bool {
+	return effects&Maps != 0
+}
+
+// HasCuts is whether the effects byte marks the cut columns, bit 6.
+func HasCuts(effects int) bool {
+	return effects&Cuts != 0
+}
+
+// ColumnCount is the column count of a table of that effects byte: 30,
+// with four mapping columns where bit 5 is 1 and four cut columns where
+// bit 6 is 1 (SPEC.md 3.3.5).
+func ColumnCount(effects int) int {
+	count := C
+	if HasMapping(effects) {
+		count += 4
+	}
+	if HasCuts(effects) {
+		count += 4
+	}
+	return count
+}
+
+// MappingColumnOf is effect i's mapping column, 30 + i, or -1 where the
+// table has no mapping columns (SPEC.md 1.10).
+func MappingColumnOf(effects, i int) int {
+	if !HasMapping(effects) {
+		return -1
+	}
+	return MappingColumn + i
+}
+
+// CutColumnOf is effect i's cut column, 30 + i where the tune maps no value
+// and 34 + i where it maps one, or -1 where the table has no cut columns
+// (SPEC.md 1.11.1).
+func CutColumnOf(effects, i int) int {
+	if !HasCuts(effects) {
+		return -1
+	}
+	if HasMapping(effects) {
+		return CutColumn + i
+	}
+	return MappingColumn + i
+}
+
 // MostTransformations is the transformation limit: numbers 1 to 127
 // select lookups; 0 selects identity (SPEC.md 1.10).
 const MostTransformations = 127
@@ -87,10 +155,12 @@ const MFP = 2457600
 // Prescaler is the number each select divides that clock by (SPEC.md 1.9).
 var Prescaler = [8]int{0, 4, 10, 16, 50, 64, 100, 200}
 
-// Columns contains a tune's columns, repeat row, effects used and
-// optional transformations. Version 9 has thirty columns; version 10
-// adds four mapping columns (SPEC.md 1.10, 3.4). Schema encodes these
-// from a YMXS tune; the ym package imports a dump into that structure.
+// Columns contains a tune's columns, repeat row, effects used, optional
+// transformations and cuts. Version 9 has thirty columns; version 10 adds
+// four mapping columns, and version 11 four cut columns after the mapping
+// columns where the tune has them (SPEC.md 1.10, 1.11, 3.4, 3.5). Schema
+// encodes these from a YMXS tune; the ym package imports a dump into that
+// structure.
 type Columns struct {
 	// Column[c][frame].
 	Column [][]byte
@@ -107,6 +177,10 @@ type Columns struct {
 	// at index n - 1 and key k selects entry k. Empty with C columns
 	// (SPEC.md 3.4).
 	Transformations [][]byte
+
+	// Cuts is the cut index: cut n is at index n - 1, and empty below
+	// version 11 (SPEC.md 3.5).
+	Cuts []Cut
 }
 
 // Duration is the frames a source of that many rows runs for at a rate,
@@ -123,11 +197,24 @@ func Duration(rows, selects, count, frameRate int) int {
 	return int((scaled + MFP - 1) / MFP)
 }
 
-// Name is a column's name in a report: a register by its number, and an
-// effect column by its effect and its part of it.
+// NameIn is a column's name in the table of that effects byte, whose cut
+// columns are 30 to 33 where it has no mapping columns (SPEC.md 3.3.5).
+func NameIn(c, effects int) string {
+	if c >= MappingColumn && HasCuts(effects) && !HasMapping(effects) {
+		return "effect " + itoa(c-MappingColumn) + " cut"
+	}
+	return Name(c)
+}
+
+// Name is a column's name in a report, in the layout of a table that maps a
+// value and cuts a source: a register by its number, and an effect column
+// by its effect and its part of it.
 func Name(c int) string {
 	if c < Effect {
 		return "R" + itoa(c)
+	}
+	if c >= CutColumn {
+		return "effect " + itoa(c-CutColumn) + " cut"
 	}
 	if c >= MappingColumn {
 		return "effect " + itoa(c-MappingColumn) + " mapping"

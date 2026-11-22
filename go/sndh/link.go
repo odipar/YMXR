@@ -268,7 +268,7 @@ func BlocksOf(tunes []ymxr.File) []string {
 				continue
 			}
 			needed[fmt.Sprintf("effect%d", i)] = true
-			if tune.Effects&ymxr.Maps != 0 && sets(tune, ymxr.MappingColumn+i, 0) {
+			if ymxr.HasMapping(tune.Effects) && sets(tune, tune.Mapping(i), 0) {
 				needed[fmt.Sprintf("map%d", i)] = true
 			}
 			if tune.Effects&ymxr.Defers != 0 && sets(tune, ymxr.Effect+4*i+2, ymxr.Deferred) {
@@ -323,7 +323,7 @@ func sets(tune ymxr.File, c int, bits byte) bool {
 // remap reaches.
 func LookupsOf(tune ymxr.File) []string {
 	var out []string
-	if tune.Version != ymxr.Version {
+	if !ymxr.HasMapping(tune.Effects) {
 		return out
 	}
 	seen := map[string]bool{}
@@ -381,7 +381,7 @@ func lookupRow(tune ymxr.File, row int, target, mapping *[4]int, running *[4]map
 		tg := int(tune.Table.Column(t)[row])
 		src := int(tune.Table.Column(t + 1)[row])
 		control := int(tune.Table.Column(t + 2)[row])
-		m := int(tune.Table.Column(ymxr.MappingColumn + i)[row])
+		m := int(tune.Table.Column(tune.Mapping(i))[row])
 		if tg&0x80 != 0 {
 			target[i] = tg & 0x7F
 		}

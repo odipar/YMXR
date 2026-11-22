@@ -44,20 +44,26 @@ import (
 var BoundMagic = []byte{'Y', 'M', 'X', 'B'}
 
 // Bound field offsets: BoundIndexAt is the source index in versions 7
-// to 9; version 10 replaces that position with BoundTransformationsAt,
-// the transformation-block pointer.
+// to 9; versions 10 and 11 replace that position with
+// BoundTransformationsAt, the transformation-block pointer, and version
+// 11 the next with BoundCutsAt, the cut-index pointer.
 const (
 	StateAt                = 12
 	ImageAt                = 16
 	BoundTableAt           = 20
 	BoundIndexAt           = 24
 	BoundTransformationsAt = 24
+	BoundCutsAt            = 28
 )
 
 // BoundIndex returns the source-index offset: 24 in versions 7 to 9; 28
-// in version 10, after the transformation-block pointer.
+// in version 10, after the transformation-block pointer; 32 in version 11,
+// after the cut-index pointer.
 func BoundIndex(version int) int {
-	if version == ymxr.Version {
+	switch version {
+	case ymxr.VersionCut:
+		return BoundCutsAt + 4
+	case ymxr.Version:
 		return BoundTransformationsAt + 4
 	}
 	return BoundIndexAt
@@ -105,6 +111,12 @@ func (set Set) TuneBytes(i int) int {
 	tune := set.Tunes[i]
 	if set.sources.bytes == 0 {
 		return len(tune)
+	}
+	// with the sources pooled a subtune keeps its header, its index and,
+	// in version 11, the cut index after the index (BINARIES.md 1.3)
+	if ymxr.GetWord(tune, 4) == ymxr.VersionCut {
+		cuts := ymxr.GetLong(tune, BoundCutsAt)
+		return cuts + 2 + 8*ymxr.GetWord(tune, cuts)
 	}
 	return BoundIndex(ymxr.GetWord(tune, 4)) + 4*len(set.sources.offsets[i])
 }
@@ -227,9 +239,8 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 // the unit, and the column count of a table of 34 (DTX abi.md 1). Under
 // DTX3 each table defines its ring, and the image has the copy code where a
 // table of it has copies, so neither separates two tables. The period
-// follows C at the writer's unit, so a table of 30 columns and one of 34 go
-// into separate images, and the key of a table of 30 is the key of version
-// 9.
+// follows C at the writer's unit, so tables of 30, 34 and 38 columns go into
+// separate images, and the key of a table of 30 is the key of version 9.
 func shape(dtx3 []byte) (string, error) {
 	header, err := dtx.ReadHeader(dtx3)
 	if err != nil {
@@ -237,7 +248,7 @@ func shape(dtx3 []byte) (string, error) {
 	}
 	payload := header.Length()
 	columns := ""
-	if header.Columns == ymxr.Mapped {
+	if header.Columns != ymxr.C {
 		columns = fmt.Sprintf(", %d columns", header.Columns)
 	}
 	return fmt.Sprintf("DTX%d at unit %d%s, values of %d", header.Variant,
@@ -268,7 +279,7 @@ func Bound(tuneFile []byte) ([]byte, error) {
 // offsets are relative to the block, so relocation preserves them. The
 // reader has already checked bounds (SPEC.md 3.4.2).
 func Block(tuneFile []byte) []byte {
-	if ymxr.GetWord(tuneFile, 4) != ymxr.Version {
+	if !ymxr.HasMapping(int(tuneFile[ymxr.EffectsAt])) {
 		return nil
 	}
 	at := ymxr.GetLong(tuneFile, ymxr.TransformationsAt)
@@ -311,8 +322,17 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	// Place sources before the image to preserve their reach through the
 	// player's signed word displacements. Put the transformation block
 	// last: frames read it, while ticks read sources and prepared lookup
-	// pages (BINARIES.md 1.3).
+	// pages. The cut index follows the source index, where a subtune whose
+	// sources an SNDH file pools keeps it (BINARIES.md 1.3).
 	here := ymxr.Align(index + 4*count)
+	var cuts []byte
+	cutsAt := 0
+	if read.Version == ymxr.VersionCut {
+		at := ymxr.GetLong(tuneFile, ymxr.CutsAt)
+		cuts = tuneFile[at : at+2+8*ymxr.GetWord(tuneFile, at)]
+		cutsAt = here
+		here = ymxr.Align(here + len(cuts))
+	}
 	sourceAt := make([]int, count)
 	for i := 0; i < count; i++ {
 		sourceAt[i] = here
@@ -341,6 +361,10 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	ymxr.PutLong(bound, BoundTableAt, table)
 	if block != nil {
 		ymxr.PutLong(bound, BoundTransformationsAt, blockAt)
+	}
+	if read.Version == ymxr.VersionCut {
+		ymxr.PutLong(bound, BoundCutsAt, cutsAt)
+		copy(bound[cutsAt:], cuts)
 	}
 	for i := 0; i < count; i++ {
 		// A counted source's mark is in the index a player reads, so

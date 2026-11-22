@@ -386,6 +386,9 @@ final class YmxsTest {
         assertEquals(0, recut.column[Columns.EFFECT + 1][1], "the recut's source column");
         assertArrayEquals(file(triangle(new Cut(0, 31), Tunes.EMPTY)), file(recut(Timer.D)),
                 "the file of the tune without the recut");
+        // a recut outside the tune whose cut a start inside it numbers
+        assertArrayEquals(file(cut()), file(triangle(new Cut(0, 15), row(Map.of(), Timer.D,
+                new Recut(new Cut(0, 15))))), "the file of the tune without the recut on D");
     }
 
     /** A tune that maps a value and cuts a source has thirty-eight columns:
@@ -405,6 +408,23 @@ final class YmxsTest {
         assertEquals("effect 0 cut", org.ymxr.Tune.name(Columns.MAPPING, Columns.CUTS));
     }
 
+    /** The rows of rule 2(i): a start, a recut to the running cut, a recut, a
+     *  start under the kept cut, a start under the whole table, a stop, a
+     *  recut of the idle timer and the repeat row's recut. */
+    static Tune keptCuts() {
+        Cut low = new Cut(0, 15);
+        Cut high = new Cut(16, 31);
+        return built(List.of(
+                row(Map.of(), Timer.A, under(low, Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, new Recut(low)),
+                row(Map.of(), Timer.A, new Recut(high)),
+                row(Map.of(), Timer.A, under(high, Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, under(new Cut(0, 31), Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, Tunes.STOP),
+                row(Map.of(), Timer.A, new Recut(new Cut(0, 31))),
+                row(Map.of(), Timer.A, new Recut(high))), 7);
+    }
+
     /**
      * Rule 2(i): a start writes the cut column where its value differs from
      * the kept cut, 0 for the whole table; a recut where its cut differs
@@ -415,16 +435,7 @@ final class YmxsTest {
     void theCutColumnIsWrittenWhereItDiffersFromWhatThePlayerKeeps() {
         Cut low = new Cut(0, 15);
         Cut high = new Cut(16, 31);
-        Tune tune = built(List.of(
-                row(Map.of(), Timer.A, under(low, Tunes.NO_PARTS)),
-                row(Map.of(), Timer.A, new Recut(low)),
-                row(Map.of(), Timer.A, new Recut(high)),
-                row(Map.of(), Timer.A, under(high, Tunes.NO_PARTS)),
-                row(Map.of(), Timer.A, under(new Cut(0, 31), Tunes.NO_PARTS)),
-                row(Map.of(), Timer.A, Tunes.STOP),
-                row(Map.of(), Timer.A, new Recut(new Cut(0, 31))),
-                row(Map.of(), Timer.A, new Recut(high))), 7);
-        Columns columns = Schema.of(tune).columns();
+        Columns columns = Schema.of(keptCuts()).columns();
         byte[] cut = columns.column[Columns.MAPPING];
         assertEquals(List.of(low, high, new Cut(0, 31)), columns.cuts, "first-use order");
         assertEquals(List.of(0x81, 0x00, 0x82, 0x00, 0x80, 0x00, 0x83, 0x82),

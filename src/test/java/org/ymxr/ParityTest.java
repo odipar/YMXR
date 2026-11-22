@@ -559,7 +559,7 @@ final class ParityTest {
     @Test
     void aTuneUnderACutReadsTheSameInBothTrees() throws Exception {
         for (org.ymxs.YMXS.Tune tune : List.of(ConformanceTest.cut(), ConformanceTest.cuts(),
-                YmxsTest.recut(org.ymxs.YMXS.Timer.D))) {
+                YmxsTest.recut(org.ymxs.YMXS.Timer.D), YmxsTest.keptCuts())) {
             byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
                     .getBytes(StandardCharsets.UTF_8), "-silent");
             both("ymxr-trace", file);

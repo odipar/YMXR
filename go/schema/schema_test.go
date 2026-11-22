@@ -931,3 +931,64 @@ func TestARateThatAgreesAcrossTheWrapIsLeftUnset(t *testing.T) {
 		t.Fatalf("the tune file has the sha256 %s", got)
 	}
 }
+
+// triangleUnder is a start on setR8 of a triangle of 32 rows, under the cut.
+func triangleUnder(t *testing.T, cut ymxs.Cut) ymxs.Start {
+	t.Helper()
+	values := make([]int, 32)
+	for n := range values {
+		values[n] = n
+		if n >= 16 {
+			values[n] = 31 - n
+		}
+	}
+	triangle := ymxs.RepeatingSource("triangle", values, 0)
+	start, err := ymxs.Starting(ymxs.Setting(ymxs.R8), triangle, timing(t), false,
+		ymxs.Mapping{}, cut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return start
+}
+
+// Rule 2(i): a start writes the cut column where its value differs from
+// the kept cut, 0 for the whole table; a recut where its cut differs from
+// the running cut, on an idle timer as on a running one; a stop leaves the
+// column unset and the running cut the kept cut. The cut columns are 30 to
+// 33 in a tune that maps no value (SPEC.md 3.3.5).
+func TestTheCutColumnIsWrittenWhereItDiffersFromWhatThePlayerKeeps(t *testing.T) {
+	low := ymxs.Cut{First: 0, Last: 15}
+	high := ymxs.Cut{First: 16, Last: 31}
+	whole := ymxs.Cut{First: 0, Last: 31}
+	one := made(t, tune([]ymxs.Row{
+		on(ymxs.TimerA, triangleUnder(t, low)),
+		on(ymxs.TimerA, ymxs.Recut{Cut: low}),
+		on(ymxs.TimerA, ymxs.Recut{Cut: high}),
+		on(ymxs.TimerA, triangleUnder(t, high)),
+		on(ymxs.TimerA, triangleUnder(t, whole)),
+		on(ymxs.TimerA, ymxs.Stop{}),
+		on(ymxs.TimerA, ymxs.Recut{Cut: whole}),
+		on(ymxs.TimerA, ymxs.Recut{Cut: high}),
+	}, 7))
+	if one.Columns.Effects != ymxr.Cuts|1 || len(one.Columns.Column) != ymxr.Mapped {
+		t.Fatalf("effects %#x and %d columns, where bit 6 and 34 columns are",
+			one.Columns.Effects, len(one.Columns.Column))
+	}
+	want := []ymxr.Cut{{First: 0, Last: 15}, {First: 16, Last: 31}, {First: 0, Last: 31}}
+	if fmt.Sprint(one.Columns.Cuts) != fmt.Sprint(want) {
+		t.Fatalf("the cuts are %v, where first-use order is %v", one.Columns.Cuts, want)
+	}
+	expect(t, "the cut column", one.Columns.Column[ymxr.MappingColumn],
+		[]byte{0x81, 0x00, 0x82, 0x00, 0x80, 0x00, 0x83, 0x82})
+}
+
+// A recut on a timer outside the tune leaves every column unset, as a
+// remap there does, where a start inside it numbers its cut (SPEC.md 6,
+// rule 2(a)).
+func TestARecutOutsideTheTuneIsLeftOut(t *testing.T) {
+	low := ymxs.Cut{First: 0, Last: 15}
+	with := made(t, tune([]ymxs.Row{on(ymxs.TimerA, triangleUnder(t, low)),
+		on(ymxs.TimerD, ymxs.Recut{Cut: low})}, 0))
+	without := made(t, tune([]ymxs.Row{on(ymxs.TimerA, triangleUnder(t, low)), {}}, 0))
+	expect(t, "the tune file", file(t, with), file(t, without))
+}

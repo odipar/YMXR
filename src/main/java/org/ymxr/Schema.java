@@ -361,7 +361,7 @@ final class Schema {
                     } else if (one.getValue() instanceof Remap remap && claimed[i]) {
                         maps[i] |= !Tunes.isIdentity(remap.mapping());
                     }
-                    cutting[i] |= value(one.getValue()) > 0;
+                    cutting[i] |= value(i, one.getValue()) > 0;
                 }
             }
         }
@@ -403,17 +403,17 @@ final class Schema {
             }
         }
 
-        /** The cut number a start or a recut selects: 0 for a start under
-         *  the whole table of its source, the number of its cut otherwise,
-         *  and -1 for every other operation and a recut outside the tune
-         *  (rule 2(i)). */
-        int value(Effect effect) {
+        /** The cut number a start or a recut on effect i selects: 0 for a
+         *  start under the whole table of its source, the number of its cut
+         *  otherwise, and -1 for every other operation and a recut outside
+         *  the tune (rule 2(i)). */
+        int value(int i, Effect effect) {
             if (effect instanceof Start start) {
                 Cut one = start.cut();
                 return one.equals(Tunes.whole(Tunes.source(start.connection())))
                         ? 0 : cuts.indexOf(one) + 1;
             }
-            if (effect instanceof Recut recut) {
+            if (effect instanceof Recut recut && claimed[i]) {
                 int at = cuts.indexOf(recut.cut());
                 return at < 0 ? -1 : at + 1;
             }
@@ -494,7 +494,7 @@ final class Schema {
                 // unset, as a remap there does (SPEC.md 6, rule 2(a)). One
                 // on a timer of the tune writes the cut column where its
                 // cut differs from the running cut (rule 2(i)).
-                int v = kept.value(recut);
+                int v = kept.value(i, recut);
                 if (v < 0 || v == kept.cutRunning[i]) {
                     return 0;
                 }
@@ -507,7 +507,7 @@ final class Schema {
             case Start start -> {
                 // The start's cut column, where its cut differs from the
                 // kept cut; a deferred start captures it (rule 2(i)).
-                int v = kept.value(start);
+                int v = kept.value(i, start);
                 if (v != kept.cut[i]) {
                     out[cutColumn(i)] = (byte) (0x80 | v);
                     kept.cut[i] = v;
