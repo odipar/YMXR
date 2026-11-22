@@ -120,7 +120,11 @@ FX_SHAPE        equ     3               ; which handler the timer's vector
                                         ; points at: 0 the general one, $FF
                                         ; the square's, 1 the one-row
                                         ; source's. The last two encode the
-                                        ; place as an immediate
+                                        ; place as an immediate. 2 and 3 the
+                                        ; handlers of two and three columns,
+                                        ; 4 to 6 the counted ones of one to
+                                        ; three, and 7 to 9 the counted ones
+                                        ; with a marked source, under a cut
 FX_FIRST        equ     4               ; the place at row 0: the running
                                         ; source's first row, and the first row
                                         ; of the column the running handler

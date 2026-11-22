@@ -32,8 +32,8 @@ ymxr_kindof:    moveq   #0,d0
                 beq.s   .kind
                 addq.w  #1,d0
 .kind:          rts
-.look:          dc.b    0,0,2,4,1,6,8,0         ; by FX_SHAPE, 0 to 6
-.ident:         dc.b    10,0,12,13,11,14,15,0
+.look:          dc.b    0,0,2,4,1,6,8,1,6,8     ; by FX_SHAPE, 0 to 9
+.ident:         dc.b    10,0,12,13,11,14,15,11,14,15
 
 ; a4 the handler of the kind a2 describes, of effect d6, in bank d4. d5
 ; clobbered.

@@ -179,8 +179,12 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.b  FX_SHAPE(a3),d5         ; R of a running source of
                 cmp.b   #2,d5                   ; several columns, or of a
                 bcs.s   .header                 ; counted one, in the record;
-                cmp.b   #6,d5                   ; of any other, in the header
-                bhi.s   .header                 ; before its first row
+                .if     YMXR_MAP                ; of any other, in the header
+                cmp.b   #9,d5                   ; before its first row
+                .else
+                cmp.b   #6,d5
+                .endif
+                bhi.s   .header
                 move.l  FX_ROWS(a3),d3
                 bra.s   .last
 .header:        movea.l FX_FIRST(a3),a5
@@ -214,6 +218,8 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.w  #BANK,d4
 .bank:          move.w  d4,FX_ABANK(a3)
                 .if     YMXR_MAP
+                tst.b   FX_CUT(a3)              ; under a cut 1 to 127, the
+                bne.w   .xarm                   ; counted kind
                 tst.b   FX_AMAP(a3)             ; a source that steps a place,
                 beq.s   .ident                  ; through a transformation: the
                 move.l  d0,d5                   ; lookup instance of its shape
@@ -227,8 +233,7 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 sf      WS_ARMING(a0)
                 lea     -ARMOFF(a3),a3          ; the record, past its mirror
                 bra.w   .armed
-.ident:         tst.b   FX_CUT(a3)              ; under a cut 1 to 127, the
-                bne.w   .xarm                   ; counted handler
+.ident:
                 .endif
                 tst.l   d0
                 bmi.s   .shaped
@@ -437,38 +442,13 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 moveq   #1,d0
                 rts
                 .if     YMXR_MAP
-; a start under a cut 1 to 127: the counted handler of the bank above, at
-; the row above, its counter the rows from there to the cut's last row
-; and its loop the cut's (ymxr_xloop)
-.xarm:          move.l  a1,-(sp)
-                move.l  d3,-(sp)                ; the row
-                lea     ymxr_at_counted(pc),a5
-                move.w  d6,d5
-                add.w   d5,d5
-                adda.w  (a5,d5.w),a5
-                adda.w  d4,a5
-                moveq   #0,d0
-                move.b  FX_CUT(a3),d0
-                bsr.w   ymxr_xrows              ; F and L
-                bsr.w   ymxr_xloop              ; the loop cell and a pass
-                move.l  (sp)+,d3
-                sub.l   d3,d1
-                addq.l  #1,d1                   ; the rows left
-                move.b  FX_TARGET(a3),TICKC_SEL(a5)
-                move.l  a4,d0
-                add.l   d3,d0                   ; the place
-                .if     YMXR_PCREL
-                sub.l   a5,d0
-                sub.l   #TICKC_PTR,d0
-                move.w  d0,TICKC_PTR(a5)
-                move.w  a1,TICKC_CELL(a5)
-                .else
-                move.l  d0,TICKC_PTR(a5)
-                move.l  a1,TICKC_CELL(a5)
-                .endif
-                move.w  d1,TICKC_LEFT(a5)
-                move.w  d6,TICKC_RELD(a5)
-                move.l  (sp)+,a1
-                move.b  #4,FX_SHAPE+ARMOFF(a3)
-                bra.w   .single
+; a start under a cut 1 to 127: the counted kind of its columns, through
+; the identity or the captured mapping, in the bank above and at the row
+; above (ymxr_kstart)
+.xarm:          move.w  4(sp),d1                ; the source
+                move.w  d6,d4
+                st      WS_ARMING(a0)
+                bsr.w   ymxr_kstart
+                sf      WS_ARMING(a0)
+                bra.w   .armed
                 .endif

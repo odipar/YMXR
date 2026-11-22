@@ -282,9 +282,9 @@ q\{ct}:         bra.w   \{tick}_done
 ; A start in a tune of version 11 (SPEC.md 4.3.2): the cut column read,
 ; the kept cut replaced where the row sets it, and the kept cut made the
 ; running cut (4.3 step 3). Under cut 0 the start is the start below.
-; Under a cut 1 to 127, the mapping column is read as below, and a start
-; through the identity runs the counted handler of the source's column
-; (ymxr_xstart). d1 is the source number.
+; Under a cut 1 to 127, the mapping column is read as below, and the start
+; runs the counted kind of the source's columns (ymxr_kstart). d1 is the
+; source number.
 \{tick}_xnow:   move.w  d1,d3
                 READ    \cx                     ; the cut column
                 bpl.s   .xkept\~
@@ -316,17 +316,16 @@ q\{ct}:         bra.w   \{tick}_done
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 ; A start under a cut 1 to 127: the mapping column, then the counted
-; handler of the source's column through the identity.
+; kind of the source's columns, through the identity or the mapping
+; (ymxr_kstart).
 \{tick}_xcut:   RREAD   \cm                     ; the mapping column
                 bpl.s   .xmap\~
                 and.b   #$7F,d1
                 move.b  d1,\fx+FX_MAP(a0)
 .xmap\~:        move.b  \fx+FX_MAP(a0),\fx+FX_RUN(a0)
-                bne.s   \{tick}_look
-                sf      \fx+FX_LOK(a0)
                 move.w  d3,d1
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                bsr.w   ymxr_xstart
+                bsr.w   ymxr_kstart
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 ; A row of version 11 that leaves the source column unset (SPEC.md 4.3.2):

@@ -305,7 +305,7 @@ case failed on main until the bump.
         installer places at L + 1 of the cut that ended, and a recut while
         a start is pending moves the running handler and the armed place;
         the kit's `cuts`
-  - [ ] sources of two and three columns, and a source through a
+  - [x] sources of two and three columns, and a source through a
         transformation, on the counted instances; the rig's generator
         draws starts under a cut and recuts
   - [ ] the link and the tools: the cut's pieces, which a link keeps for

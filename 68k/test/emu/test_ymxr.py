@@ -1696,6 +1696,11 @@ def reaches(model, i, kind):
         return False
     if not (m & 0x7F if m & 0x80 else fx["mapping"]):
         return False
+    if model.tune.cut_at is not None:
+        # a start under a cut runs ymxr_kstart, apart from these windows
+        x = r[model.tune.cut_at + i]
+        if x & 0x7F if x & 0x80 else fx["cut"]:
+            return False
     at, R, RR, columns = model.tune.sources[source]
     if kind == "window counted once":
         return bool(r[t + 2] & 0x80) and model.tune.counted[source] and R == RR == 1
@@ -1967,8 +1972,13 @@ def cutting(code, symbols):
     under the whole table after a cut, and a place's reset after each;
     deferred starts under a cut, at L + 1 of the running cut and at the
     cut's first row, and between a cut and the whole table; recuts while
-    a start is pending, of the general handler and of a square; and the
-    timers that share a control register. The third retunes an idle
+    a start is pending, of the general handler and of a square; sources of
+    two and three columns, marked and counted, under a cut; starts through
+    a transformation under a cut, of a marked source, a counted one and a
+    square, remaps under a cut to and from the identity, and recuts of a
+    lookup instance; deferred starts under a cut through a transformation
+    and of two columns, recut while pending; and the timers that share a
+    control register. The third retunes an idle
     timer and the fifth recuts one, which YMXS's check of the writing
     rules warns of (YMXS, SPEC.md 6.3), and every other follows the
     rules."""
@@ -1980,8 +1990,20 @@ def cutting(code, symbols):
     counted = ("counted", [200, 150, 100, 50, 25], 1)
     slow, quick = (200, 200), (50, 100)
 
-    def start(source, cut=None, target=8, rate=slow, tr=1, pr=1, deferred=0):
-        return ("start", source, target, rate[0], rate[1], tr, pr, deferred, 0, cut)
+    tone = ("tone", [[10, 1], [20, 2], [30, 3], [40, 4], [50, 5]], 0)
+    tones = ("tones", [[60, 6], [70, 7], [80, 8], [90, 9]], 1)
+    voice = ("voice", [[1, 1, 15], [2, 1, 12], [3, 2, 9], [4, 2, 6], [5, 3, 3], [6, 3, 0]], 1)
+    envelope = ("envelope", [[10, 200], [20, 150], [30, 100], [40, 50]], 0)
+    keys = ("keys", [200, 100, 50, 25, 130], 2)
+    noise = ("noise", [[4, 10], [8, 12], [12, 14], [16, 15], [20, 13]], 1)
+    V10, V5 = ([k * n // 15 for k in range(16)] for n in (10, 5))
+    maps = [("V10", V10), ("V5", V5), ("keys", [k % 32 for k in range(256)])]
+
+    def start(source, cut=None, target=8, rate=slow, tr=1, pr=1, deferred=0, mapping=0):
+        return ("start", source, target, rate[0], rate[1], tr, pr, deferred, mapping, cut)
+
+    def remap(mapping):
+        return ("remap", mapping)
 
     def recut(first, last):
         return ("recut", first, last)
@@ -2025,14 +2047,36 @@ def cutting(code, symbols):
                 8: start(1, pr=0, deferred=1), 9: recut(1, 4), 14: start(2, (2, 5))},
           "B": {0: start(3, target=9), 2: start(1, (1, 6), target=9, pr=0, deferred=1),
                 3: recut(1, 1)}}),
+        ("sources of two and three columns under a cut, recut, and a place's reset",
+         [tone, voice, envelope, noise],
+         {"A": {0: start(1, (1, 3), target=14), 4: recut(0, 2),
+                7: ("retune", 200, 200, 0, 1), 10: recut(0, 4)},
+          "B": {0: start(2, (2, 4), target=18), 5: recut(1, 3), 9: recut(0, 5)},
+          "C": {0: start(4, (2, 4), target=24), 3: recut(0, 3),
+                6: start(4, (1, 2), target=24, pr=0, deferred=1)},
+          "D": {0: start(3, (1, 2), target=20), 4: recut(0, 3), 8: recut(2, 3)}}),
+        ("starts through a transformation under a cut, remaps under it, and recuts",
+         [loop, keys, square],
+         {"A": {0: start(1, (2, 5), mapping=[1]), 4: remap([2]), 7: remap(0),
+                9: remap([1]), 12: recut(1, 6)},
+          "B": {0: start(2, (1, 3), target=9, mapping=[3]), 5: recut(0, 4), 9: remap([3])},
+          "D": {0: start(3, target=10, mapping=[1]), 3: recut(1, 1), 7: recut(0, 1)}}, maps),
+        ("deferred starts under a cut through a transformation and of two columns, recut while"
+         " pending", [loop, six, tone, tones],
+         {"A": {0: start(1, mapping=[1]), 2: start(2, (0, 3), pr=0, deferred=1, mapping=[2]),
+                3: recut(0, 2), 9: start(1, (2, 5), deferred=1, mapping=[1])},
+          "B": {0: start(3, target=15), 2: start(4, (1, 3), target=15, pr=0, deferred=1),
+                3: recut(0, 2)}}, maps[:2]),
         ("recuts on the timers that share a control register", [loop, six],
          {"C": {0: start(1, (3, 7), target=9), 4: recut(2, 4)},
           "D": {0: start(2, (1, 5), target=10, rate=quick), 3: recut(0, 2), 6: recut(3, 5)}}),
     ]
     played = 0
-    for title, sources, timers, *warned in cases:
-        tune = effects_tune(title, 18, sources, timers, cuts=True)
-        at, version = built(re.sub(r"[^a-z0-9]+", "-", title), tune, checked=not warned)
+    for title, sources, timers, *more in cases:
+        through = next((one for one in more if isinstance(one, list)), None)
+        tune = effects_tune(title, 18, sources, timers, cuts=True, transformations=through)
+        at, version = built(re.sub(r"[^a-z0-9]+", "-", title), tune,
+                            checked="warned" not in more)
         assert version == CUT, "%s: ymxs-to-ymxr wrote version %d" % (title, version)
         try:
             frames, ticks = check(at, code, symbols, kit=True)[:2]
@@ -2159,13 +2203,14 @@ def deferred(code, symbols):
 
 def tune_file(file):
     """Tune-file header fields: version, source count, DTX3 offset,
-    optional version 10 transformation-index offset and source-index
-    offset (SPEC.md 3.3).
+    optional transformation-index offset of versions 10 and 11, and
+    source-index offset: 16, 20 in version 10, and 24 in version 11 after
+    the cut index's (SPEC.md 3.3).
     """
     version = struct.unpack(">H", file[4:6])[0]
     return (version, file[9], long_at(file, 12),
-            long_at(file, 16) if version == MAPPED else None,
-            20 if version == MAPPED else 16)
+            long_at(file, 16) if version >= MAPPED else None,
+            {MAPPED: 20, CUT: 24}.get(version, 16))
 
 
 def edited(file, edits):
@@ -6166,12 +6211,19 @@ def drawn_source(rng, lane, name, marked):
     return name, [row[0] if len(row) == 1 else row for row in rows], repeat
 
 
-def generated_tune(rng, title, maps, defers, letters):
+def generated_tune(rng, title, maps, defers, letters, cuts=None):
     """A tune of the generator on the timers `letters` names: (its
     structure, the edits of its rows, the forms of its sources), for
     effects_tune, edited and reformed. With maps its starts and remaps
     map through transformations at times, and with defers its starts are
-    deferred at times.
+    deferred at times. With cuts, a separate generator, a start runs
+    under a cut and a row recuts at times (SPEC.md 1.11): a start at the
+    frame of a source that repeats, its cut in the rows of the source,
+    and a recut where the effect runs a source that repeats with no start
+    pending, its cut in the rows of every source of the lane; a timer
+    under a cut defers no start. The draws of cuts come from that
+    generator alone, so a tune drawn without it, as under -linked, is the
+    tune drawn before cuts.
 
     R rows, 8 to 24, at 50 Hz, R and the repeat row multiples of 4, so the
     writer pads no table (tools.md 4.4) and an edit of row N lands on row
@@ -6262,7 +6314,8 @@ def generated_tune(rng, title, maps, defers, letters):
     # kept rate, whether the timer counts at it, the kept target and the
     # kept mapping (SPEC.md rules 2(c), 2(g) and 4(e))
     state = {letter: dict(effect=None, pending=None, started=False, rate=None,
-                          counting=False, target=None, mapping=0) for letter in lanes}
+                          counting=False, target=None, mapping=0, cut=False)
+             for letter in lanes}
     first = {letter: rng.randrange(rows // 2) for letter in lanes}
     ops = {letter: {} for letter in lanes}
     aimed = []
@@ -6301,12 +6354,21 @@ def generated_tune(rng, title, maps, defers, letters):
                     one.update(by=s["rate"][0], count=s["rate"][1], tr=0, pr=0, deferred=0)
                     if rng.random() < 0.5:
                         one.update(target=s["target"], mapping=s["mapping"])
+                if cuts and one["deferred"] and s["cut"] and runs:
+                    one["deferred"] = 0         # a timer under a cut defers none
+                _, values, rr = source_of(one["source"])
+                one["cut"] = None
+                if cuts and not (one["deferred"] and runs) and rr is not None \
+                        and cuts.random() < 0.35:
+                    low = cuts.randrange(len(values))
+                    one["cut"] = (low, low + cuts.randrange(len(values) - low))
                 if one["deferred"] and runs:
                     s["pending"] = one
                     effect["until"] = min(effect["until"], n + reckoned(
                         len(source_of(effect["source"])[1]), effect["by"], effect["count"]))
                 else:
                     s["effect"], s["pending"], s["started"] = run_of(one, n), None, True
+                    s["cut"] = one["cut"] is not None
                 s["target"], s["mapping"] = one["target"], one["mapping"]
                 if one["deferred"]:
                     s["rate"], s["counting"] = None, False
@@ -6324,6 +6386,14 @@ def generated_tune(rng, title, maps, defers, letters):
             elif kind == "stop":
                 one = dict(kind=kind)
                 s["effect"], s["pending"], s["counting"] = None, None, False
+                s["cut"] = False
+            elif cuts and sure and not s["pending"] and cuts.random() < 0.15:
+                # a recut, in the rows of every source of the lane
+                most = min(len(values) for _, values, _ in pools[lane])
+                low = cuts.randrange(most)
+                one = dict(kind="recut", first=low, last=low + cuts.randrange(most - low))
+                s["cut"] = True
+                ops[letter][n] = one
             if kind:
                 ops[letter][n] = one
             if kind in (None, "retune", "remap") and rng.random() < 0.1:
@@ -6352,7 +6422,9 @@ def generated_tune(rng, title, maps, defers, letters):
             if one["kind"] == "start":
                 timers[letter][n] = ("start", order.index(one["source"]) + 1, one["target"],
                                      one["by"], one["count"], one["tr"], one["pr"],
-                                     one["deferred"], parts(lane, one["mapping"]))
+                                     one["deferred"], parts(lane, one["mapping"]), one["cut"])
+            elif one["kind"] == "recut":
+                timers[letter][n] = ("recut", one["first"], one["last"])
             elif one["kind"] == "retune":
                 timers[letter][n] = ("retune", one["by"], one["count"], one["tr"], one["pr"])
             elif one["kind"] == "remap":
@@ -6367,9 +6439,12 @@ def generated_tune(rng, title, maps, defers, letters):
         register = rng.choice(free)
         registers.setdefault("r%d" % register, [-1] * rows)[rng.randrange(rows)] = \
             rng.randint(0, 63 if register == 7 else FITS[register])
+    cut = any(one["kind"] == "recut" or one.get("cut") for by_row in ops.values()
+              for one in by_row.values())
     tune = effects_tune(title, rows, [source_of(key) for key in order], timers,
                         registers=registers, repeat=repeat,
-                        transformations=[tables[lane][k] for lane, k in used] or None)
+                        transformations=[tables[lane][k] for lane, k in used] or None,
+                        cuts=cut)
     # each row that sets the target column alone, and the next start of
     # its timer, which sets it again
     edits = {}
@@ -6402,8 +6477,12 @@ def generated_song(number):
              for _ in range(count)]
     titles = (["generated %d" % number] if count == 1
               else ["generated %d.%d" % (number, k + 1) for k in range(count)])
-    return [(title,) + generated_tune(rng, title, maps, defers, letters)
-            for title, (maps, defers, letters) in zip(titles, drawn)]
+    # the draws of cuts, a generator a subtune, apart from the song's; a
+    # link keeps the cut's code once its pieces are defined (doc/cuts.md),
+    # and until then -linked draws none
+    return [(title,) + generated_tune(rng, title, maps, defers, letters,
+                                      None if LINKED else Draws(2 ** 32 + 4 * number + k))
+            for k, (title, (maps, defers, letters)) in enumerate(zip(titles, drawn))]
 
 
 # The operations of the issue's list (#341), by the names the coverage
@@ -6414,7 +6493,8 @@ KINDS = ("starts at the frame on an idle timer", "starts at the frame on a runni
          "starts that set the source column alone", "starts at the running rate",
          "retunes", "stops", "remaps between transformations", "remaps to the identity",
          "remaps from the identity", "rows that set the target column alone",
-         "tunes that repeat to a row", "tunes that play once", "sets of several subtunes")
+         "tunes that repeat to a row", "tunes that play once", "sets of several subtunes",
+         "starts under a cut", "recuts")
 SHAPES = ("square", "one", "general", "counted", "two", "three", "envelope", "countedthree")
 
 
@@ -6459,11 +6539,16 @@ def row_kinds(model):
                 out.append("starts at the running rate")
                 if not r[t] & 0x80 and not m & 0x80:
                     out.append("starts that set the source column alone")
+            x = r[tune.cut_at + i] if tune.cut_at is not None else 0
+            if x & 0x7F if x & 0x80 else fx["cut"]:
+                out.append("starts under a cut")
             shape = source_shape(tune, s)
             out += [("shape", shape), ("effect", i), ("pair", i, shape),
                     ("target", r[t] & 0x7F if r[t] & 0x80 else fx["target"])]
         elif r[t + 1] & 0x80:
             out.append("stops")
+        elif tune.cut_at is not None and r[tune.cut_at + i] & 0x80:
+            out.append("recuts")
         elif m & 0x80:
             run, to = fx["run"], m & 0x7F
             if run and to and run != to:
