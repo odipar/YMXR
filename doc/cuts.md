@@ -1,246 +1,291 @@
 # Cuts in YMXR
 
-YMXS 0.8.0 defines a cut on a start and a recut that sets it (YMXS,
-SPEC.md 3.7; YMX issue 180). This document is the plan of encoding B
-(YMXS, doc/cuts.md): the columns, the cut index, the tick handler under
-a cut, the tune file of version 11, and the milestones in each tree.
+YMXS 0.8.0 adds a cut to each `Start` and a fifth operation, `Recut`,
+that sets the cut of a running effect (YMXS, SPEC.md 3.7; YMX issue 180).
+This document is the plan of encoding B of YMXS's doc/cuts.md in YMXR: a
+column an effect selects a cut of an index in the tune file, and the
+counted tick handler ends the cut at its last row. SPEC.md and
+BINARIES.md replace this document once they define what landed.
+
+## What stays
+
+A tune whose every `Start` is under the whole table of its source, and
+which has no `Recut`, converts to the tune file it converts to today, at
+version 9 or 10, and a structure of version 7 or before reads that way
+(YMXS, SPEC.md 3.7.1). The conformance files and the eleven tunes of
+`ym/test` are such tunes; milestone 1 verifies that the bump of the
+dependency leaves every file the tests compare as it is.
 
 ## The column
 
-Column 34 + i is the cut of effect i, as column 30 + i is its mapping.
-Bit 7 is the set bit, bits 6 to 0 the cut number:
+Column 34 + i is the cut column of effect i, as column 30 + i is its
+mapping column (SPEC.md 1.10): bit 7 the set bit, bits 6 to 0 a cut
+number.
 
-| byte | meaning |
+| byte | the row |
 |---|---|
-| `$00` | unset: the kept cut is preserved |
-| `$80` | set to 0, the whole table, rows 0 to R - 1 |
-| `$81` to `$FF` | set to 1 to 127, a cut of the index |
+| `$00` | leaves the column unset |
+| `$80` | sets cut 0, the whole table of the source started |
+| `$81` to `$FF` | sets cut 1 to 127 of the cut index |
 
-A start or a recut that sets the column makes its value the *kept cut*,
-initially 0 (the whole table). A stop preserves the kept cut, as it
-preserves the kept mapping.
+Each effect has a *kept cut*, 0 from 4.1. The column is read with the
+source column:
 
-Read the cut column with the source column:
-
-| source column | cut column | what happens |
+| source column | cut column set | cut column unset |
 |---|---|---|
-| set to 1-127, a start | set | replace the kept cut with bits 6 to 0 |
-| set to 1-127, a start | unset | reuse the kept cut |
-| set to 0, a stop | set or unset | the kept cut is preserved |
-| unset, and mapping set, a remap | set or unset | the cut column is unset (a remap leaves the cut) |
-| unset, and mapping unset | set | a recut: replace the kept cut with bits 6 to 0 |
+| 1 to 127, a start | the kept cut is bits 6 to 0, and the start runs under it | the start runs under the kept cut |
+| 0, a stop | unread, and the kept cut is left as it is | the kept cut is left as it is |
+| unset | a recut | the effect runs under its cut |
 
-A recut is a row that sets the cut column and leaves the source
-column and the mapping column unset. It replaces the kept cut of the
-effect the timer runs, and the tick reads the new cut from the next
-row of the source it reads. Where the place is outside the new cut,
-the place is the cut's first row.
+**A recut.** The kept cut is bits 6 to 0 of the column. On a timer
+running a source, the running cut is the kept cut, and where the place
+is outside it, the place is its first row; the source, the target, the
+rate and the mapping are left as they are (YMXS, SPEC.md 4.3). On an
+idle timer the timer is left as it is (YMXS rule 5). A start pending on
+the timer keeps the cut of its row, and the running source ends at the
+last row of the new cut (YMXS, SPEC.md 3.5.5). A row that sets the
+mapping column and the cut column, the source column unset, performs the
+remap of 4.3.1 and then the recut.
 
 ## The cut index
 
-A version 11 tune file has a cut index of C entries, 1 to 127. Cut n
-has a first row and a last row:
+A tune file of version 11 has U cuts, 1 to 127, at Q, the offset in the
+long at 20:
 
 | offset | bytes | meaning |
 |---|---|---|
-| Q | 2 | C, the cut count, 1 to 127 |
-| Q + 2 | 8C | cuts 1 to C: a long first, then a long last |
+| Q | 2 | U, the cut count, 1 to 127 |
+| Q + 2 | 8U | cuts 1 to U, each a long, its first row, then a long, its last row |
 
-Each entry is 8 bytes. A writer numbers cuts in first-use order: the row
-and the effect determine the order, as YMXS, SPEC.md 1.9 defines for
-sources and transformations. Two starts or recuts under the same first
-and last rows share one cut number. Cut 0 is the whole table and has no
-index entry.
-
-Start the index on a long boundary. The index follows the
-transformation index where bit 5 of the effects used is set, and
-otherwise the name, or the source index where the name is empty.
+The index begins on a long: after the transformations where bit 5 of
+the effects used is 1, and otherwise after the name, or after the source
+index where the name is empty. The DTX3 table follows it on a long. A
+writer numbers the cuts as it numbers the transformations (SPEC.md
+3.4.1): first use in row order, then timer order A to D. Two cuts of the
+same first and last rows are one cut, and cut 0 has no entry. A cut
+number is free of any source, so section 6 gains a rule: every cut a
+start or a recut selects lies in the rows of the source it runs on,
+which YMXS's check reads of the structure (YMXS, SPEC.md 1.11).
 
 ## The tune file
 
-Version 11, `$000B`, is version 10 with four cut columns and a cut
-index.
+Version 11 is version 10 with the four cut columns, bit 6 of the effects
+used, the long at 20 and the cut index:
 
-| what | version 10 | version 11 |
+| | version 10 | version 11 |
 |---|---|---|
 | columns | 34 | 38 |
-| effects used bit 6 | 0 | 1 |
-| bit 5, the mapping columns | 0 or 1 | 0 or 1 |
-| the cut index | absent | present |
+| bit 5 of the effects used | 1 | 1 where a row maps a value, 0 otherwise |
+| bit 6 of the effects used | 0 | 1 |
+| the long at 16 | where the transformation index begins | the same where bit 5 is 1, and 0 where it is 0 |
+| the long at 20 | index entry 1 | where the cut index begins |
+| the source index | at 20 | at 24 |
 
-The header offset of the cut index pointer:
+The offset of the source index follows the version alone, as it does
+today: I of 3.1.1 is 16, 20 in version 10 and 24 in version 11. In a
+tune of version 11 that maps no value, the mapping columns are in the
+table, every row leaves them unset, and DTX3 packs each as a constant
+column.
 
-| bit 5 | bit 6 | transformation index pointer | cut index pointer | source index |
-|---|---|---|---|---|
-| 0 | 0 | absent | absent | 16 |
-| 1 | 0 | 16 | absent | 20 |
-| 0 | 1 | absent | 16 | 20 |
-| 1 | 1 | 16 | 20 | 24 |
+A writer writes version 11 where a row sets a cut column to 1 to 127,
+version 10 where a row maps a value and every cut a row selects is cut
+0, and version 9 otherwise. A reader reads versions 7 to 11. Init of a
+core assembled without the cut, `YMXR_CUT`, reports -1 for a tune whose
+effects byte sets bit 6, as a core without the lookup reports it for bit
+5 (BINARIES.md 1.5).
 
-A writer writes version 11 where a row sets a cut column to 1 to 127:
-where every start has the whole-table cut and there is no recut, the
-tune is version 9 or 10 as before. A reader reads versions 7 to 11. A
-player with cut support reads the same; a player without it reads 7 to
-10. Version 11 without bit 6 set, or versions 7 to 10 with bit 6 set,
-are errors of the file.
+The errors of the file (3.3.4) gain these, U the cut count, Q where the
+cut index is, and G and L the first and the last row of cut N:
 
-Mapping columns 30 to 33 are present in version 11 whether or not the
-tune maps a value. Where no row selects a transformation, bit 5 is
-clear, the transformation index is absent, and the mapping columns are
-unset on every row: DTX3 packs each as a constant column of zero bytes.
+| condition | reported as |
+|---|---|
+| the version is 11 and bit 6 of the effects used is 0 | `version V with bit 6 of the effects used clear` |
+| the version is 7 to 10 and bit 6 of the effects used is 1 | `version V with bit 6 of the effects used set` |
+| the word U at Q, or the 8U bytes after it, end outside the file | `the cut index at Q is outside the file` |
+| U is 0 or above 127 | `the file has U cuts, and a version 11 file has 1 to 127` |
+| L of cut N is below its G | `cut N is rows G to L, and a cut ends at or after the row it begins at` |
 
 ## The tick under a cut
 
-A tick of a timer running a source under a cut, in order (the changes
-against SPEC.md 5.1):
+A start under cut 0 runs the handler it runs today, which the shape of
+its source selects (68k/player/ticks.S). A start or a recut under cut 1
+to 127 runs the counted handler of the source's column count at every
+shape of source: TICKC, TICKW counted, or TICKL or TICKWL counted
+through a transformation. A square or a source of one row under a cut
+reads the rows of the cut, which the immediates of SQUARE and ONEROW
+encode for the whole table alone.
 
-1. Write each column of the source to its register, as 5.1 defines.
-2. Write the marker's column, as 5.1 defines.
-3. Test whether the row is the last of the cut: the place equals the
-   cut's last row. The marker of step 2 is not read for this test.
-4. Where the row is before the last: the place is the row after it.
-5. Where the row is the last:
-   - Where the cut includes the source's repeat row RR (first <= RR <=
-     last): the place is RR.
-   - Where the cut excludes RR: the place is the cut's first row.
-   - For a source that plays once: stop the timer.
-   - Where a start is pending: perform it.
+The counted handler ends a pass where its counter of rows left reaches
+0. Under a cut of rows F to L, with the place at row P, a start, a recut
+and a place's reset write:
 
-Under the whole-table cut (0 to R - 1) the tick reads R rows, as a
-tick of version 10 reads them: the marker test of a marked source and
-the counter of a counted source both end at the same row as the compare.
-The player uses the existing handler for the whole-table cut and a
-cut-aware handler for a cut from the index.
+| operand | under the cut F to L |
+|---|---|
+| the place | row P, and row F where P is outside F to L |
+| the rows left | L - P + 1 |
+| the loop cell | row RR where F to L includes it, row F where it excludes it, and 0 where the source plays once |
+| the rows of a pass | L + 1 less the row of the loop cell |
 
-### The handler
+Step 3 of SPEC.md 5.1 then reads: under a cut 1 to 127 the row is the
+last where the counter reaches 0, and the marker is unread; step 5 puts
+the place at the row of the loop cell. The hook of a pending start
+(4.8) is on the counted handler's end path, so the tick that reads row L
+performs the start, as YMXS, SPEC.md 3.5.2 defines.
 
-A handler of a source under a cut (`TICKCUT`) replaces the marker test
-(`bmi.s`) with a compare of the place against the cut's last row. The
-last-row address is in the handler's data, written by the frame code at
-a start or a recut.
+A marked source under a cut writes each byte whole, as the marked
+handler does, so row R - 1, in a cut that includes it, writes its marker
+bit to the register as it does today (3.2.2).
 
-For a counted source (whole-byte columns): the counter of the existing
-handler (`TICKC`) is replaced with the compare, since the marker is
-absent and the counter is not needed under the cut.
+**The counter, not a compare.** YMXS's doc/cuts.md has encoding B
+compare the place with the last row. The place is the operand of the
+instruction that reads the row, an address a start patches, so a compare
+reads that operand out of the instruction on every tick. The counted
+handler decrements a word of the handler, its end path reloads it, and
+the hook of a pending start is on that path. It costs 20 cycles more
+than the marked handler on a tick that writes a row and 40 on the path
+that loops, measured on the instances of two columns (performance.md, A
+counted tick of two columns); TICKC's comment has the same 20 for one
+column.
 
-| tick | today (SPEC.md 5.1) | under a cut |
-|---|---|---|
-| a row written, not the last | marker test: bmi.s, 2 cycles on N set by the write | compare: `cmp` place against last, bne.s |
-| the row is the last, loop | read loop cell, write to place | read cut loop, write to place |
-| the row is the last, stop | as today | as today |
+**Through a transformation.** In TICKL and TICKWL the end test, their
+`counted` argument, is separate from the page, and the page follows the
+encoding of the source: the key of a marked source is bits 6 to 0 of the
+marker's column. A cut over a marked source through a transformation
+runs a counted instance on the page of a marked source; milestone 5
+settles whether the lookup lays one out today or gains it.
 
-The compare adds 6 cycles to the path that writes a row (the `cmp` and
-the branch instruction). The loop path reads the cut's loop cell, which
-the frame code writes at a start or a recut: the address of the cut's
-repeat row (RR where the cut includes it, first otherwise) or 0 for
-plays-once.
+## The frame
 
-### The workspace
+What SPEC.md 4 gains:
 
-Each effect's record gains:
+- 4.1 step 4: the kept cut of each effect is 0.
+- 4.2 step 2: columns 34 to 37 in version 11.
+- 4.3 step 3, a start: with bit 5 at 1 the place is the first row of the
+  cut, row 0 under cut 0; with bit 5 at 0 it is its row number modulo R
+  of the source started, and the first row of the cut where that row is
+  outside the cut (YMXS, SPEC.md 3.4.3).
+- 4.3 step 6, a place's reset with no start: the first row of the
+  running cut, and the rows left of the table above.
+- 4.3: the recut, after the remap of 4.3.1 and before step 4.
+- 4.8, a deferred start: the arming reads the kept cut after the row,
+  and the pending start keeps it. With bit 5 at 0, the tick that
+  performs it puts the place at L + 1, L the last row of the cut that
+  ended, modulo R of the source started, and at the first row of its cut
+  where that row is outside it (YMXS, SPEC.md 3.5.3). Under cut 0, L + 1
+  is R, the count of today.
+- 4.2.1: a recut writes the place, the rows left, the loop cell, the rows
+  of a pass and, where the handler changes, the vector as one operation
+  against a tick, at level 7, as a start writes its operands.
 
-| field | bytes | meaning |
-|---|---|---|
-| cut number | 1 | the kept cut, 0 to 127 |
-| cut last | 4 | the address of the cut's last row in the source |
-| cut loop | 4 | the address of the cut's loop row, or 0 for plays-once at the last |
-| cut first | 4 | the address of the cut's first row |
+## The record and the check
 
-These are set at a start or a recut: the frame code reads the cut number
-from the column, looks up the cut's first and last rows in the index (the
-init resolves them, as it resolves sources), and writes the handler's
-data.
-
-## The model
-
-Replay gains a kept cut per effect, initially the whole table. At a
-start the model reads the cut from the structure; at a recut it reads
-the new cut. The check verifies that the place stays inside the cut and
-that the loop row is in the cut.
+- 7.3: in version 11 an effect's entry ends `"cut":u`, the kept cut after
+  the row, 0 to 127, and `e` includes each effect whose cut column the
+  row sets.
+- 6.4, a tune file read alone: a cut column above U; a stop that sets its
+  cut column; a start or a recut under a cut that ends past the last row
+  of the source it runs on.
 
 ## The converter
 
-Schema reads Cut from each Start and Recut from each Recut. Cuts are
-collected and numbered in first-use order:
+The table of doc/ymxs.md, What each column is written from, gains:
 
-- The whole-table cut (0 to R - 1) is cut 0 and has no index entry.
-- Each distinct cut other than the whole table is numbered 1 upward.
-- Two cuts are equal where their first and last rows are equal.
-- 127 cuts at most.
-
-The cut column of a row is set where the row's cut differs from the kept
-cut of the effect, as the mapping column is set where the mapping differs
-from the kept mapping. At a start the converter writes the cut column where
-the start's cut differs from the kept cut; at a recut it writes the cut
-column.
-
-## Changes by tree
-
-### Java
-
-| file | what changes |
+| the structure | the columns |
 |---|---|
-| `Columns.java` | constants `CUT = 34`, `CUTS = 38`, `MOST_CUTS = 127`, `HAS_CUTS = 0x40` |
-| `Schema.java` | read Cut and Recut from the structure, number cuts, write cut columns 34 to 37, build the cut index entries |
-| `Tune.java` | `VERSION = 0x000B`, the cut index pointer in the header, `reads` accepts 7 to 11, `columns(11) = 38`, `indexAt` reads all three pointers |
-| `TuneFile.java` | read and write the cut index, decode version 11 |
-| `Replay.java` | a kept cut per effect, the tick under a cut |
-| `Report.java` | the cut in a start's report, the recut operation |
-| `Check.java` | validate cuts against sources |
+| the `cut` of a `Start` | the cut column where its value differs from the kept cut: 0 where the cut is the whole table of the source, and the number of the cut otherwise |
+| `Recut` on a timer of the tune | the cut column at the number of its cut, the source and the mapping columns unset |
+| `Recut` on a timer outside the tune | every column left unset (SPEC.md 6, rule 2(a)) |
+| the tune's cuts | numbered 1 upward in first-use order, in a tune file of version 11 where a row sets a cut column to one |
 
-### Go
+A `Recut` writes the number of its cut where the cut is the whole table
+of the running source too: after a deferred start the rows leave the
+running source open (doc/ymxs.md, Kept values), and the counted handler
+reads the same rows.
 
-| file | what changes |
-|---|---|
-| `ymxr/columns.go` | cut constants |
-| `schema/schema.go` | cut numbering, cut columns, cut index entries |
-| `ymxr/tune.go` | version 11, cut index read and write |
-| `trace/replay.go` | the tick under a cut |
-| `report/report.go` | cut reporting |
-| `check/check.go` | cut validation |
+The schema tracks the kept, the running and the pending cut of each
+effect as it tracks the mapping. At the repeat row the kept cut of an
+effect that runs under a cut is unknown, and the first start or recut
+after it writes the column, as rule 2(g) has for the mapping column.
 
-### C#
+What is an error gains a tune of more than 127 cuts with a start or a
+recut on a timer of the tune under one: `the tune cuts through N cuts,
+and a cut column numbers 127`.
 
-The same changes as Java and Go.
+## The files
 
-### 68000
+Java is the reference and Go builds the release executables; ParityTest
+compares the two byte for byte. The cut changes the files the mapping
+of version 10 changed:
 
-| file | what changes |
-|---|---|
-| `equates.S` | workspace fields for cut data |
-| `ticks.S` | `TICKCUT`, `TICKCUTC`, `TICKCUTW`: handlers that compare the place against the cut's last row |
-| `effect.S` | read the cut column in `EFFECT`, call cut-aware start and recut |
-| `start.S` | resolve the cut at a start, patch the handler's data |
-| `init.S` | resolve cut index entries into addresses |
-| `handlers.S` | lay out cut-aware handlers |
+| part | Java | Go |
+|---|---|---|
+| the columns | `Columns` | `ymxr/columns.go` |
+| the converter | `Schema` | `schema/schema.go` |
+| the tune file | `Tune`, `TuneFile` | `ymxr/tune.go` |
+| the record and the model of a frame | `Trace`, `Replay` | `trace/trace.go`, `trace/replay.go` |
+| the check | `Check` | `check/check.go` |
+| the bound tune, the core, the link and the multi file | `Binaries`, `Sndh`, `Link`, `Multi` | `sndh/sndh.go`, `sndh/link.go`, `internal/built/built.go` |
 
-### Documents
+The player, under `68k/player/`: `equates.S`, the record's fields and
+`YMXR_CUT`; `effect.S`, the cut column read beside the mapping column in
+a piece `cut<e>_1`, which a link leaves out of a tune that cuts no
+source (doc/LINKER.md); `start.S`, the start, the place's reset and the
+recut under a cut; `deferred.S`, the pending start's cut; `init.S` and
+`switches.S`, the branches init aims in a tune of version 11; `play.S`,
+`YMXR.S` and `YMXR_sndh.S`, the flag. The handlers are the counted ones
+of today.
 
-| file | what changes |
-|---|---|
-| `SPEC.md` | section 1 gains 1.11 (the cut column), section 3 gains the cut index (3.5) and the version 11 layout, section 5 gains the tick under a cut, section 8 drops the items this version defines |
-| `performance.md` | a tick under a cut: the cycles and the comparison against a tick of today |
-| `BINARIES.md` | version 11 bound tune, the cut index in the image |
-| `RELEASES.md` | the release that ships this |
+The rig's model (`68k/test/emu/test_ymxr.py`, `Model`) gains the kept,
+the running and the pending cut of each effect; `counted(i)` is true
+under a cut 1 to 127, `left(i)` is L - P + 1, and `tick(i)` ends the
+pass at L and loops to the row of the cut.
+
+The documents: SPEC.md, the clauses above, and 8.5 gains a cut column
+above U; BINARIES.md, a field of the bound tune where the cut index
+begins, the source index 4 bytes on as version 10 moved it, bit 5 of the
+flags word (2.3) for `YMXR_CUT`, and the multi file of version 11;
+doc/ymxs.md; glossary.md, *cut*, *kept cut* and *recut*; performance.md;
+RELEASES.md.
+
+The conformance kit gains the tune files of YMXS's `doc/tunes/cut.json`
+and of the YMXS kit's `cuts.json`, with their records.
 
 ## The dependency
 
-YMXS 0.8.0 defines Cut and Recut. The pom gains `org.ymx:ymxs:0.8.0`
-and go.mod `github.com/odipar/ymxs/go v0.8.0`. Build YMXS 0.8.0 and
-install it in the local Maven repository before the YMXR build.
+`pom.xml` reads `org.ymx:ymxs` 0.8.0 and `go/go.mod`
+`github.com/odipar/ymxs/go` v0.8.0. ParityTest's case of the YMXS kit,
+`everyTuneOfTheYmxsKitConvertsTheSameInBothTrees`, reads the kit of the
+YMXS checkout beside this one; that kit is version 8 since YMXS 0.8.0,
+and the 0.7.1 this repository reads converts none of it, so the case
+fails on main today and the bump fixes it.
+
+## Open for review
+
+- The counted handler at every shape under a cut 1 to 127, where a
+  square or a source of one row under a cut that equals its whole table
+  could keep its handler. The counted handler is one path to verify on
+  the rig, and a cut of the whole table of a running source is a
+  `Recut` back to it.
+- The four mapping columns in a tune of version 11 that maps no value:
+  a fixed column per effect and operation, against a layout whose cut
+  columns move with bit 5.
+- A cut of rows whose count is above 65,535: the counter is a word, as
+  for a counted source today, so a writer reports such a cut, or the
+  counter widens.
 
 ## Milestones
 
-1. Bump YMXS to 0.8.0 in Java and Go, verify the build.
-2. SPEC.md: define the cut column, the cut index, version 11, the tick
-   under a cut, and the reader's errors.
-3. Java Schema and Tune: encode cuts and write version 11.
-4. Java TuneFile and Replay: read the cut index, the tick under a cut.
-5. Java Check, Report: cut validation and reporting.
-6. Go: the same converter, tune, replay, check and report.
-7. C#: the same.
-8. 68000 player: cut-aware tick handlers, the cut column in the frame,
-   the start's and the recut's cut data, the init's resolution of the
-   cut index.
-9. Conformance: a tune under a cut and one that moves a window.
-10. Performance: measure and document the cost of a tick under a cut.
+- [ ] The dependency at YMXS 0.8.0 in both trees: the build, `mvn test`
+      and the rig, and every file the tests compare as it is
+- [ ] SPEC.md, BINARIES.md, doc/ymxs.md and glossary.md define the
+      column, the index, version 11, the tick under a cut and the record
+- [ ] Java: the converter, the tune file, the record and the check, and
+      the kit's tunes under a cut
+- [ ] Go, byte for byte with Java
+- [ ] The player: `YMXR_CUT`, the cut column, and the start, the recut
+      and the deferred start under a cut on the counted handler; the rig
+      plays a moved window against the model
+- [ ] performance.md: a tick under a cut and a frame of a recut,
+      measured on the rig, and the bytes of the core with the cut in
+- [ ] This document goes, and YMXS's doc/cuts.md ticks its two YMXR
+      items
