@@ -18,9 +18,10 @@ dependency leaves every file the tests compare as it is.
 
 ## The column
 
-Column 34 + i is the cut column of effect i, as column 30 + i is its
-mapping column (SPEC.md 1.10): bit 7 the set bit, bits 6 to 0 a cut
-number.
+Effect i has a cut column, the column i of the four cut columns, which
+follow the mapping columns where the tune has them (The tune file): bit
+7 the set bit and bits 6 to 0 a cut number, as in a mapping column
+(SPEC.md 1.10).
 
 | byte | the row |
 |---|---|
@@ -69,30 +70,38 @@ which YMXS's check reads of the structure (YMXS, SPEC.md 1.11).
 
 ## The tune file
 
-Version 11 is version 10 with the four cut columns, bit 6 of the effects
-used, the long at 20 and the cut index:
+A tune *maps a value* where a row sets a mapping column to 1 to 127, and
+*cuts a source* where a row sets a cut column to 1 to 127. A table has a
+group of four columns where the tune uses it:
+
+| the tune | version | columns | the mapping columns | the cut columns |
+|---|---|---|---|---|
+| maps no value and cuts no source | 9 | 30 | absent | absent |
+| maps a value and cuts no source | 10 | 34 | 30 to 33 | absent |
+| cuts a source and maps no value | 11 | 34 | absent | 30 to 33 |
+| maps a value and cuts a source | 11 | 38 | 30 to 33 | 34 to 37 |
+
+The player reads each column at a displacement init patches for the
+tune (68k/player/columns.S), so init patches the reads of a cut column at
+30 + i or 34 + i by bit 5, and a frame reads it in the same cycles at
+either. K of 3.3.4, the column count of the version, is 34 or 38 in
+version 11, by bit 5.
+
+The header of version 11 against version 10:
 
 | | version 10 | version 11 |
 |---|---|---|
-| columns | 34 | 38 |
-| bit 5 of the effects used | 1 | 1 where a row maps a value, 0 otherwise |
+| bit 5 of the effects used | 1 | 1 where the tune maps a value, 0 otherwise |
 | bit 6 of the effects used | 0 | 1 |
 | the long at 16 | where the transformation index begins | the same where bit 5 is 1, and 0 where it is 0 |
 | the long at 20 | index entry 1 | where the cut index begins |
 | the source index | at 20 | at 24 |
 
 The offset of the source index follows the version alone, as it does
-today: I of 3.1.1 is 16, 20 in version 10 and 24 in version 11. In a
-tune of version 11 that maps no value, the mapping columns are in the
-table, every row leaves them unset, and DTX3 packs each as a constant
-column.
-
-A writer writes version 11 where a row sets a cut column to 1 to 127,
-version 10 where a row maps a value and every cut a row selects is cut
-0, and version 9 otherwise. A reader reads versions 7 to 11. Init of a
-core assembled without the cut, `YMXR_CUT`, reports -1 for a tune whose
-effects byte sets bit 6, as a core without the lookup reports it for bit
-5 (BINARIES.md 1.5).
+today: I of 3.1.1 is 16, 20 in version 10 and 24 in version 11. A reader
+reads versions 7 to 11. Init of a core assembled without the cut,
+`YMXR_CUT`, reports -1 for a tune whose effects byte sets bit 6, as a
+core without the lookup reports it for bit 5 (BINARIES.md 1.5).
 
 The errors of the file (3.3.4) gain these, U the cut count, Q where the
 cut index is, and G and L the first and the last row of cut N:
@@ -159,7 +168,7 @@ settles whether the lookup lays one out today or gains it.
 What SPEC.md 4 gains:
 
 - 4.1 step 4: the kept cut of each effect is 0.
-- 4.2 step 2: columns 34 to 37 in version 11.
+- 4.2 step 2: the cut columns in version 11, 30 to 33 or 34 to 37.
 - 4.3 step 3, a start: with bit 5 at 1 the place is the first row of the
   cut, row 0 under cut 0; with bit 5 at 0 it is its row number modulo R
   of the source started, and the first row of the cut where that row is
@@ -266,9 +275,6 @@ fails on main today and the bump fixes it.
   could keep its handler. The counted handler is one path to verify on
   the rig, and a cut of the whole table of a running source is a
   `Recut` back to it.
-- The four mapping columns in a tune of version 11 that maps no value:
-  a fixed column per effect and operation, against a layout whose cut
-  columns move with bit 5.
 - A cut of rows whose count is above 65,535: the counter is a word, as
   for a counted source today, so a writer reports such a cut, or the
   counter widens.
