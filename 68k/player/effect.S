@@ -456,6 +456,18 @@ q\{ct}:         bra.w   \{tick}_done
                 btst    #3,d2
                 bne.w   \{tick}_kept
                 bra.w   \{tick}_rstop
+                .if     YMXR_MAP
+; A start or a stop in a tune of version 11 that defers a start: a start
+; reads the cut column first, so an arming captures the kept cut after
+; the row (SPEC.md 4.8); a stop ignores it (4.3.2).
+\{tick}_xcheck: beq.s   \{tick}_check
+                move.w  d1,d3
+                DREAD   \cx                     ; the cut column
+                bpl.s   .xk\~
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_CUT(a0)
+.xk\~:          move.w  d3,d1                   ; the source, other than 0
+                .endif
 \{tick}_check:  beq.s   \{tick}_drop            ; source 0, the and's Z: a stop
                 tst.b   \fx+FX_PENDING(a0)      ; a start pending on the timer:
                 bne.s   \{tick}_pending         ; switched, dropped or replaced

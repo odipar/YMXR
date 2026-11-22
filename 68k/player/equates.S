@@ -176,6 +176,9 @@ FX_LEVEL        equ     58              ; the running square's level at row 0
 FX_RUN          equ     59              ; the running source's mapping
 FX_USE          equ     60              ; the page in use, bank 0's then 1's
 FX_LBANK        equ     62              ; the bank of the cache
+FX_ACUT         equ     63              ; an armed start's cut, and bit 7
+                                        ; where its place is the cut's
+                                        ; first row
 FX_PAGE         equ     64              ; two bytes a page, 4 a bank
 FX_LBYTE        equ     72              ; the cache: the page byte's address
 FX_LKEY         equ     76              ; a transformation, and the fill kind

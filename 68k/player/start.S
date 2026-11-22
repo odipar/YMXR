@@ -123,6 +123,14 @@ SET_DEFER       equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_check-ymxr_
                 .if     (ymxr_e_effect3_1-ymxr_tick3_set-2+ymxr_tick3_check-ymxr_p_defer3_1)<>SET_DEFER
                 .error  "effect 3 lays its pending paths out apart from effect 0"
                 .endif
+                .if     YMXR_MAP
+; For a tune of version 11 that defers a start, init aims the start and
+; the stop at the path that reads the cut column before the arming.
+SET_X           equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_xcheck-ymxr_p_defer0_1     ; RES_DEFER
+                .if     (ymxr_e_effect3_1-ymxr_tick3_set-2+ymxr_tick3_xcheck-ymxr_p_defer3_1)<>SET_X
+                .error  "effect 3 lays its deferred start of version 11 out apart from effect 0"
+                .endif
+                .endif
                 .endif
 RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .if     YMXR_MAP

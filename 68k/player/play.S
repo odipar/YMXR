@@ -220,6 +220,8 @@ ymxr_sites:
                 .if     YMXR_MAP
                 dc.w    d_30-ymxr_frame+2,SITE_DEFER+30,d_31-ymxr_frame+2,SITE_DEFER+31
                 dc.w    d_32-ymxr_frame+2,SITE_DEFER+32,d_33-ymxr_frame+2,SITE_DEFER+33
+                dc.w    d_34-ymxr_frame+2,SITE_DEFER+34,d_35-ymxr_frame+2,SITE_DEFER+35
+                dc.w    d_36-ymxr_frame+2,SITE_DEFER+36,d_37-ymxr_frame+2,SITE_DEFER+37
                 .endif
                 .endif
 ymxr_sites_end:

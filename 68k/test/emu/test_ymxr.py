@@ -1964,8 +1964,11 @@ def cutting(code, symbols):
     and started again at that row by a select; a square, a source of one
     row and a counted source under a cut, recut to the whole table and
     back; a recut on a stopped timer, read by the start after it; starts
-    under the whole table after a cut, and a place's reset after each; and
-    the timers that share a control register. The third retunes an idle
+    under the whole table after a cut, and a place's reset after each;
+    deferred starts under a cut, at L + 1 of the running cut and at the
+    cut's first row, and between a cut and the whole table; recuts while
+    a start is pending, of the general handler and of a square; and the
+    timers that share a control register. The third retunes an idle
     timer and the fifth recuts one, which YMXS's check of the writing
     rules warns of (YMXS, SPEC.md 6.3), and every other follows the
     rules."""
@@ -1977,8 +1980,8 @@ def cutting(code, symbols):
     counted = ("counted", [200, 150, 100, 50, 25], 1)
     slow, quick = (200, 200), (50, 100)
 
-    def start(source, cut=None, target=8, rate=slow, tr=1, pr=1):
-        return ("start", source, target, rate[0], rate[1], tr, pr, 0, 0, cut)
+    def start(source, cut=None, target=8, rate=slow, tr=1, pr=1, deferred=0):
+        return ("start", source, target, rate[0], rate[1], tr, pr, deferred, 0, cut)
 
     def recut(first, last):
         return ("recut", first, last)
@@ -2007,6 +2010,21 @@ def cutting(code, symbols):
                 7: ("retune", 200, 200, 0, 1)},
           "D": {0: start(2, (0, 0), target=9), 3: start(2, target=9),
                 5: ("retune", 200, 200, 0, 1)}}),
+        ("deferred starts under a cut, at L + 1 of the running cut and at the cut's first"
+         " row", [loop, six],
+         {"A": {0: start(1, (2, 5)), 3: start(2, (1, 4), pr=0, deferred=1),
+                9: start(1, (3, 6), pr=0, deferred=1), 15: start(2, (2, 4), deferred=1)}}),
+        ("deferred starts between a cut and the whole table", [loop, six, fall],
+         {"A": {0: start(1, (2, 5)), 3: start(2, pr=0, deferred=1),
+                8: start(1, (2, 4), pr=0, deferred=1)},
+          "D": {0: start(3, (3, 8), target=9, rate=quick),
+                1: start(2, (0, 3), target=9, rate=quick, pr=0, deferred=1)}}),
+        ("recuts while a start is pending: the hook and the armed place move",
+         [loop, six, square],
+         {"A": {0: start(1), 2: start(2, (0, 3), pr=0, deferred=1), 3: recut(0, 2),
+                8: start(1, pr=0, deferred=1), 9: recut(1, 4), 14: start(2, (2, 5))},
+          "B": {0: start(3, target=9), 2: start(1, (1, 6), target=9, pr=0, deferred=1),
+                3: recut(1, 1)}}),
         ("recuts on the timers that share a control register", [loop, six],
          {"C": {0: start(1, (3, 7), target=9), 4: recut(2, 4)},
           "D": {0: start(2, (1, 5), target=10, rate=quick), 3: recut(0, 2), 6: recut(3, 5)}}),
@@ -6933,22 +6951,17 @@ def main():
                 "%s: the binder bound a tune of another version" % os.path.basename(one)
             print("%-45s the binder and the reader reject it"
                   % os.path.basename(one))
-        # The kit's cuts.ymxr defers a start under a cut, which the
-        # player reads once the deferred start under a cut is in it, and
-        # a link keeps the cut's code once its pieces are defined
-        # (doc/cuts.md): until then each is named and left out of the
-        # tunes played.
+        # A link keeps the cut's code once its pieces are defined
+        # (doc/cuts.md): until then, under -linked, each tune of version
+        # 11 is named and left out of the tunes played.
         later = []
         for one in tunes:
             with open(one, "rb") as f:
-                if f.read(6)[4:6] == b"\x00\x0b" and (
-                        LINKED or os.path.basename(one) == "cuts.ymxr"):
+                if f.read(6)[4:6] == b"\x00\x0b" and LINKED:
                     later.append(one)
         tunes = [one for one in tunes if one not in later]
         for one in later:
-            print("%-45s %s" % (os.path.basename(one), "version 11, which a link leaves out"
-                                if LINKED else "a deferred start under a cut, which this"
-                                " player does not read"))
+            print("%-45s version 11, which a link leaves out" % os.path.basename(one))
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():

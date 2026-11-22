@@ -15,6 +15,8 @@ ymxr_take:      move.b  FX_SHAPE+ARMOFF(a3),FX_SHAPE(a3)
                 .if     YMXR_MAP
                 move.b  FX_ALEVEL(a3),FX_LEVEL(a3)
                 move.b  FX_AMAP(a3),FX_RUN(a3)
+                move.b  FX_ACUT(a3),FX_CRUN(a3) ; its captured cut runs
+                bclr    #7,FX_CRUN(a3)          ; (1.11.3)
                 .endif
                 clr.b   FX_PENDING(a3)
                 rts
@@ -132,6 +134,11 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 .if     YMXR_MAP
                 move.b  FX_MAP(a3),FX_AMAP(a3)
                 sf      FX_LOK(a3)              ; the cache, until a remap
+                move.b  FX_CUT(a3),FX_ACUT(a3)  ; the kept cut, and bit 7
+                btst    #5,d2                   ; where the start is at its
+                beq.s   .acut                   ; first row (1.11.3)
+                bset    #7,FX_ACUT(a3)
+.acut:
                 .endif
                 tst.b   d1
                 bne.s   .cnt
@@ -144,9 +151,12 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 and.b   #7,d5
                 move.b  d5,FX_SELECT(a3)
                 move.b  FX_TARGET(a3),FX_TARGET+ARMOFF(a3)
-; The source, and the row it starts at: row 0 with bit 5, and otherwise
-; R of the running source modulo R of this one, the count of the rows the
-; running source played.
+; The source, and the row it starts at: row 0 with bit 5, and otherwise R
+; of the running source modulo R of this one, the count of the rows the
+; running source played. Under a running cut 1 to 127 the count is L + 1,
+; L the cut's last row, and under a cut of the start the row is inside it:
+; the cut's first row where the row is outside the cut, row 0 with bit 5
+; among them where the cut begins past it (4.8).
                 move.w  4(sp),d3
                 lsl.w   #3,d3
                 movea.l WS_SOURCES-8(a0,d3.w),a4    ; its first row
@@ -155,6 +165,17 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 moveq   #0,d3
                 btst    #5,d2
                 bne.s   .placed
+                .if     YMXR_MAP
+                tst.b   FX_CRUN(a3)
+                beq.s   .whole
+                movem.l d0-d1/a1,-(sp)
+                bsr.w   ymxr_xcut               ; L of the running cut
+                move.l  d1,d3
+                addq.l  #1,d3
+                movem.l (sp)+,d0-d1/a1
+                bra.s   .last
+.whole:
+                .endif
                 move.b  FX_SHAPE(a3),d5         ; R of a running source of
                 cmp.b   #2,d5                   ; several columns, or of a
                 bcs.s   .header                 ; counted one, in the record;
@@ -166,7 +187,23 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.l  DT_ROWS-DT_PAYLOAD(a5),d3
 .last:          move.l  DT_ROWS-DT_PAYLOAD(a4),d4
                 bsr.w   ymxr_rem
-.placed:        move.l  d3,FX_APLACE(a3)
+.placed:
+                .if     YMXR_MAP
+                tst.b   FX_CUT(a3)
+                beq.s   .xdone
+                movem.l d0-d1/a1,-(sp)
+                moveq   #0,d0
+                move.b  FX_CUT(a3),d0
+                bsr.w   ymxr_xrows              ; F and L of the start's cut,
+                cmp.l   d0,d3                   ; row 0 with bit 5 at F
+                bcs.s   .xfirst
+                cmp.l   d1,d3
+                bls.s   .xin
+.xfirst:        move.l  d0,d3
+.xin:           movem.l (sp)+,d0-d1/a1
+.xdone:
+                .endif
+                move.l  d3,FX_APLACE(a3)
 ; The bank the vector does not point into.
                 moveq   #0,d4
                 movea.w (a6),a5
@@ -190,7 +227,8 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 sf      WS_ARMING(a0)
                 lea     -ARMOFF(a3),a3          ; the record, past its mirror
                 bra.w   .armed
-.ident:
+.ident:         tst.b   FX_CUT(a3)              ; under a cut 1 to 127, the
+                bne.w   .xarm                   ; counted handler
                 .endif
                 tst.l   d0
                 bmi.s   .shaped
@@ -398,3 +436,39 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 lea     YM_SELECT.w,a2
                 moveq   #1,d0
                 rts
+                .if     YMXR_MAP
+; a start under a cut 1 to 127: the counted handler of the bank above, at
+; the row above, its counter the rows from there to the cut's last row
+; and its loop the cut's (ymxr_xloop)
+.xarm:          move.l  a1,-(sp)
+                move.l  d3,-(sp)                ; the row
+                lea     ymxr_at_counted(pc),a5
+                move.w  d6,d5
+                add.w   d5,d5
+                adda.w  (a5,d5.w),a5
+                adda.w  d4,a5
+                moveq   #0,d0
+                move.b  FX_CUT(a3),d0
+                bsr.w   ymxr_xrows              ; F and L
+                bsr.w   ymxr_xloop              ; the loop cell and a pass
+                move.l  (sp)+,d3
+                sub.l   d3,d1
+                addq.l  #1,d1                   ; the rows left
+                move.b  FX_TARGET(a3),TICKC_SEL(a5)
+                move.l  a4,d0
+                add.l   d3,d0                   ; the place
+                .if     YMXR_PCREL
+                sub.l   a5,d0
+                sub.l   #TICKC_PTR,d0
+                move.w  d0,TICKC_PTR(a5)
+                move.w  a1,TICKC_CELL(a5)
+                .else
+                move.l  d0,TICKC_PTR(a5)
+                move.l  a1,TICKC_CELL(a5)
+                .endif
+                move.w  d1,TICKC_LEFT(a5)
+                move.w  d6,TICKC_RELD(a5)
+                move.l  (sp)+,a1
+                move.b  #4,FX_SHAPE+ARMOFF(a3)
+                bra.w   .single
+                .endif

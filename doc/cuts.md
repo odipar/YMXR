@@ -301,7 +301,7 @@ case failed on main until the bump.
         reset under a cut on the counted handler of one column; the
         rig's model of the tick under a cut, and the kit's `cut` on the
         lookup cores
-  - [ ] the deferred start under a cut: the arming captures the cut, the
+  - [x] the deferred start under a cut: the arming captures the cut, the
         installer places at L + 1 of the cut that ended, and a recut while
         a start is pending moves the running handler and the armed place;
         the kit's `cuts`
@@ -328,7 +328,9 @@ case failed on main until the bump.
   cores: init aims the branches at the paths that read the cut column
   where the effects byte sets bit 6. The head ors the column at 30 + i,
   the cut column where the tune maps no value; where it maps one, init
-  aims the head's branch on the set bits at a fifth or.
+  aims the head's branch on the set bits at a fifth or. The record's
+  update after a deferred start's switch copies the armed cut in every
+  tune, two instructions (ymxr_take).
 - A recut from cut 0 to cut 0 leaves the handler as it is; every other
   recut aims the counted handler, and a recut to cut 0 keeps it there
   until the next start.
