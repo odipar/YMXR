@@ -28,7 +28,8 @@ final class Trace {
 
     /**
      * The record's header, including transformation entries after
-     * sources in version 10 (SPEC.md 7.2).
+     * sources where the file has mapping columns, and the cuts in version
+     * 11 (SPEC.md 7.2).
      */
     static String header(TuneFile tune) {
         StringBuilder line = new StringBuilder("{\"rate\":").append(tune.frameRate())
@@ -45,7 +46,7 @@ final class Trace {
             line.append("],\"repeat\":").append(s.repeat()).append('}');
         }
         line.append(']');
-        if (tune.version() == Tune.VERSION) {
+        if (Columns.maps(tune.effects())) {
             line.append(",\"transformations\":[");
             for (int n = 0; n < tune.transformations().size(); n++) {
                 byte[] entries = tune.transformations().get(n);
@@ -57,20 +58,31 @@ final class Trace {
             }
             line.append(']');
         }
+        if (tune.version() == Tune.CUT) {
+            line.append(",\"cuts\":[");
+            for (int n = 0; n < tune.cuts().size(); n++) {
+                TuneFile.Cut one = tune.cuts().get(n);
+                line.append(n == 0 ? "" : ",").append("{\"first\":").append(one.first())
+                        .append(",\"last\":").append(one.last()).append('}');
+            }
+            line.append(']');
+        }
         return line.append("}\n").toString();
     }
 
     /**
      * Writes the header and up to {@code calls} frame entries to {@code
-     * out}, one per line. A frame reporting -1 ends the record. Version
-     * 10 effect entries report the kept mapping; ticks and
-     * pending-start mappings are outside the record (SPEC.md 7.3).
+     * out}, one per line. A frame reporting -1 ends the record. Effect
+     * entries of versions 10 and 11 report the kept mapping, and of
+     * version 11 the kept cut; ticks and a pending start's mapping and cut
+     * are outside the record (SPEC.md 7.3).
      */
     static void trace(TuneFile tune, int calls, PrintStream out) {
         out.print(header(tune));
-        boolean mapped = tune.version() == Tune.VERSION;
+        boolean mapped = tune.version() >= Tune.VERSION;
+        boolean cuts = tune.version() == Tune.CUT;
         Table table = tune.table();
-        Replay model = new Replay(table);
+        Replay model = new Replay(table, tune.effects());
         for (int call = 0; call < calls; call++) {
             if (model.row() == table.rows()) {
                 out.print("{\"result\":-1}\n");
@@ -101,6 +113,9 @@ final class Trace {
                         .append(",\"deferred\":").append(e.deferred());
                 if (mapped) {
                     line.append(",\"mapping\":").append(e.mapping());
+                }
+                if (cuts) {
+                    line.append(",\"cut\":").append(e.cut());
                 }
                 line.append('}');
                 first = false;

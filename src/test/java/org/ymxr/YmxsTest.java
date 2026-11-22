@@ -336,11 +336,7 @@ final class YmxsTest {
      * the repeat row (YMXS, SPEC.md 3.7.4).
      */
     private static Tune triangle(Cut cut, Row second) {
-        Single wave = Tunes.repeating("triangle", IntStream.range(0, 32)
-                .map(n -> n < 16 ? n : 31 - n).boxed().toList(), 0);
-        Start start = new Start(new OneConnection(Tunes.setting(Register.R8), wave), STOPPED,
-                false, Tunes.NO_PARTS, cut);
-        return built(List.of(row(Map.of(), Timer.A, start), second,
+        return built(List.of(row(Map.of(), Timer.A, under(cut, Tunes.NO_PARTS)), second,
                 row(Map.of(), Timer.A, Tunes.STOP)), 2);
     }
 
@@ -355,23 +351,106 @@ final class YmxsTest {
         return triangle(new Cut(0, 31), row(Map.of(), timer, new Recut(new Cut(16, 31))));
     }
 
+    /** The triangle of {@link #triangle}, on effect 0 alone. */
+    private static Single triangle() {
+        return Tunes.repeating("triangle", IntStream.range(0, 32)
+                .map(n -> n < 16 ? n : 31 - n).boxed().toList(), 0);
+    }
+
+    /** A start of the triangle on setR8 under {@code cut}, through {@code
+     *  mapping}. */
+    private static Start under(Cut cut, Mapping mapping) {
+        return new Start(new OneConnection(Tunes.setting(Register.R8), triangle()), STOPPED,
+                false, mapping, cut);
+    }
+
     /**
-     * A tune that cuts a source is an error until the columns encode a cut
-     * (doc/cuts.md), and a recut on a timer outside the tune leaves every
-     * column unset, as a remap there does (SPEC.md 6, rule 2(a)).
+     * A start under a cut writes version 11, thirty-four columns with the
+     * cut columns at 30 to 33 where the tune maps no value, and the cut
+     * index in first-use order; a recut on a timer of the tune writes its
+     * column alone, and one outside the tune leaves every column unset, as a
+     * remap there does (SPEC.md 1.11, 3.3.5, 3.5; rules 2(a), 2(i)).
      */
     @Test
-    void aTuneThatCutsASourceIsAnErrorUntilTheColumnsEncodeACut() {
-        assertEquals("row 0: Timer A starts a source of 32 rows under the cut of rows 0 to"
-                + " 15, and this version encodes the whole table alone",
-                assertThrows(IllegalArgumentException.class, () -> Schema.of(cut()))
-                        .getMessage());
-        assertEquals("row 1: Timer A recuts to rows 16 to 31, and this version encodes the"
-                + " whole table alone",
-                assertThrows(IllegalArgumentException.class, () -> Schema.of(recut(Timer.A)))
-                        .getMessage());
+    void aTuneThatCutsASourceWritesVersionEleven() {
+        Columns cut = Schema.of(cut()).columns();
+        assertEquals(Columns.MAPPED, cut.count(), "the cut columns at 30 to 33");
+        assertEquals(Columns.CUTS | 1, cut.effects, "effect 0 and bit 6");
+        assertEquals(List.of(new Cut(0, 15)), cut.cuts);
+        assertEquals((byte) 0x81, cut.column[Columns.MAPPING][0], "row 0 selects cut 1");
+        assertEquals(org.ymxr.Tune.CUT, org.ymxr.Tune.getWord(file(cut()), 4));
+        Columns recut = Schema.of(recut(Timer.A)).columns();
+        assertEquals(List.of(new Cut(16, 31)), recut.cuts);
+        assertEquals(0, recut.column[Columns.MAPPING][0], "the whole table, as the kept cut");
+        assertEquals((byte) 0x81, recut.column[Columns.MAPPING][1], "the recut, cut 1");
+        assertEquals(0, recut.column[Columns.EFFECT + 1][1], "the recut's source column");
         assertArrayEquals(file(triangle(new Cut(0, 31), Tunes.EMPTY)), file(recut(Timer.D)),
                 "the file of the tune without the recut");
+    }
+
+    /** A tune that maps a value and cuts a source has thirty-eight columns:
+     *  the mapping columns at 30 to 33, then the cut columns (SPEC.md
+     *  3.3.5). */
+    @Test
+    void aTuneThatMapsAndCutsHasThirtyEightColumns() {
+        Tune tune = built(List.of(row(Map.of(), Timer.A,
+                under(new Cut(0, 15), Tunes.mapping(volume(10)))), Tunes.EMPTY), 0);
+        Columns columns = Schema.of(tune).columns();
+        assertEquals(Columns.ALL, columns.count());
+        assertEquals(Columns.MAPS | Columns.CUTS | 1, columns.effects);
+        assertEquals((byte) 0x81, columns.column[Columns.MAPPING][0], "transformation 1");
+        assertEquals((byte) 0x81, columns.column[Columns.CUT][0], "cut 1");
+        assertEquals(Columns.CUT, Columns.cut(columns.effects, 0));
+        assertEquals("effect 0 cut", org.ymxr.Tune.name(Columns.CUT));
+        assertEquals("effect 0 cut", org.ymxr.Tune.name(Columns.MAPPING, Columns.CUTS));
+    }
+
+    /**
+     * Rule 2(i): a start writes the cut column where its value differs from
+     * the kept cut, 0 for the whole table; a recut where its cut differs
+     * from the running cut, on an idle timer as on a running one; a stop
+     * leaves the column unset and the running cut the kept cut.
+     */
+    @Test
+    void theCutColumnIsWrittenWhereItDiffersFromWhatThePlayerKeeps() {
+        Cut low = new Cut(0, 15);
+        Cut high = new Cut(16, 31);
+        Tune tune = built(List.of(
+                row(Map.of(), Timer.A, under(low, Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, new Recut(low)),
+                row(Map.of(), Timer.A, new Recut(high)),
+                row(Map.of(), Timer.A, under(high, Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, under(new Cut(0, 31), Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, Tunes.STOP),
+                row(Map.of(), Timer.A, new Recut(new Cut(0, 31))),
+                row(Map.of(), Timer.A, new Recut(high))), 7);
+        Columns columns = Schema.of(tune).columns();
+        byte[] cut = columns.column[Columns.MAPPING];
+        assertEquals(List.of(low, high, new Cut(0, 31)), columns.cuts, "first-use order");
+        assertEquals(List.of(0x81, 0x00, 0x82, 0x00, 0x80, 0x00, 0x83, 0x82),
+                IntStream.range(0, 8).mapToObj(r -> cut[r] & 0xFF).toList(),
+                "the kept cut 1, the running cut 1, cut 2, the kept cut 2, the whole table,"
+                        + " a stop, a recut of the idle timer, and the repeat row's open cut");
+    }
+
+    /** More cuts than a cut column numbers is an error of the writer
+     *  (SPEC.md 6.5). */
+    static Tune manyCuts() {
+        List<Row> rows = new ArrayList<>();
+        rows.add(row(Map.of(), Timer.A, under(new Cut(0, 31), Tunes.NO_PARTS)));
+        for (int first = 0; first <= 31; first++) {
+            for (int last = first; last <= 31 && rows.size() <= 128; last++) {
+                rows.add(row(Map.of(), Timer.A, new Recut(new Cut(first, last))));
+            }
+        }
+        return built(rows, 0);
+    }
+
+    @Test
+    void moreThan127CutsIsAnError() {
+        assertEquals("the tune cuts through 128 cuts, and a cut column numbers 127",
+                assertThrows(IllegalArgumentException.class, () -> Schema.of(manyCuts()))
+                        .getMessage());
     }
 
     /**

@@ -289,13 +289,15 @@ case failed on main until the bump.
       and the rig, and every file the tests compare as it is
 - [x] SPEC.md, BINARIES.md and glossary.md define the column, the
       index, version 11, the tick under a cut and the record
-- [ ] Java: the converter, the tune file, the record and the check;
+- [x] Java: the converter, the tune file, the record and the check;
       doc/ymxs.md and tools.md; the rings of a table of 38 columns in
       SPEC.md 3.3.3; and the kit's tunes under a cut, SPEC.md 7.6
 - [ ] Go, byte for byte with Java
 - [ ] The player, in the lookup cores: the cut column, and the start,
       the recut and the deferred start under a cut on the counted
-      handler; the rig plays a moved window against the model
+      handler; the rig plays a moved window against the model;
+      BINARIES.md 1.5 and 2, and LINKER.md's table of the kit's tunes of
+      version 11
 - [ ] performance.md: a tick under a cut and a frame of a recut,
       measured on the rig, and the bytes of the core with the cut in
 - [ ] This document goes, and YMXS's doc/cuts.md ticks its two YMXR

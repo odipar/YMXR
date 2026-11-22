@@ -549,20 +549,41 @@ final class ParityTest {
     }
 
     /**
-     * A tune that cuts a source is one error in both trees until the
-     * columns encode a cut (doc/cuts.md), and a recut on a timer outside
-     * the tune converts to one file in both.
+     * Version 11 in both trees: the kit's two tunes under a cut converted
+     * from their structures and read back, a recut outside the tune left
+     * out, the files of version 11 written wrong, the check's lines of the
+     * cut columns, the bound tune, the layout and the multi file of version
+     * 11, and more cuts than a cut column numbers (SPEC.md 1.11, 3.3.4, 3.5,
+     * 6.4, 6.5; BINARIES.md 0, 1).
      */
     @Test
-    void aCutIsTheSameErrorInBothTrees() throws Exception {
-        assertWrong(YmxsTest.cut(), "row 0: Timer A starts a source of 32 rows under the cut"
-                + " of rows 0 to 15, and this version encodes the whole table alone");
-        assertWrong(YmxsTest.recut(org.ymxs.YMXS.Timer.A), "row 1: Timer A recuts to rows 16"
-                + " to 31, and this version encodes the whole table alone");
-        both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
-                YmxsTest.recut(org.ymxs.YMXS.Timer.D))).getBytes(StandardCharsets.UTF_8),
-                "-silent");
+    void aTuneUnderACutReadsTheSameInBothTrees() throws Exception {
+        for (org.ymxs.YMXS.Tune tune : List.of(ConformanceTest.cut(), ConformanceTest.cuts(),
+                YmxsTest.recut(org.ymxs.YMXS.Timer.D))) {
+            byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
+                    .getBytes(StandardCharsets.UTF_8), "-silent");
+            both("ymxr-trace", file);
+            both("ymxr-check", file);
+            both("ymxr-layout", both("ymxr-bind", file));
+        }
+        for (java.util.Map.Entry<String, byte[]> one : CutTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+        }
+        for (java.util.Map.Entry<List<String>, byte[]> one : CutTest.unchecked().entrySet()) {
+            assertEquals("standard input:\n  " + String.join("\n  ", one.getKey()) + "\n",
+                    new String(both("ymxr-check", one.getValue()), StandardCharsets.UTF_8));
+        }
+        byte[] cut = Files.readAllBytes(Path.of("doc/conformance/tunes/cut.ymxr"));
+        byte[] multi = multiOf(List.of(cut, MappedTest.file()));
+        assertEquals(Tune.CUT, Tune.getWord(multi, 4), "a set with a tune that cuts a source");
+        both("ymxr-layout", multi);
+        assertWrong(YmxsTest.manyCuts(), "the tune cuts through 128 cuts, and a cut column"
+                + " numbers 127");
     }
+
 
     private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))

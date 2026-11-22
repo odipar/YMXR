@@ -28,7 +28,7 @@ after the vectors.
 
 **Encoding.** `Schema` converts the structure into the columns of SPEC.md
 1: set bits, bits marking zero values in full-byte columns, effect
-columns, mapping columns, source markers or counts, and timer
+columns, mapping columns, cut columns, source markers or counts, and timer
 assignments.
 
 ## What each column is written from
@@ -44,7 +44,10 @@ assignments.
 | the `mapping` of a `Start` | the mapping column, the number of its last part, where it differs from the kept mapping (1.10; SPEC.md 6, rule 2(g)) |
 | `Remap` on a timer of the tune | the mapping column with the source column unset, where the effect may run through another mapping (1.10; SPEC.md 6, rule 2(g)) |
 | `Remap` on a timer outside the tune | every column left unset (SPEC.md 6, rule 2(a)) |
+| the `cut` of a `Start` | the cut column, 0 where the cut is the whole table of its source and the number of the cut otherwise, where it differs from the kept cut (1.11; SPEC.md 6, rule 2(i)) |
+| `Recut` on a timer of the tune | the cut column at the number of its cut, with the source column unset, where it differs from the running cut (1.11.2; SPEC.md 6, rule 2(i)) |
 | `Recut` on a timer outside the tune | every column left unset, as for a `Remap` there (SPEC.md 6, rule 2(a)) |
+| the tune's cuts | numbered 1 upward in first-use order, in a tune file of version 11 where a row selects a cut 1 to 127 (3.3.5, 3.5) |
 | the tune's transformations | numbered 1 upward in the order of YMXS, SPEC.md 1.9, in a tune file of version 10 where a row sets a mapping column to one (3.3.5, 3.4) |
 | a source | a column a register of its target (3.1.3), repeating at its repeat row: bit 7 of the marker's column set on the last row (3.2), or, where that register reads its whole byte, rows a player counts and bit 31 of the index entry (3.1.6) |
 | a source of one column every `Start` maps through a transformation, with a key of 128 or more | rows a player counts and bit 31 of the index entry (3.1.6) |
@@ -124,6 +127,24 @@ transformation; identity-only tunes remain version 9. [writing.md](writing.md)
 5.7 covers key ranges and [SPEC.md](SPEC.md) 6, rule 2(g) defines the
 column-write algorithm.
 
+## Cuts
+
+A `Start` under the whole table of its source runs as it does in version
+10: its cut is 0, and the schema writes its cut column only where the kept
+cut is another. A `Start` under another cut, and a `Recut` on a timer of
+the tune, select a cut of the index, numbered in first-use order, two of
+the same rows one cut. A `Recut` writes the number of its cut where the
+cut is the whole table of the running source too: after a deferred start
+the rows leave the running source open, and a numbered cut reads the same
+rows (SPEC.md 6, rule 2(i)).
+
+The schema tracks the kept, the running and the pending cut of each effect
+as it tracks the mapping, and at the repeat row opens the three of each
+effect that runs under a cut 1 to 127. It emits version 11 where a row
+selects a cut 1 to 127: the cut columns at 30 to 33 where no row maps a
+value, and at 34 to 37 after the mapping columns where one does (SPEC.md
+3.3.5).
+
 ## What is an error
 
 A structure this format cannot encode is an error: the tool reports the
@@ -133,6 +154,7 @@ row or the source and exits 1.
 |---|---|
 | more than 127 sources | the source column numbers 1 to 127 (1.8) |
 | more than 127 transformations, and a start, or a remap on a timer of the tune, through one | the mapping column numbers 1 to 127 (1.10) |
+| more than 127 cuts, and a start, or a recut on a timer of the tune, under one | the cut column numbers 1 to 127 (1.11) |
 | a count past 255 | the count column is the timer's data register, a byte (1.9) |
 | a start, or a remap on a timer of the tune, through a transformation for a value other than the last of its target | the mapping column maps the last value alone (1.10) |
 | a target past 24 | 25 to 127 are left to a later version (2.1, section 8) |
@@ -141,7 +163,6 @@ row or the source and exits 1.
 | a value past 127 in the marker's column of a marked source | bit 7 of that column is the marker (3.2) |
 | a key past 63 of a source a start on `setR7` maps through a transformation | bits 7 and 6 of each row are the two port directions (SPEC.md 6, rule 2(f)) |
 | a value past 255 | a column of a source is one byte (3.1.3) |
-| a `Start` under a cut other than the whole table of its source, or a `Recut` on a timer of the tune | the columns encode the whole table of each source; doc/cuts.md plans the encoding of a cut |
 
 ## The tools
 

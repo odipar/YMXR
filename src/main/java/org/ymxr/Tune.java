@@ -15,28 +15,34 @@ import org.dtx.Table;
 
 /**
  * A tune file: metadata, DTX3 tune table and DTX1 sources (SPEC.md 3.3).
- * Version 10 adds optional transformation tables; identity-only tunes use
- * version 9. Files contain data alone; {@link Bound} adds DTX's reader
- * for playback (doc/BINARIES.md).
+ * Version 10 adds optional transformation tables, and version 11 a cut
+ * index; identity-only tunes under the whole table use version 9. Files
+ * contain data alone; {@link Bound} adds DTX's reader for playback
+ * (doc/BINARIES.md).
  *
  * <pre>
  *  offset  bytes  what it is
  *  0       4      YMXR
- *  4       2      the version, $0009, or $000A where a row maps a value
+ *  4       2      the version, $0009, $000A where a row maps a value, or
+ *                 $000B where a row cuts a source
  *  6       2      the frame rate, in Hz
  *  8       1      effects used: bits 3 to 0 the effects, bit 4 a deferred
- *                 start, bit 5 the mapping columns
+ *                 start, bit 5 the mapping columns, bit 6 the cut columns
  *  9       1      S, the source count, 0 to 127
  *  10      2      where the name begins, or zero where the tune has none
  *  12      4      where the DTX3 table begins
- *  16      4      version 10: where the transformation index begins
- *  16, 20  4S     the source index, at 16 and at 20 in version 10: where
- *                 source 1 to S's DTX1 table begins
+ *  16      4      versions 10 and 11: where the transformation index
+ *                 begins, 0 in version 11 where bit 5 is clear
+ *  20      4      version 11: where the cut index begins
+ *  16..24  4S     the source index, at 16, at 20 in version 10 and at 24
+ *                 in version 11: where source 1 to S's DTX1 table begins
  *          ..     the name, its bytes and a zero, where there is one
- *          ..     version 10: the transformation index, on a long, a word
- *                 T and T longs, each where a transformation begins
+ *          ..     where bit 5 is set: the transformation index, on a long,
+ *                 a word T and T longs, each where a transformation begins
  *                 counted from the index's first byte; then the T
  *                 transformations, each on a long, a word E and E entries
+ *          ..     version 11: the cut index, on a long, a word U and U
+ *                 cuts, each a long first row and a long last row
  *          ..     the DTX3 table, on a long
  *          ..     the DTX1 tables, each on a long
  * </pre>
@@ -51,11 +57,19 @@ final class Tune {
     static final byte[] MAGIC = {'Y', 'M', 'X', 'R'};
 
     /**
-     * The highest supported version, written when a row selects a
-     * transformation. Its table has four mapping columns, and header
-     * offset 16 points to the transformation index (SPEC.md 3.3.5).
+     * The version written when a row selects a transformation and every
+     * cut is the whole table. Its table has four mapping columns, and
+     * header offset 16 points to the transformation index (SPEC.md 3.3.5).
      */
     static final int VERSION = 0x000A;
+
+    /**
+     * The highest supported version, written when a row selects a cut 1 to
+     * 127: four cut columns, after the mapping columns where bit 5 of the
+     * effects used is set, and the cut index at the header's long at 20
+     * (SPEC.md 3.3.5).
+     */
+    static final int CUT = 0x000B;
 
     /** Writer version for identity-only tunes: thirty DTX3 columns without
      *  a transformation index. Deferred starts remain available (SPEC.md
@@ -71,32 +85,37 @@ final class Tune {
     static final int OLDEST = 0x0007;
 
     /** The versions a reader reads, as its report names them. */
-    static final String READS = OLDEST + ", " + DEFERRED + ", " + UNMAPPED + " or " + VERSION;
+    static final String READS = OLDEST + ", " + DEFERRED + ", " + UNMAPPED + ", " + VERSION
+            + " or " + CUT;
 
     /** Whether a reader reads a file of that version. */
     static boolean reads(int version) {
-        return version >= OLDEST && version <= VERSION;
+        return version >= OLDEST && version <= CUT;
     }
 
-    /** The version a writer writes for a table of {@code columns} columns:
-     *  10 for the thirty-four of a tune that maps a value, and 9 for
-     *  thirty. */
-    static int version(int columns) {
-        return columns == Columns.MAPPED ? VERSION : UNMAPPED;
+    /** The version a writer writes for a table of that effects byte: 11
+     *  where it cuts a source, 10 where it maps a value and cuts none, and
+     *  9 otherwise (SPEC.md 3.3.5). */
+    static int version(int effects) {
+        return Columns.cuts(effects) ? CUT : Columns.maps(effects) ? VERSION : UNMAPPED;
     }
 
-    /** The column count of a table of that version: 34 in version 10, and
-     *  30 in 7 to 9 (SPEC.md 3.3.3). */
-    static int columns(int version) {
-        return version == VERSION ? Columns.MAPPED : Columns.C;
+    /** The column count of a table of that version and effects byte: 34
+     *  in version 10, 34 or 38 in version 11 by bit 5, and 30 in 7 to 9
+     *  (SPEC.md 3.3.3). */
+    static int columns(int version, int effects) {
+        return version == CUT ? Columns.count(effects)
+                : version == VERSION ? Columns.MAPPED : Columns.C;
     }
 
     /**
-     * Source-index offset: 16 in versions 7 to 9; 20 in version 10,
-     * after the transformation-index pointer (SPEC.md 3.3).
+     * Source-index offset: 16 in versions 7 to 9; 20 in version 10, after
+     * the transformation-index pointer; 24 in version 11, after the
+     * cut-index pointer (SPEC.md 3.3).
      */
     static int indexAt(int version) {
-        return version == VERSION ? TRANSFORMATIONS_AT + 4 : INDEX_AT;
+        return version == CUT ? CUTS_AT + 4
+                : version == VERSION ? TRANSFORMATIONS_AT + 4 : INDEX_AT;
     }
 
     /** The first and the last version whose table is DTX2, which a reader
@@ -129,6 +148,9 @@ final class Tune {
      * 3.3).
      */
     static final int TRANSFORMATIONS_AT = 16;
+
+    /** Offset of the version 11 cut-index pointer (SPEC.md 3.3, 3.5.2). */
+    static final int CUTS_AT = 20;
 
     /** The most bytes a name reaches, its zero aside. A longer one is cut
      *  to this: the player reads a name onto a screen of forty columns and
@@ -331,17 +353,21 @@ final class Tune {
             sourceBytes += tables[i].length;
         }
         byte[] named = named(name);
-        int version = version(columns.count());
+        int version = version(columns.effects);
         int index = indexAt(version);
         int after = index + 4 * tables.length;
         int nameAt = named.length == 0 ? 0 : after;
         int here = align(after + named.length);
-        // Place version 10 transformations after the name and before
-        // the DTX3 table. The table then ends at source 1, as in
-        // version 9 (SPEC.md 3.4).
-        byte[] block = version == VERSION ? transformations(columns.transformations) : new byte[0];
+        // Place the transformations after the name, then the version 11
+        // cut index, and the DTX3 table after both. The table then ends at
+        // source 1, as in version 9 (SPEC.md 3.4.3, 3.5.3).
+        boolean maps = Columns.maps(columns.effects);
+        byte[] block = maps ? transformations(columns.transformations) : new byte[0];
         int blockAt = here;
         here = align(here + block.length);
+        byte[] cuts = version == CUT ? cutIndex(columns.cuts) : new byte[0];
+        int cutsAt = here;
+        here = align(here + cuts.length);
         int tableAt = here;
         here = align(here + table.length);
         int[] sourceAt = new int[tables.length];
@@ -357,9 +383,13 @@ final class Tune {
         file[COUNT_AT] = (byte) tables.length;
         putWord(file, NAME_AT, nameAt);
         putLong(file, TABLE_AT, tableAt);
-        if (version == VERSION) {
+        if (maps) {
             putLong(file, TRANSFORMATIONS_AT, blockAt);
             System.arraycopy(block, 0, file, blockAt, block.length);
+        }
+        if (version == CUT) {
+            putLong(file, CUTS_AT, cutsAt);
+            System.arraycopy(cuts, 0, file, cutsAt, cuts.length);
         }
         System.arraycopy(named, 0, file, nameAt, named.length);
         for (int i = 0; i < tables.length; i++) {
@@ -395,6 +425,18 @@ final class Tune {
             System.arraycopy(tables.get(n), 0, block, at[n] + 2, tables.get(n).length);
         }
         return block;
+    }
+
+    /** The cut index from offset 0: a word U, then each cut's first row
+     *  and last row, a long each (SPEC.md 3.5.2). */
+    static byte[] cutIndex(List<org.ymxs.YMXS.Cut> cuts) {
+        byte[] index = new byte[2 + 8 * cuts.size()];
+        putWord(index, 0, cuts.size());
+        for (int n = 0; n < cuts.size(); n++) {
+            putLong(index, 2 + 8 * n, cuts.get(n).first());
+            putLong(index, 6 + 8 * n, cuts.get(n).last());
+        }
+        return index;
     }
 
     /** The table packed with `packer` through each of `rings`, by ring. A
@@ -583,6 +625,7 @@ final class Tune {
         byte[] table = written.table();
         int frames = written.frames();
         int columns = Dtx.header(table).columns();
+        int effects = written.file()[EFFECTS_AT] & 0xFF;
         Dtx3.Payload payload = Dtx3.payload(table);
         report.say("the table: " + Report.count(columns, "column", "columns") + " of "
                 + Report.count(frames, "row", "rows") + ", "
@@ -591,12 +634,12 @@ final class Tune {
                 + ", " + Report.count(payload.live(), "live column", "live columns"));
         for (int c = 0; c < columns; c++) {
             if (!payload.live(c)) {
-                report.row(name(c), String.format(Locale.ROOT, "%7d -> constant %d",
+                report.row(name(c, effects), String.format(Locale.ROOT, "%7d -> constant %d",
                         frames, payload.constants()[c]));
                 continue;
             }
             int bytes = payload.bytes(payload.map()[c], table.length - Dtx.HEADER);
-            report.row(name(c), String.format(Locale.ROOT, "%7d -> %6d bytes  (%5.1f%%)",
+            report.row(name(c, effects), String.format(Locale.ROOT, "%7d -> %6d bytes  (%5.1f%%)",
                     frames, bytes, 100.0 * bytes / frames));
         }
         report.say("the sources: " + Report.count(written.sources(), "table", "tables") + " of "
@@ -611,12 +654,16 @@ final class Tune {
     }
 
     /**
-     * Column label for a report: register number, effect and part, or
-     * effect mapping.
+     * Column label for a report, in the layout of a table that maps a
+     * value and cuts a source: register number, effect and part, effect
+     * mapping, or effect cut (SPEC.md 1).
      */
     static String name(int c) {
         if (c < Columns.EFFECT) {
             return "R" + c;
+        }
+        if (c >= Columns.CUT) {
+            return "effect " + (c - Columns.CUT) + " cut";
         }
         if (c >= Columns.MAPPING) {
             return "effect " + (c - Columns.MAPPING) + " mapping";
@@ -628,6 +675,16 @@ final class Tune {
             case 2 -> "timer control";
             default -> "timer count";
         };
+    }
+
+    /** Column label for a report in the table of that effects byte, whose
+     *  cut columns are 30 to 33 where it has no mapping columns (SPEC.md
+     *  3.3.5). */
+    static String name(int c, int effects) {
+        if (c >= Columns.MAPPING && Columns.cuts(effects) && !Columns.maps(effects)) {
+            return "effect " + (c - Columns.MAPPING) + " cut";
+        }
+        return name(c);
     }
 
     /** The ring a table of `columns` columns packs through: the multiple

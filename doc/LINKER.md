@@ -350,10 +350,11 @@ measures it against the linked core.
 
 ## Figures
 
-The blocks of its core each tune of the conformance kit keeps, the core
-it links, and the bytes of that core linked for it: the plain core, of
-10,144 bytes, the core with the deferred start in, of 15,326 bytes, or
-the core with the lookup and the deferred start in, of 36,616 bytes.
+The blocks of its core each tune of the conformance kit to version 10
+keeps, the core it links, and the bytes of that core linked for it: the
+plain core, of 10,144 bytes, the core with the deferred start in, of
+15,326 bytes, or the core with the lookup and the deferred start in, of
+36,616 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|

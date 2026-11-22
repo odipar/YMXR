@@ -133,10 +133,10 @@ the tune file, Q the header's long at 20 and U the word at Q (SPEC.md
 | 24 | 4 | in version 10, where the transformation block begins, signed: past the image in a bound tune written alone (1.3), and past the images in an SNDH file (3.1) |
 | 24 | 4 | in version 11, where bit 5 of the effects used is 1, where the transformation block begins, as in version 10; 0 where bit 5 is 0 |
 | 28 | 4`S` | in version 10, the source index, as at 24 in versions 7 to 9 |
-| 28 | 4 | in version 11, where the cut index begins, signed: past the DTX1 tables (1.3) |
+| 28 | 4 | in version 11, where the cut index begins, signed: past the source index (1.3) |
 | 32 | 4`S` | in version 11, the source index, as at 24 in versions 7 to 9 |
-| | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | in version 11, the cut index (1.1), on a long |
+| | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
 | | | in version 10, and in version 11 where bit 5 is 1, the transformation block and its list (1.1), on a long, in a bound tune written alone |
 
@@ -145,21 +145,23 @@ of the header at any length of image: a player whose ticks read a row
 through a displacement reaches 32,767 bytes (5.5). Transformation blocks
 follow the image: frames read them to prepare lookup pages, while ticks
 read sources and those pages. Their size therefore leaves source reach
-unchanged. The cut index follows the DTX1 tables, after the last row a
-tick reads, and frames read it at a start and a recut.
+unchanged. The cut index follows the source index, so a subtune whose
+source tables an SNDH file shares keeps it (3.1), and frames read it at a
+start and a recut.
 
 **1.3 A bound tune written alone.** A tool writes it from one tune file:
 bytes 6 to 11 are the tune file's; the field at 12 is the field at +4 of
 the format block of the image the packager makes of the tune's DTX3 table
-alone; the field at 20 is that format block's field at +8; DTX1 table 1 is
-at align(I + 4`S`), I 24, 28 in version 10 and 32 in version 11, and each
+alone; the field at 20 is that format block's field at +8; in version 11
+the cut index is at align(I + 4`S`), I 32, and the field at 28 is that
+offset; DTX1 table 1 is at align(I + 4`S`), I 24 in versions 7 to 9 and 28
+in version 10, or at align(the cut index's end) in version 11, and each
 next at align(the end of the one before); the index is those offsets, each
-with bit 31 of the tune file's index entry; in version 11 the field at 28
-is align(the last table's end), where the cut index is; the field at 16 is
-align(the last table's end), or of the cut index in version 11, where the
-image is. In version 10, and in version 11 where bit 5 is 1, the field at
-24 is align(the image's end), where the transformation block is, and the
-bound tune ends at align(the block's end).
+with bit 31 of the tune file's index entry; the field at 16 is align(the
+last table's end), where the image is. In version 10, and in version 11
+where bit 5 is 1, the field at 24 is align(the image's end), where the
+transformation block is, and the bound tune ends at align(the block's
+end).
 
 **1.4 A set.** A set shares images. The *shape* of a DTX3 table is its
 variant, its unit `k`, its width `W` and its column count `C` (DTX,
@@ -424,12 +426,13 @@ reach of the core: a player whose ticks read a row through a
 displacement reaches 32,767 bytes (5.5).
 
 Where at least two subtunes have byte-identical DTX1 tables, the bound
-tunes end at their source indices. The shared source tables follow in
-first-use order, one copy of each distinct table. Each source index entry
-keeps bit 31 and records its table's offset from the start of that bound
-tune in bits 30 to 0. Otherwise the DTX1 tables follow each tune's source
-index as in 1.2. Transformation blocks share an offset only if the
-transformation data and the page list are byte-identical.
+tunes end at their source indices, or at their cut indices in version 11.
+The shared source tables follow in first-use order, one copy of each
+distinct table. Each source index entry keeps bit 31 and records its
+table's offset from the start of that bound tune in bits 30 to 0.
+Otherwise the DTX1 tables follow each tune's source index as in 1.2.
+Transformation blocks share an offset only if the transformation data and
+the page list are byte-identical.
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
@@ -859,24 +862,27 @@ report that line alone and stop.
 
 - `{"part":"header","version":V,"rate":H,"effects":E,"sources":S,
   "stateblock":B,"image":I,"table":C}`, the fields at 4, 6, 8, 9, 12, 16
-  and 20, I the field at 16 plus the tune's first byte, which 3.1
-  patches for a subtune of an SNDH file, so that I is the image's offset
-  there, and C the field at 20 as the file has it, an offset from the
-  image's first byte. Where V is 10, `,"transformations":X` ends the
-  line, X the field at 24 plus the tune's first byte, which 3.1 patches
-  as it patches the field at 16.
+  and 20, I the field at 16 plus the tune's first byte, which 3.1 patches
+  for a subtune of an SNDH file, so that I is the image's offset there,
+  and C the field at 20 as the file has it, an offset from the image's
+  first byte. Where V is 10, or 11 with bit 5 of E set,
+  `,"transformations":X` follows, X the field at 24 plus the tune's first
+  byte, which 3.1 patches as it patches the field at 16; where V is 11,
+  `,"cuts":Q` ends the line, Q the field at 28 plus the tune's first byte.
+- `{"part":"cuts","at":Q,"count":U,"bytes":B}` where V is 11, U the word
+  at Q and B 2 + 8U: the cut index (1.3).
 - a line a source, 1 to `S`, in index order: `{"part":"source",
-  "number":i,"at":A}`, A bits 30 to 0 of the index entry, at 24, and at
-  28 where V is 10, plus the tune's first byte.
-- `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0,
-  B the file's bytes less I, or X less I where V is 10 and the field at
-  24 is above 0: the image of a bound tune written alone (1.3). A bound
+  "number":i,"at":A}`, A bits 30 to 0 of the index entry, at 24, at 28
+  where V is 10 and at 32 where V is 11, plus the tune's first byte.
+- `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0, B
+  the file's bytes less I, or X less I where V is 10 or 11 and the field
+  at 24 is above 0: the image of a bound tune written alone (1.3). A bound
   tune of a set has that field written 0 (1.4), and the line is in the
   record of the SNDH file instead (6.4).
-- `{"part":"transformations","at":X,"count":T,"bytes":B}` where V is 10
-  and the field at 24 is above 0, T the word at X and B the file's bytes
-  less X, the block, its list and its pad: the transformation block of a
-  bound tune written alone (1.3).
+- `{"part":"transformations","at":X,"count":T,"bytes":B}` where V is 10 or
+  11 and the field at 24 is above 0, T the word at X and B the file's
+  bytes less X, the block, its list and its pad: the transformation block
+  of a bound tune written alone (1.3).
 
 **6.4 An SNDH file** (3.1), after the first line:
 
@@ -919,12 +925,12 @@ report that line alone and stop.
   "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
   "stateblock":D,"image":I,"table":C}`, A the offset subtune i has in the
   subtune table, plus H, the fields of 1.2 read at A as 6.3 reads them,
-  `transformations` among them where V is 10, its image and
-  transformations lines left out, and B the bytes to the next subtune,
-  or, for the last, to the first shared source table where present and
-  to the first image otherwise; then a line a
-  source of that subtune, as 6.3 defines them, each `at` bits 30 to 0 of
-  the index entry plus A.
+  `transformations` and `cuts` among them as 6.3 has them, its image and
+  transformations lines left out, and B the bytes to the next subtune, or,
+  for the last, to the first shared source table where present and to the
+  first image otherwise; then the cut index line and a line a source of
+  that subtune, as 6.3 defines them, each `at` bits 30 to 0 of the index
+  entry plus A.
 - `{"part":"sourcepool","at":P,"bytes":B}` where a source index entry
   of a subtune before the last points at or past the next subtune. P is
   the lowest such offset and B counts to the first image.

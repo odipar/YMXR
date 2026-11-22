@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 final class MappedTest {
 
     /** The tune file of {@link BuiltTunes#mapped}. */
-    private static byte[] file() {
+    static byte[] file() {
         return BuiltTunes.mapped().file();
     }
 
@@ -236,15 +236,15 @@ final class MappedTest {
     }
 
     @Test
-    void theVersionLinesNameTheFourVersionsRead() {
-        byte[] eleven = file();
-        Tune.putWord(eleven, 4, Tune.VERSION + 1);
-        assertEquals("version 11 is not 7, 8, 9 or 10", assertThrows(
-                IllegalArgumentException.class, () -> TuneFile.read(eleven)).getMessage());
+    void theVersionLinesNameTheFiveVersionsRead() {
+        byte[] twelve = file();
+        Tune.putWord(twelve, 4, Tune.CUT + 1);
+        assertEquals("version 12 is not 7, 8, 9, 10 or 11", assertThrows(
+                IllegalArgumentException.class, () -> TuneFile.read(twelve)).getMessage());
         byte[] six = file();
         Tune.putWord(six, 4, 6);
-        assertEquals("version 6 has a DTX2 table, and this reads 7, 8, 9 or 10: write the"
-                + " tune again with ym-to-ymxr or ymxs-to-ymxr", assertThrows(
+        assertEquals("version 6 has a DTX2 table, and this reads 7, 8, 9, 10 or 11: write"
+                + " the tune again with ym-to-ymxr or ymxs-to-ymxr", assertThrows(
                 IllegalArgumentException.class, () -> TuneFile.read(six)).getMessage());
     }
 

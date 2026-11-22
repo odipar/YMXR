@@ -93,7 +93,7 @@ final class Link {
                     continue;
                 }
                 needed.add("effect" + i);
-                if ((tune.effects() & Columns.MAPS) != 0 && sets(tune, Columns.MAPPING + i, 0)) {
+                if (Columns.maps(tune.effects()) && sets(tune, tune.mapping(i), 0)) {
                     needed.add("map" + i);
                 }
                 if ((tune.effects() & Columns.DEFERS) != 0
@@ -152,7 +152,7 @@ final class Link {
      */
     static Set<String> lookups(TuneFile tune) {
         Set<String> out = new LinkedHashSet<>();
-        if (tune.version() != Tune.VERSION) {
+        if (!Columns.maps(tune.effects())) {
             return out;
         }
         Table table = tune.table();
@@ -196,7 +196,7 @@ final class Link {
             int tg = table.column(t)[row] & 0xFF;
             int src = table.column(t + 1)[row] & 0xFF;
             int control = table.column(t + 2)[row] & 0xFF;
-            int map = table.column(Columns.MAPPING + i)[row] & 0xFF;
+            int map = table.column(tune.mapping(i))[row] & 0xFF;
             if ((tg & 0x80) != 0) {
                 target[i] = tg & 0x7F;
             }

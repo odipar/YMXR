@@ -6753,6 +6753,18 @@ def main():
                 "%s: the binder bound a tune of another version" % os.path.basename(one)
             print("%-45s the binder and the reader reject it"
                   % os.path.basename(one))
+        # A tune of version 11 cuts a source, which the reader reads and
+        # the player reads once the cut is in it (doc/cuts.md): until then
+        # it is named and left out of the tunes played.
+        later = []
+        for one in tunes:
+            with open(one, "rb") as f:
+                if f.read(6)[4:6] == b"\x00\x0b":
+                    later.append(one)
+        tunes = [one for one in tunes if one not in later]
+        for one in later:
+            print("%-45s version 11, which this player does not read"
+                  % os.path.basename(one))
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():

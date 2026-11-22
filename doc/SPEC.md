@@ -705,16 +705,17 @@ divided by L less 1, where L is the table's live columns and is 2 or more,
 and one DTX's packager binds (DTX, abi.md 4).
 
 Note: a player reaches slot L less 1's ring through a 16-bit displacement
-from slot 0's, L less 1 rings on. The reference writer packs through a ring
-that is a multiple of C bytes, 2C upward: through each of 60, 120, 240,
-480, 960 and 1,920 bytes the player reaches, and of 68, 136, 272, 544,
-1,088 and 2,176 for a table of 34 columns, keeping the one whose table and
-state block come to the least. With copies asked for, it packs with them
-where they pack a live column smaller through the two of those that came to
-the least, and keeps the one of the two that comes to the less (tools.md
-4.2, 4.3). The tunes of a set share one workspace, sized for the largest
-state block among them, and the reference writer chooses their rings for the
-set (tools.md 4.7).
+from slot 0's, L less 1 rings on. The reference writer packs through a
+ring that is a multiple of C bytes, 2C upward: through each of 60, 120,
+240, 480, 960 and 1,920 bytes the player reaches, and of 68, 136, 272,
+544, 1,088 and 2,176 for a table of 34 columns, and of 76, 152, 304, 608,
+1,216 and 2,432 for one of 38, keeping the one whose table and state block
+come to the least. With copies asked for, it packs with them where they
+pack a live column smaller through the two of those that came to the
+least, and keeps the one of the two that comes to the less (tools.md 4.2,
+4.3). The tunes of a set share one workspace, sized for the largest state
+block among them, and the reference writer chooses their rings for the set
+(tools.md 4.7).
 
 **3.3.4** Errors of the file. A reader reads a file free of the conditions
 below and reports the first one present as its line, in the order of the
@@ -1556,8 +1557,8 @@ transformation` for T of 1, `1 cut` for U of 1 and `1 row` for R of 1.
 | condition | reported as |
 |---|---|
 | row r sets the source column of effect i to N, above S (rule 2(b)) | `r: effect i starts source N, and the file has S sources` |
-| in version 10, row r sets the source column of effect i to 0, a stop, and sets its mapping column (rule 3(c)) | `r: effect i stops and sets its mapping column, and a stop leaves the mapping as it is` |
-| otherwise, in version 10, row r sets the mapping column of effect i to N, above T (rule 2(b)) | `r: effect i maps through transformation N, and the file has T transformations` |
+| in a file with mapping columns, row r sets the source column of effect i to 0, a stop, and sets its mapping column (rule 3(c)) | `r: effect i stops and sets its mapping column, and a stop leaves the mapping as it is` |
+| otherwise, in a file with mapping columns, row r sets the mapping column of effect i to N, above T (rule 2(b)) | `r: effect i maps through transformation N, and the file has T transformations` |
 | in version 11, row r sets the source column of effect i to 0, a stop, and sets its cut column (rule 3(c)) | `r: effect i stops and sets its cut column, and a stop leaves the cut as it is` |
 | otherwise, in version 11, row r sets the cut column of effect i to N, above U (rule 2(b)) | `r: effect i runs under cut N, and the file has U cuts` |
 | otherwise, in version 11, row r starts source s on effect i, or recuts effect i with s the source last started on it, and the kept cut after the row, N, 1 to U, has a last row L of R or above (rule 2(i)) | `r: effect i runs source s of R rows under cut N, rows G to L` |
@@ -1720,8 +1721,9 @@ columns 14 to 17 to `$8D`, `$81`, `$E5` and `$3C`, a start of source 1 on
 ### 7.6 The conformance kit
 
 [conformance/README.md](conformance/README.md) defines the test of a
-reader: the record of each tune of the kit over the unnamed F of 7.4,
-that of `mapped.ymxr`, a tune of version 10, and the empty record of
+reader: the record of each tune of the kit over the unnamed F of 7.4, that
+of `mapped.ymxr`, a tune of version 10, of `cut.ymxr`, a tune of version
+11, and of `cuts.ymxr`, a tune of version 11, and the empty record of
 `wrong-version.ymxr` included, each with the sha256 and the length
 `MANIFEST.txt` lists.
 

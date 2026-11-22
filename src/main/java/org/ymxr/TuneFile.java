@@ -8,12 +8,29 @@ import org.dtx.Table;
 
 /**
  * A decoded tune file: metadata, packed and unpacked DTX3 table,
- * sources and optional transformation entries. Transformation n is at
- * index n - 1; source key k selects entry k. Versions below 10 have an
- * empty transformation list (SPEC.md 3.3, 3.4).
+ * sources, optional transformation entries and cuts. Transformation n
+ * and cut n are at index n - 1; source key k selects entry k. A file
+ * without mapping columns has an empty transformation list, and one below
+ * version 11 an empty cut list (SPEC.md 3.3, 3.4, 3.5).
  */
 record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table table,
-                List<Table> sources, List<Boolean> counted, List<byte[]> transformations) {
+                List<Table> sources, List<Boolean> counted, List<byte[]> transformations,
+                List<Cut> cuts) {
+
+    /** A cut of the index: its first row and its last row, each a long the
+     *  file reads as 0 to 4,294,967,295 (SPEC.md 3.5). */
+    record Cut(long first, long last) {
+    }
+
+    /** The table's mapping column of effect i, or -1 where it has none. */
+    int mapping(int i) {
+        return Columns.mapping(effects, i);
+    }
+
+    /** The table's cut column of effect i, or -1 where it has none. */
+    int cut(int i) {
+        return Columns.cut(effects, i);
+    }
 
     static TuneFile read(byte[] file) {
         if (file.length < Tune.INDEX_AT || !Arrays.equals(Arrays.copyOf(file, 4), Tune.MAGIC)) {
@@ -33,15 +50,24 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
                     + Tune.READS);
         }
         int effects = file[Tune.EFFECTS_AT] & 0xFF;
-        // SPEC.md 3.3: bit 5 of the effects used is 1 in version 10 and 0
-        // in every other version.
-        boolean maps = (effects & Columns.MAPS) != 0;
-        if (maps != (version == Tune.VERSION)) {
+        // SPEC.md 3.3: bit 5 of the effects used is 1 in version 10, either
+        // in version 11, and 0 in versions 7 to 9; bit 6 is 1 in version 11
+        // and 0 in every other version.
+        boolean maps = Columns.maps(effects);
+        if (version == Tune.VERSION && !maps || version < Tune.VERSION && maps) {
             throw new IllegalArgumentException("version " + version + " with bit 5 of the"
                     + " effects used " + (maps ? "set" : "clear"));
         }
-        List<byte[]> transformations = version == Tune.VERSION
-                ? transformations(file) : List.of();
+        boolean cuts = Columns.cuts(effects);
+        if (cuts != (version == Tune.CUT)) {
+            throw new IllegalArgumentException("version " + version + " with bit 6 of the"
+                    + " effects used " + (cuts ? "set" : "clear"));
+        }
+        if (version == Tune.CUT && file.length < Tune.CUTS_AT + 4) {
+            throw new IllegalArgumentException("not a YMXR file");
+        }
+        List<byte[]> transformations = maps ? transformations(file) : List.of();
+        List<Cut> cutList = cuts ? cuts(file) : List.of();
         int index = Tune.indexAt(version);
         int count = file[Tune.COUNT_AT] & 0xFF;
         // SPEC.md 3.3.4: each offset of the header is read against the
@@ -70,7 +96,7 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
         // payload's map is a byte a column, so a table of another C reads
         // as no payload at all (DTX, SPEC.md 2.4).
         Dtx.Header shape = Dtx.header(dtx3);
-        int columns = Tune.columns(version);
+        int columns = Tune.columns(version, effects);
         if (shape.columns() != columns || shape.width() != 1) {
             throw new IllegalArgumentException("the table is " + shape.columns()
                     + " columns of " + shape.width() + " bytes, and a tune's table is "
@@ -105,7 +131,40 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
             sources.add(source);
         }
         return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT), effects, dtx3,
-                table, sources, counted, transformations);
+                table, sources, counted, transformations, cutList);
+    }
+
+    /**
+     * Reads the version 11 cut index in validation order: the word U, its
+     * count, the 8U bytes after it, then each cut's two rows in number
+     * order (SPEC.md 3.3.4, 3.5).
+     */
+    private static List<Cut> cuts(byte[] file) {
+        long at = Tune.getLong(file, Tune.CUTS_AT) & 0xFFFFFFFFL;
+        if (at + 2 > file.length) {
+            throw new IllegalArgumentException("the cut index at " + at
+                    + " is outside the file");
+        }
+        int u = Tune.getWord(file, (int) at);
+        if (u < 1 || u > Columns.MOST_CUTS) {
+            throw new IllegalArgumentException("the file has " + u + " cuts, and a version "
+                    + Tune.CUT + " file has 1 to " + Columns.MOST_CUTS);
+        }
+        if (at + 2 + 8L * u > file.length) {
+            throw new IllegalArgumentException("the cut index at " + at
+                    + " is outside the file");
+        }
+        List<Cut> out = new ArrayList<>();
+        for (int n = 1; n <= u; n++) {
+            long first = Tune.getLong(file, (int) at + 2 + 8 * (n - 1)) & 0xFFFFFFFFL;
+            long last = Tune.getLong(file, (int) at + 6 + 8 * (n - 1)) & 0xFFFFFFFFL;
+            if (last < first) {
+                throw new IllegalArgumentException("cut " + n + " is rows " + first + " to "
+                        + last + ", and a cut ends at or after the row it begins at");
+            }
+            out.add(new Cut(first, last));
+        }
+        return List.copyOf(out);
     }
 
     /**

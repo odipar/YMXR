@@ -356,6 +356,11 @@ final class LinkTest {
                 + deferred.length);
         for (String name : names) {
             TuneFile tune = TuneFile.read(Files.readAllBytes(KIT.resolve(name)));
+            // the table reaches the kit to version 10; a tune of version 11
+            // links from the lookup cores with the cut in (doc/cuts.md)
+            if (tune.version() > Tune.VERSION) {
+                continue;
+            }
             boolean defers = (tune.effects() & Columns.DEFERS) != 0;
             boolean maps = (tune.effects() & Columns.MAPS) != 0;
             assertTrue(Link.links(defers, maps), name);
