@@ -102,13 +102,15 @@ final class Layout {
     }
 
     /**
-     * the bound header, sources and image, plus the transformation
-     * block in version 10 (BINARIES.md 6.3).
+     * the bound header, the cut index in version 11, sources and image,
+     * plus the transformation block where the tune maps a value
+     * (BINARIES.md 6.3).
      */
     private static void bound(StringBuilder out, byte[] file) {
         out.append("{\"part\":\"header\"").append(fields(file, 0)).append("}\n");
+        cuts(out, file, 0);
         sources(out, file, 0);
-        int block = word(file, 4) == Tune.VERSION ? Tune.getLong(file, 24) : 0;
+        int block = word(file, 4) >= Tune.VERSION ? Tune.getLong(file, 24) : 0;
         int image = Tune.getLong(file, 16);
         if (image > 0) {
             // The image ends at the transformation block when offset 24
@@ -222,6 +224,7 @@ final class Layout {
                     .append(",\"at\":").append(at)
                     .append(",\"bytes\":").append(upto - at)
                     .append(fields(file, at)).append("}\n");
+            cuts(out, file, at);
             sources(out, file, at);
         }
         if (poolAt < images.first()) {
@@ -304,9 +307,22 @@ final class Layout {
         }
     }
 
+    /** The line of the cut index of the bound tune at {@code at}, in
+     *  version 11: where it is, its count U and its 2 + 8U bytes. */
+    private static void cuts(StringBuilder out, byte[] file, int at) {
+        if (word(file, at + 4) != Tune.CUT) {
+            return;
+        }
+        int cuts = at + Tune.getLong(file, at + Bound.CUTS_AT);
+        int count = word(file, cuts);
+        out.append("{\"part\":\"cuts\",\"at\":").append(cuts).append(",\"count\":")
+                .append(count).append(",\"bytes\":").append(2 + 8 * count).append("}\n");
+    }
+
     /** A line a source of the bound tune at {@code at}, in index order:
-     *  the index at 24, and at 28 in version 10, each entry's bit 31 the
-     *  mark of a counted source and outside the offset. */
+     *  the index at 24, at 28 in version 10 and at 32 in version 11, each
+     *  entry's bit 31 the mark of a counted source and outside the
+     *  offset. */
     private static void sources(StringBuilder out, byte[] file, int at) {
         int sources = file[at + 9] & 0xFF;
         int index = at + Bound.indexAt(word(file, at + 4));
@@ -320,7 +336,8 @@ final class Layout {
 
     /**
      * the bound fields at the supplied offset, resolving the image and
-     * optional version 10 transformation block (BINARIES.md 1.2).
+     * transformation block where the tune maps a value and the version 11
+     * cut index (BINARIES.md 1.2).
      */
     private static String fields(byte[] file, int at) {
         int version = word(file, at + 4);
@@ -331,8 +348,10 @@ final class Layout {
                 + ",\"stateblock\":" + Tune.getLong(file, at + 12)
                 + ",\"image\":" + (at + Tune.getLong(file, at + 16))
                 + ",\"table\":" + Tune.getLong(file, at + 20)
-                + (version == Tune.VERSION
-                        ? ",\"transformations\":" + (at + Tune.getLong(file, at + 24)) : "");
+                + (version == Tune.VERSION || version == Tune.CUT && Columns.maps(file[at + 8])
+                        ? ",\"transformations\":" + (at + Tune.getLong(file, at + 24)) : "")
+                + (version == Tune.CUT
+                        ? ",\"cuts\":" + (at + Tune.getLong(file, at + Bound.CUTS_AT)) : "");
     }
 
     /** Where the next zero byte from {@code from} is. */

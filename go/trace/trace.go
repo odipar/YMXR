@@ -43,7 +43,7 @@ func Header(tune ymxr.File) string {
 		fmt.Fprintf(&line, "],\"repeat\":%d}", s.Repeat())
 	}
 	line.WriteByte(']')
-	if tune.Version == ymxr.Version {
+	if ymxr.HasMapping(tune.Effects) {
 		line.WriteString(",\"transformations\":[")
 		for n, entries := range tune.Transformations {
 			if n > 0 {
@@ -60,19 +60,29 @@ func Header(tune ymxr.File) string {
 		}
 		line.WriteByte(']')
 	}
+	if tune.Version == ymxr.VersionCut {
+		line.WriteString(",\"cuts\":[")
+		for n, one := range tune.Cuts {
+			if n > 0 {
+				line.WriteByte(',')
+			}
+			fmt.Fprintf(&line, "{\"first\":%d,\"last\":%d}", one.First, one.Last)
+		}
+		line.WriteByte(']')
+	}
 	line.WriteString("}\n")
 	return line.String()
 }
 
 // Trace writes the header and up to calls frame entries, one per line.
-// A frame reporting -1 ends the record. Version 10 effect entries
-// report the kept mapping; ticks and pending-start mappings are outside
-// the record (SPEC.md 7.3).
+// A frame reporting -1 ends the record. Effect entries of versions 10 and
+// 11 report the kept mapping, and of version 11 the kept cut; ticks and a
+// pending start's mapping and cut are outside the record (SPEC.md 7.3).
 func Trace(tune ymxr.File, calls int) []byte {
 	var out bytes.Buffer
 	out.WriteString(Header(tune))
 	table := tune.Table
-	model := Of(table)
+	model := Of(table, tune.Effects)
 	for call := 0; call < calls; call++ {
 		if model.Row() == table.Rows() {
 			out.WriteString("{\"result\":-1}\n")
@@ -103,8 +113,11 @@ func Trace(tune ymxr.File, calls int) []byte {
 			fmt.Fprintf(&out, "\"%d\":{\"target\":%d,\"source\":%d,\"select\":%d,"+
 				"\"count\":%d,\"timer\":%t,\"place\":%t,\"deferred\":%t", i, e.Target,
 				e.Source, e.Select, e.Count, e.Timer, e.Place, e.Deferred)
-			if tune.Version == ymxr.Version {
+			if tune.Version >= ymxr.Version {
 				fmt.Fprintf(&out, ",\"mapping\":%d", e.Mapping)
+			}
+			if tune.Version == ymxr.VersionCut {
+				fmt.Fprintf(&out, ",\"cut\":%d", e.Cut)
 			}
 			out.WriteByte('}')
 			first = false

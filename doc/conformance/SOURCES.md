@@ -14,7 +14,9 @@
 | `envelope-counted` | `BuiltTunes.envelopeCounted` | none | none | none | 432 | ed3f75919ad4686d | a counted source of two columns on `setEnvelope`, whose two registers read every bit of their byte, so its rows are whole bytes and a tick counts them; the high byte runs past 127, where a marked source of this target stops, and reaches 255, a period of 65,323; one source repeating to a row above 0 and one that plays once and stops its timer at its count, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `deferred` | `BuiltTunes.deferred` | none | none | none | 596 | e6c0b0cbdc580f23 | deferred starts, bit 3 of the control column, on Timer A and on Timer C: a fall after a loop, a source with the place at its number, bit 5 at 0, a deferred start a stop drops, and one on a stopped timer |
 | `mapped` | `ConformanceTest.mapped` | none | none | none | 1880 | a45b35ccafde7de9 | version 10 at 50 Hz; optional lookups, fades, deferred snapshots and kept mappings. See [Mapped transformations](#mapped-transformations). |
-| `wrong-version` | `ConformanceTest.wrongVersion` | none | none | none | 1132 | 633861ce206bd3d8 | chambers with the version word $000B: a reader produces an empty record of it |
+| `cut` | `ConformanceTest.cut` | none | none | none | 468 | ee8b5188a8d44391 | version 11 at 50 Hz: a window of 16 rows over a triangle of 32, moved two rows a frame by a recut, then narrowed to 8 rows and to 4 |
+| `cuts` | `ConformanceTest.cuts` | none | none | none | 592 | a7af984837c5be15 | version 11 at 50 Hz: a cut that excludes its source's repeat row and one that includes it, a start under the whole table, a deferred start under a cut of a source that plays once, and a recut while it is pending |
+| `wrong-version` | `ConformanceTest.wrongVersion` | none | none | none | 1132 | 345be040e600f0a5 | chambers with the version word $000C: a reader produces an empty record of it |
 
 ### Mapped transformations
 

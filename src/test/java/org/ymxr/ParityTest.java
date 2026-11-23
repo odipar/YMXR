@@ -334,12 +334,12 @@ final class ParityTest {
             assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(sndh,
                     Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
             String said = steady(made.said());
-            assertTrue(said.contains("; the lookup in: a subtune maps a value\n")
+            assertTrue(said.contains("; the lookup in: a subtune maps a value or cuts a source\n")
                     && said.contains("the images: " + (in == tune ? "1 image" : "2 images")
                     + " of "), said);
             both("ymxr-prg", sndh);
             String layout = new String(both("ymxr-layout", sndh), StandardCharsets.US_ASCII);
-            assertTrue(layout.contains("\"version\":10,") && layout.contains("\"binds\":10,"),
+            assertTrue(layout.contains("\"version\":10,") && layout.contains("\"binds\":11,"),
                     layout);
         }
         for (String tool : List.of("ymxs-to-sndh", "ymxs-to-prg")) {
@@ -363,7 +363,7 @@ final class ParityTest {
         Ran chosen = same("ymxr-sndh", far, "-carried");
         assertTrue(steady(chosen.said()).contains("ticks that read a row through an absolute"
                 + " address: the tunes end past the 32767 bytes a displacement reaches; the"
-                + " lookup in: a subtune maps a value\n"), chosen.said());
+                + " lookup in: a subtune maps a value or cuts a source\n"), chosen.said());
         assertEquals(Sndh.CORE_MAP, Tune.getWord(chosen.out(),
                 Sndh.even(Tune.getWord(chosen.out(), 2) + 2) + Sndh.CORE_FLAGS_AT));
         Ran asked = same("ymxr-sndh", far, "-carried", "-pcrel", "-silent");
@@ -547,6 +547,43 @@ final class ParityTest {
                     + " (SPEC.md rule 2(f))");
         }
     }
+
+    /**
+     * Version 11 in both trees: the kit's two tunes under a cut converted
+     * from their structures and read back, a recut outside the tune left
+     * out, the files of version 11 written wrong, the check's lines of the
+     * cut columns, the bound tune, the layout and the multi file of version
+     * 11, and more cuts than a cut column numbers (SPEC.md 1.11, 3.3.4, 3.5,
+     * 6.4, 6.5; BINARIES.md 0, 1).
+     */
+    @Test
+    void aTuneUnderACutReadsTheSameInBothTrees() throws Exception {
+        for (org.ymxs.YMXS.Tune tune : List.of(ConformanceTest.cut(), ConformanceTest.cuts(),
+                YmxsTest.recut(org.ymxs.YMXS.Timer.D), YmxsTest.keptCuts())) {
+            byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
+                    .getBytes(StandardCharsets.UTF_8), "-silent");
+            both("ymxr-trace", file);
+            both("ymxr-check", file);
+            both("ymxr-layout", both("ymxr-bind", file));
+        }
+        for (java.util.Map.Entry<String, byte[]> one : CutTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+        }
+        for (java.util.Map.Entry<List<String>, byte[]> one : CutTest.unchecked().entrySet()) {
+            assertEquals("standard input:\n  " + String.join("\n  ", one.getKey()) + "\n",
+                    new String(both("ymxr-check", one.getValue()), StandardCharsets.UTF_8));
+        }
+        byte[] cut = Files.readAllBytes(Path.of("doc/conformance/tunes/cut.ymxr"));
+        byte[] multi = multiOf(List.of(cut, MappedTest.file()));
+        assertEquals(Tune.CUT, Tune.getWord(multi, 4), "a set with a tune that cuts a source");
+        both("ymxr-layout", multi);
+        assertWrong(YmxsTest.manyCuts(), "the tune cuts through 128 cuts, and a cut column"
+                + " numbers 127");
+    }
+
 
     private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))

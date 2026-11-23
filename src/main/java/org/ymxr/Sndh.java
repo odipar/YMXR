@@ -96,8 +96,8 @@ final class Sndh {
 
     /**
      * core flag bit 4, transformation support (YMXR_MAP=1). Effects
-     * byte bit 5 requires this core, which reads bound versions 7 to 10
-     * (SPEC.md 1.10, 3.3).
+     * byte bit 5 and bit 6 require this core, which reads bound versions
+     * 7 to 11 (SPEC.md 1.10, 1.11, 3.3).
      */
     static final int CORE_MAP = 16;
 
@@ -251,7 +251,7 @@ final class Sndh {
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
             defers |= (tune.effects() & Columns.DEFERS) != 0;
-            maps |= (tune.effects() & Columns.MAPS) != 0;
+            maps |= (tune.effects() & (Columns.MAPS | Columns.CUTS)) != 0;
         }
         checkVbl(options.asked(), n, rates[0], mixed);
         if (n > 1 && (mixed || rates[0] != 50)) {
@@ -447,15 +447,19 @@ final class Sndh {
     }
 
     /** The version a set of these tune files binds at, and the version of
-     *  a multi file of them: 10 where one of them is version 10, and 9
-     *  otherwise (tools.md 11.1). */
+     *  a multi file of them: 11 where one of them is version 11, 10 where
+     *  one is version 10 and none 11, and 9 otherwise (tools.md 11.1). */
     static int binds(List<byte[]> tuneFiles) {
+        int most = Tune.UNMAPPED;
         for (byte[] tune : tuneFiles) {
-            if (tune.length >= Tune.INDEX_AT && Tune.getWord(tune, 4) == Tune.VERSION) {
-                return Tune.VERSION;
+            if (tune.length >= Tune.INDEX_AT) {
+                int version = Tune.getWord(tune, 4);
+                if (version == Tune.CUT || version == Tune.VERSION) {
+                    most = Math.max(most, version);
+                }
             }
         }
-        return Tune.UNMAPPED;
+        return most;
     }
 
     /**
@@ -517,7 +521,8 @@ final class Sndh {
         }
         if (maps && (flags & CORE_MAP) == 0) {
             throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
-                    + flags + ", and a subtune that maps a value needs bit 4 set");
+                    + flags + ", and a subtune that maps a value or cuts a source needs"
+                    + " bit 4 set");
         }
     }
 
@@ -978,7 +983,7 @@ final class Sndh {
             switches.add("the deferred start in: a subtune defers a start");
         }
         if (map) {
-            switches.add("the lookup in: a subtune maps a value");
+            switches.add("the lookup in: a subtune maps a value or cuts a source");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));

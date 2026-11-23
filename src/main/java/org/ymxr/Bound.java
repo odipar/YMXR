@@ -28,10 +28,13 @@ import org.jspecify.annotations.Nullable;
  *  12      4      the state block's bytes the image's reader needs
  *  16      4      where the image begins, signed
  *  20      4      where this tune's table is, from the image's first byte
- *  24      4      version 10: where the transformation block begins, signed
- *  24, 28  4S     the source index, at 24 and at 28 in version 10: where
- *                 source 1 to S's DTX1 table begins, bit 31 the mark of a
- *                 counted source
+ *  24      4      versions 10 and 11: where the transformation block
+ *                 begins, signed, 0 in version 11 without mapping columns
+ *  28      4      version 11: where the cut index begins, signed
+ *  24..32  4S     the source index, at 24, at 28 in version 10 and at 32 in
+ *                 version 11: where source 1 to S's DTX1 table begins, bit
+ *                 31 the mark of a counted source
+ *          ..     version 11: the cut index, on a long, the tune file's
  *          ..     the DTX1 tables, each on a long
  *          ..     the image, on a long
  *          ..     version 10: the transformation block, on a long
@@ -57,6 +60,9 @@ final class Bound {
      */
     static final int TRANSFORMATIONS_AT = 24;
 
+    /** Offset of the version 11 cut-index pointer (BINARIES.md 1.2). */
+    static final int CUTS_AT = 28;
+
     /** The image's format block, and where the state block's bytes and the
      *  first table are in it (DTX, abi.md 1). */
     static final int FORMAT_AT = 16;
@@ -67,11 +73,13 @@ final class Bound {
     }
 
     /**
-     * Source-index offset: 24 in versions 7 to 9; 28 in version 10,
-     * after the transformation-block pointer (BINARIES.md 1.2).
+     * Source-index offset: 24 in versions 7 to 9; 28 in version 10, after
+     * the transformation-block pointer; 32 in version 11, after the
+     * cut-index pointer (BINARIES.md 1.2).
      */
     static int indexAt(int version) {
-        return version == Tune.VERSION ? TRANSFORMATIONS_AT + 4 : INDEX_AT;
+        return version == Tune.CUT ? CUTS_AT + 4
+                : version == Tune.VERSION ? TRANSFORMATIONS_AT + 4 : INDEX_AT;
     }
 
     /**
@@ -96,8 +104,16 @@ final class Bound {
 
         int tuneBytes(int i) {
             byte[] tune = tunes.get(i);
-            return sources.bytes() == 0 ? tune.length
-                    : indexAt(Tune.getWord(tune, 4)) + 4 * sources.offsets()[i].length;
+            if (sources.bytes() == 0) {
+                return tune.length;
+            }
+            // with the sources pooled a subtune keeps its header, its index
+            // and, in version 11, the cut index after the index (1.3)
+            if (Tune.getWord(tune, 4) == Tune.CUT) {
+                int cuts = Tune.getLong(tune, CUTS_AT);
+                return cuts + 2 + 8 * Tune.getWord(tune, cuts);
+            }
+            return indexAt(Tune.getWord(tune, 4)) + 4 * sources.offsets()[i].length;
         }
     }
 
@@ -189,17 +205,17 @@ final class Bound {
 
     /** What an image fixes once, as a key two tables are grouped by and as
      *  a reader of the report sees it: the variant, the width, the unit,
-     *  and the column count of a table of 34 (DTX abi.md 1). Under DTX3
-     *  each table defines its ring, and the image has the copy code where
-     *  a table of it has copies, so neither separates two tables. The
-     *  period follows C at the writer's unit, so a table of 30 columns and
-     *  one of 34 go into separate images, and the key of a table of 30 is
+     *  and the column count of a table of 34 or 38 (DTX abi.md 1). Under
+     *  DTX3 each table defines its ring, and the image has the copy code
+     *  where a table of it has copies, so neither separates two tables. The
+     *  period follows C at the writer's unit, so tables of 30, 34 and 38
+     *  columns go into separate images, and the key of a table of 30 is
      *  the key of version 9. */
     private static String shape(byte[] dtx3) {
         Dtx.Header header = Dtx.header(dtx3);
         int payload = header.length();
         return "DTX" + header.variant() + " at unit " + (dtx3[payload + 2] & 0xFF)
-                + (header.columns() == Columns.MAPPED ? ", " + Columns.MAPPED + " columns" : "")
+                + (header.columns() != Columns.C ? ", " + header.columns() + " columns" : "")
                 + ", values of " + header.width();
     }
 
@@ -235,7 +251,7 @@ final class Bound {
      * (SPEC.md 3.4.2).
      */
     static byte[] block(byte[] tuneFile) {
-        if (Tune.getWord(tuneFile, 4) != Tune.VERSION) {
+        if (!Columns.maps(tuneFile[Tune.EFFECTS_AT] & 0xFF)) {
             return new byte[0];
         }
         int at = Tune.getLong(tuneFile, Tune.TRANSFORMATIONS_AT);
@@ -359,8 +375,18 @@ final class Bound {
         // Place sources before the image to preserve their reach
         // through the player's signed word displacements. Put the
         // transformation block last: frames read it, while ticks read
-        // sources and prepared lookup pages (BINARIES.md 1.3).
+        // sources and prepared lookup pages. The cut index follows the
+        // source index, where a subtune whose sources an SNDH file pools
+        // keeps it (BINARIES.md 1.3).
         int here = Tune.align(index + 4 * count);
+        byte[] cuts = new byte[0];
+        int cutsAt = 0;
+        if (version == Tune.CUT) {
+            int at = Tune.getLong(tuneFile, Tune.CUTS_AT);
+            cuts = Arrays.copyOfRange(tuneFile, at, at + 2 + 8 * Tune.getWord(tuneFile, at));
+            cutsAt = here;
+            here = Tune.align(here + cuts.length);
+        }
         int[] sourceAt = new int[count];
         for (int i = 0; i < count; i++) {
             sourceAt[i] = here;
@@ -383,8 +409,12 @@ final class Bound {
         // image of one names it in its format block; one of several
         // names the first, so a tune past the first records a separate offset.
         Tune.putLong(bound, TABLE_AT, table);
-        if (version == Tune.VERSION) {
+        if (version >= Tune.VERSION) {
             Tune.putLong(bound, TRANSFORMATIONS_AT, blockAt);
+        }
+        if (version == Tune.CUT) {
+            Tune.putLong(bound, CUTS_AT, cutsAt);
+            System.arraycopy(cuts, 0, bound, cutsAt, cuts.length);
         }
         // A counted source's mark is in the index a player reads, so
         // bit 31 is in the binding beside the offset (SPEC.md 3.1).

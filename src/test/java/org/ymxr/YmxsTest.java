@@ -13,14 +13,17 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.ymxs.Chip;
 import org.ymxs.Text;
 import org.ymxs.Tunes;
+import org.ymxs.YMXS.Cut;
 import org.ymxs.YMXS.Effect;
 import org.ymxs.YMXS.Mapping;
 import org.ymxs.YMXS.OneConnection;
+import org.ymxs.YMXS.Recut;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Remap;
 import org.ymxs.YMXS.Retune;
@@ -117,7 +120,7 @@ final class YmxsTest {
 
     private static Start start(Register register, Single source, Timing timing,
                                boolean deferred, Mapping mapping) {
-        return new Start(new OneConnection(Tunes.setting(register), source), timing, deferred,
+        return Tunes.start(new OneConnection(Tunes.setting(register), source), timing, deferred,
                 mapping);
     }
 
@@ -254,9 +257,9 @@ final class YmxsTest {
                         new org.ymxs.YMXS.Three(128, 1, 12)), 0));
         Timing stopped = new Timing(Chip.prescaler(4), 100, true, true);
         Map<Timer, Effect> both = new EnumMap<>(Timer.class);
-        both.put(Timer.A, new Start(new org.ymxs.YMXS.TwoConnection(
+        both.put(Timer.A, Tunes.start(new org.ymxs.YMXS.TwoConnection(
                 new org.ymxs.YMXS.SetEnvelope(), sweep), stopped, false, Tunes.NO_PARTS));
-        both.put(Timer.B, new Start(new org.ymxs.YMXS.ThreeConnection(
+        both.put(Timer.B, Tunes.start(new org.ymxs.YMXS.ThreeConnection(
                 new org.ymxs.YMXS.SetVoice(org.ymxs.YMXS.Voice.A), voice), stopped, false,
                 Tunes.NO_PARTS));
         return built(List.of(new Row(Map.of(), both), new Row(Map.of(), Map.of())), 0);
@@ -325,6 +328,140 @@ final class YmxsTest {
         assertEquals(org.ymxr.Tune.UNMAPPED, org.ymxr.Tune.getWord(file, 4));
         assertEquals(Columns.C, Schema.of(with).columns().count(), "thirty columns");
         assertArrayEquals(file(without), file, "the file of the tune without the remaps");
+    }
+
+    /**
+     * A triangle of 32 rows on setR8, started on Timer A at row 0 under
+     * {@code cut}, {@code second} at row 1, and Timer A stopped at row 2,
+     * the repeat row (YMXS, SPEC.md 3.7.4).
+     */
+    private static Tune triangle(Cut cut, Row second) {
+        return built(List.of(row(Map.of(), Timer.A, under(cut, Tunes.NO_PARTS)), second,
+                row(Map.of(), Timer.A, Tunes.STOP)), 2);
+    }
+
+    /** The triangle started under the cut of rows 0 to 15. */
+    static Tune cut() {
+        return triangle(new Cut(0, 15), Tunes.EMPTY);
+    }
+
+    /** The triangle started under its whole table, and a recut to rows 16
+     *  to 31 on {@code timer} at row 1. */
+    static Tune recut(Timer timer) {
+        return triangle(new Cut(0, 31), row(Map.of(), timer, new Recut(new Cut(16, 31))));
+    }
+
+    /** The triangle of {@link #triangle}, on effect 0 alone. */
+    private static Single triangle() {
+        return Tunes.repeating("triangle", IntStream.range(0, 32)
+                .map(n -> n < 16 ? n : 31 - n).boxed().toList(), 0);
+    }
+
+    /** A start of the triangle on setR8 under {@code cut}, through {@code
+     *  mapping}. */
+    private static Start under(Cut cut, Mapping mapping) {
+        return new Start(new OneConnection(Tunes.setting(Register.R8), triangle()), STOPPED,
+                false, mapping, cut);
+    }
+
+    /**
+     * A start under a cut writes version 11, thirty-four columns with the
+     * cut columns at 30 to 33 where the tune maps no value, and the cut
+     * index in first-use order; a recut on a timer of the tune writes its
+     * column alone, and one outside the tune leaves every column unset, as a
+     * remap there does (SPEC.md 1.11, 3.3.5, 3.5; rules 2(a), 2(i)).
+     */
+    @Test
+    void aTuneThatCutsASourceWritesVersionEleven() {
+        Columns cut = Schema.of(cut()).columns();
+        assertEquals(Columns.MAPPED, cut.count(), "the cut columns at 30 to 33");
+        assertEquals(Columns.CUTS | 1, cut.effects, "effect 0 and bit 6");
+        assertEquals(List.of(new Cut(0, 15)), cut.cuts);
+        assertEquals((byte) 0x81, cut.column[Columns.MAPPING][0], "row 0 selects cut 1");
+        assertEquals(org.ymxr.Tune.CUT, org.ymxr.Tune.getWord(file(cut()), 4));
+        Columns recut = Schema.of(recut(Timer.A)).columns();
+        assertEquals(List.of(new Cut(16, 31)), recut.cuts);
+        assertEquals(0, recut.column[Columns.MAPPING][0], "the whole table, as the kept cut");
+        assertEquals((byte) 0x81, recut.column[Columns.MAPPING][1], "the recut, cut 1");
+        assertEquals(0, recut.column[Columns.EFFECT + 1][1], "the recut's source column");
+        assertArrayEquals(file(triangle(new Cut(0, 31), Tunes.EMPTY)), file(recut(Timer.D)),
+                "the file of the tune without the recut");
+        // a recut outside the tune whose cut a start inside it numbers
+        assertArrayEquals(file(cut()), file(triangle(new Cut(0, 15), row(Map.of(), Timer.D,
+                new Recut(new Cut(0, 15))))), "the file of the tune without the recut on D");
+    }
+
+    /** A tune that maps a value and cuts a source has thirty-eight columns:
+     *  the mapping columns at 30 to 33, then the cut columns (SPEC.md
+     *  3.3.5). */
+    @Test
+    void aTuneThatMapsAndCutsHasThirtyEightColumns() {
+        Tune tune = built(List.of(row(Map.of(), Timer.A,
+                under(new Cut(0, 15), Tunes.mapping(volume(10)))), Tunes.EMPTY), 0);
+        Columns columns = Schema.of(tune).columns();
+        assertEquals(Columns.ALL, columns.count());
+        assertEquals(Columns.MAPS | Columns.CUTS | 1, columns.effects);
+        assertEquals((byte) 0x81, columns.column[Columns.MAPPING][0], "transformation 1");
+        assertEquals((byte) 0x81, columns.column[Columns.CUT][0], "cut 1");
+        assertEquals(Columns.CUT, Columns.cut(columns.effects, 0));
+        assertEquals("effect 0 cut", org.ymxr.Tune.name(Columns.CUT));
+        assertEquals("effect 0 cut", org.ymxr.Tune.name(Columns.MAPPING, Columns.CUTS));
+    }
+
+    /** The rows of rule 2(i): a start, a recut to the running cut, a recut, a
+     *  start under the kept cut, a start under the whole table, a stop, a
+     *  recut of the idle timer and the repeat row's recut. */
+    static Tune keptCuts() {
+        Cut low = new Cut(0, 15);
+        Cut high = new Cut(16, 31);
+        return built(List.of(
+                row(Map.of(), Timer.A, under(low, Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, new Recut(low)),
+                row(Map.of(), Timer.A, new Recut(high)),
+                row(Map.of(), Timer.A, under(high, Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, under(new Cut(0, 31), Tunes.NO_PARTS)),
+                row(Map.of(), Timer.A, Tunes.STOP),
+                row(Map.of(), Timer.A, new Recut(new Cut(0, 31))),
+                row(Map.of(), Timer.A, new Recut(high))), 7);
+    }
+
+    /**
+     * Rule 2(i): a start writes the cut column where its value differs from
+     * the kept cut, 0 for the whole table; a recut where its cut differs
+     * from the running cut, on an idle timer as on a running one; a stop
+     * leaves the column unset and the running cut the kept cut.
+     */
+    @Test
+    void theCutColumnIsWrittenWhereItDiffersFromWhatThePlayerKeeps() {
+        Cut low = new Cut(0, 15);
+        Cut high = new Cut(16, 31);
+        Columns columns = Schema.of(keptCuts()).columns();
+        byte[] cut = columns.column[Columns.MAPPING];
+        assertEquals(List.of(low, high, new Cut(0, 31)), columns.cuts, "first-use order");
+        assertEquals(List.of(0x81, 0x00, 0x82, 0x00, 0x80, 0x00, 0x83, 0x82),
+                IntStream.range(0, 8).mapToObj(r -> cut[r] & 0xFF).toList(),
+                "the kept cut 1, the running cut 1, cut 2, the kept cut 2, the whole table,"
+                        + " a stop, a recut of the idle timer, and the repeat row's open cut");
+    }
+
+    /** More cuts than a cut column numbers is an error of the writer
+     *  (SPEC.md 6.5). */
+    static Tune manyCuts() {
+        List<Row> rows = new ArrayList<>();
+        rows.add(row(Map.of(), Timer.A, under(new Cut(0, 31), Tunes.NO_PARTS)));
+        for (int first = 0; first <= 31; first++) {
+            for (int last = first; last <= 31 && rows.size() <= 128; last++) {
+                rows.add(row(Map.of(), Timer.A, new Recut(new Cut(first, last))));
+            }
+        }
+        return built(rows, 0);
+    }
+
+    @Test
+    void moreThan127CutsIsAnError() {
+        assertEquals("the tune cuts through 128 cuts, and a cut column numbers 127",
+                assertThrows(IllegalArgumentException.class, () -> Schema.of(manyCuts()))
+                        .getMessage());
     }
 
     /**
@@ -630,7 +767,7 @@ final class YmxsTest {
         return built(List.of(
                 row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false,
                         Tunes.mapping(volume(15)))),
-                row(Map.of(), Timer.B, new Start(chord(), STOPPED, false,
+                row(Map.of(), Timer.B, Tunes.start(chord(), STOPPED, false,
                         Tunes.mapping(Tunes.IDENTITY, Tunes.IDENTITY, volume(10)))),
                 row(Map.of(), Timer.B, new Remap(all)),
                 row(Timer.A, Tunes.STOP, Timer.B, Tunes.STOP)), 3);
@@ -646,12 +783,12 @@ final class YmxsTest {
     void aMappingOfAValueOtherThanTheLastIsAnError() {
         assertEquals("row 2: the mapping maps value 0 of setVoiceB, and a mapping column maps"
                 + " its value 2 alone", reported(chordRemapped()));
-        Tune started = built(List.of(row(Map.of(), Timer.B, new Start(chord(), STOPPED, false,
+        Tune started = built(List.of(row(Map.of(), Timer.B, Tunes.start(chord(), STOPPED, false,
                 Tunes.mapping(Tunes.IDENTITY, divided("half", 16, 2), volume(10))))), 0);
         assertEquals("row 0: the mapping maps value 1 of setVoiceB, and a mapping column maps"
                 + " its value 2 alone", reported(started));
         // the volume alone is mapped
-        Tune fine = built(List.of(row(Map.of(), Timer.B, new Start(chord(), STOPPED, false,
+        Tune fine = built(List.of(row(Map.of(), Timer.B, Tunes.start(chord(), STOPPED, false,
                 Tunes.mapping(Tunes.IDENTITY, Tunes.IDENTITY, volume(10))))), 0);
         assertArrayEquals(new byte[] {(byte) 0x81}, mapping(Schema.of(fine), 2));
     }
@@ -677,7 +814,7 @@ final class YmxsTest {
         rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false)));
         rows.add(Tunes.EMPTY);
         rows.add(Tunes.EMPTY);
-        rows.add(row(Map.of(), Timer.A, new Start(new org.ymxs.YMXS.TwoConnection(
+        rows.add(row(Map.of(), Timer.A, Tunes.start(new org.ymxs.YMXS.TwoConnection(
                 new org.ymxs.YMXS.SetNoise(org.ymxs.YMXS.Voice.A), hiss), STOPPED, false,
                 Tunes.mapping(divided("half", 32, 2), Tunes.IDENTITY))));
         rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP)));
@@ -734,7 +871,7 @@ final class YmxsTest {
         assertFalse(org.ymxs.Check.of(both).isEmpty(), "the value 128 through the identity");
         org.ymxs.YMXS.Pair tone = new org.ymxs.YMXS.Pair("tone", Tunes.repeating(
                 List.of(new org.ymxs.YMXS.Two(0, 200), new org.ymxs.YMXS.Two(0, 1)), 0));
-        Tune toned = built(List.of(row(Map.of(), Timer.A, new Start(
+        Tune toned = built(List.of(row(Map.of(), Timer.A, Tunes.start(
                 new org.ymxs.YMXS.TwoConnection(new org.ymxs.YMXS.SetTone(
                         org.ymxs.YMXS.Voice.A), tone), timing, false,
                 Tunes.mapping(Tunes.IDENTITY, divided("high", 256, 16))))), 0);
@@ -1209,7 +1346,7 @@ final class YmxsTest {
         org.ymxs.YMXS.Pair sweep = new org.ymxs.YMXS.Pair("period",
                 Tunes.repeating(List.of(new org.ymxs.YMXS.Two(0, 200),
                         new org.ymxs.YMXS.Two(255, 255)), 0));
-        List<Row> rows = List.of(row(Map.of(), Timer.A, new Start(
+        List<Row> rows = List.of(row(Map.of(), Timer.A, Tunes.start(
                 new org.ymxs.YMXS.TwoConnection(new org.ymxs.YMXS.SetEnvelope(), sweep),
                 new Timing(Chip.prescaler(4), 100, true, true), false, Tunes.NO_PARTS)));
         Schema.Made made = Schema.of(built(rows, 0));

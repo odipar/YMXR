@@ -8,11 +8,13 @@ import java.util.Set;
 import java.util.stream.IntStream;
 import org.ymxs.Chip;
 import org.ymxs.Tunes;
+import org.ymxs.YMXS.Cut;
 import org.ymxs.YMXS.Effect;
 import org.ymxs.YMXS.Identity;
 import org.ymxs.YMXS.Mapping;
 import org.ymxs.YMXS.Part;
 import org.ymxs.YMXS.Prescaler;
+import org.ymxs.YMXS.Recut;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Remap;
 import org.ymxs.YMXS.Retune;
@@ -35,7 +37,9 @@ import org.ymxs.YMXS.Transformation;
  * version 9. Version 10 permits a lookup on the target's last value
  * alone. Kept, running and pending mappings are tracked separately
  * because a deferred start can change the running mapping between
- * frames (SPEC.md 6, rule 2(g)).
+ * frames (SPEC.md 6, rule 2(g)). Version 11 adds the cut columns and the
+ * cut index, whose kept, running and pending cuts follow the same rules
+ * (rule 2(i)).
  */
 final class Schema {
 
@@ -89,7 +93,16 @@ final class Schema {
         // 10 includes the full list; version 9 omits it (SPEC.md
         // 3.4.1).
         List<Transformation> list = Tunes.transformations(tune);
-        Kept kept = new Kept(rows, list, Tunes.timers(tune));
+        Set<Timer> timers = Tunes.timers(tune);
+        // Cuts are numbered in first-use order, row order then timer order
+        // A to D; a start under the whole table of its source selects cut 0
+        // (SPEC.md 3.5.1).
+        List<Cut> cuts = cuts(rows, timers);
+        if (cuts.size() > Columns.MOST_CUTS) {
+            throw new IllegalArgumentException("the tune cuts through " + cuts.size()
+                    + " cuts, and a cut column numbers " + Columns.MOST_CUTS);
+        }
+        Kept kept = new Kept(rows, list, timers, cuts);
         // Ignore remaps on timers outside the tune. The
         // transformation-count limit applies only when an encoded start
         // or remap uses a lookup (SPEC.md 6, rule 2(a)).
@@ -98,7 +111,7 @@ final class Schema {
                     + " transformations, and a mapping column numbers "
                     + Columns.MOST_TRANSFORMATIONS);
         }
-        byte[][] column = new byte[Columns.MAPPED][size];
+        byte[][] column = new byte[Columns.ALL][size];
         int used = 0;
         for (int f = 0; f < size; f++) {
             // The wrap preserves player state. Write targets again
@@ -109,32 +122,42 @@ final class Schema {
                 kept.wrap();
             }
             Row row = rows.get(f);
-            byte[] out = new byte[Columns.MAPPED];
+            byte[] out = new byte[Columns.ALL];
             registers(row, out);
             for (Map.Entry<Timer, Effect> one : Tunes.effects(row).entrySet()) {
                 int i = effect(one.getKey());
                 used |= effect(out, i, one.getValue(), sources, kept, padded.frames()[f]);
             }
-            for (int c = 0; c < Columns.MAPPED; c++) {
+            for (int c = 0; c < Columns.ALL; c++) {
                 column[c][f] = out[c];
             }
         }
-        // Choose version 10 only when a row selects a transformation.
-        // Otherwise retain thirty columns and version 9 (SPEC.md
-        // 3.3.5).
-        Columns columns = maps(column)
-                ? new Columns(column, repeat, used | Columns.MAPS, tables(list))
-                : new Columns(Arrays.copyOf(column, Columns.C), repeat, used);
+        // A table has a group of four columns where the tune uses it: the
+        // mapping columns where a row selects a transformation, and the cut
+        // columns where a row selects a cut 1 to 127, after the mapping
+        // columns (SPEC.md 3.3.5).
+        boolean maps = selects(column, Columns.MAPPING);
+        boolean cutting = selects(column, Columns.CUT);
+        byte[][] table = new byte[Columns.C + (maps ? 4 : 0) + (cutting ? 4 : 0)][];
+        int at = 0;
+        for (int c = 0; c < Columns.ALL; c++) {
+            if (c < Columns.C || maps && c < Columns.CUT || cutting && c >= Columns.CUT) {
+                table[at++] = column[c];
+            }
+        }
+        Columns columns = new Columns(table, repeat,
+                used | (maps ? Columns.MAPS : 0) | (cutting ? Columns.CUTS : 0),
+                maps ? tables(list) : List.of(), cutting ? cuts : List.of());
         return new Made(columns, new Sources(sources(sources, markers(rows, sources))),
                 tune.rate());
     }
 
     /**
-     * Whether any row selects a transformation number, requiring
-     * version 10 (SPEC.md 3.3.5).
+     * Whether any row sets one of the four columns from {@code first} to a
+     * number 1 to 127, a transformation or a cut (SPEC.md 3.3.5).
      */
-    private static boolean maps(byte[][] column) {
-        for (int c = Columns.MAPPING; c < Columns.MAPPED; c++) {
+    private static boolean selects(byte[][] column, int first) {
+        for (int c = first; c < first + 4; c++) {
             for (byte one : column[c]) {
                 if ((one & 0x80) != 0 && (one & 0x7F) != 0) {
                     return true;
@@ -142,6 +165,33 @@ final class Schema {
             }
         }
         return false;
+    }
+
+    /**
+     * The cuts the rows select, in first-use order: row order, then timer
+     * order A to D. A start under a cut other than the whole table of its
+     * source selects one, and so does a recut on a timer of the tune; two
+     * cuts of the same rows are one (SPEC.md 3.5.1).
+     */
+    private static List<Cut> cuts(List<Row> rows, Set<Timer> timers) {
+        List<Cut> out = new ArrayList<>();
+        for (Row row : rows) {
+            Map<Timer, Effect> effects = Tunes.effects(row);
+            for (Timer timer : Timer.values()) {
+                Effect one = effects.get(timer);
+                Cut cut = null;
+                if (one instanceof Start start
+                        && !start.cut().equals(Tunes.whole(Tunes.source(start.connection())))) {
+                    cut = start.cut();
+                } else if (one instanceof Recut recut && timers.contains(timer)) {
+                    cut = recut.cut();
+                }
+                if (cut != null && !out.contains(cut)) {
+                    out.add(cut);
+                }
+            }
+        }
+        return out;
     }
 
     /**
@@ -207,6 +257,8 @@ final class Schema {
                 }
                 case Stop ignored -> counting[i] = false;
                 case Remap ignored -> {
+                }
+                case Recut ignored -> {
                 }
             }
         }
@@ -276,11 +328,24 @@ final class Schema {
          */
         final Target[] runs = new Target[4];
         final List<Transformation> list;
+        /** The cut index, cut n at n - 1 (SPEC.md 3.5.1). */
+        final List<Cut> cuts;
+        /** The cut reused by later starts, the cut current ticks read
+         *  under, and a pending start's captured cut, as the mappings above
+         *  (rule 2(i)). */
+        final int[] cut = new int[4];
+        final int[] cutRunning = new int[4];
+        final int[] cutPending = new int[4];
+        /** Whether a start or a recut on this effect runs under a cut 1 to
+         *  127, which opens its three cuts at the repeat row. */
+        final boolean[] cutting = new boolean[4];
 
-        Kept(List<Row> rows, List<Transformation> list, Set<Timer> timers) {
+        Kept(List<Row> rows, List<Transformation> list, Set<Timer> timers, List<Cut> cuts) {
             this.list = list;
+            this.cuts = cuts;
             Arrays.fill(target, OPEN);
             Arrays.fill(pending, NONE);
+            Arrays.fill(cutPending, NONE);
             for (Timer timer : timers) {
                 claimed[effect(timer)] = true;
             }
@@ -296,6 +361,7 @@ final class Schema {
                     } else if (one.getValue() instanceof Remap remap && claimed[i]) {
                         maps[i] |= !Tunes.isIdentity(remap.mapping());
                     }
+                    cutting[i] |= value(i, one.getValue()) > 0;
                 }
             }
         }
@@ -329,8 +395,36 @@ final class Schema {
                     running[i] = OPEN;
                     pending[i] = OPEN;
                 }
+                if (cutting[i]) {
+                    cut[i] = OPEN;
+                    cutRunning[i] = OPEN;
+                    cutPending[i] = OPEN;
+                }
             }
         }
+
+        /** The cut number a start or a recut on effect i selects: 0 for a
+         *  start under the whole table of its source, the number of its cut
+         *  otherwise, and -1 for every other operation and a recut outside
+         *  the tune (rule 2(i)). */
+        int value(int i, Effect effect) {
+            if (effect instanceof Start start) {
+                Cut one = start.cut();
+                return one.equals(Tunes.whole(Tunes.source(start.connection())))
+                        ? 0 : cuts.indexOf(one) + 1;
+            }
+            if (effect instanceof Recut recut && claimed[i]) {
+                int at = cuts.indexOf(recut.cut());
+                return at < 0 ? -1 : at + 1;
+            }
+            return -1;
+        }
+    }
+
+    /** Effect i's cut column in the layout of 38 the rows are written in,
+     *  before the groups a tune leaves unused are dropped (SPEC.md 3.3.5). */
+    private static int cutColumn(int i) {
+        return Columns.CUT + i;
     }
 
     /** The registers the row sets, each in its column: the set bit where
@@ -373,6 +467,8 @@ final class Schema {
                 kept.rate.keep(i, effect);
                 kept.pending[i] = NONE;
                 kept.running[i] = kept.mapping[i];
+                kept.cutPending[i] = NONE;
+                kept.cutRunning[i] = kept.cut[i];
                 return 0;
             }
             case Remap remap -> {
@@ -393,7 +489,36 @@ final class Schema {
                 kept.running[i] = kept.pending[i] == NONE || kept.pending[i] == m ? m : OPEN;
                 return 0;
             }
+            case Recut recut -> {
+                // A recut on a timer outside the tune leaves every column
+                // unset, as a remap there does (SPEC.md 6, rule 2(a)). One
+                // on a timer of the tune writes the cut column where its
+                // cut differs from the running cut (rule 2(i)).
+                int v = kept.value(i, recut);
+                if (v < 0 || v == kept.cutRunning[i]) {
+                    return 0;
+                }
+                out[cutColumn(i)] = (byte) (0x80 | v);
+                kept.cut[i] = v;
+                kept.cutRunning[i] = kept.cutPending[i] == NONE || kept.cutPending[i] == v
+                        ? v : OPEN;
+                return 0;
+            }
             case Start start -> {
+                // The start's cut column, where its cut differs from the
+                // kept cut; a deferred start captures it (rule 2(i)).
+                int v = kept.value(i, start);
+                if (v != kept.cut[i]) {
+                    out[cutColumn(i)] = (byte) (0x80 | v);
+                    kept.cut[i] = v;
+                }
+                if (start.deferred()) {
+                    kept.cutRunning[i] = kept.cutRunning[i] == v ? v : OPEN;
+                    kept.cutPending[i] = v;
+                } else {
+                    kept.cutRunning[i] = v;
+                    kept.cutPending[i] = NONE;
+                }
                 Target on = Tunes.target(start.connection());
                 int m = mapped(start.mapping(), on, kept.list, at);
                 kept.runs[i] = on;

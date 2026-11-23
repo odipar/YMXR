@@ -125,6 +125,7 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .include "player/lookup_prefill.S"
                 .include "player/lookup_kinds.S"
                 .include "player/lookup_ref.S"
+                .include "player/cut.S"
                 HANDLERS
                 HANDLEQU
                 .include "player/lookup_checks.S"

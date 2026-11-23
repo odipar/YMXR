@@ -96,11 +96,16 @@ final class LinkTest {
             if (!map || !defer) {
                 all.remove("align");
             }
-            // the remap's piece of each effect's frame code is in a core
-            // with the lookup, and the deferred start's in one with it
+            // the remap's piece and the cut's of each effect's frame code
+            // and the cut's routines are in a core with the lookup, and the
+            // deferred start's piece in one with it
+            if (!map) {
+                all.remove("cut");
+            }
             for (int i = 0; i < 4; i++) {
                 if (!map) {
                     all.remove("map" + i);
+                    all.remove("cut" + i);
                 }
                 if (!defer) {
                     all.remove("defer" + i);
@@ -310,6 +315,12 @@ final class LinkTest {
         }
     }
 
+    /** A figure as the documents write it, a comma between each three
+     *  digits in the root locale: under en_NL the default writes 10.144. */
+    private static String grouped(long value) {
+        return String.format(java.util.Locale.ROOT, "%,d", value);
+    }
+
     private static java.util.Map<String, Integer> sizes(Pieces table) {
         java.util.Map<String, Integer> out = new java.util.HashMap<>();
         for (Pieces.Piece piece : table.pieces()) {
@@ -326,14 +337,14 @@ final class LinkTest {
         String prose = doc.replaceAll("\\s+", " ");
         byte[] core = Binaries.core();
         Pieces table = Pieces.carried(Binaries.CORE);
-        assertTrue(prose.contains("the plain core, of " + String.format("%,d", core.length)
+        assertTrue(prose.contains("the plain core, of " + grouped(core.length)
                 + " bytes"), "LINKER.md names another size of the plain core than "
                 + core.length);
         int least = Link.link(core, table, Set.of()).length;
         String share = "A tune of general sources alone, with no effect, links "
-                + String.format("%,d", least)
+                + grouped(least)
                 + " bytes, " + Math.round(100.0 * least / core.length)
-                + "% of the core: the blocks are " + String.format("%,d", core.length - least)
+                + "% of the core: the blocks are " + grouped(core.length - least)
                 + " bytes of it.";
         assertTrue(prose.contains(share), "LINKER.md does not read: " + share);
         List<String> names = new ArrayList<>();
@@ -345,13 +356,15 @@ final class LinkTest {
         Binaries.Binary deferring = Binaries.binary(false, false, true, true, false);
         byte[] deferred = Binaries.carried(deferring.name());
         assertTrue(prose.contains("the core with the deferred start in, of "
-                + String.format("%,d", deferred.length) + " bytes"),
+                + grouped(deferred.length) + " bytes"),
                 "LINKER.md names another size of the core with the deferred start than "
                 + deferred.length);
         for (String name : names) {
             TuneFile tune = TuneFile.read(Files.readAllBytes(KIT.resolve(name)));
             boolean defers = (tune.effects() & Columns.DEFERS) != 0;
-            boolean maps = (tune.effects() & Columns.MAPS) != 0;
+            // a tune that maps a value or cuts a source links from a core
+            // with the lookup in
+            boolean maps = (tune.effects() & (Columns.MAPS | Columns.CUTS)) != 0;
             assertTrue(Link.links(defers, maps), name);
             Binaries.Binary binary = Binaries.binary(false, false, true, defers, maps);
             byte[] carried = Binaries.carried(binary.name());
@@ -359,7 +372,7 @@ final class LinkTest {
             if (maps) {
                 assertTrue(prose.contains("the core with the lookup" + (defers
                         ? " and the deferred start" : "") + " in, of "
-                        + String.format("%,d", carried.length) + " bytes"),
+                        + grouped(carried.length) + " bytes"),
                         "LINKER.md names another size of " + binary.name() + " than "
                         + carried.length);
             }
@@ -374,9 +387,9 @@ final class LinkTest {
                     : defers ? "the deferred start" : "plain";
             String row = "| `" + name + "` | " + which + " | "
                     + (kept.isEmpty() ? "none" : String.join(", ", kept)) + " | "
-                    + String.format("%,d", linked.length) + " |";
+                    + grouped(linked.length) + " |";
             assertTrue(doc.contains(row + "\n"), "LINKER.md has no row " + row);
-            if (maps) {
+            if ((tune.effects() & Columns.MAPS) != 0) {
                 String said = lookups(name, carried, pieces, Link.blocks(List.of(tune)),
                         linked.length);
                 assertTrue(prose.contains(said), "LINKER.md does not read: " + said);
@@ -416,12 +429,12 @@ final class LinkTest {
             keptKinds += blocks.contains(block) ? 1 : 0;
         }
         return "`" + name + "` keeps " + keptInstances + " lookup instances of " + keptKinds
-                + " kinds and links " + String.format("%,d", linked) + " bytes of "
-                + String.format("%,d", core.length) + ": the "
+                + " kinds and links " + grouped(linked) + " bytes of "
+                + grouped(core.length) + ": the "
                 + (instances.size() - keptInstances) + " instances and the "
                 + (kinds.size() - keptKinds) + " loops of init it leaves out are "
-                + String.format("%,d", out) + " bytes, and the gaps it keeps are "
-                + String.format("%,d", Math.abs(linked - (core.length - left))) + " bytes "
+                + grouped(out) + " bytes, and the gaps it keeps are "
+                + grouped(Math.abs(linked - (core.length - left))) + " bytes "
                 + (linked >= core.length - left ? "longer" : "shorter") + " than in the core.";
     }
 }

@@ -15,7 +15,6 @@ import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Row;
 import org.ymxs.YMXS.Single;
 import org.ymxs.YMXS.Source;
-import org.ymxs.YMXS.Start;
 import org.ymxs.YMXS.Table;
 import org.ymxs.YMXS.Timing;
 import org.ymxs.YMXS.Timer;
@@ -171,7 +170,7 @@ final class Ym {
                         boolean unmoved = !keyframe && slot[i].kind() == Effects.SID
                                 && lastKind[i] == Effects.SID
                                 && lastTarget[i] == slot[i].target();
-                        effects.put(timer, new Start(new OneConnection(
+                        effects.put(timer, Tunes.start(new OneConnection(
                                 Tunes.setting(Chip.register(slot[i].target())),
                                 source(made, sources, number[i])),
                                 new Timing(Chip.prescaler(Columns.PRESCALER[slot[i].select()]),

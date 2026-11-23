@@ -63,9 +63,9 @@ final class Pages {
         }
     }
 
-    /** The list of a tune file, empty below version 10. */
+    /** The list of a tune file, empty where it has no mapping columns. */
     static byte[] of(TuneFile tune) {
-        if (tune.version() != Tune.VERSION) {
+        if (!Columns.maps(tune.effects())) {
             return new byte[0];
         }
         List<LinkedHashSet<Integer>> pages = new ArrayList<>();
@@ -79,6 +79,8 @@ final class Pages {
         for (int c = Columns.EFFECT; c < Columns.MAPPED; c++) {
             columns[c] = table.column(c);
         }
+        // the mapping columns are 30 to 33 in every table that has them
+        // (SPEC.md 3.3.5)
         for (int row = 0; row < table.rows(); row++) {
             play(tune, columns, row, effects, pages);
         }
@@ -169,8 +171,10 @@ final class Pages {
 
     /**
      * The form source {@code s} runs on {@code target} through a
-     * transformation, or -1 for a square or a source of one row, whose
-     * entries are in the handler (SPEC.md 3.4.4): a counted source plain,
+     * transformation, or -1 for a square or a source of one row in
+     * version 10, whose entries are in the handler; in version 11 a tick
+     * under a cut reads such a source as a marked source of one column
+     * (SPEC.md 3.4.4): a counted source plain,
      * and the ports' form on setR7; a marked source of one column marked;
      * of two, plain on the noise targets and marked on the others; of
      * three, marked on setBuzzer and plain on the voices.
@@ -185,7 +189,7 @@ final class Pages {
         }
         if (source.columns() == 1) {
             boolean shaped = source.repeat() == 0 && (source.rows() == 1 || source.rows() == 2);
-            return shaped ? -1 : MARKED;
+            return shaped && tune.version() != Tune.CUT ? -1 : MARKED;
         }
         if (source.columns() == 2) {
             return target >= NOISE ? PLAIN : MARKED;

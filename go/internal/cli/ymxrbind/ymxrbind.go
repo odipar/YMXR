@@ -65,7 +65,7 @@ func bound_(said *report.Report, tune, bound []byte) {
 	// file's end (BINARIES.md 1.3).
 	sources := len(file.Sources)
 	block := 0
-	if file.Version == ymxr.Version {
+	if file.Version >= ymxr.Version {
 		block = ymxr.GetLong(bound, sndh.BoundTransformationsAt)
 	}
 	ends := len(bound)

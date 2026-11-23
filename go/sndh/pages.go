@@ -63,7 +63,7 @@ func (one *pagesEffect) state() string {
 // start adds its form to the forms before it, since the tick that
 // performs it is outside what the rows record.
 func Pages(tune ymxr.File) []byte {
-	if tune.Version != ymxr.Version {
+	if !ymxr.HasMapping(tune.Effects) {
 		return nil
 	}
 	pages := make([][]int, 4)
@@ -84,6 +84,8 @@ func Pages(tune ymxr.File) []byte {
 	for c := ymxr.Effect; c < ymxr.Mapped; c++ {
 		columns[c] = table.Column(c)
 	}
+	// the mapping columns are 30 to 33 in every table that has them
+	// (SPEC.md 3.3.5)
 	for row := 0; row < table.Rows(); row++ {
 		pagesPlay(tune, columns, row, effects, add)
 	}
@@ -173,8 +175,10 @@ func pagesPlay(tune ymxr.File, columns [][]byte, row int, effects []*pagesEffect
 }
 
 // PageForm is the form source s runs on target through a
-// transformation, or -1 for a square or a source of one row, whose
-// entries are in the handler (SPEC.md 3.4.4): a counted source plain,
+// transformation, or -1 for a square or a source of one row in version 10,
+// whose entries are in the handler; in version 11 a tick under a cut reads
+// such a source as a marked source of one column (SPEC.md 3.4.4): a
+// counted source plain,
 // and the ports' form on setR7; a marked source of one column marked; of
 // two, plain on the noise targets and marked on the others; of three,
 // marked on setBuzzer and plain on the voices.
@@ -191,7 +195,8 @@ func PageForm(tune ymxr.File, s, target int) int {
 	}
 	switch source.Columns() {
 	case 1:
-		if source.Repeat() == 0 && (source.Rows() == 1 || source.Rows() == 2) {
+		if source.Repeat() == 0 && (source.Rows() == 1 || source.Rows() == 2) &&
+			tune.Version != ymxr.VersionCut {
 			return -1
 		}
 		return PageMarked

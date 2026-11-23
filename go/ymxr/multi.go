@@ -35,15 +35,20 @@ type MultiRead struct {
 }
 
 // BindsAt is the version a set of these tune files binds at, and the
-// version of a multi file of them: 10 where one of them is version 10, and
-// 9 otherwise (tools.md 11.1).
+// version of a multi file of them: 11 where one of them is version 11, 10
+// where one is version 10 and none 11, and 9 otherwise (tools.md 11.1).
 func BindsAt(tunes [][]byte) int {
+	most := Unmapped
 	for _, tune := range tunes {
-		if len(tune) >= HeaderLength && GetWord(tune, 4) == Version {
-			return Version
+		if len(tune) < HeaderLength {
+			continue
+		}
+		if version := GetWord(tune, 4); (version == VersionCut || version == Version) &&
+			version > most {
+			most = version
 		}
 	}
-	return Unmapped
+	return most
 }
 
 // IsMulti is whether the file opens as a multi file.

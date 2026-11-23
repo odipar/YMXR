@@ -58,6 +58,11 @@ TF_INDEX        equ     24
 TF_TRANS        equ     24              ; version 10: the transformations'
                                         ; block, a signed long from the
                                         ; bound tune's first byte, and the
+                                        ; source index 4 bytes on;
+                                        ; version 11: the block, or 0
+TF_CUTS         equ     28              ; version 11: the cut index, a
+                                        ; signed long from the bound
+                                        ; tune's first byte, and the
                                         ; source index 4 bytes on
                 .endif
 
@@ -115,7 +120,11 @@ FX_SHAPE        equ     3               ; which handler the timer's vector
                                         ; points at: 0 the general one, $FF
                                         ; the square's, 1 the one-row
                                         ; source's. The last two encode the
-                                        ; place as an immediate
+                                        ; place as an immediate. 2 and 3 the
+                                        ; handlers of two and three columns,
+                                        ; 4 to 6 the counted ones of one to
+                                        ; three, and 7 to 9 the counted ones
+                                        ; with a marked source, under a cut
 FX_FIRST        equ     4               ; the place at row 0: the running
                                         ; source's first row, and the first row
                                         ; of the column the running handler
@@ -171,6 +180,9 @@ FX_LEVEL        equ     58              ; the running square's level at row 0
 FX_RUN          equ     59              ; the running source's mapping
 FX_USE          equ     60              ; the page in use, bank 0's then 1's
 FX_LBANK        equ     62              ; the bank of the cache
+FX_ACUT         equ     63              ; an armed start's cut, and bit 7
+                                        ; where its place is the cut's
+                                        ; first row
 FX_PAGE         equ     64              ; two bytes a page, 4 a bank
 FX_LBYTE        equ     72              ; the cache: the page byte's address
 FX_LKEY         equ     76              ; a transformation, and the fill kind
@@ -184,6 +196,8 @@ FX_LLAST        equ     83
 FX_LMAPS        equ     84              ; the three fill kinds' tables
 FX_LCUR         equ     96              ; the page byte a start writes
 FX_LFB          equ     97              ; the page of the first fallback
+FX_CUT          equ     98              ; the kept cut
+FX_CRUN         equ     99              ; the running cut
 FX_SIZE         equ     100
 WS_TRANS        equ     2456            ; the transformations' block, a long
 YMXR_FIXED      equ     2460
@@ -206,6 +220,8 @@ FX_LLAST        equ     39
 FX_LMAPS        equ     40
 FX_LCUR         equ     52
 FX_LFB          equ     53
+FX_CUT          equ     54
+FX_CRUN         equ     55
 FX_SIZE         equ     56
 WS_TRANS        equ     2280
 YMXR_FIXED      equ     2284

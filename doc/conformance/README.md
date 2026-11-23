@@ -1,8 +1,8 @@
 # The conformance kit
 
-**1.** The kit is 17 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
+**1.** The kit is 19 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
 beside its `.rows` (3), and a reference record of each (SPEC.md 7):
-18,945 entries, one line each, the first line of each record among them.
+18,991 entries, one line each, the first line of each record among them.
 The kit tests the two documents, [SPEC.md](../SPEC.md) and YMXS's
 `doc/SPEC.md`: an implementer who has read them alone writes a reader
 (2), and a record equal to the reference byte for byte shows that the
@@ -20,21 +20,23 @@ tests a reader; the rig (7) tests the player against the same record.
 |---|---|
 | `TASK.md` | the task an implementer receives, with the line count of each tune |
 | `tunes/X.ymxr` | the tune file of tune `X` |
-| `tunes/X.rows` | the tune's table as DTX0 (DTX, SPEC.md 2.1): a 16-byte header, `R` at bytes 4 to 7, `C` at 8 and 9, 30 for a tune of version 9 and 34 for one of version 10, `RR` at 10 to 13 and `W` = 1 at 14, then `R` rows of `C` bytes; empty for `wrong-version` |
+| `tunes/X.rows` | the tune's table as DTX0 (DTX, SPEC.md 2.1): a 16-byte header, `R` at bytes 4 to 7, `C` at 8 and 9, 30 for a tune of version 9, 34 for one of version 10, and 34 or 38 for one of version 11, `RR` at 10 to 13 and `W` = 1 at 14, then `R` rows of `C` bytes; empty for `wrong-version` |
 | `X.jsonl` | the reference record of tune `X`, outside the kit: `MANIFEST.txt` records its sha256 and bytes |
 | `MANIFEST.txt` | `# sha256  bytes  file`, then a line each for `tunes/X.ymxr`, `tunes/X.rows` and `X.jsonl` of every tune |
 | `SOURCES.md` | a row a tune: its name, the dump or builder it comes from, the dump's title and author, the converter's flags, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
 
 The converter makes nine tunes from eight dumps under `ym/test`: six of
-published music, by Jochen Hippel, Mad Max and Scavenger as their
-headers record, one of them converted twice (`circus`, `plays-once`),
-and two built (`preempt`, `retune`). Code builds `four-timers`,
-`voices`, `envelope`, `counted`, `envelope-counted` and `deferred` as
-columns, and `mapped` as a YMXS structure that the schema of
-`ymxs-to-ymxr` writes at version 10; `wrong-version` is `chambers` with
-the version word $000B. The published music belongs to its composers,
-and the repository's LICENSE excludes it: a copy of the kit has the
-tunes for the exercise alone.
+published music, by Jochen Hippel, Mad Max and Scavenger as their headers
+record, one of them converted twice (`circus`, `plays-once`), and two
+built (`preempt`, `retune`). Code builds `four-timers`, `voices`,
+`envelope`, `counted`, `envelope-counted` and `deferred` as columns,
+`mapped` as a YMXS structure that the schema of `ymxs-to-ymxr` writes at
+version 10, and `cut` and `cuts` as YMXS structures it writes at version
+11, the window of YMXS's `doc/tunes/cut.json` and the cuts of the YMXS
+kit's `cuts.json`; `wrong-version` is `chambers` with the version word
+$000C. The published music belongs to its composers, and the repository's
+LICENSE excludes it: a copy of the kit has the tunes for the exercise
+alone.
 
 **4. The exercise.** Initial condition: an implementer whose reading
 excludes the three repositories and every implementation of the format,
@@ -408,7 +410,9 @@ Two places changed for entries that left output as it is:
 | `envelope-counted` | a counted source of two columns on `setEnvelope`, whose two registers read every bit of their byte, so its rows are whole bytes and a tick counts them; the high byte runs past 127, where a marked source of that target stops, and reaches 255, an envelope period of 65,323; one source repeating to a row above 0 and one that plays once and stops its timer at its count, a start that changes the source on a running timer, and the envelope shape set from column 13 while the period ticks |
 | `deferred` | deferred starts, bit 3 of the control column (SPEC.md 4.8), on Timer A and on Timer C, and bit 4 of the effects used: a fall after a loop, a source with the place at its number, bit 5 at 0, a deferred start a stop drops, and one on a stopped timer |
 | `mapped` | version 10 at 50 Hz; optional lookups, fades, deferred snapshots and kept mappings. See [Mapped transformations](#mapped-transformations). |
-| `wrong-version` | the version word $000B: a reader produces an empty record |
+| `cut` | version 11 at 50 Hz; a window of 16 rows over a triangle of 32, moved two rows a frame by a recut, then narrowed to 8 rows and to 4: the 34 columns of a tune that cuts a source and maps no value, its cut columns at 30 to 33 |
+| `cuts` | version 11 at 50 Hz; a cut that excludes its source's repeat row and one that includes it, a start under the whole table, a deferred start under a cut of a source that plays once, and a recut while it is pending |
+| `wrong-version` | the version word $000C: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.
