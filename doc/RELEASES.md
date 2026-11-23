@@ -37,6 +37,46 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.16.0, 2026-11-23
+
+<https://github.com/odipar/YMXR/releases/tag/v0.16.0>, built from the commit
+tagged `v0.16.0`.
+
+A tune that cuts a source converts to a tune file of version 11: YMXS
+0.8.0's cut on a `Start` and its `Recut`, encoded as a cut column for each
+effect and a cut index, each cut a first and a last row of the source it
+runs on (SPEC.md 1.11, 3.5). The cut columns are 30 to 33 where the tune
+maps no value, and 34 to 37 past the mapping columns where it maps one. A
+tune that cuts no source converts to the file 0.15.0 writes, at version 9
+or 10.
+
+- **The converter, the reader and the check** read and write version 11 in
+  the Java and Go trees, byte for byte with each other. `ymxs-to-ymxr`
+  writes a `Start` under a cut and a `Recut`, and in version 11 a frame's
+  entry of the record ends each effect with its kept cut (SPEC.md 7.3).
+  The conformance kit gains `cut.ymxr` and `cuts.ymxr`.
+- **The player** reads version 11 in the cores with the lookup,
+  `YMXR_MAP=1`. A start or a recut under a cut runs the counted handler of
+  the source's columns at every shape of source, through the identity or a
+  transformation, and the handler ends a pass at the cut's last row, where
+  a deferred start under a cut switches. Init of every other core reports
+  -1 for such a tune (BINARIES.md 1.5), and a bound tune of version 11 is
+  version 11 ($000B).
+- **The SNDH tools** put a subtune that cuts a source on a core with the
+  lookup, and the link keeps the cut's code for a song that cuts a source
+  alone: the kit's `cut.ymxr` links 11,302 bytes of 25,592.
+- **The figures** (performance.md, A cut): a tick under a cut costs 20
+  cycles more a row written than a marked source under cut 0, and 40 more
+  at the end of a pass. At the frame a start under a cut costs 824 to 900
+  cycles on a source of one column through the identity and 1,968 to 2,216
+  on two or three columns, and a recut on the counted handler 1,106 to
+  1,790. The player with the lookup in is 24,884 bytes against 21,966,
+  2,674 of them the cut's blocks.
+
+Open questions of the cut are issues 364 to 368; one of the rig's tunes of
+cuts passes R4.5's 6,656 cycles at a row that starts four sources of two
+and three columns under a cut (368).
+
 ### 0.15.0, 2026-11-09
 
 <https://github.com/odipar/YMXR/releases/tag/v0.15.0>, built from the commit
