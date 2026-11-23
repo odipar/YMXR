@@ -1973,8 +1973,10 @@ def cut_cases():
     by a select; a square, a source of one row and a counted source under a
     cut, recut to the whole table and back; a recut on a stopped timer, read
     by the start after it; starts under the whole table after a cut, and a
-    place's reset after each; deferred starts under a cut, at L + 1 of the
-    running cut and at the cut's first row, and between a cut and the whole
+    place's reset after each, and recuts of a loop and a square started
+    under the whole table; deferred starts under a cut, at L + 1 of the
+    running cut and at the cut's first row, with a recut between them on
+    the handler the first switched to, and between a cut and the whole
     table; recuts while a start is pending, of the general handler and of a
     square; sources of two and three columns, marked and counted, under a
     cut; starts through a transformation under a cut, of a marked source, a
@@ -2035,16 +2037,18 @@ def cut_cases():
         ("a recut on a stopped timer, read by the start after it", [loop, six],
          {"A": {0: start(1, (2, 5)), 3: ("stop",), 5: recut(1, 3), 7: start(2, (1, 3)),
                 10: start(1, (4, 7), pr=0)}}, "warned"),
-        ("starts under the whole table after a cut, each place reset after",
-         [loop, held, counted],
-         {"A": {0: start(1, (3, 6)), 4: start(1), 6: ("retune", 200, 200, 0, 1)},
+        ("starts under the whole table after a cut, each place reset after, and recuts of a"
+         " loop and a square started under it", [loop, held, counted, square],
+         {"A": {0: start(1, (3, 6)), 4: start(1), 6: ("retune", 200, 200, 0, 1),
+                15: recut(2, 5)},
+          "C": {0: start(4, target=10), 5: recut(0, 1)},
           "B": {0: start(3, (2, 4), target=11), 4: start(3, target=11),
                 7: ("retune", 200, 200, 0, 1)},
           "D": {0: start(2, (0, 0), target=9), 3: start(2, target=9),
                 5: ("retune", 200, 200, 0, 1)}}),
         ("deferred starts under a cut, at L + 1 of the running cut and at the cut's first"
-         " row", [loop, six],
-         {"A": {0: start(1, (2, 5)), 3: start(2, (1, 4), pr=0, deferred=1),
+         " row, and a recut between them", [loop, six],
+         {"A": {0: start(1, (2, 5)), 3: start(2, (1, 4), pr=0, deferred=1), 7: recut(0, 3),
                 9: start(1, (3, 6), pr=0, deferred=1), 15: start(2, (2, 4), deferred=1)}}),
         ("deferred starts between a cut and the whole table", [loop, six, fall],
          {"A": {0: start(1, (2, 5)), 3: start(2, pr=0, deferred=1),
@@ -2673,7 +2677,14 @@ FALLBACK_FROM = 100
 FALLBACK_FILLS = (("remap", 16), ("remap", 32), ("start", 16), ("start", 32))
 
 
-def fallback_tune(compact=False):
+# The sizes of fallback_tune: the transformations effect 0 and effect 1
+# remap through before the starts and remaps that fill a page at the
+# frame, the full fixture first and then the compact ones, each smaller,
+# for a core whose reach leaves less room past the tune (fallbacks).
+FALLBACK_SIZES = ((FALLBACK_FROM, 20), (16, 8), (12, 6), (8, 4))
+
+
+def fallback_tune(size=FALLBACK_SIZES[0]):
     """A tune whose pages pass the reach of the first handler: effect 0
     remaps through 100 transformations of 16 entries, one a row, and
     effect 1 through 20 in rows 81 to 99, so init fills the first pages of
@@ -2682,12 +2693,12 @@ def fallback_tune(compact=False):
     alone runs a row of FALLBACK_FILLS, a start at row 0 or a remap,
     through a transformation of 16 or 32 entries that each row before it
     leaves unused, and fills a page of its fallback at the frame.
-    The compact fixture uses 16 and 8 transformations before those
-    starts and remaps, so the page area fits after the tune on a
-    larger core."""
-    if compact in _FALLBACK:
-        return _FALLBACK[compact]
-    first, second = (16, 8) if compact else (FALLBACK_FROM, 20)
+    A compact fixture uses fewer transformations before those starts and
+    remaps, size, so the page area fits after the tune on a larger
+    core."""
+    if size in _FALLBACK:
+        return _FALLBACK[size]
+    first, second = size
     tables = [("T%d" % n, [(k * (2 * (n % 8) + 1) + n // 8 + 1) % 16 for k in range(16)])
               for n in range(first + second)]
     ramp = ("ramp", list(range(16)), 0)
@@ -2706,7 +2717,7 @@ def fallback_tune(compact=False):
                         {"A": a, "D": d}, transformations=tables)
     at, version = built("fallbacks", tune)
     assert version == MAPPED, "the fallback's tune is of version %d" % version
-    _FALLBACK[compact] = at
+    _FALLBACK[size] = at
     return at
 
 
@@ -2720,19 +2731,22 @@ def fallbacks(code, symbols):
     global AREA_AFTER
     if "ymxr_look" not in symbols:
         code, symbols = build(switched(DEFINES, lookup=True))
-    at = fallback_tune()
     work = tempfile.mkdtemp()
-    with open(at, "rb") as f:
-        bound = bind(f.read(), work)
     # The fixture fills the available page reach, so its source rows go
-    # before the area on PC-relative builds. On larger cores the compact
-    # fixture leaves room for the area and still makes both effects fall
-    # back.
-    after = (placed(len(code)) + len(bound) + 1) & ~1
-    if PCREL and area_of(bound, symbols, after) is None:
-        at = fallback_tune(compact=True)
+    # before the area on PC-relative builds. On larger cores a compact
+    # fixture leaves room for the area: the first of FALLBACK_SIZES whose
+    # pages fit with both effects falling back.
+    for size in FALLBACK_SIZES:
+        at = fallback_tune(size)
         with open(at, "rb") as f:
             bound = bind(f.read(), work)
+        if not PCREL:
+            break
+        count, entries = list_of(bound)
+        after = (placed(len(code)) + len(bound) + 1) & ~1
+        plan = plan_of(count, entries, reach_of(symbols, after), fallback_of(symbols))
+        if plan is not None and {e for e, _, _ in entries[plan[0]:]} == {0, 1}:
+            break
     count, entries = list_of(bound)
     # Play every frame under -frames too, so both effects use a fallback.
     global MOST_FRAMES
@@ -3301,8 +3315,12 @@ ROUTINES = ("ymxr_lstart", "ymxr_remap", "ymxr_rmove")
 REMAPS = ("ymxr_tick%d_remap", "ymxr_tick%d_remapped")
 # The routines of a start under a cut and of a recut, each counted from
 # its call to its return, apart from those of ROUTINES (performance.md,
-# A cut).
-CUT_ROUTINES = ("ymxr_kstart", "ymxr_recut")
+# A cut). A start under a cut through a transformation is a start through
+# a transformation, whose routine R4.5 counts apart with those of
+# ROUTINES: check counts it there, by the record's running mapping at the
+# call (FX_RUN).
+CUT_ROUTINES = ("ymxr_kone", "ymxr_kstart", "ymxr_recut")
+CUT_STARTS = ("ymxr_kone",)
 
 
 def routine_calls(code, symbols):
@@ -3366,8 +3384,10 @@ def lookup_events(model, before, row):
 def cut_events(model, before, row):
     """The starts and the recuts of a row of version 11, from the effects'
     records before it (before) and the model after it, as (effect,
-    operation, shape): "recut" on a running timer and "recut, stopped" on
-    a stopped one, the shape the source's; and "start under a cut" or
+    operation, shape): "recut" on a running timer whose source the counted
+    handler runs, "recut, moved" on one whose source another handler runs,
+    which the recut moves to the counted handler, and "recut, stopped" on
+    a stopped timer, the shape the source's; and "start under a cut" or
     "start under cut 0" at the frame, ", the place kept" where bit 5 is
     clear, the shape the started source's (SPEC.md 4.3.2): cut_shape's,
     "mapped " before it where a transformation runs the source after the
@@ -3387,7 +3407,10 @@ def cut_events(model, before, row):
             if not row[t + 2] & 0x80 or not row[t + 2] & 0x20:
                 what += ", the place kept"
         elif x & 0x80 and not m & 0x80:
-            what = "recut" if was["running"] and was["source"] else "recut, stopped"
+            what = "recut, stopped"
+            if was["running"] and was["source"]:
+                counted = was["counting"] or tune.counted[was["source"]]
+                what = "recut" if counted else "recut, moved"
         else:
             continue
         source = fx["source"] or was["source"]
@@ -3648,17 +3671,23 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                       end=CODE + symbols["ymxr_filled"])
     # Measure each call of a routine of ROUTINES from entry after bsr
     # to the instruction after its rts (routine_calls), and each call of
-    # one of CUT_ROUTINES apart, in "cut".
+    # one of CUT_ROUTINES apart, in "cut", but for a start under a cut
+    # through a transformation, which R4.5 counts with ROUTINES.
     routine = {"cycles": 0, "cut": 0, "at": None, "into": "cycles"}
     looking = ()
     if cycles and "copy" in cycles.regions:
         looking = tuple(lookup_regions(symbols)) + ("routine", "cut routine")
 
-        def entering(into):
+        def entering(into, mapped=False):
+            run = equate("FX_RUN", symbols)
+
             def entered(mu, address, size, data):
                 # the remap of the frame code counts the routine it calls
                 if routine["at"] is None:
-                    routine.update(at=cycles.counter.cycles, into=into)
+                    if mapped and bytes(mu.mem_read(mu.reg_read(UC_M68K_REG_A3) + run, 1))[0]:
+                        routine.update(at=cycles.counter.cycles, into="cycles")
+                    else:
+                        routine.update(at=cycles.counter.cycles, into=into)
             return entered
 
         def returned(mu, address, size, data):
@@ -3669,8 +3698,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                             (CUT_ROUTINES, "cut")):
             for name in names:
                 if name in symbols:
-                    m.mu.hook_add(UC_HOOK_CODE, entering(into), begin=CODE + symbols[name],
-                                  end=CODE + symbols[name])
+                    m.mu.hook_add(UC_HOOK_CODE, entering(into, name in CUT_STARTS),
+                                  begin=CODE + symbols[name], end=CODE + symbols[name])
         for at in routine_calls(code, symbols):
             m.mu.hook_add(UC_HOOK_CODE, returned, begin=CODE + at, end=CODE + at)
     lookups = []
@@ -4903,6 +4932,13 @@ def cut_read(code, symbols, cycles_of, general):
     reads(r"a start with the place kept reads the running row and its remainder by R as"
           r" well, ([\d,]+(?: to [\d,]+)?) cycles on one column and ([\d,]+(?: to [\d,]+)?)"
           r" on two\.", span(kept[0]), span(kept[1]))
+    reads(r"A recut that moves a source from another handler to the counted handler runs the"
+          r" path of one column through the identity on such a source, ([\d,]+(?: to"
+          r" [\d,]+)?) cycles, and the general routine on every other, ([\d,]+(?: to"
+          r" [\d,]+)?) cycles on a square through a transformation\.",
+          span(set().union(*(frames.get(("recut, moved", shape), set())
+                             for shape in CUT_FRAMES[0][1])) or {0}),
+          span(frames.get(("recut, moved", "mapped a square"), {0})))
     reads(r"A recut on a stopped timer sets the kept cut alone, ([\d,]+(?: to [\d,]+)?)"
           r" cycles\.", span(frames.get(("recut, stopped", "one column"), {0})))
     reads(r"On the same span a start under cut 0 at row 0 of a marked source of one column"
@@ -4918,7 +4954,7 @@ def cut_read(code, symbols, cycles_of, general):
         stale.append("performance.md's costliest calls under a cut are of %s, and the rig"
                      " plays %s" % ([title for title, _, _, _ in rows],
                                     [title for title, _, _, _ in played]))
-    over, within = [], 0
+    over, within, shapes = [], 0, set()
     for title, cost, lookups, cuts in played:
         looks = [c - spent["routine"] for c, (_, spent, _) in zip(cost, lookups)]
         both = [c - spent["cut routine"] for c, (_, spent, _) in zip(looks, lookups)]
@@ -4930,18 +4966,20 @@ def cut_read(code, symbols, cycles_of, general):
         within = max(within, max(both))
         if max(looks) > budget:
             f = looks.index(max(looks))
-            starts = [what for g, _, what, _ in cuts if g == f and what.startswith("start")]
-            over.append((f, len(starts), sum(1 for what in starts if "under a cut" in what)))
-    if any(f for f, _, _ in over) or len({n for _, n, _ in over}) > 1:
-        stale.append("the calls past R4.5 under a cut are at frames and of starts %s" % over)
-    under_cut = sorted((n for _, _, n in over), reverse=True)
-    reads(r"Of the (\w+), (\w+) pass R4\.5's ([\d,]+), each at its first row, which starts"
-          r" (\w+) sources, (\w+) of them under a cut in one and (\w+) in the other\. With the"
-          r" routines of the cut counted apart as well, every call is within it, the costliest"
-          r" at ([\d,]+)\.",
+            starts = [(what, shape) for g, _, what, shape in cuts
+                      if g == f and what.startswith("start")]
+            over.append((f, len(starts), sum(1 for what, _ in starts if "under a cut" in what)))
+            shapes |= {shape for _, shape in starts}
+    if any(f for f, _, _ in over) or any(n != under for _, n, under in over) \
+            or not shapes <= {"two columns", "three columns", "counted two columns",
+                              "counted three columns"}:
+        stale.append("the calls past R4.5 under a cut are at frames and of starts %s, of %s"
+                     % (over, sorted(shapes)))
+    reads(r"Of the (\w+), (\w+) pass(?:es)? R4\.5's ([\d,]+), at its first row, which starts"
+          r" (\w+) sources of two and three columns under a cut\. With the routines of the cut"
+          r" counted apart as well, every call is within it, the costliest at ([\d,]+)\.",
           WORDS.get(len(played)), WORDS.get(len(over)), budget,
-          WORDS.get(over[0][1]) if over else None,
-          *([WORDS.get(n) for n in under_cut] if len(under_cut) == 2 else [under_cut, None]),
+          WORDS.get(over[0][1]) if len(over) == 1 else over,
           within if within <= budget else None)
     return stale
 

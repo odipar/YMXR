@@ -166,13 +166,14 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 btst    #5,d2
                 bne.s   .placed
                 .if     YMXR_MAP
-                tst.b   FX_CRUN(a3)
+                moveq   #0,d4
+                move.b  FX_CRUN(a3),d4
                 beq.s   .whole
-                movem.l d0-d1/a1,-(sp)
-                bsr.w   ymxr_xcut               ; L of the running cut
-                move.l  d1,d3
+                movea.l WS_TUNE(a0),a5          ; L of the running cut, out
+                adda.l  TF_CUTS(a5),a5          ; of the cut index (cut.S,
+                lsl.w   #3,d4                   ; ymxr_xrows)
+                move.l  -2(a5,d4.w),d3
                 addq.l  #1,d3
-                movem.l (sp)+,d0-d1/a1
                 bra.s   .last
 .whole:
                 .endif
@@ -193,18 +194,17 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 bsr.w   ymxr_rem
 .placed:
                 .if     YMXR_MAP
-                tst.b   FX_CUT(a3)
+                moveq   #0,d4
+                move.b  FX_CUT(a3),d4
                 beq.s   .xdone
-                movem.l d0-d1/a1,-(sp)
-                moveq   #0,d0
-                move.b  FX_CUT(a3),d0
-                bsr.w   ymxr_xrows              ; F and L of the start's cut,
-                cmp.l   d0,d3                   ; row 0 with bit 5 at F
+                movea.l WS_TUNE(a0),a5          ; F and L of the start's cut,
+                adda.l  TF_CUTS(a5),a5          ; row 0 with bit 5 at F
+                lsl.w   #3,d4
+                cmp.l   -6(a5,d4.w),d3
                 bcs.s   .xfirst
-                cmp.l   d1,d3
-                bls.s   .xin
-.xfirst:        move.l  d0,d3
-.xin:           movem.l (sp)+,d0-d1/a1
+                cmp.l   -2(a5,d4.w),d3
+                bls.s   .xdone
+.xfirst:        move.l  -6(a5,d4.w),d3
 .xdone:
                 .endif
                 move.l  d3,FX_APLACE(a3)

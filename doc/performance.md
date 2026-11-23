@@ -877,9 +877,9 @@ absolute address. Each handler gains a stub: an instance of the wide
 handler is 138 bytes against 134, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 24,036 bytes against 9,454,
-and 25,326 against 9,112 where a tick reads an absolute address. With the
-deferred start in as well, 38,498 against 14,636, and 40,544 against
+The lookup in, `YMXR_MAP=1`, makes the player 24,884 bytes against 9,454,
+and 26,174 against 9,112 where a tick reads an absolute address. With the
+deferred start in as well, 39,860 against 14,636, and 41,394 against
 14,490.
 
 ## A cut
@@ -915,54 +915,66 @@ several effects; the counted handler drops the level on a tune of one
 effect as well, so a tick under a cut costs the same on either (A
 tick).
 
-A start under a cut and a recut each run a routine of the cut (ymxr_kstart
-and ymxr_recut), which reads the source's shape, its kind and the cut's
-rows, and writes the place, the loop cell and the counter of each column;
-a recut reads the running row as well. A start is counted from the
+A start under a cut and a recut each run a routine of the cut
+(68k/player/cut.S). A source of one column through the identity starts and
+recuts on a separate path (ymxr_kone, and the first path of ymxr_recut),
+which reads the cut's rows and the source's loop row and writes the place,
+the loop cell, the counter and its reload of the counted handler of one
+column. A recut of a source the counted handler already runs writes the
+places, the loop cells, the counter and its reload of that handler, and
+leaves its registers, its page byte and the vector as they are. Every
+other start, and a recut that moves a source of several columns or through
+a transformation to the counted handler, runs the general routine, which
+reads the source's shape and its kind first. A start is counted from the
 effect's start in the frame code to its rate, and a recut from the
 effect's branch on the set bit of its source column to its rate:
 
-| the source | a start under a cut | a recut |
+| the source | a start under a cut | a recut on the counted handler |
 |---|---|---|
-| one column | 1676 to 1776 | 2404 to 2574 |
-| two columns | 2202 to 2212 | 3070 to 3136 |
-| three columns | 2492 | 3320 |
-| one column, through a transformation | 2382 to 2448 | 2962 to 3220 |
+| one column | 824 to 900 | 1106 to 1136 |
+| two columns | 1968 to 1974 | 1650 to 1690 |
+| three columns | 2216 | 1790 |
+| one column, through a transformation | 2138 to 2204 | 1380 |
 
 The ranges are the effect, the source's shape and the cut. The table's
 start puts the place at row F of the cut; a start with the place kept
-reads the running row and its remainder by R as well, 2,024 to 2,058
-cycles on one column and 2,538 on two. A recut on a stopped timer sets the
-kept cut alone, 116 cycles. On the same span a start under cut 0 at row 0
-of a marked source of one column costs 464 cycles.
+reads the running row and its remainder by R as well, 1,190 to 1,210
+cycles on one column and 2,300 on two. A recut that moves a source from
+another handler to the counted handler runs the path of one column through
+the identity on such a source, 1,050 to 1,068 cycles, and the general
+routine on every other, 2,884 cycles on a square through a transformation.
+A recut on a stopped timer sets the kept cut alone, 116 cycles. On the
+same span a start under cut 0 at row 0 of a marked source of one column
+costs 464 cycles.
 
 The routines run inside the play call. Each tune's costliest call, the
 same with the routines of a start or a remap through a transformation
-apart, as R4.5 counts them, and with the routines of a start under a
-cut and of a recut apart as well:
+apart, a start under a cut through a transformation among them, as R4.5
+counts them, and with the routines of every start under a cut and every
+recut apart as well:
 
 | tune | the costliest call | as R4.5 counts it | the cut's routines apart as well |
 |---|---|---|---|
-| a cut past row 0 that excludes the repeat row, its place reset, one after a recut to the whole table, and one of a source of one row under cut 0 | 5678 | 5678 | 2624 |
-| starts at the running row, inside a cut and outside it | 3700 | 3700 | 2192 |
-| a source that plays once under a cut, started again by a select | 3404 | 3404 | 1904 |
-| a square, one row and a counted source under a cut, recut to the whole table | 6610 | 6610 | 3436 |
-| a recut on a stopped timer, read by the start after it | 3470 | 3470 | 1904 |
-| starts under the whole table after a cut, each place reset after | 6566 | 6566 | 3558 |
-| sources of two and three columns under a cut, recut, and a place's reset | 12204 | 12204 | 3790 |
-| starts through a transformation under a cut, remaps under it, and recuts, beside a timer that maps a source under the whole table | 10170 | 8486 | 4052 |
-| recuts on the timers that share a control register | 5766 | 5766 | 2654 |
+| a cut past row 0 that excludes the repeat row, its place reset, one after a recut to the whole table, and one of a source of one row under cut 0 | 3948 | 3948 | 2588 |
+| starts at the running row, inside a cut and outside it | 2866 | 2866 | 2192 |
+| a source that plays once under a cut, started again by a select | 2552 | 2552 | 1920 |
+| a square, one row and a counted source under a cut, recut to the whole table | 4856 | 4856 | 3468 |
+| a recut on a stopped timer, read by the start after it | 2600 | 2600 | 1920 |
+| starts under the whole table after a cut, each place reset after, and recuts of a loop and a square started under it | 5802 | 5802 | 4414 |
+| sources of two and three columns under a cut, recut, and a place's reset | 11218 | 11218 | 3854 |
+| starts through a transformation under a cut, remaps under it, and recuts, beside a timer that maps a source under the whole table | 9682 | 4670 | 4084 |
+| recuts on the timers that share a control register | 4046 | 4046 | 2686 |
 
-Of the nine, two pass R4.5's 6,656, each at its first row, which starts
-four sources, four of them under a cut in one and two in the other. With
-the routines of the cut counted apart as well, every call is within it,
-the costliest at 4,052.
+Of the nine, one passes R4.5's 6,656, at its first row, which starts four
+sources of two and three columns under a cut. With the routines of the
+cut counted apart as well, every call is within it, the costliest at
+4,414.
 
-The cut makes the player with the lookup in 24,036 bytes against 21,966 in
-release 0.15.0, and 25,326 against 23,256 where a tick reads an absolute
-address; with the deferred start in as well, 38,498 against 35,908, and
-40,544 against 37,954. Of the 2,070 bytes it adds to the player as it is,
-1,778 are the cut's blocks, which a link leaves out of the player of a
-song that cuts no source (LINKER.md): 1,322 of routines and 114 of each
-effect's frame code. With the deferred start in, the blocks are 2,246 of
-the 2,590.
+The cut makes the player with the lookup in 24,884 bytes against 21,966 in
+release 0.15.0, and 26,174 against 23,256 where a tick reads an absolute
+address; with the deferred start in as well, 39,860 against 35,908, and
+41,394 against 37,954. Of the 2,918 bytes it adds to the player as it is,
+2,674 are the cut's blocks, which a link leaves out of the player of a
+song that cuts no source (LINKER.md): 2,154 of routines and 130 of each
+effect's frame code. With the deferred start in, the blocks are 3,148 of
+the 3,952.

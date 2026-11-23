@@ -296,12 +296,15 @@ case failed on main until the bump.
   song that cuts general sources. The rig's tunes reach it there for a
   source of one row alone, so a link that leaves `several` out passes
   every check.
-- The routines of a start under a cut and of a recut, 1,676 to 3,320
-  cycles at the frame (performance.md, A cut). R4.5 counts the routines
-  of a start or a remap through a transformation apart and these inside
-  the call, so two of the rig's tunes of cuts pass its 6,656, each at a
-  row that starts four sources. With the cut's routines counted apart as
-  well, every call of those tunes is within it, at 4,052 at most.
+- The routines of a start under a cut and of a recut, 824 to 2,216
+  cycles at the frame for a start and 1,106 to 1,790 for a recut on the
+  counted handler (performance.md, A cut). R4.5 counts the routines of a
+  start or a remap through a transformation apart, a start under a cut
+  through one among them, and every other inside the call, so one of the
+  rig's tunes of cuts passes its 6,656, at a row that starts four
+  sources of two and three columns under a cut. With the cut's routines
+  counted apart as well, every call of those tunes is within it, at
+  4,414 at most.
 
 ## Milestones
 
@@ -334,6 +337,9 @@ case failed on main until the bump.
         version 11
 - [x] performance.md: a tick under a cut and a frame of a recut,
       measured on the rig, and the bytes of the core with the cut in
+- [x] The start and the recut faster: a path for a source of one column
+      through the identity, a recut in the counted handler a source runs,
+      and the operands written in words; performance.md measured again
 - [ ] This document goes, and YMXS's doc/cuts.md ticks its two YMXR
       items
 

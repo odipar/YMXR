@@ -15,6 +15,12 @@
 ; where it keeps an effect's cut piece (doc/LINKER.md).
                 PIECE   cut_1
 
+; A kind's descriptor is KD_SIZE bytes, so a kind times 32 is a shift.
+KD_SHIFT        equ     5
+                .if     KD_SIZE<>(1<<KD_SHIFT)
+                .error  "a kind's descriptor is not 1 << KD_SHIFT bytes"
+                .endif
+
 ; The rows F and L of the running cut of the record a3, or of cut d0 at
 ; ymxr_xrows, in d0 and d1, out of the cut index the bound tune's field
 ; at 28 locates (BINARIES.md 1.2): a word U, then a long first row and a
@@ -74,18 +80,35 @@ ymxr_xpass:     move.l  DT_REPEAT-DT_PAYLOAD(a4),d3     ; RR
 ; and its loop cell at row d5, 0 where d5 is -1, past the column's row 0
 ; in the record a3 (FX_FIRST, FX_FIRST2, FX_FIRST3); the rows left, d1
 ; less d3 plus 1, and the rows of a pass, d6. Under YMXR_PCREL a place
-; and a cell are displacements from the column's read.
-ymxr_xput:      movem.l d0-d2/d4/d6-d7/a1-a2,-(sp)
-                sub.l   d3,d1
-                addq.l  #1,d1
-                move.w  KD_LEFT(a2),d0
-                move.w  d1,(a5,d0.w)            ; the rows left
-                move.w  KD_RELD(a2),d0
-                move.w  d6,(a5,d0.w)            ; the rows of a pass
+; and a cell are displacements from the column's read. d0, d4, d6, d7
+; and a1 clobbered.
+ymxr_xput:      movem.l d2/a2,-(sp)
+                move.l  d1,d0
+                sub.l   d3,d0
+                addq.l  #1,d0
+                move.w  KD_LEFT(a2),d4
+                move.w  d0,(a5,d4.w)            ; the rows left
+                move.w  KD_RELD(a2),d4
+                move.w  d6,(a5,d4.w)            ; the rows of a pass
                 move.w  KD_COLS(a2),d7
                 move.w  KD_CELLS(a2),d4
                 lea     FX_FIRST(a3),a1
 .col:           move.l  (a1)+,d2                ; the column's row 0
+                .if     YMXR_PCREL
+; a displacement is a word: the column's row 0 less its read's address,
+; to which the loop row and the place add
+                move.w  KD_PTR(a2),d0           ; its read
+                sub.w   a5,d2
+                sub.w   d0,d2
+                moveq   #0,d6
+                tst.l   d5
+                bmi.s   .cell                   ; 0 where it plays once
+                move.w  d2,d6
+                add.w   d5,d6                   ; the loop row
+.cell:          move.w  d6,(a5,d4.w)
+                add.w   d3,d2                   ; the place
+                move.w  d2,(a5,d0.w)
+                .else
                 moveq   #0,d0
                 move.w  KD_PTR(a2),d0           ; its read
                 moveq   #0,d6
@@ -93,28 +116,14 @@ ymxr_xput:      movem.l d0-d2/d4/d6-d7/a1-a2,-(sp)
                 bmi.s   .cell                   ; 0 where it plays once
                 move.l  d2,d6
                 add.l   d5,d6                   ; the loop row
-                .if     YMXR_PCREL
-                sub.l   a5,d6
-                sub.l   d0,d6
-                .endif
-.cell:
-                .if     YMXR_PCREL
-                move.w  d6,(a5,d4.w)
-                .else
-                move.l  d6,(a5,d4.w)
-                .endif
+.cell:          move.l  d6,(a5,d4.w)
                 add.l   d3,d2                   ; the place
-                .if     YMXR_PCREL
-                sub.l   a5,d2
-                sub.l   d0,d2
-                move.w  d2,(a5,d0.w)
-                .else
                 move.l  d2,(a5,d0.w)
                 .endif
                 addq.l  #4,a2
                 addq.w  #CELL_SIZE,d4
                 dbra    d7,.col
-                movem.l (sp)+,d0-d2/d4/d6-d7/a1-a2
+                movem.l (sp)+,d2/a2
                 rts
 
 ; The fill kind of the lookup kind d2 on the record's shape d0, d1 the
@@ -169,6 +178,129 @@ ymxr_xpage:     movem.l d1/a4,-(sp)
                 movem.l (sp)+,d1/a4
                 rts
 
+; The operands of the counted kind of one column under a cut, at level
+; 7, as ymxr_xput writes them: in the instance a5, the place at row d0
+; and the loop cell at row d3, 0 where d3 is -1, past row 0 at a4; the
+; rows left, L in d1 less d0 plus 1; and the rows of a pass, L + 1 less
+; d3, and 1 where d3 is -1. d1 and d4 clobbered.
+                .macro  KPUT1
+                move.l  d1,d4
+                sub.l   d3,d4
+                addq.l  #1,d4                   ; the rows of a pass
+                tst.l   d3
+                bpl.s   .pass\~
+                moveq   #1,d4
+.pass\~:        move.w  d4,TICKC_RELD(a5)
+                sub.l   d0,d1
+                addq.l  #1,d1
+                move.w  d1,TICKC_LEFT(a5)       ; the rows left
+                move.l  a4,d1
+                add.l   d0,d1                   ; the place
+                .if     YMXR_PCREL
+                sub.l   a5,d1
+                sub.w   #TICKC_PTR,d1
+                move.w  d1,TICKC_PTR(a5)
+                .else
+                move.l  d1,TICKC_PTR(a5)
+                .endif
+                moveq   #0,d1                   ; the loop cell, 0 where the
+                tst.l   d3                      ; source plays once
+                bmi.s   .cell\~
+                move.l  a4,d1
+                add.l   d3,d1
+                .if     YMXR_PCREL
+                sub.l   a5,d1
+                sub.w   #TICKC_PTR,d1
+                .endif
+.cell\~:
+                .if     YMXR_PCREL
+                move.w  d1,TICKC_CELL(a5)
+                .else
+                move.l  d1,TICKC_CELL(a5)
+                .endif
+                .endm
+
+; The rows F and L of the running cut of the record a3 in d0 and d1, out
+; of the cut index, a2 clobbered (ymxr_xcut).
+                .macro  XROWS
+                moveq   #0,d0
+                move.b  FX_CRUN(a3),d0
+                movea.l WS_TUNE(a0),a2
+                adda.l  TF_CUTS(a2),a2
+                lsl.w   #3,d0
+                move.l  -2(a2,d0.w),d1          ; L
+                move.l  -6(a2,d0.w),d0          ; F
+                .endm
+
+; The loop row of the cut F to L, d0 and d1, of the source whose row 0 is
+; at a2, in d3, -1 where the source plays once (ymxr_xpass).
+                .macro  XLOOP
+                move.l  DT_REPEAT-DT_PAYLOAD(a2),d3     ; RR
+                cmp.l   DT_ROWS-DT_PAYLOAD(a2),d3
+                beq.s   .once\~
+                cmp.l   d0,d3
+                bcs.s   .first\~
+                cmp.l   d1,d3
+                bls.s   .loop\~
+.first\~:       move.l  d0,d3
+                bra.s   .loop\~
+.once\~:        moveq   #-1,d3
+.loop\~:
+                .endm
+
+; A start under a cut 1 to 127 at the frame, from the effect's frame code
+; (_xcut): a3 the record, a5 the effect's counted instance of one column
+; in bank 0, d1 the source, d2 the control byte and d4 the effect, with
+; the running cut and the running mapping in the record. A source of one
+; column through the identity runs that instance, aimed here; every other
+; source starts in ymxr_kstartr. The place is row F where the row sets bit
+; 5, and otherwise the running row modulo R, row F where that row is
+; outside the cut. Returns a5 the handler, a3 the record and a2 at the
+; chip's select register; clobbers d0, d1, d3 to d5 and a4.
+ymxr_kone:      tst.b   FX_RUN(a3)
+                bne.w   ymxr_kstartr            ; through the mapping
+                move.w  d1,d0
+                lsl.w   #3,d0
+                move.l  WS_SOURCES-4(a0,d0.w),d3    ; the cell, or the tag
+                moveq   #7,d5                   ; marked: a cell, a square,
+                cmp.l   #-2,d3                  ; -1, or one row, -2
+                bge.s   .one
+                moveq   #4,d5                   ; counted, of one column
+                cmp.l   #-5,d3
+                bne.w   ymxr_kstartr            ; several columns
+.one:           movea.l WS_SOURCES-8(a0,d0.w),a4    ; its first row
+                XROWS
+                movea.l a4,a2
+                XLOOP
+                lea     ymxr_timers(pc),a2
+                lsl.w   #3,d4
+                movea.w (a2,d4.w),a2            ; the vector's address
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                btst    #5,d2
+                bne.s   .placed                 ; row F
+                movem.l d0-d1/d3/d5/a2,-(sp)
+                bsr     ymxr_runrow             ; the running row
+                move.l  DT_ROWS-DT_PAYLOAD(a4),d4
+                bsr     ymxr_rem                ; modulo R
+                move.l  d3,d4
+                movem.l (sp)+,d0-d1/d3/d5/a2
+                cmp.l   d0,d4
+                bcs.s   .placed                 ; outside the cut: row F
+                cmp.l   d1,d4
+                bhi.s   .placed
+                move.l  d4,d0
+.placed:        move.b  FX_TARGET(a3),TICKC_SEL(a5)
+                KPUT1
+                move.l  a5,(a2)                 ; the vector
+                move.w  (sp)+,sr
+                move.l  a4,FX_FIRST(a3)
+                move.l  DT_ROWS-DT_PAYLOAD(a4),FX_ROWS(a3)
+                move.b  d5,FX_SHAPE(a3)
+                sf      FX_LOK(a3)
+                lea     YM_SELECT.w,a2
+                rts
+
 ; A start under a cut 1 to 127 (SPEC.md 4.3 step 3): the counted kind of
 ; the source's columns, through the identity or through the mapping,
 ; aimed at the cut's rows with the kept target. Its place is row F of the
@@ -188,12 +320,13 @@ XS_KIND         equ     -4                      ; the kind, in ymxr_kinds
 XS_STRIDE       equ     -6                      ; the stride of the columns
 XS_PAGE         equ     -8                      ; the page byte
 XS_VECTOR       equ     -10                     ; the vector's address
-ymxr_kstart:    movem.l d2/d6-d7/a1/a6,-(sp)
+ymxr_kstart:    move.w  d4,d0
+                mulu    #FX_SIZE,d0
+                lea     WS_FX(a0),a3
+                adda.w  d0,a3                   ; its record
+ymxr_kstartr:   movem.l d2/d6-d7/a1/a6,-(sp)    ; with the record in a3
                 link    a6,#-10
                 move.w  d4,d6                   ; the effect
-                mulu    #FX_SIZE,d4
-                lea     WS_FX(a0),a3
-                adda.w  d4,a3                   ; its record
                 lea     ymxr_timers(pc),a2
                 move.w  d6,d0
                 lsl.w   #3,d0
@@ -256,7 +389,7 @@ ymxr_kstart:    movem.l d2/d6-d7/a1/a6,-(sp)
 .lookup:        dc.b    1,6,8,0                 ; lc, le, lg
 .kind:          move.w  d5,XS_KIND(a6)
                 move.w  d5,d0
-                mulu    #KD_SIZE,d0
+                lsl.w   #KD_SHIFT,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2                   ; its descriptor
                 move.w  d6,d0
@@ -294,10 +427,26 @@ ymxr_kstart:    movem.l d2/d6-d7/a1/a6,-(sp)
                 move.b  FX_CUT(a3),d0
 .cut:
                 .endif
-                bsr     ymxr_xrows              ; F and L
-                bsr     ymxr_xpass              ; the loop row and a pass
-                move.l  d3,d5
-                move.w  sr,-(sp)
+                movea.l WS_TUNE(a0),a1          ; F and L (ymxr_xrows)
+                adda.l  TF_CUTS(a1),a1
+                lsl.w   #3,d0
+                move.l  -2(a1,d0.w),d1
+                move.l  -6(a1,d0.w),d0
+                move.l  DT_REPEAT-DT_PAYLOAD(a4),d5 ; the loop row and a
+                cmp.l   DT_ROWS-DT_PAYLOAD(a4),d5   ; pass (ymxr_xpass)
+                beq.s   .xonce
+                cmp.l   d0,d5
+                bcs.s   .xfirst
+                cmp.l   d1,d5
+                bls.s   .xrow
+.xfirst:        move.l  d0,d5
+.xrow:          move.l  d1,d6
+                addq.l  #1,d6
+                sub.l   d5,d6
+                bra.s   .xpass
+.xonce:         moveq   #-1,d5
+                moveq   #1,d6
+.xpass:         move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 move.l  d0,d3                   ; row F where the row resets
                 .if     YMXR_DEFER              ; the place, or the arming's
@@ -338,9 +487,15 @@ ymxr_kstart:    movem.l d2/d6-d7/a1/a6,-(sp)
 .col:           move.w  KD_SEL(a2,d2.w),d0
                 move.b  (a1)+,(a5,d0.w)         ; the register
                 moveq   #0,d0
-                move.b  (a1)+,d0                ; the column it writes
-                mulu    XS_STRIDE(a6),d0        ; by the stride
-                add.l   a4,d0
+                move.b  (a1)+,d0                ; the column it writes, 0 to
+                beq.s   .c0                     ; 2, by the stride
+                moveq   #0,d4
+                move.w  XS_STRIDE(a6),d4
+                subq.b  #1,d0
+                beq.s   .c1
+                add.l   d4,d4
+.c1:            move.l  d4,d0
+.c0:            add.l   a4,d0
                 move.l  d0,FX_FIRST(a3,d2.w)
                 addq.w  #4,d2
                 dbra    d7,.col
@@ -382,8 +537,14 @@ ymxr_kstart:    movem.l d2/d6-d7/a1/a6,-(sp)
 ; With a start pending after the record's settling (ymxr_pend) the recut
 ; is at level 7 to the vector's write, a page's fill among it, so the
 ; switch is before the recut or after it, and the hook (ymxr_rehook) and
-; the armed place (ymxr_xplace) follow the new cut. d4 the effect.
-; Clobbers d0, d1, d4, d5 and a3 to a5.
+; the armed place (ymxr_xplace) follow the new cut. From the effect's
+; frame code (_xunset): a3 the record, a5 the effect's counted instance
+; of one column in bank 0, and d4 the effect. A source of one column
+; through the identity with no start pending moves to that instance here,
+; in bank 0 as a start at the frame does, since the second bank has no
+; armed handler; a source the counted kind already runs is recut in its
+; handler (.within); and every other below (.general). Clobbers d0, d1,
+; d4, d5, a4 and a5; returns a2 at the chip's select register.
 XR_EFFECT       equ     -2                      ; the effect
 XR_VECTOR       equ     -4                      ; its vector's address
 XR_OLD          equ     -5                      ; the running shape
@@ -392,13 +553,142 @@ XR_KIND         equ     -8                      ; the counted kind
 XR_RUNNING      equ     -10                     ; the running kind, or -1
 XR_PAGE         equ     -12                     ; the page byte
 XR_BANK         equ     -14                     ; the running bank, 0 or 1
-ymxr_recut:     movem.l d2-d3/d6-d7/a1-a2/a6,-(sp)
+ymxr_recut:     lea     ymxr_park(pc),a4
+                cmpa.l  FX_FIRST(a3),a4
+                beq.w   .none                   ; no source to cut yet
+                .if     YMXR_DEFER
+                tst.b   FX_PENDING(a3)
+                bne.w   .general                ; a start pending
+                .endif
+                move.b  FX_CRUN(a3),d0
+                or.b    FX_CUT(a3),d0
+                beq.w   .none                   ; cut 0 to cut 0
+                move.b  FX_SHAPE(a3),d5
+                tst.b   FX_RUN(a3)
+                bne.s   .fkind                  ; through the mapping
+                tst.b   d5                      ; one column: the general
+                beq.s   .fone                   ; handler, a square, one
+                bmi.s   .fone                   ; row, and the counted kind
+                cmp.b   #1,d5                   ; of one column, marked or
+                beq.s   .fone                   ; counted
+                cmp.b   #7,d5
+                beq.s   .fone
+                cmp.b   #4,d5
+                beq.s   .fone
+.fkind:         cmp.b   #4,d5                   ; a counted kind, shape 4 to
+                blt.w   .general                ; 9, already: .within; a
+                                                ; square is -1
+                bra.w   .within
+.fone:          move.l  d3,-(sp)
+                move.b  FX_CUT(a3),FX_CRUN(a3)  ; the kept cut runs
+                lea     ymxr_timers(pc),a4
+                lsl.w   #3,d4
+                move.w  (a4,d4.w),d4            ; the vector's address
+                movea.w d4,a4
+                movea.l (a4),a4                 ; the running handler
+                XROWS
+                movea.l FX_FIRST(a3),a2         ; row 0
+                move.l  DT_ROWS-DT_PAYLOAD(a2),FX_ROWS(a3)
+                XLOOP
+                move.w  d4,-(sp)                ; the vector's address
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+; the running row and register: a square's by bit 7 of its immediate, a
+; source of one row's 0, and every other's at TICK_PTR and TICK_SEL
+                moveq   #0,d4
+                tst.b   d5
+                beq.s   .fsteps
+                bmi.s   .fsquare
+                cmp.b   #1,d5
+                bne.s   .fsteps
+                move.b  ONE_SEL(a4),TICKC_SEL(a5)
+                bra.s   .frow
+.fsquare:       move.b  SQ_SEL(a4),TICKC_SEL(a5)
+                tst.b   SQ_VAL(a4)
+                bpl.s   .frow
+                moveq   #1,d4
+                bra.s   .frow
+.fsteps:        move.b  TICK_SEL(a4),TICKC_SEL(a5)
+                .if     YMXR_PCREL
+                move.w  TICK_PTR(a4),d4
+                lea     TICK_PTR(a4,d4.w),a4
+                move.l  a4,d4
+                .else
+                move.l  TICK_PTR(a4),d4
+                .endif
+                sub.l   FX_FIRST(a3),d4         ; its row number
+.frow:          cmp.l   d0,d4                   ; the place: the running
+                bcs.s   .fplaced                ; row where the cut includes
+                cmp.l   d1,d4                   ; it, and row F where it
+                bhi.s   .fplaced                ; excludes it
+                move.l  d4,d0
+.fplaced:       movea.l FX_FIRST(a3),a4         ; row 0
+                KPUT1
+                movea.w 2(sp),a2
+                move.l  a5,(a2)                 ; the vector
+                move.w  (sp)+,sr
+                addq.l  #2,sp
+                cmp.b   #4,d5                   ; a counted source's shape,
+                beq.s   .fshape                 ; and a marked one's 7
+                moveq   #7,d5
+.fshape:        move.b  d5,FX_SHAPE(a3)
+                sf      FX_LOK(a3)
+                move.l  (sp)+,d3
+                lea     YM_SELECT.w,a2
+.none:          rts
+; A recut of a source the counted kind already runs, shape 4 to 9: the
+; counted kind of its columns is the running handler, so the recut writes
+; its places, loop cells and counters (ymxr_xput) and leaves its
+; registers, its page byte, the vector and the cache as they are.
+.within:        movem.l d3/d6-d7/a1,-(sp)
+                move.b  FX_CUT(a3),FX_CRUN(a3)  ; the kept cut runs
+                lea     ymxr_timers(pc),a4
+                lsl.w   #3,d4
+                movea.w (a4,d4.w),a4
+                movea.l (a4),a5                 ; the running handler
+                bsr     ymxr_kindof             ; d0 the lookup kind, d1 the
+                tst.b   FX_RUN(a3)              ; identity's
+                bne.s   .wkind
+                move.w  d1,d0
+.wkind:         move.w  d0,d4
+                bsr     ymxr_xhead              ; the running source
+                XROWS
+                movea.l a4,a2
+                XLOOP
+                move.l  d3,d5                   ; the loop row
+                move.l  d1,d6
+                sub.l   d3,d6
+                addq.l  #1,d6                   ; the rows of a pass
+                tst.l   d3
+                bpl.s   .wpass
+                moveq   #1,d6
+.wpass:         lsl.w   #KD_SHIFT,d4
+                lea     ymxr_kinds(pc),a2
+                adda.w  d4,a2                   ; the descriptor
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                .if     YMXR_PCREL              ; the running row, at the
+                move.w  TICK_PTR(a5),d3         ; first column's place
+                lea     TICK_PTR(a5,d3.w),a4
+                move.l  a4,d3
+                .else
+                move.l  TICK_PTR(a5),d3
+                .endif
+                sub.l   FX_FIRST(a3),d3
+                cmp.l   d0,d3                   ; the place: the running
+                bcs.s   .wout                   ; row where the cut includes
+                cmp.l   d1,d3                   ; it, and row F where it
+                bls.s   .wput                   ; excludes it
+.wout:          move.l  d0,d3
+.wput:          bsr     ymxr_xput
+                move.w  (sp)+,sr
+                movem.l (sp)+,d3/d6-d7/a1
+                lea     YM_SELECT.w,a2
+                rts
+.general:       movem.l d2-d3/d6-d7/a1-a2/a6,-(sp)
                 move.w  sr,-(sp)
                 link    a6,#-14
                 move.w  d4,XR_EFFECT(a6)
-                mulu    #FX_SIZE,d4
-                lea     WS_FX(a0),a3
-                adda.w  d4,a3                   ; its record
                 lea     ymxr_park(pc),a4
                 cmpa.l  FX_FIRST(a3),a4
                 beq.w   .kept
@@ -463,7 +753,7 @@ ymxr_recut:     movem.l d2-d3/d6-d7/a1-a2/a6,-(sp)
                 move.w  d1,d0
 .k0l:           move.w  d0,XR_RUNNING(a6)
 .k0:            move.w  XR_KIND(a6),d0
-                mulu    #KD_SIZE,d0
+                lsl.w   #KD_SHIFT,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2                   ; the descriptor
                 move.w  XR_EFFECT(a6),d0
@@ -527,7 +817,7 @@ ymxr_recut:     movem.l d2-d3/d6-d7/a1-a2/a6,-(sp)
                 move.b  d7,TICK_SEL(a5)
                 bra.s   .put
 .several:       move.w  XR_RUNNING(a6),d0
-                mulu    #KD_SIZE,d0
+                lsl.w   #KD_SHIFT,d0
                 lea     ymxr_kinds(pc),a1
                 adda.w  d0,a1                   ; the running kind's
                 moveq   #0,d2                   ; four bytes a column
@@ -614,7 +904,7 @@ ymxr_xplace:    btst    #7,FX_ACUT(a3)
                 bne.s   .kind
                 move.w  d1,d0
 .kind:          movem.l (sp)+,d1/a3
-                mulu    #KD_SIZE,d0
+                lsl.w   #KD_SHIFT,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
                 move.w  KD_LEFT(a2),d5
@@ -645,15 +935,41 @@ ymxr_xplace:    btst    #7,FX_ACUT(a3)
 ; The place's reset in a tune that cuts a source (SPEC.md 4.3 step 6):
 ; under a cut 1 to 127, the place in every column at row F of the running
 ; cut and L - F + 1 rows left, through the kind of the running handler;
-; under cut 0, ymxr_widereset's. d3 the effect; clobbers d0 to d5, a3 and
-; a5.
-ymxr_xreset:    move.w  d3,d4
-                mulu    #FX_SIZE,d4
-                lea     WS_FX(a0),a3
-                adda.w  d4,a3                   ; the effect's record
-                tst.b   FX_CRUN(a3)
+; under cut 0, ymxr_widereset's. a3 the record and d3 the effect;
+; clobbers d0 to d5, a3 and a5.
+ymxr_xreset:    tst.b   FX_CRUN(a3)
                 beq.w   ymxr_widereset
-                movem.l d6-d7/a1-a2,-(sp)
+                tst.b   FX_RUN(a3)              ; the counted kind of one
+                bne.s   .kinds                  ; column through the
+                move.b  FX_SHAPE(a3),d0         ; identity, marked or
+                cmp.b   #7,d0                   ; counted
+                beq.s   .one
+                cmp.b   #4,d0
+                bne.s   .kinds
+.one:           XROWS
+                sub.l   d0,d1
+                addq.l  #1,d1                   ; L - F + 1 rows left
+                add.l   FX_FIRST(a3),d0         ; row F
+                lea     ymxr_timers(pc),a5
+                lsl.w   #3,d3
+                movea.w (a5,d3.w),a5
+                movea.l (a5),a5                 ; the running handler
+                .if     YMXR_PCREL
+                sub.l   a5,d0
+                sub.w   #TICKC_PTR,d0
+                .endif
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                .if     YMXR_PCREL
+                move.w  d0,TICKC_PTR(a5)
+                .else
+                move.l  d0,TICKC_PTR(a5)
+                .endif
+                move.w  d1,TICKC_LEFT(a5)
+                move.w  (sp)+,sr
+                lea     YM_SELECT.w,a2
+                rts
+.kinds:         movem.l d6-d7/a1-a2,-(sp)
                 bsr.w   ymxr_xcut               ; F and L
                 move.l  d0,d6                   ; row F
                 move.l  d1,d7
@@ -667,7 +983,7 @@ ymxr_xreset:    move.w  d3,d4
                 tst.b   FX_RUN(a3)              ; identity's
                 bne.s   .kind
                 move.w  d1,d0
-.kind:          mulu    #KD_SIZE,d0
+.kind:          lsl.w   #KD_SHIFT,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
                 move.w  KD_LEFT(a2),d5

@@ -33,6 +33,26 @@
                 .endif
                 .endm
 
+; a5 the counted instance of one column of the effect whose record is at
+; fx, in bank 0: EFFECT has rmac's twenty arguments, so the record's
+; offset picks the instance.
+                .if     YMXR_MAP
+                .macro  CNTOF   fx
+                .if     (\fx-WS_FX)/FX_SIZE=0
+                lea     ymxr_cnt0(pc),a5
+                .endif
+                .if     (\fx-WS_FX)/FX_SIZE=1
+                lea     ymxr_cnt1(pc),a5
+                .endif
+                .if     (\fx-WS_FX)/FX_SIZE=2
+                lea     ymxr_cnt2(pc),a5
+                .endif
+                .if     (\fx-WS_FX)/FX_SIZE=3
+                lea     ymxr_cnt3(pc),a5
+                .endif
+                .endm
+                .endif
+
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset. Its
 ; frame code is pieces: the head, \{eff}_1, up to the branch that tells
@@ -303,20 +323,24 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  d3,d0
 .xrun\~:        and.b   #255-\keep,d0
                 beq.w   \{tick}_remapck
-                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                lea     \fx(a0),a3             ; the record, and the
+                CNTOF   \fx                    ; counted instance of one
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4    ; column in bank 0
                 bsr.w   ymxr_recut
                 bra.w   \{tick}_remapck
 ; A start under a cut 1 to 127: the mapping column, then the counted
 ; kind of the source's columns, through the identity or the mapping
-; (ymxr_kstart).
+; (ymxr_kone).
 \{tick}_xcut:   RREAD   \cm                     ; the mapping column
                 bpl.s   .xmap\~
                 and.b   #$7F,d1
                 move.b  d1,\fx+FX_MAP(a0)
-.xmap\~:        move.b  \fx+FX_MAP(a0),\fx+FX_RUN(a0)
-                move.w  d3,d1
+.xmap\~:        lea     \fx(a0),a3             ; the record
+                move.b  FX_MAP(a3),FX_RUN(a3)
+                CNTOF   \fx                    ; the counted instance of
+                move.w  d3,d1                   ; one column in bank 0
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                bsr.w   ymxr_kstart
+                bsr.w   ymxr_kone
                 bclr    #5,d2
                 bra.w   \{tick}_rate
                 .if     YMXR_DEFER
@@ -608,7 +632,8 @@ q\{ct}:         bra.w   \{tick}_done
                 .if     YMXR_MAP
 ; The place's reset in a tune that cuts a source, through the running
 ; cut (ymxr_xreset).
-\{tick}_xrow:   moveq   #(\fx-WS_FX)/FX_SIZE,d3
+\{tick}_xrow:   lea     \fx(a0),a3             ; the record
+                moveq   #(\fx-WS_FX)/FX_SIZE,d3
                 bsr.w   ymxr_xreset
                 bra.s   \{tick}_done
                 .endif
