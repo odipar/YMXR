@@ -545,13 +545,15 @@ LAST_VALUE.update({14: 1, 15: 1, 16: 1, 17: 2, 18: 2, 19: 2, 20: 1, 21: 2,
                    22: 1, 23: 1, 24: 1})
 
 
-def assemble(source="YMXR.S", defines=()):
-    """The bytes a source under 68k/ assembles to, and its symbols: the
-    player's, or the SNDH core's, which includes the player."""
+def assemble(source="YMXR.S", defines=(), sources=None):
+    """The bytes a source under 68k/, or under the folder sources names,
+    assembles to, and its symbols: the player's, or the SNDH core's, which
+    includes the player."""
     work = tempfile.mkdtemp()
     out, lst = os.path.join(work, "code.bin"), os.path.join(work, "code.lst")
-    r = spawned([RMAC, "-m68000", "-fr", "-l*" + lst, "-i" + os.path.join(ROOT, "68k")]
-                       + list(defines) + ["-o", out, os.path.join(ROOT, "68k", source)],
+    sources = sources or os.path.join(ROOT, "68k")
+    r = spawned([RMAC, "-m68000", "-fr", "-l*" + lst, "-i" + sources]
+                       + list(defines) + ["-o", out, os.path.join(sources, source)],
                        capture_output=True)
     assert r.returncode == 0, r.stdout.decode() + r.stderr.decode()
     symbols = Symbols()
@@ -602,7 +604,7 @@ MOST_FRAMES = None
 # sets of subtunes, and one each of the functions below.
 CHECKS = ("cores", "sets", "unplaced", "deferred", "cutting", "mapped", "fallbacks",
           "deferred_sizes", "mapped_sizes", "absolute_sizes", "halves", "voices", "widekept",
-          "envelope", "wholebyte", "outofreach")
+          "envelope", "wholebyte", "outofreach", "sizes")
 
 
 def spread(most):
@@ -3208,6 +3210,81 @@ def outofreach(code, symbols):
     assert m.call("init", a0=far, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
         "init took a tune %d bytes from the handlers" % (far - CODE)
     return "a tune %d bytes off: init reports -1" % (far - CODE)
+
+
+# The patches of 68k/test/sizes, each applied on the ones before it: the
+# pieces a song with no effect leaves out, and one copy of the frame's
+# steps 6 and 7 (sizes.md). The check of sizes counts this many frames of
+# each dump.
+SIZES_PATCHES = ("pieces.patch", "one-copy.patch")
+SIZES_FRAMES = 1000
+
+
+def patched(names):
+    """The player assembled from a copy of 68k/ with the patches of
+    68k/test/sizes named applied in order, and its symbols. The copy is in
+    a folder of a short path: rmac stops on an include path past about 130
+    characters."""
+    work = tempfile.mkdtemp(prefix="ymxr", dir="/tmp" if os.path.isdir("/tmp") else None)
+    shutil.copytree(os.path.join(ROOT, "68k"), os.path.join(work, "68k"),
+                    ignore=shutil.ignore_patterns("test"))
+    for name in names:
+        r = spawned(["patch", "-s", "-p1", "-d", work, "-i",
+                     os.path.join(ROOT, "68k", "test", "sizes", name)], capture_output=True)
+        assert r.returncode == 0, "%s does not apply: %s" % (name, r.stdout.decode()
+                                                            + r.stderr.decode())
+    return assemble("YMXR.S", DEFINES, os.path.join(work, "68k"))
+
+
+def sizes(code, symbols):
+    """sizes.md's cycles: every call and every tick of the eleven dumps
+    of ym/test over their first SIZES_FRAMES frames, counted with DTX's
+    cycle counter on the player assembled as it is and with each patch of
+    68k/test/sizes. The pieces leave every call and every tick as it is,
+    and one copy of steps 6 and 7 moves the calls by the figures the
+    section on a few cycles more reads; the ticks stay as they are."""
+    global MOST_FRAMES
+    assert not DEFINES, "the check of sizes counts the player as it is, with no switch"
+    sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))
+    import test_dtx
+    with_movep(test_dtx)
+    players = [(code, symbols)] + [patched(SIZES_PATCHES[:n + 1])
+                                   for n in range(len(SIZES_PATCHES))]
+    dumps = sorted(os.path.join(ROOT, "ym", "test", f)
+                   for f in os.listdir(os.path.join(ROOT, "ym", "test")) if f.endswith(".ym"))
+    most, MOST_FRAMES = MOST_FRAMES, SIZES_FRAMES
+    try:
+        counted = [[check(ym, one, named, CyclesOn(test_dtx))[2:5] for ym in dumps]
+                   for one, named in players]
+    finally:
+        MOST_FRAMES = most
+    now, pieces, copy_ = counted
+    for ym, a, b in zip(dumps, now, pieces):
+        assert a == b, "%s: a call or a tick on the player with the pieces costs other" \
+            " cycles than on the player as it is" % os.path.basename(ym)
+    means, calls, ticks = [], [], []
+    for a, b in zip(pieces, copy_):
+        more = [y - x for x, y in zip(a[0], b[0])]
+        means.append(sum(more) / len(more))
+        calls.extend(more)
+        ticks.append(a[1:] == b[1:])
+    assert all(ticks), "one copy of steps 6 and 7 moves a tick"
+    tools = " ".join(open(os.path.join(ROOT, "doc", "tools.md")).read().split())
+    assert "the eleven dumps of `ym/test` over %s frames each" % "{:,}".format(SIZES_FRAMES) \
+        in tools, "tools.md reads another count of frames for the check of sizes"
+    text = open(os.path.join(ROOT, "doc", "sizes.md")).read()
+    said = " ".join(text.split())
+    want = ("Over the first %s frames of each of the eleven dumps, the rig counts every call"
+            " and every tick on the player assembled with the pieces at the cycles of the"
+            " player as it is." % "{:,}".format(SIZES_FRAMES))
+    assert want in said, "sizes.md does not read: " + want
+    want = ("Over the same frames the average call of a dump costs %d to %d cycles more and a"
+            " single call %d fewer to %d more, and every tick costs what it costs today."
+            % (round(min(means)), round(max(means)), -min(calls), max(calls)))
+    assert want in said, "sizes.md does not read: " + want
+    return ("the pieces: %d dumps, every call and tick as it is; one copy of steps 6 and 7:"
+            " a call %d to %d more on average, %+d to %+d, the ticks as they are"
+            % (len(dumps), round(min(means)), round(max(means)), min(calls), max(calls)))
 
 
 def wholebyte(code, symbols):
@@ -7506,8 +7583,12 @@ def main():
                           ("widekept", lambda: widekept(code, symbols)),
                           ("envelope", lambda: envelope(code, symbols)),
                           ("wholebyte", lambda: wholebyte(code, symbols)),
-                          ("outofreach", lambda: outofreach(code, symbols))):
-            if wanted(name) and (PCREL or name != "outofreach"):
+                          ("outofreach", lambda: outofreach(code, symbols)),
+                          ("sizes", lambda: sizes(code, symbols))):
+            # the check of sizes counts cycles over 33 runs, so a run makes it
+            # where -only names it
+            if wanted(name) and (PCREL or name != "outofreach") \
+                    and (name != "sizes" or only is not None):
                 print("    %s" % run())
     if only is not None:
         print("%d %s whole: %s" % (len(only), "check runs" if len(only) == 1
