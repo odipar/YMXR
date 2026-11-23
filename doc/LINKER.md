@@ -45,8 +45,8 @@ player and of the player with the lookup in:
 | the tables of the instances of the general handler, the square and the one-row source | | 24 |
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
 | the lookup's routines | | 3,458 |
-| the cut's routines | | 2,140 |
-| the lookup instances and the gaps before them, ten kinds | | 6,810 |
+| the cut's routines | | 2,174 |
+| the lookup instances and the gaps before them, ten kinds | | 6,776 |
 | the player | 9,454 | 24,884 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
@@ -384,8 +384,8 @@ and the deferred start in, of 40,568 bytes.
 | `chambers.ymxr` | plain | none | 2,752 |
 | `circus.ymxr` | plain | none | 2,752 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,868 |
-| `cut.ymxr` | the lookup | counted, counted0, several, effect0, map0, cut, cut0 | 11,302 |
-| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, several, effect0, effect2, map0, defer0, cut, cut0, align | 14,592 |
+| `cut.ymxr` | the lookup | counted, counted0, several, effect0, map0, cut, cut0 | 11,336 |
+| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, several, effect0, effect2, map0, defer0, cut, cut0, align | 14,626 |
 | `deferred.ymxr` | the deferred start | effect0, effect3, defer0, defer3 | 5,222 |
 | `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0 | 4,882 |
 | `envelope.ymxr` | plain | two, two0, several, effect0 | 4,838 |
@@ -405,8 +405,8 @@ of the core: the blocks are 7,392 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
 start of several columns, and links 6,828. `mapped.ymxr` keeps 4 lookup
 instances of 3 kinds and links 15,528 bytes of 40,568: the 36 instances
-and the 7 loops of init it leaves out are 14,302 bytes, and the gaps it
-keeps are 728 bytes shorter than in the core.
+and the 7 loops of init it leaves out are 14,234 bytes, and the gaps it
+keeps are 762 bytes shorter than in the core.
 
 ## The check
 

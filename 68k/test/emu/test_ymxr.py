@@ -905,11 +905,16 @@ class Model:
             # row where the cut excludes it. A stopped timer keeps its
             # running cut and its place; a pending start keeps the cut of
             # its row (SPEC.md 4.3.2). The player aims its counted
-            # handler at any cut but a recut from cut 0 to cut 0, which
-            # leaves the handler as it is (68k/player/cut.S, ymxr_recut).
+            # handler at any cut but a recut from cut 0 to cut 0, and
+            # but the square's handler and the one-row source's under
+            # their whole table with no start pending, each of which it
+            # leaves as it is (68k/player/cut.S, ymxr_recut).
             fx["cut"] = x & 0x7F
             if fx["running"]:
-                if fx["crun"] or fx["cut"]:
+                whole = fx["pending"] is None and (
+                    self.onerow(i) or self.square(i)
+                    and self.rows_of(fx["cut"], 2) == (0, 1))
+                if (fx["crun"] or fx["cut"]) and not whole:
                     fx["counting"] = True
                 fx["crun"] = fx["cut"]
                 F, L = self.rows_of(fx["crun"], tune.sources[fx["source"]][1])
@@ -1971,10 +1976,12 @@ def cut_cases():
     start at the running row, inside a cut and outside it; a source that
     plays once, stopped at the cut's last row and started again at that row
     by a select; a square, a source of one row and a counted source under a
-    cut, recut to the whole table and back; a recut on a stopped timer, read
+    cut, recut to the whole table and back, and a place's reset of the
+    source of one row after its recut; a recut on a stopped timer, read
     by the start after it; starts under the whole table after a cut, and a
     place's reset after each, and recuts of a loop and a square started
-    under the whole table; deferred starts under a cut, at L + 1 of the
+    under the whole table, the square's to its two rows and then to one;
+    deferred starts under a cut, at L + 1 of the
     running cut and at the cut's first row, with a recut between them on
     the handler the first switched to, and between a cut and the whole
     table; recuts while a start is pending, of the general handler and of a
@@ -2033,7 +2040,8 @@ def cut_cases():
          [square, held, counted],
          {"A": {0: start(1, (1, 1)), 3: recut(0, 1), 6: recut(0, 0), 9: recut(1, 1)},
           "B": {0: start(3, (2, 4), target=11), 4: recut(0, 4), 8: recut(1, 3)},
-          "D": {0: start(2, (0, 0), target=9), 5: recut(0, 0)}}),
+          "D": {0: start(2, (0, 0), target=9), 5: recut(0, 0),
+                8: ("retune", 200, 200, 0, 1)}}),
         ("a recut on a stopped timer, read by the start after it", [loop, six],
          {"A": {0: start(1, (2, 5)), 3: ("stop",), 5: recut(1, 3), 7: start(2, (1, 3)),
                 10: start(1, (4, 7), pr=0)}}, "warned"),
@@ -2041,7 +2049,7 @@ def cut_cases():
          " loop and a square started under it", [loop, held, counted, square],
          {"A": {0: start(1, (3, 6)), 4: start(1), 6: ("retune", 200, 200, 0, 1),
                 15: recut(2, 5)},
-          "C": {0: start(4, target=10), 5: recut(0, 1)},
+          "C": {0: start(4, target=10), 5: recut(0, 1), 9: recut(1, 1)},
           "B": {0: start(3, (2, 4), target=11), 4: start(3, target=11),
                 7: ("retune", 200, 200, 0, 1)},
           "D": {0: start(2, (0, 0), target=9), 3: start(2, target=9),
@@ -3382,8 +3390,10 @@ def cut_events(model, before, row):
     records before it (before) and the model after it, as (effect,
     operation, shape): "recut" on a running timer whose source the counted
     handler runs, "recut, moved" on one whose source another handler runs,
-    which the recut moves to the counted handler, and "recut, stopped" on
-    a stopped timer, the shape the source's; and "start under a cut" or
+    which the recut moves to the counted handler, "recut, kept" on one
+    whose square's or one-row source's handler the recut leaves running,
+    and "recut, stopped" on a stopped timer, the shape the source's; and
+    "start under a cut" or
     "start under cut 0" at the frame, ", the place kept" where bit 5 is
     clear, the shape the started source's (SPEC.md 4.3.2): cut_shape's,
     "mapped " before it where a transformation runs the source after the
@@ -3406,7 +3416,8 @@ def cut_events(model, before, row):
             what = "recut, stopped"
             if was["running"] and was["source"]:
                 counted = was["counting"] or tune.counted[was["source"]]
-                what = "recut" if counted else "recut, moved"
+                what = "recut" if counted else "recut, kept" if not fx["counting"] \
+                    else "recut, moved"
         else:
             continue
         source = fx["source"] or was["source"]
@@ -3924,7 +3935,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             # a tick through a transformation, whose kind the counts keep
             # apart from the identity's
             mapping = fx["run"]
-            crun = fx["crun"]
+            # the counted handler a cut runs, where the cut leaves the
+            # square's or the one-row source's handler running
+            crun = fx["crun"] and model.counting(i)
             want, then = model.tick(i)
             if cycles:
                 cycles._settle(None)
@@ -4875,14 +4888,14 @@ def cut_read(code, symbols, cycles_of, general):
           span(more.get("on", {0})), WORDS[len({columns for _, columns, _ in CUT_TICKS})],
           span(more.get("end", {0})))
     square = (ticked.get("cut a square on", set()), ticked.get("cut a square loop", set()))
-    one = ticked.get("cut one row loop", set())
-    if "cut one row on" in ticked or "cut one row on alone" in ticked:
-        stale.append("a source of one row under a cut ticks a row without the end of a pass")
-    reads(r"A square under a cut of its two rows ticks at (\d+) and (\d+) in turn, against"
-          r" (\d+) under cut 0, and a source of one row at (\d+), every tick the end of a"
-          r" pass, against (\d+)\.",
-          span(square[0] or {0}), span(square[1] or {0}), span(general.get("square", {0})),
-          span(one or {0}), span(general.get("one", {0})))
+    ones = sorted(kind for kind in ticked if kind.startswith(("cut one row", "cut mapped one row")))
+    if ones:
+        stale.append("a source of one row ticks the counted handler under a cut: %s" % ones)
+    reads(r"A square that a start or a recut puts under a cut of one of its rows runs the counted"
+          r" handler, and ticks at (\d+) and (\d+) in turn under its two rows after that, against"
+          r" (\d+) on its handler\. A recut to its two rows of a square on its handler, and every"
+          r" recut of a source of one row, leave that handler running\.",
+          span(square[0] or {0}), span(square[1] or {0}), span(general.get("square", {0})))
     same = all(ticked.get("counted " + then) == ticked.get("cut counted one column " + then)
                and ticked.get("counted " + then) for then in ("on", "loop"))
     if not same:
@@ -4929,6 +4942,11 @@ def cut_read(code, symbols, cycles_of, general):
           span(set().union(*(frames.get(("recut, moved", shape), set())
                              for shape in CUT_FRAMES[0][1])) or {0}),
           span(frames.get(("recut, moved", "mapped a square"), {0})))
+    reads(r"A recut that leaves a square's or a one-row source's handler running sets the running"
+          r" cut alone: ([\d,]+(?: to [\d,]+)?) cycles on a square and ([\d,]+(?: to [\d,]+)?) on a"
+          r" source of one row\.",
+          span(frames.get(("recut, kept", "a square"), {0})),
+          span(frames.get(("recut, kept", "one row"), {0})))
     reads(r"A recut on a stopped timer sets the kept cut alone, ([\d,]+(?: to [\d,]+)?)"
           r" cycles\.", span(frames.get(("recut, stopped", "one column"), {0})))
     reads(r"On the same span a start under cut 0 at row 0 of a marked source of one column"

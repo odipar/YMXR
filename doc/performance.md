@@ -904,16 +904,17 @@ is.
 
 The counter of rows left costs 20 cycles a row written on each of the
 three, and 40 at the end of a pass, where the handler reloads it (A
-counted tick of two columns). A square under a cut of its two rows
-ticks at 116 and 154 in turn, against 80 under cut 0, and a source of
-one row at 154, every tick the end of a pass, against 56. A counted
-source runs the counted handler under cut 0 as well, and ticks at the
-same figures under a cut. Through a transformation a tick under a cut
-costs 24 cycles more a row written and 28 more at the end of a pass,
-140 and 182 on one column. The column under cut 0 is of a tune of
-several effects; the counted handler drops the level on a tune of one
-effect as well, so a tick under a cut costs the same on either (A
-tick).
+counted tick of two columns). A square that a start or a recut puts under
+a cut of one of its rows runs the counted handler, and ticks at 116 and
+154 in turn under its two rows after that, against 80 on its handler. A
+recut to its two rows of a square on its handler, and every recut of a
+source of one row, leave that handler running. A counted source runs the
+counted handler under cut 0 as well, and ticks at the same figures under a
+cut. Through a transformation a tick under a cut costs 24 cycles more a
+row written and 28 more at the end of a pass, 140 and 182 on one column.
+The column under cut 0 is of a tune of several effects; the counted
+handler drops the level on a tune of one effect as well, so a tick under a
+cut costs the same on either (A tick).
 
 A start under a cut and a recut each run a routine of the cut
 (68k/player/cut.S). A source of one column through the identity starts and
@@ -941,11 +942,13 @@ start puts the place at row F of the cut; a start with the place kept
 reads the running row and its remainder by R as well, 1,190 to 1,210
 cycles on one column and 2,300 on two. A recut that moves a source from
 another handler to the counted handler runs the path of one column through
-the identity on such a source, 1,050 to 1,068 cycles, and the general
-routine on every other, 2,884 cycles on a square through a transformation.
-A recut on a stopped timer sets the kept cut alone, 116 cycles. On the
-same span a start under cut 0 at row 0 of a marked source of one column
-costs 464 cycles.
+the identity on such a source, 1,082 to 1,152 cycles, and the general
+routine on every other, 2,984 cycles on a square through a transformation.
+A recut that leaves a square's or a one-row source's handler running sets
+the running cut alone: 418 cycles on a square and 314 on a source of one
+row. A recut on a stopped timer sets the kept cut alone, 116 cycles. On
+the same span a start under cut 0 at row 0 of a marked source of one
+column costs 464 cycles.
 
 The routines run inside the play call, and R4.5 counts them apart, as it
 counts those of a start or a remap through a transformation. Each tune's
@@ -973,7 +976,7 @@ The cut makes the player with the lookup in 24,884 bytes against 21,966 in
 release 0.15.0, and 26,174 against 23,256 where a tick reads an absolute
 address; with the deferred start in as well, 39,860 against 35,908, and
 41,394 against 37,954. Of the 2,918 bytes it adds to the player as it is,
-2,674 are the cut's blocks, which a link leaves out of the player of a
-song that cuts no source (LINKER.md): 2,154 of routines and 130 of each
-effect's frame code. With the deferred start in, the blocks are 3,148 of
+2,708 are the cut's blocks, which a link leaves out of the player of a
+song that cuts no source (LINKER.md): 2,188 of routines and 130 of each
+effect's frame code. With the deferred start in, the blocks are 3,182 of
 the 3,952.

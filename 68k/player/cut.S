@@ -531,18 +531,21 @@ ymxr_kstartr:   movem.l d2/d6-d7/a1/a6,-(sp)    ; with the record in a3
 ; running source moves to the counted kind of its columns in the running
 ; bank, through its running mapping, with its running registers, at the
 ; row the running handler is at where the cut includes it and at row F
-; where it excludes it; its counter and loop are ymxr_xput's. Under cut 0
-; the rows are 0 to R - 1, and a recut from cut 0 to cut 0 leaves the
+; where it excludes it; its counter and loop are ymxr_xput's. Under cut
+; 0 the rows are 0 to R - 1, and a recut from cut 0 to cut 0 leaves the
 ; handler as it is; a timer before the first start has no source to cut.
 ; With a start pending after the record's settling (ymxr_pend) the recut
 ; is at level 7 to the vector's write, a page's fill among it, so the
 ; switch is before the recut or after it, and the hook (ymxr_rehook) and
 ; the armed place (ymxr_xplace) follow the new cut. From the effect's
 ; frame code (_xunset): a3 the record, a5 the effect's counted instance
-; of one column in bank 0, and d4 the effect. A source of one column
-; through the identity with no start pending moves to that instance here,
-; in bank 0 as a start at the frame does, since the second bank has no
-; armed handler; a source the counted kind already runs is recut in its
+; of one column in bank 0, and d4 the effect. With no start pending, the
+; square's handler under a cut of its two rows and the one-row source's
+; under any cut, which is its whole table, run on: the recut sets the
+; running cut alone (.fkeep). A source of one column through the
+; identity with no start pending moves to that instance here, in bank 0
+; as a start at the frame does, since the second bank has no armed
+; handler; a source the counted kind already runs is recut in its
 ; handler (.within); and every other below (.general). Clobbers d0, d1,
 ; d4, d5, a4 and a5; returns a2 at the chip's select register.
 XR_EFFECT       equ     -2                      ; the effect
@@ -563,15 +566,16 @@ ymxr_recut:     lea     ymxr_park(pc),a4
                 move.b  FX_CRUN(a3),d0
                 or.b    FX_CUT(a3),d0
                 beq.w   .none                   ; cut 0 to cut 0
-                move.b  FX_SHAPE(a3),d5
-                tst.b   FX_RUN(a3)
+                move.b  FX_SHAPE(a3),d5         ; the square's handler and
+                bmi.s   .fwhole                 ; the one-row source's stay
+                cmp.b   #1,d5                   ; where the cut is the whole
+                beq.s   .fkeep                  ; table, which every cut of a
+.fclass:        tst.b   FX_RUN(a3)              ; source of one row is
                 bne.s   .fkind                  ; through the mapping
                 tst.b   d5                      ; one column: the general
-                beq.s   .fone                   ; handler, a square, one
-                bmi.s   .fone                   ; row, and the counted kind
-                cmp.b   #1,d5                   ; of one column, marked or
-                beq.s   .fone                   ; counted
-                cmp.b   #7,d5
+                beq.s   .fone                   ; handler, a square, and the
+                bmi.s   .fone                   ; counted kind of one column,
+                cmp.b   #7,d5                   ; marked or counted
                 beq.s   .fone
                 cmp.b   #4,d5
                 beq.s   .fone
@@ -579,6 +583,18 @@ ymxr_recut:     lea     ymxr_park(pc),a4
                 blt.w   .general                ; 9, already: .within; a
                                                 ; square is -1
                 bra.w   .within
+.fwhole:        moveq   #0,d0                   ; a square's cut of rows 0
+                move.b  FX_CUT(a3),d0           ; and 1
+                movea.l WS_TUNE(a0),a4
+                adda.l  TF_CUTS(a4),a4
+                lsl.w   #3,d0
+                tst.l   -6(a4,d0.w)             ; F
+                bne.s   .fclass
+                moveq   #1,d1
+                cmp.l   -2(a4,d0.w),d1          ; L
+                bne.s   .fclass
+.fkeep:         move.b  FX_CUT(a3),FX_CRUN(a3)  ; the kept cut runs, on the
+                rts                             ; handler that runs
 .fone:          move.l  d3,-(sp)
                 move.b  FX_CUT(a3),FX_CRUN(a3)  ; the kept cut runs
                 lea     ymxr_timers(pc),a4
@@ -593,16 +609,11 @@ ymxr_recut:     lea     ymxr_park(pc),a4
                 move.w  d4,-(sp)                ; the vector's address
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
-; the running row and register: a square's by bit 7 of its immediate, a
-; source of one row's 0, and every other's at TICK_PTR and TICK_SEL
+; the running row and register: a square's by bit 7 of its immediate,
+; and every other's at TICK_PTR and TICK_SEL
                 moveq   #0,d4
                 tst.b   d5
-                beq.s   .fsteps
-                bmi.s   .fsquare
-                cmp.b   #1,d5
-                bne.s   .fsteps
-                move.b  ONE_SEL(a4),TICKC_SEL(a5)
-                bra.s   .frow
+                bpl.s   .fsteps
 .fsquare:       move.b  SQ_SEL(a4),TICKC_SEL(a5)
                 tst.b   SQ_VAL(a4)
                 bpl.s   .frow
@@ -939,6 +950,10 @@ ymxr_xplace:    btst    #7,FX_ACUT(a3)
 ; clobbers d0 to d5, a3 and a5.
 ymxr_xreset:    tst.b   FX_CRUN(a3)
                 beq.w   ymxr_widereset
+                cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
+                bne.s   .cut                    ; row 0 and moves no place
+                rts
+.cut:
                 tst.b   FX_RUN(a3)              ; the counted kind of one
                 bne.s   .kinds                  ; column through the
                 move.b  FX_SHAPE(a3),d0         ; identity, marked or
