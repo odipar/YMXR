@@ -3315,12 +3315,8 @@ ROUTINES = ("ymxr_lstart", "ymxr_remap", "ymxr_rmove")
 REMAPS = ("ymxr_tick%d_remap", "ymxr_tick%d_remapped")
 # The routines of a start under a cut and of a recut, each counted from
 # its call to its return, apart from those of ROUTINES (performance.md,
-# A cut). A start under a cut through a transformation is a start through
-# a transformation, whose routine R4.5 counts apart with those of
-# ROUTINES: check counts it there, by the record's running mapping at the
-# call (FX_RUN).
+# A cut); R4.5 counts both apart.
 CUT_ROUTINES = ("ymxr_kone", "ymxr_kstart", "ymxr_recut")
-CUT_STARTS = ("ymxr_kone",)
 
 
 def routine_calls(code, symbols):
@@ -3671,23 +3667,17 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                       end=CODE + symbols["ymxr_filled"])
     # Measure each call of a routine of ROUTINES from entry after bsr
     # to the instruction after its rts (routine_calls), and each call of
-    # one of CUT_ROUTINES apart, in "cut", but for a start under a cut
-    # through a transformation, which R4.5 counts with ROUTINES.
+    # one of CUT_ROUTINES apart, in "cut".
     routine = {"cycles": 0, "cut": 0, "at": None, "into": "cycles"}
     looking = ()
     if cycles and "copy" in cycles.regions:
         looking = tuple(lookup_regions(symbols)) + ("routine", "cut routine")
 
-        def entering(into, mapped=False):
-            run = equate("FX_RUN", symbols)
-
+        def entering(into):
             def entered(mu, address, size, data):
                 # the remap of the frame code counts the routine it calls
                 if routine["at"] is None:
-                    if mapped and bytes(mu.mem_read(mu.reg_read(UC_M68K_REG_A3) + run, 1))[0]:
-                        routine.update(at=cycles.counter.cycles, into="cycles")
-                    else:
-                        routine.update(at=cycles.counter.cycles, into=into)
+                    routine.update(at=cycles.counter.cycles, into=into)
             return entered
 
         def returned(mu, address, size, data):
@@ -3698,8 +3688,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                             (CUT_ROUTINES, "cut")):
             for name in names:
                 if name in symbols:
-                    m.mu.hook_add(UC_HOOK_CODE, entering(into, name in CUT_STARTS),
-                                  begin=CODE + symbols[name], end=CODE + symbols[name])
+                    m.mu.hook_add(UC_HOOK_CODE, entering(into), begin=CODE + symbols[name],
+                                  end=CODE + symbols[name])
         for at in routine_calls(code, symbols):
             m.mu.hook_add(UC_HOOK_CODE, returned, begin=CODE + at, end=CODE + at)
     lookups = []
@@ -4816,8 +4806,8 @@ def cut_read(code, symbols, cycles_of, general):
     columns and shape, against a marked source's under cut 0, the fixtures'
     of one column (general, by kind) and the kit's voices.ymxr's of two and
     three; a start under a cut and a recut at the frame (cut_events); and
-    each tune's costliest call, whole, with the routines of the lookup
-    apart and with those of the cut apart as well, against R4.5."""
+    each tune's costliest call, whole and as R4.5 counts it, the routines
+    of the lookup and of the cut apart."""
     text = open(os.path.join(ROOT, "doc", "performance.md")).read()
     if "\n## A cut\n" not in text:
         return ["performance.md has no section on a cut"]
@@ -4945,42 +4935,56 @@ def cut_read(code, symbols, cycles_of, general):
           r" costs ([\d,]+(?: to [\d,]+)?) cycles\.",
           span(frames.get(("start under cut 0", "one column"), {0})))
 
-    # each tune's costliest call, against R4.5
+    # each tune's costliest call, whole and as R4.5 counts it, the routines
+    # of the lookup and of the cut apart
     budget = re.search(r"A play call costs at most ([\d,]+) cycles",
                        " ".join(open(os.path.join(ROOT, "doc", "requirements.md")).read().split()))
     budget = int(budget.group(1).replace(",", "")) if budget else 0
-    rows = re.findall(r"^\| ([^|]+?) \| (\d+) \| (\d+) \| (\d+) \|$", section, re.M)
-    if [title for title, _, _, _ in rows] != [title for title, _, _, _ in played]:
+    table = section[section.index("| tune | the costliest call |"):] \
+        if "| tune | the costliest call |" in section else ""
+    table = table[:table.index("\n\n")] if "\n\n" in table else table
+    rows = re.findall(r"^\| ([^|]+?) \| (\d+) \| (\d+) \|$", table, re.M)
+    if [title for title, _, _ in rows] != [title for title, _, _, _ in played]:
         stale.append("performance.md's costliest calls under a cut are of %s, and the rig"
-                     " plays %s" % ([title for title, _, _, _ in rows],
+                     " plays %s" % ([title for title, _, _ in rows],
                                     [title for title, _, _, _ in played]))
-    over, within, shapes = [], 0, set()
+    whole, within = [], 0
     for title, cost, lookups, cuts in played:
-        looks = [c - spent["routine"] for c, (_, spent, _) in zip(cost, lookups)]
-        both = [c - spent["cut routine"] for c, (_, spent, _) in zip(looks, lookups)]
-        counted = (max(cost), max(looks), max(both))
+        apart = [c - spent["routine"] - spent["cut routine"]
+                 for c, (_, spent, _) in zip(cost, lookups)]
+        counted = (max(cost), max(apart))
         row = next((tuple(int(x) for x in got[1:]) for got in rows if got[0] == title), None)
         if not near(row, counted):
             stale.append("performance.md reads the costliest call of %s as %s, and the rig"
                          " counts %s" % (title, row, counted))
-        within = max(within, max(both))
-        if max(looks) > budget:
-            f = looks.index(max(looks))
-            starts = [(what, shape) for g, _, what, shape in cuts
-                      if g == f and what.startswith("start")]
-            over.append((f, len(starts), sum(1 for what, _ in starts if "under a cut" in what)))
-            shapes |= {shape for _, shape in starts}
-    if any(f for f, _, _ in over) or any(n != under for _, n, under in over) \
-            or not shapes <= {"two columns", "three columns", "counted two columns",
-                              "counted three columns"}:
-        stale.append("the calls past R4.5 under a cut are at frames and of starts %s, of %s"
-                     % (over, sorted(shapes)))
-    reads(r"Of the (\w+), (\w+) pass(?:es)? R4\.5's ([\d,]+), at its first row, which starts"
-          r" (\w+) sources of two and three columns under a cut\. With the routines of the cut"
-          r" counted apart as well, every call is within it, the costliest at ([\d,]+)\.",
-          WORDS.get(len(played)), WORDS.get(len(over)), budget,
-          WORDS.get(over[0][1]) if len(over) == 1 else over,
-          within if within <= budget else None)
+        within = max(within, max(apart))
+        if max(cost) > budget:
+            f = cost.index(max(cost))
+            whole.append((max(cost), f, [(what, shape) for g, _, what, shape in cuts
+                                         if g == f and what.startswith("start")]))
+    # the calls past the budget counted whole, the costliest first: each at
+    # its first row, which starts as many sources; the first's of two and
+    # three columns under a cut, the second's through a transformation
+    whole.sort(reverse=True)
+    wide = ("two columns", "three columns", "counted two columns", "counted three columns")
+    starts = {len(begun) for _, _, begun in whole}
+    if any(f for _, f, _ in whole) or len(starts) != 1:
+        stale.append("the calls past R4.5 counted whole are at %s"
+                     % [(cost, f, begun) for cost, f, begun in whole])
+    figures = [None] * 5
+    if len(whole) == 2:
+        (first, _, a), (second, _, b) = whole
+        figures = [first, WORDS.get(sum(1 for what, shape in a
+                                     if "under a cut" in what and shape in wide)),
+                second, WORDS.get(sum(1 for _, shape in b if shape.startswith("mapped "))),
+                WORDS.get(sum(1 for what, _ in b if "under a cut" in what))]
+    reads(r"Every call of the (\w+) is within R4\.5's ([\d,]+) as it counts them, the costliest"
+          r" at ([\d,]+)\. Counted whole, (\w+) pass(?:es)? it, each at its first row, which"
+          r" starts (\w+) sources: ([\d,]+) cycles, (\w+) of two and three columns under a cut,"
+          r" and ([\d,]+), (\w+) through a transformation, (\w+) of them under a cut\.",
+          WORDS.get(len(played)), budget, within if within <= budget else None,
+          WORDS.get(len(whole)), WORDS.get(next(iter(starts))) if len(starts) == 1 else starts,
+          *figures)
     return stale
 
 
