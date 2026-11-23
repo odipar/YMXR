@@ -7,15 +7,16 @@ library they come in, the link, and how a linked player is checked.
 
 The SNDH writers link by default. `-carried` writes the full core
 selected by the switches. A player linked from any of the 32 cores
-leaves out the frame code and the handlers of each effect the song does
-not run; each handler of an effect whose rows start no source of the
-handler's kind, with its start in the effect's frame code; each lookup
-instance of an effect that maps no source of the instance's kind; the
-remap and the deferred start of an effect that maps no value or defers
-no start, in both banks of a core with the deferred start; and the paths
-that read the cut column of an effect that cuts no source, with the
-cut's routines where the song cuts none. The plan at the end lists what
-is done and what follows.
+leaves out the frame code, the handlers and the timer code of each
+effect the song does not run, and init's and stop's work for the effects
+where the song runs none; each handler of an effect whose rows start no
+source of the handler's kind, with its start in the effect's frame code;
+each lookup instance of an effect that maps no source of the instance's
+kind; the remap and the deferred start of an effect that maps no value
+or defers no start, in both banks of a core with the deferred start; and
+the paths that read the cut column of an effect that cuts no source,
+with the cut's routines where the song cuts none. The plan at the end
+lists what is done and what follows.
 
 ## The player today
 
@@ -26,7 +27,7 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,628 | 3,114 |
+| init | 1,626 | 3,112 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
 | the frame | 2,784 | 4,312 |
 | the frame's read-site tables | 180 | 308 |
@@ -47,7 +48,7 @@ player and of the player with the lookup in:
 | the lookup's routines | | 3,458 |
 | the cut's routines | | 2,176 |
 | the lookup instances and the gaps before them, ten kinds | | 6,774 |
-| the player | 9,454 | 24,884 |
+| the player | 9,452 | 24,882 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -57,8 +58,16 @@ general and square sources runs 432 of them.
 A block is the code and data a player runs for one part of a song:
 
 - an effect's block, `effect0` to `effect3`, is its frame code but for
-  the pieces below and its general handler, which a song needs where its
-  effects byte sets the effect's bit, bits 0 to 3, in a tune of the song;
+  the pieces below, its general handler and its timer code: the claim of
+  its timer at init, the record of the claim and the put-back of the
+  timer in the SNDH core, and its release at stop. A song needs it where
+  its effects byte sets the effect's bit, bits 0 to 3, in a tune of the
+  song;
+- `effects` is init's and stop's work for the effects: the loop that
+  resolves the sources and the check of their reach, the links of the
+  general handlers and the level's drop, the effects' records, the shape
+  tests and the effects' heads, `ymxr_rem` and the timers' table, which a
+  song needs where it needs an effect's block;
 - an effect's remap's block, `map0` to `map3`, in a core with the
   lookup, is the start through a transformation and the remap in the
   effect's frame code, which a song needs where a tune maps a value, bit
@@ -117,8 +126,9 @@ A block is the code and data a player runs for one part of a song:
 | `countedthree` | 162 | in `several` | counted, three columns |
 
 Sizes are in bytes, of the plain core. An effect's block is its frame
-code but for the two starts, 412 to 432 bytes, and its general handler,
-80; `several` is 1,288 bytes of routines and 128 of tables.
+code but for the two starts, 412 to 432 bytes, its general handler, 80,
+and its timer code, which sizes.md lists with the pieces of `effects`;
+`several` is 1,288 bytes of routines and 128 of tables.
 
 | lookup kind | an instance | init's loop | a source of the kind, mapped to a target |
 |---|---|---|---|
@@ -144,10 +154,11 @@ effects' state at the repeat row is one they have had there before. A
 deferred start on a running timer adds its source to the ones a remap
 reaches.
 
-The rest is in every linked player: the jump table, init, `YMXR_stop`,
-`YMXR_play`, the frame's register steps and its tables, `ymxr_rem`, the
-mask words, the timers' table and the parked place, and in a core with
-the lookup the lookup's routines and the effects' references. A source
+The rest is in every linked player: the SNDH core's entries, init and
+`YMXR_stop` but for their work for the effects, `YMXR_play`, the frame's
+register steps and its tables, the mask words and the parked place, and
+in a core with the lookup the lookup's routines and the effects'
+references. A source
 of one column that is none of the shapes above runs the general handler.
 The frame reaches an effect's handler of a kind on a start on that
 effect of a source of that kind alone. Init writes the branch that picks
@@ -386,27 +397,27 @@ and the deferred start in, of 40,568 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
-| `chambers.ymxr` | plain | none | 2,752 |
-| `circus.ymxr` | plain | none | 2,752 |
-| `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,868 |
-| `cut.ymxr` | the lookup | counted, counted0, effect0, map0, cut, cut0 | 10,090 |
-| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, map0, defer0, cut, cut0, align | 13,346 |
-| `deferred.ymxr` | the deferred start | effect0, effect3, defer0, defer3 | 5,222 |
-| `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0 | 4,882 |
-| `envelope.ymxr` | plain | two, two0, several, effect0 | 4,838 |
-| `fine-zero.ymxr` | plain | none | 2,752 |
-| `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,038 |
-| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,528 |
-| `plays-once.ymxr` | plain | none | 2,752 |
-| `preempt.ymxr` | plain | square, square0, effect0, effect1 | 3,942 |
-| `retune.ymxr` | plain | one, one0, effect0 | 3,336 |
-| `synergy.ymxr` | plain | square, square0, square1, effect0, effect1 | 4,094 |
-| `turrican-2.ymxr` | plain | effect1 | 3,262 |
-| `turrican.ymxr` | plain | effect1 | 3,262 |
-| `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3 | 6,828 |
+| `chambers.ymxr` | plain | none | 1,466 |
+| `circus.ymxr` | plain | none | 1,466 |
+| `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,868 |
+| `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 9,640 |
+| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 13,046 |
+| `deferred.ymxr` | the deferred start | effect0, effect3, effects, defer0, defer3 | 4,922 |
+| `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0, effects | 4,432 |
+| `envelope.ymxr` | plain | two, two0, several, effect0, effects | 4,388 |
+| `fine-zero.ymxr` | plain | none | 1,466 |
+| `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3, effects | 5,038 |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, effects, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,528 |
+| `plays-once.ymxr` | plain | none | 1,466 |
+| `preempt.ymxr` | plain | square, square0, effect0, effect1, effects | 3,642 |
+| `retune.ymxr` | plain | one, one0, effect0, effects | 2,886 |
+| `synergy.ymxr` | plain | square, square0, square1, effect0, effect1, effects | 3,794 |
+| `turrican-2.ymxr` | plain | effect1, effects | 2,812 |
+| `turrican.ymxr` | plain | effect1, effects | 2,812 |
+| `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3, effects | 6,828 |
 
-A tune of general sources alone, with no effect, links 2,752 bytes, 27%
-of the core: the blocks are 7,392 bytes of it. `voices.ymxr` runs all
+A tune of general sources alone, with no effect, links 1,466 bytes, 14%
+of the core: the blocks are 8,678 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
 start of several columns, and links 6,828. `mapped.ymxr` keeps 4 lookup
 instances of 3 kinds and links 15,528 bytes of 40,568: the 36 instances
@@ -501,3 +512,8 @@ keeps are 764 bytes shorter than in the core.
     Done: the cut's place's reset leaves a source of one row as it is,
     and a link keeps `several` for a song that cuts general sources only
     where a recut to cut 0 leaves one on the counted handler.
+14. Each effect's timer code as pieces of the effect's block, and init's
+    and stop's work for the effects as a block, `effects`, which a song
+    that runs an effect keeps. Done: the pieces leave every instruction of
+    the play call and the ticks as it is, and sizes.md has the bytes a
+    song saves.

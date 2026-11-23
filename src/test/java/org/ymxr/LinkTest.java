@@ -176,24 +176,27 @@ final class LinkTest {
         }
     }
 
-    /** The blocks of a tune: each effect it runs, and the instance of each
-     *  kind on the effect whose rows start a source of the kind, its shape
-     *  as init resolves it. */
+    /** The blocks of a tune: each effect it runs, init's and stop's work
+     *  for the effects where it runs one, and the instance of each kind on
+     *  the effect whose rows start a source of the kind, its shape as init
+     *  resolves it. */
     @Test
     void theBlocksOfTheKitsTunes() throws IOException {
         assertEquals(List.of("align"), List.copyOf(blocks("chambers.ymxr")));
-        assertEquals(List.of("square", "square0", "effect0", "effect1", "align"),
+        assertEquals(List.of("square", "square0", "effect0", "effect1", "effects", "align"),
                 List.copyOf(blocks("preempt.ymxr")));
-        assertEquals(List.of("one", "one0", "effect0", "align"),
+        assertEquals(List.of("one", "one0", "effect0", "effects", "align"),
                 List.copyOf(blocks("retune.ymxr")));
-        assertEquals(List.of("effect1", "align"), List.copyOf(blocks("turrican.ymxr")));
+        assertEquals(List.of("effect1", "effects", "align"),
+                List.copyOf(blocks("turrican.ymxr")));
         assertEquals(List.of("square", "square1", "counted", "counted0", "counted1", "counted2",
-                "counted3", "several", "effect0", "effect1", "effect2", "effect3", "align"),
+                "counted3", "several", "effect0", "effect1", "effect2", "effect3", "effects",
+                "align"),
                 List.copyOf(blocks("counted.ymxr")));
-        assertEquals(List.of("envelope", "envelope0", "several", "effect0", "align"),
+        assertEquals(List.of("envelope", "envelope0", "several", "effect0", "effects", "align"),
                 List.copyOf(blocks("envelope-counted.ymxr")));
         assertEquals(List.of("two", "two1", "two3", "three", "three0", "three2", "several",
-                "effect0", "effect1", "effect2", "effect3", "align"),
+                "effect0", "effect1", "effect2", "effect3", "effects", "align"),
                 List.copyOf(blocks("voices.ymxr")));
     }
 
@@ -206,7 +209,7 @@ final class LinkTest {
                 "mapped.ymxr: " + mapped);
         assertTrue(!mapped.contains("defer0") && !mapped.contains("defer1")
                 && !mapped.contains("defer3"), "mapped.ymxr: " + mapped);
-        assertEquals(List.of("effect0", "effect3", "defer0", "defer3", "align"),
+        assertEquals(List.of("effect0", "effect3", "effects", "defer0", "defer3", "align"),
                 List.copyOf(blocks("deferred.ymxr")));
     }
 

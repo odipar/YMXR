@@ -3212,11 +3212,9 @@ def outofreach(code, symbols):
     return "a tune %d bytes off: init reports -1" % (far - CODE)
 
 
-# The patches of 68k/test/sizes, each applied on the ones before it: the
-# pieces a song with no effect leaves out, and one copy of the frame's
-# steps 6 and 7 (sizes.md). The check of sizes counts this many frames of
-# each dump.
-SIZES_PATCHES = ("pieces.patch", "one-copy.patch")
+# The patch of 68k/test/sizes: one copy of the frame's steps 6 and 7
+# (sizes.md). The check of sizes counts this many frames of each dump.
+SIZES_PATCH = "one-copy.patch"
 SIZES_FRAMES = 1000
 
 
@@ -3239,17 +3237,16 @@ def patched(names):
 def sizes(code, symbols):
     """sizes.md's cycles: every call and every tick of the eleven dumps
     of ym/test over their first SIZES_FRAMES frames, counted with DTX's
-    cycle counter on the player assembled as it is and with each patch of
-    68k/test/sizes. The pieces leave every call and every tick as it is,
-    and one copy of steps 6 and 7 moves the calls by the figures the
-    section on a few cycles more reads; the ticks stay as they are."""
+    cycle counter on the player assembled as it is and with the patch of
+    68k/test/sizes. One copy of steps 6 and 7 moves the calls by the
+    figures the section on a few cycles more reads, and the ticks stay as
+    they are."""
     global MOST_FRAMES
     assert not DEFINES, "the check of sizes counts the player as it is, with no switch"
     sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))
     import test_dtx
     with_movep(test_dtx)
-    players = [(code, symbols)] + [patched(SIZES_PATCHES[:n + 1])
-                                   for n in range(len(SIZES_PATCHES))]
+    players = [(code, symbols), patched([SIZES_PATCH])]
     dumps = sorted(os.path.join(ROOT, "ym", "test", f)
                    for f in os.listdir(os.path.join(ROOT, "ym", "test")) if f.endswith(".ym"))
     most, MOST_FRAMES = MOST_FRAMES, SIZES_FRAMES
@@ -3258,12 +3255,9 @@ def sizes(code, symbols):
                    for one, named in players]
     finally:
         MOST_FRAMES = most
-    now, pieces, copy_ = counted
-    for ym, a, b in zip(dumps, now, pieces):
-        assert a == b, "%s: a call or a tick on the player with the pieces costs other" \
-            " cycles than on the player as it is" % os.path.basename(ym)
+    now, copy_ = counted
     means, calls, ticks = [], [], []
-    for a, b in zip(pieces, copy_):
+    for a, b in zip(now, copy_):
         more = [y - x for x, y in zip(a[0], b[0])]
         means.append(sum(more) / len(more))
         calls.extend(more)
@@ -3274,17 +3268,14 @@ def sizes(code, symbols):
         in tools, "tools.md reads another count of frames for the check of sizes"
     text = open(os.path.join(ROOT, "doc", "sizes.md")).read()
     said = " ".join(text.split())
-    want = ("Over the first %s frames of each of the eleven dumps, the rig counts every call"
-            " and every tick on the player assembled with the pieces at the cycles of the"
-            " player as it is." % "{:,}".format(SIZES_FRAMES))
+    want = ("Over the first %s frames of each of the eleven dumps the average call of a dump"
+            " costs %d to %d cycles more and a single call %d fewer to %d more, and every tick"
+            " costs what it costs today." % ("{:,}".format(SIZES_FRAMES), round(min(means)),
+                                             round(max(means)), -min(calls), max(calls)))
     assert want in said, "sizes.md does not read: " + want
-    want = ("Over the same frames the average call of a dump costs %d to %d cycles more and a"
-            " single call %d fewer to %d more, and every tick costs what it costs today."
-            % (round(min(means)), round(max(means)), -min(calls), max(calls)))
-    assert want in said, "sizes.md does not read: " + want
-    return ("the pieces: %d dumps, every call and tick as it is; one copy of steps 6 and 7:"
-            " a call %d to %d more on average, %+d to %+d, the ticks as they are"
-            % (len(dumps), round(min(means)), round(max(means)), min(calls), max(calls)))
+    return ("one copy of steps 6 and 7: %d dumps, a call %d to %d more on average, %+d to %+d,"
+            " the ticks as they are" % (len(dumps), round(min(means)), round(max(means)),
+                                        min(calls), max(calls)))
 
 
 def wholebyte(code, symbols):
@@ -6528,16 +6519,20 @@ def linked_player(ym, defines):
         if any(a < first + value < to or (a == first + value and sym not in BETWEEN)
                for _, a, to in out):
             continue
-        moved[sym] = value - sum(lost.get(name, 0) for name, _, to in table[0]
-                                 if to <= first + value)
+        # a label of the player moves by the pieces of the player before it
+        moved[sym] = value - sum(lost.get(name, 0) for name, a, to in table[0]
+                                 if a >= first and to <= first + value)
+    # the player's first byte in the linked core, past the wrapper's pieces
+    # left out: each effect's claim and put-back of its timer
+    start = first - sum(lost.get(name, 0) for name, _, to in table[0] if to <= first)
     # each effect's reference, which the link picks, out of ymxr_refat
     if "ymxr_refat" in moved:
         for e in range(4):
             at = moved["ymxr_refat"] + 2 * e
             moved["ymxr_ref%d" % e] = moved["ymxr_ref"] + struct.unpack(
-                ">H", ours[first + at:first + at + 2])[0]
+                ">H", ours[start + at:start + at + 2])[0]
     moved.text = frozenset(sym for sym in symbols.text if sym in moved)
-    return ours[first:], moved, "%s linked, %d bytes of %d, %s left out" % (
+    return ours[start:], moved, "%s linked, %d bytes of %d, %s left out" % (
         name, len(ours), len(core_code), ", ".join(blocks_out) or "no block"), \
         (name, set(blocks_out) - {""})
 
@@ -7585,7 +7580,7 @@ def main():
                           ("wholebyte", lambda: wholebyte(code, symbols)),
                           ("outofreach", lambda: outofreach(code, symbols)),
                           ("sizes", lambda: sizes(code, symbols))):
-            # the check of sizes counts cycles over 33 runs, so a run makes it
+            # the check of sizes counts cycles over 22 runs, so a run makes it
             # where -only names it
             if wanted(name) and (PCREL or name != "outofreach") \
                     and (name != "sizes" or only is not None):

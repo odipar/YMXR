@@ -25,10 +25,11 @@ var Lookups = []string{"lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh
 // Blocks are the blocks a core's pieces belong to, in the order
 // doc/LINKER.md lists them: each handler kind, which init's loop over it
 // is, and its instance on each effect; the start of several columns; each
-// effect's frame code and general handler; each effect's remap and
-// deferred start; the cut's routines and each effect's paths that read
-// the cut column; each lookup kind and its instance on each effect; and
-// align, the padding before the second bank.
+// effect's frame code, general handler and timer code; init's and stop's
+// work for the effects; each effect's remap and deferred start; the cut's
+// routines and each effect's paths that read the cut column; each lookup
+// kind and its instance on each effect; and align, the padding before the
+// second bank.
 var Blocks = func() []string {
 	var all []string
 	for _, kind := range Kinds {
@@ -41,6 +42,7 @@ var Blocks = func() []string {
 	for i := 0; i < 4; i++ {
 		all = append(all, fmt.Sprintf("effect%d", i))
 	}
+	all = append(all, "effects")
 	for _, part := range []string{"map", "defer"} {
 		for i := 0; i < 4; i++ {
 			all = append(all, fmt.Sprintf("%s%d", part, i))
@@ -251,13 +253,14 @@ func Kind(source *dtx.Table, counted bool) string {
 	return "general"
 }
 
-// BlocksOf is the blocks a set of tunes needs: the block of each effect
-// a tune runs, bits 0 to 3 of its effects byte, and its remap where the
-// tune maps a value and a row sets the effect's mapping column, and its
-// deferred start where the tune defers a start and a row of the effect
+// BlocksOf is the blocks a set of tunes needs: effects, init's and stop's
+// work for the effects, where a tune runs an effect; the block of each
+// effect a tune runs, bits 0 to 3 of its effects byte, and its remap where
+// the tune maps a value and a row sets the effect's mapping column, and
+// its deferred start where the tune defers a start and a row of the effect
 // does; for each source an effect's rows start, the instance of its
-// handler kind on that effect and the kind's loop of init; several where
-// a start is of a counted source or one of several columns; the lookup
+// handler kind on that effect and the kind's loop of init; several where a
+// start is of a counted source or one of several columns; the lookup
 // instance of each kind an effect maps a source through, and the kind's
 // loop of init; and align, the padding before the second bank; in the
 // order of Blocks. An effect that cuts a source, in a tune of version 11
@@ -279,6 +282,7 @@ func BlocksOf(tunes []ymxr.File) []string {
 				continue
 			}
 			needed[fmt.Sprintf("effect%d", i)] = true
+			needed["effects"] = true
 			cuts := CutsOf(tune, i)
 			if cuts {
 				needed["cut"] = true

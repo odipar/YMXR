@@ -1,8 +1,8 @@
 ; pieces.S - PIECE and ENDPIECE, the bounds of a piece: bytes a player
-; linked for one song leaves out where the song runs no source of the
-; piece's kind (doc/LINKER.md). A piece is named for its block and
-; numbered within it, as square_1, and its bounds are the labels
-; ymxr_p_<name> and ymxr_e_<name>.
+; linked for one song leaves out where the song needs none of the piece's
+; block (doc/LINKER.md). A piece is named for its block and numbered
+; within it, as square_1, and its bounds are the labels ymxr_p_<name> and
+; ymxr_e_<name>.
 ;
 ; Neither macro writes a byte. Where the assembly defines YMXR_PAD_<name>
 ; (rmac -dYMXR_PAD_square_1=1 -dYMXR_PADSIZE=2), ENDPIECE writes
@@ -11,6 +11,10 @@
 ; field whose value moves with the pad refers across the piece's end.
 ; Both labels are equates of the location counter, so a local label
 ; before a piece is in scope past it.
+;
+; The SNDH core includes this file before its code, and the player where
+; it is assembled alone (68k/YMXR.S).
+YMXR_PIECES     equ     1
 
                 .macro  PIECE   name
 ymxr_p_\name    equ     *

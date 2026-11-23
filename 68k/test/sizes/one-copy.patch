@@ -40,7 +40,7 @@
  ; The row is written: the next one is read now, after every write this
  ; call makes, so no part of the advance's cost is between a host's clock
  ; and the chip.
-@@ -202,9 +186,6 @@
+@@ -204,9 +188,6 @@
                  dc.w    q_24-ymxr_frame+2,24,q_25-ymxr_frame+2,25
                  dc.w    q_26-ymxr_frame+2,26,q_27-ymxr_frame+2,27
                  dc.w    q_28-ymxr_frame+2,28,q_29-ymxr_frame+2,29
