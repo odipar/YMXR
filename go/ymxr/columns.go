@@ -33,6 +33,10 @@ const (
 // index; 0 is the whole table (SPEC.md 1.11).
 const MostCuts = 127
 
+// MostCountedRows is the rows the counted handler counts, in a word: of a
+// cut, and of a source that fills its byte (SPEC.md section 8).
+const MostCountedRows = 65535
+
 // Cut is a cut of the index: its first row and its last row (SPEC.md
 // 3.5).
 type Cut struct {
