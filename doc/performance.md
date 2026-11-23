@@ -947,28 +947,27 @@ A recut on a stopped timer sets the kept cut alone, 116 cycles. On the
 same span a start under cut 0 at row 0 of a marked source of one column
 costs 464 cycles.
 
-The routines run inside the play call. Each tune's costliest call, the
-same with the routines of a start or a remap through a transformation
-apart, a start under a cut through a transformation among them, as R4.5
-counts them, and with the routines of every start under a cut and every
-recut apart as well:
+The routines run inside the play call, and R4.5 counts them apart, as it
+counts those of a start or a remap through a transformation. Each tune's
+costliest call, whole and as R4.5 counts it:
 
-| tune | the costliest call | as R4.5 counts it | the cut's routines apart as well |
-|---|---|---|---|
-| a cut past row 0 that excludes the repeat row, its place reset, one after a recut to the whole table, and one of a source of one row under cut 0 | 3948 | 3948 | 2588 |
-| starts at the running row, inside a cut and outside it | 2866 | 2866 | 2192 |
-| a source that plays once under a cut, started again by a select | 2552 | 2552 | 1920 |
-| a square, one row and a counted source under a cut, recut to the whole table | 4856 | 4856 | 3468 |
-| a recut on a stopped timer, read by the start after it | 2600 | 2600 | 1920 |
-| starts under the whole table after a cut, each place reset after, and recuts of a loop and a square started under it | 5802 | 5802 | 4414 |
-| sources of two and three columns under a cut, recut, and a place's reset | 11218 | 11218 | 3854 |
-| starts through a transformation under a cut, remaps under it, and recuts, beside a timer that maps a source under the whole table | 9682 | 4670 | 4084 |
-| recuts on the timers that share a control register | 4046 | 4046 | 2686 |
+| tune | the costliest call | as R4.5 counts it |
+|---|---|---|
+| a cut past row 0 that excludes the repeat row, its place reset, one after a recut to the whole table, and one of a source of one row under cut 0 | 3948 | 2588 |
+| starts at the running row, inside a cut and outside it | 2866 | 2192 |
+| a source that plays once under a cut, started again by a select | 2552 | 1920 |
+| a square, one row and a counted source under a cut, recut to the whole table | 4856 | 3468 |
+| a recut on a stopped timer, read by the start after it | 2600 | 1920 |
+| starts under the whole table after a cut, each place reset after, and recuts of a loop and a square started under it | 5802 | 4414 |
+| sources of two and three columns under a cut, recut, and a place's reset | 11218 | 3854 |
+| starts through a transformation under a cut, remaps under it, and recuts, beside a timer that maps a source under the whole table | 9682 | 4084 |
+| recuts on the timers that share a control register | 4046 | 2686 |
 
-Of the nine, one passes R4.5's 6,656, at its first row, which starts four
-sources of two and three columns under a cut. With the routines of the
-cut counted apart as well, every call is within it, the costliest at
-4,414.
+Every call of the nine is within R4.5's 6,656 as it counts them, the
+costliest at 4,414. Counted whole, two pass it, each at its first row,
+which starts four sources: 11,218 cycles, four of two and three columns
+under a cut, and 9,682, four through a transformation, two of them under a
+cut.
 
 The cut makes the player with the lookup in 24,884 bytes against 21,966 in
 release 0.15.0, and 26,174 against 23,256 where a tick reads an absolute
