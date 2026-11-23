@@ -11,6 +11,10 @@
 ; the marked form, and the record has the shape of a marked source on a
 ; counted kind at 7 to 9, of one to three columns (equates.S).
 
+; The routines are the piece cut_1 of the cut's block, which a link keeps
+; where it keeps an effect's cut piece (doc/LINKER.md).
+                PIECE   cut_1
+
 ; The rows F and L of the running cut of the record a3, or of cut d0 at
 ; ymxr_xrows, in d0 and d1, out of the cut index the bound tune's field
 ; at 28 locates (BINARIES.md 1.2): a word U, then a long first row and a
@@ -688,3 +692,4 @@ ymxr_xreset:    move.w  d3,d4
                 move.w  (sp)+,sr
                 movem.l (sp)+,d6-d7/a1-a2
                 rts
+                ENDPIECE cut_1

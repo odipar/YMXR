@@ -37,13 +37,13 @@
 ; count and select written, with the timer's and the place's reset. Its
 ; frame code is pieces: the head, \{eff}_1, up to the branch that tells
 ; the shapes apart; the start of a square, square<e>_3; the start of a
-; source of one row, one<e>_3; with the lookup in, the start through a
-; transformation and the remap, map<e>_1; with the deferred start in,
-; the paths that arm and read a pending start, defer<e>_1; and the rest,
-; \{eff}_5, which play.S ends. A link leaves a piece out where the
-; effect runs none of it, and init reads the bytes of the pieces the
-; effect keeps out of ymxr_resets wherever a branch it aims reaches past
-; them.
+; source of one row, one<e>_3; with the lookup in, the paths that read
+; the cut column, cut<e>_1, and the start through a transformation and
+; the remap, map<e>_1; with the deferred start in, the paths that arm and
+; read a pending start, defer<e>_1; and the rest, \{eff}_5, which play.S
+; ends. A link leaves a piece out where the effect runs none of it, and
+; init reads the bytes of the pieces the effect keeps out of ymxr_resets
+; wherever a branch it aims reaches past them.
                 .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,eff,vector,lk,cx
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
@@ -278,13 +278,64 @@ q\{ct}:         bra.w   \{tick}_done
                 bra.w   \{tick}_rate
                 EENDPIECE one,_3,\fx
                 .if     YMXR_MAP
-                EPIECE  map,_1,\fx
+                EPIECE  cut,_1,\fx
+; The paths of a tune of version 11 that read the cut column, a piece of
+; the effect's cut block (doc/LINKER.md): a link keeps it where a row
+; sets the effect's cut column, and keeps the remap's piece after it, into
+; which the start at its end falls through.
+;
+; A row of version 11 that leaves the source column unset (SPEC.md 4.3.2):
+; a recut where it sets the cut column, then the remap's test below. The
+; player makes the recut first: the recut writes the place and the loop of
+; the running handler and a remap its page, and either order leaves the
+; handler the same. A timer stopped before the row keeps its running cut,
+; its place and its handler; the control byte before the row's reset is in
+; d3 (_rmk).
+\{tick}_xunset: MREAD   \cx                     ; the cut column
+                bpl.w   \{tick}_remapck
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_CUT(a0)       ; the kept cut
+                move.b  \ctrl.w,d0
+                tst.b   d2
+                bpl.s   .xrun\~
+                btst    #6,d2
+                beq.s   .xrun\~
+                move.b  d3,d0
+.xrun\~:        and.b   #255-\keep,d0
+                beq.w   \{tick}_remapck
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                bsr.w   ymxr_recut
+                bra.w   \{tick}_remapck
+; A start under a cut 1 to 127: the mapping column, then the counted
+; kind of the source's columns, through the identity or the mapping
+; (ymxr_kstart).
+\{tick}_xcut:   RREAD   \cm                     ; the mapping column
+                bpl.s   .xmap\~
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_MAP(a0)
+.xmap\~:        move.b  \fx+FX_MAP(a0),\fx+FX_RUN(a0)
+                move.w  d3,d1
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                bsr.w   ymxr_kstart
+                bclr    #5,d2
+                bra.w   \{tick}_rate
+                .if     YMXR_DEFER
+; A start or a stop in a tune of version 11 that defers a start: a start
+; reads the cut column first, so an arming captures the kept cut after
+; the row (SPEC.md 4.8); a stop ignores it (4.3.2).
+\{tick}_xcheck: beq.w   \{tick}_check
+                move.w  d1,d3
+                DREAD   \cx                     ; the cut column
+                bpl.s   .xk\~
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_CUT(a0)
+.xk\~:          move.w  d3,d1                   ; the source, other than 0
+                bra.w   \{tick}_check
+                .endif
 ; A start in a tune of version 11 (SPEC.md 4.3.2): the cut column read,
 ; the kept cut replaced where the row sets it, and the kept cut made the
-; running cut (4.3 step 3). Under cut 0 the start is the start below.
-; Under a cut 1 to 127, the mapping column is read as below, and the start
-; runs the counted kind of the source's columns (ymxr_kstart). d1 is the
-; source number.
+; running cut (4.3 step 3). Under cut 0 the start is the start below, and
+; under a cut 1 to 127 the start above (_xcut). d1 is the source number.
 \{tick}_xnow:   move.w  d1,d3
                 READ    \cx                     ; the cut column
                 bpl.s   .xkept\~
@@ -293,6 +344,8 @@ q\{ct}:         bra.w   \{tick}_done
 .xkept\~:       move.w  d3,d1
                 move.b  \fx+FX_CUT(a0),\fx+FX_CRUN(a0)  ; the kept cut runs
                 bne.w   \{tick}_xcut
+                EENDPIECE cut,_1,\fx
+                EPIECE  map,_1,\fx
 ; Start with optional lookup support (SPEC.md 1.10.2). Init redirects
 ; _now here. A set mapping column replaces kept; an unset column reuses
 ; it. Identity uses the start above; a transformation uses the shared
@@ -315,40 +368,6 @@ q\{ct}:         bra.w   \{tick}_done
                 bsr.w   ymxr_lstart
                 bclr    #5,d2
                 bra.w   \{tick}_rate
-; A start under a cut 1 to 127: the mapping column, then the counted
-; kind of the source's columns, through the identity or the mapping
-; (ymxr_kstart).
-\{tick}_xcut:   RREAD   \cm                     ; the mapping column
-                bpl.s   .xmap\~
-                and.b   #$7F,d1
-                move.b  d1,\fx+FX_MAP(a0)
-.xmap\~:        move.b  \fx+FX_MAP(a0),\fx+FX_RUN(a0)
-                move.w  d3,d1
-                moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                bsr.w   ymxr_kstart
-                bclr    #5,d2
-                bra.w   \{tick}_rate
-; A row of version 11 that leaves the source column unset (SPEC.md 4.3.2):
-; a recut where it sets the cut column, then the remap's test below. The
-; player makes the recut first: the recut writes the place and the loop of
-; the running handler and a remap its page, and either order leaves the
-; handler the same. A timer stopped before the row keeps its running cut,
-; its place and its handler; the control byte before the row's reset is in
-; d3 (_rmk).
-\{tick}_xunset: MREAD   \cx                     ; the cut column
-                bpl.s   \{tick}_remapck
-                and.b   #$7F,d1
-                move.b  d1,\fx+FX_CUT(a0)       ; the kept cut
-                move.b  \ctrl.w,d0
-                tst.b   d2
-                bpl.s   .xrun\~
-                btst    #6,d2
-                beq.s   .xrun\~
-                move.b  d3,d0
-.xrun\~:        and.b   #255-\keep,d0
-                beq.s   \{tick}_remapck
-                moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                bsr.w   ymxr_recut
 ; Remap entry (SPEC.md 1.10.2). Init redirects _unset here for a tune
 ; using lookups. A set mapping column changes current ticks; an unset
 ; one continues to rate processing.
@@ -455,18 +474,6 @@ q\{ct}:         bra.w   \{tick}_done
                 btst    #3,d2
                 bne.w   \{tick}_kept
                 bra.w   \{tick}_rstop
-                .if     YMXR_MAP
-; A start or a stop in a tune of version 11 that defers a start: a start
-; reads the cut column first, so an arming captures the kept cut after
-; the row (SPEC.md 4.8); a stop ignores it (4.3.2).
-\{tick}_xcheck: beq.s   \{tick}_check
-                move.w  d1,d3
-                DREAD   \cx                     ; the cut column
-                bpl.s   .xk\~
-                and.b   #$7F,d1
-                move.b  d1,\fx+FX_CUT(a0)
-.xk\~:          move.w  d3,d1                   ; the source, other than 0
-                .endif
 \{tick}_check:  beq.s   \{tick}_drop            ; source 0, the and's Z: a stop
                 tst.b   \fx+FX_PENDING(a0)      ; a start pending on the timer:
                 bne.s   \{tick}_pending         ; switched, dropped or replaced

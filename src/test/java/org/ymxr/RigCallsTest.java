@@ -343,12 +343,12 @@ final class RigCallsTest {
                 () -> "the four shards are " + joined + ", not " + LINKED);
     }
 
-    /** The conformance kit's tunes, the 20 of the check of deferred starts
-     *  and the 33 of the check of tunes that map a value, each on the player
-     *  ymxr-sndh links for it, under each set of switches: the tool's
-     *  core against the rig's link of the assembled core, and every tick
-     *  against the model (doc/LINKER.md, The check). The workflow runs the
-     *  sets in the four jobs of cores. */
+    /** The conformance kit's tunes, the 20 of the check of deferred
+     *  starts, the 33 of the check of tunes that map a value and the 13 of
+     *  the check of cuts, each on the player ymxr-sndh links for it, under
+     *  each set of switches: the tool's core against the rig's link of the
+     *  assembled core, and every tick against the model (doc/LINKER.md,
+     *  The check). The workflow runs the sets in the four jobs of cores. */
     @TestFactory
     Stream<DynamicTest> theRigPlaysOnLinkedPlayersOfEverySetOfSwitches() {
         return played(shard(LINKED, System.getProperty(SHARD)), "the plain switches", core -> {
@@ -357,9 +357,10 @@ final class RigCallsTest {
             argv.addAll(core);
             return argv;
         }, (argv, said) -> assertTrue(said.startsWith("0\n")
-                        && said.contains("16 tunes play as the specification reads")
+                        && said.contains("18 tunes play as the specification reads")
                         && said.contains("deferred starts: 20 tunes")
                         && said.contains("tunes that map a value: 33 tunes")
+                        && said.contains("cuts: 13 tunes")
                         && said.contains("linked, "),
                 () -> RIG + " " + String.join(" ", argv) + " does not play on"
                         + " linked players:\n" + said));
@@ -382,7 +383,8 @@ final class RigCallsTest {
             "starts that set the source column alone", "starts at the running rate",
             "retunes", "stops", "remaps between transformations", "remaps to the identity",
             "remaps from the identity", "rows that set the target column alone",
-            "tunes that repeat to a row", "tunes that play once", "sets of several subtunes");
+            "starts under a cut", "recuts", "tunes that repeat to a row", "tunes that play once",
+            "sets of several subtunes");
 
     /** The operations of {@link #COVERED} the coverage line counts none of,
      *  and the shapes, effects and targets it finds short of all. */

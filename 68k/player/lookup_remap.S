@@ -250,11 +250,14 @@ ymxr_rlevel     equ     *                       ; between the mask and the
                 movem.l (sp)+,d2/d6-d7/a1/a6
                 lea     YM_SELECT.w,a2
                 rts
-; The marked form of the kind's page (ymxr_xfill).
+; The marked form of the kind's page (ymxr_xfill), the piece cut_2 of the
+; cut's block.
+                PIECE   cut_2
 .marked:        moveq   #0,d0
                 move.b  FX_SHAPE(a3),d0
-                bsr     ymxr_xfill
+                bsr.w   ymxr_xfill
                 bra     .kind
+                ENDPIECE cut_2
 
 ; The running source moved from the handler a5, which a2 describes, to
 ; the handler a4 of the same shape, which a1 describes: each column's

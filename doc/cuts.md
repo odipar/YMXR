@@ -282,6 +282,20 @@ case failed on main until the bump.
 - A cut of rows whose count is above 65,535: the counter is a word, as
   for a counted source today, so a writer reports such a cut, or the
   counter widens.
+- A walk of the rows, as for the lookup instances, so a link keeps the
+  counted kind of the sources a start or a recut under a cut 1 to 127
+  runs alone, where it keeps that kind of every source an effect starts
+  today.
+- `several` beside an effect's cut block. The place's reset under cut 0
+  of an effect that cuts runs `ymxr_widereset`. Past the sources that
+  keep `several` without a cut, a tune the converter writes reaches it
+  for a source of one row, whose place it leaves as it is, and a tune
+  file that recuts to cut 0 for the counted kind of any source. A reset
+  of a source of one row in the cut's routine, and a rule that reads a
+  recut to cut 0 in the rows, would let a link leave `several` out of a
+  song that cuts general sources. The rig's tunes reach it there for a
+  source of one row alone, so a link that leaves `several` out passes
+  every check.
 
 ## Milestones
 
@@ -308,7 +322,7 @@ case failed on main until the bump.
   - [x] sources of two and three columns, and a source through a
         transformation, on the counted instances; the rig's generator
         draws starts under a cut and recuts
-  - [ ] the link and the tools: the cut's pieces, which a link keeps for
+  - [x] the link and the tools: the cut's pieces, which a link keeps for
         a song that cuts a source alone, the SNDH tools' core for bit 6,
         BINARIES.md 1.5 and 2, and LINKER.md's table of the kit's tunes of
         version 11
@@ -334,5 +348,11 @@ case failed on main until the bump.
 - A recut from cut 0 to cut 0 leaves the handler as it is; every other
   recut aims the counted handler, and a recut to cut 0 keeps it there
   until the next start.
-- The core's descriptor records version 10 until the last step, so the
-  SNDH tools bind a tune of version 11 once a link keeps the cut's code.
+- The core's descriptor records version 11, and the SNDH tools bind a
+  tune that maps a value or cuts a source on a core with the lookup.
+- A link keeps an effect's cut piece where a row sets the effect's cut
+  column, and with it the effect's remap's piece, into which the start
+  under a cut falls through, `several`, whose place's reset the cut's
+  runs under cut 0, and the counted kind of the columns of each source
+  the effect starts. The rule reads which cut columns a row sets; a walk
+  of the cuts the rows select is open for review.

@@ -80,8 +80,8 @@ const corePcrel = 4
 const coreDefer = 8
 
 // coreMap is core flag bit 4, transformation support (YMXR_MAP=1).
-// Effects byte bit 5 requires this core, which reads bound versions 7
-// to 10 (SPEC.md 1.10, 3.3).
+// Effects byte bit 5 and bit 6 require this core, which reads bound
+// versions 7 to 11 (SPEC.md 1.10, 1.11, 3.3).
 const coreMap = 16
 
 // pcrelReach is the bytes from the core's first byte plus its field at 26
@@ -208,7 +208,7 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		}
 		claimed |= Claims(tune.Effects)
 		defers = defers || tune.Effects&ymxr.Defers != 0
-		maps = maps || tune.Effects&ymxr.Maps != 0
+		maps = maps || tune.Effects&(ymxr.Maps|ymxr.Cuts) != 0
 	}
 	if err := checkVbl(options.Asked, n, rates[0], mixed); err != nil {
 		return nil, err
@@ -436,7 +436,7 @@ func checkCore(core []byte, monitor, lean, pcrel, defers, maps bool, binds int) 
 	}
 	if maps && flags&coreMap == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and a subtune that maps a"+
-			" value needs bit 4 set", CoreFlagsAt, flags)
+			" value or cuts a source needs bit 4 set", CoreFlagsAt, flags)
 	}
 	return nil
 }

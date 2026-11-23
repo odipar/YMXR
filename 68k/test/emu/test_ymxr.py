@@ -194,9 +194,7 @@ COUNTED = 1 << 31
 
 def bound_versions(symbols):
     """Supported bound versions: 7 to 11 with lookup support, 7 to 9
-    without it (BINARIES.md 1.5; YMXR_MAP). The descriptor of a core with
-    the lookup records 10 until a link keeps the cut's code
-    (68k/player/switches.S).
+    without it (BINARIES.md 1.5; YMXR_MAP).
     """
     return (7, 8, 9, 10, 11) if "ymxr_look" in symbols else (7, 8, 9)
 
@@ -1961,27 +1959,28 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
 
 
 def cutting(code, symbols):
-    """Check starts, recuts and places' resets under a cut, tick by tick
-    and every frame against the reader's record (SPEC.md 1.11, 4.3.2,
-    5.1): a cut whose first row is past row 0 and which excludes its
-    source's repeat row; a start at the running row, inside a cut and
-    outside it; a source that plays once, stopped at the cut's last row
-    and started again at that row by a select; a square, a source of one
-    row and a counted source under a cut, recut to the whole table and
-    back; a recut on a stopped timer, read by the start after it; starts
-    under the whole table after a cut, and a place's reset after each;
-    deferred starts under a cut, at L + 1 of the running cut and at the
-    cut's first row, and between a cut and the whole table; recuts while
-    a start is pending, of the general handler and of a square; sources of
-    two and three columns, marked and counted, under a cut; starts through
-    a transformation under a cut, of a marked source, a counted one and a
-    square, remaps under a cut to and from the identity, and recuts of a
-    lookup instance; deferred starts under a cut through a transformation
-    and of two columns, recut while pending; and the timers that share a
-    control register. The third retunes an idle
-    timer and the fifth recuts one, which YMXS's check of the writing
-    rules warns of (YMXS, SPEC.md 6.3), and every other follows the
-    rules."""
+    """Check starts, recuts and places' resets under a cut, tick by tick and
+    every frame against the reader's record (SPEC.md 1.11, 4.3.2, 5.1): a
+    cut whose first row is past row 0 and which excludes its source's repeat
+    row, its place's reset after a recut to the whole table, and the reset
+    of a source of one row started under cut 0 on a timer that cuts, with no
+    source of several columns; a start at the running row, inside a cut and
+    outside it; a source that plays once, stopped at the cut's last row and
+    started again at that row by a select; a square, a source of one row and
+    a counted source under a cut, recut to the whole table and back; a recut
+    on a stopped timer, read by the start after it; starts under the whole
+    table after a cut, and a place's reset after each; deferred starts under
+    a cut, at L + 1 of the running cut and at the cut's first row, and
+    between a cut and the whole table; recuts while a start is pending, of
+    the general handler and of a square; sources of two and three columns,
+    marked and counted, under a cut; starts through a transformation under a
+    cut, of a marked source, a counted one and a square, remaps under a cut
+    to and from the identity, and recuts of a lookup instance, beside a
+    timer that maps a source under the whole table; deferred starts under a
+    cut through a transformation and of two columns, recut while pending;
+    and the timers that share a control register. The third retunes an idle
+    timer and the fifth recuts one, which YMXS's check of the writing rules
+    warns of (YMXS, SPEC.md 6.3), and every other follows the rules."""
     loop = ("loop of eight", [15, 14, 13, 12, 11, 10, 9, 8], 2)
     fall = ("fall", list(range(15, -1, -1)), None)
     six = ("six", [1, 2, 3, 4, 5, 6], 0)
@@ -2008,9 +2007,14 @@ def cutting(code, symbols):
     def recut(first, last):
         return ("recut", first, last)
     cases = [
-        ("a cut past row 0 that excludes the repeat row, its place reset", [loop],
+        ("a cut past row 0 that excludes the repeat row, its place reset, one after a"
+         " recut to the whole table, and one of a source of one row under cut 0",
+         [loop, held],
          {"A": {0: start(1, (3, 6)), 5: ("retune", 200, 200, 0, 1), 7: recut(1, 5),
-                11: ("retune", 200, 200, 0, 1), 14: recut(0, 7)}}),
+                11: ("retune", 200, 200, 0, 1), 14: recut(0, 7),
+                16: ("retune", 200, 200, 0, 1)},
+          "D": {0: start(1, (2, 5), target=9), 4: start(2, (0, 0), target=9),
+                6: ("retune", 200, 200, 0, 1)}}),
         ("starts at the running row, inside a cut and outside it", [loop, six],
          {"A": {0: start(1), 3: start(2, (1, 4), pr=0), 6: start(1, (5, 7), pr=0),
                 9: start(2, (0, 2), pr=0)}}),
@@ -2055,11 +2059,12 @@ def cutting(code, symbols):
           "C": {0: start(4, (2, 4), target=24), 3: recut(0, 3),
                 6: start(4, (1, 2), target=24, pr=0, deferred=1)},
           "D": {0: start(3, (1, 2), target=20), 4: recut(0, 3), 8: recut(2, 3)}}),
-        ("starts through a transformation under a cut, remaps under it, and recuts",
-         [loop, keys, square],
+        ("starts through a transformation under a cut, remaps under it, and recuts, beside a"
+         " timer that maps a source under the whole table", [loop, keys, square, six],
          {"A": {0: start(1, (2, 5), mapping=[1]), 4: remap([2]), 7: remap(0),
                 9: remap([1]), 12: recut(1, 6)},
           "B": {0: start(2, (1, 3), target=9, mapping=[3]), 5: recut(0, 4), 9: remap([3])},
+          "C": {0: start(4, target=11, mapping=[2]), 6: remap([1])},
           "D": {0: start(3, target=10, mapping=[1]), 3: recut(1, 1), 7: recut(0, 1)}}, maps),
         ("deferred starts under a cut through a transformation and of two columns, recut while"
          " pending", [loop, six, tone, tones],
@@ -2079,7 +2084,7 @@ def cutting(code, symbols):
                             checked="warned" not in more)
         assert version == CUT, "%s: ymxs-to-ymxr wrote version %d" % (title, version)
         try:
-            frames, ticks = check(at, code, symbols, kit=True)[:2]
+            frames, ticks = check(at, *played_on(at, code, symbols), kit=True)[:2]
         except AssertionError as e:
             raise AssertionError("%s: %s" % (title, e))
         assert ticks, "%s: no tick" % title
@@ -6112,7 +6117,7 @@ def played_on(at, code, symbols):
 
 # The checks before the tunes that play their tunes through played_on, so
 # a run under -linked plays them on linked players.
-LINKABLE = ("deferred", "mapped")
+LINKABLE = ("deferred", "mapped", "cutting")
 
 # The tunes of -generated: tune N is drawn from a generator seeded with N,
 # so tune I of a run from seed S is tune S + I, and -generated1 -seedN
@@ -6222,8 +6227,8 @@ def generated_tune(rng, title, maps, defers, letters, cuts=None):
     and a recut where the effect runs a source that repeats with no start
     pending, its cut in the rows of every source of the lane; a timer
     under a cut defers no start. The draws of cuts come from that
-    generator alone, so a tune drawn without it, as under -linked, is the
-    tune drawn before cuts.
+    generator alone, so a tune drawn without it is the tune drawn before
+    cuts.
 
     R rows, 8 to 24, at 50 Hz, R and the repeat row multiples of 4, so the
     writer pads no table (tools.md 4.4) and an edit of row N lands on row
@@ -6477,11 +6482,9 @@ def generated_song(number):
              for _ in range(count)]
     titles = (["generated %d" % number] if count == 1
               else ["generated %d.%d" % (number, k + 1) for k in range(count)])
-    # the draws of cuts, a generator a subtune, apart from the song's; a
-    # link keeps the cut's code once its pieces are defined (doc/cuts.md),
-    # and until then -linked draws none
+    # the draws of cuts, a generator a subtune, apart from the song's
     return [(title,) + generated_tune(rng, title, maps, defers, letters,
-                                      None if LINKED else Draws(2 ** 32 + 4 * number + k))
+                                      Draws(2 ** 32 + 4 * number + k))
             for k, (title, (maps, defers, letters)) in enumerate(zip(titles, drawn))]
 
 
@@ -6824,9 +6827,7 @@ def patched_code_follows_the_subtune(defines, tunes):
         except AnotherFormat:
             continue
         bound = bind(file, work)
-        # a tune of version 11 is outside an SNDH file until a link keeps
-        # the cut's code (68k/player/switches.S)
-        if bound is None or struct.unpack(">H", file[4:6])[0] == CUT:
+        if bound is None:
             continue
         rate = rate or file[6:8]
         if file[6:8] != rate:
@@ -7036,17 +7037,6 @@ def main():
                 "%s: the binder bound a tune of another version" % os.path.basename(one)
             print("%-45s the binder and the reader reject it"
                   % os.path.basename(one))
-        # A link keeps the cut's code once its pieces are defined
-        # (doc/cuts.md): until then, under -linked, each tune of version
-        # 11 is named and left out of the tunes played.
-        later = []
-        for one in tunes:
-            with open(one, "rb") as f:
-                if f.read(6)[4:6] == b"\x00\x0b" and LINKED:
-                    later.append(one)
-        tunes = [one for one in tunes if one not in later]
-        for one in later:
-            print("%-45s version 11, which a link leaves out" % os.path.basename(one))
     elif wide is not None:
         said = wide[len("-corpus"):]
         if said and not said.isdigit():
@@ -7116,10 +7106,6 @@ def main():
         try:
             file, _ = convert(one, opens)
         except AnotherFormat:
-            continue
-        # a tune of version 11 is outside an SNDH file until a link keeps
-        # the cut's code (68k/player/switches.S)
-        if struct.unpack(">H", file[4:6])[0] == CUT:
             continue
         first = one
         break

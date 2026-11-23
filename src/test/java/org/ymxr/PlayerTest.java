@@ -268,7 +268,7 @@ final class PlayerTest {
         List<Integer> reads = figures(row(said, "the highest bound tune version").getKey());
         assertEquals(List.of(equates(false, false).get("YMXR_VERSION"),
                 equates(false, true).get("YMXR_VERSION")), reads, "2.2's versions");
-        assertEquals(List.of(Tune.UNMAPPED, Tune.VERSION), reads);
+        assertEquals(List.of(Tune.UNMAPPED, Tune.CUT), reads);
         List<Integer> fixed = new java.util.ArrayList<>();
         for (boolean[] one : new boolean[][] {{false, false}, {true, false}, {false, true},
                 {true, true}}) {
@@ -330,7 +330,8 @@ final class PlayerTest {
                 "the player's magic is the bound tune's");
         // Version 9 has thirty columns and source index at 24. Version
         // 10 adds mapping columns, block pointer at 24 and source index
-        // after it (BINARIES.md 1.2; SPEC.md 3.3.5).
+        // after it, and version 11 cut columns, the cut index at 28 and
+        // the source index after it (BINARIES.md 1.2; SPEC.md 3.3.5).
         for (boolean defer : new boolean[] {false, true}) {
             Map<String, Integer> plain = equates(defer, false);
             Map<String, Integer> mapped = equates(defer, true);
@@ -339,13 +340,17 @@ final class PlayerTest {
             assertEquals(Columns.C, plain.get("YMXR_COLUMNS"));
             assertEquals(Bound.indexAt(Tune.UNMAPPED), plain.get("TF_INDEX"));
             assertTrue(!plain.containsKey("TF_TRANS"), "TF_TRANS without the lookup");
-            assertEquals(Tune.VERSION, mapped.get("YMXR_VERSION"),
+            assertEquals(Tune.CUT, mapped.get("YMXR_VERSION"),
                     "the version the player with the lookup reads");
-            assertEquals(Columns.MAPPED, mapped.get("YMXR_COLUMNS"));
+            assertEquals(Columns.ALL, mapped.get("YMXR_COLUMNS"));
             assertEquals(Bound.TRANSFORMATIONS_AT, mapped.get("TF_TRANS"));
             assertEquals(Bound.indexAt(Tune.VERSION),
                     Objects.requireNonNull(mapped.get("TF_TRANS")) + 4,
                     "the index of version 10 follows the block's long");
+            assertEquals(Bound.CUTS_AT, mapped.get("TF_CUTS"));
+            assertEquals(Bound.indexAt(Tune.CUT),
+                    Objects.requireNonNull(mapped.get("TF_CUTS")) + 4,
+                    "the index of version 11 follows the cut index's long");
             assertEquals(Bound.indexAt(Tune.UNMAPPED), mapped.get("TF_INDEX"),
                     "versions 7 to 9 on the player with the lookup");
         }

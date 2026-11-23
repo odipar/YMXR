@@ -16,11 +16,13 @@ ymxr_k_two:     dc.w    $000F
 ymxr_k_three:   dc.w    $000F
 ymxr_k_envelope: dc.w   $000F
 ymxr_k_countedthree: dc.w $000F
-; The effects that keep the remap's piece and the deferred start's of
-; their frame code, a bit an effect: init aims an effect's branches at the
-; two where its bit is set and the tune maps a value or defers a start.
+; The effects that keep the remap's piece, the cut's and the deferred
+; start's of their frame code, a bit an effect: init aims an effect's
+; branches at the three where its bit is set and the tune maps a value,
+; is of version 11 or defers a start.
                 .if     YMXR_MAP
 ymxr_k_map:     dc.w    $000F
+ymxr_k_cut:     dc.w    $000F
                 .endif
                 .if     YMXR_DEFER
 ymxr_k_defer:   dc.w    $000F

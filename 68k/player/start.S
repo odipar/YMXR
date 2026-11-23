@@ -15,12 +15,14 @@
 ; lists an effect at the offsets RES_ below.
 ; An effect's record in ymxr_resets: the site of its place's reset, and
 ; the bytes from its head's end to the start of a source of one row, to
-; the remap's piece, to the deferred start's and to the rest.
+; the cut's piece, to the remap's, to the deferred start's and to the
+; rest.
 RES_ONE         equ     2
-RES_MAP         equ     4
-RES_DEFER       equ     4+(2*YMXR_MAP)
-RES_TAIL        equ     4+(2*YMXR_MAP)+(2*YMXR_DEFER)
-RES_SIZE        equ     6+(2*YMXR_MAP)+(2*YMXR_DEFER)
+RES_CUT         equ     4
+RES_MAP         equ     4+(2*YMXR_MAP)
+RES_DEFER       equ     4+(4*YMXR_MAP)
+RES_TAIL        equ     4+(4*YMXR_MAP)+(2*YMXR_DEFER)
+RES_SIZE        equ     6+(4*YMXR_MAP)+(2*YMXR_DEFER)
 PICK_AT         equ     ymxr_tick0_pick-ymxr_tick0_over+2
 PICK_SQ         equ     ymxr_e_effect0_1-ymxr_tick0_pick-2
 PICK_ONE        equ     ymxr_e_effect0_1-ymxr_tick0_pick-2      ; and the square's
@@ -78,15 +80,15 @@ RS_MAP          equ     ymxr_e_effect0_1-ymxr_tick0_rs-2+ymxr_tick0_rmk-ymxr_p_m
 ; that read the cut column first, and, where the tune maps a value, the
 ; head's branch on the set bits past the count at the or of the cut column
 ; (init.S).
-NOW_X           equ     ymxr_e_effect0_1-ymxr_tick0_now-2+ymxr_tick0_xnow-ymxr_p_map0_1         ; RES_MAP
-UNSET_X         equ     ymxr_e_effect0_1-ymxr_tick0_unset-2+ymxr_tick0_xunset-ymxr_p_map0_1     ; RES_MAP
+NOW_X           equ     ymxr_e_effect0_1-ymxr_tick0_now-2+ymxr_tick0_xnow-ymxr_p_cut0_1         ; RES_CUT
+UNSET_X         equ     ymxr_e_effect0_1-ymxr_tick0_unset-2+ymxr_tick0_xunset-ymxr_p_cut0_1     ; RES_CUT
 HEAD_AT         equ     ymxr_tick0_head-ymxr_tick0_over
 HEAD_SOME       equ     $6B00|((ymxr_tick0_some-ymxr_tick0_head-2)&$FF)     ; bmi.s _some
 HEAD_X          equ     $6000|((ymxr_tick0_xhead-ymxr_tick0_head-2)&$FF)    ; bra.s _xhead
-                .if     (ymxr_e_effect3_1-ymxr_tick3_now-2+ymxr_tick3_xnow-ymxr_p_map3_1)<>NOW_X
+                .if     (ymxr_e_effect3_1-ymxr_tick3_now-2+ymxr_tick3_xnow-ymxr_p_cut3_1)<>NOW_X
                 .error  "effect 3 lays its start of version 11 out apart from effect 0"
                 .endif
-                .if     (ymxr_e_effect3_1-ymxr_tick3_unset-2+ymxr_tick3_xunset-ymxr_p_map3_1)<>UNSET_X
+                .if     (ymxr_e_effect3_1-ymxr_tick3_unset-2+ymxr_tick3_xunset-ymxr_p_cut3_1)<>UNSET_X
                 .error  "effect 3 lays its recut out apart from effect 0"
                 .endif
                 .if     ((ymxr_tick3_head-ymxr_tick3_over)<>HEAD_AT)|((ymxr_tick3_xhead-ymxr_tick3_head)<>(ymxr_tick0_xhead-ymxr_tick0_head))|((ymxr_tick3_some-ymxr_tick3_head)<>(ymxr_tick0_some-ymxr_tick0_head))
@@ -126,8 +128,8 @@ SET_DEFER       equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_check-ymxr_
                 .if     YMXR_MAP
 ; For a tune of version 11 that defers a start, init aims the start and
 ; the stop at the path that reads the cut column before the arming.
-SET_X           equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_xcheck-ymxr_p_defer0_1     ; RES_DEFER
-                .if     (ymxr_e_effect3_1-ymxr_tick3_set-2+ymxr_tick3_xcheck-ymxr_p_defer3_1)<>SET_X
+SET_X           equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_xcheck-ymxr_p_cut0_1       ; RES_CUT
+                .if     (ymxr_e_effect3_1-ymxr_tick3_set-2+ymxr_tick3_xcheck-ymxr_p_cut3_1)<>SET_X
                 .error  "effect 3 lays its deferred start of version 11 out apart from effect 0"
                 .endif
                 .endif

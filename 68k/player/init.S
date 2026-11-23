@@ -529,12 +529,6 @@ YMXR_init:
                 beq.s   .aims                   ; lie elsewhere where it has
                 move.l  #((WIDE_WIDEN&$FFFF)<<16)|(RESET_WIDE&$FF),d0
 .aims:
-                .if     YMXR_MAP
-                btst    #6,WS_EFFECTS(a6)       ; a tune that cuts a source
-                beq.s   .uncuts                 ; runs the counted handler at
-                move.b  #RESET_X&$FF,d0         ; any shape, whose place's
-.uncuts:                                        ; reset reads the running cut
-                .endif
 
 ; The effects the tune runs are read every row; the others are jumped
 ; over by the branch at each macro's head, where the tune does not run
@@ -565,6 +559,22 @@ YMXR_init:
                 subq.l  #2,d3                   ; replaced with the read
                 move.w  d3,2(a1)
 .pick:          move.l  d0,d5
+                .if     YMXR_MAP
+; Bits 5 and 6 of the effects byte as the effect runs them, in d3: bit 6
+; where the effect keeps the cut's piece (ymxr_k_cut), and a tune of
+; version 11 otherwise as one that cuts no source. An effect that cuts
+; runs the counted handler at any shape, whose place's reset reads the
+; running cut.
+                move.b  WS_EFFECTS(a6),d3
+                and.b   #$60,d3
+                btst    d2,ymxr_k_cut+1(pc)
+                bne.s   .xkept
+                bclr    #6,d3
+.xkept:         btst    #6,d3
+                beq.s   .xreset
+                move.b  #RESET_X&$FF,d5
+.xreset:
+                .endif
                 move.w  (a2),d4
                 move.b  d5,(a4,d4.w)            ; the place's reset, at the site
                 move.w  d1,d4                   ; the table names; a branch to
@@ -612,19 +622,19 @@ YMXR_init:
 ; installs a pending start; other tunes continue directly to rate
 ; processing.
 ;
-; For effects bit 6, version 11, the start and the unset source are aimed
-; at the paths that read the cut column first (_xnow, _xunset), and the
-; timer's reset as for bit 5, at the path that keeps the control byte
-; before the reset in d3 for the recut (_rmk); where the tune defers a
-; start, the start's test as well, so the arming captures the kept cut
-; after the row (_xcheck). The head ors the column at 30 + i, the cut
-; column where the tune maps no value; where it maps one, the head's
-; branch on the set bits is aimed past the count at the or of the cut
-; column at 34 + i (_xhead).
+; For effects bit 6, version 11, in an effect that keeps the cut's
+; piece, the start and the unset source are aimed at the paths that read
+; the cut column first (_xnow, _xunset), and the timer's reset as for bit
+; 5, at the path that keeps the control byte before the reset in d3 for
+; the recut (_rmk); where the tune defers a start, the start's test as
+; well, so the arming captures the kept cut after the row (_xcheck). The
+; head ors the column at 30 + i, the cut column where the tune maps no
+; value; where it maps one, the head's branch on the set bits is aimed
+; past the count at the or of the cut column at 34 + i (_xhead). A link
+; keeps the piece where a row sets the effect's cut column, and an effect
+; without it runs the tune as one that cuts no source.
                 move.w  #HEAD_SOME,HEAD_AT(a1)
-                move.b  WS_EFFECTS(a6),d4
-                and.b   #$60,d4
-                cmp.b   #$60,d4
+                cmp.b   #$60,d3
                 bne.s   .head
                 move.w  #HEAD_X,HEAD_AT(a1)
 .head:          btst    d2,ymxr_k_map+1(pc)     ; an effect that keeps the
@@ -637,22 +647,21 @@ YMXR_init:
                 add.w   #REMAP_RATE,d4
                 move.w  d4,REMAP_AT(a0)
                 .endif
-                move.b  WS_EFFECTS(a6),d4
-                and.b   #$60,d4
+                tst.b   d3
                 beq.s   .identity
-                btst    #6,d4
+                btst    #6,d3
                 bne.s   .cuts
                 AIM     NOW_MAP,NOW_AT,RES_MAP
                 AIM     UNSET_MAP,UNSET_AT,RES_MAP
                 bra.s   .reset
-.cuts:          AIM     NOW_X,NOW_AT,RES_MAP
-                AIM     UNSET_X,UNSET_AT,RES_MAP
+.cuts:          AIM     NOW_X,NOW_AT,RES_CUT
+                AIM     UNSET_X,UNSET_AT,RES_CUT
                 .if     YMXR_DEFER
                 btst    #4,WS_EFFECTS(a6)       ; and the start that defers,
                 beq.s   .reset                  ; through the cut column
                 btst    d2,ymxr_k_defer+1(pc)
                 beq.s   .reset
-                AIM     SET_X,SET_AT+2,RES_DEFER
+                AIM     SET_X,SET_AT+2,RES_CUT
                 .endif
 .reset:         move.w  #$6000,RS_AT(a1)        ; bra.w
                 AIM     RS_MAP,RS_AT+2,RES_MAP
@@ -855,6 +864,11 @@ ymxr_kept:      and.w   #$FF,d0
                 btst    d0,ymxr_k_map+1(pc)
                 rts
 .map_done:
+                btst    #10,d1
+                beq.s   .cut_done
+                btst    d0,ymxr_k_cut+1(pc)
+                rts
+.cut_done:
                 .endif
                 .if     YMXR_DEFER
                 btst    #9,d1

@@ -29,7 +29,9 @@ final class Link {
      *  lists them: each handler kind, which init's loop over it is, and
      *  its instance on each effect; the start of several columns; each
      *  effect's frame code and general handler; each effect's remap and
-     *  deferred start; each lookup kind and its instances; and align. */
+     *  deferred start; the cut's routines and each effect's paths that
+     *  read the cut column; each lookup kind and its instances; and
+     *  align. */
     static final List<String> BLOCKS = blocks();
 
     private static List<String> blocks() {
@@ -48,6 +50,10 @@ final class Link {
             for (int i = 0; i < 4; i++) {
                 all.add(part + i);
             }
+        }
+        all.add("cut");
+        for (int i = 0; i < 4; i++) {
+            all.add("cut" + i);
         }
         for (String kind : LOOKUPS) {
             all.add(kind);
@@ -73,12 +79,17 @@ final class Link {
      * bits 0 to 3 of its effects byte, and its remap where the tune maps a
      * value and a row sets the effect's mapping column, and its deferred
      * start where the tune defers a start and a row of the effect does;
-     * for each source an effect's rows
-     * start, the instance of its handler kind on that effect and the
-     * kind's loop of init; {@code several} where a start is of a counted
-     * source or one of several columns; the lookup instance of each kind
-     * an effect maps a source through, and the kind's loop of init; and
-     * {@code align}, the padding before the second bank.
+     * for each source an effect's rows start, the instance of its handler
+     * kind on that effect and the kind's loop of init; {@code several}
+     * where a start is of a counted source or one of several columns; the
+     * lookup instance of each kind an effect maps a source through, and
+     * the kind's loop of init; and {@code align}, the padding before the
+     * second bank. An effect that cuts a source, in a tune of version 11
+     * whose row sets the effect's cut column, needs its paths that read
+     * the column, {@code cut0} for effect 0, the cut's routines, its
+     * remap, {@code several}, and for each source its rows start the
+     * counted kind of the source's columns, the kind a start and a recut
+     * under a cut run.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
@@ -93,6 +104,13 @@ final class Link {
                     continue;
                 }
                 needed.add("effect" + i);
+                boolean cuts = cuts(tune, i);
+                if (cuts) {
+                    needed.add("cut");
+                    needed.add("cut" + i);
+                    needed.add("map" + i);
+                    needed.add("several");
+                }
                 if (Columns.maps(tune.effects()) && sets(tune, tune.mapping(i), 0)) {
                     needed.add("map" + i);
                 }
@@ -111,6 +129,11 @@ final class Link {
                     if (counted || source.columns() > 1) {
                         needed.add("several");
                     }
+                    if (cuts) {
+                        String under = kind(source, true);
+                        needed.add(under);
+                        needed.add(under + i);
+                    }
                 }
             }
         }
@@ -121,6 +144,12 @@ final class Link {
             }
         }
         return ordered;
+    }
+
+    /** Whether effect i cuts a source: the tune is of version 11, bit 6
+     *  of its effects byte, and a row sets the effect's cut column. */
+    static boolean cuts(TuneFile tune, int i) {
+        return Columns.cuts(tune.effects()) && sets(tune, tune.cut(i), 0);
     }
 
     /** Whether a row of the tune sets column {@code c}, bit 7, with the
@@ -148,7 +177,9 @@ final class Link {
      * rows are read as a player reads them, through the repeat row until
      * each effect's state there is one it has had before, as Pages reads
      * them; a deferred start on a running timer adds its source to the
-     * ones a remap reaches.
+     * ones a remap reaches. On an effect that cuts a source, each source
+     * mapped adds the counted kind of its columns, the kind a start and a
+     * recut under a cut run.
      */
     static Set<String> lookups(TuneFile tune) {
         Set<String> out = new LinkedHashSet<>();
@@ -156,6 +187,10 @@ final class Link {
             return out;
         }
         Table table = tune.table();
+        boolean[] cuts = new boolean[4];
+        for (int i = 0; i < 4; i++) {
+            cuts[i] = (tune.effects() & 1 << i) != 0 && cuts(tune, i);
+        }
         int[] target = new int[4];
         int[] mapping = new int[4];
         List<Set<Integer>> running = new ArrayList<>();
@@ -163,7 +198,7 @@ final class Link {
             running.add(new java.util.TreeSet<>());
         }
         for (int row = 0; row < table.rows(); row++) {
-            lookupRow(tune, table, row, target, mapping, running, out);
+            lookupRow(tune, table, row, target, mapping, running, cuts, out);
         }
         Set<List<Integer>> seen = new java.util.HashSet<>();
         while (table.repeat() < table.rows()) {
@@ -178,7 +213,7 @@ final class Link {
                 break;
             }
             for (int row = table.repeat(); row < table.rows(); row++) {
-                lookupRow(tune, table, row, target, mapping, running, out);
+                lookupRow(tune, table, row, target, mapping, running, cuts, out);
             }
         }
         return out;
@@ -187,7 +222,8 @@ final class Link {
     /** One row's effect columns for {@link #lookups}: a running source is
      *  kept with its target, its number times 64 plus the target. */
     private static void lookupRow(TuneFile tune, Table table, int row, int[] target,
-                                  int[] mapping, List<Set<Integer>> running, Set<String> out) {
+                                  int[] mapping, List<Set<Integer>> running, boolean[] cuts,
+                                  Set<String> out) {
         for (int i = 0; i < 4; i++) {
             if ((tune.effects() & 1 << i) == 0) {
                 continue;
@@ -209,9 +245,8 @@ final class Link {
                 if ((map & 0x80) != 0) {
                     mapping[i] = map & 0x7F;
                 }
-                String kind = lookup(tune, s, target[i]);
-                if (mapping[i] != 0 && kind != null) {
-                    out.add(kind + i);
+                if (mapping[i] != 0) {
+                    mapped(tune, s, target[i], i, cuts[i], out);
                 }
                 boolean deferred = (control & 0x80) != 0 && (control & Columns.DEFERRED) != 0;
                 if (!deferred || running.get(i).isEmpty()) {
@@ -222,13 +257,29 @@ final class Link {
                 mapping[i] = map & 0x7F;
                 if (mapping[i] != 0) {
                     for (int one : running.get(i)) {
-                        String kind = lookup(tune, one / 64, one % 64);
-                        if (kind != null) {
-                            out.add(kind + i);
-                        }
+                        mapped(tune, one / 64, one % 64, i, cuts[i], out);
                     }
                 }
             }
+        }
+    }
+
+    /** The lookup instances on effect i of source {@code s} mapped on
+     *  {@code target}: the kind of its shape, and under a cut the counted
+     *  kind of its columns. */
+    private static void mapped(TuneFile tune, int s, int target, int i, boolean cuts,
+                               Set<String> out) {
+        String kind = lookup(tune, s, target);
+        if (kind != null) {
+            out.add(kind + i);
+        }
+        if (cuts && s >= 1 && s <= tune.sources().size()) {
+            Table source = tune.sources().get(s - 1);
+            out.add(switch (source.columns()) {
+                case 1 -> "lc";
+                case 2 -> target >= NOISE ? "lf" : "le";
+                default -> target == BUZZER ? "lg" : "lh";
+            } + i);
         }
     }
 

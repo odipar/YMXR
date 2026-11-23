@@ -334,12 +334,12 @@ final class ParityTest {
             assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(sndh,
                     Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
             String said = steady(made.said());
-            assertTrue(said.contains("; the lookup in: a subtune maps a value\n")
+            assertTrue(said.contains("; the lookup in: a subtune maps a value or cuts a source\n")
                     && said.contains("the images: " + (in == tune ? "1 image" : "2 images")
                     + " of "), said);
             both("ymxr-prg", sndh);
             String layout = new String(both("ymxr-layout", sndh), StandardCharsets.US_ASCII);
-            assertTrue(layout.contains("\"version\":10,") && layout.contains("\"binds\":10,"),
+            assertTrue(layout.contains("\"version\":10,") && layout.contains("\"binds\":11,"),
                     layout);
         }
         for (String tool : List.of("ymxs-to-sndh", "ymxs-to-prg")) {
@@ -363,7 +363,7 @@ final class ParityTest {
         Ran chosen = same("ymxr-sndh", far, "-carried");
         assertTrue(steady(chosen.said()).contains("ticks that read a row through an absolute"
                 + " address: the tunes end past the 32767 bytes a displacement reaches; the"
-                + " lookup in: a subtune maps a value\n"), chosen.said());
+                + " lookup in: a subtune maps a value or cuts a source\n"), chosen.said());
         assertEquals(Sndh.CORE_MAP, Tune.getWord(chosen.out(),
                 Sndh.even(Tune.getWord(chosen.out(), 2) + 2) + Sndh.CORE_FLAGS_AT));
         Ran asked = same("ymxr-sndh", far, "-carried", "-pcrel", "-silent");

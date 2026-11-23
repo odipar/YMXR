@@ -179,12 +179,14 @@ fields.
 **1.5 What the player reads.** At init (5.1), in order:
 
 1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007 to
-   $0009 (SPEC.md 3.3.5), or $0007 to $000A in a player assembled with
+   $0009 (SPEC.md 3.3.5), or $0007 to $000B in a player assembled with
    the lookup (2.1), report -1 and stop.
 2. The field at 16 and the field at 8; where bit 4 of the field at 8 is
    set and the player is assembled without the deferred start (2.1),
-   report -1 and stop. In a player assembled with the lookup, where bit 5
-   is set and the version is other than $000A, report -1 and stop.
+   report -1 and stop. In a player assembled with the lookup, report -1
+   and stop where bit 5 is set and the version is $0007 to $0009, or
+   $000B with the field at 24 at 0; and where bit 6 is set and the
+   version is other than $000B, or clear and the version is $000B.
 3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
@@ -193,7 +195,8 @@ fields.
    its `RR` and its rows from byte 16. A player of 5.5 measures each
    source against its handlers here and reports -1 for one past their
    reach.
-6. In a player assembled with the lookup, a version 10 tune's list:
+6. In a player assembled with the lookup, the list of a tune of version
+   10, and of version 11 where bit 5 is set:
    where the tag is absent, an entry is out of range, or the list counts
    a page and the area of `a2` (5.1) is odd, below the player's last
    byte, or too near the reach for the fallback of 5.6, report -1 and
@@ -232,20 +235,21 @@ reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
 core with it is 5,182 bytes larger.
 
 Each of the sixteen has a twin with `-map` before `.bin`, assembled with
-optional lookup support, `YMXR_MAP=1` (SPEC.md 1.10). Its flags word is
-the original plus 16: `YMXR_sndh-map.bin` reads 20, and
+optional lookup support, `YMXR_MAP=1` (SPEC.md 1.10, 1.11). Its flags
+word is the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 `YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to
-version 10 and every other core to version 9 (2.2), so init of a core
+version 11 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
-bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 14,544 bytes larger than
-`YMXR_sndh.bin`. The field at 26 of a core with the lookup in is the
-offset of its first handler: every byte from there to the core's end is
-a handler, an installer, the monitor's counter or padding. The padding
-puts every lookup handler's page displacement on its effect's offset
-modulo 256. With deferred starts, the second bank of handlers begins a
-multiple of 256 bytes from the first. The frame's routines come before
-the first handler. The page area and the fallbacks of 5.6 follow the
-core's last byte (3.1).
+bit 5, and of version 11, whose effects byte sets bit 6 (SPEC.md 3.3);
+`YMXR_sndh-map.bin` is 14,600 bytes larger than `YMXR_sndh.bin`. The
+field at 26 of a core with the lookup in is the offset of its first
+handler: every byte from there to the core's end is a handler, an
+installer, the monitor's counter or padding. The padding puts every
+lookup handler's page displacement on its effect's offset modulo 256.
+With deferred starts, the second bank of handlers begins a multiple of
+256 bytes from the first. The frame's routines come before the first
+handler. The page area and the fallbacks of 5.6 follow the core's last
+byte (3.1).
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
@@ -255,8 +259,8 @@ without the lookup, and the core that reads an absolute address for a
 file whose tunes end further off (5.5). A caller that names the third
 reads back that core, or the line of 2.10 where the file's tunes end
 past the reach. The tool enables deferred-start support if any subtune
-sets effects bit 4, and lookup support if any subtune sets bit 5. An
-identity-only set uses a core without lookup support.
+sets effects bit 4, and lookup support if any subtune sets bit 5 or
+bit 6.
 
 **2.2 Layout**, from the core's first byte:
 
@@ -267,7 +271,7 @@ identity-only set uses a core without lookup support.
 | 8 | 4 | `bra.w` to play (2.9) |
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
-| 18 | 2 | the highest bound tune version this core reads: 9, and 10 with the lookup in (2.1) |
+| 18 | 2 | the highest bound tune version this core reads: 9, and 11 with the lookup in (2.1) |
 | 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, 2,312 with the deferred start in, 2,284 with the lookup in, and 2,460 with both |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
@@ -287,7 +291,7 @@ in. The patched offsets count from the core's first byte and are even.
 | 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires with `YMXR_NEST=0`; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
 | 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose bound tunes and sources end within 32,767 bytes of the core's first byte plus its field at 26 (2.1), which the tool that writes it reads (2.10, 5.5) |
 | 3 | the deferred start (`YMXR_DEFER=1`, performance.md): the frame arms the start of SPEC.md 4.8, and the tick that reads the running source's last row performs it | this core under a tune whose effects byte sets bit 4, which init of a core with bit 3 clear reports -1 for (1.5) |
-| 4 | the lookup (`YMXR_MAP=1`, SPEC.md 1.10): the player reads bound tunes to version 10, and a tick of a source through a transformation writes the transformation's entry for the source's key | this core under a tune whose effects byte sets bit 5, a tune of version 10, which init of a core with bit 4 clear reports -1 for (1.5) |
+| 4 | the lookup (`YMXR_MAP=1`, SPEC.md 1.10, 1.11): the player reads bound tunes to version 11, a tick of a source through a transformation writes the transformation's entry for the source's key, and a start and a recut run a source under a cut | this core under a tune whose effects byte sets bit 5 or bit 6, a tune of version 10 or 11, which init of a core with bit 4 clear reports -1 for (1.5) |
 
 **2.4 The state byte**, at the offset in the field at 24: bit 0 is
 set from init's step 8 to exit's step 1, while a tune plays; bit 1 is set
@@ -382,7 +386,7 @@ file (3) and reports the first condition met:
 | the lean tick is selected and bit 1 of the flags word F is clear | `the core's flags at 22 read F, and the lean tick asked for needs bit 1 set` |
 | the row read through the program counter is selected and bit 2 of the flags word F is clear | `the core's flags at 22 read F, and the row read through the program counter asked for needs bit 2 set` |
 | the effects byte of a subtune sets bit 4 and bit 3 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that defers a start needs bit 3 set` |
-| the effects byte of a subtune sets bit 5 and bit 4 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that maps a value needs bit 4 set` |
+| the effects byte of a subtune sets bit 5 or bit 6 and bit 4 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that maps a value or cuts a source needs bit 4 set` |
 | the row read through the program counter is selected, the core's field at 26 is 0, and the file's bound tunes and sources end B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
 | the row read through the program counter is selected, the core's field at 26 is F, above 0, and the file's bound tunes and sources end B bytes past the core's first byte plus F, B above 32,767 (2.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
 | the core has the lookup in, its field at 26 is F, and a subtune's list needs an area of 5.6 that ends past the reach with its tables and the fallback of each effect of the list alone, B bytes past the core's first byte plus F | `the page area ends B bytes past the core's first handler, at F, and a tick's page read reaches 32767` |

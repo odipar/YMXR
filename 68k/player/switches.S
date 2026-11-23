@@ -57,20 +57,19 @@ YMXR_DEFER      equ     0
 ; by ymxr_fill.
 ;
 ; With lookup support, init accepts versions 7 to 11, and version 11 adds
-; the cut (SPEC.md 1.11); the core's descriptor records 10 (BINARIES.md 2)
-; until a link keeps the cut's code (doc/cuts.md). Without it, init
-; accepts 7 to 9 and reports -1 for 10 and 11. Code from ymxr_tick0 onward
-; contains handlers, installers and alignment padding; tools measure
-; source reach from there (BINARIES.md 2.1).
+; the cut (SPEC.md 1.11), which the core's descriptor records (BINARIES.md
+; 2.2). Without it, init accepts 7 to 9 and reports -1 for 10 and 11. Code
+; from ymxr_tick0 onward contains handlers, installers and alignment
+; padding; tools measure source reach from there (BINARIES.md 2.1).
                 .if     ^^defined YMXR_MAP
                 .else
 YMXR_MAP        equ     0
                 .endif
                 .if     YMXR_MAP
-YMXR_VERSION    equ     $000A           ; the descriptor's version:
-                                        ; versions 7 to 10, including
-                                        ; mapping columns
-YMXR_COLUMNS    equ     34
+YMXR_VERSION    equ     $000B           ; the descriptor's version:
+                                        ; versions 7 to 11, including
+                                        ; mapping and cut columns
+YMXR_COLUMNS    equ     38
                 .else
 YMXR_VERSION    equ     $0009           ; the version it reads, a bound tune
                                         ; whose table is DTX3 (SPEC.md 3.3.5),

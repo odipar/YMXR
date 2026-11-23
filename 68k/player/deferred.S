@@ -444,11 +444,13 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 .if     YMXR_MAP
 ; a start under a cut 1 to 127: the counted kind of its columns, through
 ; the identity or the captured mapping, in the bank above and at the row
-; above (ymxr_kstart)
+; above (ymxr_kstart); the piece cut_3 of the cut's block
+                PIECE   cut_3
 .xarm:          move.w  4(sp),d1                ; the source
                 move.w  d6,d4
                 st      WS_ARMING(a0)
                 bsr.w   ymxr_kstart
                 sf      WS_ARMING(a0)
                 bra.w   .armed
+                ENDPIECE cut_3
                 .endif

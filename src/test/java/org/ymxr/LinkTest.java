@@ -96,11 +96,16 @@ final class LinkTest {
             if (!map || !defer) {
                 all.remove("align");
             }
-            // the remap's piece of each effect's frame code is in a core
-            // with the lookup, and the deferred start's in one with it
+            // the remap's piece and the cut's of each effect's frame code
+            // and the cut's routines are in a core with the lookup, and the
+            // deferred start's piece in one with it
+            if (!map) {
+                all.remove("cut");
+            }
             for (int i = 0; i < 4; i++) {
                 if (!map) {
                     all.remove("map" + i);
+                    all.remove("cut" + i);
                 }
                 if (!defer) {
                     all.remove("defer" + i);
@@ -356,13 +361,10 @@ final class LinkTest {
                 + deferred.length);
         for (String name : names) {
             TuneFile tune = TuneFile.read(Files.readAllBytes(KIT.resolve(name)));
-            // the table reaches the kit to version 10; a tune of version 11
-            // links from the lookup cores with the cut in (doc/cuts.md)
-            if (tune.version() > Tune.VERSION) {
-                continue;
-            }
             boolean defers = (tune.effects() & Columns.DEFERS) != 0;
-            boolean maps = (tune.effects() & Columns.MAPS) != 0;
+            // a tune that maps a value or cuts a source links from a core
+            // with the lookup in
+            boolean maps = (tune.effects() & (Columns.MAPS | Columns.CUTS)) != 0;
             assertTrue(Link.links(defers, maps), name);
             Binaries.Binary binary = Binaries.binary(false, false, true, defers, maps);
             byte[] carried = Binaries.carried(binary.name());
@@ -387,7 +389,7 @@ final class LinkTest {
                     + (kept.isEmpty() ? "none" : String.join(", ", kept)) + " | "
                     + grouped(linked.length) + " |";
             assertTrue(doc.contains(row + "\n"), "LINKER.md has no row " + row);
-            if (maps) {
+            if ((tune.effects() & Columns.MAPS) != 0) {
                 String said = lookups(name, carried, pieces, Link.blocks(List.of(tune)),
                         linked.length);
                 assertTrue(prose.contains(said), "LINKER.md does not read: " + said);

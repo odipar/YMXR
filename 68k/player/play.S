@@ -142,12 +142,13 @@ ymxr_overs:
 ; Each effect's place's reset, in the order of the heads above, effect 3
 ; first, and the bytes from the head's end to each piece of the frame
 ; code past it that the effect keeps: the start of a source of one row,
-; the remap's, the deferred start's and the rest (RES_ in start.S). Init
-; reads the two tables side by side, and leaves the entries of an effect
-; a link left out.
+; the cut's, the remap's, the deferred start's and the rest (RES_ in
+; start.S). Init reads the two tables side by side, and leaves the
+; entries of an effect a link left out.
 ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
                 dc.w    ymxr_p_one3_3-ymxr_e_effect3_1
                 .if     YMXR_MAP
+                dc.w    ymxr_p_cut3_1-ymxr_e_effect3_1
                 dc.w    ymxr_p_map3_1-ymxr_e_effect3_1
                 .endif
                 .if     YMXR_DEFER
@@ -157,6 +158,7 @@ ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
                 dc.w    ymxr_tick2_reset-ymxr_frame+1
                 dc.w    ymxr_p_one2_3-ymxr_e_effect2_1
                 .if     YMXR_MAP
+                dc.w    ymxr_p_cut2_1-ymxr_e_effect2_1
                 dc.w    ymxr_p_map2_1-ymxr_e_effect2_1
                 .endif
                 .if     YMXR_DEFER
@@ -166,6 +168,7 @@ ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
                 dc.w    ymxr_tick1_reset-ymxr_frame+1
                 dc.w    ymxr_p_one1_3-ymxr_e_effect1_1
                 .if     YMXR_MAP
+                dc.w    ymxr_p_cut1_1-ymxr_e_effect1_1
                 dc.w    ymxr_p_map1_1-ymxr_e_effect1_1
                 .endif
                 .if     YMXR_DEFER
@@ -175,6 +178,7 @@ ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
                 dc.w    ymxr_tick0_reset-ymxr_frame+1
                 dc.w    ymxr_p_one0_3-ymxr_e_effect0_1
                 .if     YMXR_MAP
+                dc.w    ymxr_p_cut0_1-ymxr_e_effect0_1
                 dc.w    ymxr_p_map0_1-ymxr_e_effect0_1
                 .endif
                 .if     YMXR_DEFER
@@ -186,6 +190,7 @@ ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
 ; The high byte is zero for a site in the effect's base code.
 SITE_MAP        equ     $0100
 SITE_DEFER      equ     $0200
+SITE_CUT        equ     $0400
 ymxr_sites:
                 dc.w    q_14-ymxr_frame+2,14,q_15-ymxr_frame+2,15
                 dc.w    q_16-ymxr_frame+2,16,q_17-ymxr_frame+2,17
@@ -205,14 +210,14 @@ ymxr_sites:
                 dc.w    c_32-ymxr_frame+2,SITE_MAP+32,c_33-ymxr_frame+2,SITE_MAP+33
                 dc.w    m_30-ymxr_frame+2,SITE_MAP+30,m_31-ymxr_frame+2,SITE_MAP+31
                 dc.w    m_32-ymxr_frame+2,SITE_MAP+32,m_33-ymxr_frame+2,SITE_MAP+33
-                dc.w    r_30-ymxr_frame+2,SITE_MAP+30,r_31-ymxr_frame+2,SITE_MAP+31
-                dc.w    r_32-ymxr_frame+2,SITE_MAP+32,r_33-ymxr_frame+2,SITE_MAP+33
+                dc.w    r_30-ymxr_frame+2,SITE_CUT+30,r_31-ymxr_frame+2,SITE_CUT+31
+                dc.w    r_32-ymxr_frame+2,SITE_CUT+32,r_33-ymxr_frame+2,SITE_CUT+33
                 dc.w    q_34-ymxr_frame+2,34,q_35-ymxr_frame+2,35
                 dc.w    q_36-ymxr_frame+2,36,q_37-ymxr_frame+2,37
-                dc.w    c_34-ymxr_frame+2,SITE_MAP+34,c_35-ymxr_frame+2,SITE_MAP+35
-                dc.w    c_36-ymxr_frame+2,SITE_MAP+36,c_37-ymxr_frame+2,SITE_MAP+37
-                dc.w    m_34-ymxr_frame+2,SITE_MAP+34,m_35-ymxr_frame+2,SITE_MAP+35
-                dc.w    m_36-ymxr_frame+2,SITE_MAP+36,m_37-ymxr_frame+2,SITE_MAP+37
+                dc.w    c_34-ymxr_frame+2,SITE_CUT+34,c_35-ymxr_frame+2,SITE_CUT+35
+                dc.w    c_36-ymxr_frame+2,SITE_CUT+36,c_37-ymxr_frame+2,SITE_CUT+37
+                dc.w    m_34-ymxr_frame+2,SITE_CUT+34,m_35-ymxr_frame+2,SITE_CUT+35
+                dc.w    m_36-ymxr_frame+2,SITE_CUT+36,m_37-ymxr_frame+2,SITE_CUT+37
                 .endif
                 .if     YMXR_DEFER
                 dc.w    d_17-ymxr_frame+2,SITE_DEFER+17,d_21-ymxr_frame+2,SITE_DEFER+21
@@ -220,8 +225,8 @@ ymxr_sites:
                 .if     YMXR_MAP
                 dc.w    d_30-ymxr_frame+2,SITE_DEFER+30,d_31-ymxr_frame+2,SITE_DEFER+31
                 dc.w    d_32-ymxr_frame+2,SITE_DEFER+32,d_33-ymxr_frame+2,SITE_DEFER+33
-                dc.w    d_34-ymxr_frame+2,SITE_DEFER+34,d_35-ymxr_frame+2,SITE_DEFER+35
-                dc.w    d_36-ymxr_frame+2,SITE_DEFER+36,d_37-ymxr_frame+2,SITE_DEFER+37
+                dc.w    d_34-ymxr_frame+2,SITE_CUT+34,d_35-ymxr_frame+2,SITE_CUT+35
+                dc.w    d_36-ymxr_frame+2,SITE_CUT+36,d_37-ymxr_frame+2,SITE_CUT+37
                 .endif
                 .endif
 ymxr_sites_end:

@@ -669,12 +669,13 @@ report of 12.4 prints the text as passed.
 
 **12.3 The core's descriptor** (BINARIES.md 2) is checked before the
 combine: `not an SNDH core: no YMXS at 12`; `the core's descriptor is
-version V, and this writes 1`; `the core reads bound tunes to version V, and
-this binds at W`, W the version the tune binds at; `the core's flags at 22
-read F, and the raster monitor asked for needs bit 0 set`; `... the lean
-tick asked for needs bit 1 set`, `... the row read through the program
-counter asked for needs bit 2 set`, `... a subtune that defers a start
-needs bit 3 set`, or `... a subtune that maps a value needs bit 4 set`.
+version V, and this writes 1`; `the core reads bound tunes to version V,
+and this binds at W`, W the version the tune binds at; `the core's flags
+at 22 read F, and the raster monitor asked for needs bit 0 set`; `... the
+lean tick asked for needs bit 1 set`, `... the row read through the
+program counter asked for needs bit 2 set`, `... a subtune that defers a
+start needs bit 3 set`, or `... a subtune that maps a value or cuts a
+source needs bit 4 set`.
 
 **12.4 The report:** the heading `the core: <file>, B bytes` under
 `-carried`, and `the core: <file> linked for the set, B bytes of C` and
@@ -687,20 +688,20 @@ read a row through an absolute address` where that was passed, and `ticks
 that read a row through an absolute address: the tunes end past the 32767
 bytes a displacement reaches` where the tool chose it (12.1), `the
 deferred start in: a subtune defers a start` where the core has it, and
-`the lookup in: a subtune maps a value` where the core has it, joined by
-`; `; the heading `the tags: TITL <title>`, then `, COMM <composer>` where
-present, `, CONV <converter>`, `, <clock><rate>` and `, FLAG ~<letters>`,
-then `, !#SN with N names` for several subtunes; a row a subtune, its name
-or `the tune`, `B bytes bound to B2, its table in image I`, B the tune
-file's bytes, B2 the bound tune's, I the number of its image from 1; the
-heading `the images: N images of B bytes, DTX's reader once a set of tunes
-that share one` with a row an image, `image I`, `<shape>, N tunes`, the
-shape `DTX3 at unit K, values of W`, W the width of a value in bytes, and
-`DTX3 at unit K, C columns, values of W` for a table of C columns, 34 or
-38 (BINARIES.md 1.4); the heading `the file: B bytes, the core C, the
-images I, the tunes T, the workspace and the rest W`, C, I, T and W the
-bytes of the core, the images, the bound tunes, and the remainder. The
-summary line is `ymxr-sndh: B bytes, N subtunes`.
+`the lookup in: a subtune maps a value or cuts a source` where the core
+has it, joined by `; `; the heading `the tags: TITL <title>`, then `, COMM
+<composer>` where present, `, CONV <converter>`, `, <clock><rate>` and `,
+FLAG ~<letters>`, then `, !#SN with N names` for several subtunes; a row a
+subtune, its name or `the tune`, `B bytes bound to B2, its table in image
+I`, B the tune file's bytes, B2 the bound tune's, I the number of its
+image from 1; the heading `the images: N images of B bytes, DTX's reader
+once a set of tunes that share one` with a row an image, `image I`,
+`<shape>, N tunes`, the shape `DTX3 at unit K, values of W`, W the width
+of a value in bytes, and `DTX3 at unit K, C columns, values of W` for a
+table of C columns, 34 or 38 (BINARIES.md 1.4); the heading `the file: B
+bytes, the core C, the images I, the tunes T, the workspace and the rest
+W`, C, I, T and W the bytes of the core, the images, the bound tunes, and
+the remainder. The summary line is `ymxr-sndh: B bytes, N subtunes`.
 
 ---
 
@@ -936,7 +937,7 @@ figure are read exactly.
 |---|---|
 | absent | the dumps named, or the eleven under `ym/test` |
 | `-corpus[N]` | N tunes spread over the corpus, `YM_CORPUS`: of its F files by name, every (F divided by N)-th, the first N of those; 40 with N absent. N follows the flag or is the argument after it, as for `-generated` and `-seed` |
-| `-generated[N]` | N tunes the rig's generator draws, in place of the fixtures, the checks before the tunes left out; 20 with N absent. Tune T is drawn from a generator seeded with T, each draw made of Python's `random()` alone: a tune, or a set of subtunes, each mapping a value or not and deferring a start or not, of rows repeating to a row or playing once, written through `ymxs-to-ymxr` and following every rule of YMXS's check of the writing rules (7.2), its rows edited and its sources reformed after. Each timer of a tune runs on targets of one width, with registers no other timer of the tune writes, and its rows perform starts of each source shape at the frame and deferred, on an idle timer and a running one, at times at the running rate with both resets clear and setting the source column alone; retunes, stops, and remaps between transformations and to and from the identity; starts under a cut and recuts, drawn from a separate generator, which `-linked` leaves out until a link keeps the cut's code, so a tune it draws is the tune drawn before cuts; a row sets the target column alone at times, and the repeat row starts or stops every timer. Each subtune plays one pass and one loop at most, which `-framesN` caps, every tick against the model and every frame against the reader's record, ticks inside a frame among them, and the run prints its frames and ticks on a line. Under `-linked` each tune plays on the player `ymxr-sndh` links for it, a set linked as one, a line before its subtunes naming the core and the blocks left out. The run then prints its coverage line: the count of each operation of the rows played, of the tunes that repeat and that play once and of the sets, and the shapes, the effects and the targets started; under `-linked` a line a core, the tunes linked from it and the blocks every one of them leaves out; and last the count of the tunes and the subtunes that play as the specification reads, with the seed and the version of Python. A tune that fails is written to a new folder, its name beginning `ymxr-generated-T-`, in the folder `YMXR_GENERATED` names, or in the system's temporary folder where it is unset: each subtune's structure, its tune file and the edits and forms of its rows and sources. The run prints the folder's path, the seed, the version of Python and the tune's place in the run, and `-generated1 -seedT` plays it alone. A tune named, `-corpus`, `-kit` and `-only` with it are an error |
+| `-generated[N]` | N tunes the rig's generator draws, in place of the fixtures, the checks before the tunes left out; 20 with N absent. Tune T is drawn from a generator seeded with T, each draw made of Python's `random()` alone: a tune, or a set of subtunes, each mapping a value or not and deferring a start or not, of rows repeating to a row or playing once, written through `ymxs-to-ymxr` and following every rule of YMXS's check of the writing rules (7.2), its rows edited and its sources reformed after. Each timer of a tune runs on targets of one width, with registers no other timer of the tune writes, and its rows perform starts of each source shape at the frame and deferred, on an idle timer and a running one, at times at the running rate with both resets clear and setting the source column alone; retunes, stops, and remaps between transformations and to and from the identity; starts under a cut and recuts, drawn from a separate generator, so a tune drawn without it is the tune drawn before cuts; a row sets the target column alone at times, and the repeat row starts or stops every timer. Each subtune plays one pass and one loop at most, which `-framesN` caps, every tick against the model and every frame against the reader's record, ticks inside a frame among them, and the run prints its frames and ticks on a line. Under `-linked` each tune plays on the player `ymxr-sndh` links for it, a set linked as one, a line before its subtunes naming the core and the blocks left out. The run then prints its coverage line: the count of each operation of the rows played, of the tunes that repeat and that play once and of the sets, and the shapes, the effects and the targets started; under `-linked` a line a core, the tunes linked from it and the blocks every one of them leaves out; and last the count of the tunes and the subtunes that play as the specification reads, with the seed and the version of Python. A tune that fails is written to a new folder, its name beginning `ymxr-generated-T-`, in the folder `YMXR_GENERATED` names, or in the system's temporary folder where it is unset: each subtune's structure, its tune file and the edits and forms of its rows and sources. The run prints the folder's path, the seed, the version of Python and the tune's place in the run, and `-generated1 -seedT` plays it alone. A tune named, `-corpus`, `-kit` and `-only` with it are an error |
 | `-seedS` | with `-generated`, the tunes from tune S on: tune I of the run is tune S + I; 0 with S absent |
 | `-framesN` | each tune for N frames at most |
 | `-onlyNAMES` | the checks NAMES names alone, a comma between two, after one build of the player and with no tune played: of `cores`, `sets`, `unplaced`, `deferred`, `cutting`, `mapped`, `fallbacks`, `deferred_sizes`, `mapped_sizes`, `absolute_sizes`, `halves`, `voices`, `widekept`, `envelope`, `wholebyte` and `outofreach`, in that order; another name is an error |
@@ -952,8 +953,8 @@ figure are read exactly.
 | `-lean` | the player assembled with `YMXR_NEST=0` and `YMXR_AEOI=1`, against the model |
 | `-defer` | every tune on the player assembled with `YMXR_DEFER=1`, against the model; without it, a tune whose effects byte sets bit 4 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
 | `-map` | every tune on the player assembled with `YMXR_MAP=1`, against the model; without it, a tune whose effects byte sets bit 5 plays on that player after the player without it reports -1 at its init, and every other tune on the player without it |
-| `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it; under `-linked` a tune of version 11 is named on a line and left out until a link keeps the cut's code (doc/cuts.md) |
-| `-linked` | each tune on the player `ymxr-sndh` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. Of the checks the run makes before the tunes it runs the deferred starts' and the tunes that map a value alone, each of their tunes on the player linked for it. With `-corpus` the dumps of the corpus play the same way, and with `-generated` the generator's tunes |
+| `-kit` | the tune files named, or the conformance kit's, each frame the player produces against the reader's record from `ymxr-trace`, and the record's first line against the tune's header; `wrong-version.ymxr` is left out of the tunes played, and the rig requires `ymxr-trace` to exit other than 0 with an empty output on it and `ymxr-bind` to reject it |
+| `-linked` | each tune on the player `ymxr-sndh` links for it (LINKER.md), cut out of the SNDH file, against the model; the rig first requires the tool's core to be the rig's link of the assembled core, its patched longs aside, and the player in the core to be the player assembled alone. Of the checks the run makes before the tunes it runs the deferred starts', the tunes that map a value and the cuts alone, each of their tunes on the player linked for it. With `-corpus` the dumps of the corpus play the same way, and with `-generated` the generator's tunes |
 
 **17.2 `ym/keys.py [--keep]`** presses the program's keys. It writes a
 program of twelve subtunes, each writing the number it is to R0, starts
@@ -971,16 +972,16 @@ exit 2, a key that lands on another subtune exit 1.
 build, the two built tunes at `-frames24` on each of the thirty-two
 cores of 12.1, `-abs`, `-lean`, `-perf`, `-defer` and `-map` alone and
 together and the plain core; the conformance kit at `-frames24` under
-`-kit`; the kit and the checks of deferred starts and of tunes that map
-a value at `-frames24` under `-linked -kit -defer -map`, with each of
-the eight sets of `-abs`, `-lean` and `-perf`; the generator's tunes
-under `-linked -generated20 -seed0`, with each of the eight sets; and
-`-refill` over `Turrican 2 - world completed 1` whole, which reads the
-tune's row of performance.md and a refill of a tune with a source. The
-workflow runs the generator's tunes in a separate job, `-refill` over
-the eleven fixtures whole as a step after the suite, which reads the
-sentences over the set, and `-cycles -abs` over them, which reads the
-absolute build's tables. The workflow then runs `-stub`, `-hatari`,
+`-kit`; the kit and the checks of deferred starts, of tunes that map a
+value and of cuts at `-frames24` under `-linked -kit -defer -map`, with
+each of the eight sets of `-abs`, `-lean` and `-perf`; the generator's
+tunes under `-linked -generated20 -seed0`, with each of the eight sets;
+and `-refill` over `Turrican 2 - world completed 1` whole, which reads
+the tune's row of performance.md and a refill of a tune with a source.
+The workflow runs the generator's tunes in a separate job, `-refill`
+over the eleven fixtures whole as a step after the suite, which reads
+the sentences over the set, and `-cycles -abs` over them, which reads
+the absolute build's tables. The workflow then runs `-stub`, `-hatari`,
 `-clock`, `-cost` and `-xpatch` under Hatari 2.6.1, built from its tag,
 and the PAL image of EmuTOS 1.4, which boots the ST at the 50 Hz the two
 modes require; a caller runs them under TOS 2.06, which `TOS` names.

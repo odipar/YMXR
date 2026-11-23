@@ -26,7 +26,8 @@ var Lookups = []string{"lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh
 // doc/LINKER.md lists them: each handler kind, which init's loop over it
 // is, and its instance on each effect; the start of several columns; each
 // effect's frame code and general handler; each effect's remap and
-// deferred start; each lookup kind and its instance on each effect; and
+// deferred start; the cut's routines and each effect's paths that read
+// the cut column; each lookup kind and its instance on each effect; and
 // align, the padding before the second bank.
 var Blocks = func() []string {
 	var all []string
@@ -44,6 +45,10 @@ var Blocks = func() []string {
 		for i := 0; i < 4; i++ {
 			all = append(all, fmt.Sprintf("%s%d", part, i))
 		}
+	}
+	all = append(all, "cut")
+	for i := 0; i < 4; i++ {
+		all = append(all, fmt.Sprintf("cut%d", i))
 	}
 	for _, kind := range Lookups {
 		all = append(all, kind)
@@ -250,12 +255,16 @@ func Kind(source *dtx.Table, counted bool) string {
 // a tune runs, bits 0 to 3 of its effects byte, and its remap where the
 // tune maps a value and a row sets the effect's mapping column, and its
 // deferred start where the tune defers a start and a row of the effect
-// does; for each source an
-// effect's rows start, the instance of its handler kind on that effect
-// and the kind's loop of init; several where a start is of a counted
-// source or one of several columns; the lookup instance of each kind an
-// effect maps a source through, and the kind's loop of init; and align,
-// the padding before the second bank; in the order of Blocks.
+// does; for each source an effect's rows start, the instance of its
+// handler kind on that effect and the kind's loop of init; several where
+// a start is of a counted source or one of several columns; the lookup
+// instance of each kind an effect maps a source through, and the kind's
+// loop of init; and align, the padding before the second bank; in the
+// order of Blocks. An effect that cuts a source, in a tune of version 11
+// whose row sets the effect's cut column, needs its paths that read the
+// column, cut0 for effect 0, the cut's routines, its remap, several, and
+// for each source its rows start the counted kind of the source's
+// columns, the kind a start and a recut under a cut run.
 func BlocksOf(tunes []ymxr.File) []string {
 	needed := map[string]bool{"align": true}
 	for _, tune := range tunes {
@@ -268,6 +277,13 @@ func BlocksOf(tunes []ymxr.File) []string {
 				continue
 			}
 			needed[fmt.Sprintf("effect%d", i)] = true
+			cuts := CutsOf(tune, i)
+			if cuts {
+				needed["cut"] = true
+				needed[fmt.Sprintf("cut%d", i)] = true
+				needed[fmt.Sprintf("map%d", i)] = true
+				needed["several"] = true
+			}
 			if ymxr.HasMapping(tune.Effects) && sets(tune, tune.Mapping(i), 0) {
 				needed[fmt.Sprintf("map%d", i)] = true
 			}
@@ -284,6 +300,11 @@ func BlocksOf(tunes []ymxr.File) []string {
 				if tune.Counted[s-1] || source.Columns() > 1 {
 					needed["several"] = true
 				}
+				if cuts {
+					under := Kind(source, true)
+					needed[under] = true
+					needed[fmt.Sprintf("%s%d", under, i)] = true
+				}
 			}
 		}
 	}
@@ -294,6 +315,12 @@ func BlocksOf(tunes []ymxr.File) []string {
 		}
 	}
 	return ordered
+}
+
+// CutsOf is whether effect i cuts a source: the tune is of version 11,
+// bit 6 of its effects byte, and a row sets the effect's cut column.
+func CutsOf(tune ymxr.File, i int) bool {
+	return ymxr.HasCuts(tune.Effects) && sets(tune, tune.CutColumn(i), 0)
 }
 
 // sets is whether a row of the tune sets column c, bit 7, with the bits of
@@ -320,7 +347,9 @@ func sets(tune ymxr.File, c int, bits byte) bool {
 // are read as a player reads them, through the repeat row until each
 // effect's state there is one it has had before, as the pages are read;
 // a deferred start on a running timer adds its source to the ones a
-// remap reaches.
+// remap reaches. On an effect that cuts a source, each source mapped adds
+// the counted kind of its columns, the kind a start and a recut under a
+// cut run.
 func LookupsOf(tune ymxr.File) []string {
 	var out []string
 	if !ymxr.HasMapping(tune.Effects) {
@@ -333,11 +362,15 @@ func LookupsOf(tune ymxr.File) []string {
 			out = append(out, block)
 		}
 	}
+	var cuts [4]bool
+	for i := 0; i < 4; i++ {
+		cuts[i] = tune.Effects&(1<<i) != 0 && CutsOf(tune, i)
+	}
 	var target, mapping [4]int
 	running := [4]map[int]bool{{}, {}, {}, {}}
 	table := tune.Table
 	for row := 0; row < table.Rows(); row++ {
-		lookupRow(tune, row, &target, &mapping, &running, add)
+		lookupRow(tune, row, &target, &mapping, &running, &cuts, add)
 	}
 	states := map[string]bool{}
 	for table.Repeat() < table.Rows() {
@@ -354,7 +387,7 @@ func LookupsOf(tune ymxr.File) []string {
 		}
 		states[state.String()] = true
 		for row := table.Repeat(); row < table.Rows(); row++ {
-			lookupRow(tune, row, &target, &mapping, &running, add)
+			lookupRow(tune, row, &target, &mapping, &running, &cuts, add)
 		}
 	}
 	return out
@@ -372,7 +405,7 @@ func sortedKeys(set map[int]bool) []int {
 // lookupRow is one row's effect columns for LookupsOf: a running source is
 // kept with its target, its number times 64 plus the target.
 func lookupRow(tune ymxr.File, row int, target, mapping *[4]int, running *[4]map[int]bool,
-	add func(string)) {
+	cuts *[4]bool, add func(string)) {
 	for i := 0; i < 4; i++ {
 		if tune.Effects&(1<<i) == 0 {
 			continue
@@ -394,8 +427,8 @@ func lookupRow(tune ymxr.File, row int, target, mapping *[4]int, running *[4]map
 			if m&0x80 != 0 {
 				mapping[i] = m & 0x7F
 			}
-			if kind := Lookup(tune, s, target[i]); mapping[i] != 0 && kind != "" {
-				add(fmt.Sprintf("%s%d", kind, i))
+			if mapping[i] != 0 {
+				mapped(tune, s, target[i], i, cuts[i], add)
 			}
 			deferred := control&0x80 != 0 && control&ymxr.Deferred != 0
 			if !deferred || len(running[i]) == 0 {
@@ -406,13 +439,35 @@ func lookupRow(tune ymxr.File, row int, target, mapping *[4]int, running *[4]map
 			mapping[i] = m & 0x7F
 			if mapping[i] != 0 {
 				for _, one := range sortedKeys(running[i]) {
-					if kind := Lookup(tune, one/64, one%64); kind != "" {
-						add(fmt.Sprintf("%s%d", kind, i))
-					}
+					mapped(tune, one/64, one%64, i, cuts[i], add)
 				}
 			}
 		}
 	}
+}
+
+// mapped adds the lookup instances on effect i of source s mapped on that
+// target: the kind of its shape, and under a cut the counted kind of its
+// columns.
+func mapped(tune ymxr.File, s, target, i int, cuts bool, add func(string)) {
+	if kind := Lookup(tune, s, target); kind != "" {
+		add(fmt.Sprintf("%s%d", kind, i))
+	}
+	if !cuts || s < 1 || s > len(tune.Sources) {
+		return
+	}
+	kind := "lh"
+	switch columns := tune.Sources[s-1].Columns(); {
+	case columns == 1:
+		kind = "lc"
+	case columns == 2 && target >= noise:
+		kind = "lf"
+	case columns == 2:
+		kind = "le"
+	case target == buzzer:
+		kind = "lg"
+	}
+	add(fmt.Sprintf("%s%d", kind, i))
 }
 
 // The first target that maps its first value, setNoiseA, and the target

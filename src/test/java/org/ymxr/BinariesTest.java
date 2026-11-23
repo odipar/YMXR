@@ -62,8 +62,8 @@ final class BinariesTest {
         assertArrayEquals(Sndh.CORE_MAGIC, Arrays.copyOfRange(core, 12, 16));
         assertEquals(1, Tune.getWord(core, 16));
         // Cores without lookups support version 9; lookup cores also
-        // support version 10 (SPEC.md 3.3.5).
-        assertEquals(map ? Tune.VERSION : Tune.UNMAPPED, Tune.getWord(core, 18),
+        // support versions 10 and 11 (SPEC.md 3.3.5).
+        assertEquals(map ? Tune.CUT : Tune.UNMAPPED, Tune.getWord(core, 18),
                 "the bound tune version the core reads");
         assertEquals(PlayerTest.equates(defer, map).get("YMXR_VERSION"), Tune.getWord(core, 18),
                 "the version the player reads");
@@ -173,8 +173,8 @@ final class BinariesTest {
         Tune.putWord(core, Sndh.CORE_FLAGS_AT, Sndh.CORE_PCREL);
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.checkCore(core, false, false, true, false, true, Tune.VERSION));
-        assertEquals("the core's flags at 22 read 4, and a subtune that maps a value needs bit"
-                + " 4 set", wrong.getMessage());
+        assertEquals("the core's flags at 22 read 4, and a subtune that maps a value or cuts a"
+                + " source needs bit 4 set", wrong.getMessage());
         IllegalArgumentException of = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(core, List.of(fade()), new Sndh.Options("Fade", null, null, false,
                         false)));
@@ -919,11 +919,12 @@ final class BinariesTest {
                     effects |= file[Tune.EFFECTS_AT];
                 }
                 boolean defer = (effects & Columns.DEFERS) != 0;
-                boolean map = (effects & Columns.MAPS) != 0;
+                boolean map = (effects & (Columns.MAPS | Columns.CUTS)) != 0;
                 byte[] sndh = Sndh.of(files, options);
                 assertEquals(setting | (defer ? Sndh.CORE_DEFER : 0) | (map ? Sndh.CORE_MAP : 0),
                         Tune.getWord(sndh, Sndh.even(tags(sndh).end()) + Sndh.CORE_FLAGS_AT),
-                        "bit 4 of the file's flags where a subtune maps a value");
+                        "bit 4 of the file's flags where a subtune maps a value or cuts a"
+                                + " source");
                 assertCombined(Binaries.core(monitor, lean, pcrel, defer, map), sndh, files,
                         tags(sndh));
             }

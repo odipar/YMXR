@@ -112,9 +112,9 @@ final class Binaries {
      * starts; {@code -map} for transformation lookups.
      *
      * <p>Without {@code -abs}, ticks use program-counter displacements.
-     * A subtune with effects bit 4 requires {@code -defer}; bit 5
-     * requires {@code -map}. Lookup cores read bound versions 7 to 10;
-     * other cores read 7 to 9 (doc/BINARIES.md 2).
+     * A subtune with effects bit 4 requires {@code -defer}; bit 5 and
+     * bit 6 require {@code -map}. Lookup cores read bound versions 7 to
+     * 11; other cores read 7 to 9 (doc/BINARIES.md 2).
      */
     static Binary binary(boolean monitor, boolean lean, boolean pcrel, boolean defer,
                          boolean map) {

@@ -8,13 +8,14 @@ library they come in, the link, and how a linked player is checked.
 The SNDH writers link by default. `-carried` writes the full core
 selected by the switches. A player linked from any of the 32 cores
 leaves out the frame code and the handlers of each effect the song does
-not run;
-each handler of an effect whose rows start no source of the handler's
-kind, with its start in the effect's frame code; each lookup instance of
-an effect that maps no source of the instance's kind; and the remap and
-the deferred start of an effect that maps no value or defers no start,
-in both banks of a core with the deferred start. The plan at the end
-lists what is done and what follows.
+not run; each handler of an effect whose rows start no source of the
+handler's kind, with its start in the effect's frame code; each lookup
+instance of an effect that maps no source of the instance's kind; the
+remap and the deferred start of an effect that maps no value or defers
+no start, in both banks of a core with the deferred start; and the paths
+that read the cut column of an effect that cuts no source, with the
+cut's routines where the song cuts none. The plan at the end lists what
+is done and what follows.
 
 ## The player today
 
@@ -25,10 +26,10 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,628 | 3,100 |
+| init | 1,628 | 3,114 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
-| the frame | 2,784 | 4,200 |
-| the frame's read-site tables | 180 | 300 |
+| the frame | 2,784 | 4,232 |
+| the frame's read-site tables | 180 | 308 |
 | the general handler, four effects | 320 | 320 |
 | the square's | 112 | 112 |
 | the one-row source's | 80 | 80 |
@@ -40,13 +41,13 @@ player and of the player with the lookup in:
 | the place's reset of several columns | 284 | 116 |
 | the start of several columns | 1,004 | 1,004 |
 | `ymxr_rem` | 64 | 64 |
-| the mask words | 16 | 38 |
+| the mask words | 16 | 40 |
 | the tables of the instances of the general handler, the square and the one-row source | | 24 |
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
 | the lookup's routines | | 3,458 |
 | the cut's routines | | 1,308 |
 | the lookup instances and the gaps before them, ten kinds | | 6,874 |
-| the player | 9,454 | 23,980 |
+| the player | 9,454 | 24,036 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -67,6 +68,19 @@ A block is the code and data a player runs for one part of a song:
   arm and read a pending start, and the effect's installer, which a song
   needs where a tune defers a start, bit 4, and a row of the effect does:
   its control column with bit 7 and bit 3 set (SPEC.md 1.9);
+- an effect's cut block, `cut0` to `cut3`, in a core with the lookup, is
+  the paths of the effect's frame code that read the cut column, which a
+  song needs where a tune of version 11, bit 6 of its effects byte, has a
+  row that sets the effect's cut column (SPEC.md 1.11). A start and a
+  recut under a cut run the counted kind of the source's columns, so the
+  effect then needs the counted handler of the columns of each source
+  its rows start and the counted lookup instance of the columns of each
+  source it maps through a transformation, each with its kind's loop of
+  init, and the song needs the effect's remap's block, `several` and
+  `cut`;
+- `cut`, in a core with the lookup, is the cut's routines and the paths
+  of the deferred start and the remap under a cut, which a song needs
+  where it needs an effect's cut block;
 - a handler's block, such as `square1`, is one handler of one kind on
   one effect, and for a square and a source of one row the start of the
   kind in the effect's frame code, which a song needs where the effect's
@@ -164,12 +178,14 @@ Each effect's frame code is pieces, one after another: the head,
 `effect0_1` for effect 0, up to the branch that tells the two shapes
 apart; the start of a square, `square0_3`, a piece of the effect's
 square's block; the start of a source of one row, `one0_3`, of the
-effect's one-row source's block; in a core with the lookup, the start
-through a transformation and the remap, `map0_1`; in a core with the
-deferred start, the paths that arm and read a pending start, `defer0_1`;
-and the rest, `effect0_5`. The head, the rest and the general handler
-are pieces of the effect's block, and an effect's frame code falls
-through to the next one the player has.
+effect's one-row source's block; in a core with the lookup, the paths
+that read the cut column, `cut0_1`, a piece of the effect's cut block,
+and the start through a transformation and the remap, `map0_1`; in a
+core with the deferred start, the paths that arm and read a pending
+start, `defer0_1`; and the rest, `effect0_5`. The head, the rest and the
+general handler are pieces of the effect's block, and an effect's frame
+code falls through to the next one the player has. The last path of the
+cut's piece, a start, falls through into the remap's piece.
 
 Init writes the branches of every effect out of one effect's distances,
 since one macro lays the four out. A distance from a site in the head to
@@ -177,19 +193,25 @@ a target past it is the distance to the head's end and from the first
 byte of the target's piece, which a link keeps as they are, and init
 adds the bytes from the head's end to that piece in the effect:
 `ymxr_resets` lists them an effect, to the one-row source's start, the
-remap's piece, the deferred start's and the rest, words the link moves
-as it leaves a piece out. The branch that tells the shapes apart is a
-word, `bne.w`, as it reaches the one-row source's start past the
-square's.
+cut's piece, the remap's, the deferred start's and the rest, words the
+link moves as it leaves a piece out. The branch that tells the shapes
+apart is a word, `bne.w`, as it reaches the one-row source's start past
+the square's.
 
 Init aims an effect's branches at the remap's piece where the tune maps
-a value and the effect's bit in the word `ymxr_k_map` is set, and at the
-deferred start's where the tune defers a start and its bit in
+a value and the effect's bit in the word `ymxr_k_map` is set, at the
+cut's where the tune is of version 11 and its bit in `ymxr_k_cut` is,
+and at the deferred start's where the tune defers a start and its bit in
 `ymxr_k_defer` is; the other paths otherwise, the ones a tune that maps
 no value or defers no start runs. A link writes each word with the
 effects it keeps the piece of. An effect whose mapping column no row
 sets keeps the identity, and one whose rows defer no start has no start
-pending, so on those paths it runs as it did on the others.
+pending, so on those paths it runs as it did on the others. An effect
+whose bit in `ymxr_k_cut` is clear runs a tune of version 11 as one that
+cuts no source, its head's branch and its place's reset included. The
+cut's routines are the piece `cut_1`, and its paths in the deferred
+start's arming and in the remap `cut_3` and `cut_2`, which run where a
+start or a recut under a cut has run.
 
 A core with the deferred start has a second bank of handlers, BANK bytes
 past the first, the same handlers in the same order (deferred.S). Each
@@ -351,23 +373,25 @@ measures it against the linked core.
 
 ## Figures
 
-The blocks of its core each tune of the conformance kit to version 10
-keeps, the core it links, and the bytes of that core linked for it: the
-plain core, of 10,144 bytes, the core with the deferred start in, of
-15,326 bytes, or the core with the lookup and the deferred start in, of
-39,126 bytes.
+The blocks of its core each tune of the conformance kit keeps, the core
+it links, and the bytes of that core linked for it: the plain core, of
+10,144 bytes, the core with the deferred start in, of 15,326 bytes, the
+core with the lookup in, of 24,744 bytes, or the core with the lookup
+and the deferred start in, of 39,206 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 2,752 |
 | `circus.ymxr` | plain | none | 2,752 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,868 |
+| `cut.ymxr` | the lookup | counted, counted0, several, effect0, map0, cut, cut0 | 10,450 |
+| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, several, effect0, effect2, map0, defer0, cut, cut0, align | 13,728 |
 | `deferred.ymxr` | the deferred start | effect0, effect3, defer0, defer3 | 5,222 |
 | `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0 | 4,882 |
 | `envelope.ymxr` | plain | two, two0, several, effect0 | 4,838 |
 | `fine-zero.ymxr` | plain | none | 2,752 |
 | `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3 | 5,038 |
-| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 17,616 |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,510 |
 | `plays-once.ymxr` | plain | none | 2,752 |
 | `preempt.ymxr` | plain | square, square0, effect0, effect1 | 3,942 |
 | `retune.ymxr` | plain | one, one0, effect0 | 3,336 |
@@ -379,11 +403,10 @@ plain core, of 10,144 bytes, the core with the deferred start in, of
 A tune of general sources alone, with no effect, links 2,752 bytes, 27%
 of the core: the blocks are 7,392 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
-start of several columns, and links 6,828.
-`mapped.ymxr` keeps 4 lookup instances of 3 kinds and links 17,616 bytes
-of 39,126: the 36 instances and the 7 loops of init it leaves out are
-13,930 bytes, and the gaps it keeps are 658 bytes shorter than in the
-core.
+start of several columns, and links 6,828. `mapped.ymxr` keeps 4 lookup
+instances of 3 kinds and links 15,510 bytes of 39,206: the 36 instances
+and the 7 loops of init it leaves out are 13,930 bytes, and the gaps it
+keeps are 658 bytes shorter than in the core.
 
 ## The check
 
@@ -394,36 +417,38 @@ core.
 - ParityTest requires `ymxr-sndh` to write the same file and
   report in the Java and the Go trees, for each tune of the kit, each
   switch and a set of two.
-- The rig's `-linked` plays each tune on the player `ymxr-sndh`
-  links for it, cut out of the SNDH file, against the model. It first
-  requires the tool's core to be the rig's link of the assembled core,
-  its patched longs aside, and the player in the core to be the player
-  assembled alone. The 16 tunes of the kit play their whole length as
+- The rig's `-linked` plays each tune on the player `ymxr-sndh` links
+  for it, cut out of the SNDH file, against the model. It first requires
+  the tool's core to be the rig's link of the assembled core, its
+  patched longs aside, and the player in the core to be the player
+  assembled alone. The 18 tunes of the kit play their whole length as
   the specification reads on linked players of the plain core, `-lean`,
   `-abs -perf`, `-lean -abs` and `-perf -lean`, and the 11 dumps of
   `ym/test` on the plain core. Under `-defer -map` the 20 tunes of the
-  check of deferred starts, and under `-map` the 33 tunes of the check of
-  tunes that map a value, play every tick against the model on the
-  players linked for them, with each of those switches.
+  check of deferred starts, and under `-map` the 33 tunes of the check
+  of tunes that map a value and the 13 of the check of cuts, play every
+  tick against the model on the players linked for them, with each of
+  those switches.
 - RigCallsTest runs `-linked -kit -defer -map` at `-frames24` with each
   of the eight sets of `-abs`, `-lean` and `-perf`, in the four jobs of
-  cores of the workflow: the kit, the 20 tunes of the deferred starts and
-  the 33 that map a value on the players linked for them. A tune's
-  effects pick the deferred start and the lookup, so the eight sets are
-  the 32 cores of a linked player.
+  cores of the workflow: the kit, the 20 tunes of the deferred starts,
+  the 33 that map a value and the 13 that cut a source on the players
+  linked for them. A tune's effects pick the deferred start and the
+  lookup, so the eight sets are the 32 cores of a linked player.
 - The rig's `-generated` plays tunes its generator draws over the rows
   the specification allows, each written through `ymxs-to-ymxr` and
   following every rule of YMXS's check: starts of each source shape on
   each effect, at the frame and deferred, on an idle timer and a running
   one, at the running rate and setting the source column alone; retunes,
   stops, remaps between transformations and to and from the identity,
-  rows that set the target column alone, repeat rows, and sets of
-  several subtunes, each mapping a value or not and deferring a start or
-  not, which `-linked` links as one. RigCallsTest runs `-linked
-  -generated20 -seed0` with each of the eight sets, in a separate job of
-  the workflow, every tick against the model and every frame against the
-  reader's record, and requires each of those operations, each shape,
-  each effect and each target in the coverage line of the run.
+  starts under a cut and recuts, rows that set the target column alone,
+  repeat rows, and sets of several subtunes, each mapping a value or not
+  and deferring a start or not, which `-linked` links as one.
+  RigCallsTest runs `-linked -generated20 -seed0` with each of the eight
+  sets, in a separate job of the workflow, every tick against the model
+  and every frame against the reader's record, and requires each of
+  those operations, each shape, each effect and each target in the
+  coverage line of the run.
 - `-linked -corpus` plays a spread of the dumps of `YM_CORPUS` on the
   players linked for them.
 
@@ -460,3 +485,7 @@ core.
    remap and the deferred start where the link keeps them.
 10. The SNDH writers link by default (#342). The SNDH files of the
     binaries kit use the linked cores. Done.
+11. The cut's paths of each effect's frame code and the cut's routines as
+    blocks (doc/cuts.md). Done: init aims an effect at the cut's piece
+    where the link keeps it, and a tune of version 11 links from the
+    cores with the lookup.
