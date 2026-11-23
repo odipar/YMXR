@@ -102,6 +102,15 @@ final class Schema {
             throw new IllegalArgumentException("the tune cuts through " + cuts.size()
                     + " cuts, and a cut column numbers " + Columns.MOST_CUTS);
         }
+        // The counted handler counts a cut's rows in a word (SPEC.md section 8).
+        for (Cut cut : cuts) {
+            int length = cut.last() - cut.first() + 1;
+            if (length > Columns.MOST_COUNTED_ROWS) {
+                throw new IllegalArgumentException("the tune cuts rows " + cut.first() + " to "
+                        + cut.last() + ", " + length + " rows, and a cut is "
+                        + Columns.MOST_COUNTED_ROWS + " rows at most");
+            }
+        }
         Kept kept = new Kept(rows, list, timers, cuts);
         // Ignore remaps on timers outside the tune. The
         // transformation-count limit applies only when an encoded start
@@ -769,6 +778,12 @@ final class Schema {
             boolean counted = marker[n] == -1
                     || marker[n] == 0 && Tunes.columns(source) == 1 && marks.keyed()[n]
                     && pastMarker(values);
+            // The counted handler counts the rows in a word (SPEC.md section 8).
+            if (counted && values.size() > Columns.MOST_COUNTED_ROWS) {
+                throw new IllegalArgumentException("the source " + Tunes.name(source)
+                        + " fills its byte and has " + values.size() + " rows, and such a"
+                        + " source is " + Columns.MOST_COUNTED_ROWS + " rows at most");
+            }
             // A tick of a counted source on `setR7` writes the row whole,
             // so the two port directions are in the source rather than
             // in the player (SPEC.md rule 2(f)).

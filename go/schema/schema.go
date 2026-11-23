@@ -86,6 +86,13 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 		return Made{}, fmt.Errorf("the tune cuts through %d cuts, and a cut column numbers"+
 			" %d", len(cuts.list), ymxr.MostCuts)
 	}
+	// The counted handler counts a cut's rows in a word (SPEC.md section 8).
+	for _, cut := range cuts.list {
+		if length := cut.Last - cut.First + 1; length > ymxr.MostCountedRows {
+			return Made{}, fmt.Errorf("the tune cuts rows %d to %d, %d rows, and a cut is %d"+
+				" rows at most", cut.First, cut.Last, length, ymxr.MostCountedRows)
+		}
+	}
 	column := make([][]byte, ymxr.All)
 	for c := range column {
 		column[c] = make([]byte, size)
@@ -781,6 +788,12 @@ func sourceTables(sources []ymxs.Source, marks marks) ([]ymxr.Source, error) {
 			marker = -1
 		}
 		counted := marker == -1
+		// The counted handler counts the rows in a word (SPEC.md section 8).
+		if counted && len(values) > ymxr.MostCountedRows {
+			return nil, fmt.Errorf("the source %s fills its byte and has %d rows, and such a"+
+				" source is %d rows at most", ymxs.SourceName(source), len(values),
+				ymxr.MostCountedRows)
+		}
 		// A tick of a counted source on setR7 writes the row whole, so the
 		// two port directions are in the source rather than in the
 		// player (SPEC.md rule 2(f)).

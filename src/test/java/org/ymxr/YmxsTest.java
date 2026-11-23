@@ -464,6 +464,41 @@ final class YmxsTest {
                         .getMessage());
     }
 
+    /** A source of 65,537 rows, the values 0 to 15 over and over, a marked
+     *  one on R8; and its start under a cut of 65,536 rows, more than the
+     *  counted handler counts (SPEC.md section 8). */
+    static Tune longCut() {
+        List<Integer> values = IntStream.range(0, Columns.MOST_COUNTED_ROWS + 2)
+                .map(r -> r % 16).boxed().toList();
+        Single tall = Tunes.repeating("tall", values, 0);
+        Start start = new Start(new OneConnection(Tunes.setting(Register.R8), tall), STOPPED,
+                false, Tunes.NO_PARTS, new Cut(0, Columns.MOST_COUNTED_ROWS));
+        return built(List.of(row(Map.of(), Timer.A, start), Tunes.EMPTY), 0);
+    }
+
+    /** A source of 65,536 rows on R0, whose register fills its byte, so a
+     *  player counts its rows, more than the counted handler counts
+     *  (SPEC.md section 8). */
+    static Tune longCounted() {
+        List<Integer> values = IntStream.range(0, Columns.MOST_COUNTED_ROWS + 1)
+                .map(r -> r & 0xFF).boxed().toList();
+        Single tall = Tunes.repeating("tall", values, 0);
+        return built(List.of(row(Map.of(), Timer.A, start(Register.R0, tall, STOPPED, false)),
+                Tunes.EMPTY), 0);
+    }
+
+    @Test
+    void aCutOrACountedSourceOfMoreThan65535RowsIsAnError() {
+        assertEquals("the tune cuts rows 0 to 65535, 65536 rows, and a cut is 65535 rows at"
+                        + " most",
+                assertThrows(IllegalArgumentException.class, () -> Schema.of(longCut()))
+                        .getMessage());
+        assertEquals("the source tall fills its byte and has 65536 rows, and such a source is"
+                        + " 65535 rows at most",
+                assertThrows(IllegalArgumentException.class, () -> Schema.of(longCounted()))
+                        .getMessage());
+    }
+
     /**
      * A lookup used only by a remap outside the tune does not require
      * version 10 (SPEC.md 6, rule 2(a)).

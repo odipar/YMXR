@@ -155,6 +155,8 @@ row or the source and exits 1.
 | more than 127 sources | the source column numbers 1 to 127 (1.8) |
 | more than 127 transformations, and a start, or a remap on a timer of the tune, through one | the mapping column numbers 1 to 127 (1.10) |
 | more than 127 cuts, and a start, or a recut on a timer of the tune, under one | the cut column numbers 1 to 127 (1.11) |
+| a cut of more than 65,535 rows, and a start, or a recut on a timer of the tune, under it | a player counts a cut's rows in a word (section 8) |
+| a counted source of more than 65,535 rows | a player counts its rows in a word (section 8) |
 | a count past 255 | the count column is the timer's data register, a byte (1.9) |
 | a start, or a remap on a timer of the tune, through a transformation for a value other than the last of its target | the mapping column maps the last value alone (1.10) |
 | a target past 24 | 25 to 127 are left to a later version (2.1, section 8) |

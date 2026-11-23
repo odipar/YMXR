@@ -553,8 +553,9 @@ final class ParityTest {
      * from their structures and read back, a recut outside the tune left
      * out, the files of version 11 written wrong, the check's lines of the
      * cut columns, the bound tune, the layout and the multi file of version
-     * 11, and more cuts than a cut column numbers (SPEC.md 1.11, 3.3.4, 3.5,
-     * 6.4, 6.5; BINARIES.md 0, 1).
+     * 11, more cuts than a cut column numbers, and a cut and a counted source
+     * of more rows than the counted handler counts (SPEC.md 1.11, 3.3.4, 3.5,
+     * 6.4, 6.5, section 8; BINARIES.md 0, 1).
      */
     @Test
     void aTuneUnderACutReadsTheSameInBothTrees() throws Exception {
@@ -582,6 +583,10 @@ final class ParityTest {
         both("ymxr-layout", multi);
         assertWrong(YmxsTest.manyCuts(), "the tune cuts through 128 cuts, and a cut column"
                 + " numbers 127");
+        assertWrong(YmxsTest.longCut(), "the tune cuts rows 0 to 65535, 65536 rows, and a cut"
+                + " is 65535 rows at most");
+        assertWrong(YmxsTest.longCounted(), "the source tall fills its byte and has 65536 rows,"
+                + " and such a source is 65535 rows at most");
     }
 
 

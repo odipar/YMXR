@@ -41,6 +41,10 @@ final class Columns {
      *  the whole table (SPEC.md 1.11). */
     static final int MOST_CUTS = 127;
 
+    /** The rows the counted handler counts, in a word: of a cut, and of a
+     *  source that fills its byte (SPEC.md section 8). */
+    static final int MOST_COUNTED_ROWS = 65535;
+
     /**
      * The transformation limit: mapping numbers 1 to 127 select
      * lookups; 0 selects identity (SPEC.md 1.10).

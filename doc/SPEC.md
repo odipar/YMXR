@@ -1751,3 +1751,6 @@ transformation (2.1.5).
 
 **8.7** A mapping with a transformation for a value before the last of its
 target (1.10.1).
+
+**8.8** A cut of more than 65,535 rows (1.11), and a counted source of
+more than 65,535 rows (3.1).
