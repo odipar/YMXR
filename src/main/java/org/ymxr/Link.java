@@ -87,8 +87,8 @@ final class Link {
      * second bank. An effect that cuts a source, in a tune of version 11
      * whose row sets the effect's cut column, needs its paths that read
      * the column, {@code cut0} for effect 0, the cut's routines, its
-     * remap, {@code several}, and the counted kinds {@link #counted} reads
-     * in its rows.
+     * remap, and the counted kinds and {@code several} that
+     * {@link #counted} reads in its rows.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
@@ -98,10 +98,7 @@ final class Link {
                 needed.add(lookup);
                 needed.add(lookup.substring(0, 2));
             }
-            for (String instance : counted(tune)) {
-                needed.add(instance);
-                needed.add(instance.substring(0, instance.length() - 1));
-            }
+            needed.addAll(counted(tune));
             for (int i = 0; i < 4; i++) {
                 if ((tune.effects() & 1 << i) == 0) {
                     continue;
@@ -112,7 +109,6 @@ final class Link {
                     needed.add("cut");
                     needed.add("cut" + i);
                     needed.add("map" + i);
-                    needed.add("several");
                 }
                 if (Columns.maps(tune.effects()) && sets(tune, tune.mapping(i), 0)) {
                     needed.add("map" + i);
@@ -268,11 +264,14 @@ final class Link {
 
     /**
      * The counted kinds a tune runs under a cut, as blocks such as
-     * {@code counted0} and {@code lc1}: on each effect, the counted kind of
-     * the columns of each source the counted handler runs after a start
-     * under a cut 1 to 127 or a recut, the identity's where the source runs
-     * through it and the lookup's on the source's target where it runs
-     * through a transformation. The rows are read as {@link #lookups} reads
+     * {@code counted} and {@code counted0}, or {@code lc} and {@code lc1}:
+     * on each effect, the counted kind of the columns of each source the
+     * counted handler runs after a start under a cut 1 to 127 or a recut,
+     * the identity's where the source runs through it and the lookup's on
+     * the source's target where it runs through a transformation; and
+     * {@code several} where a recut to cut 0 leaves a source on the
+     * counted handler, whose place's reset under cut 0 runs
+     * ymxr_widereset. The rows are read as {@link #lookups} reads
      * them. A stop leaves the effect no source; a start runs under the
      * kept cut, on the counted handler where that cut is 1 to 127; a
      * deferred start on an effect that runs a source keeps the cut and the
@@ -399,8 +398,13 @@ final class Link {
             for (Runs r : one.runs) {
                 if (r.counting() && r.source() >= 1 && r.source() <= tune.sources().size()) {
                     Table source = tune.sources().get(r.source() - 1);
-                    out.add((r.mapping() == 0 ? kind(source, true)
-                            : countedLookup(source.columns(), r.target())) + i);
+                    String kind = r.mapping() == 0 ? kind(source, true)
+                            : countedLookup(source.columns(), r.target());
+                    out.add(kind);
+                    out.add(kind + i);
+                    if (!r.cut()) {
+                        out.add("several");
+                    }
                 }
             }
         }
@@ -408,8 +412,8 @@ final class Link {
 
     /** Whether cut {@code n} is the whole table of source {@code s}, where
      *  a recut leaves its handler running: any cut of a marked source of one
-     *  row, and rows 0 and 1 of a marked square (68k/player/cut.S,
-     *  ymxr_recut). */
+     *  row, and cut 0 and rows 0 and 1 of a marked square
+     *  (68k/player/cut.S, ymxr_recut). */
     private static boolean whole(TuneFile tune, int s, int n) {
         if (s < 1 || s > tune.sources().size() || tune.counted().get(s - 1)) {
             return false;
@@ -418,8 +422,13 @@ final class Link {
         if (source.rows() == 1) {
             return true;
         }
-        if (n < 1 || n > tune.cuts().size() || source.columns() != 1 || source.rows() != 2
-                || source.repeat() != 0) {
+        if (source.columns() != 1 || source.rows() != 2 || source.repeat() != 0) {
+            return false;
+        }
+        if (n == 0) {
+            return true;
+        }
+        if (n > tune.cuts().size()) {
             return false;
         }
         TuneFile.Cut cut = tune.cuts().get(n - 1);

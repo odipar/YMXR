@@ -976,7 +976,7 @@ The cut makes the player with the lookup in 24,884 bytes against 21,966 in
 release 0.15.0, and 26,174 against 23,256 where a tick reads an absolute
 address; with the deferred start in as well, 39,860 against 35,908, and
 41,394 against 37,954. Of the 2,918 bytes it adds to the player as it is,
-2,708 are the cut's blocks, which a link leaves out of the player of a
-song that cuts no source (LINKER.md): 2,188 of routines and 130 of each
-effect's frame code. With the deferred start in, the blocks are 3,182 of
+2,710 are the cut's blocks, which a link leaves out of the player of a
+song that cuts no source (LINKER.md): 2,190 of routines and 130 of each
+effect's frame code. With the deferred start in, the blocks are 3,184 of
 the 3,952.

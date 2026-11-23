@@ -584,7 +584,8 @@ ymxr_recut:     lea     ymxr_park(pc),a4
                                                 ; square is -1
                 bra.w   .within
 .fwhole:        moveq   #0,d0                   ; a square's cut of rows 0
-                move.b  FX_CUT(a3),d0           ; and 1
+                move.b  FX_CUT(a3),d0           ; and 1, and cut 0, its whole
+                beq.s   .fkeep                  ; table
                 movea.l WS_TUNE(a0),a4
                 adda.l  TF_CUTS(a4),a4
                 lsl.w   #3,d0
@@ -946,14 +947,14 @@ ymxr_xplace:    btst    #7,FX_ACUT(a3)
 ; The place's reset in a tune that cuts a source (SPEC.md 4.3 step 6):
 ; under a cut 1 to 127, the place in every column at row F of the running
 ; cut and L - F + 1 rows left, through the kind of the running handler;
-; under cut 0, ymxr_widereset's. a3 the record and d3 the effect;
-; clobbers d0 to d5, a3 and a5.
-ymxr_xreset:    tst.b   FX_CRUN(a3)
-                beq.w   ymxr_widereset
-                cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
+; under cut 0, ymxr_widereset's; and of a source of one row, none, at
+; either. a3 the record and d3 the effect; clobbers d0 to d5, a3 and
+; a5.
+ymxr_xreset:    cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
                 bne.s   .cut                    ; row 0 and moves no place
                 rts
-.cut:
+.cut:           tst.b   FX_CRUN(a3)
+                beq.w   ymxr_widereset
                 tst.b   FX_RUN(a3)              ; the counted kind of one
                 bne.s   .kinds                  ; column through the
                 move.b  FX_SHAPE(a3),d0         ; identity, marked or

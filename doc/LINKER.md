@@ -45,8 +45,8 @@ player and of the player with the lookup in:
 | the tables of the instances of the general handler, the square and the one-row source | | 24 |
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
 | the lookup's routines | | 3,458 |
-| the cut's routines | | 2,174 |
-| the lookup instances and the gaps before them, ten kinds | | 6,776 |
+| the cut's routines | | 2,176 |
+| the lookup instances and the gaps before them, ten kinds | | 6,774 |
 | the player | 9,454 | 24,884 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
@@ -79,8 +79,10 @@ A block is the code and data a player runs for one part of a song:
   where a transformation runs it, each with its kind's loop of init. The
   link reads which by a walk of the rows, as for the lookup instances,
   and a recut that leaves a square's or a one-row source's handler
-  running needs none. The song needs the effect's remap's block,
-  `several` and `cut`;
+  running needs none. The song needs the effect's remap's block and
+  `cut`, and `several` where a recut to cut 0 leaves a source on the
+  counted handler, whose place's reset under cut 0 runs
+  `ymxr_widereset`;
 - `cut`, in a core with the lookup, is the cut's routines and the paths
   of the deferred start and the remap under a cut, which a song needs
   where it needs an effect's cut block;
@@ -387,8 +389,8 @@ and the deferred start in, of 40,568 bytes.
 | `chambers.ymxr` | plain | none | 2,752 |
 | `circus.ymxr` | plain | none | 2,752 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3 | 6,868 |
-| `cut.ymxr` | the lookup | counted, counted0, several, effect0, map0, cut, cut0 | 11,336 |
-| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, several, effect0, effect2, map0, defer0, cut, cut0, align | 14,626 |
+| `cut.ymxr` | the lookup | counted, counted0, effect0, map0, cut, cut0 | 10,090 |
+| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, map0, defer0, cut, cut0, align | 13,346 |
 | `deferred.ymxr` | the deferred start | effect0, effect3, defer0, defer3 | 5,222 |
 | `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0 | 4,882 |
 | `envelope.ymxr` | plain | two, two0, several, effect0 | 4,838 |
@@ -408,8 +410,8 @@ of the core: the blocks are 7,392 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
 start of several columns, and links 6,828. `mapped.ymxr` keeps 4 lookup
 instances of 3 kinds and links 15,528 bytes of 40,568: the 36 instances
-and the 7 loops of init it leaves out are 14,234 bytes, and the gaps it
-keeps are 762 bytes shorter than in the core.
+and the 7 loops of init it leaves out are 14,230 bytes, and the gaps it
+keeps are 764 bytes shorter than in the core.
 
 ## The check
 
@@ -495,3 +497,7 @@ keeps are 762 bytes shorter than in the core.
 12. The counted kinds under a cut by a walk of the rows, as for the
     lookup instances (#366). Done: a source an effect starts under its
     whole table alone keeps its counted kind out of the link.
+13. `several` beside an effect's cut block by the same walk (#367).
+    Done: the cut's place's reset leaves a source of one row as it is,
+    and a link keeps `several` for a song that cuts general sources only
+    where a recut to cut 0 leaves one on the counted handler.

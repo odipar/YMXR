@@ -42,40 +42,40 @@ piece effect3_5 7698 7878
 piece several_1 8612 9732
 piece several_2 9892 10020
 piece cut_2 11378 11392
-piece cut_1 13480 15654
-piece effect0_2 15654 15712
-piece effect1_2 15712 15770
-piece effect2_2 15770 15828
-piece effect3_2 15828 15886
-piece square0_1 15886 15904
-piece square1_1 15904 15922
-piece square2_1 15922 15940
-piece square3_1 15940 15958
-piece one0_1 15958 15968
-piece one1_1 15968 15978
-piece one2_1 15978 15988
-piece one3_1 15988 15998
-piece counted0_1 15998 16078
-piece counted1_1 16078 16158
-piece counted2_1 16158 16238
-piece counted3_1 16238 16318
-piece two0_1 16318 16408
-piece two1_1 16408 16498
-piece two2_1 16498 16588
-piece two3_1 16588 16678
-piece three0_1 16678 16796
-piece three1_1 16796 16914
-piece three2_1 16914 17032
-piece three3_1 17032 17150
-piece envelope0_1 17150 17262
-piece envelope1_1 17262 17374
-piece envelope2_1 17374 17486
-piece envelope3_1 17486 17598
-piece countedthree0_1 17598 17738
-piece countedthree1_1 17738 17878
-piece countedthree2_1 17878 18018
-piece countedthree3_1 18018 18158
-piece lt0_1 18158 18276
+piece cut_1 13480 15656
+piece effect0_2 15656 15714
+piece effect1_2 15714 15772
+piece effect2_2 15772 15830
+piece effect3_2 15830 15888
+piece square0_1 15888 15906
+piece square1_1 15906 15924
+piece square2_1 15924 15942
+piece square3_1 15942 15960
+piece one0_1 15960 15970
+piece one1_1 15970 15980
+piece one2_1 15980 15990
+piece one3_1 15990 16000
+piece counted0_1 16000 16080
+piece counted1_1 16080 16160
+piece counted2_1 16160 16240
+piece counted3_1 16240 16320
+piece two0_1 16320 16410
+piece two1_1 16410 16500
+piece two2_1 16500 16590
+piece two3_1 16590 16680
+piece three0_1 16680 16798
+piece three1_1 16798 16916
+piece three2_1 16916 17034
+piece three3_1 17034 17152
+piece envelope0_1 17152 17264
+piece envelope1_1 17264 17376
+piece envelope2_1 17376 17488
+piece envelope3_1 17488 17600
+piece countedthree0_1 17600 17740
+piece countedthree1_1 17740 17880
+piece countedthree2_1 17880 18020
+piece countedthree3_1 18020 18160
+piece lt0_1 18160 18276
 piece lt0_2 18276 18362
 piece lt1_1 18362 18390
 piece lt1_2 18390 18476
@@ -740,14 +740,14 @@ field 14212 2 cut_1+1
 field 14342 2 cut_2-1 several_2-1
 field 14388 2 cut_2-1 several_2-1
 field 14500 2 cut_2-1
-field 14618 2 cut_2-1 several_2-1
-field 14856 2 cut_2-1 several_2-1
-field 15018 2 cut_2-1
-field 15048 2 cut_2-1 several_2-1
-field 15194 2 cut_1+1
-field 15446 2 cut_2-1 several_1-1 several_2-1
-field 15514 2 cut_2-1 several_2-1
-field 15570 2 cut_2-1 several_2-1
+field 14620 2 cut_2-1 several_2-1
+field 14858 2 cut_2-1 several_2-1
+field 15020 2 cut_2-1
+field 15050 2 cut_2-1 several_2-1
+field 15196 2 cut_1+1
+field 15458 2 cut_2-1 several_1-1 several_2-1
+field 15516 2 cut_2-1 several_2-1
+field 15572 2 cut_2-1 several_2-1
 field 18332 2 counted0_1-1 counted1_1-1 counted2_1-1 counted3_1-1 countedthree0_1-1 countedthree1_1-1 countedthree2_1-1 countedthree3_1-1 effect0_2-1 effect1_2-1 effect2_2-1 effect3_2-1 envelope0_1-1 envelope1_1-1 envelope2_1-1 envelope3_1-1 lt0_1-1 one0_1-1 one1_1-1 one2_1-1 one3_1-1 square0_1-1 square1_1-1 square2_1-1 square3_1-1 three0_1-1 three1_1-1 three2_1-1 three3_1-1 two0_1-1 two1_1-1 two2_1-1 two3_1-1
 field 18446 2 counted0_1-1 counted1_1-1 counted2_1-1 counted3_1-1 countedthree0_1-1 countedthree1_1-1 countedthree2_1-1 countedthree3_1-1 effect1_2-1 effect2_2-1 effect3_2-1 envelope0_1-1 envelope1_1-1 envelope2_1-1 envelope3_1-1 lt0_1-1 lt0_2-1 lt1_1-1 one0_1-1 one1_1-1 one2_1-1 one3_1-1 square0_1-1 square1_1-1 square2_1-1 square3_1-1 three0_1-1 three1_1-1 three2_1-1 three3_1-1 two0_1-1 two1_1-1 two2_1-1 two3_1-1
 field 18560 2 counted0_1-1 counted1_1-1 counted2_1-1 counted3_1-1 countedthree0_1-1 countedthree1_1-1 countedthree2_1-1 countedthree3_1-1 effect2_2-1 effect3_2-1 envelope0_1-1 envelope1_1-1 envelope2_1-1 envelope3_1-1 lt0_1-1 lt0_2-1 lt1_1-1 lt1_2-1 lt2_1-1 one0_1-1 one1_1-1 one2_1-1 one3_1-1 square0_1-1 square1_1-1 square2_1-1 square3_1-1 three0_1-1 three1_1-1 three2_1-1 three3_1-1 two0_1-1 two1_1-1 two2_1-1 two3_1-1
