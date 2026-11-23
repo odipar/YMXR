@@ -486,6 +486,6 @@ keeps are 728 bytes shorter than in the core.
 10. The SNDH writers link by default (#342). The SNDH files of the
     binaries kit use the linked cores. Done.
 11. The cut's paths of each effect's frame code and the cut's routines as
-    blocks (doc/cuts.md). Done: init aims an effect at the cut's piece
-    where the link keeps it, and a tune of version 11 links from the
-    cores with the lookup.
+    blocks. Done: init aims an effect at the cut's piece where the link
+    keeps it, and a tune of version 11 links from the cores with the
+    lookup.

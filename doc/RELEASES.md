@@ -30,10 +30,10 @@ and an executable built from one embeds these. `BinariesTest` reads them
 against the assembly the build makes, so one that does not match what rmac
 writes today fails the build.
 
-A player pins a version of this format: a tune file is 9, or 10 where a
-row maps a value (SPEC.md 3.3.5), and a bound tune the version of the
-tune file bound (BINARIES.md 1), and a release's number names the tools
-rather than either.
+A player pins a version of this format: a tune file is 9, 10 where a row
+maps a value, and 11 where a row cuts a source (SPEC.md 3.3.5), and a
+bound tune the version of the tune file bound (BINARIES.md 1), and a
+release's number names the tools rather than either.
 
 ## Published
 

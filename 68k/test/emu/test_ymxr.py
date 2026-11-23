@@ -433,7 +433,7 @@ def deferring(defines):
 def needs(effects):
     """Required switches from the effects byte: bit 4 for deferred starts,
     bit 5 for lookups, and bit 6, the cuts of version 11, for the lookup
-    core too (BINARIES.md 2.1; doc/cuts.md).
+    core too (BINARIES.md 2.1).
     """
     return bool(effects & 0x10), bool(effects & 0x60)
 
