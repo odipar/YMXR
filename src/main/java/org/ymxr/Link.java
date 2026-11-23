@@ -87,9 +87,8 @@ final class Link {
      * second bank. An effect that cuts a source, in a tune of version 11
      * whose row sets the effect's cut column, needs its paths that read
      * the column, {@code cut0} for effect 0, the cut's routines, its
-     * remap, {@code several}, and for each source its rows start the
-     * counted kind of the source's columns, the kind a start and a recut
-     * under a cut run.
+     * remap, {@code several}, and the counted kinds {@link #counted} reads
+     * in its rows.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
@@ -98,6 +97,10 @@ final class Link {
             for (String lookup : lookups(tune)) {
                 needed.add(lookup);
                 needed.add(lookup.substring(0, 2));
+            }
+            for (String instance : counted(tune)) {
+                needed.add(instance);
+                needed.add(instance.substring(0, instance.length() - 1));
             }
             for (int i = 0; i < 4; i++) {
                 if ((tune.effects() & 1 << i) == 0) {
@@ -128,11 +131,6 @@ final class Link {
                     }
                     if (counted || source.columns() > 1) {
                         needed.add("several");
-                    }
-                    if (cuts) {
-                        String under = kind(source, true);
-                        needed.add(under);
-                        needed.add(under + i);
                     }
                 }
             }
@@ -177,9 +175,8 @@ final class Link {
      * rows are read as a player reads them, through the repeat row until
      * each effect's state there is one it has had before, as Pages reads
      * them; a deferred start on a running timer adds its source to the
-     * ones a remap reaches. On an effect that cuts a source, each source
-     * mapped adds the counted kind of its columns, the kind a start and a
-     * recut under a cut run.
+     * ones a remap reaches. The counted kinds under a cut are
+     * {@link #counted}'s.
      */
     static Set<String> lookups(TuneFile tune) {
         Set<String> out = new LinkedHashSet<>();
@@ -187,10 +184,6 @@ final class Link {
             return out;
         }
         Table table = tune.table();
-        boolean[] cuts = new boolean[4];
-        for (int i = 0; i < 4; i++) {
-            cuts[i] = (tune.effects() & 1 << i) != 0 && cuts(tune, i);
-        }
         int[] target = new int[4];
         int[] mapping = new int[4];
         List<Set<Integer>> running = new ArrayList<>();
@@ -198,7 +191,7 @@ final class Link {
             running.add(new java.util.TreeSet<>());
         }
         for (int row = 0; row < table.rows(); row++) {
-            lookupRow(tune, table, row, target, mapping, running, cuts, out);
+            lookupRow(tune, table, row, target, mapping, running, out);
         }
         Set<List<Integer>> seen = new java.util.HashSet<>();
         while (table.repeat() < table.rows()) {
@@ -213,7 +206,7 @@ final class Link {
                 break;
             }
             for (int row = table.repeat(); row < table.rows(); row++) {
-                lookupRow(tune, table, row, target, mapping, running, cuts, out);
+                lookupRow(tune, table, row, target, mapping, running, out);
             }
         }
         return out;
@@ -222,7 +215,7 @@ final class Link {
     /** One row's effect columns for {@link #lookups}: a running source is
      *  kept with its target, its number times 64 plus the target. */
     private static void lookupRow(TuneFile tune, Table table, int row, int[] target,
-                                  int[] mapping, List<Set<Integer>> running, boolean[] cuts,
+                                  int[] mapping, List<Set<Integer>> running,
                                   Set<String> out) {
         for (int i = 0; i < 4; i++) {
             if ((tune.effects() & 1 << i) == 0) {
@@ -246,7 +239,7 @@ final class Link {
                     mapping[i] = map & 0x7F;
                 }
                 if (mapping[i] != 0) {
-                    mapped(tune, s, target[i], i, cuts[i], out);
+                    mapped(tune, s, target[i], i, out);
                 }
                 boolean deferred = (control & 0x80) != 0 && (control & Columns.DEFERRED) != 0;
                 if (!deferred || running.get(i).isEmpty()) {
@@ -257,30 +250,190 @@ final class Link {
                 mapping[i] = map & 0x7F;
                 if (mapping[i] != 0) {
                     for (int one : running.get(i)) {
-                        mapped(tune, one / 64, one % 64, i, cuts[i], out);
+                        mapped(tune, one / 64, one % 64, i, out);
                     }
                 }
             }
         }
     }
 
-    /** The lookup instances on effect i of source {@code s} mapped on
-     *  {@code target}: the kind of its shape, and under a cut the counted
-     *  kind of its columns. */
-    private static void mapped(TuneFile tune, int s, int target, int i, boolean cuts,
-                               Set<String> out) {
+    /** The lookup instance on effect i of source {@code s} mapped on
+     *  {@code target}, the kind of its shape. */
+    private static void mapped(TuneFile tune, int s, int target, int i, Set<String> out) {
         String kind = lookup(tune, s, target);
         if (kind != null) {
             out.add(kind + i);
         }
-        if (cuts && s >= 1 && s <= tune.sources().size()) {
-            Table source = tune.sources().get(s - 1);
-            out.add(switch (source.columns()) {
-                case 1 -> "lc";
-                case 2 -> target >= NOISE ? "lf" : "le";
-                default -> target == BUZZER ? "lg" : "lh";
-            } + i);
+    }
+
+    /**
+     * The counted kinds a tune runs under a cut, as blocks such as
+     * {@code counted0} and {@code lc1}: on each effect, the counted kind of
+     * the columns of each source the counted handler runs after a start
+     * under a cut 1 to 127 or a recut, the identity's where the source runs
+     * through it and the lookup's on the source's target where it runs
+     * through a transformation. The rows are read as {@link #lookups} reads
+     * them. A stop leaves the effect no source; a start runs under the
+     * kept cut, on the counted handler where that cut is 1 to 127; a
+     * deferred start on an effect that runs a source keeps the cut and the
+     * mapping of its row while it is pending and may switch at any row
+     * after it; a remap moves a source between the identity's counted kind
+     * and the lookup's; and a recut aims the counted handler, but from cut
+     * 0 to cut 0 and where a recut with no start pending leaves the
+     * square's or the one-row source's handler running under the source's
+     * whole table (68k/player/cut.S, ymxr_recut).
+     */
+    static Set<String> counted(TuneFile tune) {
+        Set<String> out = new LinkedHashSet<>();
+        if (!Columns.cuts(tune.effects())) {
+            return out;
         }
+        Table table = tune.table();
+        Under[] under = {new Under(), new Under(), new Under(), new Under()};
+        for (int row = 0; row < table.rows(); row++) {
+            countedRow(tune, row, under, out);
+        }
+        Set<String> seen = new java.util.HashSet<>();
+        while (table.repeat() < table.rows()) {
+            if (!seen.add(Arrays.toString(under))) {
+                break;
+            }
+            for (int row = table.repeat(); row < table.rows(); row++) {
+                countedRow(tune, row, under, out);
+            }
+        }
+        return out;
+    }
+
+    /** A source an effect runs, or runs once a pending start switches: its
+     *  target, whether a cut 1 to 127 runs, its mapping, and whether the
+     *  counted handler runs it. */
+    private record Runs(int source, int target, boolean cut, int mapping, boolean counting,
+                        boolean pending) {
+    }
+
+    /** An effect's state for {@link #counted}: the kept target, cut and
+     *  mapping, and the sources it runs. */
+    private static final class Under {
+        int target;
+        int cut;
+        int mapping;
+        Set<Runs> runs = new LinkedHashSet<>();
+
+        @Override
+        public String toString() {
+            List<String> each = new ArrayList<>();
+            for (Runs one : runs) {
+                each.add(one.toString());
+            }
+            java.util.Collections.sort(each);
+            return target + " " + cut + " " + mapping + " " + each;
+        }
+    }
+
+    /** One row's effect columns for {@link #counted}. */
+    private static void countedRow(TuneFile tune, int row, Under[] under, Set<String> out) {
+        Table table = tune.table();
+        for (int i = 0; i < 4; i++) {
+            if ((tune.effects() & 1 << i) == 0) {
+                continue;
+            }
+            Under one = under[i];
+            int t = Columns.EFFECT + 4 * i;
+            int tg = table.column(t)[row] & 0xFF;
+            int src = table.column(t + 1)[row] & 0xFF;
+            int control = table.column(t + 2)[row] & 0xFF;
+            int map = Columns.maps(tune.effects()) ? table.column(tune.mapping(i))[row] & 0xFF : 0;
+            int cut = table.column(tune.cut(i))[row] & 0xFF;
+            if ((tg & 0x80) != 0) {
+                one.target = tg & 0x7F;
+            }
+            if ((src & 0x80) != 0) {
+                int s = src & 0x7F;
+                if (s == 0) {
+                    one.runs.clear();
+                    continue;
+                }
+                if ((map & 0x80) != 0) {
+                    one.mapping = map & 0x7F;
+                }
+                if ((cut & 0x80) != 0) {
+                    one.cut = cut & 0x7F;
+                }
+                boolean deferred = (control & 0x80) != 0 && (control & Columns.DEFERRED) != 0;
+                boolean pending = deferred && !one.runs.isEmpty();
+                if (!pending) {
+                    one.runs.clear();
+                }
+                one.runs.add(new Runs(s, one.target, one.cut != 0, one.mapping, one.cut != 0,
+                        pending));
+            } else {
+                if ((map & 0x80) != 0) {
+                    one.mapping = map & 0x7F;
+                    Set<Runs> next = new LinkedHashSet<>();
+                    for (Runs r : one.runs) {
+                        if (r.pending()) {
+                            next.add(r);
+                        }
+                        next.add(new Runs(r.source(), r.target(), r.cut(), one.mapping,
+                                r.counting(), false));
+                    }
+                    one.runs = next;
+                }
+                if ((cut & 0x80) != 0) {
+                    one.cut = cut & 0x7F;
+                    boolean pending = one.runs.stream().anyMatch(Runs::pending);
+                    Set<Runs> next = new LinkedHashSet<>();
+                    for (Runs r : one.runs) {
+                        if (r.pending()) {
+                            next.add(r);
+                        }
+                        boolean keeps = !r.counting() && !pending && whole(tune, r.source(), one.cut);
+                        next.add(new Runs(r.source(), r.target(), one.cut != 0, r.mapping(),
+                                keeps ? r.counting() : r.counting() || r.cut() || one.cut != 0,
+                                false));
+                    }
+                    one.runs = next;
+                }
+            }
+            for (Runs r : one.runs) {
+                if (r.counting() && r.source() >= 1 && r.source() <= tune.sources().size()) {
+                    Table source = tune.sources().get(r.source() - 1);
+                    out.add((r.mapping() == 0 ? kind(source, true)
+                            : countedLookup(source.columns(), r.target())) + i);
+                }
+            }
+        }
+    }
+
+    /** Whether cut {@code n} is the whole table of source {@code s}, where
+     *  a recut leaves its handler running: any cut of a marked source of one
+     *  row, and rows 0 and 1 of a marked square (68k/player/cut.S,
+     *  ymxr_recut). */
+    private static boolean whole(TuneFile tune, int s, int n) {
+        if (s < 1 || s > tune.sources().size() || tune.counted().get(s - 1)) {
+            return false;
+        }
+        Table source = tune.sources().get(s - 1);
+        if (source.rows() == 1) {
+            return true;
+        }
+        if (n < 1 || n > tune.cuts().size() || source.columns() != 1 || source.rows() != 2
+                || source.repeat() != 0) {
+            return false;
+        }
+        TuneFile.Cut cut = tune.cuts().get(n - 1);
+        return cut.first() == 0 && cut.last() == 1;
+    }
+
+    /** The lookup's counted kind of a source of that many columns on that
+     *  target (68k/player/cut.S, ymxr_kstart). */
+    private static String countedLookup(int columns, int target) {
+        return switch (columns) {
+            case 1 -> "lc";
+            case 2 -> target >= NOISE ? "lf" : "le";
+            default -> target == BUZZER ? "lg" : "lh";
+        };
     }
 
     /** The lookup kind of source {@code s} on {@code target}, or null for a

@@ -15,6 +15,17 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.ymxs.Chip;
+import org.ymxs.Tunes;
+import org.ymxs.YMXS.Cut;
+import org.ymxs.YMXS.OneConnection;
+import org.ymxs.YMXS.Register;
+import org.ymxs.YMXS.Row;
+import org.ymxs.YMXS.Single;
+import org.ymxs.YMXS.Start;
+import org.ymxs.YMXS.Timer;
+import org.ymxs.YMXS.Timing;
+import org.ymxs.YMXS.Transformation;
 
 /** The linker (doc/LINKER.md): the tables the build cuts, the link, and
  *  the figures the document reads. */
@@ -210,6 +221,43 @@ final class LinkTest {
         }
         assertTrue(blocks.stream().anyMatch(block -> block.matches("l[a-z][0-3]")),
                 "mapped.ymxr runs no lookup instance: " + blocks);
+    }
+
+    /** A link keeps the counted kind of the sources a start or a recut
+     *  under a cut runs alone (Link.counted): effect 0 starts a source
+     *  through a transformation under its whole table, then another under
+     *  a cut through the identity, so the link keeps the lookup's general
+     *  kind, lk0, and the identity's counted kind, counted0, and leaves out
+     *  the lookup's counted kind, lc0, which a cut through the
+     *  transformation runs (doc/LINKER.md). */
+    @Test
+    void aLinkKeepsTheCountedKindOfTheSourcesACutRunsAlone() {
+        Set<String> blocks = Link.blocks(List.of(TuneFile.read(cutAlone())));
+        assertTrue(blocks.containsAll(List.of("lk0", "counted0", "cut0")), blocks.toString());
+        assertTrue(!blocks.contains("lc0") && !blocks.contains("lc"), blocks.toString());
+    }
+
+    /** The tune file of that test: effect 0 starts a source through a
+     *  transformation under its whole table, then another under a cut
+     *  through the identity. ParityTest links it in both trees. */
+    static byte[] cutAlone() {
+        Single wave = Tunes.repeating("wave", List.of(15, 12, 9, 6, 3, 0), 0);
+        Single fall = Tunes.repeating("fall", List.of(15, 13, 11, 9, 7, 5, 3, 1), 0);
+        List<Integer> half = new ArrayList<>();
+        for (int k = 0; k < 16; k++) {
+            half.add(k / 2);
+        }
+        Timing timing = new Timing(Chip.prescaler(4), 100, true, true);
+        Start mapped = new Start(new OneConnection(Tunes.setting(Register.R8), wave), timing,
+                false, Tunes.mapping(new Transformation("half", half)), Tunes.whole(wave));
+        Start cut = new Start(new OneConnection(Tunes.setting(Register.R8), fall), timing,
+                false, Tunes.NO_PARTS, new Cut(2, 5));
+        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, mapped)),
+                Tunes.EMPTY, new Row(java.util.Map.of(), java.util.Map.of(Timer.A, cut)),
+                Tunes.EMPTY);
+        org.ymxs.YMXS.Tune tune = new org.ymxs.YMXS.Tune("a cut alone", "", "LinkTest", 50,
+                Tunes.repeating(rows, 0));
+        return ConformanceTest.schema(tune).file();
     }
 
     private static Set<String> blocks(String name) throws IOException {

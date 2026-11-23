@@ -553,9 +553,10 @@ final class ParityTest {
      * from their structures and read back, a recut outside the tune left
      * out, the files of version 11 written wrong, the check's lines of the
      * cut columns, the bound tune, the layout and the multi file of version
-     * 11, more cuts than a cut column numbers, and a cut and a counted source
-     * of more rows than the counted handler counts (SPEC.md 1.11, 3.3.4, 3.5,
-     * 6.4, 6.5, section 8; BINARIES.md 0, 1).
+     * 11, more cuts than a cut column numbers, a cut and a counted source of
+     * more rows than the counted handler counts, and the SNDH file of each,
+     * whose core the link keeps by the walk of its rows (SPEC.md 1.11,
+     * 3.3.4, 3.5, 6.4, 6.5, section 8; BINARIES.md 0, 1; doc/LINKER.md).
      */
     @Test
     void aTuneUnderACutReadsTheSameInBothTrees() throws Exception {
@@ -566,7 +567,10 @@ final class ParityTest {
             both("ymxr-trace", file);
             both("ymxr-check", file);
             both("ymxr-layout", both("ymxr-bind", file));
+            both("ymxr-sndh", file, "-silent");
         }
+        // the blocks the link keeps under a cut, by the walk of the rows
+        both("ymxr-sndh", LinkTest.cutAlone(), "-silent");
         for (java.util.Map.Entry<String, byte[]> one : CutTest.wrong().entrySet()) {
             Ran java = same("ymxr-trace", one.getValue());
             assertEquals(1, java.exit(), java.said());

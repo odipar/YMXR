@@ -70,14 +70,17 @@ A block is the code and data a player runs for one part of a song:
   its control column with bit 7 and bit 3 set (SPEC.md 1.9);
 - an effect's cut block, `cut0` to `cut3`, in a core with the lookup, is
   the paths of the effect's frame code that read the cut column, which a
-  song needs where a tune of version 11, bit 6 of its effects byte, has a
-  row that sets the effect's cut column (SPEC.md 1.11). A start and a
+  song needs where a tune of version 11, bit 6 of its effects byte, has
+  a row that sets the effect's cut column (SPEC.md 1.11). A start and a
   recut under a cut run the counted kind of the source's columns, so the
-  effect then needs the counted handler of the columns of each source
-  its rows start and the counted lookup instance of the columns of each
-  source it maps through a transformation, each with its kind's loop of
-  init, and the song needs the effect's remap's block, `several` and
-  `cut`;
+  effect then needs, for each source a start under a cut 1 to 127 or a
+  recut puts on the counted handler, the counted handler of its columns
+  through the identity, or the counted lookup instance of its columns
+  where a transformation runs it, each with its kind's loop of init. The
+  link reads which by a walk of the rows, as for the lookup instances,
+  and a recut that leaves a square's or a one-row source's handler
+  running needs none. The song needs the effect's remap's block,
+  `several` and `cut`;
 - `cut`, in a core with the lookup, is the cut's routines and the paths
   of the deferred start and the remap under a cut, which a song needs
   where it needs an effect's cut block;
@@ -489,3 +492,6 @@ keeps are 762 bytes shorter than in the core.
     blocks. Done: init aims an effect at the cut's piece where the link
     keeps it, and a tune of version 11 links from the cores with the
     lookup.
+12. The counted kinds under a cut by a walk of the rows, as for the
+    lookup instances (#366). Done: a source an effect starts under its
+    whole table alone keeps its counted kind out of the link.
