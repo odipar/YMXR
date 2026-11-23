@@ -296,6 +296,12 @@ case failed on main until the bump.
   song that cuts general sources. The rig's tunes reach it there for a
   source of one row alone, so a link that leaves `several` out passes
   every check.
+- The routines of a start under a cut and of a recut, 1,676 to 3,320
+  cycles at the frame (performance.md, A cut). R4.5 counts the routines
+  of a start or a remap through a transformation apart and these inside
+  the call, so two of the rig's tunes of cuts pass its 6,656, each at a
+  row that starts four sources. With the cut's routines counted apart as
+  well, every call of those tunes is within it, at 4,052 at most.
 
 ## Milestones
 
@@ -307,7 +313,7 @@ case failed on main until the bump.
       doc/ymxs.md and tools.md; the rings of a table of 38 columns in
       SPEC.md 3.3.3; and the kit's tunes under a cut, SPEC.md 7.6
 - [x] Go, byte for byte with Java
-- [ ] The player, in the lookup cores, in four steps, each green on the
+- [x] The player, in the lookup cores, in four steps, each green on the
       rig and the suite:
   - [x] a source of one column through the identity: init reads version
         11, the cut column's read sites, the kept and the running cut in
@@ -326,7 +332,7 @@ case failed on main until the bump.
         a song that cuts a source alone, the SNDH tools' core for bit 6,
         BINARIES.md 1.5 and 2, and LINKER.md's table of the kit's tunes of
         version 11
-- [ ] performance.md: a tick under a cut and a frame of a recut,
+- [x] performance.md: a tick under a cut and a frame of a recut,
       measured on the rig, and the bytes of the core with the cut in
 - [ ] This document goes, and YMXS's doc/cuts.md ticks its two YMXR
       items

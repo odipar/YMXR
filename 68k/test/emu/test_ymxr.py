@@ -1958,29 +1958,35 @@ def effects_tune(title, rows, sources, timers, registers=None, repeat=0,
             "tunes": [tune]}
 
 
-def cutting(code, symbols):
-    """Check starts, recuts and places' resets under a cut, tick by tick and
-    every frame against the reader's record (SPEC.md 1.11, 4.3.2, 5.1): a
-    cut whose first row is past row 0 and which excludes its source's repeat
-    row, its place's reset after a recut to the whole table, and the reset
-    of a source of one row started under cut 0 on a timer that cuts, with no
-    source of several columns; a start at the running row, inside a cut and
-    outside it; a source that plays once, stopped at the cut's last row and
-    started again at that row by a select; a square, a source of one row and
-    a counted source under a cut, recut to the whole table and back; a recut
-    on a stopped timer, read by the start after it; starts under the whole
-    table after a cut, and a place's reset after each; deferred starts under
-    a cut, at L + 1 of the running cut and at the cut's first row, and
-    between a cut and the whole table; recuts while a start is pending, of
-    the general handler and of a square; sources of two and three columns,
-    marked and counted, under a cut; starts through a transformation under a
-    cut, of a marked source, a counted one and a square, remaps under a cut
-    to and from the identity, and recuts of a lookup instance, beside a
-    timer that maps a source under the whole table; deferred starts under a
-    cut through a transformation and of two columns, recut while pending;
-    and the timers that share a control register. The third retunes an idle
-    timer and the fifth recuts one, which YMXS's check of the writing rules
-    warns of (YMXS, SPEC.md 6.3), and every other follows the rules."""
+# The tunes of the check of cuts, each built once a run (cut_cases).
+_CUT_TUNES = []
+
+
+def cut_cases():
+    """The tunes of the check of cuts, each as (title, path, deferred):
+    deferred where a row defers a start. A cut whose first row is past row
+    0 and which excludes its source's repeat row, its place's reset after a
+    recut to the whole table, and the reset of a source of one row started
+    under cut 0 on a timer that cuts, with no source of several columns; a
+    start at the running row, inside a cut and outside it; a source that
+    plays once, stopped at the cut's last row and started again at that row
+    by a select; a square, a source of one row and a counted source under a
+    cut, recut to the whole table and back; a recut on a stopped timer, read
+    by the start after it; starts under the whole table after a cut, and a
+    place's reset after each; deferred starts under a cut, at L + 1 of the
+    running cut and at the cut's first row, and between a cut and the whole
+    table; recuts while a start is pending, of the general handler and of a
+    square; sources of two and three columns, marked and counted, under a
+    cut; starts through a transformation under a cut, of a marked source, a
+    counted one and a square, remaps under a cut to and from the identity,
+    and recuts of a lookup instance, beside a timer that maps a source under
+    the whole table; deferred starts under a cut through a transformation
+    and of two columns, recut while pending; and the timers that share a
+    control register. The third retunes an idle timer and the fifth recuts
+    one, which YMXS's check of the writing rules warns of (YMXS, SPEC.md
+    6.3), and every other follows the rules."""
+    if _CUT_TUNES:
+        return _CUT_TUNES
     loop = ("loop of eight", [15, 14, 13, 12, 11, 10, 9, 8], 2)
     fall = ("fall", list(range(15, -1, -1)), None)
     six = ("six", [1, 2, 3, 4, 5, 6], 0)
@@ -2057,7 +2063,7 @@ def cutting(code, symbols):
                 7: ("retune", 200, 200, 0, 1), 10: recut(0, 4)},
           "B": {0: start(2, (2, 4), target=18), 5: recut(1, 3), 9: recut(0, 5)},
           "C": {0: start(4, (2, 4), target=24), 3: recut(0, 3),
-                6: start(4, (1, 2), target=24, pr=0, deferred=1)},
+                6: start(4, (1, 2), target=24, pr=0)},
           "D": {0: start(3, (1, 2), target=20), 4: recut(0, 3), 8: recut(2, 3)}}),
         ("starts through a transformation under a cut, remaps under it, and recuts, beside a"
          " timer that maps a source under the whole table", [loop, keys, square, six],
@@ -2076,13 +2082,24 @@ def cutting(code, symbols):
          {"C": {0: start(1, (3, 7), target=9), 4: recut(2, 4)},
           "D": {0: start(2, (1, 5), target=10, rate=quick), 3: recut(0, 2), 6: recut(3, 5)}}),
     ]
-    played = 0
     for title, sources, timers, *more in cases:
         through = next((one for one in more if isinstance(one, list)), None)
         tune = effects_tune(title, 18, sources, timers, cuts=True, transformations=through)
         at, version = built(re.sub(r"[^a-z0-9]+", "-", title), tune,
                             checked="warned" not in more)
         assert version == CUT, "%s: ymxs-to-ymxr wrote version %d" % (title, version)
+        deferred = any(op[0] == "start" and op[7] for ops in timers.values()
+                       for op in ops.values())
+        _CUT_TUNES.append((title, at, deferred))
+    return _CUT_TUNES
+
+
+def cutting(code, symbols):
+    """Check starts, recuts and places' resets under a cut, tick by tick and
+    every frame against the reader's record (SPEC.md 1.11, 4.3.2, 5.1), on
+    the tunes of cut_cases."""
+    played = 0
+    for title, at, _ in cut_cases():
         try:
             frames, ticks = check(at, *played_on(at, code, symbols), kit=True)[:2]
         except AssertionError as e:
@@ -2853,12 +2870,16 @@ def deferred_sizes():
 
 def mapped_sizes():
     """Verify performance.md player sizes across combinations of source
-    addressing, deferred starts and lookup support (A deferred start).
-    """
-    sizes = {(pcrel, defer, look): len(build(([] if pcrel else ["-dYMXR_PCREL=0"])
-                                             + ([DEFER_ON] if defer else [])
-                                             + ([MAP_ON] if look else []))[0])
+    addressing, deferred starts and lookup support (A deferred start),
+    and the sizes of the section on a cut: the four players with the
+    lookup in, the bytes the cut adds to them against the release's
+    figures beside them, and the cut's blocks, a piece of each from its
+    label to its end (doc/LINKER.md)."""
+    built = {(pcrel, defer, look): build(([] if pcrel else ["-dYMXR_PCREL=0"])
+                                         + ([DEFER_ON] if defer else [])
+                                         + ([MAP_ON] if look else []))
              for pcrel in (True, False) for defer in (False, True) for look in (True, False)}
+    sizes = {key: len(code) for key, (code, _) in built.items()}
     said = " ".join(open(os.path.join(ROOT, "doc", "performance.md")).read()
                     .split("## A deferred start")[1].split())
     m = re.search(r"The lookup in, `YMXR_MAP=1`, makes the player ([\d,]+) bytes against"
@@ -2870,6 +2891,34 @@ def mapped_sizes():
     assert m and tuple(int(x.replace(",", "")) for x in m.groups()) == counted, \
         "performance.md reads the players with the lookup as %s, and they assemble to %s" % (
             m and m.groups(), counted)
+    text = open(os.path.join(ROOT, "doc", "performance.md")).read()
+    said = " ".join(text[text.index("\n## A cut\n"):].split()) if "\n## A cut\n" in text else ""
+    m = re.search(r"The cut makes the player with the lookup in ([\d,]+) bytes against ([\d,]+)"
+                  r" in release [\d.]+, and ([\d,]+) against ([\d,]+) where a tick reads an"
+                  r" absolute address; with the deferred start in as well, ([\d,]+) against"
+                  r" ([\d,]+), and ([\d,]+) against ([\d,]+)\. Of the ([\d,]+) bytes it adds to"
+                  r" the player as it is, ([\d,]+) are the cut's blocks, which a link leaves out"
+                  r" of the player of a song that cuts no source \(LINKER\.md\): ([\d,]+) of"
+                  r" routines and ([\d,]+) of each effect's frame code\. With the deferred start"
+                  r" in, the blocks are ([\d,]+) of the ([\d,]+)\.", said)
+    assert m, "performance.md's section on a cut has no sizes of the player with the cut in"
+    read = [int(x.replace(",", "")) for x in m.groups()]
+
+    def pieces(defer):
+        symbols = built[(True, defer, True)][1]
+        return {name[len("ymxr_p_"):]: symbols["ymxr_e_" + name[len("ymxr_p_"):]] - at
+                for name, at in symbols.items() if name.startswith("ymxr_p_cut")}
+    now, now_defer = pieces(False), pieces(True)
+    effects = {now[name] for name in now if re.match(r"cut\d_", name)}
+    counted = [sizes[(True, False, True)], read[1], sizes[(False, False, True)], read[3],
+               sizes[(True, True, True)], read[5], sizes[(False, True, True)], read[7],
+               sizes[(True, False, True)] - read[1], sum(now.values()),
+               sum(v for name, v in now.items() if not re.match(r"cut\d_", name)),
+               next(iter(effects)) if len(effects) == 1 else effects,
+               sum(now_defer.values()), sizes[(True, True, True)] - read[5]]
+    assert read == counted, \
+        "performance.md reads the player with the cut in as %s, and the rig counts %s" % (
+            read, counted)
     return ("the lookup: the player %d bytes against %d, every size performance.md reads"
             % (sizes[(True, False, True)], sizes[(True, False, False)]))
 
@@ -3250,13 +3299,17 @@ def lookup_regions(symbols):
 # ends at, or to the return of the routine it calls.
 ROUTINES = ("ymxr_lstart", "ymxr_remap", "ymxr_rmove")
 REMAPS = ("ymxr_tick%d_remap", "ymxr_tick%d_remapped")
+# The routines of a start under a cut and of a recut, each counted from
+# its call to its return, apart from those of ROUTINES (performance.md,
+# A cut).
+CUT_ROUTINES = ("ymxr_kstart", "ymxr_recut")
 
 
 def routine_calls(code, symbols):
-    """Return addresses after each bsr.w calling a routine of ROUTINES,
-    and the end of each effect's remap (REMAPS).
+    """Return addresses after each bsr.w calling a routine of ROUTINES or
+    of CUT_ROUTINES, and the end of each effect's remap (REMAPS).
     """
-    called = {symbols[name] for name in ROUTINES if name in symbols}
+    called = {symbols[name] for name in ROUTINES + CUT_ROUTINES if name in symbols}
     return [at + 4 for at in range(0, len(code) - 3, 2)
             if code[at:at + 2] == b"\x61\x00"
             and at + 2 + struct.unpack(">h", code[at + 2:at + 4])[0] in called] + [
@@ -3308,6 +3361,53 @@ def lookup_events(model, before, row):
                 what = "switch"
             events.append((i, what, shape))
     return events
+
+
+def cut_events(model, before, row):
+    """The starts and the recuts of a row of version 11, from the effects'
+    records before it (before) and the model after it, as (effect,
+    operation, shape): "recut" on a running timer and "recut, stopped" on
+    a stopped one, the shape the source's; and "start under a cut" or
+    "start under cut 0" at the frame, ", the place kept" where bit 5 is
+    clear, the shape the started source's (SPEC.md 4.3.2): cut_shape's,
+    "mapped " before it where a transformation runs the source after the
+    row. A recut whose row sets the mapping column as well is left out,
+    and so is a deferred start."""
+    tune = model.tune
+    events = []
+    for i in range(4):
+        t = EFFECT + 4 * i
+        fx, was = model.fx[i], before[i]
+        x = row[tune.cut_at + i]
+        m = row[tune.mapping_at + i] if tune.mapping_at is not None else 0
+        if row[t + 1] & 0x80:
+            if not row[t + 1] & 0x7F or fx["pending"]:
+                continue
+            what = "start under a cut" if fx["crun"] else "start under cut 0"
+            if not row[t + 2] & 0x80 or not row[t + 2] & 0x20:
+                what += ", the place kept"
+        elif x & 0x80 and not m & 0x80:
+            what = "recut" if was["running"] and was["source"] else "recut, stopped"
+        else:
+            continue
+        source = fx["source"] or was["source"]
+        if not source:
+            continue
+        events.append((i, what, ("mapped " if fx["run"] else "") + cut_shape(tune, source)))
+    return events
+
+
+def cut_shape(tune, source):
+    """A source's shape as the section on a cut reads it (performance.md,
+    A cut): "one column", "a square", "one row", "two columns" or "three
+    columns", "counted " before it where the source is counted."""
+    _, R, RR, columns = tune.sources[source]
+    shape = {2: "two columns", 3: "three columns"}.get(len(columns), "one column")
+    if len(columns) == 1 and R == 2 and RR == 0:
+        shape = "a square"
+    elif len(columns) == 1 and R == 1:
+        shape = "one row"
+    return ("counted " if tune.counted[source] else "") + shape
 
 
 def page_of(m, symbols, at, name):
@@ -3448,7 +3548,7 @@ def pages(m, symbols, model, i, at, name, said):
 
 
 def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
-          ticked=None, spans=None, kinds=None):
+          ticked=None, spans=None, kinds=None, cuts=None):
     """The tune on the player, against the model frame by frame and tick
     by tick; with kit, each frame against the reader's entry as well,
     and a tune that plays once to the call that reports its end. With
@@ -3464,7 +3564,9 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     counts the operations each refill parses, so one pass over the frames
     reads the table's figures and the parts below it (refills). With
     kinds, a Counter, each row's operations are added to it as row_kinds
-    reads them."""
+    reads them. With cuts, a list, each start and each recut of a tune of
+    version 11 is added to it as (frame, effect, operation, shape), as
+    cut_events reads them."""
     work = tempfile.mkdtemp()
     file, report = convert(ym, work)
     workspace = WORK + 0x100
@@ -3545,24 +3647,30 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         m.mu.hook_add(UC_HOOK_CODE, filled, begin=CODE + symbols["ymxr_filled"],
                       end=CODE + symbols["ymxr_filled"])
     # Measure each call of a routine of ROUTINES from entry after bsr
-    # to the instruction after its rts (routine_calls).
-    routine = {"cycles": 0, "at": None}
+    # to the instruction after its rts (routine_calls), and each call of
+    # one of CUT_ROUTINES apart, in "cut".
+    routine = {"cycles": 0, "cut": 0, "at": None, "into": "cycles"}
     looking = ()
     if cycles and "copy" in cycles.regions:
-        looking = tuple(lookup_regions(symbols)) + ("routine",)
-        def entered(mu, address, size, data):
-            # the remap of the frame code counts the routine it calls
-            if routine["at"] is None:
-                routine["at"] = cycles.counter.cycles
+        looking = tuple(lookup_regions(symbols)) + ("routine", "cut routine")
+
+        def entering(into):
+            def entered(mu, address, size, data):
+                # the remap of the frame code counts the routine it calls
+                if routine["at"] is None:
+                    routine.update(at=cycles.counter.cycles, into=into)
+            return entered
 
         def returned(mu, address, size, data):
             if routine["at"] is not None:
-                routine["cycles"] += cycles.counter.cycles - routine["at"]
+                routine[routine["into"]] += cycles.counter.cycles - routine["at"]
                 routine["at"] = None
-        for name in ROUTINES + tuple(REMAPS[0] % i for i in range(4)):
-            if name in symbols:
-                m.mu.hook_add(UC_HOOK_CODE, entered, begin=CODE + symbols[name],
-                              end=CODE + symbols[name])
+        for names, into in ((ROUTINES + tuple(REMAPS[0] % i for i in range(4)), "cycles"),
+                            (CUT_ROUTINES, "cut")):
+            for name in names:
+                if name in symbols:
+                    m.mu.hook_add(UC_HOOK_CODE, entering(into), begin=CODE + symbols[name],
+                                  end=CODE + symbols[name])
         for at in routine_calls(code, symbols):
             m.mu.hook_add(UC_HOOK_CODE, returned, begin=CODE + at, end=CODE + at)
     lookups = []
@@ -3691,6 +3799,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             cycles._settle(None)
         spent_before = dict(cycles.spent) if cycles else {}
         spent_before["routine"] = routine["cycles"]
+        spent_before["cut routine"] = routine["cut"]
         copies.clear()
         before = cycles.cycles if cycles else 0
         image_before = cycles.image if cycles else 0
@@ -3736,9 +3845,15 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             row = model.tune.rows[model.row]
         if kinds is not None:
             kinds.update(row_kinds(model))
+        if cuts is not None and model.tune.cut_at is not None:
+            held = [dict(model.fx[i]) for i in range(4)]
+            cut_row = model.tune.rows[model.row]
         want = model.frame()
+        if cuts is not None and model.tune.cut_at is not None:
+            cuts.extend((f,) + event for event in cut_events(model, held, cut_row))
         if looking:
             spent = dict(cycles.spent, routine=routine["cycles"])
+            spent["cut routine"] = routine["cut"]
             delta = {name: spent[name] - spent_before[name] for name in looking}
             delta["starts"] = tuple(begun["starts"])
             begun["starts"].clear()
@@ -3790,6 +3905,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             # a tick through a transformation, whose kind the counts keep
             # apart from the identity's
             mapping = fx["run"]
+            crun = fx["crun"]
             want, then = model.tick(i)
             if cycles:
                 cycles._settle(None)
@@ -3811,6 +3927,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                     kind = "wide " + then
                 if mapping:
                     kind = "mapped " + kind
+                if crun:
+                    # the counted handler of a cut, by the source's shape
+                    kind = "cut %s%s %s" % ("mapped " if mapping else "",
+                                            cut_shape(tune, read[0]), then)
                 if bin(tune.effects & 0x0F).count("1") == 1:
                     kind += " alone"        # init took the level's drop out
                 tick_cost.setdefault(kind, set()).add(cycles.cycles - before)
@@ -4635,6 +4755,194 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                    r" (\w+) to another transformation costs ([\d,]+)",
           WORDS.get(len(begun[0])) if shapes == {"lc"} else shapes,
           WORDS.get(len(remapped[0])), four)
+    return stale
+
+
+# The rows of the section on a cut's table of ticks, each with the
+# columns of the source and the path (cut_read).
+CUT_TICKS = (("one column, a row written", 1, "on"),
+             ("one column, the end of a pass, the place to its loop row", 1, "loop"),
+             ("one column, the end of a pass, the timer stopped", 1, "stop"),
+             ("two columns, a row written", 2, "on"),
+             ("two columns, the end of a pass, the places to its loop row", 2, "loop"),
+             ("three columns, a row written", 3, "on"),
+             ("three columns, the end of a pass, the places to its loop row", 3, "loop"))
+
+# The rows of its table of a start and a recut at the frame, each with the
+# shapes cut_events reads that it covers.
+CUT_FRAMES = (("one column", ("one column", "a square", "one row", "counted one column",
+                              "counted a square", "counted one row")),
+              ("two columns", ("two columns", "counted two columns")),
+              ("three columns", ("three columns", "counted three columns")),
+              ("one column, through a transformation",
+               tuple("mapped " + shape for shape in ("one column", "a square", "one row",
+                                                     "counted one column", "counted a square",
+                                                     "counted one row"))))
+
+
+def cut_read(code, symbols, cycles_of, general):
+    """performance.md's section on a cut against the rig, on the player as
+    it is with the lookup in, over the tunes of the check of cuts that
+    defer no start (cut_cases): each tick under a cut by the source's
+    columns and shape, against a marked source's under cut 0, the fixtures'
+    of one column (general, by kind) and the kit's voices.ymxr's of two and
+    three; a start under a cut and a recut at the frame (cut_events); and
+    each tune's costliest call, whole, with the routines of the lookup
+    apart and with those of the cut apart as well, against R4.5."""
+    text = open(os.path.join(ROOT, "doc", "performance.md")).read()
+    if "\n## A cut\n" not in text:
+        return ["performance.md has no section on a cut"]
+    section = text[text.index("\n## A cut\n") + 1:]
+    if "\n## " in section:
+        section = section[:section.index("\n## ")]
+    said = " ".join(section.split())
+    stale = []
+
+    def reads(claim, *want):
+        m = re.search(claim, said)
+        if not m:
+            stale.append("performance.md's section on a cut has no \"%s\"" % claim)
+        elif not near(tuple(g.replace(",", "") for g in m.groups()),
+                      tuple(str(w).replace(",", "") for w in want)):
+            stale.append("performance.md reads %s on a cut where the rig counts %s"
+                         % (m.groups(), tuple(str(w) for w in want)))
+
+    played, ticked, frames = [], {}, {}
+    for title, at, deferred in cut_cases():
+        if deferred:
+            continue
+        spans, cuts = [], []
+        result = check(at, code, symbols, CyclesOn(cycles_of), spans=spans, cuts=cuts)
+        for kind, spent in result[3].items():
+            # a tick under a cut costs the same on a tune of one effect
+            ticked.setdefault(kind, set()).update(spent)
+        events = {(f, i): (what, shape) for f, i, what, shape in cuts}
+        for f, i, label, n in spans:
+            what, shape = events.get((f, i), (None, None))
+            if (label, what and what.startswith("recut")) in (("now", False), ("unset", True)):
+                frames.setdefault((what, shape), set()).add(n)
+        played.append((title, result[2], result[5][8], cuts))
+    reads(r"The rig counts the figures below on the (\w+) tunes of its check of cuts that"
+          r" defer no start", WORDS.get(len(played), len(played)))
+
+    def under(columns, then, mapped=False, alone=None):
+        """The ticks under a cut of every shape of that many columns, on
+        that path, of the tunes of one effect, of several, or both."""
+        shapes = CUT_FRAMES[3 if mapped else columns - 1][1]
+        return {n for kind, spent in ticked.items() for n in spent
+                for shape in shapes
+                if kind in ("cut %s %s" % (shape, then), "cut %s %s alone" % (shape, then))
+                and (alone is None or kind.endswith(" alone") == alone)}
+    kit = os.path.join(ROOT, "doc", "conformance", "tunes")
+    voices = check(os.path.join(kit, "voices.ymxr"), code, symbols, CyclesOn(cycles_of))[3]
+    # under cut 0, the fixtures' ticks and those of the tunes of cuts
+    general = {kind: set(general.get(kind, set())) | ticked.get(kind, set())
+               for kind in set(general) | set(ticked)}
+    marked = {(1, then): general.get(then, set()) for then in ("on", "loop", "stop")}
+    marked.update({(columns, then): voices.get("%s %s" % (name, then), set())
+                   for columns, name in ((2, "wide"), (3, "three")) for then in ("on", "loop")})
+    more = {}
+    for row, columns, then in CUT_TICKS:
+        m = re.search(r"^\| %s \| (\d+) \| (\d+) \|$" % re.escape(row), section, re.M)
+        counted = (marked[(columns, then)], under(columns, then))
+        if not m or not near((int(m.group(1)), int(m.group(2))), counted):
+            stale.append("performance.md reads the tick %s as %s, and the rig counts %s"
+                         % (row, m and m.groups(), counted))
+        elif all(len(one) == 1 for one in counted):
+            more.setdefault("on" if then == "on" else "end", set()).add(
+                next(iter(counted[1])) - next(iter(counted[0])))
+    reads(r"The counter of rows left costs (\d+) cycles a row written on each of the (\w+),"
+          r" and (\d+) at the end of a pass",
+          span(more.get("on", {0})), WORDS[len({columns for _, columns, _ in CUT_TICKS})],
+          span(more.get("end", {0})))
+    square = (ticked.get("cut a square on", set()), ticked.get("cut a square loop", set()))
+    one = ticked.get("cut one row loop", set())
+    if "cut one row on" in ticked or "cut one row on alone" in ticked:
+        stale.append("a source of one row under a cut ticks a row without the end of a pass")
+    reads(r"A square under a cut of its two rows ticks at (\d+) and (\d+) in turn, against"
+          r" (\d+) under cut 0, and a source of one row at (\d+), every tick the end of a"
+          r" pass, against (\d+)\.",
+          span(square[0] or {0}), span(square[1] or {0}), span(general.get("square", {0})),
+          span(one or {0}), span(general.get("one", {0})))
+    same = all(ticked.get("counted " + then) == ticked.get("cut counted one column " + then)
+               and ticked.get("counted " + then) for then in ("on", "loop"))
+    if not same:
+        stale.append("a counted source ticks %s under cut 0 and %s under a cut" % (
+            [ticked.get("counted " + then) for then in ("on", "loop")],
+            [ticked.get("cut counted one column " + then) for then in ("on", "loop")]))
+    reads(r"A counted source runs the counted handler under cut 0 as well, and ticks at the"
+          r" same figures under a cut\.")
+    looked = (under(1, "on", True), under(1, "loop", True))
+    reads(r"Through a transformation a tick under a cut costs (\d+) cycles more a row written"
+          r" and (\d+) more at the end of a pass, (\d+) and (\d+) on one column\.",
+          *([next(iter(looked[0])) - next(iter(under(1, "on"))),
+             next(iter(looked[1])) - next(iter(under(1, "loop"))),
+             next(iter(looked[0])), next(iter(looked[1]))]
+            if all(len(one) == 1 for one in looked + (under(1, "on"), under(1, "loop")))
+            else [looked]))
+    for columns, then in ((1, "on"), (1, "loop")):
+        if under(columns, then, alone=True) and under(columns, then, alone=True) != \
+                under(columns, then, alone=False):
+            stale.append("a tick under a cut %s costs %s on a tune of one effect and %s on"
+                         " several" % (then, under(columns, then, alone=True),
+                                       under(columns, then, alone=False)))
+    reads(r"so a tick under a cut costs the same on either \(A tick\)")
+
+    # the frame: a start under a cut at row F and a recut on a running
+    # timer, by the source's columns
+    for row, shapes in CUT_FRAMES:
+        m = re.search(r"^\| %s \| ([^|]+?) \| ([^|]+?) \|$" % re.escape(row), section, re.M)
+        counted = tuple(span(set().union(*(frames.get((what, shape), set())
+                                          for shape in shapes)) or {0}, "")
+                        for what in ("start under a cut", "recut"))
+        if not m or not near(m.groups(), counted):
+            stale.append("performance.md reads %s at the frame under a cut as %s, and the rig"
+                         " counts %s" % (row, m and m.groups(), counted))
+    kept = [set().union(*(frames.get(("start under a cut, the place kept", shape), set())
+                          for shape in shapes)) or {0} for _, shapes in CUT_FRAMES[:2]]
+    reads(r"a start with the place kept reads the running row and its remainder by R as"
+          r" well, ([\d,]+(?: to [\d,]+)?) cycles on one column and ([\d,]+(?: to [\d,]+)?)"
+          r" on two\.", span(kept[0]), span(kept[1]))
+    reads(r"A recut on a stopped timer sets the kept cut alone, ([\d,]+(?: to [\d,]+)?)"
+          r" cycles\.", span(frames.get(("recut, stopped", "one column"), {0})))
+    reads(r"On the same span a start under cut 0 at row 0 of a marked source of one column"
+          r" costs ([\d,]+(?: to [\d,]+)?) cycles\.",
+          span(frames.get(("start under cut 0", "one column"), {0})))
+
+    # each tune's costliest call, against R4.5
+    budget = re.search(r"A play call costs at most ([\d,]+) cycles",
+                       " ".join(open(os.path.join(ROOT, "doc", "requirements.md")).read().split()))
+    budget = int(budget.group(1).replace(",", "")) if budget else 0
+    rows = re.findall(r"^\| ([^|]+?) \| (\d+) \| (\d+) \| (\d+) \|$", section, re.M)
+    if [title for title, _, _, _ in rows] != [title for title, _, _, _ in played]:
+        stale.append("performance.md's costliest calls under a cut are of %s, and the rig"
+                     " plays %s" % ([title for title, _, _, _ in rows],
+                                    [title for title, _, _, _ in played]))
+    over, within = [], 0
+    for title, cost, lookups, cuts in played:
+        looks = [c - spent["routine"] for c, (_, spent, _) in zip(cost, lookups)]
+        both = [c - spent["cut routine"] for c, (_, spent, _) in zip(looks, lookups)]
+        counted = (max(cost), max(looks), max(both))
+        row = next((tuple(int(x) for x in got[1:]) for got in rows if got[0] == title), None)
+        if not near(row, counted):
+            stale.append("performance.md reads the costliest call of %s as %s, and the rig"
+                         " counts %s" % (title, row, counted))
+        within = max(within, max(both))
+        if max(looks) > budget:
+            f = looks.index(max(looks))
+            starts = [what for g, _, what, _ in cuts if g == f and what.startswith("start")]
+            over.append((f, len(starts), sum(1 for what in starts if "under a cut" in what)))
+    if any(f for f, _, _ in over) or len({n for _, n, _ in over}) > 1:
+        stale.append("the calls past R4.5 under a cut are at frames and of starts %s" % over)
+    under_cut = sorted((n for _, _, n in over), reverse=True)
+    reads(r"Of the (\w+), (\w+) pass R4\.5's ([\d,]+), each at its first row, which starts"
+          r" (\w+) sources, (\w+) of them under a cut in one and (\w+) in the other\. With the"
+          r" routines of the cut counted apart as well, every call is within it, the costliest"
+          r" at ([\d,]+)\.",
+          WORDS.get(len(played)), WORDS.get(len(over)), budget,
+          WORDS.get(over[0][1]) if over else None,
+          *([WORDS.get(n) for n in under_cut] if len(under_cut) == 2 else [under_cut, None]),
+          within if within <= budget else None)
     return stale
 
 
@@ -7368,6 +7676,9 @@ def main():
         # a transformation, A remap at the frame and The cost of 34
         # columns against mapped tunes.
         stale += mapped_read(code, symbols, cycles_of, general, plays)
+        if PCREL and not LEAN:
+            # the section on a cut, on the player as it is
+            stale += cut_read(code, symbols, cycles_of, general)
     if costs and not args and wide is None and not kit and PCREL and not LEAN:
         # plan.md's shares, gates and parts over the eleven fixtures
         stale += plan_read(walker or FrameWalk(cycles_of, code, symbols), tunes, measured)
