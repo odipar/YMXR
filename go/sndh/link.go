@@ -262,8 +262,8 @@ func Kind(source *dtx.Table, counted bool) string {
 // loop of init; and align, the padding before the second bank; in the
 // order of Blocks. An effect that cuts a source, in a tune of version 11
 // whose row sets the effect's cut column, needs its paths that read the
-// column, cut0 for effect 0, the cut's routines, its remap, several, and
-// the counted kinds CountedOf reads in its rows.
+// column, cut0 for effect 0, the cut's routines, its remap, and the
+// counted kinds and several that CountedOf reads in its rows.
 func BlocksOf(tunes []ymxr.File) []string {
 	needed := map[string]bool{"align": true}
 	for _, tune := range tunes {
@@ -271,9 +271,8 @@ func BlocksOf(tunes []ymxr.File) []string {
 			needed[lookup] = true
 			needed[lookup[:2]] = true
 		}
-		for _, instance := range CountedOf(tune) {
-			needed[instance] = true
-			needed[instance[:len(instance)-1]] = true
+		for _, block := range CountedOf(tune) {
+			needed[block] = true
 		}
 		for i := 0; i < 4; i++ {
 			if tune.Effects&(1<<i) == 0 {
@@ -285,7 +284,6 @@ func BlocksOf(tunes []ymxr.File) []string {
 				needed["cut"] = true
 				needed[fmt.Sprintf("cut%d", i)] = true
 				needed[fmt.Sprintf("map%d", i)] = true
-				needed["several"] = true
 			}
 			if ymxr.HasMapping(tune.Effects) && sets(tune, tune.Mapping(i), 0) {
 				needed[fmt.Sprintf("map%d", i)] = true
@@ -447,11 +445,13 @@ func mapped(tune ymxr.File, s, target, i int, add func(string)) {
 }
 
 // CountedOf is the counted kinds a tune runs under a cut, as blocks such as
-// counted0 and lc1: on each effect, the counted kind of the columns of each
-// source the counted handler runs after a start under a cut 1 to 127 or a
-// recut, the identity's where the source runs through it and the lookup's
-// on the source's target where it runs through a transformation. The rows
-// are read as LookupsOf reads them. A stop leaves the effect no source; a
+// counted and counted0, or lc and lc1: on each effect, the counted kind of
+// the columns of each source the counted handler runs after a start under
+// a cut 1 to 127 or a recut, the identity's where the source runs through
+// it and the lookup's on the source's target where it runs through a
+// transformation; and several where a recut to cut 0 leaves a source on
+// the counted handler, whose place's reset under cut 0 runs
+// ymxr_widereset. The rows are read as LookupsOf reads them. A stop leaves the effect no source; a
 // start runs under the kept cut, on the counted handler where that cut is
 // 1 to 127; a deferred start on an effect that runs a source keeps the cut
 // and the mapping of its row while it is pending and may switch at any
@@ -602,14 +602,19 @@ func countedRow(tune ymxr.File, row int, all *[4]under, add func(string)) {
 			if r.mapping != 0 {
 				kind = countedLookup(source.Columns(), r.target)
 			}
+			add(kind)
 			add(fmt.Sprintf("%s%d", kind, i))
+			if !r.cut {
+				add("several")
+			}
 		}
 	}
 }
 
 // whole is whether cut n is the whole table of source s, where a recut
 // leaves its handler running: any cut of a marked source of one row, and
-// rows 0 and 1 of a marked square (68k/player/cut.S, ymxr_recut).
+// cut 0 and rows 0 and 1 of a marked square (68k/player/cut.S,
+// ymxr_recut).
 func whole(tune ymxr.File, s, n int) bool {
 	if s < 1 || s > len(tune.Sources) || tune.Counted[s-1] {
 		return false
@@ -618,8 +623,13 @@ func whole(tune ymxr.File, s, n int) bool {
 	if source.Rows() == 1 {
 		return true
 	}
-	if n < 1 || n > len(tune.Cuts) || source.Columns() != 1 || source.Rows() != 2 ||
-		source.Repeat() != 0 {
+	if source.Columns() != 1 || source.Rows() != 2 || source.Repeat() != 0 {
+		return false
+	}
+	if n == 0 {
+		return true
+	}
+	if n > len(tune.Cuts) {
 		return false
 	}
 	cut := tune.Cuts[n-1]

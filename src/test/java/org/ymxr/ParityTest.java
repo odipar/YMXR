@@ -571,6 +571,8 @@ final class ParityTest {
         }
         // the blocks the link keeps under a cut, by the walk of the rows
         both("ymxr-sndh", LinkTest.cutAlone(), "-silent");
+        both("ymxr-sndh", LinkTest.recut(false), "-silent");
+        both("ymxr-sndh", LinkTest.recut(true), "-silent");
         for (java.util.Map.Entry<String, byte[]> one : CutTest.wrong().entrySet()) {
             Ran java = same("ymxr-trace", one.getValue());
             assertEquals(1, java.exit(), java.said());

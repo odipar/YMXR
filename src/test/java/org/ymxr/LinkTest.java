@@ -19,6 +19,7 @@ import org.ymxs.Chip;
 import org.ymxs.Tunes;
 import org.ymxs.YMXS.Cut;
 import org.ymxs.YMXS.OneConnection;
+import org.ymxs.YMXS.Recut;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Row;
 import org.ymxs.YMXS.Single;
@@ -258,6 +259,41 @@ final class LinkTest {
         org.ymxs.YMXS.Tune tune = new org.ymxs.YMXS.Tune("a cut alone", "", "LinkTest", 50,
                 Tunes.repeating(rows, 0));
         return ConformanceTest.schema(tune).file();
+    }
+
+    /** A link keeps {@code several} beside an effect's cut block where a
+     *  recut to cut 0 leaves a source on the counted handler, whose
+     *  place's reset under cut 0 runs ymxr_widereset, and leaves it out
+     *  otherwise (Link.counted): effect 0 starts a marked source of one
+     *  column under a cut and recuts it to its whole table, which the
+     *  converter writes as a cut 1 to 127; the same file with that cut
+     *  column at cut 0 keeps {@code several}. */
+    @Test
+    void aLinkKeepsSeveralWhereARecutToCutZeroLeavesTheCountedHandler() {
+        assertTrue(!Link.blocks(List.of(TuneFile.read(recut(false)))).contains("several"));
+        assertTrue(Link.blocks(List.of(TuneFile.read(recut(true)))).contains("several"));
+    }
+
+    /** The tune file of that test, its recut at cut 0 where {@code zero}
+     *  is true. ParityTest links both in both trees. */
+    static byte[] recut(boolean zero) {
+        Single fall = Tunes.repeating("fall", List.of(15, 13, 11, 9, 7, 5, 3, 1), 0);
+        Start start = new Start(new OneConnection(Tunes.setting(Register.R8), fall),
+                new Timing(Chip.prescaler(4), 100, true, true), false, Tunes.NO_PARTS,
+                new Cut(2, 5));
+        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, start)),
+                Tunes.EMPTY, new Row(java.util.Map.of(), java.util.Map.of(Timer.A,
+                        new Recut(new Cut(0, 7)))), Tunes.EMPTY);
+        org.ymxs.YMXS.Tune tune = new org.ymxs.YMXS.Tune("a recut", "", "LinkTest", 50,
+                Tunes.repeating(rows, 0));
+        Report report = new Report();
+        Schema.Made made = Schema.of(Padding.toUnit(tune, YmToYmxr.UNIT, report));
+        if (zero) {
+            // effect 0's cut column, the first of the last four (SPEC.md 3.3.5)
+            made.columns().column[made.columns().count() - 4][2] = (byte) 0x80;
+        }
+        return Tune.write(made.columns(), made.sources(), made.rate(), YmToYmxr.UNIT,
+                Tune.CHOOSE, Tune.packers(), report, tune.title()).file();
     }
 
     private static Set<String> blocks(String name) throws IOException {
