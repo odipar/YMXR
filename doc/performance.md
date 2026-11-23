@@ -723,9 +723,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 9,454 bytes, 1,592 of them the counted shapes' twelve
+The player is 9,452 bytes, 1,592 of them the counted shapes' twelve
 instances, four each of one, two and three columns. Where a tick reads
-an absolute address, 9,112 bytes and 1,696, instances of 144 bytes
+an absolute address, 9,110 bytes and 1,696, instances of 144 bytes
 against the marked shape's 122 for two columns.
 
 ## A tick through an absolute address
@@ -793,7 +793,7 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 9,112 bytes against 9,454. Two figures
+assembles this build, which is 9,110 bytes against 9,452. Two figures
 move against each other: a place is a word where it was a long, which
 shortens a timer's handlers by 52 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
@@ -871,16 +871,16 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 14,636
-bytes against 9,454, and 14,490 against 9,112 where a tick reads an
+The second bank, the installers and the stubs make the player 14,634
+bytes against 9,452, and 14,488 against 9,110 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 138 bytes against 134, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 24,884 bytes against 9,454,
-and 26,174 against 9,112 where a tick reads an absolute address. With the
-deferred start in as well, 39,860 against 14,636, and 41,394 against
-14,490.
+The lookup in, `YMXR_MAP=1`, makes the player 24,882 bytes against 9,452,
+and 26,172 against 9,110 where a tick reads an absolute address. With the
+deferred start in as well, 39,858 against 14,634, and 41,392 against
+14,488.
 
 ## A cut
 
@@ -972,11 +972,11 @@ which starts four sources: 11,218 cycles, four of two and three columns
 under a cut, and 9,682, four through a transformation, two of them under a
 cut.
 
-The cut makes the player with the lookup in 24,884 bytes against 21,966 in
-release 0.15.0, and 26,174 against 23,256 where a tick reads an absolute
-address; with the deferred start in as well, 39,860 against 35,908, and
-41,394 against 37,954. Of the 2,918 bytes it adds to the player as it is,
+The cut makes the player with the lookup in 24,882 bytes against 21,966 in
+release 0.15.0, and 26,172 against 23,256 where a tick reads an absolute
+address; with the deferred start in as well, 39,858 against 35,908, and
+41,392 against 37,954. Of the 2,916 bytes it adds to the player as it is,
 2,710 are the cut's blocks, which a link leaves out of the player of a
 song that cuts no source (LINKER.md): 2,190 of routines and 130 of each
 effect's frame code. With the deferred start in, the blocks are 3,184 of
-the 3,952.
+the 3,950.

@@ -67,10 +67,13 @@ ymxr_k_lh:      dc.w    $000F
                 .endif
                 dc.b    \mask,\shift
                 .endm
+; The four timers, a piece of the block of the effects.
+                PIECE   effects_9
 ymxr_timers:    TIMERAT $134,$FA19,ymxr_inst0,$07,$00
                 TIMERAT $110,$FA1D,ymxr_inst1,$07,$80
                 TIMERAT $120,$FA1B,ymxr_inst2,$07,$00
                 TIMERAT $114,$FA1D,ymxr_inst3,$70,$84
+                ENDPIECE effects_9
 
                 PIECE   several_2
 ; The targets that write several registers (SPEC.md 2.1): a register and

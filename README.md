@@ -145,6 +145,7 @@ to write a reader, SPEC.md sections 1 to 3 and 7, then the
 | [performance.md](doc/performance.md) | measured playback costs |
 | [experiments.md](doc/experiments.md) | experiments and measurements |
 | [plan.md](doc/plan.md) | estimated costs and possible reductions |
+| [sizes.md](doc/sizes.md) | linked player sizes and what makes them smaller |
 | [RELEASES.md](doc/RELEASES.md) | release history |
 
 ## What is here

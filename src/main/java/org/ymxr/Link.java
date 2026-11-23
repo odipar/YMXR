@@ -26,12 +26,12 @@ final class Link {
     static final List<String> LOOKUPS = List.of("lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh");
 
     /** The blocks a core's pieces belong to, in the order the document
-     *  lists them: each handler kind, which init's loop over it is, and
-     *  its instance on each effect; the start of several columns; each
-     *  effect's frame code and general handler; each effect's remap and
-     *  deferred start; the cut's routines and each effect's paths that
-     *  read the cut column; each lookup kind and its instances; and
-     *  align. */
+     *  lists them: each handler kind, which init's loop over it is, and its
+     *  instance on each effect; the start of several columns; each effect's
+     *  frame code, general handler and timer code; init's and stop's work
+     *  for the effects; each effect's remap and deferred start; the cut's
+     *  routines and each effect's paths that read the cut column; each
+     *  lookup kind and its instances; and align. */
     static final List<String> BLOCKS = blocks();
 
     private static List<String> blocks() {
@@ -46,6 +46,7 @@ final class Link {
         for (int i = 0; i < 4; i++) {
             all.add("effect" + i);
         }
+        all.add("effects");
         for (String part : List.of("map", "defer")) {
             for (int i = 0; i < 4; i++) {
                 all.add(part + i);
@@ -75,20 +76,21 @@ final class Link {
     }
 
     /**
-     * The blocks a set of tunes needs: the block of each effect a tune runs,
-     * bits 0 to 3 of its effects byte, and its remap where the tune maps a
-     * value and a row sets the effect's mapping column, and its deferred
-     * start where the tune defers a start and a row of the effect does;
-     * for each source an effect's rows start, the instance of its handler
-     * kind on that effect and the kind's loop of init; {@code several}
-     * where a start is of a counted source or one of several columns; the
-     * lookup instance of each kind an effect maps a source through, and
-     * the kind's loop of init; and {@code align}, the padding before the
-     * second bank. An effect that cuts a source, in a tune of version 11
-     * whose row sets the effect's cut column, needs its paths that read
-     * the column, {@code cut0} for effect 0, the cut's routines, its
-     * remap, and the counted kinds and {@code several} that
-     * {@link #counted} reads in its rows.
+     * The blocks a set of tunes needs: {@code effects}, init's and stop's
+     * work for the effects, where a tune runs an effect; the block of each
+     * effect a tune runs, bits 0 to 3 of its effects byte, and its remap
+     * where the tune maps a value and a row sets the effect's mapping column,
+     * and its deferred start where the tune defers a start and a row of the
+     * effect does; for each source an effect's rows start, the instance of
+     * its handler kind on that effect and the kind's loop of init; {@code
+     * several} where a start is of a counted source or one of several
+     * columns; the lookup instance of each kind an effect maps a source
+     * through, and the kind's loop of init; and {@code align}, the padding
+     * before the second bank. An effect that cuts a source, in a tune of
+     * version 11 whose row sets the effect's cut column, needs its paths that
+     * read the column, {@code cut0} for effect 0, the cut's routines, its
+     * remap, and the counted kinds and {@code several} that {@link #counted}
+     * reads in its rows.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
@@ -104,6 +106,7 @@ final class Link {
                     continue;
                 }
                 needed.add("effect" + i);
+                needed.add("effects");
                 boolean cuts = cuts(tune, i);
                 if (cuts) {
                     needed.add("cut");

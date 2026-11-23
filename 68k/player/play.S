@@ -134,7 +134,10 @@ ymxr_reads:
                 dc.w    c_24-ymxr_frame+2,c_25-ymxr_frame+2,c_26-ymxr_frame+2
                 dc.w    c_27-ymxr_frame+2,c_28-ymxr_frame+2,c_29-ymxr_frame+2
 
-; The four effects' heads, effect 3 first, as offsets into the frame.
+; The four effects' heads, effect 3 first, as offsets into the frame. This
+; table and the next are a piece of the block of the effects, which init's
+; loop over the heads reads.
+                PIECE   effects_7
 ymxr_overs:
                 dc.w    ymxr_tick3_over-ymxr_frame,ymxr_tick2_over-ymxr_frame
                 dc.w    ymxr_tick1_over-ymxr_frame,ymxr_tick0_over-ymxr_frame
@@ -185,6 +188,7 @@ ymxr_resets:    dc.w    ymxr_tick3_reset-ymxr_frame+1
                 dc.w    ymxr_p_defer0_1-ymxr_e_effect0_1
                 .endif
                 dc.w    ymxr_p_effect0_5-ymxr_e_effect0_1
+                ENDPIECE effects_7
 
 ; The other read sites, each with its column and the piece it needs.
 ; The high byte is zero for a site in the effect's base code.

@@ -538,7 +538,9 @@ ymxr_widestart:
 ; high word over R and then its remainder above the low word; where R
 ; itself is past a word, subtractions of R shifted. The shifts stop at
 ; bit 31: a number of 2^31 or more would otherwise double R past 32 bits
-; and back below the number.
+; and back below the number. A piece of the block of the effects, since an
+; effect's start calls it.
+                PIECE   effects_8
 ymxr_rem:       cmp.l   d4,d3
                 bcs.s   .in
                 cmp.l   #$FFFF,d4
@@ -569,3 +571,4 @@ ymxr_rem:       cmp.l   d4,d3
                 sub.l   d5,d3
 .half:          lsr.l   #1,d5
                 bra.s   .down
+                ENDPIECE effects_8
