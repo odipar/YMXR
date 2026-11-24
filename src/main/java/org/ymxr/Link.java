@@ -421,28 +421,33 @@ final class Link {
     }
 
     /** Whether cut {@code n} is the whole table of source {@code s}, where
-     *  a recut leaves its handler running: any cut of a marked source of one
-     *  row, and cut 0 and rows 0 and 1 of a marked square
-     *  (68k/player/cut.S, ymxr_recut). */
+     *  a recut leaves its handler running: any cut of a source of the
+     *  one-row kind, and cut 0 and rows 0 and 1 of a square ({@link #kind};
+     *  68k/player/cut.S, ymxr_recut). A source of one row and several
+     *  columns, and one that plays once, runs another handler, which a recut
+     *  moves to the counted kind of its columns. */
     private static boolean whole(TuneFile tune, int s, int n) {
-        if (s < 1 || s > tune.sources().size() || tune.counted().get(s - 1)) {
+        if (s < 1 || s > tune.sources().size()) {
             return false;
         }
-        Table source = tune.sources().get(s - 1);
-        if (source.rows() == 1) {
-            return true;
+        switch (kind(tune.sources().get(s - 1), tune.counted().get(s - 1))) {
+            case "one" -> {
+                return true;
+            }
+            case "square" -> {
+                if (n == 0) {
+                    return true;
+                }
+                if (n > tune.cuts().size()) {
+                    return false;
+                }
+                TuneFile.Cut cut = tune.cuts().get(n - 1);
+                return cut.first() == 0 && cut.last() == 1;
+            }
+            default -> {
+                return false;
+            }
         }
-        if (source.columns() != 1 || source.rows() != 2 || source.repeat() != 0) {
-            return false;
-        }
-        if (n == 0) {
-            return true;
-        }
-        if (n > tune.cuts().size()) {
-            return false;
-        }
-        TuneFile.Cut cut = tune.cuts().get(n - 1);
-        return cut.first() == 0 && cut.last() == 1;
     }
 
     /** The lookup's counted kind of a source of that many columns on that

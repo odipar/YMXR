@@ -574,6 +574,9 @@ final class ParityTest {
         both("ymxr-sndh", LinkTest.cutAlone(), "-silent");
         both("ymxr-sndh", LinkTest.recut(false), "-silent");
         both("ymxr-sndh", LinkTest.recut(true), "-silent");
+        for (int columns = 1; columns <= 3; columns++) {
+            both("ymxr-sndh", LinkTest.oneRow(columns), "-silent");
+        }
         for (java.util.Map.Entry<String, byte[]> one : CutTest.wrong().entrySet()) {
             Ran java = same("ymxr-trace", one.getValue());
             assertEquals(1, java.exit(), java.said());
