@@ -606,9 +606,9 @@ MOST_FRAMES = None
 # The checks a run makes after it builds the player and before it plays the
 # tunes, in their order, by the names -only reads: the SNDH cores, the two
 # sets of subtunes, and one each of the functions below.
-CHECKS = ("cores", "sets", "unplaced", "deferred", "cutting", "mapped", "fallbacks",
-          "deferred_sizes", "mapped_sizes", "absolute_sizes", "halves", "voices", "widekept",
-          "envelope", "wholebyte", "outofreach", "sizes")
+CHECKS = ("cores", "sets", "switches", "unplaced", "deferred", "cutting", "mapped",
+          "fallbacks", "deferred_sizes", "mapped_sizes", "absolute_sizes", "halves", "voices",
+          "widekept", "envelope", "wholebyte", "outofreach", "sizes")
 
 
 def spread(most):
@@ -7424,6 +7424,150 @@ def patched_code_follows_the_subtune(defines, tunes):
             "" if others == 0 else "; %d at a rate other than the first's left out" % others)
 
 
+# The switches of the check below: the frames of a subtune a switch is made
+# at, the first and the thirteenth, and the first of each run of frames
+# with a deferred start's hook in a handler, within its first
+# SWITCH_FRAMES; and the frames of the next subtune read after it.
+SWITCH_AT = (1, 13)
+SWITCH_FRAMES = 60
+SWITCHED_FRAMES = 24
+
+
+def switches(defines):
+    """Switch subtunes as the program stub does (BINARIES.md 4.7): exit,
+    then init of the next, in one loaded SNDH file. Compare the next
+    subtune's chip writes, a frame at a time with the ticks fired as its
+    timers run, with the same subtune started on a fresh machine. The set
+    is the conformance kit's tunes at 50 Hz, the one rate an SNDH file
+    records (BINARIES.md 3.3). The check switches from each subtune to
+    each, itself included, at SWITCH_AT and at the first frame of each run
+    of frames with the hook of a deferred start in a handler (SPEC.md
+    4.8), which the stop writes back. A start stays pending in its record
+    from the frame that arms it to the next row that reads the record, and
+    the tick that performs it in between writes the word back first: the
+    hook is in place where the word at the record's address is other than
+    the word the record keeps. Memory and the timers are restored after
+    each switch, so the subtune before plays on from where it was.
+
+    The set check before this one inits one subtune after another with
+    no frame played between; a switch here follows frames of play."""
+    kit = os.path.join(ROOT, "doc", "conformance", "tunes")
+    names, files = [], []
+    for name in sorted(os.listdir(kit)):
+        if name.endswith(".ymxr") and name != "wrong-version.ymxr":
+            with open(os.path.join(kit, name), "rb") as f:
+                file = f.read()
+            if struct.unpack(">H", file[6:8])[0] == 50:
+                names.append(name[:-len(".ymxr")])
+                files.append(file)
+    work = tempfile.mkdtemp()
+    made = sndh_of(files, defines, work)
+    # a set past the reach of a tick that reads a row through the program
+    # counter, as on the core with the raster monitor in, keeps each tune
+    # with which it is within the reach (BINARIES.md 2.1, 2.10)
+    left = 0
+    if made is None:
+        kept = []
+        for one in zip(names, files):
+            tried = sndh_of([file for _, file in kept + [one]], defines, work)
+            if tried is not None:
+                kept.append(one)
+                made = tried
+        left = len(files) - len(kept)
+        names, files = [name for name, _ in kept], [file for _, file in kept]
+    body, code, symbols, flags, _, spans = from_core(made, defines)
+    assert "ymxr_bank1" in symbols, "the kit's set is on %s, without the deferred start" % (
+        core_name(flags))
+    workspace = CODE + ((long_at(body, 32) + 3) & ~3)
+    records = [workspace + equate("WS_FX", symbols) + i * equate("FX_SIZE", symbols)
+               for i in range(4)]
+    pend, hook, word = (equate(name, symbols) for name in ("FX_PENDING", "FX_HOOK", "FX_HOOKW"))
+
+    def hooked(m):
+        return any(m.byte(at + pend) and m.word(m.long(at + hook)) != m.word(at + word)
+                   for at in records)
+    clocks = MFP_CLOCK / 50
+    # the memory a switch changes, and the chip's and the MFP's registers
+    regions = ((0, 0x1000), (CODE, WORK - CODE), (WORK, 0x40000),
+               (0xFFFF8000, 0x1000), (0xFFFFF000, 0x1000))
+
+    class Played:
+        """A machine of the file, and the timers of the subtune playing:
+        those of the effects its effects byte sets, the rest the host's."""
+
+        def __init__(self):
+            self.m = Machine(body, symbols, b"")
+            self.timers = Timers.of_machine(self.m, 0)
+
+        def start(self, s):
+            for name, d0 in (("core-exit", 0), ("core-init", s)):
+                self.m.call(name, d0=d0)
+                self.timers.apply(self.m.mfp)
+            assert self.m.byte(CODE + symbols["sndh_state"]) & 1, \
+                "the core's init rejected %s" % names[s - 1]
+            self.timers.effects = body[spans[s - 1][0] + 8] & 15
+
+        def frame(self):
+            m = self.m
+            m.call("core-play")
+            self.timers.apply(m.mfp)
+            writes = list(m.psg)
+            for i in self.timers.due(clocks):
+                m.interrupt(TIMER[i]["vector"])
+                self.timers.apply(m.mfp)
+                writes.extend(m.psg)
+            return tuple(writes)
+
+        def kept(self):
+            return ([bytes(self.m.mu.mem_read(at, n)) for at, n in regions],
+                    copy.deepcopy(self.timers.__dict__), self.m.select)
+
+        def back(self, kept):
+            memory, timers, select = kept
+            for (at, n), one in zip(regions, memory):
+                self.m.mu.mem_write(at, one)
+            self.m.mu.ctl_flush_tb()
+            self.timers.__dict__.update(copy.deepcopy(timers))
+            self.m.select = select
+
+    count = len(files)
+    alone = {}
+    for b in range(1, count + 1):
+        p = Played()
+        p.start(b)
+        alone[b] = [p.frame() for _ in range(SWITCHED_FRAMES)]
+    made_at = armed = 0
+    for a in range(1, count + 1):
+        p = Played()
+        p.start(a)
+        was = False
+        for f in range(1, SWITCH_FRAMES + 1):
+            p.frame()
+            now = hooked(p.m)
+            if f in SWITCH_AT or (now and not was):
+                kept = p.kept()
+                for b in range(1, count + 1):
+                    p.start(b)
+                    for k in range(SWITCHED_FRAMES):
+                        got = p.frame()
+                        if got != alone[b][k]:
+                            raise AssertionError(
+                                "%s after %s at its frame %d plays frame %d otherwise than"
+                                " %s alone: %s where %s" % (
+                                    names[b - 1], names[a - 1], f, k, names[b - 1],
+                                    got[:8], alone[b][k][:8]))
+                    p.back(kept)
+                    made_at += 1
+                    armed += now
+            was = now
+    assert armed, "no switch of the kit's set is made with a deferred start's hook in place"
+    return ("switches: the kit's %d tunes at 50 Hz in one SNDH file on %s, %d switches as the"
+            " program makes them, %d with a deferred start's hook in place: the subtune after"
+            " each plays its first %d frames as it plays alone%s"
+            % (count, core_name(flags), made_at, armed, SWITCHED_FRAMES,
+               "" if left == 0 else "; %d past the displacement's reach left out" % left))
+
+
 def core(defines, ym):
     """Check the SNDH core's vector $60: init saves the host vector and
     installs rte; exit restores it. Clearing an MFP pending/enable bit
@@ -7646,7 +7790,8 @@ def main():
             # core with the lookup in
             print("    %s" % patched_code_follows_the_subtune(
                 defines, [at for _, at, kinds in lookup][:SET_MAPPED] + tunes))
-        for name, run in (("unplaced", lambda: unplaced(code, symbols)),
+        for name, run in (("switches", lambda: switches(defines)),
+                          ("unplaced", lambda: unplaced(code, symbols)),
                           ("deferred", lambda: deferred(*deferring(defines))),
                           ("cutting", lambda: cutting(code, symbols)),
                           ("mapped", lambda: mapped(code, symbols)),
@@ -7661,10 +7806,11 @@ def main():
                           ("wholebyte", lambda: wholebyte(code, symbols)),
                           ("outofreach", lambda: outofreach(code, symbols)),
                           ("sizes", lambda: sizes(code, symbols))):
-            # the check of sizes counts cycles over 22 runs, so a run makes it
-            # where -only names it
+            # the check of sizes counts cycles over 22 runs, and the check of
+            # switches plays the kit's set through every switch, so a run makes
+            # each where -only names it
             if wanted(name) and (PCREL or name != "outofreach") \
-                    and (name != "sizes" or only is not None):
+                    and (name not in ("sizes", "switches") or only is not None):
                 print("    %s" % run())
     if only is not None:
         print("%d %s whole: %s" % (len(only), "check runs" if len(only) == 1
