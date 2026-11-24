@@ -37,6 +37,45 @@ release's number names the tools rather than either.
 
 ## Published
 
+### 0.17.0, 2026-11-24
+
+<https://github.com/odipar/YMXR/releases/tag/v0.17.0>, built from the commit
+tagged `v0.17.0`.
+
+A player linked for a song is smaller, and a start and a recut under a cut
+of a source of two or three columns are faster. The tune file and the bound
+tune are 0.16.0's.
+
+- **Smaller players.** Init's and stop's work for the effects is a block a
+  song keeps where it runs an effect, and the frame writes registers 11,
+  12, 8 to 10 and 7 in one copy (LINKER.md, sizes.md). A song with no
+  effect links 1,336 bytes where it linked 2,752, and the players of the
+  544 dumps of the corpus are 45% fewer bytes. The one copy costs a dump's
+  average call 24 to 40 cycles, and the costliest frame of the eleven dumps
+  of `ym/test` is Synergy Credits' 5,074 cycles, 1,582 under R4.5's
+  budget. A song that cuts a source and maps no value leaves out the
+  lookup's routines and tables, 2,672 bytes: the kit's `cut.ymxr` links
+  7,336 bytes.
+- **Faster cuts.** A start under a cut of a source of two or three columns
+  through the identity runs a separate path, 1,534 to 1,540 cycles on two
+  columns and 1,752 on three against 1,968 to 1,974 and 2,216, and a recut
+  that moves such a source to the counted handler runs another, 1,842 and
+  2,086 cycles. A recut of a square to its two rows and every recut of a
+  source of one row leave that handler running: 426 and 314 cycles, where
+  the move to the counted handler cost about 1,050. R4.5 counts the
+  routines of a start under a cut and of a recut apart, as it counts the
+  lookup's, and every call of the rig's tunes of cuts is within its 6,656
+  cycles (performance.md, A cut).
+- **The link** keeps the counted kinds and `several` that a song's rows run
+  under a cut, read by a walk of the rows, where 0.16.0's kept every
+  counted kind of an effect that cuts and `several` for every song that
+  cuts.
+- **The converter** reports a cut or a counted source of more than 65,535
+  rows, and a source of two or three columns of more than 65,534 rows,
+  which a player plays wrong (SPEC.md 8.8).
+
+Issues 364 to 368 are closed.
+
 ### 0.16.0, 2026-11-23
 
 <https://github.com/odipar/YMXR/releases/tag/v0.16.0>, built from the commit
