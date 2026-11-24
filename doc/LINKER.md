@@ -86,12 +86,15 @@ A block is the code and data a player runs for one part of a song:
   recut puts on the counted handler, the counted handler of its columns
   through the identity, or the counted lookup instance of its columns
   where a transformation runs it, each with its kind's loop of init. The
-  link reads which by a walk of the rows, as for the lookup instances,
-  and a recut that leaves a square's or a one-row source's handler
-  running needs none. The song needs the effect's remap's block and
-  `cut`, and `several` where a recut to cut 0 leaves a source on the
-  counted handler, whose place's reset under cut 0 runs
-  `ymxr_widereset`;
+  link reads which by a walk of the rows, as for the lookup instances. A
+  recut leaves two handlers running, which need no counted kind: the
+  square's under cut 0 or its rows 0 and 1, and the one-row source's, of
+  one column repeating its row, under any cut. A source of one row and
+  several columns, or one that plays once, runs another handler, which a
+  recut moves to the counted kind of its columns. The song needs the
+  effect's remap's block and `cut`, and `several` where a recut to cut 0
+  leaves a source on the counted handler, whose place's reset under cut
+  0 runs `ymxr_widereset`;
 - `cut`, in a core with the lookup, is the cut's routines and the paths
   of the deferred start and the remap under a cut, which a song needs
   where it needs an effect's cut block;

@@ -300,6 +300,53 @@ final class LinkTest {
                 Tune.CHOOSE, Tune.packers(), report, tune.title()).file();
     }
 
+    /** A recut leaves the handler of the one-row kind running, a source of
+     *  one column repeating its one row, and moves a source of one row and
+     *  several columns to the counted kind of its columns (Link.counted;
+     *  68k/player/cut.S, ymxr_recut): effect 0 starts a source of one row
+     *  under its whole table and recuts it to that row, which the converter
+     *  writes as a cut 1 to 127. The link keeps no counted kind for the
+     *  one-row kind, the counted kind of two columns for a row of two and of
+     *  three for a row of three. */
+    @Test
+    void aRecutMovesARowOfSeveralColumnsToTheCountedKind() {
+        Set<String> one = Link.blocks(List.of(TuneFile.read(oneRow(1))));
+        assertTrue(one.contains("one0") && one.stream().noneMatch(
+                block -> block.startsWith("counted") || block.startsWith("envelope")),
+                one.toString());
+        Set<String> two = Link.blocks(List.of(TuneFile.read(oneRow(2))));
+        assertTrue(two.containsAll(List.of("envelope", "envelope0", "cut0")), two.toString());
+        Set<String> three = Link.blocks(List.of(TuneFile.read(oneRow(3))));
+        assertTrue(three.containsAll(List.of("countedthree", "countedthree0", "cut0")),
+                three.toString());
+    }
+
+    /** The tune file of that test: effect 0 starts a source of one row of
+     *  that many columns, on R8, setToneA or setVoiceA, and recuts it to its
+     *  row. ParityTest links the three in both trees. */
+    static byte[] oneRow(int columns) {
+        Timing timing = new Timing(Chip.prescaler(4), 100, true, true);
+        org.ymxs.YMXS.Connection connection = switch (columns) {
+            case 1 -> new OneConnection(Tunes.setting(Register.R8),
+                    Tunes.repeating("row", List.of(9), 0));
+            case 2 -> new org.ymxs.YMXS.TwoConnection(
+                    new org.ymxs.YMXS.SetTone(org.ymxs.YMXS.Voice.A),
+                    new org.ymxs.YMXS.Pair("row",
+                            Tunes.repeating(List.of(new org.ymxs.YMXS.Two(51, 3)), 0)));
+            default -> new org.ymxs.YMXS.ThreeConnection(
+                    new org.ymxs.YMXS.SetVoice(org.ymxs.YMXS.Voice.A),
+                    new org.ymxs.YMXS.Triple("row",
+                            Tunes.repeating(List.of(new org.ymxs.YMXS.Three(51, 3, 12)), 0)));
+        };
+        Start start = Tunes.start(connection, timing, false, Tunes.NO_PARTS);
+        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, start)),
+                Tunes.EMPTY, new Row(java.util.Map.of(), java.util.Map.of(Timer.A,
+                        new Recut(new Cut(0, 0)))), Tunes.EMPTY);
+        org.ymxs.YMXS.Tune tune = new org.ymxs.YMXS.Tune("a row recut", "", "LinkTest", 50,
+                Tunes.repeating(rows, 0));
+        return ConformanceTest.schema(tune).file();
+    }
+
     private static Set<String> blocks(String name) throws IOException {
         return Link.blocks(List.of(TuneFile.read(Files.readAllBytes(KIT.resolve(name)))));
     }

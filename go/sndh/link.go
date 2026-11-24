@@ -622,28 +622,29 @@ func countedRow(tune ymxr.File, row int, all *[4]under, add func(string)) {
 }
 
 // whole is whether cut n is the whole table of source s, where a recut
-// leaves its handler running: any cut of a marked source of one row, and
-// cut 0 and rows 0 and 1 of a marked square (68k/player/cut.S,
-// ymxr_recut).
+// leaves its handler running: any cut of a source of the one-row kind,
+// and cut 0 and rows 0 and 1 of a square (Kind; 68k/player/cut.S,
+// ymxr_recut). A source of one row and several columns, and one that
+// plays once, runs another handler, which a recut moves to the counted
+// kind of its columns.
 func whole(tune ymxr.File, s, n int) bool {
-	if s < 1 || s > len(tune.Sources) || tune.Counted[s-1] {
+	if s < 1 || s > len(tune.Sources) {
 		return false
 	}
-	source := tune.Sources[s-1]
-	if source.Rows() == 1 {
+	switch Kind(tune.Sources[s-1], tune.Counted[s-1]) {
+	case "one":
 		return true
+	case "square":
+		if n == 0 {
+			return true
+		}
+		if n > len(tune.Cuts) {
+			return false
+		}
+		cut := tune.Cuts[n-1]
+		return cut.First == 0 && cut.Last == 1
 	}
-	if source.Columns() != 1 || source.Rows() != 2 || source.Repeat() != 0 {
-		return false
-	}
-	if n == 0 {
-		return true
-	}
-	if n > len(tune.Cuts) {
-		return false
-	}
-	cut := tune.Cuts[n-1]
-	return cut.First == 0 && cut.Last == 1
+	return false
 }
 
 // countedLookup is the lookup's counted kind of a source of that many
