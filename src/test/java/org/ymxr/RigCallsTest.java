@@ -513,6 +513,29 @@ final class RigCallsTest {
                         + " does not play the built tunes:\n" + said));
     }
 
+    /** The conformance kit's tunes at 50 Hz in one SNDH file, each subtune
+     *  switched to each as the program stub does, at frames of its play
+     *  and where a deferred start's hook is in a handler: the subtune after
+     *  each switch plays as it plays alone, on the plain core and on the
+     *  core that -perf, -lean and -abs select together. The rig makes the
+     *  check where -only names it. */
+    @TestFactory
+    Stream<DynamicTest> theRigSwitchesTheSubtunesOfTheKit() throws IOException {
+        String plays = "the subtune after each plays its first 24 frames as it plays alone";
+        assertTrue(String.join(" ", Files.readString(Path.of("doc/tools.md")).split("\\s+"))
+                .contains(plays), "tools.md does not read: " + plays);
+        return played(List.of(List.of(), List.of("-perf", "-lean", "-abs")), "the plain core",
+                core -> {
+                    List<String> argv = new ArrayList<>(core);
+                    argv.add("-onlyswitches");
+                    return argv;
+                }, (argv, said) -> assertTrue(said.startsWith("0\n")
+                        && said.contains("switches: the kit's 17 tunes at 50 Hz")
+                        && said.contains("with a deferred start's hook in place: " + plays),
+                        () -> RIG + " " + String.join(" ", argv)
+                                + " does not switch the kit's subtunes:\n" + said));
+    }
+
     /** The conformance kit's tunes, capped: the player's frames against
      *  the reader's entries, and the tune of another version rejected by
      *  the binder and the reader. */
