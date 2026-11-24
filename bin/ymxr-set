@@ -188,4 +188,6 @@ done < "$work/names"
 "$tools/ymxr-sndh" $perf $lean $ticks $clock $carried $silent ${title:+"-t$title"} \
     ${composer:+"-c$composer"} ${writer:+"-w$writer"} < "$work/SET.YMXR" \
     > "$work/SET.SND"
-exec "$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"
+# ymxr-prg runs as a child of this shell, whose EXIT trap then removes the
+# folder.
+"$tools/ymxr-prg" $silent ${rows:+"$rows"} < "$work/SET.SND"

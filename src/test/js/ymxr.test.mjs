@@ -7,14 +7,15 @@
 //   YMXR_WASM=ymxr.wasm node --test src/test/js/ymxr.test.mjs
 
 import assert from "node:assert/strict";
-import { copyFile, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { Worker as Thread } from "node:worker_threads";
 
 const served = await mkdtemp(join(tmpdir(), "ymxr-page-"));
+after(() => rm(served, { recursive: true, force: true }));
 for (const script of ["ymxr.js", "ymxr-worker.js", "ymxr-wasi.js"]) {
   await copyFile(join("wasm", script), join(served, script));
 }
