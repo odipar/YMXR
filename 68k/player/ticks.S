@@ -28,6 +28,21 @@
 .no\~:
                 .endm
 
+; A start pending at the stop has its hook in the running handler, and
+; the next init of the same loaded player runs that handler: the hooked
+; word is written back and the start dropped, as a row that drops it
+; does (deferred.S, ymxr_pend). a1 clobbered.
+                .macro  UNHOOK  i
+                .if     YMXR_DEFER
+                tst.b   \i*FX_SIZE+WS_FX+FX_PENDING(a6)
+                beq.s   .no\~
+                movea.l \i*FX_SIZE+WS_FX+FX_HOOK(a6),a1
+                move.w  \i*FX_SIZE+WS_FX+FX_HOOKW(a6),(a1)
+                clr.b   \i*FX_SIZE+WS_FX+FX_PENDING(a6)
+.no\~:
+                .endif
+                .endm
+
 ; The monitor's mark: the background kept on the stack and this handler's
 ; colour written.
                 .macro  MARK    colour

@@ -42,9 +42,10 @@ release's number names the tools rather than either.
 <https://github.com/odipar/YMXR/releases/tag/v0.17.0>, built from the commit
 tagged `v0.17.0`.
 
-A player linked for a song is smaller, and a start and a recut under a cut
-of a source of two or three columns are faster. The tune file and the bound
-tune are 0.16.0's.
+A player linked for a song is smaller, a start and a recut under a cut of
+a source of two or three columns are faster, and a stop writes back the
+hook of a deferred start pending. The tune file and the bound tune are
+0.16.0's.
 
 - **Smaller players.** Init's and stop's work for the effects is a block a
   song keeps where it runs an effect, and the frame writes registers 11,
@@ -73,6 +74,14 @@ tune are 0.16.0's.
 - **The converter** reports a cut or a counted source of more than 65,535
   rows, and a source of two or three columns of more than 65,534 rows,
   which a player plays wrong (SPEC.md 8.8).
+- **A stop with a deferred start pending** writes back the word the start
+  hooked into the running handler (performance.md, A deferred start).
+  From 0.6.0 the stop left it, and the next init of the same loaded
+  player, another subtune of a set or the same one started again, ran
+  that handler with the hook in place: at its last row the tick ran the
+  installer of the start armed before, and the voice played another
+  source at another rate. A player with the deferred start in is 72 bytes
+  larger.
 
 Issues 364 to 368 are closed.
 
