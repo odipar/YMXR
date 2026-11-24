@@ -6311,13 +6311,22 @@ def mapping_sites(m, symbols):
              for site, _ in MAP_SITES] for i in range(4)]
 
 
-def sites_are(got, version):
-    """Whether each site matches the table version: a live-column read or
-    constant operand in version 10; constant 0 for thirty-column tables.
+def sites_are(got, version, effects):
+    """Whether each site matches the table version: a live-column read or a
+    constant operand in version 10, and in version 11 where the tune maps a
+    value, bit 5 of its effects byte; in version 11 where it maps none, the
+    head's or reads the cut column at 30 + i, live or constant, and the
+    start's and the remap's reads are the constant 0; and every site is the
+    constant 0 in a table of thirty columns (68k/player/init.S, ymxr_col
+    and ymxr_xcol).
     """
+    maps = version == MAPPED or version == CUT and effects & 0x20
     for sites in got:
         for (site, ops), (op, operand) in zip(MAP_SITES, sites):
-            if op not in ops or (version != MAPPED and (op, operand) != (ops[1], 0)):
+            if op not in ops:
+                return False
+            either = maps or version == CUT and site == "q"
+            if not either and (op, operand) != (ops[1], 0):
                 return False
     return True
 
@@ -7199,8 +7208,9 @@ def from_core(made, defines):
     """Load an SNDH with its core at CODE. Return bytes from that origin,
     matching assembled core and symbols, flags, subtune-table end and
     bound-tune spans. Compare assembly byte for byte except patched
-    fields 28 and 32. Feature flags follow subtune effects bits 4 and 5;
-    the table follows the even-aligned core end (BINARIES.md 2.1, 3.1).
+    fields 28 and 32. Feature flags follow subtune effects bits 4 and 5,
+    and bit 6, a cut, selects the lookup as bit 5 does; the table follows
+    the even-aligned core end (BINARIES.md 2.1, 3.1).
     """
     at = struct.unpack(">h", made[2:4])[0] + 2
     body = made[at:]
@@ -7215,7 +7225,7 @@ def from_core(made, defines):
     effects = 0
     for one in starts:
         effects |= body[one + 8]
-    want = asked(defines) | (effects & 0x30) >> 1
+    want = asked(defines) | (effects & 0x30) >> 1 | (0x10 if effects & 0x40 else 0)
     assert flags == want, \
         "ymxr-sndh wrote %s, flags %d, and the run and the subtunes select %s" % (
             core_name(flags), flags, core_name(want))
@@ -7384,7 +7394,7 @@ def core(defines, ym):
             ["/".join("%04X" % o for o in h) for h in want_heads(bound[8])],
             format(bound[8], "04b"))
     version = struct.unpack(">H", bound[4:6])[0]
-    assert sites_are(mapping_sites(m, symbols), version), \
+    assert sites_are(mapping_sites(m, symbols), version, bound[8]), \
         "init left the mapping sites at %s for a tune of version %d" % (
             [["%04X %04X" % one for one in sites] for sites in mapping_sites(m, symbols)],
             version)
