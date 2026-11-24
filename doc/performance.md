@@ -15,17 +15,17 @@ idle past the last.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 432 | 1048 | 2754 | 547 | 2270 |
-| Chambers of Shaolin 5 - you blew it! | 1000 | 1131 | 3780 | 575 | 3128 |
-| Circus Attractions 2 | 8 | 1458 | 1660 | 766 | 766 |
-| DBA 2 | 19444 | 1456 | 4066 | 664 | 3386 |
-| DBA 5 | 22264 | 1551 | 3784 | 740 | 2734 |
-| Digidrum preempt, built | 800 | 1624 | 3998 | 777 | 2424 |
-| Retrigger retune, built | 1200 | 1379 | 2796 | 668 | 2096 |
-| Synergy Credits | 10756 | 1995 | 5086 | 903 | 2924 |
-| Turrican - world 4-3 | 3680 | 1497 | 4362 | 779 | 3716 |
-| Turrican 2 - world completed 1 | 182 | 1362 | 4072 | 697 | 3456 |
-| capture | 1844 | 1248 | 3536 | 663 | 3048 |
+| Big - Samantha Fox Strip Poker 6 | 432 | 1088 | 2794 | 547 | 2270 |
+| Chambers of Shaolin 5 - you blew it! | 1000 | 1171 | 3820 | 575 | 3128 |
+| Circus Attractions 2 | 8 | 1485 | 1648 | 766 | 766 |
+| DBA 2 | 19444 | 1496 | 4106 | 664 | 3386 |
+| DBA 5 | 22264 | 1590 | 3824 | 740 | 2734 |
+| Digidrum preempt, built | 800 | 1648 | 4022 | 777 | 2424 |
+| Retrigger retune, built | 1200 | 1402 | 2820 | 668 | 2096 |
+| Synergy Credits | 10756 | 2021 | 5074 | 903 | 2924 |
+| Turrican - world 4-3 | 3680 | 1534 | 4402 | 779 | 3716 |
+| Turrican 2 - world completed 1 | 182 | 1401 | 4112 | 697 | 3456 |
+| capture | 1844 | 1286 | 3576 | 663 | 3048 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so
 a refill is fifteen units of two bytes, and a period's thirty turns are one
@@ -72,12 +72,12 @@ its costliest frame.
 Unit 1 packs a table smaller and costs more to decode: Turrican - world 4-3
 packs to 3,332 bytes at `-k1` against 3,600, its advance reads 929 on
 average and 4,136 in the costliest frame against 779 and 3,716, and the
-play call 1,647 on average and 4,838 at most against 1,497 and 4,362.
+play call 1,684 on average and 4,878 at most against 1,534 and 4,402.
 `-k1` packs at unit 1. Five of the eleven tunes of Scavenger's in the
 corpus pass R4.5's budget at unit 1, DBA 4's costliest frame the furthest
 at 7,214, and none of them at unit 2.
 
-The frame procedure is the rest, from 501 to 1,092 cycles on average: the
+The frame procedure is the rest, from 541 to 1,118 cycles on average: the
 fourteen register columns' tests and the writes they admit, the effects'
 columns and the call's entry and exit. The call jumps over an effect the
 tune leaves unused, and two nops replace the jump at the head of its columns
@@ -97,7 +97,7 @@ end, so each row pays for one decoder's copy at most.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it:
 the averages by more than two thirds of it, and the costliest frame of
-every tune by 1,570 cycles or more, Synergy Credits' 5,086 the nearest.
+every tune by 1,582 cycles or more, Synergy Credits' 5,074 the nearest.
 The ticks of a frame come on top of the call, and A tick below counts them.
 
 Release 0.4.22 packed every column at unit 2 through a ring of 960 bytes.
@@ -105,22 +105,24 @@ Its play call, counted the same way on its player, against the table above:
 
 | tune | on average, 0.4.22 | on average | at most, 0.4.22 | at most |
 |---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 1292 | 1048 | 1924 | 2754 |
-| Chambers of Shaolin 5 - you blew it! | 1367 | 1131 | 3258 | 3780 |
-| Circus Attractions 2 | 1446 | 1458 | 1648 | 1660 |
-| DBA 2 | 1674 | 1456 | 4272 | 4066 |
-| DBA 5 | 1754 | 1551 | 3606 | 3784 |
-| Digidrum preempt, built | 1627 | 1624 | 2762 | 3998 |
-| Retrigger retune, built | 1490 | 1379 | 2220 | 2796 |
-| Synergy Credits | 2030 | 1995 | 5094 | 5086 |
-| Turrican - world 4-3 | 1606 | 1497 | 4532 | 4362 |
-| Turrican 2 - world completed 1 | 1606 | 1362 | 4060 | 4072 |
-| capture | 1414 | 1248 | 3422 | 3536 |
+| Big - Samantha Fox Strip Poker 6 | 1292 | 1088 | 1924 | 2794 |
+| Chambers of Shaolin 5 - you blew it! | 1367 | 1171 | 3258 | 3820 |
+| Circus Attractions 2 | 1446 | 1485 | 1648 | 1648 |
+| DBA 2 | 1674 | 1496 | 4272 | 4106 |
+| DBA 5 | 1754 | 1590 | 3606 | 3824 |
+| Digidrum preempt, built | 1627 | 1648 | 2762 | 4022 |
+| Retrigger retune, built | 1490 | 1402 | 2220 | 2820 |
+| Synergy Credits | 2030 | 2021 | 5094 | 5074 |
+| Turrican - world 4-3 | 1606 | 1534 | 4532 | 4402 |
+| Turrican 2 - world completed 1 | 1606 | 1401 | 4060 | 4112 |
+| capture | 1414 | 1286 | 3422 | 3576 |
 
-The call costs less on average on ten of the eleven and 12 cycles more on
-Circus Attractions 2, and its costliest frame is higher on eight, by 12 to
-1,236 cycles, and lower on three, by 8 to 206. Under 0.4.22 the nearest
-frame to the budget was 1,562 cycles under it, and is 1,570 under it now.
+The call costs less on average on nine of the eleven, and 21 and 39
+cycles more on Digidrum preempt, built and Circus Attractions 2. Its
+costliest frame is higher on seven, by 52 to 1,260 cycles, lower on
+three, by 20 to 166, and the same on Circus Attractions 2. Under 0.4.22
+the nearest frame to the budget was 1,562 cycles under it, and is 1,582
+under it now.
 
 A tune needs its bound tune (BINARIES.md 1) and a state block in the
 workspace, the rings among them. The tools of 0.4.22 and of this release
@@ -244,9 +246,9 @@ within 64.
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
-| Synergy Credits | YMXR | 1895 | 3512 | 4512 |
+| Synergy Credits | YMXR | 1932 | 3528 | 4528 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
-| Turrican - world 4-3 | YMXR | 1540 | 3548 | 4524 |
+| Turrican - world 4-3 | YMXR | 1573 | 3584 | 4560 |
 
 These figures and the rig's are two samples: the rig counts every frame
 of the tune in 68000 cycles with no wait state, and these are the first
@@ -254,7 +256,7 @@ of the tune in 68000 cycles with no wait state, and these are the first
 fetches. Synergy Credits' costliest frame is its 5,347th, past the end of
 this run.
 
-YMXR costs a fifth less on average on Turrican - world 4-3 and a fifth less
+YMXR costs a sixth less on average on Turrican - world 4-3 and a sixth less
 on Synergy Credits, and at their worst 6 per cent more on Turrican - world
 4-3 and 4 per cent less on Synergy Credits, and the figures have two
 causes. The frame procedure here tests the fourteen register columns and
@@ -264,7 +266,7 @@ the call, where YMX writes its fourteen registers unconditionally, one
 included. Fourteen tests and a few writes cost what fourteen writes cost,
 which YMX's measurement found and its design follows; the schema adds the
 effects' columns and the entry. So YMXR's frame procedure costs less on the
-rows that set few columns, 718 on average on that tune, the rig's call there
+rows that set few columns, 755 on average on that tune, the rig's call there
 less its advance, against YMX's 908, and its average is the lower.
 
 The refill is the second cause. YMXR refills fifteen units of two bytes on
@@ -279,21 +281,20 @@ smaller of the two, twelve units against fifteen. A refill parses at most
 one operation a unit, so its unit count bounds the parse: YMX's worst frame
 parses twelve operations of twelve, and Turrican - world 4-3's heaviest
 refill here fourteen of fifteen. On Synergy Credits the run ends before
-YMXR's costliest frame, so its 4,512 at most is not that frame, which the
-rig counts at 5,086. Both players pad this tune to unit 2, YMX by
+YMXR's costliest frame, so its 4,528 at most is not that frame, which the
+rig counts at 5,074. Both players pad this tune to unit 2, YMX by
 duplicating a frame and YMXR by an unset row (SPEC.md 6, rule 6). At `-k1`
 YMXR packs it at unit 1: the refill is thirty units, and a run of the same
 length reads 5,560 at most.
 
 YMX alone writes its register columns unconditionally, dense, with the
-effects behind one bit. Counted by
-the rig against the player as it is, each register written as the player
-writes a set column, in 36 cycles, and the effects' steps behind a test of
-22, that costs 4 to 181 cycles a frame on nine of the eleven fixtures and
-saves 6 to 32 on the other two, for rewriting 1.1 to 1.7 and redefining
-five bits against R6.2. YMX's finding that a test costs what a write costs
-applies to a 30-cycle test and not to the 22 of a test that forms the select
-only where it writes.
+effects behind one bit. Counted by the rig against the player as it is,
+each register written as the player writes a set column, in 36 cycles, and
+the effects' steps behind a test of 22, that costs 22 to 141 cycles a
+frame on seven of the eleven fixtures and saves 2 to 56 on the other four,
+for rewriting 1.1 to 1.7 and redefining five bits against R6.2. YMX's
+finding that a test costs what a write costs applies to a 30-cycle test
+and not to the 22 of a test that forms the select only where it writes.
 
 ---
 
@@ -323,8 +324,8 @@ moves between them by their difference: 80 cycles, 144 with the entry and
 the `rte`, against the 160 and 178 the two paths of the general handler
 cost. A tune whose effects are all such sources ticks 29.4 times a frame on
 Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 735, 620 and 505
-cycles a frame come off those tunes, against a play call of 1,995, 1,456
-and 1,551 (the table above).
+cycles a frame come off those tunes, against a play call of 2,021, 1,496
+and 1,590 (the table above).
 
 A tick drops the interrupt level and writes an end of interrupt because the
 MFP runs in software end-of-interrupt mode, as TOS leaves it, and because a
@@ -723,9 +724,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 9,452 bytes, 1,592 of them the counted shapes' twelve
+The player is 9,322 bytes, 1,592 of them the counted shapes' twelve
 instances, four each of one, two and three columns. Where a tick reads
-an absolute address, 9,110 bytes and 1,696, instances of 144 bytes
+an absolute address, 8,980 bytes and 1,696, instances of 144 bytes
 against the marked shape's 122 for two columns.
 
 ## A tick through an absolute address
@@ -793,7 +794,7 @@ them and reports -1 for one further off (BINARIES.md 1.5), and the
 layouts put a tune's DTX1 tables before its image and a set's subtunes
 before the images, so the rows of the tune a host loads are beside the
 player at any length of image. A host that places them further off
-assembles this build, which is 9,110 bytes against 9,452. Two figures
+assembles this build, which is 8,980 bytes against 9,322. Two figures
 move against each other: a place is a word where it was a long, which
 shortens a timer's handlers by 52 bytes, and a start does the arithmetic
 that turns a row's address into a displacement, 38 bytes more of the
@@ -864,23 +865,23 @@ read the running handler through the vector, 8 or 16 cycles more than
 the build without the deferred start, which reads it at its address as
 version 7 did. On that build the play call of each of the eleven
 fixtures counts the cycles of version 7, and on this build the play call
-of Synergy Credits counts 2,005 cycles on average and 5,118 at most,
-against 1,995 and 5,086. On either build a start with bit 5 at 0, after
+of Synergy Credits counts 2,031 cycles on average and 5,106 at most,
+against 2,021 and 5,074. On either build a start with bit 5 at 0, after
 a source whose handler steps a place, compares the row number with R, 32
 cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 14,634
-bytes against 9,452, and 14,488 against 9,110 where a tick reads an
+The second bank, the installers and the stubs make the player 14,504
+bytes against 9,322, and 14,358 against 8,980 where a tick reads an
 absolute address. Each handler gains a stub: an instance of the wide
 handler is 138 bytes against 134, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 24,882 bytes against 9,452,
-and 26,172 against 9,110 where a tick reads an absolute address. With the
-deferred start in as well, 39,858 against 14,634, and 41,392 against
-14,488.
+The lookup in, `YMXR_MAP=1`, makes the player 24,752 bytes against 9,322,
+and 26,042 against 8,980 where a tick reads an absolute address. With the
+deferred start in as well, 39,728 against 14,504, and 41,262 against
+14,358.
 
 ## A cut
 
@@ -972,11 +973,11 @@ which starts four sources: 11,218 cycles, four of two and three columns
 under a cut, and 9,682, four through a transformation, two of them under a
 cut.
 
-The cut makes the player with the lookup in 24,882 bytes against 21,966 in
-release 0.15.0, and 26,172 against 23,256 where a tick reads an absolute
-address; with the deferred start in as well, 39,858 against 35,908, and
-41,392 against 37,954. Of the 2,916 bytes it adds to the player as it is,
-2,710 are the cut's blocks, which a link leaves out of the player of a
-song that cuts no source (LINKER.md): 2,190 of routines and 130 of each
-effect's frame code. With the deferred start in, the blocks are 3,184 of
-the 3,950.
+The player with the lookup in is 24,752 bytes against 21,966 in release
+0.15.0, before the cut, and 26,042 against 23,256 where a tick reads an
+absolute address; with the deferred start in as well, 39,728 against
+35,908, and 41,262 against 37,954. Of the 2,786 bytes it is longer than in
+that release, 2,710 are the cut's blocks, which a link leaves out of the
+player of a song that cuts no source (LINKER.md): 2,190 of routines and
+130 of each effect's frame code. With the deferred start in, the blocks
+are 3,184 of the 3,820.

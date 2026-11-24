@@ -22,13 +22,13 @@ import org.junit.jupiter.api.Test;
 
 /** doc/sizes.md: the links of the dumps of ym/test and of the corpus, the
  *  pieces of each effect's timer code and of the block of the effects, and
- *  the core of the patch of 68k/test/sizes, applied to a copy of 68k, with
- *  its table cut as the build cuts it. The rig's -onlysizes reads the
- *  document's cycles. */
+ *  the core of the patch of 68k/test/sizes, the second copy of the frame's
+ *  steps 6 and 7 applied to a copy of 68k, with its table cut as the build
+ *  cuts it. The rig's -onlysizes reads the document's cycles. */
 class SizesTest {
 
     private static final Path DOC = Path.of("doc/sizes.md");
-    private static final Path PATCH = Path.of("68k/test/sizes/one-copy.patch");
+    private static final Path PATCH = Path.of("68k/test/sizes/two-copies.patch");
     private static final Path DUMPS = Path.of("ym/test");
     private static final Path RMAC = Path.of("rmac");
     private static final String EFFECTS = "effects";
@@ -115,7 +115,7 @@ class SizesTest {
     }
 
     /** The table of the eleven dumps: the blocks kept, the bytes linked,
-     *  and the bytes with one copy of steps 6 and 7. */
+     *  and the bytes with the second copy of steps 6 and 7. */
     @Test
     void theDocumentReadsTheDumps() throws Exception {
         String doc = Files.readString(DOC);
@@ -181,12 +181,13 @@ class SizesTest {
         int withCopy = floor(copy.core(), copy.table());
         assertTrue(prose.contains("The floor of the plain core is " + grouped(floor)
                         + " bytes, and " + grouped(withCopy)
-                        + " with one copy of steps 6 and 7."),
+                        + " with the second copy of steps 6 and 7."),
                 "sizes.md reads other floors of the plain core");
-        // the second copy is in the floor, so every player loses its bytes
-        assertEquals(Binaries.core().length - copy.core().length, floor - withCopy);
-        assertTrue(prose.contains("One copy of steps 6 and 7 is " + grouped(floor - withCopy)
-                + " bytes fewer in every player."), "sizes.md reads another size of the copy");
+        // the second copy is in the floor, so every player keeps its bytes
+        assertEquals(copy.core().length - Binaries.core().length, withCopy - floor);
+        assertTrue(prose.contains("The second copy of steps 6 and 7 is "
+                + grouped(withCopy - floor) + " bytes more in every player."),
+                "sizes.md reads another size of the second copy");
         StringBuilder others = new StringBuilder("The floor of the core with the deferred start"
                 + " in is ");
         String[] names = {"the deferred start", "the lookup", "the lookup and the deferred start"};
@@ -270,6 +271,12 @@ class SizesTest {
                 + Math.round(100.0 * floor * dumps / bytes) + "% of the " + grouped(bytes)
                 + " bytes of the " + grouped(dumps) + " players.";
         assertTrue(prose.contains(share), "sizes.md does not read: " + share);
+        Matcher before = Pattern.compile("the " + grouped(dumps) + " players were ([\\d,]+) bytes:"
+                + " they are (\\d+)% fewer now").matcher(prose);
+        assertTrue(before.find(), "sizes.md has no bytes of the players before");
+        long was = number(before.group(1));
+        assertEquals(Math.round(100.0 * (was - bytes) / was), Integer.parseInt(before.group(2)),
+                "the share the players are fewer");
         String folder = System.getenv("YM_CORPUS");
         if (folder != null && Files.isDirectory(Path.of(folder))) {
             assertEquals(counts, corpus(Path.of(folder)), "the dumps of each set of blocks");

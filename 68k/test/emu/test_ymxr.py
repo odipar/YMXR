@@ -2917,11 +2917,11 @@ def mapped_sizes():
             m and m.groups(), counted)
     text = open(os.path.join(ROOT, "doc", "performance.md")).read()
     said = " ".join(text[text.index("\n## A cut\n"):].split()) if "\n## A cut\n" in text else ""
-    m = re.search(r"The cut makes the player with the lookup in ([\d,]+) bytes against ([\d,]+)"
-                  r" in release [\d.]+, and ([\d,]+) against ([\d,]+) where a tick reads an"
+    m = re.search(r"The player with the lookup in is ([\d,]+) bytes against ([\d,]+)"
+                  r" in release [\d.]+, before the cut, and ([\d,]+) against ([\d,]+) where a tick reads an"
                   r" absolute address; with the deferred start in as well, ([\d,]+) against"
-                  r" ([\d,]+), and ([\d,]+) against ([\d,]+)\. Of the ([\d,]+) bytes it adds to"
-                  r" the player as it is, ([\d,]+) are the cut's blocks, which a link leaves out"
+                  r" ([\d,]+), and ([\d,]+) against ([\d,]+)\. Of the ([\d,]+) bytes it is longer"
+                  r" than in that release, ([\d,]+) are the cut's blocks, which a link leaves out"
                   r" of the player of a song that cuts no source \(LINKER\.md\): ([\d,]+) of"
                   r" routines and ([\d,]+) of each effect's frame code\. With the deferred start"
                   r" in, the blocks are ([\d,]+) of the ([\d,]+)\.", said)
@@ -3212,9 +3212,10 @@ def outofreach(code, symbols):
     return "a tune %d bytes off: init reports -1" % (far - CODE)
 
 
-# The patch of 68k/test/sizes: one copy of the frame's steps 6 and 7
-# (sizes.md). The check of sizes counts this many frames of each dump.
-SIZES_PATCH = "one-copy.patch"
+# The patch of 68k/test/sizes: the second copy of the frame's steps 6 and
+# 7, for a row that leaves the shape column 0 (sizes.md). The check of
+# sizes counts this many frames of each dump.
+SIZES_PATCH = "two-copies.patch"
 SIZES_FRAMES = 1000
 
 
@@ -3238,9 +3239,9 @@ def sizes(code, symbols):
     """sizes.md's cycles: every call and every tick of the eleven dumps
     of ym/test over their first SIZES_FRAMES frames, counted with DTX's
     cycle counter on the player assembled as it is and with the patch of
-    68k/test/sizes. One copy of steps 6 and 7 moves the calls by the
-    figures the section on a few cycles more reads, and the ticks stay as
-    they are."""
+    68k/test/sizes. The player as it is, with one copy of steps 6 and 7,
+    costs a call the cycles sizes.md reads more than the player with the
+    second copy, and a tick the same."""
     global MOST_FRAMES
     assert not DEFINES, "the check of sizes counts the player as it is, with no switch"
     sys.path.insert(0, os.path.join(DTX_REPO, "68k", "test", "emu"))
@@ -3258,23 +3259,24 @@ def sizes(code, symbols):
     now, copy_ = counted
     means, calls, ticks = [], [], []
     for a, b in zip(now, copy_):
-        more = [y - x for x, y in zip(a[0], b[0])]
+        more = [x - y for x, y in zip(a[0], b[0])]
         means.append(sum(more) / len(more))
         calls.extend(more)
         ticks.append(a[1:] == b[1:])
-    assert all(ticks), "one copy of steps 6 and 7 moves a tick"
+    assert all(ticks), "the second copy of steps 6 and 7 moves a tick"
     tools = " ".join(open(os.path.join(ROOT, "doc", "tools.md")).read().split())
     assert "the eleven dumps of `ym/test` over %s frames each" % "{:,}".format(SIZES_FRAMES) \
         in tools, "tools.md reads another count of frames for the check of sizes"
     text = open(os.path.join(ROOT, "doc", "sizes.md")).read()
     said = " ".join(text.split())
     want = ("Over the first %s frames of each of the eleven dumps the average call of a dump"
-            " costs %d to %d cycles more and a single call %d fewer to %d more, and every tick"
-            " costs what it costs today." % ("{:,}".format(SIZES_FRAMES), round(min(means)),
-                                             round(max(means)), -min(calls), max(calls)))
+            " costs %d to %d cycles more than with the second copy and a single call %d fewer"
+            " to %d more, and every tick costs the same." % (
+                "{:,}".format(SIZES_FRAMES), round(min(means)), round(max(means)),
+                -min(calls), max(calls)))
     assert want in said, "sizes.md does not read: " + want
-    return ("one copy of steps 6 and 7: %d dumps, a call %d to %d more on average, %+d to %+d,"
-            " the ticks as they are" % (len(dumps), round(min(means)), round(max(means)),
+    return ("one copy of steps 6 and 7 against two: %d dumps, a call %d to %d more on average,"
+            " %+d to %+d, the ticks as they are" % (len(dumps), round(min(means)), round(max(means)),
                                         min(calls), max(calls)))
 
 
@@ -7939,10 +7941,8 @@ class FrameWalk:
         return total
 
     def volumes(self, r):
-        """Step 6's three columns on the path the row runs: WRITE after a
-        column 13 other than 0, RWRITE in the copy after one of 0."""
-        kind = "r" if r[13] == 0 else "c"
-        return sum(self.walk(self.at["%s_%d" % (kind, v)], self.at["%s_%d" % (kind, stop)],
+        """Step 6's three columns, WRITE each."""
+        return sum(self.walk(self.at["c_%d" % v], self.at["c_%d" % stop],
                              lambda n, v=v: not r[v] & 0x80)
                    for v, stop in ((8, 9), (9, 10), (10, 7)))
 
@@ -7950,12 +7950,6 @@ class FrameWalk:
         """Steps 4 to 8 of the row, ymxr_regs to ymxr_played."""
         at = self.at
         total = self.tones(r) + self.walk(at["c_6"], at["c_13"], lambda n: not r[6] & 0x80)
-        if r[13] == 0:
-            total += self.walk(at["c_13"], at["q_11"], lambda n: True)
-            total += self.walk(at["q_11"], at["q_12"], lambda n: r[11] == 0)
-            total += self.walk(at["q_12"], at["r_8"], lambda n: r[12] == 0)
-            total += self.volumes(r)
-            return total + self.walk(at["r_7"], at["ymxr_played"], lambda n: not r[7] & 0x80)
         total += self.walk(at["c_13"], at["c_11"], lambda n: False)
         for column, bit, stop in ((11, 6, "c_12"), (12, 5, "c_8")):
             went = [True] if r[column] else [False, not r[13] >> bit & 1]
@@ -7980,10 +7974,10 @@ def plan_figures(walker, tunes):
     row, and what three gates would cost or save it a frame, each a mean
     over the rows. A gate is a bit a row sets where it sets a column of a
     group, tested before the group: 20 cycles where it skips and 18 where it
-    does not, as walked. The volume gate in column 13 moves a row that sets
-    a volume where column 13 was 0 from the copy of steps 6 and 7 to the
-    longer path; in column 6, and the tone gate, each read their bit on
-    every row, a move of 12."""
+    does not, as walked. The volume gate in column 13 sets a bit of the
+    shape column a row that sets a volume where column 13 was 0, which the
+    walk counts as the row runs it; in column 6, and the tone gate, each
+    read their bit on every row, a move of 12."""
     gate = "        btst    #4,d2\n        beq.s   over\n        nop\nover:\n"
     skip = walker.snippet(gate, lambda n: True)
     part = assemble_text(gate)
@@ -8132,12 +8126,12 @@ def plan_read(walker, tunes, parts):
          r" them", (-int(round(means["net 13"])), WORDS[len(tune)], WORDS[len(costs["net 13"])]),
          "the gate in column 13")
     six = costs["net 6"]
-    read(r"costs a read of (\d+) on every row and leaves column 13 alone, reads (-?\d+) as the mean,"
-         r" the better of the two, and costs (\w+) tunes: (.+?)\. Column 13 pays",
-         (fig["read"], int(round(means["net 6"])), WORDS[len(six)],
+    read(r"costs a read of (\d+) on every row and leaves column 13 alone, reads (-?\d+) as the mean"
+         r" against column 13's (-?\d+), and costs (\w+) tunes: (.+?)\. Gating the tone group",
+         (fig["read"], int(round(means["net 6"])), int(round(means["net 13"])), WORDS[len(six)],
           ", ".join(six[:-1]) + " and " + six[-1]), "the gate in column 6")
-    if means["net 6"] >= means["net 13"]:
-        stale.append("plan.md reads column 6 as the better gate, and the rig counts column 13's"
+    if means["net 13"] >= means["net 6"]:
+        stale.append("plan.md reads column 13 as the better gate, and the rig counts column 6's"
                      " mean lower")
     idle = [v["no tone"] for v in tune.values()]
     share = sum(idle) / len(idle) / 100.0
@@ -8147,7 +8141,7 @@ def plan_read(walker, tunes, parts):
           fig["tones"] - fig["skip"] - fig["read"], PARTS[int(round(1 / share))],
           fig["read"] + fig["run"]), "the tone gate")
     read(r"(\d+) cycles a frame, the better gate, is a version of the tune file, .*? and (\w+)"
-         r" tunes that read slower", (-int(round(means["net 6"])), WORDS[len(six)]),
+         r" tunes that read slower", (-int(round(means["net 13"])), WORDS[len(costs["net 13"])]),
          "the better gate")
     tick = sample_tick(walker)
     read(r"Of the (\d+) its instructions cost, (\d+) are the chip writes, (\d+) the step, (\d+) the"

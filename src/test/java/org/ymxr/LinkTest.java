@@ -476,6 +476,12 @@ final class LinkTest {
                     + (kept.isEmpty() ? "none" : String.join(", ", kept)) + " | "
                     + grouped(linked.length) + " |";
             assertTrue(doc.contains(row + "\n"), "LINKER.md has no row " + row);
+            if (name.equals("voices.ymxr")) {
+                String voices = "`voices.ymxr` runs all four effects, keeps a handler of two or"
+                        + " three columns on each and the start of several columns, and links "
+                        + grouped(linked.length) + ".";
+                assertTrue(prose.contains(voices), "LINKER.md does not read: " + voices);
+            }
             if ((tune.effects() & Columns.MAPS) != 0) {
                 String said = lookups(name, carried, pieces, Link.blocks(List.of(tune)),
                         linked.length);
