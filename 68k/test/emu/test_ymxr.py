@@ -5052,8 +5052,8 @@ def cut_read(code, symbols, cycles_of, general):
             whole.append((max(cost), f, [(what, shape) for g, _, what, shape in cuts
                                          if g == f and what.startswith("start")]))
     # the calls past the budget counted whole, the costliest first: each at
-    # its first row, which starts as many sources; the first's of two and
-    # three columns under a cut, the second's through a transformation
+    # its first row, which starts as many sources; the first's through a
+    # transformation, the second's of two and three columns under a cut
     whole.sort(reverse=True)
     wide = ("two columns", "three columns", "counted two columns", "counted three columns")
     starts = {len(begun) for _, _, begun in whole}
@@ -5063,14 +5063,14 @@ def cut_read(code, symbols, cycles_of, general):
     figures = [None] * 5
     if len(whole) == 2:
         (first, _, a), (second, _, b) = whole
-        figures = [first, WORDS.get(sum(1 for what, shape in a
-                                     if "under a cut" in what and shape in wide)),
-                second, WORDS.get(sum(1 for _, shape in b if shape.startswith("mapped "))),
-                WORDS.get(sum(1 for what, _ in b if "under a cut" in what))]
+        figures = [first, WORDS.get(sum(1 for _, shape in a if shape.startswith("mapped "))),
+                   WORDS.get(sum(1 for what, _ in a if "under a cut" in what)),
+                   second, WORDS.get(sum(1 for what, shape in b
+                                         if "under a cut" in what and shape in wide))]
     reads(r"Every call of the (\w+) is within R4\.5's ([\d,]+) as it counts them, the costliest"
           r" at ([\d,]+)\. Counted whole, (\w+) pass(?:es)? it, each at its first row, which"
-          r" starts (\w+) sources: ([\d,]+) cycles, (\w+) of two and three columns under a cut,"
-          r" and ([\d,]+), (\w+) through a transformation, (\w+) of them under a cut\.",
+          r" starts (\w+) sources: ([\d,]+) cycles, (\w+) through a transformation, (\w+) of"
+          r" them under a cut, and ([\d,]+), (\w+) of two and three columns under a cut\.",
           WORDS.get(len(played)), budget, within if within <= budget else None,
           WORDS.get(len(whole)), WORDS.get(next(iter(starts))) if len(starts) == 1 else starts,
           *figures)
