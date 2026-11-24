@@ -878,9 +878,9 @@ absolute address. Each handler gains a stub: an instance of the wide
 handler is 138 bytes against 134, and of the marked shape of two columns
 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 25,008 bytes against 9,322,
-and 26,298 against 8,980 where a tick reads an absolute address. With the
-deferred start in as well, 39,984 against 14,504, and 41,518 against
+The lookup in, `YMXR_MAP=1`, makes the player 25,264 bytes against 9,322,
+and 26,554 against 8,980 where a tick reads an absolute address. With the
+deferred start in as well, 40,240 against 14,504, and 41,774 against
 14,358.
 
 ## A cut
@@ -938,8 +938,8 @@ effect's branch on the set bit of its source column to its rate:
 | the source | a start under a cut | a recut on the counted handler |
 |---|---|---|
 | one column | 840 to 916 | 1090 to 1120 |
-| two columns | 1534 to 1540 | 1658 to 1698 |
-| three columns | 1752 | 1798 |
+| two columns | 1534 to 1540 | 1670 to 1710 |
+| three columns | 1752 | 1810 |
 | one column, through a transformation | 2138 to 2204 | 1404 |
 
 The ranges are the effect, the source's shape and the cut. The table's
@@ -947,13 +947,15 @@ start puts the place at row F of the cut; a start with the place kept
 reads the running row and its remainder by R as well, 1,206 to 1,226
 cycles on one column and 1,872 on two. A recut that moves a source from
 another handler to the counted handler runs the path of one column through
-the identity on such a source, 1,082 to 1,160 cycles, and the general
-routine on every other, 2,992 cycles on a square through a transformation.
-A recut that leaves a square's or a one-row source's handler running sets
-the running cut alone: 426 cycles on a square and 314 on a source of one
-row. A recut on a stopped timer sets the kept cut alone, 116 cycles. On
-the same span a start under cut 0 at row 0 of a marked source of one
-column costs 464 cycles.
+the identity on such a source, 1,082 to 1,160 cycles, the path of several
+columns through the identity on a marked source of two or three columns,
+1,842 cycles on two and 2,086 on three, and the general routine on every
+other, 2,992 cycles on a square through a transformation. A recut that
+leaves a square's or a one-row source's handler running sets the running
+cut alone: 426 cycles on a square and 314 on a source of one row. A recut
+on a stopped timer sets the kept cut alone, 116 cycles. On the same span a
+start under cut 0 at row 0 of a marked source of one column costs 464
+cycles.
 
 The routines run inside the play call, and R4.5 counts them apart, as it
 counts those of a start or a remap through a transformation. Each tune's
@@ -967,21 +969,21 @@ costliest call, whole and as R4.5 counts it:
 | a square, one row and a counted source under a cut, recut to the whole table | 4928 | 3508 |
 | a recut on a stopped timer, read by the start after it | 2656 | 1960 |
 | starts under the whole table after a cut, each place reset after, and recuts of a loop and a square started under it | 5874 | 4454 |
-| sources of two and three columns under a cut, recut, and a place's reset | 9486 | 3894 |
+| sources of two and three columns under a cut and under the whole table, recut, and a place's reset | 9486 | 4968 |
 | starts through a transformation under a cut, remaps under it, and recuts, beside a timer that maps a source under the whole table | 9722 | 4124 |
 | recuts on the timers that share a control register | 4118 | 2726 |
 
 Every call of the nine is within R4.5's 6,656 as it counts them, the
-costliest at 4,454. Counted whole, two pass it, each at its first row,
+costliest at 4,968. Counted whole, two pass it, each at its first row,
 which starts four sources: 9,722 cycles, four through a transformation,
 two of them under a cut, and 9,486, four of two and three columns under a
 cut.
 
-The player with the lookup in is 25,008 bytes against 21,966 in release
-0.15.0, before the cut, and 26,298 against 23,256 where a tick reads an
-absolute address; with the deferred start in as well, 39,984 against
-35,908, and 41,518 against 37,954. Of the 3,042 bytes it is longer than in
-that release, 2,946 are the cut's blocks, which a link leaves out of the
-player of a song that cuts no source (LINKER.md): 2,426 of routines and
+The player with the lookup in is 25,264 bytes against 21,966 in release
+0.15.0, before the cut, and 26,554 against 23,256 where a tick reads an
+absolute address; with the deferred start in as well, 40,240 against
+35,908, and 41,774 against 37,954. Of the 3,298 bytes it is longer than in
+that release, 3,208 are the cut's blocks, which a link leaves out of the
+player of a song that cuts no source (LINKER.md): 2,688 of routines and
 130 of each effect's frame code. With the deferred start in, the blocks
-are 3,420 of the 4,076.
+are 3,682 of the 4,332.

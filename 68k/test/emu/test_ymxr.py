@@ -1988,7 +1988,8 @@ def cut_cases():
     the handler the first switched to, and between a cut and the whole
     table; recuts while a start is pending, of the general handler and of a
     square; sources of two and three columns, marked and counted, under a
-    cut; starts through a transformation under a cut, of a marked source, a
+    cut, and marked ones under the whole table, which a recut moves to the
+    counted handler; starts through a transformation under a cut, of a marked source, a
     counted one and a square, remaps under a cut to and from the identity,
     and recuts of a lookup instance, beside a timer that maps a source under
     the whole table; deferred starts under a cut through a transformation
@@ -2071,11 +2072,13 @@ def cut_cases():
                 8: start(1, pr=0, deferred=1), 9: recut(1, 4), 14: start(2, (2, 5))},
           "B": {0: start(3, target=9), 2: start(1, (1, 6), target=9, pr=0, deferred=1),
                 3: recut(1, 1)}}),
-        ("sources of two and three columns under a cut, recut, and a place's reset",
-         [tone, voice, envelope, noise],
+        ("sources of two and three columns under a cut and under the whole table, recut, and a"
+         " place's reset", [tone, voice, envelope, noise],
          {"A": {0: start(1, (1, 3), target=14), 4: recut(0, 2),
-                7: ("retune", 200, 200, 0, 1), 10: recut(0, 4)},
-          "B": {0: start(2, (2, 4), target=18), 5: recut(1, 3), 9: recut(0, 5)},
+                7: ("retune", 200, 200, 0, 1), 10: recut(0, 4), 12: start(1, target=14),
+                14: recut(1, 3)},
+          "B": {0: start(2, (2, 4), target=18), 5: recut(1, 3), 9: recut(0, 5),
+                12: start(2, target=18), 14: recut(1, 4)},
           "C": {0: start(4, (2, 4), target=24), 3: recut(0, 3),
                 6: start(4, (1, 2), target=24, pr=0)},
           "D": {0: start(3, (1, 2), target=20), 4: recut(0, 3), 8: recut(2, 3)}}),
@@ -5008,10 +5011,14 @@ def cut_read(code, symbols, cycles_of, general):
           r" on two\.", span(kept[0]), span(kept[1]))
     reads(r"A recut that moves a source from another handler to the counted handler runs the"
           r" path of one column through the identity on such a source, ([\d,]+(?: to"
-          r" [\d,]+)?) cycles, and the general routine on every other, ([\d,]+(?: to"
-          r" [\d,]+)?) cycles on a square through a transformation\.",
+          r" [\d,]+)?) cycles, the path of several columns through the identity on a marked"
+          r" source of two or three columns, ([\d,]+(?: to [\d,]+)?) cycles on two and"
+          r" ([\d,]+(?: to [\d,]+)?) on three, and the general routine on every other,"
+          r" ([\d,]+(?: to [\d,]+)?) cycles on a square through a transformation\.",
           span(set().union(*(frames.get(("recut, moved", shape), set())
                              for shape in CUT_FRAMES[0][1])) or {0}),
+          span(frames.get(("recut, moved", "two columns"), {0})),
+          span(frames.get(("recut, moved", "three columns"), {0})),
           span(frames.get(("recut, moved", "mapped a square"), {0})))
     reads(r"A recut that leaves a square's or a one-row source's handler running sets the running"
           r" cut alone: ([\d,]+(?: to [\d,]+)?) cycles on a square and ([\d,]+(?: to [\d,]+)?) on a"

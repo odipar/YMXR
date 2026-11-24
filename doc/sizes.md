@@ -122,7 +122,7 @@ value: the start through a transformation, the remap, the page routines,
 init's fill of the pages and the routines of the lookup kinds' loops. The
 block is 2,672 bytes of the core with the lookup in and 2,992 of the core
 with the deferred start in as well, and a song that cuts a source alone
-leaves it out: `cut.ymxr` links 7,074 bytes, against 9,746 with the
+leaves it out: `cut.ymxr` links 7,336 bytes, against 10,008 with the
 block. The table of the kinds' descriptors, `ymxr_kindof` and
 `ymxr_runrow` stay in the floor, as a start and a recut under a cut read
 them.
