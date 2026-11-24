@@ -27,9 +27,9 @@ var Lookups = []string{"lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh
 // is, and its instance on each effect; the start of several columns; each
 // effect's frame code, general handler and timer code; init's and stop's
 // work for the effects; each effect's remap and deferred start; the cut's
-// routines and each effect's paths that read the cut column; each lookup
-// kind and its instance on each effect; and align, the padding before the
-// second bank.
+// routines and each effect's paths that read the cut column; the lookup's
+// routines and tables; each lookup kind and its instance on each effect;
+// and align, the padding before the second bank.
 var Blocks = func() []string {
 	var all []string
 	for _, kind := range Kinds {
@@ -52,6 +52,7 @@ var Blocks = func() []string {
 	for i := 0; i < 4; i++ {
 		all = append(all, fmt.Sprintf("cut%d", i))
 	}
+	all = append(all, "lookup")
 	for _, kind := range Lookups {
 		all = append(all, kind)
 		for i := 0; i < 4; i++ {
@@ -260,16 +261,21 @@ func Kind(source *dtx.Table, counted bool) string {
 // its deferred start where the tune defers a start and a row of the effect
 // does; for each source an effect's rows start, the instance of its
 // handler kind on that effect and the kind's loop of init; several where a
-// start is of a counted source or one of several columns; the lookup
-// instance of each kind an effect maps a source through, and the kind's
-// loop of init; and align, the padding before the second bank; in the
-// order of Blocks. An effect that cuts a source, in a tune of version 11
-// whose row sets the effect's cut column, needs its paths that read the
-// column, cut0 for effect 0, the cut's routines, its remap, and the
-// counted kinds and several that CountedOf reads in its rows.
+// start is of a counted source or one of several columns; lookup, the
+// lookup's routines and tables, where a tune is of version 10 or maps a
+// value, bit 5 of its effects byte; the lookup instance of each kind an
+// effect maps a source through, and the kind's loop of init; and align,
+// the padding before the second bank; in the order of Blocks. An effect
+// that cuts a source, in a tune of version 11 whose row sets the effect's
+// cut column, needs its paths that read the column, cut0 for effect 0, the
+// cut's routines, its remap, and the counted kinds and several that
+// CountedOf reads in its rows.
 func BlocksOf(tunes []ymxr.File) []string {
 	needed := map[string]bool{"align": true}
 	for _, tune := range tunes {
+		if tune.Version == ymxr.Version || ymxr.HasMapping(tune.Effects) {
+			needed["lookup"] = true
+		}
 		for _, lookup := range LookupsOf(tune) {
 			needed[lookup] = true
 			needed[lookup[:2]] = true

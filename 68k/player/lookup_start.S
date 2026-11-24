@@ -28,6 +28,13 @@
 ; vector left to the installer. It returns a5 the instance and a3 the
 ; mirror; with WS_ARMING at 1 it fills the page alone and returns a3 the
 ; record.
+;
+; This file, the remap but for cut_2 and ymxr_rehook, the page routines
+; but for ymxr_runrow, prefill's fill of the pages and the routines of
+; the lookup kinds' loops are the pieces lookup_1 to lookup_7 of the
+; block lookup, which a link keeps where a tune is of version 10 or maps
+; a value (doc/LINKER.md).
+                PIECE   lookup_1
 ymxr_lstart:    lsl.w   #3,d3                   ; the source's entry
                 movea.l WS_SOURCES-8(a0,d3.w),a4    ; its first row
                 move.l  WS_SOURCES-4(a0,d3.w),d0    ; its loop cell, or a tag

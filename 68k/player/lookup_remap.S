@@ -252,12 +252,14 @@ ymxr_rlevel     equ     *                       ; between the mask and the
                 rts
 ; The marked form of the kind's page (ymxr_xfill), the piece cut_2 of the
 ; cut's block.
+                ENDPIECE lookup_1
                 PIECE   cut_2
 .marked:        moveq   #0,d0
                 move.b  FX_SHAPE(a3),d0
                 bsr.w   ymxr_xfill
                 bra     .kind
                 ENDPIECE cut_2
+                PIECE   lookup_2
 
 ; The running source moved from the handler a5, which a2 describes, to
 ; the handler a4 of the same shape, which a1 describes: each column's
@@ -320,6 +322,7 @@ ymxr_move:      move.w  KD_COLS(a2),d4
 .aim:           move.l  a4,(a6)
                 move.w  (sp)+,sr
                 rts
+                ENDPIECE lookup_2
 
                 .if     YMXR_DEFER
 ; Move a pending hook when remapping to handler a4, kind d0 in

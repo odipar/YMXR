@@ -30,8 +30,9 @@ final class Link {
      *  instance on each effect; the start of several columns; each effect's
      *  frame code, general handler and timer code; init's and stop's work
      *  for the effects; each effect's remap and deferred start; the cut's
-     *  routines and each effect's paths that read the cut column; each
-     *  lookup kind and its instances; and align. */
+     *  routines and each effect's paths that read the cut column; the
+     *  lookup's routines and tables; each lookup kind and its instances;
+     *  and align. */
     static final List<String> BLOCKS = blocks();
 
     private static List<String> blocks() {
@@ -56,6 +57,7 @@ final class Link {
         for (int i = 0; i < 4; i++) {
             all.add("cut" + i);
         }
+        all.add("lookup");
         for (String kind : LOOKUPS) {
             all.add(kind);
             for (int i = 0; i < 4; i++) {
@@ -84,18 +86,23 @@ final class Link {
      * effect does; for each source an effect's rows start, the instance of
      * its handler kind on that effect and the kind's loop of init; {@code
      * several} where a start is of a counted source or one of several
-     * columns; the lookup instance of each kind an effect maps a source
-     * through, and the kind's loop of init; and {@code align}, the padding
-     * before the second bank. An effect that cuts a source, in a tune of
-     * version 11 whose row sets the effect's cut column, needs its paths that
-     * read the column, {@code cut0} for effect 0, the cut's routines, its
-     * remap, and the counted kinds and {@code several} that {@link #counted}
-     * reads in its rows.
+     * columns; {@code lookup}, the lookup's routines and tables, where a
+     * tune is of version 10 or maps a value, bit 5 of its effects byte; the
+     * lookup instance of each kind an effect maps a source through, and the
+     * kind's loop of init; and {@code align}, the padding before the second
+     * bank. An effect that cuts a source, in a tune of version 11 whose row
+     * sets the effect's cut column, needs its paths that read the column,
+     * {@code cut0} for effect 0, the cut's routines, its remap, and the
+     * counted kinds and {@code several} that {@link #counted} reads in its
+     * rows.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
         needed.add("align");
         for (TuneFile tune : tunes) {
+            if (tune.version() == Tune.VERSION || Columns.maps(tune.effects())) {
+                needed.add("lookup");
+            }
             for (String lookup : lookups(tune)) {
                 needed.add(lookup);
                 needed.add(lookup.substring(0, 2));

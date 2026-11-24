@@ -9,6 +9,7 @@
 ; instance's page byte, at FX_LBYTE, plus its high byte times 256: FX_LHIGH,
 ; and 2 more a bank and 1 more for the bank's page 1. Preserves every
 ; register.
+                PIECE   lookup_3
 ymxr_lfill:     movem.l d0-d1/d3/a2/a4,-(sp)
                 tst.b   FX_LFB(a3)              ; an effect without one: no
                 beq.s   .none                   ; page written
@@ -174,6 +175,7 @@ ymxr_fill:      move.w  (a2)+,d0                ; E
 .long:          move.l  (a2)+,(a4)+
 .lnext:         dbra    d0,.long
                 rts
+                ENDPIECE lookup_3
 
 ; d3 the row the running handler is at, a2 the vector that names it and a3
 ; the effect's record: a square's by bit 7 of its immediate, a source of

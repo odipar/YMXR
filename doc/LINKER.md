@@ -95,6 +95,11 @@ A block is the code and data a player runs for one part of a song:
 - `cut`, in a core with the lookup, is the cut's routines and the paths
   of the deferred start and the remap under a cut, which a song needs
   where it needs an effect's cut block;
+- `lookup`, in a core with the lookup, is the lookup's routines and
+  tables: the start through a transformation, the remap, the page
+  routines, init's fill of the pages and the routines of the lookup
+  kinds' loops, which a song needs where a tune is of version 10 or maps
+  a value, bit 5 of its effects byte;
 - a handler's block, such as `square1`, is one handler of one kind on
   one effect, and for a square and a source of one row the start of the
   kind in the effect's frame code, which a song needs where the effect's
@@ -157,15 +162,15 @@ reaches.
 The rest is in every linked player: the SNDH core's entries, init and
 `YMXR_stop` but for their work for the effects, `YMXR_play`, the frame's
 register steps and its tables, the mask words and the parked place, and
-in a core with the lookup the lookup's routines and the effects'
-references. A source
-of one column that is none of the shapes above runs the general handler.
-The frame reaches an effect's handler of a kind on a start on that
-effect of a source of that kind alone. Init writes the branch that picks
-a start's shape from the shapes of every source of the tune, and a start
-of a source of several columns or a counted source calls the routines of
-`several`. A path to a block the song does not need is a path no row of
-the song runs.
+in a core with the lookup the effects' references and the table of the
+kinds' descriptors, `ymxr_kindof` and `ymxr_runrow`, which a start and a
+recut under a cut read. A source of one column that is none of the
+shapes above runs the general handler. The frame reaches an effect's
+handler of a kind on a start on that effect of a source of that kind
+alone. Init writes the branch that picks a start's shape from the shapes
+of every source of the tune, and a start of a source of several columns
+or a counted source calls the routines of `several`. A path to a block
+the song does not need is a path no row of the song runs.
 
 ### Pieces
 
@@ -228,6 +233,18 @@ cuts no source, its head's branch and its place's reset included. The
 cut's routines are the piece `cut_1`, and its paths in the deferred
 start's arming and in the remap `cut_3` and `cut_2`, which run where a
 start or a recut under a cut has run.
+
+The lookup's routines and tables are the pieces `lookup_1` to
+`lookup_7`: the start through a transformation and the remap up to
+`cut_2`, the remap past it, the page routines but for `ymxr_runrow`,
+init's fill of the pages past its test of the transformation block, the
+fill's return of -1 and its read of a list's entry, the routines of the
+lookup kinds' loops, and the table of a fill kind without pages. In a
+core with the deferred start, `ymxr_rehook`, which a deferred start
+runs, is between the second piece and the third. Init calls the fill for
+every tune, and the fill returns at its test where the bound tune has no
+transformation block, as a tune of version 11 that maps no value has
+none (BINARIES.md 1.2).
 
 A core with the deferred start has a second bank of handlers, BANK bytes
 past the first, the same handlers in the same order (deferred.S). Each
@@ -400,14 +417,14 @@ and the deferred start in, of 40,438 bytes.
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
-| `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 9,510 |
-| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 12,916 |
+| `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 6,838 |
+| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 9,924 |
 | `deferred.ymxr` | the deferred start | effect0, effect3, effects, defer0, defer3 | 4,792 |
 | `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0, effects | 4,302 |
 | `envelope.ymxr` | plain | two, two0, several, effect0, effects | 4,258 |
 | `fine-zero.ymxr` | plain | none | 1,336 |
 | `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3, effects | 4,908 |
-| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, effects, map0, map1, map2, map3, defer2, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,398 |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, effects, map0, map1, map2, map3, defer2, lookup, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,398 |
 | `plays-once.ymxr` | plain | none | 1,336 |
 | `preempt.ymxr` | plain | square, square0, effect0, effect1, effects | 3,512 |
 | `retune.ymxr` | plain | one, one0, effect0, effects | 2,756 |
@@ -517,3 +534,7 @@ keeps are 764 bytes shorter than in the core.
     that runs an effect keeps. Done: the pieces leave every instruction of
     the play call and the ticks as it is, and sizes.md has the bytes a
     song saves.
+15. The lookup's routines and tables as a block, `lookup`, which a song
+    keeps where a tune is of version 10 or maps a value. Done: a song that
+    cuts a source and maps no value leaves it out, and sizes.md has the
+    bytes it saves.

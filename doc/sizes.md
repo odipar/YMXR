@@ -110,17 +110,22 @@ the second copy of steps 6 and 7:
 
 The floor of the plain core is 1,336 bytes, and 1,466 with the second
 copy of steps 6 and 7. The floor of the core with the deferred start in
-is 2,126 bytes, of the core with the lookup in 5,220, and of the core
-with the lookup and the deferred start in 6,960.
+is 2,126 bytes, of the core with the lookup in 2,548, and of the core
+with the lookup and the deferred start in 3,968.
 
 ## The cores with the lookup
 
 A song that cuts a source and maps no value links from a core with the
-lookup in (LINKER.md), and that core's floor has the lookup's routines
-and tables: `ymxr_prefill`, the window tables, `ymxr_rmove` and the page
-routines. A block of what a song runs where it maps a value would leave
-those out of the player of a song that cuts a source alone. That block is
-left to a later change.
+lookup in (LINKER.md). The lookup's routines and tables are the block
+`lookup`, which a link keeps where a tune is of version 10 or maps a
+value: the start through a transformation, the remap, the page routines,
+init's fill of the pages and the routines of the lookup kinds' loops. The
+block is 2,672 bytes of the core with the lookup in and 2,992 of the core
+with the deferred start in as well, and a song that cuts a source alone
+leaves it out: `cut.ymxr` links 6,838 bytes, against 9,510 with the
+block. The table of the kinds' descriptors, `ymxr_kindof` and
+`ymxr_runrow` stay in the floor, as a start and a recut under a cut read
+them.
 
 ## The check
 
