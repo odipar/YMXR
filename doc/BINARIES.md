@@ -241,7 +241,7 @@ word is the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 version 11 and every other core to version 9 (2.2), so init of a core
 without it reports -1 for a tune of version 10, whose effects byte sets
 bit 5, and of version 11, whose effects byte sets bit 6 (SPEC.md 3.3);
-`YMXR_sndh-map.bin` is 15,704 bytes larger than `YMXR_sndh.bin`. The
+`YMXR_sndh-map.bin` is 15,960 bytes larger than `YMXR_sndh.bin`. The
 field at 26 of a core with the lookup in is the offset of its first
 handler: every byte from there to the core's end is a handler, an
 installer, the monitor's counter or padding. The padding puts every
