@@ -2,25 +2,26 @@
 
 A player linked for a song is the floor, the bytes every song keeps, and
 the blocks of what the song runs (LINKER.md). This document lists where
-those bytes are and what makes them fewer for a few cycles more a call.
+those bytes are, what they cost in cycles, and what makes them fewer for
+a few cycles more a call.
 
 ## The corpus
 
 The player of each of the 544 dumps links from the plain core. The
-floor, 1,466 bytes, is 87% of the 913,226 bytes of the 544 players. The
+floor, 1,336 bytes, is 86% of the 842,506 bytes of the 544 players. The
 link keeps one of four sets of blocks:
 
 | blocks kept | dumps | bytes |
 |---|---|---|
-| none | 461 | 1,466 |
-| effect1, effects | 69 | 2,812 |
-| square, square0, effect0, effects | 12 | 2,982 |
-| square, square0, square1, effect0, effect1, effects | 2 | 3,794 |
+| none | 461 | 1,336 |
+| effect1, effects | 69 | 2,682 |
+| square, square0, effect0, effects | 12 | 2,852 |
+| square, square0, square1, effect0, effect1, effects | 2 | 3,664 |
 
-Before the block of the effects (LINKER.md, plan item 14) the floor was
-2,752 bytes and the 544 players were 1,543,122 bytes: they are 41% fewer
-now. The corpus is the one of experiments.md, and `YM_CORPUS` is its
-folder.
+Before the block of the effects (LINKER.md, plan item 14) and one copy
+of steps 6 and 7, the floor was 2,752 bytes and the 544 players were
+1,543,122 bytes: they are 45% fewer now. The corpus is the one of
+experiments.md, and `YM_CORPUS` is its folder.
 
 ## The floor
 
@@ -56,20 +57,22 @@ The timer code of an effect is 150 bytes, and the block of the effects
 686 bytes. The pieces leave every instruction of the play call and the
 ticks as it is.
 
-## A few cycles more
+## One copy of steps 6 and 7
 
-The frame writes registers 11, 12, 8 to 10 and 7 in two copies: the first
-for a row that sets the shape column, the second, `ymxr_plain`, for a row
-that leaves it 0, without the tests of the shape's bits.
-`68k/test/sizes/one-copy.patch` keeps the first copy alone. One copy of
-steps 6 and 7 is 130 bytes fewer in every player.
+The frame writes registers 11, 12, 8 to 10 and 7 in one copy, for a row
+that sets the shape column and for a row that leaves it 0. The player
+had a second copy for the row that leaves it 0, without the tests of the
+shape's bits, which `68k/test/sizes/two-copies.patch` restores. The
+second copy of steps 6 and 7 is 130 bytes more in every player.
 
 Over the first 1,000 frames of each of the eleven dumps the average call
-of a dump costs 24 to 40 cycles more and a single call 22 fewer to 40
-more, and every tick costs what it costs today. A row that leaves the
-shape column 0 runs the tests the second copy leaves out, and a row that
-sets it runs without the branch to that copy. plan.md has the cost of an
-average call.
+of a dump costs 24 to 40 cycles more than with the second copy and a
+single call 22 fewer to 40 more, and every tick costs the same. A row that
+leaves the shape column 0 runs the tests the second copy leaves out, and
+a row that sets it runs without the branch to that copy. plan.md has the
+cost of an average call.
+
+## A few cycles more
 
 Two places have more bytes, each at a cost in cycles the rig has yet to
 count:
@@ -89,26 +92,26 @@ a cycle there costs the most: the handlers stay as they are.
 ## The dumps of ym/test
 
 The blocks the link keeps for each dump, its bytes, and its bytes with
-one copy of steps 6 and 7:
+the second copy of steps 6 and 7:
 
-| dump | blocks kept | bytes | with one copy |
+| dump | blocks kept | bytes | with the second copy |
 |---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | none | 1,466 | 1,336 |
-| Chambers of Shaolin 5 - you blew it! | none | 1,466 | 1,336 |
-| Circus Attractions  2 | none | 1,466 | 1,336 |
-| DBA 2 | square, square0, effect0, effects | 2,982 | 2,852 |
-| DBA 5 | square, square0, effect0, effects | 2,982 | 2,852 |
-| Digidrum preempt, built | square, square0, effect0, effect1, effects | 3,642 | 3,512 |
-| Retrigger retune, built | one, one0, effect0, effects | 2,886 | 2,756 |
-| Synergy Credits | square, square0, square1, effect0, effect1, effects | 3,794 | 3,664 |
-| Turrican - world 4-3 | effect1, effects | 2,812 | 2,682 |
-| Turrican 2 - world completed 1 | effect1, effects | 2,812 | 2,682 |
-| capture | none | 1,466 | 1,336 |
+| Big - Samantha Fox Strip Poker 6 | none | 1,336 | 1,466 |
+| Chambers of Shaolin 5 - you blew it! | none | 1,336 | 1,466 |
+| Circus Attractions  2 | none | 1,336 | 1,466 |
+| DBA 2 | square, square0, effect0, effects | 2,852 | 2,982 |
+| DBA 5 | square, square0, effect0, effects | 2,852 | 2,982 |
+| Digidrum preempt, built | square, square0, effect0, effect1, effects | 3,512 | 3,642 |
+| Retrigger retune, built | one, one0, effect0, effects | 2,756 | 2,886 |
+| Synergy Credits | square, square0, square1, effect0, effect1, effects | 3,664 | 3,794 |
+| Turrican - world 4-3 | effect1, effects | 2,682 | 2,812 |
+| Turrican 2 - world completed 1 | effect1, effects | 2,682 | 2,812 |
+| capture | none | 1,336 | 1,466 |
 
-The floor of the plain core is 1,466 bytes, and 1,336 with one copy of
-steps 6 and 7. The floor of the core with the deferred start in is 2,256
-bytes, of the core with the lookup in 5,350, and of the core with the
-lookup and the deferred start in 7,090.
+The floor of the plain core is 1,336 bytes, and 1,466 with the second
+copy of steps 6 and 7. The floor of the core with the deferred start in
+is 2,126 bytes, of the core with the lookup in 5,220, and of the core
+with the lookup and the deferred start in 6,960.
 
 ## The cores with the lookup
 
@@ -123,9 +126,9 @@ left to a later change.
 
 - SizesTest reads the bytes above off the cores and tables under
   `go/binaries/data`, and off the patch applied to a copy of `68k`, with
-  its table cut as the build cuts it. A row of the corpus's table is read against
-  the dump of `ym/test` that keeps the same blocks, and its count of
-  dumps against the corpus where `YM_CORPUS` is set.
+  its table cut as the build cuts it. A row of the corpus's table is read
+  against the dump of `ym/test` that keeps the same blocks, and its count
+  of dumps against the corpus where `YM_CORPUS` is set.
 - The rig's `-onlysizes` plays the eleven dumps on the player as it is
   and on the player of the patch, each against the model, and reads the
   cycles above.

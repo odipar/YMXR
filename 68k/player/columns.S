@@ -20,8 +20,8 @@ q\{col}:
                 move.b  $7FFF(a1),d1
                 .endm
 
-; The same, at a column's third site: the copy of steps 6 and 7 the row
-; that sets no envelope column falls into.
+; The same, at a column's third site: the mapping column the cut's path
+; of an effect reads (effect.S).
                 .macro  RREAD   col
 r\{col}:
                 move.b  $7FFF(a1),d1
@@ -42,30 +42,9 @@ m\{col}:
                 move.b  $7FFF(a1),d1
                 .endm
 
-; A column with a set bit, written at that third site.
-                .macro  RWRITE  col,select
-                RREAD   \col
-                bpl.s   .no\~
-                move.w  #\select,d0
-                move.b  d1,d0
-                movep.w d0,(a2)
-.no\~:
-                .endm
-
                 .macro  QOR     col
 q\{col}:
                 or.b    $7FFF(a1),d1
-                .endm
-
-; A column that fills its byte, on the row where the column beside it is
-; 0: written where it is not 0, with no further test.
-                .macro  PLAIN   col,select
-                QREAD   \col
-                beq.s   .no\~
-                move.w  #\select,d0
-                move.b  d1,d0
-                movep.w d0,(a2)
-.no\~:
                 .endm
 
 ; A column with a set bit, to its register: the column read, and where

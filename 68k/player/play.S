@@ -43,11 +43,10 @@ ymxr_regs:
                 TONE    _2,_3,$0200,$0300
                 TONE    _4,_5,$0400,$0500
 ; 5: the noise period, and the envelope period beside the shape's bits:
-;    where the shape column is 0, no bit beside is set, and a period byte
-;    is written where it is not 0, with no further test.
+;    a period byte is written where it is not 0, and a 0 where its bit in
+;    the shape column is set.
                 WRITE   _6,$0600
                 READ2   _13
-                beq.w   ymxr_plain
                 RESERVED _11,6,$0B00
                 RESERVED _12,5,$0C00
 ; 6: the volumes.
@@ -62,29 +61,14 @@ ymxr_regs:
                 move.b  d1,d0
                 movep.w d0,(a2)
 .no7:
-; 8: the shape, read above into d2. Step 5 found the column set, so the
-; test here is of its set bit alone.
+; 8: the shape, read above into d2: a row that leaves the column 0
+; leaves its set bit clear.
                 tst.b   d2
                 bpl.s   ymxr_played
                 move.w  #$0D00,d1
                 move.b  d2,d1
                 movep.w d1,(a2)
-                bra.s   ymxr_played
 
-; Steps 6 and 7 again, for the row whose envelope column step 5 found 0:
-; step 8 leaves every register as it is on that row, and this copy ends without
-; the test that would say so.
-ymxr_plain:     PLAIN   _11,$0B00
-                PLAIN   _12,$0C00
-                RWRITE  _8,$0800
-                RWRITE  _9,$0900
-                RWRITE  _10,$0A00
-                RREAD   _7
-                bpl.s   ymxr_played
-                or.b    #YM_PORTS,d1
-                move.w  #$0700,d0
-                move.b  d1,d0
-                movep.w d0,(a2)
 ; The row is written: the next one is read now, after every write this
 ; call makes, so no part of the advance's cost is between a host's clock
 ; and the chip.
@@ -204,9 +188,6 @@ ymxr_sites:
                 dc.w    q_24-ymxr_frame+2,24,q_25-ymxr_frame+2,25
                 dc.w    q_26-ymxr_frame+2,26,q_27-ymxr_frame+2,27
                 dc.w    q_28-ymxr_frame+2,28,q_29-ymxr_frame+2,29
-                dc.w    q_11-ymxr_frame+2,11,q_12-ymxr_frame+2,12
-                dc.w    r_8-ymxr_frame+2,8,r_9-ymxr_frame+2,9
-                dc.w    r_10-ymxr_frame+2,10,r_7-ymxr_frame+2,7
                 .if     YMXR_MAP
                 dc.w    q_30-ymxr_frame+2,30,q_31-ymxr_frame+2,31
                 dc.w    q_32-ymxr_frame+2,32,q_33-ymxr_frame+2,33
