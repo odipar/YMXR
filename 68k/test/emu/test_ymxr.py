@@ -2225,7 +2225,7 @@ def deferred(code, symbols):
                 2: start(2, target=9, deferred=1, mapping=[1]),
                 3: start(3, target=9, deferred=1, mapping=[2])}}, two_maps),
     ]
-    played = mapped = 0
+    played = mapped = stops = 0
     for title, sources, timers, *through in cases:
         tune = effects_tune(title, 24, sources, timers,
                             transformations=through[0] if through else None)
@@ -2238,10 +2238,64 @@ def deferred(code, symbols):
         frames, ticks = check(at, *played_on(at, code, symbols), kit=bool(through),
                               ticked=ticked)[:2]
         assert ticks, "%s: no tick" % title
+        stops += pending_stops(title, at, 24, *played_on(at, code, symbols))
         played += 1
         mapped += bool(through)
+    assert stops, "no frame of the cases leaves a start pending"
     return ("deferred starts: %d tunes, every tick against the model, and the %d that map"
-            " a value every frame against the reader's record" % (played, mapped))
+            " a value every frame against the reader's record; a stop at each of %d frames"
+            " with a start pending writes the hooked word back" % (played, mapped, stops))
+
+
+def pending_stops(title, at, rows, code, symbols):
+    """Stop the player at each frame that leaves a deferred start pending,
+    and check that the stop writes each hooked word back (SPEC.md 4.8). A
+    set inits one loaded player for each subtune, and a hook left in a
+    handler sends the next subtune's tick at its last row into the
+    installer of the start armed before. The rows play with no tick
+    fired, so a start armed on a running timer stays pending until a row
+    drops or replaces it. Returns the count of frames stopped at."""
+    work = tempfile.mkdtemp()
+    file, _ = convert(at, work)
+    bound = bind(file, work)
+    if not LINKED and needs(bound[8])[1] and "ymxr_look" not in symbols:
+        code, symbols = build(switched(DEFINES, True, True))
+    workspace = WORK + 0x100
+    size = equate("FX_SIZE", symbols)
+    record = workspace + equate("WS_FX", symbols)
+    pend, hook, word = (equate(name, symbols) for name in ("FX_PENDING", "FX_HOOK", "FX_HOOKW"))
+
+    def pending(m):
+        return [i for i in range(4) if m.byte(record + i * size + pend)]
+
+    def played(frames):
+        m = Machine(code, symbols, bound)
+        assert m.call("init", a0=FILE, a1=workspace) == 0, "%s: init rejected the tune" % title
+        for _ in range(frames):
+            m.call("play", a0=workspace)
+        return m
+    m = played(0)
+    at_frames = []
+    for f in range(1, rows + 1):
+        m.call("play", a0=workspace)
+        if pending(m):
+            at_frames.append(f)
+    for f in at_frames:
+        m = played(f)
+        hooked = []
+        for i in pending(m):
+            one = record + i * size
+            hooked.append((i, m.long(one + hook), m.word(one + word)))
+            assert m.word(m.long(one + hook)) != m.word(one + word), \
+                "%s: effect %d has a start pending at frame %d and no hook" % (title, i, f)
+        m.call("stop", a0=workspace)
+        for i, address, was in hooked:
+            assert m.word(address) == was, \
+                "%s: the stop at frame %d left effect %d's hook, $%04X where the word was" \
+                " $%04X" % (title, f, i, m.word(address), was)
+            assert not m.byte(record + i * size + pend), \
+                "%s: the stop at frame %d left effect %d's start pending" % (title, f, i)
+    return len(at_frames)
 
 
 def tune_file(file):

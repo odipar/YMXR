@@ -827,15 +827,18 @@ alone. The figures below are counted from the 68000's instruction
 timings, on that build with the row read through the program counter,
 and start at the head of the path that ends a source.
 
-At the frame of a deferred start on a running timer the player patches
-the handler of the start's shape in the bank its vector does not point
-into, writes the rate into the effect's installer, and writes one word
-into the running handler, at the head of its last row's path: a `bra.s`
-to its stub, or a `nop` where the stub follows the word. The tick that
-reads the last row runs the stub and the installer, which writes the word
-back, stops the timer where the start sets the timer's reset, writes the
-count, the vector and the select, and returns; the next tick runs the
-armed handler.
+At the frame of a deferred start on a running timer the player patches the
+handler of the start's shape in the bank its vector does not point into,
+writes the rate into the effect's installer, and writes one word into the
+running handler, at the head of its last row's path: a `bra.s` to its
+stub, or a `nop` where the stub follows the word. The tick that reads the
+last row runs the stub and the installer, which writes the word back,
+stops the timer where the start sets the timer's reset, writes the count,
+the vector and the select, and returns; the next tick runs the armed
+handler. A stop with a start pending writes the word back and drops the
+start, since a set inits one loaded player for each subtune: a word left
+in place sends the next subtune's tick at its last row into the installer
+of the start armed before.
 
 | the tick that reads the last row | cycles |
 |---|---|
@@ -872,16 +875,16 @@ cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 14,504
-bytes against 9,322, and 14,358 against 8,980 where a tick reads an
-absolute address. Each handler gains a stub: an instance of the wide
-handler is 138 bytes against 134, and of the marked shape of two columns
-116 against 112.
+The second bank, the installers, the stubs and the stop's write-back make
+the player 14,576 bytes against 9,322, and 14,430 against 8,980 where a
+tick reads an absolute address. Each handler gains a stub: an instance of
+the wide handler is 138 bytes against 134, and of the marked shape of two
+columns 116 against 112.
 
 The lookup in, `YMXR_MAP=1`, makes the player 25,264 bytes against 9,322,
 and 26,554 against 8,980 where a tick reads an absolute address. With the
-deferred start in as well, 40,240 against 14,504, and 41,774 against
-14,358.
+deferred start in as well, 40,312 against 14,576, and 41,846 against
+14,430.
 
 ## A cut
 
@@ -981,9 +984,9 @@ cut.
 
 The player with the lookup in is 25,264 bytes against 21,966 in release
 0.15.0, before the cut, and 26,554 against 23,256 where a tick reads an
-absolute address; with the deferred start in as well, 40,240 against
-35,908, and 41,774 against 37,954. Of the 3,298 bytes it is longer than in
+absolute address; with the deferred start in as well, 40,312 against
+35,908, and 41,846 against 37,954. Of the 3,298 bytes it is longer than in
 that release, 3,208 are the cut's blocks, which a link leaves out of the
 player of a song that cuts no source (LINKER.md): 2,688 of routines and
 130 of each effect's frame code. With the deferred start in, the blocks
-are 3,682 of the 4,332.
+are 3,682 of the 4,404.
