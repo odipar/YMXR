@@ -153,8 +153,8 @@ player (sizes.md), and performance.md has the cost of a call now:
 
 The first four were counted before they were built and each measured at
 its count. Synergy Credits reads 2,021 cycles a call against the 2,469
-this document opened at and 2,350 cycles of ticks against 5,380, so
-4,371 a frame against 7,849. performance.md has the call, and `-cycles`
+this document opened at and 4,228 cycles of ticks against 5,380, so
+6,249 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
 What was left was the costliest frame. A refill parses at most one ST4

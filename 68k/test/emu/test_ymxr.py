@@ -3990,10 +3990,11 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                 # The timer counts the ticks its data register names, and a
                 # register of 0 counts 256 (SPEC.md 1.9), so the column's
                 # count is read as ticks to compare with what the MFP counts.
-                ticks = fx["count"] or 256
-                assert (timers.pending[i] or timers.count[i]) == ticks, \
+                # `ticks` is the run's total, so the count has a separate name.
+                count = fx["count"] or 256
+                assert (timers.pending[i] or timers.count[i]) == count, \
                     "frame %d: effect %d counts %d ticks, not %d" % (
-                        f, i, timers.pending[i] or timers.count[i], ticks)
+                        f, i, timers.pending[i] or timers.count[i], count)
             elif fx["source"] == 0 and tune.effects & 1 << i:
                 assert timers.mode[i] == 0, "frame %d: effect %d's timer runs with no source" % (f, i)
             if model.place_address(i) is not None and fx["running"]:
