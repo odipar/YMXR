@@ -36,7 +36,9 @@ ymxr_kindof:    moveq   #0,d0
 .ident:         dc.b    10,0,12,13,11,14,15,11,14,15
 
 ; a4 the handler of the kind a2 describes, of effect d6, in bank d4. d5
-; clobbered.
+; clobbered. The remap and the lookup kinds' loops call this, ymxr_inst
+; and ymxr_page0, the piece lookup_6.
+                PIECE   lookup_6
 ymxr_at:        move.w  d6,d5
                 add.w   d5,d5
                 move.w  (a2,d5.w),d5            ; KD_AT, the effect's instance
@@ -79,6 +81,7 @@ ymxr_page0:     lea     ymxr_refat(pc),a5
                 move.b  d1,(a3)
                 move.b  d1,(a2)
                 rts
+                ENDPIECE lookup_6
 
 ; Stepping-handler kinds: the lookup kinds in page-byte-table order,
 ; then the identity kinds.
@@ -116,5 +119,7 @@ ymxr_hooks:     dc.w    LK_LAST,LK_HOOKW,LC_LAST,LC_HOOKW,LT_LAST,LT_HOOKW
 ymxr_refat:     dc.w    ymxr_ref0-ymxr_ref,ymxr_ref1-ymxr_ref
                 dc.w    ymxr_ref2-ymxr_ref,ymxr_ref3-ymxr_ref
 ; The table of a fill kind without pages: 0 for every transformation,
-; each page to the fallback (ymxr_prefill).
+; each page to the fallback (ymxr_prefill), the piece lookup_7.
+                PIECE   lookup_7
 ymxr_nomap:     dcb.b   128,0
+                ENDPIECE lookup_7

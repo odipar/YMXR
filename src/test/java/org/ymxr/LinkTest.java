@@ -108,11 +108,12 @@ final class LinkTest {
             if (!map || !defer) {
                 all.remove("align");
             }
-            // the remap's piece and the cut's of each effect's frame code
-            // and the cut's routines are in a core with the lookup, and the
-            // deferred start's piece in one with it
+            // the remap's piece and the cut's of each effect's frame code,
+            // the cut's routines and the lookup's are in a core with the
+            // lookup, and the deferred start's piece in one with it
             if (!map) {
                 all.remove("cut");
+                all.remove("lookup");
             }
             for (int i = 0; i < 4; i++) {
                 if (!map) {

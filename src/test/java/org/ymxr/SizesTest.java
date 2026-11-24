@@ -233,6 +233,42 @@ class SizesTest {
         return Link.link(core, table, Set.of("align")).length;
     }
 
+    /** The block of the lookup: its bytes in the two cores with the lookup
+     *  in, and the kit's cut.ymxr, which cuts a source and maps no value,
+     *  linked without it and with it. */
+    @Test
+    void aSongThatCutsAloneLeavesTheLookupOut() throws IOException {
+        int[] bytes = new int[2];
+        for (int i = 0; i < 2; i++) {
+            for (Pieces.Piece piece : Pieces.carried(Binaries.binary(false, false, true,
+                    i == 1, true)).pieces()) {
+                if (piece.block().equals("lookup")) {
+                    bytes[i] += piece.size();
+                }
+            }
+        }
+        Binaries.Binary binary = Binaries.binary(false, false, true, false, true);
+        byte[] core = Binaries.carried(binary.name());
+        Pieces table = Pieces.carried(binary);
+        TuneFile cut = TuneFile.read(Files.readAllBytes(
+                Path.of("doc/conformance/tunes/cut.ymxr")));
+        Set<String> blocks = Link.blocks(List.of(cut));
+        assertTrue(!blocks.contains("lookup"), "cut.ymxr keeps the lookup: " + blocks);
+        Set<String> with = new LinkedHashSet<>(blocks);
+        with.add("lookup");
+        int without = Link.link(core, table, blocks).length;
+        int kept = Link.link(core, table, with).length;
+        assertEquals(bytes[0], kept - without);
+        String prose = prose();
+        String block = "The block is " + grouped(bytes[0]) + " bytes of the core with the"
+                + " lookup in and " + grouped(bytes[1]) + " of the core with the deferred start"
+                + " in as well";
+        assertTrue(prose.contains(block), "sizes.md does not read: " + block);
+        String links = "`cut.ymxr` links " + grouped(without) + " bytes, against "
+                + grouped(kept) + " with the block.";
+        assertTrue(prose.contains(links), "sizes.md does not read: " + links);
+    }
+
     /** The corpus's table. Each row's bytes are the link of a dump of
      *  ym/test that keeps the same blocks, and the sentence of the corpus
      *  is the sums of the rows. Where YM_CORPUS is the corpus's folder,
