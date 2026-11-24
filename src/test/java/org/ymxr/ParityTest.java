@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The two trees against each other, byte for byte.
@@ -39,15 +40,20 @@ import org.junit.jupiter.api.Test;
  */
 final class ParityTest {
 
+    /** The folder of every file the tests here write, which JUnit removes
+     *  after the last of them. */
+    private static Path scratch;
+
     /** Where the Go tools are built, once for every test here. */
     private static @Nullable Path built;
 
     @BeforeAll
-    static void buildTheGoTree() throws IOException, InterruptedException {
+    static void buildTheGoTree(@TempDir Path folder) throws IOException, InterruptedException {
+        scratch = folder;
         Assumptions.assumeTrue(onThePath("go"), "no go on the path");
         Assumptions.assumeTrue(Files.exists(Path.of("target/classes/org/ymxr/Tune.class")),
                 "the Java tools are not built");
-        Path into = Files.createTempDirectory("ymxr-go");
+        Path into = Files.createTempDirectory(scratch, "ymxr-go");
         Process ran = new ProcessBuilder("go", "build", "-o", into + "/", "./cmd/...")
                 .directory(Path.of("go").toFile())
                 .redirectErrorStream(true)
@@ -73,7 +79,7 @@ final class ParityTest {
     /** {@code tool} run on {@code in}, out of the tree {@code where} names. */
     private static Ran ran(Path where, String tool, byte[] in, String... flags)
             throws IOException, InterruptedException {
-        Path input = Files.createTempFile("in", ".bin");
+        Path input = Files.createTempFile(scratch, "in", ".bin");
         Files.write(input, in);
         List<String> command = new ArrayList<>(List.of(where.resolve(tool).toString()));
         command.addAll(List.of(flags));
@@ -899,7 +905,7 @@ final class ParityTest {
         List<Path> dumps = dumps();
         byte[] one = both("ym-to-ymxr", Files.readAllBytes(dumps.get(0)), "-silent");
         byte[] two = both("ym-to-ymxr", Files.readAllBytes(dumps.get(1)), "-silent");
-        Path work = Files.createTempDirectory("ymxr-parity");
+        Path work = Files.createTempDirectory(scratch, "ymxr-parity");
         Path first = work.resolve("one.ymxr");
         Path second = work.resolve("two.ymxr");
         Files.write(first, one);
@@ -918,7 +924,7 @@ final class ParityTest {
      *  must be the same bytes. ymxr-multi reads file names rather than
      *  standard input, so it is run here rather than through both. */
     private static byte[] multiOf(List<byte[]> tunes, String... flags) throws Exception {
-        Path work = Files.createTempDirectory("ymxr-parity");
+        Path work = Files.createTempDirectory(scratch, "ymxr-parity");
         List<String> argv = new ArrayList<>();
         for (int i = 0; i < tunes.size(); i++) {
             Path at = work.resolve("tune" + (i + 1) + ".ymxr");
@@ -975,7 +981,7 @@ final class ParityTest {
             said.add(ran(Path.of("bin"), call[0], in,
                     Arrays.copyOfRange(call, 1, call.length)).said());
         }
-        Path work = Files.createTempDirectory("ymxr-parity");
+        Path work = Files.createTempDirectory(scratch, "ymxr-parity");
         Path one = work.resolve("one.ym");
         Files.write(one, dump);
         Ran java = ran(Path.of("bin"), "ymxr-check", new byte[0], one.toString());

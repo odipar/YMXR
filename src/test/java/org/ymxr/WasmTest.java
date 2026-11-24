@@ -16,6 +16,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The WebAssembly module against the executables (doc/tools.md 20.5): the
@@ -29,14 +30,19 @@ import org.junit.jupiter.api.Test;
  */
 final class WasmTest {
 
+    /** The folder of every file the tests here write, which JUnit removes
+     *  after the last of them. */
+    private static Path scratch;
+
     /** The Go executables and the module, built once for every test here. */
     private static @Nullable Path built;
 
     @BeforeAll
-    static void buildTheModule() throws IOException, InterruptedException {
+    static void buildTheModule(@TempDir Path folder) throws IOException, InterruptedException {
+        scratch = folder;
         Assumptions.assumeTrue(onThePath("go", "version"), "no go on the path");
         Assumptions.assumeTrue(onThePath("node", "--version"), "no node on the path");
-        Path into = Files.createTempDirectory("ymxr-wasm");
+        Path into = Files.createTempDirectory(scratch, "ymxr-wasm");
         build(into, List.of("go", "build", "-o", into + "/", "./cmd/..."), List.of());
         build(into, List.of("go", "build", "-o", into + "/",
                 "github.com/odipar/ymxs/go/cmd/ymxs-check"), List.of());
@@ -81,7 +87,7 @@ final class WasmTest {
 
     /** One call, standard input from {@code in}. */
     private static Ran ran(List<String> command, byte[] in) throws IOException, InterruptedException {
-        Path input = Files.createTempFile("in", ".bin");
+        Path input = Files.createTempFile(scratch, "in", ".bin");
         Files.write(input, in);
         ProcessBuilder call = new ProcessBuilder(command).redirectInput(input.toFile());
         call.environment().put("YMXR_WASM", built().resolve("ymxr.wasm").toString());
@@ -198,7 +204,7 @@ final class WasmTest {
      *  reads them into the directory the module opens as "/". */
     @Test
     void theFilesAToolReadsByNameReadTheSame() throws Exception {
-        Path at = Files.createTempDirectory("ymxr-named");
+        Path at = Files.createTempDirectory(scratch, "ymxr-named");
         Files.write(at.resolve("a.ymxr"), executable("ym-to-ymxr",
                 Files.readAllBytes(Path.of("ym/test/DBA 2.ym")), "-silent").out());
         Files.write(at.resolve("b.ymxr"), executable("ym-to-ymxr",

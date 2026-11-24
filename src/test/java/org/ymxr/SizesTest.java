@@ -51,7 +51,8 @@ class SizesTest {
             return done;
         }
         // a short path: rmac stops on an include path past about 130
-        // characters
+        // characters. The copy is removed once the core and its table are
+        // read, and kept where the patch or an assembly fails.
         Path work = Files.createTempDirectory(Path.of("/tmp"), "ymxr");
         Path sources = work.resolve("68k");
         try (Stream<Path> all = Files.walk(Path.of("68k"))) {
@@ -70,6 +71,11 @@ class SizesTest {
         assertEquals(0, run.waitFor(), PATCH + " does not apply: " + said);
         Cut made = new Cut(Binaries.assemble(RMAC, sources, Binaries.CORE),
                 Pieces.cut(RMAC, sources, Binaries.CORE));
+        try (Stream<Path> tree = Files.walk(work)) {
+            for (Path one : tree.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(one);
+            }
+        }
         patched = made;
         return made;
     }

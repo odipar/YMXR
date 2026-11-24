@@ -101,6 +101,10 @@ chip write is read against the same model, the frames cut at the VBL and the
 ticks counted against the rates the trace shows the timers programmed at. So
 -hatari requires tunes at 50 Hz.
 
+A run writes its files into one temporary folder. A run that passes
+removes the folder, and a run that fails keeps it and prints its path; a
+tune of -generated that fails is copied to GENERATED_FOLDER as well.
+
 Needs rmac (RMAC, or on the path), DTX's dtx-write (DTX_WRITE, or on the
 path) to read the table back and to pack one again with a row set by hand,
 unicorn (pip install unicorn), and the converter, the binder, the multi
@@ -3225,8 +3229,9 @@ SIZES_FRAMES = 1000
 def patched(names):
     """The player assembled from a copy of 68k/ with the patches of
     68k/test/sizes named applied in order, and its symbols. The copy is in
-    a folder of a short path: rmac stops on an include path past about 130
-    characters."""
+    a folder of a short path, outside the run's folder: rmac stops on an
+    include path past about 130 characters. A copy that assembles is
+    removed, and one that fails is kept."""
     work = tempfile.mkdtemp(prefix="ymxr", dir="/tmp" if os.path.isdir("/tmp") else None)
     shutil.copytree(os.path.join(ROOT, "68k"), os.path.join(work, "68k"),
                     ignore=shutil.ignore_patterns("test"))
@@ -3235,7 +3240,9 @@ def patched(names):
                      os.path.join(ROOT, "68k", "test", "sizes", name)], capture_output=True)
         assert r.returncode == 0, "%s does not apply: %s" % (name, r.stdout.decode()
                                                             + r.stderr.decode())
-    return assemble("YMXR.S", DEFINES, os.path.join(work, "68k"))
+    built = assemble("YMXR.S", DEFINES, os.path.join(work, "68k"))
+    shutil.rmtree(work)
+    return built
 
 
 def sizes(code, symbols):
@@ -8263,4 +8270,17 @@ class CyclesOn:
 
 
 if __name__ == "__main__":
-    main()
+    # every mkdtemp of the run makes its folder inside this one
+    tempfile.tempdir = tempfile.mkdtemp(prefix="ymxr-run-")
+    passed = False
+    try:
+        main()
+        passed = True
+    except SystemExit as ended:
+        passed = ended.code in (None, 0)
+        raise
+    finally:
+        if passed:
+            shutil.rmtree(tempfile.tempdir, ignore_errors=True)
+        else:
+            print("the run's files are in " + tempfile.tempdir, file=sys.stderr)

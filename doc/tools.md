@@ -1101,25 +1101,27 @@ off the path or the Java tree is unbuilt.
 | `ymxr-check` on several files | read in parallel | read in order |
 | the ring of `-mN` | `Math.round` of a float | a float64 plus 0.5, equal for N of 0 upward |
 
-**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the
-suite of 19.2 on the caller's machine. A skipped test is a check that
-did not run, so the script requires go on the path, python3 with unicorn
-in it, rmac on the path or at `RMAC`, DTX's packer on the path or at
-`DTX_WRITE`, a built DTX checkout at `DTX_REPO`, and a YMXS checkout at
-`YMXS_REPO`, whose conformance kit ParityTest runs through both trees,
-exit 2 where one of them is absent; it reads `gofmt -l go` beside them
-and ends with 2 where a file would be rewritten, and runs `go test
-./...` in `go`, exit 1 where a Go test fails. After the run it reads the
-count of skipped tests, exit 1 and the lines that report it where the
-count is above 0. `pom.xml` requires one release of DTX and one of YMXS,
-and the messages name them: another release of DTX's packer is another
-set of bytes. The maven argument `-Drig.shard=k/n` runs RigCallsTest's
-matrix on the cores whose index leaves k after a division by n, and its
-linked runs on the sets of switches whose index does, `-Drig.shard=none`
-on none, and the matrix runs on all thirty-two cores and all eight sets
-without it. `-Drig.parallel=N` runs at most N of a factory's rig runs of
-RigCallsTest at once, and as many as the processors the JVM counts
-without it; each test of the factory reads the output of its run.
+**19.6 The whole suite.** `bin/suite [maven argument ...]` runs the suite
+of 19.2 on the caller's machine. A skipped test is a check that did not
+run, so the script requires go on the path, python3 with unicorn in it,
+rmac on the path or at `RMAC`, DTX's packer on the path or at `DTX_WRITE`,
+a built DTX checkout at `DTX_REPO`, and a YMXS checkout at `YMXS_REPO`,
+whose conformance kit ParityTest runs through both trees, exit 2 where one
+of them is absent; it reads `gofmt -l go` beside them and ends with 2
+where a file would be rewritten, and runs `go test ./...` in `go`, exit 1
+where a Go test fails. The maven argument `clean` runs as a separate `mvn
+clean` before the run, since it removes `target`, the folder of the run's
+log. After the run it reads the count of skipped tests from the log, exit
+1 and the lines that report it where the count is above 0. `pom.xml`
+requires one release of DTX and one of YMXS, and the messages name them:
+another release of DTX's packer is another set of bytes. The maven
+argument `-Drig.shard=k/n` runs RigCallsTest's matrix on the cores whose
+index leaves k after a division by n, and its linked runs on the sets of
+switches whose index does, `-Drig.shard=none` on none, and the matrix runs
+on all thirty-two cores and all eight sets without it. `-Drig.parallel=N`
+runs at most N of a factory's rig runs of RigCallsTest at once, and as
+many as the processors the JVM counts without it; each test of the factory
+reads the output of its run.
 
 ---
 
