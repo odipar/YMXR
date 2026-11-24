@@ -1,6 +1,7 @@
 package org.ymxr;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -497,6 +498,45 @@ final class YmxsTest {
                         + " 65535 rows at most",
                 assertThrows(IllegalArgumentException.class, () -> Schema.of(longCounted()))
                         .getMessage());
+    }
+
+    /** A source of {@code rows} rows on timer A in three tunes: on setToneA,
+     *  two marked columns; on setEnvelope, two columns a player counts
+     *  (SPEC.md 2.1.3); and on setVoiceA, three marked columns. */
+    static List<Tune> wide(int rows) {
+        Timing stopped = new Timing(Chip.prescaler(4), 100, true, true);
+        org.ymxs.YMXS.Pair pair = new org.ymxs.YMXS.Pair("tall", Tunes.repeating(
+                IntStream.range(0, rows).mapToObj(r -> new org.ymxs.YMXS.Two(r & 0xFF, r % 16))
+                        .toList(), 0));
+        org.ymxs.YMXS.Triple triple = new org.ymxs.YMXS.Triple("tall", Tunes.repeating(
+                IntStream.range(0, rows)
+                        .mapToObj(r -> new org.ymxs.YMXS.Three(r & 0xFF, r % 16, r % 16))
+                        .toList(), 0));
+        List<Effect> starts = List.of(
+                Tunes.start(new org.ymxs.YMXS.TwoConnection(
+                        new org.ymxs.YMXS.SetTone(org.ymxs.YMXS.Voice.A), pair), stopped, false,
+                        Tunes.NO_PARTS),
+                Tunes.start(new org.ymxs.YMXS.TwoConnection(
+                        new org.ymxs.YMXS.SetEnvelope(), pair), stopped, false, Tunes.NO_PARTS),
+                Tunes.start(new org.ymxs.YMXS.ThreeConnection(
+                        new org.ymxs.YMXS.SetVoice(org.ymxs.YMXS.Voice.A), triple), stopped,
+                        false, Tunes.NO_PARTS));
+        return starts.stream()
+                .map(start -> built(List.of(row(Map.of(), Timer.A, start), Tunes.EMPTY), 0))
+                .toList();
+    }
+
+    @Test
+    void aSourceOfSeveralColumnsOfMoreThan65534RowsIsAnError() {
+        List<Integer> columns = List.of(2, 2, 3);
+        List<Tune> tall = wide(Columns.MOST_WIDE_ROWS + 1);
+        for (int k = 0; k < tall.size(); k++) {
+            assertEquals("the source tall has " + columns.get(k) + " columns and 65535 rows,"
+                    + " and such a source is 65534 rows at most", reported(tall.get(k)));
+        }
+        for (Tune tune : wide(Columns.MOST_WIDE_ROWS)) {
+            assertDoesNotThrow(() -> Schema.of(tune));
+        }
     }
 
     /**

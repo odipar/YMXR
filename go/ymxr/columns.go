@@ -37,6 +37,11 @@ const MostCuts = 127
 // cut, and of a source that fills its byte (SPEC.md section 8).
 const MostCountedRows = 65535
 
+// MostWideRows is the rows of a source of two or three columns: a player
+// keeps the stride of its columns, align(R), in a word (SPEC.md 3.1.3,
+// section 8).
+const MostWideRows = 65534
+
 // Cut is a cut of the index: its first row and its last row (SPEC.md
 // 3.5).
 type Cut struct {

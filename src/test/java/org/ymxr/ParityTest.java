@@ -554,8 +554,9 @@ final class ParityTest {
      * out, the files of version 11 written wrong, the check's lines of the
      * cut columns, the bound tune, the layout and the multi file of version
      * 11, more cuts than a cut column numbers, a cut and a counted source of
-     * more rows than the counted handler counts, and the SNDH file of each,
-     * whose core the link keeps by the walk of its rows (SPEC.md 1.11,
+     * more rows than the counted handler counts, a source of two or three
+     * columns of more than 65,534 rows, and the SNDH file of each, whose
+     * core the link keeps by the walk of its rows (SPEC.md 1.11, 3.1.3,
      * 3.3.4, 3.5, 6.4, 6.5, section 8; BINARIES.md 0, 1; doc/LINKER.md).
      */
     @Test
@@ -593,6 +594,12 @@ final class ParityTest {
                 + " is 65535 rows at most");
         assertWrong(YmxsTest.longCounted(), "the source tall fills its byte and has 65536 rows,"
                 + " and such a source is 65535 rows at most");
+        List<Integer> columns = List.of(2, 2, 3);
+        List<org.ymxs.YMXS.Tune> wide = YmxsTest.wide(Columns.MOST_WIDE_ROWS + 1);
+        for (int k = 0; k < wide.size(); k++) {
+            assertWrong(wide.get(k), "the source tall has " + columns.get(k) + " columns and"
+                    + " 65535 rows, and such a source is 65534 rows at most");
+        }
     }
 
 
