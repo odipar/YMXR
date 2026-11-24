@@ -788,6 +788,14 @@ func sourceTables(sources []ymxs.Source, marks marks) ([]ymxr.Source, error) {
 			marker = -1
 		}
 		counted := marker == -1
+		// A player keeps the stride of the columns, align(R), in a word
+		// (SPEC.md 3.1.3, section 8).
+		if columns := ymxs.SourceColumns(source); columns > 1 &&
+			len(values) > ymxr.MostWideRows {
+			return nil, fmt.Errorf("the source %s has %d columns and %d rows, and such a"+
+				" source is %d rows at most", ymxs.SourceName(source), columns, len(values),
+				ymxr.MostWideRows)
+		}
 		// The counted handler counts the rows in a word (SPEC.md section 8).
 		if counted && len(values) > ymxr.MostCountedRows {
 			return nil, fmt.Errorf("the source %s fills its byte and has %d rows, and such a"+

@@ -45,6 +45,11 @@ final class Columns {
      *  source that fills its byte (SPEC.md section 8). */
     static final int MOST_COUNTED_ROWS = 65535;
 
+    /** The rows of a source of two or three columns: a player keeps the
+     *  stride of its columns, align(R), in a word (SPEC.md 3.1.3, section
+     *  8). */
+    static final int MOST_WIDE_ROWS = 65534;
+
     /**
      * The transformation limit: mapping numbers 1 to 127 select
      * lookups; 0 selects identity (SPEC.md 1.10).

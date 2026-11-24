@@ -778,6 +778,14 @@ final class Schema {
             boolean counted = marker[n] == -1
                     || marker[n] == 0 && Tunes.columns(source) == 1 && marks.keyed()[n]
                     && pastMarker(values);
+            // A player keeps the stride of the columns, align(R), in a word
+            // (SPEC.md 3.1.3, section 8).
+            if (Tunes.columns(source) > 1 && values.size() > Columns.MOST_WIDE_ROWS) {
+                throw new IllegalArgumentException("the source " + Tunes.name(source)
+                        + " has " + Tunes.columns(source) + " columns and " + values.size()
+                        + " rows, and such a source is " + Columns.MOST_WIDE_ROWS
+                        + " rows at most");
+            }
             // The counted handler counts the rows in a word (SPEC.md section 8).
             if (counted && values.size() > Columns.MOST_COUNTED_ROWS) {
                 throw new IllegalArgumentException("the source " + Tunes.name(source)
