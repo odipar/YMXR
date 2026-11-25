@@ -843,10 +843,11 @@ transformation T in version 10, and the cut index follows it in version 11
 (3.3.1, 3.5.3).
 
 Note: all transformation offsets are relative to O, so the index and
-entries form one movable block. Moving it changes only the header's
-long at 16. A bound tune places this block after its image, with its
-offset at 24 (BINARIES.md 1.3); an SNDH file places it after the shared
-images (BINARIES.md 3.1).
+entries form one movable block. Moving it changes only the header's long
+at 16. A bound tune places this block after its image, with its offset at
+24 (BINARIES.md 1.3); an SNDH file places the index after the shared
+images and stores a transformation that two subtunes index once
+(BINARIES.md 3.1).
 
 **3.4.4** The *pages* of a tune are the pairs of a transformation and a
 form that each effect's starts and remaps map through, which a bound tune

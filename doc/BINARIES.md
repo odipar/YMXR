@@ -413,8 +413,8 @@ from H.
 | the bound tunes | subtune 1 at U + 2 + 4`N`, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset |
 | the shared source tables | after the bound tune headers, each on a long, from the core | present when at least two subtunes share a DTX1 table |
 | the images | after the bound tunes and sources, each on a long, from the core | the images of the set (1.4), in group order |
-| the transformation blocks | from the end of the last image, each on a long, from the core | one copy of each distinct block (1.1), in first-use order, each subtune's field at 24 patched with its block's offset less its offset |
-| the workspace | W = even(the end of the last block, or of the last image where no subtune has a transformation block), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
+| the transformation blocks | from the end of the last image, on a long, from the core | the index of each distinct block (1.1), each on a long, in first-use order; then each distinct transformation once, each on a long, in the order the blocks first index it; and each block's list right after the last transformation the block indexes first, or, where an earlier block indexes each of its transformations, after a copy of its shortest, the first of equal length. Each index entry is its transformation's offset from the index, and each subtune's field at 24 its block's index offset less its offset |
+| the workspace | W = even(the end of the last list, or of the last image where no subtune has a transformation block), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
 
 The page area is right after the core, whose last bytes are its lookup
 handlers, so that a page is within reach of the handlers that read it:
@@ -435,8 +435,14 @@ The shared source tables follow in first-use order, one copy of each
 distinct table. Each source index entry keeps bit 31 and records its
 table's offset from the start of that bound tune in bits 30 to 0.
 Otherwise the DTX1 tables follow each tune's source index as in 1.2.
-Transformation blocks share an offset only if the transformation data and
-the page list are byte-identical.
+
+Byte-identical blocks share one index. A transformation that two blocks
+index is stored once, and each block's list is past the furthest end of
+its index and of each transformation it indexes, the byte M - O of 1.1
+where init reads it (1.5 step 6). A frame reads a transformation through
+its index entry, so its place leaves the cycles of a frame and of a tick
+as they are. Where a set has one distinct block, its transformation
+blocks are that block byte for byte.
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.

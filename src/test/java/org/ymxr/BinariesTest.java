@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -429,19 +430,22 @@ final class BinariesTest {
             imageAt[i] = next;
             next += set.images().get(i).length;
         }
-        // the transformation blocks of the subtunes of version 10 after
-        // the images, each on a long, in subtune order (BINARIES.md 3.1)
+        // the transformation blocks after the images, on a long: each
+        // subtune's index reads the transformations of its tune file's
+        // block, and its list is the block's, at the furthest end of the
+        // index and of those transformations (BINARIES.md 3.1)
         int[] blockAt = new int[files.size()];
-        for (int i = 0; i < files.size(); i++) {
-            byte[] block = set.blocks().get(i);
-            if (block.length > 0) {
-                next = Tune.align(next);
-                blockAt[i] = next;
-                assertArrayEquals(block, Arrays.copyOfRange(sndh, header + next,
-                        header + next + block.length),
-                        "subtune " + (i + 1) + "'s transformation block");
-                next += block.length;
+        Bound.Transformations laid = Bound.transformations(set.blocks());
+        if (laid.bytes().length > 0) {
+            next = Tune.align(next);
+            for (int i = 0; i < files.size(); i++) {
+                if (laid.at()[i] >= 0) {
+                    blockAt[i] = next + laid.at()[i];
+                    assertIndexes(set.blocks().get(i), sndh, header + blockAt[i],
+                            "subtune " + (i + 1) + "'s transformation block");
+                }
             }
+            next += laid.bytes().length;
         }
         next = Sndh.even(next);
         for (int i = 0; i < files.size(); i++) {
@@ -465,6 +469,93 @@ final class BinariesTest {
         for (int at = header + workAt; at < sndh.length; at++) {
             assertEquals(0, sndh[at], "a workspace byte at " + at);
         }
+    }
+
+    /** That the index at {@code at} of {@code file} reads the
+     *  transformations of {@code block}, a tune file's block and its list,
+     *  in their order, and that the block's list is at the furthest end of
+     *  that index and of each transformation it indexes, the ends compared
+     *  unsigned as init compares them (BINARIES.md 1.5 step 6). */
+    private static void assertIndexes(byte[] block, byte[] file, int at, String what) {
+        int count = Tune.getWord(block, 0);
+        assertEquals(count, Tune.getWord(file, at), what + ": the count");
+        long furthest = 2 + 4L * count;
+        int end = 2 + 4 * count;
+        for (int n = 0; n < count; n++) {
+            int p = Tune.getLong(block, 2 + 4 * n);
+            int length = 2 + Tune.getWord(block, p);
+            end = Math.max(end, p + length);
+            long offset = Tune.getLong(file, at + 2 + 4 * n) & 0xFFFFFFFFL;
+            furthest = Math.max(furthest, offset + length);
+            assertTrue(at + offset + length <= file.length,
+                    what + ": transformation " + (n + 1) + " past the file");
+            int q = at + (int) offset;
+            assertArrayEquals(Arrays.copyOfRange(block, p, p + length),
+                    Arrays.copyOfRange(file, q, q + length),
+                    what + ": transformation " + (n + 1));
+        }
+        assertTrue(at + furthest + block.length - end <= file.length,
+                what + ": the list past the file");
+        int list = at + (int) furthest;
+        assertArrayEquals(Arrays.copyOfRange(block, end, block.length),
+                Arrays.copyOfRange(file, list, list + block.length - end),
+                what + ": the list at the furthest end");
+    }
+
+    /** A tune file's block of transformations of these entries, the index
+     *  and each transformation on a long from the block's first byte
+     *  (SPEC.md 3.4.3), then the list. */
+    private static byte[] block(byte[] list, int[]... entries) {
+        int at = 2 + 4 * entries.length;
+        int[] where = new int[entries.length];
+        for (int n = 0; n < entries.length; n++) {
+            where[n] = Tune.align(at);
+            at = where[n] + 2 + entries[n].length;
+        }
+        byte[] out = new byte[at + list.length];
+        Tune.putWord(out, 0, entries.length);
+        for (int n = 0; n < entries.length; n++) {
+            Tune.putLong(out, 2 + 4 * n, where[n]);
+            Tune.putWord(out, where[n], entries[n].length);
+            for (int k = 0; k < entries[n].length; k++) {
+                out[where[n] + 2 + k] = (byte) entries[n][k];
+            }
+        }
+        System.arraycopy(list, 0, out, at, list.length);
+        return out;
+    }
+
+    /**
+     * Three blocks that share transformations, the first again whole, and a
+     * subtune without a block: each transformation two blocks index is
+     * stored once, the block whose transformations an earlier block
+     * indexes ends on a copy of its shortest, and each list is at the
+     * furthest end of its block (BINARIES.md 3.1). The bytes are worked out
+     * by hand, and the Go tree's TestTransformations reads the same
+     * ones.
+     */
+    @Test
+    void aTransformationTwoBlocksIndexIsStoredOnce() {
+        int[] a = {1, 2};
+        int[] b = {3, 4, 5};
+        int[] c = {9};
+        byte[] one = block(HexFormat.of().parseHex("595001000001"), a, b);
+        byte[] two = block(HexFormat.of().parseHex("595001000102"), b, c);
+        byte[] three = block(HexFormat.of().parseHex("595000"), a);
+        List<byte[]> blocks = List.of(one, two, three, one, new byte[0]);
+        Bound.Transformations laid = Bound.transformations(blocks);
+        assertArrayEquals(HexFormat.of().parseHex(
+                "0002000000200000002400000002000000180000002400000001000000240000"
+                        + "00020102" + "0003030405" + "595001000001" + "00" + "000109"
+                        + "595001000102" + "000000" + "00020102" + "595000"),
+                laid.bytes(), "the indexes, then a, b and the first list, c and the"
+                        + " second, a again and the third");
+        assertArrayEquals(new int[] {0, 12, 24, 0, -1}, laid.at(), "each block's index");
+        for (int i = 0; i < 4; i++) {
+            assertIndexes(blocks.get(i), laid.bytes(), laid.at()[i], "block " + (i + 1));
+        }
+        assertArrayEquals(one, Bound.transformations(List.of(one)).bytes(),
+                "one block, byte for byte");
     }
 
     @Test

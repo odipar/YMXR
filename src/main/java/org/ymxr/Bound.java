@@ -268,6 +268,108 @@ final class Bound {
         return block;
     }
 
+    /** The transformation blocks of a set laid out one after another, and
+     *  the offset of each tune's block in them, -1 for a tune without
+     *  one. */
+    record Transformations(byte[] bytes, int[] at) {
+    }
+
+    /**
+     * The transformation blocks of a set laid out from an offset on a long
+     * (BINARIES.md 3.1): the index of each distinct block, then each
+     * distinct transformation once, and each block's list right after the
+     * last transformation the block indexes first, or after a copy of its
+     * shortest where an earlier block indexes each of its transformations.
+     * A block's list is then past the furthest end of its index and of each
+     * transformation it indexes, where init reads it (1.1, 1.5), and a
+     * frame reads a transformation through its index entry at any
+     * offset.
+     */
+    static Transformations transformations(List<byte[]> blocks) {
+        List<List<byte[]>> entries = new ArrayList<>();
+        List<byte[]> lists = new ArrayList<>();
+        Map<ByteBuffer, Integer> known = new HashMap<>();
+        int[] which = new int[blocks.size()];
+        for (int i = 0; i < blocks.size(); i++) {
+            byte[] block = blocks.get(i);
+            which[i] = -1;
+            if (block.length == 0) {
+                continue;
+            }
+            Integer d = known.get(ByteBuffer.wrap(block));
+            if (d == null) {
+                int count = Tune.getWord(block, 0);
+                List<byte[]> one = new ArrayList<>();
+                int end = 2 + 4 * count;
+                for (int n = 0; n < count; n++) {
+                    int p = Tune.getLong(block, 2 + 4 * n);
+                    one.add(Arrays.copyOfRange(block, p, p + 2 + Tune.getWord(block, p)));
+                    end = Math.max(end, p + one.get(n).length);
+                }
+                d = entries.size();
+                known.put(ByteBuffer.wrap(block), d);
+                entries.add(one);
+                lists.add(Arrays.copyOfRange(block, end, block.length));
+            }
+            which[i] = d;
+        }
+        int size = 0;
+        int[] index = new int[entries.size()];
+        for (int d = 0; d < entries.size(); d++) {
+            size = Tune.align(size);
+            index[d] = size;
+            size += 2 + 4 * entries.get(d).size();
+        }
+        Map<ByteBuffer, Integer> placed = new HashMap<>();
+        int[][] where = new int[entries.size()][];
+        int[] listAt = new int[entries.size()];
+        for (int d = 0; d < entries.size(); d++) {
+            List<byte[]> one = entries.get(d);
+            where[d] = new int[one.size()];
+            boolean added = false;
+            for (int n = 0; n < one.size(); n++) {
+                Integer p = placed.get(ByteBuffer.wrap(one.get(n)));
+                if (p != null) {
+                    where[d][n] = p;
+                    continue;
+                }
+                size = Tune.align(size);
+                placed.put(ByteBuffer.wrap(one.get(n)), size);
+                where[d][n] = size;
+                size += one.get(n).length;
+                added = true;
+            }
+            if (!added) {
+                int shortest = 0;
+                for (int n = 0; n < one.size(); n++) {
+                    if (one.get(n).length < one.get(shortest).length) {
+                        shortest = n;
+                    }
+                }
+                size = Tune.align(size);
+                where[d][shortest] = size;
+                size += one.get(shortest).length;
+            }
+            listAt[d] = size;
+            size += lists.get(d).length;
+        }
+        byte[] out = new byte[size];
+        for (int d = 0; d < entries.size(); d++) {
+            List<byte[]> one = entries.get(d);
+            Tune.putWord(out, index[d], one.size());
+            for (int n = 0; n < one.size(); n++) {
+                Tune.putLong(out, index[d] + 2 + 4 * n, where[d][n] - index[d]);
+                System.arraycopy(one.get(n), 0, out, where[d][n], one.get(n).length);
+            }
+            System.arraycopy(lists.get(d), 0, out, listAt[d], lists.get(d).length);
+        }
+        int[] at = new int[blocks.size()];
+        for (int i = 0; i < blocks.size(); i++) {
+            at[i] = which[i] < 0 ? -1 : index[which[i]];
+        }
+        return new Transformations(out, at);
+    }
+
     /** The pages the list after a bound tune's transformation block at
      *  {@code block} counts, 0 where no list follows it (BINARIES.md
      *  1.1). */

@@ -6,10 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import org.dtx.Table;
 import org.jspecify.annotations.Nullable;
 import org.ymxs.tool.Tool;
@@ -673,8 +671,8 @@ final class Sndh {
     /**
      * Combines a set with shared images: the page area follows the core,
      * bound tunes follow the subtune table, then shared source tables,
-     * images and transformation blocks. Patch each tune's offsets
-     * relative to that tune.
+     * images and transformation blocks, each distinct transformation once.
+     * Patch each tune's offsets relative to that tune.
      * A tune without a shared image is packaged separately with its
      * image and block.
      */
@@ -722,23 +720,19 @@ final class Sndh {
             imageAt[i] = at;
             at += set.images().get(i).length;
         }
-        // Frames read the transformation blocks, including each lookup
-        // page list. Identical blocks share an offset past the images.
+        // Then the transformation blocks, which frames read, each distinct
+        // transformation once (Bound.transformations).
         int[] blockAt = new int[n];
-        Map<ByteBuffer, Integer> blocks = new HashMap<>();
-        for (int i = 0; i < n; i++) {
-            byte[] block = set.blocks().get(i);
-            if (block.length == 0) {
-                continue;
+        Bound.Transformations transformations = Bound.transformations(set.blocks());
+        int transformationsAt = 0;
+        if (transformations.bytes().length > 0) {
+            transformationsAt = Tune.align(at);
+            for (int i = 0; i < n; i++) {
+                if (transformations.at()[i] >= 0) {
+                    blockAt[i] = transformationsAt + transformations.at()[i];
+                }
             }
-            ByteBuffer key = ByteBuffer.wrap(block);
-            Integer where = blocks.get(key);
-            if (where == null) {
-                where = Tune.align(at);
-                blocks.put(key, where);
-                at = where + block.length;
-            }
-            blockAt[i] = where;
+            at = transformationsAt + transformations.bytes().length;
         }
         at = even(at);
         int workAt = at;
@@ -761,10 +755,8 @@ final class Sndh {
             source.get(source.position(), file, at, source.remaining());
             at += Tune.align(source.remaining());
         }
-        for (Map.Entry<ByteBuffer, Integer> entry : blocks.entrySet()) {
-            ByteBuffer block = entry.getKey();
-            block.get(0, file, header + entry.getValue(), block.remaining());
-        }
+        System.arraycopy(transformations.bytes(), 0, file, header + transformationsAt,
+                transformations.bytes().length);
         for (int i = 0; i < imageAt.length; i++) {
             System.arraycopy(set.images().get(i), 0, file, header + imageAt[i],
                     set.images().get(i).length);
