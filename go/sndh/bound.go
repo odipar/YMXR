@@ -298,6 +298,103 @@ func Block(tuneFile []byte) []byte {
 	return block
 }
 
+// Transformations is the transformation blocks of a set laid out from an
+// offset on a long (BINARIES.md 3.1): the index of each distinct block, then
+// each distinct transformation once, and each block's list right after the
+// last transformation the block indexes first, or after a copy of its
+// shortest where an earlier block indexes each of its transformations. A
+// block's list is then past the furthest end of its index and of each
+// transformation it indexes, where init reads it (1.1, 1.5), and a frame
+// reads a transformation through its index entry at any offset. Returns the
+// bytes and the offset of each tune's block in them, -1 for a tune without
+// one.
+func Transformations(blocks [][]byte) ([]byte, []int) {
+	type parsed struct {
+		entries [][]byte
+		list    []byte
+	}
+	var distinct []parsed
+	known := make(map[string]int)
+	which := make([]int, len(blocks))
+	for i, block := range blocks {
+		which[i] = -1
+		if len(block) == 0 {
+			continue
+		}
+		d, found := known[string(block)]
+		if !found {
+			count := ymxr.GetWord(block, 0)
+			one := parsed{entries: make([][]byte, count)}
+			end := 2 + 4*count
+			for n := 0; n < count; n++ {
+				p := ymxr.GetLong(block, 2+4*n)
+				one.entries[n] = block[p : p+2+ymxr.GetWord(block, p)]
+				end = max(end, p+len(one.entries[n]))
+			}
+			one.list = block[end:]
+			d = len(distinct)
+			known[string(block)] = d
+			distinct = append(distinct, one)
+		}
+		which[i] = d
+	}
+	size := 0
+	index := make([]int, len(distinct))
+	for d, one := range distinct {
+		size = ymxr.Align(size)
+		index[d] = size
+		size += 2 + 4*len(one.entries)
+	}
+	placed := make(map[string]int)
+	where := make([][]int, len(distinct))
+	lists := make([]int, len(distinct))
+	for d, one := range distinct {
+		where[d] = make([]int, len(one.entries))
+		added := false
+		for n, entry := range one.entries {
+			if p, found := placed[string(entry)]; found {
+				where[d][n] = p
+				continue
+			}
+			size = ymxr.Align(size)
+			placed[string(entry)] = size
+			where[d][n] = size
+			size += len(entry)
+			added = true
+		}
+		if !added {
+			shortest := 0
+			for n, entry := range one.entries {
+				if len(entry) < len(one.entries[shortest]) {
+					shortest = n
+				}
+			}
+			size = ymxr.Align(size)
+			where[d][shortest] = size
+			size += len(one.entries[shortest])
+		}
+		lists[d] = size
+		size += len(one.list)
+	}
+	out := make([]byte, size)
+	for d, one := range distinct {
+		ymxr.PutWord(out, index[d], len(one.entries))
+		for n, entry := range one.entries {
+			ymxr.PutLong(out, index[d]+2+4*n, where[d][n]-index[d])
+			copy(out[where[d][n]:], entry)
+		}
+		copy(out[lists[d]:], one.list)
+	}
+	at := make([]int, len(blocks))
+	for i, d := range which {
+		at[i] = -1
+		if d >= 0 {
+			at[i] = index[d]
+		}
+	}
+	return out, at
+}
+
 // build writes the bound header, source index and DTX1 tables. If image
 // is supplied, append it and the version 10 transformation block. With
 // nil image, the caller places the shared image and block and patches

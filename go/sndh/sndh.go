@@ -639,9 +639,10 @@ func seconds(frames, rate int) int {
 // bound tunes and workspace. Each entry branches to the corresponding core
 // entry. Bound tunes start at even addresses.
 //
-// Shared source tables follow the tunes, then the images. Transformation blocks
-// follow the images. Patch each tune's ImageAt and
-// BoundTransformationsAt relative to that tune (doc/BINARIES.md 3.1).
+// Shared source tables follow the tunes, then the images. The transformation
+// blocks follow the images, each distinct transformation once
+// (Transformations). Patch each tune's ImageAt and BoundTransformationsAt
+// relative to that tune (doc/BINARIES.md 3.1).
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	return combine(core, set, tags, workspace, nil)
 }
@@ -685,21 +686,19 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 		imageAt[i] = at
 		at += len(set.Images[i])
 	}
-	// Frames read the transformation blocks, including each lookup page
-	// list. Identical blocks share an offset past the images.
+	// Then the transformation blocks, which frames read, each distinct
+	// transformation once (Transformations).
 	blockAt := make([]int, n)
-	blocks := make(map[string]int)
-	for i, block := range set.Blocks {
-		if len(block) == 0 {
-			continue
+	transformations, within := Transformations(set.Blocks)
+	transformationsAt := 0
+	if len(transformations) > 0 {
+		transformationsAt = ymxr.Align(at)
+		for i, one := range within {
+			if one >= 0 {
+				blockAt[i] = transformationsAt + one
+			}
 		}
-		where, found := blocks[string(block)]
-		if !found {
-			where = ymxr.Align(at)
-			blocks[string(block)] = where
-			at = where + len(block)
-		}
-		blockAt[i] = where
+		at = transformationsAt + len(transformations)
 	}
 	at = even(at)
 	workAt := at
@@ -722,9 +721,7 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 		copy(file[at:], table)
 		at += ymxr.Align(len(table))
 	}
-	for block, where := range blocks {
-		copy(file[header+where:], block)
-	}
+	copy(file[header+transformationsAt:], transformations)
 	for i := range imageAt {
 		copy(file[header+imageAt[i]:], set.Images[i])
 	}
