@@ -169,18 +169,28 @@ final class Pages {
         }
     }
 
+    /** The form of copy from frame on {@code target}, the form of the
+     *  counted source its target's handler runs (SPEC.md 3.4.4): the ports'
+     *  on setR7 and plain on every other target. */
+    static int copyForm(int target) {
+        return target == MIXER ? PORTS : PLAIN;
+    }
+
     /**
      * The form source {@code s} runs on {@code target} through a
-     * transformation, or -1 for copy from frame, and for a square or a
-     * source of one row in a tune whose rows cut no source, whose entries
-     * are in the handler; in version 11, and in version 12 where a row cuts
-     * a source, a tick under a cut reads such a source as a marked source of
-     * one column (SPEC.md 3.4.4): a counted source plain,
+     * transformation, or -1 for a square or a source of one row in a tune
+     * whose rows cut no source, whose entries are in the handler; in
+     * version 11, and in version 12 where a row cuts a source, a tick under
+     * a cut reads such a source as a marked source of one column (SPEC.md
+     * 3.4.4): a counted source plain,
      * and the ports' form on setR7; a marked source of one column marked;
      * of two, plain on the noise targets and marked on the others; of
      * three, marked on setBuzzer and plain on the voices.
      */
     static int form(TuneFile tune, int s, int target) {
+        if (tune.copies() && s == tune.count()) {
+            return copyForm(target);
+        }
         if (s > tune.sources().size()) {
             return -1;
         }

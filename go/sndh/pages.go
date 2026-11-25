@@ -174,16 +174,28 @@ func pagesPlay(tune ymxr.File, columns [][]byte, row int, effects []*pagesEffect
 	}
 }
 
+// CopyForm is the form of copy from frame on target, the form of the counted
+// source its target's handler runs (SPEC.md 3.4.4): the ports' on setR7 and
+// plain on every other target.
+func CopyForm(target int) int {
+	if target == pagesMixer {
+		return PagePorts
+	}
+	return PagePlain
+}
+
 // PageForm is the form source s runs on target through a
-// transformation, or -1 for copy from frame, and for a square or a source of
-// one row in a tune whose rows cut no source, whose entries are in the
-// handler; in version 11, and in version 12 where a row cuts a source, a tick
-// under a cut reads such a source as a marked source of one column (SPEC.md
-// 3.4.4): a counted source plain,
+// transformation, or -1 for a square or a source of one row in a tune whose
+// rows cut no source, whose entries are in the handler; in version 11, and in
+// version 12 where a row cuts a source, a tick under a cut reads such a source
+// as a marked source of one column (SPEC.md 3.4.4): a counted source plain,
 // and the ports' form on setR7; a marked source of one column marked; of
 // two, plain on the noise targets and marked on the others; of three,
 // marked on setBuzzer and plain on the voices.
 func PageForm(tune ymxr.File, s, target int) int {
+	if tune.Copies() && s == tune.Count() {
+		return CopyForm(target)
+	}
 	if s > len(tune.Sources) {
 		return -1
 	}

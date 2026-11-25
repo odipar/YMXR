@@ -129,16 +129,14 @@ final class Link {
                     needed.add("defer" + i);
                 }
                 for (int target : copies(tune, i)) {
-                    // copy from frame runs the handler of its target's
-                    // registers, of the kinds the start of several columns
-                    // finds in its tables (copy.S)
+                    // copy from frame runs the counted handler of its
+                    // target's columns, of the kinds the start of several
+                    // columns finds in its tables (copy.S)
                     needed.add("copy");
                     String kind = copyKind(target);
-                    if (KINDS.contains(kind)) {
-                        needed.add(kind);
-                        needed.add(kind + i);
-                        needed.add("several");
-                    }
+                    needed.add(kind);
+                    needed.add(kind + i);
+                    needed.add("several");
                 }
                 for (int s : started(tune, i)) {
                     Table source = tune.sources().get(s - 1);
@@ -163,33 +161,26 @@ final class Link {
         return ordered;
     }
 
-    /** The registers that read every bit of their byte, a bit a register:
-     *  R0, R2, R4, R7, R11 and R12 (SPEC.md 2.1.2). */
-    private static final int COUNTED_REGISTERS = 0x1895;
-
     /** The handler kind copy from frame runs on a target (copy.S): the
-     *  general handler, in the effect's block, for a register of seven bits
-     *  or fewer; the counted handler for one that reads every bit; and the
-     *  handler of the target's columns for a target of several registers,
-     *  the counted one of two for {@code setEnvelope}. */
+     *  counted handler of the target's columns, whose count of one row ends
+     *  each pass, so a frame value has no marker. */
     static String copyKind(int target) {
-        if (target < 14) {
-            return (COUNTED_REGISTERS >> target & 1) != 0 ? "counted" : "general";
-        }
-        if (target == 20) {
-            return "envelope";
-        }
-        return target >= 17 && target <= 21 ? "three" : "two";
+        return switch (copyColumns(target)) {
+            case 1 -> "counted";
+            case 2 -> "envelope";
+            default -> "countedthree";
+        };
     }
 
-    /** The counted kind of the target's columns, which copy from frame runs
-     *  once a recut moves it there, through mapping 0 (rule 2(j);
-     *  68k/player/cut.S, ymxr_recut). */
-    static String copyCounted(int target) {
-        if (target < 14) {
-            return "counted";
-        }
-        return target >= 17 && target <= 21 && target != 20 ? "countedthree" : "envelope";
+    /** The lookup kind copy from frame runs on a target through a
+     *  transformation, the counted lookup kind of its columns. */
+    static String copyLookup(int target) {
+        return countedLookup(copyColumns(target), target);
+    }
+
+    /** The columns of copy from frame on a target, a register each. */
+    static int copyColumns(int target) {
+        return target < 14 ? 1 : target >= 17 && target <= 21 && target != 20 ? 3 : 2;
     }
 
     /** The kept targets of effect i at each start of copy from frame,
@@ -475,7 +466,7 @@ final class Link {
             for (Runs r : one.runs) {
                 String kind = null;
                 if (tune.copies() && r.source() == tune.count()) {
-                    kind = copyCounted(r.target());
+                    kind = r.mapping() == 0 ? copyKind(r.target()) : copyLookup(r.target());
                 } else if (r.source() >= 1 && r.source() <= tune.sources().size()) {
                     Table source = tune.sources().get(r.source() - 1);
                     kind = r.mapping() == 0 ? kind(source, true)
@@ -535,6 +526,9 @@ final class Link {
     /** The lookup kind of source {@code s} on {@code target}, or null for a
      *  square or a source of one row (68k/player/lookup_start.S, .kind). */
     static @org.jspecify.annotations.Nullable String lookup(TuneFile tune, int s, int target) {
+        if (tune.copies() && s == tune.count()) {
+            return copyLookup(target);
+        }
         if (s < 1 || s > tune.sources().size()) {
             return null;
         }

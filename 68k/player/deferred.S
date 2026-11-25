@@ -105,6 +105,7 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.w  d1,-(sp)                ; the count column
                 move.w  d6,d4
                 move.b  #1,WS_ARMING(a0)        ; the page alone
+ymxr_arm_look1  equ     *                       ; aimed as ymxr_arm_look2
                 bsr.w   ymxr_lstart
                 sf      WS_ARMING(a0)
                 move.w  (sp)+,d1
@@ -229,6 +230,9 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
                 move.w  4(sp),d3
                 move.w  d6,d4
                 st      WS_ARMING(a0)
+; the call init aims at ymxr_copylook in a tune that copies from frame,
+; an equate so the local labels around it stay in scope
+ymxr_arm_look2  equ     *
                 bsr.w   ymxr_lstart
                 sf      WS_ARMING(a0)
                 lea     -ARMOFF(a3),a3          ; the record, past its mirror

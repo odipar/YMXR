@@ -120,8 +120,9 @@ ymxr_cbit:      sub.l   a6,d5
 ; the handler its vector names, the mirror where a tick has performed the
 ; start pending on it (4.8), and each column of that handler whose row 0
 ; is a frame value, the register of that frame value. Each register the
-; row sets has the byte the frame writes as its frame value, and the
-; frame writes it to the chip where its bit of d3 is 0.
+; row sets has the byte the frame writes, masked to the register's width,
+; as its frame value, and the frame writes it to the chip where its bit of
+; d3 is 0.
 ymxr_cregs:     move.l  a6,-(sp)
                 lea     ymxr_fv(pc),a6
                 moveq   #0,d3
@@ -177,13 +178,13 @@ ymxr_cregs:     move.l  a6,-(sp)
                 KTONE   _0,_1,$0000,$0100,0,1
                 KTONE   _2,_3,$0200,$0300,2,3
                 KTONE   _4,_5,$0400,$0500,4,5
-                KWRITE  _6,$0600,6
+                KWRITE  _6,$0600,6,$1F
                 KREAD2  _13
                 KRESERVED _11,6,$0B00,11
                 KRESERVED _12,5,$0C00,12
-                KWRITE  _8,$0800,8
-                KWRITE  _9,$0900,9
-                KWRITE  _10,$0A00,10
+                KWRITE  _8,$0800,8,$1F
+                KWRITE  _9,$0900,9,$1F
+                KWRITE  _10,$0A00,10,$1F
                 KREAD   _7
                 bpl.s   .no7
                 or.b    #YM_PORTS,d1
@@ -195,7 +196,9 @@ ymxr_cregs:     move.l  a6,-(sp)
                 movep.w d0,(a2)
 .no7:           tst.b   d2
                 bpl.s   .played
-                move.b  d2,13*FV_STRIDE(a3)
+                move.b  d2,d0
+                and.b   #$0F,d0
+                move.b  d0,13*FV_STRIDE(a3)
                 btst    #13,d3
                 bne.s   .played
                 move.w  #$0D00,d1

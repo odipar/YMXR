@@ -255,12 +255,6 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			return 0, err
 		}
 		_, copies := e.Connection.(ymxs.CopyFromFrame)
-		if mapping != 0 && copies {
-			return 0, fmt.Errorf("row %d: copy from frame on %s through transformation %d,"+
-				" which this version leaves to a later one (SPEC.md section 8)", at,
-				ymxs.TargetName(runs), mapping)
-		}
-		maps.copies[i] = copies
 		reaches := ymxs.TargetNumber(runs)
 		if reaches != target[i] {
 			out[t] = byte(0x80 | reaches)
@@ -576,10 +570,6 @@ type mappings struct {
 	// runs records the latest start's target, or the first start's target
 	// before one occurs. Used for remap diagnostics.
 	runs [4]ymxs.Target
-
-	// copies marks the effects whose last start in row order is copy from
-	// frame, whose mapping is 0 (rule 2(j)).
-	copies [4]bool
 }
 
 // transforms reports whether an encoded start or remap uses a
@@ -694,11 +684,6 @@ func (m *mappings) remap(out []byte, i int, mapping ymxs.Mapping, at int) error 
 	number, err := m.number(mapping, m.runs[i], at)
 	if err != nil {
 		return err
-	}
-	if number != 0 && m.copies[i] {
-		return fmt.Errorf("row %d: a remap through transformation %d of copy from frame on"+
-			" %s, which this version leaves to a later one (SPEC.md section 8)", at, number,
-			ymxs.TargetName(m.runs[i]))
 	}
 	if m.running[i] == number {
 		return nil

@@ -347,9 +347,6 @@ final class Schema {
         /** Whether the effect's timer is a timer of the tune, which a row
          *  starts a source on (YMXS, SPEC.md 1.10). */
         final boolean[] claimed = new boolean[4];
-        /** Whether the last start on the effect in row order is copy from
-         *  frame, whose mapping is 0 (rule 2(j)). */
-        final boolean[] copies = new boolean[4];
         /**
          * Target of the latest start, or of the first start before one
          * occurs. Used for remap diagnostics.
@@ -509,12 +506,6 @@ final class Schema {
                     return 0;
                 }
                 int m = mapped(remap.mapping(), kept.runs[i], kept.list, at);
-                if (m != 0 && kept.copies[i]) {
-                    throw new IllegalArgumentException("row " + at + ": a remap through"
-                            + " transformation " + m + " of copy from frame on "
-                            + Tunes.name(kept.runs[i]) + ", which this version leaves to a"
-                            + " later one (SPEC.md section 8)");
-                }
                 if (kept.running[i] == m) {
                     return 0;
                 }
@@ -556,12 +547,6 @@ final class Schema {
                 Target on = Tunes.target(start.connection());
                 int m = mapped(start.mapping(), on, kept.list, at);
                 boolean copy = start.connection() instanceof CopyFromFrame;
-                if (m != 0 && copy) {
-                    throw new IllegalArgumentException("row " + at + ": copy from frame on "
-                            + Tunes.name(on) + " through transformation " + m + ", which"
-                            + " this version leaves to a later one (SPEC.md section 8)");
-                }
-                kept.copies[i] = copy;
                 kept.runs[i] = on;
                 // An unset mapping column reuses the kept value. A
                 // deferred start captures it now for installation at

@@ -302,15 +302,14 @@ func BlocksOf(tunes []ymxr.File) []string {
 				needed[fmt.Sprintf("defer%d", i)] = true
 			}
 			for _, target := range CopiesOf(tune, i) {
-				// copy from frame runs the handler of its target's
-				// registers, of the kinds the start of several columns
-				// finds in its tables (copy.S)
+				// copy from frame runs the counted handler of its
+				// target's columns, of the kinds the start of several
+				// columns finds in its tables (copy.S)
 				needed["copy"] = true
-				if kind := CopyKind(target); kind != "general" {
-					needed[kind] = true
-					needed[fmt.Sprintf("%s%d", kind, i)] = true
-					needed["several"] = true
-				}
+				kind := CopyKind(target)
+				needed[kind] = true
+				needed[fmt.Sprintf("%s%d", kind, i)] = true
+				needed["several"] = true
 			}
 			for _, s := range Started(tune, i) {
 				source := tune.Sources[s-1]
@@ -334,40 +333,34 @@ func BlocksOf(tunes []ymxr.File) []string {
 	return ordered
 }
 
-// countedRegisters are the registers that read every bit of their byte, a
-// bit a register: R0, R2, R4, R7, R11 and R12 (SPEC.md 2.1.2).
-const countedRegisters = 0x1895
-
 // CopyKind is the handler kind copy from frame runs on a target (copy.S): the
-// general handler, in the effect's block, for a register of seven bits or
-// fewer; the counted handler for one that reads every bit; and the handler of
-// the target's columns for a target of several registers, the counted one of
-// two for setEnvelope.
+// counted handler of the target's columns, whose count of one row ends each
+// pass, so a frame value has no marker.
 func CopyKind(target int) string {
-	switch {
-	case target < 14 && countedRegisters>>target&1 != 0:
+	switch CopyColumns(target) {
+	case 1:
 		return "counted"
-	case target < 14:
-		return "general"
-	case target == 20:
+	case 2:
 		return "envelope"
-	case target >= 17 && target <= 21:
-		return "three"
 	}
-	return "two"
+	return "countedthree"
 }
 
-// CopyCounted is the counted kind of the target's columns, which copy from
-// frame runs once a recut moves it there, through mapping 0 (rule 2(j);
-// 68k/player/cut.S, ymxr_recut).
-func CopyCounted(target int) string {
+// CopyLookup is the lookup kind copy from frame runs on a target through a
+// transformation, the counted lookup kind of its columns.
+func CopyLookup(target int) string {
+	return countedLookup(CopyColumns(target), target)
+}
+
+// CopyColumns is the columns of copy from frame on a target, a register each.
+func CopyColumns(target int) int {
 	switch {
 	case target < 14:
-		return "counted"
+		return 1
 	case target >= 17 && target <= 21 && target != 20:
-		return "countedthree"
+		return 3
 	}
-	return "envelope"
+	return 2
 }
 
 // CopiesOf is the kept targets of effect i at each start of copy from frame,
@@ -688,7 +681,10 @@ func countedRow(tune ymxr.File, row int, all *[4]under, add func(string)) {
 			var kind string
 			switch {
 			case tune.Copies() && r.source == tune.Count():
-				kind = CopyCounted(r.target)
+				kind = CopyKind(r.target)
+				if r.mapping != 0 {
+					kind = CopyLookup(r.target)
+				}
 			case r.source >= 1 && r.source <= len(tune.Sources):
 				source := tune.Sources[r.source-1]
 				kind = Kind(source, true)
@@ -759,6 +755,9 @@ const (
 // Lookup is the lookup kind of source s on that target, or "" for a square
 // or a source of one row (68k/player/lookup_start.S, .kind).
 func Lookup(tune ymxr.File, s, target int) string {
+	if tune.Copies() && s == tune.Count() {
+		return CopyLookup(target)
+	}
 	if s < 1 || s > len(tune.Sources) {
 		return ""
 	}

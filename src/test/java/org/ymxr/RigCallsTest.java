@@ -345,7 +345,7 @@ final class RigCallsTest {
 
     /** The conformance kit's tunes, the 20 of the check of deferred
      *  starts, the 33 of the check of tunes that map a value, the 13 of the
-     *  check of cuts and the 4 of the check of copy from frame, each on the
+     *  check of cuts and the 5 of the check of copy from frame, each on the
      *  player ymxr-sndh links for it, under each set of switches: the tool's
      *  core against the rig's link of the assembled core, and every tick
      *  against the model (doc/LINKER.md, The check). The workflow runs the
@@ -362,7 +362,7 @@ final class RigCallsTest {
                         && said.contains("deferred starts: 20 tunes")
                         && said.contains("tunes that map a value: 33 tunes")
                         && said.contains("cuts: 13 tunes")
-                        && said.contains("copy from frame: 4 tunes")
+                        && said.contains("copy from frame: 5 tunes")
                         && said.contains("linked, "),
                 () -> RIG + " " + String.join(" ", argv) + " does not play on"
                         + " linked players:\n" + said));
@@ -387,6 +387,7 @@ final class RigCallsTest {
             "remaps from the identity", "rows that set the target column alone",
             "starts under a cut", "recuts", "tunes that repeat to a row", "tunes that play once",
             "sets of several subtunes", "starts of copy from frame",
+            "starts of copy from frame through a transformation",
             "rows that set a register copy from frame runs on");
 
     /** The operations of {@link #COVERED} the coverage line counts none of,
