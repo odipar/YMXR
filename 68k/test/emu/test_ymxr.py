@@ -7007,9 +7007,9 @@ def generated_tune(rng, title, maps, defers, letters, cuts=None, copies=None):
     under a cut defers no start. The draws of cuts come from that
     generator alone, so a tune drawn without it is the tune drawn before
     cuts. With copies, a third generator, a subtune copies from frame at
-    times: a start is of copy from frame at times, through mapping 0 under
-    cut 0, and a remap on its timer selects mapping 0 while it is the
-    timer's last start (rule 2(j)); the rows set each register of its
+    times: a start is of copy from frame at times, under cut 0 (rule 2(j)),
+    through the lane's transformations as any source of the lane; the rows
+    set each register of its
     target at times while it runs, and the start row sets one no row
     before it sets, so a deferred start of copy from frame on a running
     timer comes after a row that sets each (YMXS, SPEC.md rules 1(e) and
@@ -7118,7 +7118,7 @@ def generated_tune(rng, title, maps, defers, letters, cuts=None, copies=None):
     # kept rate, whether the timer counts at it, the kept target and the
     # kept mapping (SPEC.md rules 2(c), 2(g) and 4(e))
     state = {letter: dict(effect=None, pending=None, started=False, rate=None,
-                          counting=False, target=None, mapping=0, cut=False, copy=False)
+                          counting=False, target=None, mapping=0, cut=False)
              for letter in lanes}
     # the first row that sets each register, and the values the rows set on
     # the registers copy from frame runs on, by register and row
@@ -7156,15 +7156,13 @@ def generated_tune(rng, title, maps, defers, letters, cuts=None, copies=None):
                            pr=rng.randint(0, 1) if s["started"] else 1,
                            deferred=int(defers and rng.random() < 0.4), mapping=mapping(lane))
                 if letter in copying and copies.random() < 0.35:
-                    # copy from frame, through mapping 0 (rule 2(j))
-                    one.update(source=COPY_KEY, mapping=0)
+                    one["source"] = COPY_KEY        # copy from frame
                 if sure and s["counting"] and rng.random() < 0.3:
                     # the running rate again, both resets clear, and at
                     # times the kept target and mapping as well
                     one.update(by=s["rate"][0], count=s["rate"][1], tr=0, pr=0, deferred=0)
                     if rng.random() < 0.5:
-                        one.update(target=s["target"], mapping=0 if one["source"] == COPY_KEY
-                                   else s["mapping"])
+                        one.update(target=s["target"], mapping=s["mapping"])
                 if cuts and one["deferred"] and s["cut"] and runs:
                     one["deferred"] = 0         # a timer under a cut defers none
                 if one["source"] == COPY_KEY and one["deferred"] and runs and any(
@@ -7184,7 +7182,6 @@ def generated_tune(rng, title, maps, defers, letters, cuts=None, copies=None):
                     s["effect"], s["pending"], s["started"] = run_of(one, n), None, True
                     s["cut"] = one["cut"] is not None
                 s["target"], s["mapping"] = one["target"], one["mapping"]
-                s["copy"] = one["source"] == COPY_KEY
                 if one["deferred"]:
                     s["rate"], s["counting"] = None, False
                 else:
@@ -7197,8 +7194,6 @@ def generated_tune(rng, title, maps, defers, letters, cuts=None, copies=None):
                 s["rate"] = (by, count)
             elif kind == "remap":
                 one = dict(kind=kind, mapping=mapping(lane))
-                if s["copy"]:
-                    one["mapping"] = 0          # rule 2(j)
                 s["mapping"] = one["mapping"]
             elif kind == "stop":
                 one = dict(kind=kind)
@@ -7334,6 +7329,7 @@ KINDS = ("starts at the frame on an idle timer", "starts at the frame on a runni
          "remaps from the identity", "rows that set the target column alone",
          "tunes that repeat to a row", "tunes that play once", "sets of several subtunes",
          "starts under a cut", "recuts", "starts of copy from frame",
+         "starts of copy from frame through a transformation",
          "rows that set a register copy from frame runs on")
 SHAPES = ("square", "one", "general", "counted", "two", "three", "envelope", "countedthree",
           "copy")
@@ -7389,6 +7385,8 @@ def row_kinds(model):
             shape = source_shape(tune, s)
             if s == tune.copy:
                 out.append("starts of copy from frame")
+                if m & 0x7F if m & 0x80 else fx["mapping"]:
+                    out.append("starts of copy from frame through a transformation")
             out += [("shape", shape), ("effect", i), ("pair", i, shape),
                     ("target", r[t] & 0x7F if r[t] & 0x80 else fx["target"])]
         elif r[t + 1] & 0x80:

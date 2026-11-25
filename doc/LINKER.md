@@ -478,7 +478,7 @@ keeps are 686 bytes shorter than in the core.
   `-abs -perf`, `-lean -abs` and `-perf -lean`, and the 11 dumps of
   `ym/test` on the plain core. Under `-defer -map` the 20 tunes of the
   check of deferred starts, and under `-map` the 33 tunes of the check
-  of tunes that map a value, the 13 of the check of cuts and the 4 of the
+  of tunes that map a value, the 13 of the check of cuts and the 5 of the
   check of copy from frame, play every tick against the model on the
   players linked for them, with each of those switches.
 - RigCallsTest runs `-linked -kit -defer -map` at `-frames24` with each
