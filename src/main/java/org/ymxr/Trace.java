@@ -28,8 +28,9 @@ final class Trace {
 
     /**
      * The record's header, including transformation entries after
-     * sources where the file has mapping columns, and the cuts in version
-     * 11 (SPEC.md 7.2).
+     * sources where the file has mapping columns, and the cuts where it has
+     * cut columns; copy from frame has no table and is left out (SPEC.md
+     * 7.2).
      */
     static String header(TuneFile tune) {
         StringBuilder line = new StringBuilder("{\"rate\":").append(tune.frameRate())
@@ -58,7 +59,7 @@ final class Trace {
             }
             line.append(']');
         }
-        if (tune.version() == Tune.CUT) {
+        if (Columns.cuts(tune.effects())) {
             line.append(",\"cuts\":[");
             for (int n = 0; n < tune.cuts().size(); n++) {
                 TuneFile.Cut one = tune.cuts().get(n);
@@ -73,14 +74,14 @@ final class Trace {
     /**
      * Writes the header and up to {@code calls} frame entries to {@code
      * out}, one per line. A frame reporting -1 ends the record. Effect
-     * entries of versions 10 and 11 report the kept mapping, and of
-     * version 11 the kept cut; ticks and a pending start's mapping and cut
+     * entries of versions 10 to 12 report the kept mapping, and of versions
+     * 11 and 12 the kept cut; ticks and a pending start's mapping and cut
      * are outside the record (SPEC.md 7.3).
      */
     static void trace(TuneFile tune, int calls, PrintStream out) {
         out.print(header(tune));
         boolean mapped = tune.version() >= Tune.VERSION;
-        boolean cuts = tune.version() == Tune.CUT;
+        boolean cuts = tune.version() >= Tune.CUT;
         Table table = tune.table();
         Replay model = new Replay(table, tune.effects());
         for (int call = 0; call < calls; call++) {

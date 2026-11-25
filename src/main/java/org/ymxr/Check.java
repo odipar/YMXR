@@ -213,7 +213,8 @@ final class Check {
     static List<String> places(TuneFile file) {
         Table table = file.table();
         int transformations = file.transformations().size();
-        int sources = file.sources().size();
+        // S counts copy from frame, source S without a table (3.1.7)
+        int sources = file.count();
         // the kept cut of each effect after the row, and the source last
         // started on it, 0 before the first start (SPEC.md 1.11.3)
         int[] kept = new int[4];
@@ -259,7 +260,9 @@ final class Check {
                     boolean recuts = (source & 0x80) == 0 && (cut & 0x80) != 0;
                     if ((starts || recuts) && kept[i] > 0 && last[i] > 0) {
                         TuneFile.Cut under = file.cuts().get(kept[i] - 1);
-                        int rows = file.sources().get(last[i] - 1).rows();
+                        // copy from frame is a source of one row (3.1.7)
+                        int rows = last[i] > file.sources().size() ? 1
+                                : file.sources().get(last[i] - 1).rows();
                         if (under.last() >= rows) {
                             said.add(r + ": effect " + i + " runs source " + last[i] + " of "
                                     + Report.count(rows, "row", "rows") + " under cut "

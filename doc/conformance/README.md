@@ -1,8 +1,8 @@
 # The conformance kit
 
-**1.** The kit is 19 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
+**1.** The kit is 20 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
 beside its `.rows` (3), and a reference record of each (SPEC.md 7):
-18,991 entries, one line each, the first line of each record among them.
+19,000 entries, one line each, the first line of each record among them.
 The kit tests the two documents, [SPEC.md](../SPEC.md) and YMXS's
 `doc/SPEC.md`: an implementer who has read them alone writes a reader
 (2), and a record equal to the reference byte for byte shows that the
@@ -34,7 +34,7 @@ built (`preempt`, `retune`). Code builds `four-timers`, `voices`,
 version 10, and `cut` and `cuts` as YMXS structures it writes at version
 11, the window of YMXS's `doc/tunes/cut.json` and the cuts of the YMXS
 kit's `cuts.json`; `wrong-version` is `chambers` with the version word
-$000C. The published music belongs to its composers, and the repository's
+$000D. The published music belongs to its composers, and the repository's
 LICENSE excludes it: a copy of the kit has the tunes for the exercise
 alone.
 
@@ -412,7 +412,8 @@ Two places changed for entries that left output as it is:
 | `mapped` | version 10 at 50 Hz; optional lookups, fades, deferred snapshots and kept mappings. See [Mapped transformations](#mapped-transformations). |
 | `cut` | version 11 at 50 Hz; a window of 16 rows over a triangle of 32, moved two rows a frame by a recut, then narrowed to 8 rows and to 4: the 34 columns of a tune that cuts a source and maps no value, its cut columns at 30 to 33 |
 | `cuts` | version 11 at 50 Hz; a cut that excludes its source's repeat row and one that includes it, a start under the whole table, a deferred start under a cut of a source that plays once, and a recut while it is pending |
-| `wrong-version` | the version word $000C: a reader produces an empty record |
+| `copy-from-frame` | version 12 at 50 Hz; copy from frame, source S and index entry 0, on `setR13` on Timer A from row 0 and on `setVoiceB` on Timer D from row 1, beside a square on R10 on Timer B: the rows set R13, R2 and R9 while copy from frame runs on them, and the record reports those writes as the frame's (SPEC.md 7.3); bit 7 of the effects used |
+| `wrong-version` | the version word $000D: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
 full.

@@ -171,10 +171,11 @@ final class Pages {
 
     /**
      * The form source {@code s} runs on {@code target} through a
-     * transformation, or -1 for a square or a source of one row in
-     * version 10, whose entries are in the handler; in version 11 a tick
-     * under a cut reads such a source as a marked source of one column
-     * (SPEC.md 3.4.4): a counted source plain,
+     * transformation, or -1 for copy from frame, and for a square or a
+     * source of one row in a tune whose rows cut no source, whose entries
+     * are in the handler; in version 11, and in version 12 where a row cuts
+     * a source, a tick under a cut reads such a source as a marked source of
+     * one column (SPEC.md 3.4.4): a counted source plain,
      * and the ports' form on setR7; a marked source of one column marked;
      * of two, plain on the noise targets and marked on the others; of
      * three, marked on setBuzzer and plain on the voices.
@@ -189,7 +190,7 @@ final class Pages {
         }
         if (source.columns() == 1) {
             boolean shaped = source.repeat() == 0 && (source.rows() == 1 || source.rows() == 2);
-            return shaped && tune.version() != Tune.CUT ? -1 : MARKED;
+            return shaped && !Columns.cuts(tune.effects()) ? -1 : MARKED;
         }
         if (source.columns() == 2) {
             return target >= NOISE ? PLAIN : MARKED;

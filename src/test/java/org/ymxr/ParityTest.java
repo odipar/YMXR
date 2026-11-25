@@ -340,7 +340,8 @@ final class ParityTest {
             assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(sndh,
                     Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
             String said = steady(made.said());
-            assertTrue(said.contains("; the lookup in: a subtune maps a value or cuts a source\n")
+            assertTrue(said.contains("; the lookup in: a subtune maps a value, cuts a source or"
+                            + " copies from frame\n")
                     && said.contains("the images: " + (in == tune ? "1 image" : "2 images")
                     + " of "), said);
             both("ymxr-prg", sndh);
@@ -369,7 +370,8 @@ final class ParityTest {
         Ran chosen = same("ymxr-sndh", far, "-carried");
         assertTrue(steady(chosen.said()).contains("ticks that read a row through an absolute"
                 + " address: the tunes end past the 32767 bytes a displacement reaches; the"
-                + " lookup in: a subtune maps a value or cuts a source\n"), chosen.said());
+                + " lookup in: a subtune maps a value, cuts a source or copies from frame\n"),
+                chosen.said());
         assertEquals(Sndh.CORE_MAP, Tune.getWord(chosen.out(),
                 Sndh.even(Tune.getWord(chosen.out(), 2) + 2) + Sndh.CORE_FLAGS_AT));
         Ran asked = same("ymxr-sndh", far, "-carried", "-pcrel", "-silent");
@@ -611,6 +613,31 @@ final class ParityTest {
         }
     }
 
+
+    /**
+     * Version 12 in both trees: a tune that copies from frame converted from
+     * its structure and read back, its record and its check, the files of
+     * version 12 written wrong, its bound tune and its SNDH file, and the
+     * writer's lines of copy from frame through a transformation (SPEC.md
+     * 3.1.7, 3.3.4, 3.3.5, rule 2(j), 8.9; BINARIES.md 1.2).
+     */
+    @Test
+    void aTuneThatCopiesFromFrameReadsTheSameInBothTrees() throws Exception {
+        byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                CopyTest.tune())).getBytes(StandardCharsets.UTF_8), "-silent");
+        assertEquals(Tune.COPY, Tune.getWord(file, 4));
+        both("ymxr-trace", file);
+        both("ymxr-check", file);
+        for (java.util.Map.Entry<String, byte[]> one : CopyTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+        }
+        both("ymxr-bind", file, "-silent");
+        both("ymxr-sndh", file, "-silent");
+        both("ymxr-sndh", file, "-silent", "-carried");
+    }
 
     private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))

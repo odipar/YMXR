@@ -175,10 +175,11 @@ func pagesPlay(tune ymxr.File, columns [][]byte, row int, effects []*pagesEffect
 }
 
 // PageForm is the form source s runs on target through a
-// transformation, or -1 for a square or a source of one row in version 10,
-// whose entries are in the handler; in version 11 a tick under a cut reads
-// such a source as a marked source of one column (SPEC.md 3.4.4): a
-// counted source plain,
+// transformation, or -1 for copy from frame, and for a square or a source of
+// one row in a tune whose rows cut no source, whose entries are in the
+// handler; in version 11, and in version 12 where a row cuts a source, a tick
+// under a cut reads such a source as a marked source of one column (SPEC.md
+// 3.4.4): a counted source plain,
 // and the ports' form on setR7; a marked source of one column marked; of
 // two, plain on the noise targets and marked on the others; of three,
 // marked on setBuzzer and plain on the voices.
@@ -196,7 +197,7 @@ func PageForm(tune ymxr.File, s, target int) int {
 	switch source.Columns() {
 	case 1:
 		if source.Repeat() == 0 && (source.Rows() == 1 || source.Rows() == 2) &&
-			tune.Version != ymxr.VersionCut {
+			!ymxr.HasCuts(tune.Effects) {
 			return -1
 		}
 		return PageMarked

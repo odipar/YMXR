@@ -16,7 +16,8 @@
 | `mapped` | `ConformanceTest.mapped` | none | none | none | 1880 | a45b35ccafde7de9 | version 10 at 50 Hz; optional lookups, fades, deferred snapshots and kept mappings. See [Mapped transformations](#mapped-transformations). |
 | `cut` | `ConformanceTest.cut` | none | none | none | 468 | ee8b5188a8d44391 | version 11 at 50 Hz: a window of 16 rows over a triangle of 32, moved two rows a frame by a recut, then narrowed to 8 rows and to 4 |
 | `cuts` | `ConformanceTest.cuts` | none | none | none | 592 | a7af984837c5be15 | version 11 at 50 Hz: a cut that excludes its source's repeat row and one that includes it, a start under the whole table, a deferred start under a cut of a source that plays once, and a recut while it is pending |
-| `wrong-version` | `ConformanceTest.wrongVersion` | none | none | none | 1132 | 345be040e600f0a5 | chambers with the version word $000C: a reader produces an empty record of it |
+| `copy-from-frame` | `CopyTest.tune` | none | none | none | 632 | ae855eb258161ee7 | version 12 at 50 Hz: copy from frame, index entry 0, on `setR13` on Timer A from row 0 and on `setVoiceB` on Timer D from row 1, beside a square on R10 on Timer B; rows that set R13, R2 and R9 while copy from frame runs on them, which the frame leaves to the ticks, and a stop of each at row 3, after which the frame writes R2 and R9 at row 0 |
+| `wrong-version` | `ConformanceTest.wrongVersion` | none | none | none | 1132 | 26acbebb38f55855 | chambers with the version word $000D: a reader produces an empty record of it |
 
 ### Mapped transformations
 

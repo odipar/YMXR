@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.stream.IntStream;
 import org.ymxs.Chip;
 import org.ymxs.Tunes;
+import org.ymxs.YMXS.CopyFromFrame;
 import org.ymxs.YMXS.Cut;
 import org.ymxs.YMXS.Effect;
 import org.ymxs.YMXS.Identity;
@@ -39,7 +40,8 @@ import org.ymxs.YMXS.Transformation;
  * because a deferred start can change the running mapping between
  * frames (SPEC.md 6, rule 2(g)). Version 11 adds the cut columns and the
  * cut index, whose kept, running and pending cuts follow the same rules
- * (rule 2(i)).
+ * (rule 2(i)). Version 12 adds copy from frame, source S after the tables
+ * (SPEC.md 3.1.7).
  */
 final class Schema {
 
@@ -85,8 +87,10 @@ final class Schema {
         int size = rows.size();
         int repeat = tune.table().repeat().orElse(size);
         List<Source> sources = Tunes.sources(tune);
-        if (sources.size() > Sources.MOST) {
-            throw new IllegalArgumentException("the tune runs " + sources.size()
+        // Copy from frame is source S, after the tables (SPEC.md 3.1.7).
+        int count = sources.size() + (copies(rows) ? 1 : 0);
+        if (count > Sources.MOST) {
+            throw new IllegalArgumentException("the tune runs " + count
                     + " sources, and a source column numbers " + Sources.MOST);
         }
         // Transformation numbers follow YMXS first-use order. Version
@@ -161,6 +165,19 @@ final class Schema {
                 tune.rate());
     }
 
+    /** Whether a row starts copy from frame (SPEC.md 3.1.7). */
+    private static boolean copies(List<Row> rows) {
+        for (Row row : rows) {
+            for (Effect one : row.effects().values()) {
+                if (one instanceof Start start
+                        && start.connection() instanceof CopyFromFrame) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /**
      * Whether any row sets one of the four columns from {@code first} to a
      * number 1 to 127, a transformation or a cut (SPEC.md 3.3.5).
@@ -190,7 +207,7 @@ final class Schema {
                 Effect one = effects.get(timer);
                 Cut cut = null;
                 if (one instanceof Start start
-                        && !start.cut().equals(Tunes.whole(Tunes.source(start.connection())))) {
+                        && !start.cut().equals(Tunes.whole(start.connection()))) {
                     cut = start.cut();
                 } else if (one instanceof Recut recut && timers.contains(timer)) {
                     cut = recut.cut();
@@ -257,8 +274,7 @@ final class Schema {
                     boolean deferred = start.deferred();
                     select[i] = deferred ? OPEN : select(start.timing().prescaler());
                     count[i] = deferred ? OPEN : start.timing().count();
-                    counting[i] = !deferred
-                            && Tunes.rows(Tunes.source(start.connection())).repeat().isPresent();
+                    counting[i] = !deferred && Tunes.repeats(start.connection());
                 }
                 case Retune retune -> {
                     select[i] = select(retune.timing().prescaler());
@@ -331,6 +347,9 @@ final class Schema {
         /** Whether the effect's timer is a timer of the tune, which a row
          *  starts a source on (YMXS, SPEC.md 1.10). */
         final boolean[] claimed = new boolean[4];
+        /** Whether the last start on the effect in row order is copy from
+         *  frame, whose mapping is 0 (rule 2(j)). */
+        final boolean[] copies = new boolean[4];
         /**
          * Target of the latest start, or of the first start before one
          * occurs. Used for remap diagnostics.
@@ -419,7 +438,7 @@ final class Schema {
         int value(int i, Effect effect) {
             if (effect instanceof Start start) {
                 Cut one = start.cut();
-                return one.equals(Tunes.whole(Tunes.source(start.connection())))
+                return one.equals(Tunes.whole(start.connection()))
                         ? 0 : cuts.indexOf(one) + 1;
             }
             if (effect instanceof Recut recut && claimed[i]) {
@@ -490,6 +509,12 @@ final class Schema {
                     return 0;
                 }
                 int m = mapped(remap.mapping(), kept.runs[i], kept.list, at);
+                if (m != 0 && kept.copies[i]) {
+                    throw new IllegalArgumentException("row " + at + ": a remap through"
+                            + " transformation " + m + " of copy from frame on "
+                            + Tunes.name(kept.runs[i]) + ", which this version leaves to a"
+                            + " later one (SPEC.md section 8)");
+                }
                 if (kept.running[i] == m) {
                     return 0;
                 }
@@ -530,6 +555,13 @@ final class Schema {
                 }
                 Target on = Tunes.target(start.connection());
                 int m = mapped(start.mapping(), on, kept.list, at);
+                boolean copy = start.connection() instanceof CopyFromFrame;
+                if (m != 0 && copy) {
+                    throw new IllegalArgumentException("row " + at + ": copy from frame on "
+                            + Tunes.name(on) + " through transformation " + m + ", which"
+                            + " this version leaves to a later one (SPEC.md section 8)");
+                }
+                kept.copies[i] = copy;
                 kept.runs[i] = on;
                 // An unset mapping column reuses the kept value. A
                 // deferred start captures it now for installation at
@@ -543,8 +575,9 @@ final class Schema {
                     out[t] = (byte) (0x80 | reaches);
                     target[i] = reaches;
                 }
-                out[t + 1] = (byte) (0x80
-                        | (sources.indexOf(Tunes.source(start.connection())) + 1));
+                // Copy from frame is source S, after the tables (3.1.7).
+                out[t + 1] = (byte) (0x80 | (copy ? sources.size() + 1
+                        : sources.indexOf(Tunes.source(start.connection())) + 1));
                 Timing timing = start.timing();
                 int now = select(timing.prescaler());
                 int rate = counted(timing.count(), at);
@@ -575,7 +608,7 @@ final class Schema {
                     kept.running[i] = m;
                     kept.pending[i] = NONE;
                 }
-                return 1 << i | (deferred ? Columns.DEFERS : 0);
+                return 1 << i | (deferred ? Columns.DEFERS : 0) | (copy ? Columns.COPIES : 0);
             }
             case Retune retune -> {
                 int now = select(retune.timing().prescaler());
@@ -715,9 +748,21 @@ final class Schema {
                 if (!(one instanceof Start start)) {
                     continue;
                 }
-                Source source = Tunes.source(start.connection());
-                int n = sources.indexOf(source);
                 int number = Tunes.number(Tunes.target(start.connection()));
+                Source source = Tunes.source(start.connection());
+                if (source == null) {
+                    // copy from frame has no table, and its marker is the
+                    // player's (SPEC.md 3.1.7); its target is one this
+                    // version encodes
+                    if (number >= Columns.MARKER.length) {
+                        throw new IllegalArgumentException("copy from frame runs on "
+                                + Tunes.name(Tunes.target(start.connection()))
+                                + ", a target this version leaves to a later one"
+                                + " (SPEC.md section 8)");
+                    }
+                    continue;
+                }
+                int n = sources.indexOf(source);
                 boolean through = !Tunes.isIdentity(start.mapping());
                 identity[n] |= !through;
                 mixer[n] |= through && number == Columns.MIXER_TARGET;

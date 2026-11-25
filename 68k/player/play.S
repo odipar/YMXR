@@ -101,6 +101,144 @@ ymxr_return:
 ymxr_over:      moveq   #-1,d0
                 rts
 
+                .if     YMXR_MAP
+                PIECE   copy_3
+; The register of the frame value at d5, its bit set in d3 where d5 is
+; one: a6 the frame values, each register's number in the byte after its
+; value.
+ymxr_cbit:      sub.l   a6,d5
+                cmp.l   #13*FV_STRIDE,d5
+                bhi.s   .out
+                move.b  1(a6,d5.w),d5
+                bset    d5,d3
+.out:           rts
+
+; The register steps of a frame of a tune that copies from frame (SPEC.md
+; 3.1.7, 4.4): init writes a branch here over the first read of ymxr_regs
+; for such a tune alone. d3 is the registers the ticks of copy from frame
+; write: for each effect the tune runs whose timer counts, the record of
+; the handler its vector names, the mirror where a tick has performed the
+; start pending on it (4.8), and each column of that handler whose row 0
+; is a frame value, the register of that frame value. Each register the
+; row sets has the byte the frame writes as its frame value, and the
+; frame writes it to the chip where its bit of d3 is 0.
+ymxr_cregs:     move.l  a6,-(sp)
+                lea     ymxr_fv(pc),a6
+                moveq   #0,d3
+                lea     WS_FX+FX_SIZE+FX_SIZE+FX_SIZE(a0),a4    ; effect 3's
+                lea     ymxr_timers+8+8+8(pc),a5                ; record, timer
+                moveq   #3,d4
+.fx:            btst    d4,WS_EFFECTS(a0)
+                beq.s   .next
+                movea.w 2(a5),a3                ; the timer's control register
+                move.b  (a3),d5
+                and.b   6(a5),d5                ; its select, 0 where stopped
+                beq.s   .next
+                movea.l a4,a3
+                .if     YMXR_DEFER
+                tst.b   FX_PENDING(a4)
+                beq.s   .rec
+                movea.w (a5),a3
+                movea.l (a3),a3                 ; the handler the vector names
+                cmpa.l  FX_ARMED(a4),a3
+                movea.l a4,a3
+                bne.s   .rec
+                lea     ARMOFF(a4),a3           ; the start a tick performed
+                .endif
+.rec:           move.b  FX_SHAPE(a3),d5         ; the handler's columns: 0, 4
+                beq.s   .one                    ; and 7 one, 2, 5 and 8 two, 3,
+                cmp.b   #4,d5                   ; 6 and 9 three, the counted
+                beq.s   .one                    ; ones under a cut among them;
+                cmp.b   #7,d5                   ; a square and a source of one
+                beq.s   .one                    ; row are never copy from frame
+                cmp.b   #2,d5
+                beq.s   .two
+                cmp.b   #5,d5
+                beq.s   .two
+                cmp.b   #8,d5
+                beq.s   .two
+                cmp.b   #3,d5
+                beq.s   .three
+                cmp.b   #6,d5
+                beq.s   .three
+                cmp.b   #9,d5
+                bne.s   .next
+.three:         move.l  FX_FIRST3(a3),d5
+                bsr.w   ymxr_cbit
+.two:           move.l  FX_FIRST2(a3),d5
+                bsr.w   ymxr_cbit
+.one:           move.l  FX_FIRST(a3),d5
+                bsr.w   ymxr_cbit
+.next:          lea     -FX_SIZE(a4),a4
+                subq.l  #8,a5
+                dbra    d4,.fx
+                movea.l a6,a3                   ; the frame values
+                movea.l (sp)+,a6
+                KTONE   _0,_1,$0000,$0100,0,1
+                KTONE   _2,_3,$0200,$0300,2,3
+                KTONE   _4,_5,$0400,$0500,4,5
+                KWRITE  _6,$0600,6
+                KREAD2  _13
+                KRESERVED _11,6,$0B00,11
+                KRESERVED _12,5,$0C00,12
+                KWRITE  _8,$0800,8
+                KWRITE  _9,$0900,9
+                KWRITE  _10,$0A00,10
+                KREAD   _7
+                bpl.s   .no7
+                or.b    #YM_PORTS,d1
+                move.b  d1,7*FV_STRIDE(a3)
+                btst    #7,d3
+                bne.s   .no7
+                move.w  #$0700,d0
+                move.b  d1,d0
+                movep.w d0,(a2)
+.no7:           tst.b   d2
+                bpl.s   .played
+                move.b  d2,13*FV_STRIDE(a3)
+                btst    #13,d3
+                bne.s   .played
+                move.w  #$0D00,d1
+                move.b  d2,d1
+                movep.w d1,(a2)
+.played:        bra.w   ymxr_played
+
+; The read sites of ymxr_cregs, as the frame's are written (ymxr_col), on
+; every init, so each subtune of a set finds them as it finds them alone;
+; and for a tune that copies from frame the branch to them over the first
+; read of ymxr_regs, which ymxr_copyinit writes back as the frame's read
+; before init writes the frame's sites. a0 the table's payload, d3 N, a4
+; ymxr_frame, a6 the workspace; every register kept.
+ymxr_copysites: movem.l d0-d4/a1/a3/a5,-(sp)
+                lea     ymxr_kreads(pc),a3
+                moveq   #0,d1
+                moveq   #14-1,d2
+.site:          move.w  (a3)+,d4
+                move.w  d1,d0
+                bsr     ymxr_col
+                addq.w  #1,d1
+                dbra    d2,.site
+                btst    #7,WS_EFFECTS(a6)       ; copy from frame (3.1.7)
+                beq.s   .done
+                lea     ymxr_regs(pc),a1
+                move.w  #$6000,(a1)+            ; bra.w
+                lea     ymxr_cregs(pc),a3
+                move.l  a3,d0
+                sub.l   a1,d0
+                move.w  d0,(a1)
+.done:          movem.l (sp)+,d0-d4/a1/a3/a5
+                rts
+
+; The read sites of ymxr_cregs, one a register in column order, as
+; ymxr_reads has the frame's.
+ymxr_kreads:    dc.w    k_0-ymxr_frame+2,k_1-ymxr_frame+2,k_2-ymxr_frame+2
+                dc.w    k_3-ymxr_frame+2,k_4-ymxr_frame+2,k_5-ymxr_frame+2
+                dc.w    k_6-ymxr_frame+2,k_7-ymxr_frame+2,k_8-ymxr_frame+2
+                dc.w    k_9-ymxr_frame+2,k_10-ymxr_frame+2,k_11-ymxr_frame+2
+                dc.w    k_12-ymxr_frame+2,k_13-ymxr_frame+2
+                ENDPIECE copy_3
+                .endif
+
                 .if     YMXR_PERF&(YMXR_MAP=0)
 ymxr_perf_acc:  dc.w    0                       ; the ticks' counted cost
                 .endif                          ; since the last call

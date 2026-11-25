@@ -244,8 +244,8 @@ func TestACoreWithoutBit4ReportsTheLineOfTheLookup(t *testing.T) {
 	_, ten := files(t)
 	core := append([]byte(nil), mappingCore(t)...)
 	ymxr.PutWord(core, sndh.CoreFlagsAt, 4)
-	line := "the core's flags at 22 read 4, and a subtune that maps a value or cuts a" +
-		" source needs bit 4 set"
+	line := "the core's flags at 22 read 4, and a subtune that maps a value, cuts a" +
+		" source or copies from frame needs bit 4 set"
 	if _, err := sndh.With(core, [][]byte{ten}, sndh.Options{Title: "set"}); err == nil ||
 		err.Error() != line {
 		t.Fatalf("a core with bit 4 clear reads %v, and the line is %q", err, line)

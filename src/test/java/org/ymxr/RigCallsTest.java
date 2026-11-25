@@ -344,11 +344,12 @@ final class RigCallsTest {
     }
 
     /** The conformance kit's tunes, the 20 of the check of deferred
-     *  starts, the 33 of the check of tunes that map a value and the 13 of
-     *  the check of cuts, each on the player ymxr-sndh links for it, under
-     *  each set of switches: the tool's core against the rig's link of the
-     *  assembled core, and every tick against the model (doc/LINKER.md,
-     *  The check). The workflow runs the sets in the four jobs of cores. */
+     *  starts, the 33 of the check of tunes that map a value, the 13 of the
+     *  check of cuts and the 4 of the check of copy from frame, each on the
+     *  player ymxr-sndh links for it, under each set of switches: the tool's
+     *  core against the rig's link of the assembled core, and every tick
+     *  against the model (doc/LINKER.md, The check). The workflow runs the
+     *  sets in the four jobs of cores. */
     @TestFactory
     Stream<DynamicTest> theRigPlaysOnLinkedPlayersOfEverySetOfSwitches() {
         return played(shard(LINKED, System.getProperty(SHARD)), "the plain switches", core -> {
@@ -357,10 +358,11 @@ final class RigCallsTest {
             argv.addAll(core);
             return argv;
         }, (argv, said) -> assertTrue(said.startsWith("0\n")
-                        && said.contains("18 tunes play as the specification reads")
+                        && said.contains("19 tunes play as the specification reads")
                         && said.contains("deferred starts: 20 tunes")
                         && said.contains("tunes that map a value: 33 tunes")
                         && said.contains("cuts: 13 tunes")
+                        && said.contains("copy from frame: 4 tunes")
                         && said.contains("linked, "),
                 () -> RIG + " " + String.join(" ", argv) + " does not play on"
                         + " linked players:\n" + said));
@@ -384,7 +386,8 @@ final class RigCallsTest {
             "retunes", "stops", "remaps between transformations", "remaps to the identity",
             "remaps from the identity", "rows that set the target column alone",
             "starts under a cut", "recuts", "tunes that repeat to a row", "tunes that play once",
-            "sets of several subtunes");
+            "sets of several subtunes", "starts of copy from frame",
+            "rows that set a register copy from frame runs on");
 
     /** The operations of {@link #COVERED} the coverage line counts none of,
      *  and the shapes, effects and targets it finds short of all. */
@@ -446,11 +449,11 @@ final class RigCallsTest {
     @Test
     void aCountedOneRowSourceCanStopBeforeTheSelect() throws Exception {
         theRigRuns();
-        String said = rigWith(List.of("-linked", "-generated1", "-seed37"));
+        String said = rigWith(List.of("-linked", "-generated1", "-seed116"));
         assertTrue(said.startsWith("0\n")
                         && said.contains("ticks that end a counted one-row source before the select: 1")
-                        && said.contains("1 generated tune, tune 37, 1 subtune, plays"),
-                () -> RIG + " -linked -generated1 -seed37:\n" + said);
+                        && said.contains("1 generated tune, tune 116, 3 subtunes, plays"),
+                () -> RIG + " -linked -generated1 -seed116:\n" + said);
     }
 
     /** The coverage line reads each operation of {@link #COVERED}: a line
@@ -530,7 +533,7 @@ final class RigCallsTest {
                     argv.add("-onlyswitches");
                     return argv;
                 }, (argv, said) -> assertTrue(said.startsWith("0\n")
-                        && said.contains("switches: the kit's 17 tunes at 50 Hz")
+                        && said.contains("switches: the kit's 18 tunes at 50 Hz")
                         && said.contains("with a deferred start's hook in place: " + plays),
                         () -> RIG + " " + String.join(" ", argv)
                                 + " does not switch the kit's subtunes:\n" + said));

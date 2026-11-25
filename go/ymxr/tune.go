@@ -51,11 +51,17 @@ var Magic = []byte{'Y', 'M', 'X', 'R'}
 // includes transformation tables (SPEC.md 3.3.5).
 const Version = 0x000A
 
-// VersionCut is the highest supported version, written when a row selects
-// a cut 1 to 127: four cut columns, after the mapping columns where bit 5
-// of the effects used is set, and the cut index at the header's long at 20
-// (SPEC.md 3.3.5).
+// VersionCut is the version written when a row selects a cut 1 to 127:
+// four cut columns, after the mapping columns where bit 5 of the effects
+// used is set, and the cut index at the header's long at 20 (SPEC.md
+// 3.3.5).
 const VersionCut = 0x000B
+
+// VersionCopy is the highest supported version, written where a row starts
+// copy from frame: the header of version 11, the mapping and the cut
+// columns where bits 5 and 6 of the effects used are set, and index entry S
+// 0 (SPEC.md 3.1.7, 3.3.5).
+const VersionCopy = 0x000C
 
 // Unmapped is the writer version for identity-only tunes. It uses
 // thirty DTX3 columns without a transformation index. Deferred starts
@@ -71,19 +77,21 @@ const VersionDeferred = 0x0008
 const Oldest = 0x0007
 
 // Reads is the versions a reader reads, as its report names them.
-var Reads = fmt.Sprintf("%d, %d, %d, %d or %d", Oldest, VersionDeferred, Unmapped, Version,
-	VersionCut)
+var Reads = fmt.Sprintf("%d, %d, %d, %d, %d or %d", Oldest, VersionDeferred, Unmapped,
+	Version, VersionCut, VersionCopy)
 
 // ReadsVersion is whether a reader reads a file of that version.
 func ReadsVersion(version int) bool {
-	return version >= Oldest && version <= VersionCut
+	return version >= Oldest && version <= VersionCopy
 }
 
 // VersionOf is the version a writer writes for a table of that effects
-// byte: 11 where it cuts a source, 10 where it maps a value and cuts none,
-// and 9 otherwise (SPEC.md 3.3.5).
+// byte: 12 where it copies from frame, 11 where it cuts a source, 10 where
+// it maps a value and cuts none, and 9 otherwise (SPEC.md 3.3.5).
 func VersionOf(effects int) int {
 	switch {
+	case HasCopies(effects):
+		return VersionCopy
 	case HasCuts(effects):
 		return VersionCut
 	case HasMapping(effects):
@@ -93,11 +101,11 @@ func VersionOf(effects int) int {
 }
 
 // ColumnsOf is the column count of a table of that version and effects
-// byte: 34 in version 10, 34 or 38 in version 11 by bit 5, and 30 in 7 to 9
-// (SPEC.md 3.3.3).
+// byte: 34 in version 10, 34 or 38 in version 11 by bit 5, 30, 34 or 38 in
+// version 12 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md 3.3.3).
 func ColumnsOf(version, effects int) int {
 	switch version {
-	case VersionCut:
+	case VersionCut, VersionCopy:
 		return ColumnCount(effects)
 	case Version:
 		return Mapped
@@ -118,11 +126,11 @@ const (
 const Counted = 1 << 31
 
 // IndexAt returns the source-index offset: 16 in versions 7 to 9; 20 in
-// version 10, after the transformation-index pointer; 24 in version 11,
-// after the cut-index pointer (SPEC.md 3.3).
+// version 10, after the transformation-index pointer; 24 in versions 11 and
+// 12, after the cut-index pointer (SPEC.md 3.3).
 func IndexAt(version int) int {
 	switch version {
-	case VersionCut:
+	case VersionCut, VersionCopy:
 		return CutsAt + 4
 	case Version:
 		return TransformationsAt + 4
@@ -415,7 +423,12 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 	named := namedBytes(name)
 	version := VersionOf(columns.Effects)
 	index := IndexAt(version)
-	after := index + 4*len(tables)
+	// Copy from frame is index entry S, after the tables (SPEC.md 3.1.7).
+	entries := len(tables)
+	if HasCopies(columns.Effects) {
+		entries++
+	}
+	after := index + 4*entries
 	nameAt := 0
 	if len(named) != 0 {
 		nameAt = after
@@ -433,7 +446,7 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 	}
 	cutsAt := here
 	var cuts []byte
-	if version == VersionCut {
+	if HasCuts(columns.Effects) {
 		cuts = CutIndex(columns.Cuts)
 		here = Align(here + len(cuts))
 	}
@@ -449,14 +462,14 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 	PutWord(file, 4, version)
 	PutWord(file, FrameRateAt, frameRate)
 	file[EffectsAt] = byte(columns.Effects)
-	file[CountAt] = byte(len(tables))
+	file[CountAt] = byte(entries)
 	PutWord(file, NameAt, nameAt)
 	PutLong(file, TableAt, tableAt)
 	if maps {
 		PutLong(file, TransformationsAt, transformationsAt)
 		copy(file[transformationsAt:], block)
 	}
-	if version == VersionCut {
+	if HasCuts(columns.Effects) {
 		PutLong(file, CutsAt, cutsAt)
 		copy(file[cutsAt:], cuts)
 	}
@@ -562,11 +575,14 @@ func sortedRings(plain map[int]Packed) []int {
 
 // WithTable is the tune file with table in place of its DTX3 table, every
 // other part as it is: the source tables after it move by what the table's
-// length moves them, and the index records where each now begins (SPEC.md
-// 3.3).
+// length moves them, and the index records where each now begins; the entry
+// of copy from frame stays 0 (SPEC.md 3.1.7, 3.3).
 func WithTable(file, table []byte) []byte {
 	tableAt := GetLong(file, TableAt)
 	count := int(file[CountAt])
+	if HasCopies(int(file[EffectsAt])) {
+		count--
+	}
 	index := IndexAt(GetWord(file, 4))
 	from := len(file)
 	if count > 0 {
@@ -801,7 +817,9 @@ func GetLong(b []byte, at int) int {
 
 // File contains decoded metadata, packed and unpacked DTX3 table,
 // sources and optional transformation entries. Versions below 10 have
-// an empty transformation list (SPEC.md 3.3, 3.4).
+// an empty transformation list (SPEC.md 3.3, 3.4). The sources are the
+// tables; in version 12 copy from frame is source S, after them, and has
+// none (3.1.7).
 type File struct {
 	Version         int
 	FrameRate       int
@@ -812,6 +830,20 @@ type File struct {
 	Counted         []bool
 	Transformations [][]byte
 	Cuts            []Cut
+}
+
+// Copies is whether a row starts copy from frame, source S (SPEC.md 3.1.7).
+func (f File) Copies() bool {
+	return HasCopies(f.Effects)
+}
+
+// Count is S, the source count: the tables, and copy from frame where a row
+// starts it (SPEC.md 3.1.7, 3.3).
+func (f File) Count() int {
+	if f.Copies() {
+		return len(f.Sources) + 1
+	}
+	return len(f.Sources)
 }
 
 // Mapping is the table's mapping column of effect i, or -1 where it has
@@ -844,19 +876,25 @@ func Read(file []byte) (File, error) {
 	}
 	effects := int(file[EffectsAt])
 	// SPEC.md 3.3: bit 5 of the effects used is 1 in version 10, either in
-	// version 11, and 0 in versions 7 to 9; bit 6 is 1 in version 11 and 0
-	// in every other version.
+	// versions 11 and 12, and 0 in versions 7 to 9; bit 6 is 1 in version 11,
+	// either in version 12, and 0 in every other version; bit 7 is 1 in
+	// version 12 and 0 in every other version.
 	maps := HasMapping(effects)
 	if version == Version && !maps || version < Version && maps {
 		return File{}, fmt.Errorf("version %d with bit 5 of the effects used %s", version,
 			setOrClear(maps))
 	}
 	cutting := HasCuts(effects)
-	if cutting != (version == VersionCut) {
+	if version == VersionCut && !cutting || version < VersionCut && cutting {
 		return File{}, fmt.Errorf("version %d with bit 6 of the effects used %s", version,
 			setOrClear(cutting))
 	}
-	if version == VersionCut && len(file) < CutsAt+4 {
+	copies := HasCopies(effects)
+	if copies != (version == VersionCopy) {
+		return File{}, fmt.Errorf("version %d with bit 7 of the effects used %s", version,
+			setOrClear(copies))
+	}
+	if version >= VersionCut && len(file) < CutsAt+4 {
 		return File{}, errors.New("not a YMXR file")
 	}
 	var transformations [][]byte
@@ -882,9 +920,25 @@ func Read(file []byte) (File, error) {
 	if index+4*count > len(file) {
 		return File{}, fmt.Errorf("the source index at %d is outside the file", index)
 	}
+	// SPEC.md 3.1.7: in version 12 index entry S is copy from frame, 0, and
+	// every entry before it is the offset of a table.
+	if copies && (count == 0 || GetLong(file, index+4*(count-1)) != 0) {
+		return File{}, fmt.Errorf("version %d with source %d other than copy from frame",
+			version, count)
+	}
+	tables := count
+	if copies {
+		tables--
+		for i := 0; i < tables; i++ {
+			if GetLong(file, index+4*i) == 0 {
+				return File{}, fmt.Errorf("source %d is copy from frame, and copy from"+
+					" frame is source %d", i+1, count)
+			}
+		}
+	}
 	tableAt := GetLong(file, TableAt)
 	end := len(file)
-	if count != 0 {
+	if tables != 0 {
 		end = GetLong(file, index) &^ Counted
 	}
 	if tableAt < 0 || end > len(file) || tableAt > end {
@@ -918,12 +972,12 @@ func Read(file []byte) (File, error) {
 	}
 	var sources []*dtx.Table
 	var counted []bool
-	for i := 0; i < count; i++ {
+	for i := 0; i < tables; i++ {
 		entry := GetLong(file, index+4*i)
 		at := entry &^ Counted
 		counted = append(counted, entry&Counted != 0)
 		to := len(file)
-		if i+1 < count {
+		if i+1 < tables {
 			to = GetLong(file, index+4*(i+1)) &^ Counted
 		}
 		if at < 0 || to > len(file) || at > to {

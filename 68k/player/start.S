@@ -40,6 +40,13 @@ PICK_BOTH       equ     ymxr_tick0_shaped-ymxr_tick0_pick-2
 ; blocks the shared control register and the select's shift add, so the
 ; table below names that site an effect.
 WIDE_AT         equ     ymxr_tick0_wide-ymxr_tick0_over+2
+; The displacement of the call of ymxr_widestart in the start of several
+; columns, which init aims at ymxr_copywide in a tune that copies from
+; frame (copy.S).
+WIDEN_CALL      equ     ymxr_tick0_widen-ymxr_tick0_over+4
+                .if     (ymxr_tick3_widen-ymxr_tick3_over+4)<>WIDEN_CALL
+                .error  "effect 3 lays its start of several columns out apart from effect 0"
+                .endif
 WIDE_ONE        equ     ymxr_e_effect0_1-ymxr_tick0_wide-2      ; and the square's
 WIDE_WIDEN      equ     ymxr_tick0_widen-ymxr_tick0_wide-2
 RESET_DONE      equ     ymxr_tick0_done-ymxr_tick0_reset-2

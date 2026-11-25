@@ -145,8 +145,8 @@ func made(said *report.Report, options sndh.Options, names []string, tunes [][]b
 		switches = append(switches, "the deferred start in: a subtune defers a start")
 	}
 	if mapped {
-		switches = append(switches, "the lookup in: a subtune maps a value or cuts a"+
-			" source")
+		switches = append(switches, "the lookup in: a subtune maps a value, cuts a"+
+			" source or copies from frame")
 	}
 	if len(switches) == 0 {
 		said.Row("the switches", "none, the plain core")

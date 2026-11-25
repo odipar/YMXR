@@ -64,6 +64,7 @@ final class Link {
                 all.add(kind + i);
             }
         }
+        all.add("copy");
         all.add("align");
         return List.copyOf(all);
     }
@@ -127,6 +128,18 @@ final class Link {
                         && sets(tune, Columns.EFFECT + 4 * i + 2, Columns.DEFERRED)) {
                     needed.add("defer" + i);
                 }
+                for (int target : copies(tune, i)) {
+                    // copy from frame runs the handler of its target's
+                    // registers, of the kinds the start of several columns
+                    // finds in its tables (copy.S)
+                    needed.add("copy");
+                    String kind = copyKind(target);
+                    if (KINDS.contains(kind)) {
+                        needed.add(kind);
+                        needed.add(kind + i);
+                        needed.add("several");
+                    }
+                }
                 for (int s : started(tune, i)) {
                     Table source = tune.sources().get(s - 1);
                     boolean counted = tune.counted().get(s - 1);
@@ -148,6 +161,60 @@ final class Link {
             }
         }
         return ordered;
+    }
+
+    /** The registers that read every bit of their byte, a bit a register:
+     *  R0, R2, R4, R7, R11 and R12 (SPEC.md 2.1.2). */
+    private static final int COUNTED_REGISTERS = 0x1895;
+
+    /** The handler kind copy from frame runs on a target (copy.S): the
+     *  general handler, in the effect's block, for a register of seven bits
+     *  or fewer; the counted handler for one that reads every bit; and the
+     *  handler of the target's columns for a target of several registers,
+     *  the counted one of two for {@code setEnvelope}. */
+    static String copyKind(int target) {
+        if (target < 14) {
+            return (COUNTED_REGISTERS >> target & 1) != 0 ? "counted" : "general";
+        }
+        if (target == 20) {
+            return "envelope";
+        }
+        return target >= 17 && target <= 21 ? "three" : "two";
+    }
+
+    /** The counted kind of the target's columns, which copy from frame runs
+     *  once a recut moves it there, through mapping 0 (rule 2(j);
+     *  68k/player/cut.S, ymxr_recut). */
+    static String copyCounted(int target) {
+        if (target < 14) {
+            return "counted";
+        }
+        return target >= 17 && target <= 21 && target != 20 ? "countedthree" : "envelope";
+    }
+
+    /** The kept targets of effect i at each start of copy from frame,
+     *  source S of a tune of version 12 (SPEC.md 3.1.7): the target column
+     *  last set on the effect, through the wrap, 0 before a row sets it. */
+    static Set<Integer> copies(TuneFile tune, int i) {
+        Set<Integer> out = new LinkedHashSet<>();
+        if (!tune.copies()) {
+            return out;
+        }
+        Table table = tune.table();
+        int t = Columns.EFFECT + 4 * i;
+        int kept = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int r = pass == 0 ? 0 : table.repeat(); r < table.rows(); r++) {
+                int target = table.column(t)[r] & 0xFF;
+                if ((target & 0x80) != 0) {
+                    kept = target & 0x7F;
+                }
+                if ((table.column(t + 1)[r] & 0xFF) == (0x80 | tune.count())) {
+                    out.add(kept);
+                }
+            }
+        }
+        return out;
     }
 
     /** Whether effect i cuts a source: the tune is of version 11, bit 6
@@ -406,10 +473,15 @@ final class Link {
                 }
             }
             for (Runs r : one.runs) {
-                if (r.counting() && r.source() >= 1 && r.source() <= tune.sources().size()) {
+                String kind = null;
+                if (tune.copies() && r.source() == tune.count()) {
+                    kind = copyCounted(r.target());
+                } else if (r.source() >= 1 && r.source() <= tune.sources().size()) {
                     Table source = tune.sources().get(r.source() - 1);
-                    String kind = r.mapping() == 0 ? kind(source, true)
+                    kind = r.mapping() == 0 ? kind(source, true)
                             : countedLookup(source.columns(), r.target());
+                }
+                if (r.counting() && kind != null) {
                     out.add(kind);
                     out.add(kind + i);
                     if (!r.cut()) {

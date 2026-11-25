@@ -208,7 +208,8 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		}
 		claimed |= Claims(tune.Effects)
 		defers = defers || tune.Effects&ymxr.Defers != 0
-		maps = maps || tune.Effects&(ymxr.Maps|ymxr.Cuts) != 0
+		// the core with the lookup reads cuts and copy from frame too
+		maps = maps || tune.Effects&(ymxr.Maps|ymxr.Cuts|ymxr.Copies) != 0
 	}
 	if err := checkVbl(options.Asked, n, rates[0], mixed); err != nil {
 		return nil, err
@@ -436,7 +437,7 @@ func checkCore(core []byte, monitor, lean, pcrel, defers, maps bool, binds int) 
 	}
 	if maps && flags&coreMap == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and a subtune that maps a"+
-			" value or cuts a source needs bit 4 set", CoreFlagsAt, flags)
+			" value, cuts a source or copies from frame needs bit 4 set", CoreFlagsAt, flags)
 	}
 	return nil
 }
