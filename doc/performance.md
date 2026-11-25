@@ -1010,3 +1010,58 @@ those. Init aims the frame and the starts at the block only for a tune
 that copies from frame, so every other tune runs the frame and the ticks
 it ran in the release before, at the same cycles, and a song of such tunes
 links the same player as in that release.
+
+The rig counts the figures below on the five tunes of its check of copy
+from frame, on the player as it is with the lookup in, and with the
+deferred start in as well on the two that defer a start. A tick:
+
+| tick | cycles |
+|---|---|
+| one column | 154 |
+| two columns | 218 |
+| three columns | 282 |
+| one column, through a transformation | 182 |
+| three columns, through a transformation | 310 |
+
+Through the identity and on one column through a transformation, each
+figure is the counted handler's at the end of a pass under a cut (A cut).
+
+A frame runs the block's register steps, and they cost 604 to 1,684
+cycles more than the frame's steps on the same rows, which the rig counts
+by playing each tune again with the frame's steps and without a tick. Of
+the difference, 584 to 1,584 cycles are the read of the effects' records
+and 20 to 156 the steps a register, each of which keeps the value it
+reads as the frame value and tests whether a tick writes the register.
+The read runs on every frame of such a tune: it reads the record of each
+effect whose timer counts and each column of its handler, where the
+effect copies from frame and where it plays a source, and costs 890
+cycles on the frames of these tunes where no effect copies from frame.
+
+A start of copy from frame at the frame, counted from the effect's start
+in the frame code to its rate as A cut counts one, by its target's
+columns:
+
+| columns | the player as it is | with the deferred start in |
+|---|---|---|
+| one | 730 to 810 | 896 to 954 |
+| two | 1040 to 1080 | 1266 to 1284 |
+| three | 1296 | 1462 |
+
+On the same span a start under cut 0 at row 0 of a marked source of one
+column costs 464 cycles (A cut). Through a transformation, on the player
+with the deferred start in, a start of one column costs 1,380 to 1,624
+cycles.
+
+A start of copy from frame runs inside the play call, and R4.5 counts it
+with the call. Each tune's costliest call, whole and as R4.5 counts it:
+
+| tune | the costliest call | as R4.5 counts it |
+|---|---|---|
+| copy from frame on a register of each kind of handler | 8486 | 8486 |
+| copy from frame on targets of two and three registers | 8928 | 8928 |
+| copy from frame replaced and replacing, at the frame and deferred, and recut | 7520 | 7520 |
+| copy from frame beside a mapped source, its timer remapped to mapping 0 | 4378 | 3884 |
+| copy from frame through transformations, remapped, deferred and beside a mapped source | 10016 | 9482 |
+
+Four of the five pass R4.5's 6,656 as it counts them, each at its first
+row, which starts copy from frame on three or four effects.
