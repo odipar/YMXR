@@ -637,6 +637,11 @@ final class ParityTest {
         both("ymxr-bind", file, "-silent");
         both("ymxr-sndh", file, "-silent");
         both("ymxr-sndh", file, "-silent", "-carried");
+        byte[] mapped = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                CopyTest.mapped())).getBytes(StandardCharsets.UTF_8), "-silent");
+        both("ymxr-trace", mapped);
+        both("ymxr-bind", mapped, "-silent");
+        both("ymxr-sndh", mapped, "-silent");
     }
 
     private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {

@@ -520,8 +520,12 @@ source column is written unchanged.
 | any other column | b | entry k |
 
 The marker and port directions remain source bits, independent of the
-lookup entry. A key above the last key of transformation n, E - 1, is
-left to a later version (section 8).
+lookup entry. A key above the last key of transformation n, E - 1, is left
+to a later version (section 8). On copy from frame (3.1.7) b is the frame
+value of the register, in the row of the table its column has: the
+marker's column for a register of seven bits or fewer, setR7's for R7,
+with bits 7 and 6 at 1 (1.4.2), and any other column for a register whose
+column fills its byte.
 
 ### 2.2 The sources
 
@@ -656,8 +660,10 @@ value of its column as the last row that set the column set it, from step
 4 of that row's frame (4.4): for a column with a set bit, the byte masked
 to the register's width, as 7.3 reports it; for a column that fills its
 byte, the byte (1.1.3). Before a row sets the column, the frame value is 0
-(4.1 step 4). A start of copy from frame runs through mapping 0 (rule
-2(j)), and under cut 0, the whole table of a source of one row.
+(4.1 step 4). A start of copy from frame runs under cut 0, the whole table
+of a source of one row (rule 2(j)), and through its mapping a tick reads
+the frame value of the register of the target's last value as the key of
+2.1.5.
 
 ### 3.2 The rows
 
@@ -909,8 +915,13 @@ has form 0 where s is counted, 2 where it is counted and t is `setR7`; and
 where s is marked, form 1 for one column, for two columns 0 on the noise
 targets and 1 on the others, and for three columns 1 on `setBuzzer` and 0
 on the voices. A square and a source of one row (4.3) have no form in
-version 10, and form 1 in version 11, where a tick under a cut 1 to 127
-reads them as a marked source of one column (5.1). A writer reads the rows
+version 10, and form 1 in version 11 and in version 12 where a row cuts a
+source, where a tick under a cut 1 to 127 reads them as a marked source of
+one column (5.1). Copy from frame has the form of the source its target's
+handler runs (3.1.7): on a target of one register, form 1 where the
+register is of seven bits or fewer, 2 on `setR7` and 0 on the others; on
+`setEnvelope`, whose two registers fill their bytes, 0; and on every other
+target the form of a marked source of its columns. A writer reads the rows
 in order, row 0 to R - 1 and then rows RR to R - 1 again until each effect
 is at row RR as a pass before left it, with four values an effect the tune
 runs: the kept target and the kept mapping (4.3, 1.10.3), whether a start
@@ -1273,9 +1284,10 @@ mapping:
 
 A tick of copy from frame (3.1.7) writes at steps 1 and 2 the frame value
 of the register of each column in place of the byte at the place, R7's
-with bits 7 and 6 at 1 (1.4.2); at step 3 its row is the last of cut 0,
-the one row of the source, so the place stays at row 0, and step 5
-performs a start pending on the timer.
+with bits 7 and 6 at 1 (1.4.2), the target's last value through the tick's
+mapping (2.1.5); at step 3 its row is the last of cut 0, the one row of
+the source, so the place stays at row 0, and step 5 performs a start
+pending on the timer.
 
 **5.1.1** A player runs the MFP in the mode the host leaves it, bit 3 of
 `$FFFA17` at 1, and performs step 6. A player that clears bit 3 at 4.1,
@@ -1452,10 +1464,11 @@ numbers the maps assign.**
     recut on a timer of the tune runs under a cut 1 to 127, so the first
     start or recut at or after the repeat row writes the column. Every
     other effect keeps 0, and its cut column is 0 in every row.
-- 2(j) A start of copy from frame runs through mapping 0 under cut 0, and
-  a remap on its timer selects mapping 0 while copy from frame is the last
-  start on the timer in row order (3.1.7); copy from frame through a
-  transformation is left to a later version (section 8).
+- 2(j) A start of copy from frame runs under cut 0 (3.1.7). Through
+  transformation n, on a start or a remap of its timer while copy from
+  frame is the last start on the timer in row order, the key of 2.1.5 of
+  each value a row sets on the register of the target's last value, and of
+  its frame value 0, is at most E - 1 of transformation n.
 
 **Rule 3: a start sets bit 5 of the control column where the structure
 sets `placeReset`, and bit 6 where the timer is stopped** (YMXS rules 3
@@ -1806,9 +1819,9 @@ included, each with the sha256 and the length `MANIFEST.txt` lists.
 ## 8. What a later version defines
 
 A player of this version is unconstrained in each item below. A number
-missing from the list is a clause a version has defined, and the rest
-keep their numbers: 8.1 is defined at 3.3.4, 8.4 at 1.8.4, and 8.6 at
-4.2.1 and 5.2.1.
+missing from the list is a clause a version has defined, and the rest keep
+their numbers: 8.1 is defined at 3.3.4, 8.4 at 1.8.4, 8.6 at 4.2.1 and
+5.2.1, and 8.9 at 2.1.5 and 3.1.7.
 
 **8.2** Targets 25 to 127 (2.1).
 
@@ -1829,6 +1842,3 @@ target (1.10.1).
 **8.8** A cut of more than 65,535 rows (1.11), a counted source of more
 than 65,535 rows (3.1), and a source of two or three columns of more than
 65,534 rows (3.1.3).
-
-**8.9** Copy from frame through a mapping other than mapping 0 (3.1.7,
-rule 2(j)).

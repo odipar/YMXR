@@ -1,5 +1,6 @@
 package org.ymxr;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -153,32 +154,40 @@ class CopyTest {
         assertEquals(entry(file, 1), entry(past, 1));
     }
 
-    /** Rule 2(j): copy from frame runs through mapping 0, and a remap selects
-     *  mapping 0 while copy from frame is the last start on its timer; the
-     *  writer reports the row of either (SPEC.md section 8). */
-    @Test
-    void copyFromFrameThroughATransformationIsLeftToALaterVersion() {
+    /** The tune of {@link #tune} with copy from frame on setR13 through
+     *  transformation 1, half, from row 0 and through transformation 2,
+     *  third, from a remap at row 2. */
+    static org.ymxs.YMXS.Tune mapped() {
         Transformation half = new Transformation("half", List.of(0, 0, 1, 1, 2, 2, 3, 3, 4,
                 4, 5, 5, 6, 6, 7, 7));
-        org.ymxs.YMXS.Tune tune = tune();
-        List<Row> rows = new ArrayList<>(tune.table().rows());
+        Transformation third = new Transformation("third", List.of(0, 0, 0, 1, 1, 1, 2, 2, 2,
+                3, 3, 3, 4, 4, 4, 5));
+        List<Row> rows = new ArrayList<>(tune().table().rows());
         Map<Timer, Effect> mapped = new EnumMap<>(rows.get(0).effects());
         mapped.put(Timer.A, copying(13, 16, 96, Tunes.mapping(half)));
         rows.set(0, new Row(rows.get(0).registers(), mapped));
-        assertEquals("row 0: copy from frame on setR13 through transformation 1, which this"
-                + " version leaves to a later one (SPEC.md section 8)",
-                assertThrows(IllegalArgumentException.class, () -> ConformanceTest.schema(
-                        new org.ymxs.YMXS.Tune("copy", "", "CopyTest", 50,
-                                Tunes.repeating(rows, 0)))).getMessage());
-        List<Row> remapped = new ArrayList<>(tune.table().rows());
-        Map<Timer, Effect> two = new EnumMap<>(remapped.get(2).effects());
-        two.put(Timer.A, new Remap(Tunes.mapping(half)));
-        remapped.set(2, new Row(remapped.get(2).registers(), two));
-        assertEquals("row 2: a remap through transformation 1 of copy from frame on setR13,"
-                + " which this version leaves to a later one (SPEC.md section 8)",
-                assertThrows(IllegalArgumentException.class, () -> ConformanceTest.schema(
-                        new org.ymxs.YMXS.Tune("copy", "", "CopyTest", 50,
-                                Tunes.repeating(remapped, 0)))).getMessage());
+        Map<Timer, Effect> remapped = new EnumMap<>(rows.get(2).effects());
+        remapped.put(Timer.A, new Remap(Tunes.mapping(third)));
+        rows.set(2, new Row(rows.get(2).registers(), remapped));
+        return new org.ymxs.YMXS.Tune("copy mapped", "", "CopyTest", 50,
+                Tunes.repeating(rows, 0));
+    }
+
+    /** Copy from frame through a transformation, at a start and at a remap
+     *  of its timer (rule 2(j)): the mapping column selects each, and the
+     *  list of pages has both in the form of setR13's register, of four
+     *  bits, marked (SPEC.md 3.4.4). */
+    @Test
+    void copyFromFrameRunsThroughATransformation() {
+        byte[] file = ConformanceTest.schema(mapped()).file();
+        TuneFile read = TuneFile.read(file);
+        assertEquals(Tune.COPY, read.version());
+        assertTrue(Columns.maps(read.effects()) && read.copies());
+        byte[] column = read.table().column(read.mapping(0));
+        assertEquals(0x81, column[0] & 0xFF, "the start's mapping column");
+        assertEquals(0x82, column[2] & 0xFF, "the remap's mapping column");
+        assertArrayEquals(new byte[] {'Y', 'P', 2, 0, Pages.MARKED, 1, 0, Pages.MARKED, 2},
+                Pages.of(read), "the pages of copy from frame on setR13");
     }
 
     /** The binder binds a tune file of version 12 whose rows map no value

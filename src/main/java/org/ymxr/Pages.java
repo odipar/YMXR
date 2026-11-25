@@ -169,18 +169,49 @@ final class Pages {
         }
     }
 
+    /** The form of copy from frame on {@code target}, the form of the
+     *  source its target's handler runs (SPEC.md 3.4.4): on a register of
+     *  seven bits or fewer marked, on setR7 the ports' and on another
+     *  register plain; on setEnvelope, whose registers fill their bytes,
+     *  plain; and on every other target a marked source's of its columns. */
+    static int copyForm(int target) {
+        if (target < 14) {
+            if (target == MIXER) {
+                return PORTS;
+            }
+            return (WHOLE_BYTES >> target & 1) != 0 ? PLAIN : MARKED;
+        }
+        if (target == ENVELOPE) {
+            return PLAIN;
+        }
+        if (target >= 17 && target <= BUZZER) {
+            return target == BUZZER ? MARKED : PLAIN;
+        }
+        return target >= NOISE ? PLAIN : MARKED;
+    }
+
+    /** The registers whose column fills its byte, a bit a register: R0, R2,
+     *  R4, R7, R11 and R12 (SPEC.md 2.1.2). */
+    private static final int WHOLE_BYTES = 0x1895;
+
+    /** setEnvelope, a target of two registers that fill their bytes. */
+    private static final int ENVELOPE = 20;
+
     /**
      * The form source {@code s} runs on {@code target} through a
-     * transformation, or -1 for copy from frame, and for a square or a
-     * source of one row in a tune whose rows cut no source, whose entries
-     * are in the handler; in version 11, and in version 12 where a row cuts
-     * a source, a tick under a cut reads such a source as a marked source of
-     * one column (SPEC.md 3.4.4): a counted source plain,
+     * transformation, or -1 for a square or a source of one row in a tune
+     * whose rows cut no source, whose entries are in the handler; in
+     * version 11, and in version 12 where a row cuts a source, a tick under
+     * a cut reads such a source as a marked source of one column (SPEC.md
+     * 3.4.4): a counted source plain,
      * and the ports' form on setR7; a marked source of one column marked;
      * of two, plain on the noise targets and marked on the others; of
      * three, marked on setBuzzer and plain on the voices.
      */
     static int form(TuneFile tune, int s, int target) {
+        if (tune.copies() && s == tune.count()) {
+            return copyForm(target);
+        }
         if (s > tune.sources().size()) {
             return -1;
         }

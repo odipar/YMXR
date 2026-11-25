@@ -357,9 +357,43 @@ func CopyKind(target int) string {
 	return "two"
 }
 
+// CopyLookup is the lookup kind copy from frame runs on a target through a
+// transformation, the kind of the handler CopyKind names on it
+// (68k/player/copy.S).
+func CopyLookup(target int) string {
+	switch CopyKind(target) {
+	case "counted":
+		return "lc"
+	case "general":
+		return "lk"
+	case "envelope":
+		return "le"
+	case "two":
+		if target >= noise {
+			return "ln"
+		}
+		return "lt"
+	}
+	if target == buzzer {
+		return "lb"
+	}
+	return "lv"
+}
+
+// CopyColumns is the columns of copy from frame on a target, a register each.
+func CopyColumns(target int) int {
+	switch {
+	case target < 14:
+		return 1
+	case target >= 17 && target <= 21 && target != 20:
+		return 3
+	}
+	return 2
+}
+
 // CopyCounted is the counted kind of the target's columns, which copy from
-// frame runs once a recut moves it there, through mapping 0 (rule 2(j);
-// 68k/player/cut.S, ymxr_recut).
+// frame runs once a recut moves it there through the identity
+// (68k/player/cut.S, ymxr_recut).
 func CopyCounted(target int) string {
 	switch {
 	case target < 14:
@@ -689,6 +723,9 @@ func countedRow(tune ymxr.File, row int, all *[4]under, add func(string)) {
 			switch {
 			case tune.Copies() && r.source == tune.Count():
 				kind = CopyCounted(r.target)
+				if r.mapping != 0 {
+					kind = countedLookup(CopyColumns(r.target), r.target)
+				}
 			case r.source >= 1 && r.source <= len(tune.Sources):
 				source := tune.Sources[r.source-1]
 				kind = Kind(source, true)
@@ -759,6 +796,9 @@ const (
 // Lookup is the lookup kind of source s on that target, or "" for a square
 // or a source of one row (68k/player/lookup_start.S, .kind).
 func Lookup(tune ymxr.File, s, target int) string {
+	if tune.Copies() && s == tune.Count() {
+		return CopyLookup(target)
+	}
 	if s < 1 || s > len(tune.Sources) {
 		return ""
 	}
