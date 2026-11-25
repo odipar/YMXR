@@ -6283,6 +6283,12 @@ def hatari(ym, code, symbols, perf=False):
     cwide = symbols["ymxr_cwide1"] - symbols["ymxr_cwide0"]
     cwides = [(base + symbols["ymxr_cwide%d" % i], base + symbols["ymxr_cwide%d" % i] + cwide)
               for i in range(4)]
+    # and in a core with the lookup, each lookup instance of each kind, from
+    # its label to its end's (68k/player/lookup_ticks.S)
+    looks = [[(base + symbols["ymxr_%s%d" % (kind, i)], base + symbols["ymxr_%s%d_end" % (kind, i)])
+              for kind in ("lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh")
+              if "ymxr_%s%d_end" % (kind, i) in symbols]
+             for i in range(4)]
     # With the deferred start in, every handler has a copy in bank 1, BANK
     # bytes on, and each effect an installer, which the tick that performs
     # a start runs: its writes are that tick's. The installers follow the
@@ -6314,7 +6320,8 @@ def hatari(ym, code, symbols, perf=False):
                     or threes[i][0] <= pc < threes[i][1]
                     or cnts[i][0] <= pc < cnts[i][1]
                     or envs[i][0] <= pc < envs[i][1]
-                    or cwides[i][0] <= pc < cwides[i][1]):
+                    or cwides[i][0] <= pc < cwides[i][1]
+                    or any(lo <= pc < hi for lo, hi in looks[i])):
                 return i
         return None
 
@@ -6471,6 +6478,19 @@ def hatari(ym, code, symbols, perf=False):
                     return True
             return False
 
+        # A step that leaves the timer's registers alone, a recut or a remap,
+        # has no place in the trace among the ticks, and the replay steps it
+        # at the first tick that disagrees. Where that tick is later than the
+        # step, as on a recut to a cut that has the rows of the cut before it
+        # for a while, the replay goes back to a tick of the effect before,
+        # the latest first, steps it there and reads the events on from it:
+        # a snapshot before each tick of an effect not yet stepped.
+        marks, tried = [], set()
+
+        def snapshot():
+            return (copy.deepcopy(model.fx), list(model.fv), list(model.row_writes),
+                    list(stepped), list(writes), copy.deepcopy(want), list(counted))
+
         at = 0
         while at < len(events):
             kind, reg, value = events[at]
@@ -6492,6 +6512,8 @@ def hatari(ym, code, symbols, perf=False):
                     # (SPEC.md 4.8), so it is after the step: a frame that
                     # arms a start writes neither the chip nor the timer
                     upto(kind)
+                if not stepped[kind]:
+                    marks.append((at, kind, snapshot()))
                 fx = model.fx[kind]
                 assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, kind)
                 before = dict(fx)
@@ -6499,6 +6521,7 @@ def hatari(ym, code, symbols, perf=False):
                 got = wrote(at, kind, len(w))
                 if not stepped[kind] and (got is None or masked(got) != masked(w)):
                     model.fx[kind] = before    # the tick came after the effect step
+                    tried.add(at)
                     upto(kind)
                     assert model.fx[kind]["running"], \
                         "frame %d: a tick of effect %d with no source running" % (f, kind)
@@ -6511,16 +6534,30 @@ def hatari(ym, code, symbols, perf=False):
                     # no register of leaves out of the trace (SPEC.md 4.4)
                     upto(3)
                     steps = row_writes(model.playing)
+                    kept = model.fv
                     for k in range(len(steps) + 1):
-                        fv = list(values)
+                        model.fv = list(values)
                         for register, value in steps[:k]:
-                            fv[register] = value
-                        stored = [(register, fv[register] | (0xC0 if register == 7 else 0))
-                                  for register, _ in TARGETS[model.fx[kind]["using"]]]
+                            model.fv[register] = value
+                        stored = model.ticking(kind)
                         got = wrote(at, kind, len(stored))
                         if got is not None and masked(got) == masked(stored):
                             w = stored
                             break
+                    model.fv = kept
+                if got is None or masked(got) != masked(w):
+                    back = next((mark for mark in reversed(marks)
+                                 if mark[1] == kind and mark[0] not in tried), None)
+                    if back is not None:
+                        mat, _, (fxs, fv, rw, was, wrote_, wanted, ticks) = back
+                        tried.add(mat)
+                        del marks[marks.index(back):]
+                        model.fx, model.fv, model.row_writes = copy.deepcopy(fxs), list(fv), list(rw)
+                        stepped[:], writes[:], counted[:] = was, wrote_, ticks
+                        want = copy.deepcopy(wanted)
+                        upto(kind)
+                        at = mat
+                        continue
                 assert got is not None, \
                     "frame %d: a tick of effect %d writes %d registers and the trace has %s" % (
                         f, kind, len(w), events[at:at + len(w)])
@@ -6536,6 +6573,13 @@ def hatari(ym, code, symbols, perf=False):
         assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
     for f, (events, clocks, stops, installed) in enumerate(frames[first:first + STUB_FRAMES]):
+        if model.row == tune.R:
+            # past the last row of a tune that plays once the call reports the
+            # end and leaves every register as it is (SPEC.md 4.6), and the
+            # model has no row to read
+            assert not [one for one in events if one[0] == "frame"], \
+                "frame %d: the call after the last row writes %s" % (f, events)
+            break
         was = list(counted)
         replay(events, f)
         played += 1
@@ -8038,16 +8082,20 @@ def main():
                                for f in os.listdir(os.path.join(ROOT, "ym", "test"))
                                if f.endswith(".ym"))
         # No dump converts to a target of several registers, to a counted
-        # source or to a deferred start, so the kit's tunes of versions 4
-        # to 6 and its deferred tune go on the end of a run on a real MFP:
-        # with the dumps before them every handler shape of the player is
-        # read there against the same model as the rest, the counted
-        # shapes of one column and of several among them, and the switch
-        # of the core with the deferred start in.
+        # source, to a deferred start, to a mapped value, to a cut or to
+        # copy from frame, so the kit's tunes of versions 4 to 6, its
+        # deferred tune and its tunes of versions 10 to 12 go on the end of
+        # a run on a real MFP: with the dumps before them every handler
+        # shape of the player is read there against the same model as the
+        # rest, the counted shapes of one column and of several and the
+        # lookup instances among them, and the switches of the cores with
+        # the deferred start and the lookup in.
         if real and not args:
             tunes = tunes + [os.path.join(ROOT, "doc", "conformance", "tunes", one)
                              for one in ("voices.ymxr", "counted.ymxr",
-                                         "envelope-counted.ymxr", "deferred.ymxr")]
+                                         "envelope-counted.ymxr", "deferred.ymxr",
+                                         "mapped.ymxr", "cut.ymxr", "cuts.ymxr",
+                                         "copy-from-frame.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]
