@@ -331,6 +331,9 @@ ymxr_arm:       movem.l d3/d6-d7/a6,-(sp)       ; the source at 4(sp) below
 .wide:          subq.l  #1,d0                   ; the tag as a start passes it
                 move.w  d6,d4
                 st      WS_ARMING(a0)
+; the call init aims at ymxr_copywide in a tune that copies from frame,
+; an equate so the local labels around it stay in scope
+ymxr_arm_wide   equ     *
                 bsr.w   ymxr_widestart
                 sf      WS_ARMING(a0)
                 lea     -ARMOFF(a3),a3          ; the record, past its mirror

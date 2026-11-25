@@ -28,8 +28,8 @@ frame reporting -1 is one line, and the record ends with it. `<lines>`
 counts the lines, the first line among them, so the program reads at
 most `<lines>` - 1 frames, and fewer where the record ends first; it is
 not the F of `SPEC.md` 7.4, which counts frames alone. For a file whose
-version word is other than $0007, $0008, $0009 and $000A (`SPEC.md`
-3.3.5), the record is empty and the program's output is empty.
+version word is other than $0007, $0008, $0009, $000A, $000B and $000C
+(`SPEC.md` 3.3.5), the record is empty and the program's output is empty.
 
 The output is compared with the reference byte for byte: each line free
 of spaces, integers in decimal, names in the order `SPEC.md` 7 defines,
@@ -87,6 +87,7 @@ a reader does with a file outside those is outside this task.
 | `mapped.ymxr` | 65 |
 | `cut.ymxr` | 25 |
 | `cuts.ymxr` | 21 |
+| `copy-from-frame.ymxr` | 9 |
 | `wrong-version.ymxr` | 0 |
 
 The count is the first line and `R` + `R` - `RR` frames for a tune that

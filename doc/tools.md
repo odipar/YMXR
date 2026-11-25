@@ -576,13 +576,15 @@ file the reader rejects is its message, exit 1.
 named, `-nNAME` flags, the i-th naming the i-th file, and the packer's
 `-mN` and `-copies[S]` (4.2, 4.3); the output is the multi file
 (BINARIES.md 0), version 11 where a tune file of it is version 11, 10
-where one is version 10 and none 11, and 9 otherwise. Each table is
-unpacked and packed again at the unit its tune file packs at: through the
-rings chosen for the set (4.7) where `-m` is absent, and through the ring
-`-mN` names as 4.2 reads it otherwise. Every other part of a tune file is
-as the file has it. A tune is named by its `-nNAME`, else by the name its
-tune file records (SPEC.md 3.3), else by the stem of its file name: the
-name after the last `/`, up to its last `.`.
+where one is version 10 and none 11, and 9 otherwise, a tune file of
+version 12 counted at the version it binds at: 11 where a row cuts a
+source, 10 where a row maps a value, and 9 otherwise (BINARIES.md 1.2).
+Each table is unpacked and packed again at the unit its tune file packs
+at: through the rings chosen for the set (4.7) where `-m` is absent, and
+through the ring `-mN` names as 4.2 reads it otherwise. Every other part
+of a tune file is as the file has it. A tune is named by its `-nNAME`,
+else by the name its tune file records (SPEC.md 3.3), else by the stem of
+its file name: the name after the last `/`, up to its last `.`.
 
 **11.2 Errors.** A file that fails to read is `cannot read F: <message>`,
 exit 2; a file the reader rejects (writing.md 7) is its message, exit 1; a
@@ -674,8 +676,8 @@ and this binds at W`, W the version the tune binds at; `the core's flags
 at 22 read F, and the raster monitor asked for needs bit 0 set`; `... the
 lean tick asked for needs bit 1 set`, `... the row read through the
 program counter asked for needs bit 2 set`, `... a subtune that defers a
-start needs bit 3 set`, or `... a subtune that maps a value or cuts a
-source needs bit 4 set`.
+start needs bit 3 set`, or `... a subtune that maps a value, cuts a source
+or copies from frame needs bit 4 set`.
 
 **12.4 The report:** the heading `the core: <file>, B bytes` under
 `-carried`, and `the core: <file> linked for the set, B bytes of C` and
@@ -688,20 +690,21 @@ read a row through an absolute address` where that was passed, and `ticks
 that read a row through an absolute address: the tunes end past the 32767
 bytes a displacement reaches` where the tool chose it (12.1), `the
 deferred start in: a subtune defers a start` where the core has it, and
-`the lookup in: a subtune maps a value or cuts a source` where the core
-has it, joined by `; `; the heading `the tags: TITL <title>`, then `, COMM
-<composer>` where present, `, CONV <converter>`, `, <clock><rate>` and `,
-FLAG ~<letters>`, then `, !#SN with N names` for several subtunes; a row a
-subtune, its name or `the tune`, `B bytes bound to B2, its table in image
-I`, B the tune file's bytes, B2 the bound tune's, I the number of its
-image from 1; the heading `the images: N images of B bytes, DTX's reader
-once a set of tunes that share one` with a row an image, `image I`,
-`<shape>, N tunes`, the shape `DTX3 at unit K, values of W`, W the width
-of a value in bytes, and `DTX3 at unit K, C columns, values of W` for a
-table of C columns, 34 or 38 (BINARIES.md 1.4); the heading `the file: B
-bytes, the core C, the images I, the tunes T, the workspace and the rest
-W`, C, I, T and W the bytes of the core, the images, the bound tunes, and
-the remainder. The summary line is `ymxr-sndh: B bytes, N subtunes`.
+`the lookup in: a subtune maps a value, cuts a source or copies from
+frame` where the core has it, joined by `; `; the heading `the tags: TITL
+<title>`, then `, COMM <composer>` where present, `, CONV <converter>`, `,
+<clock><rate>` and `, FLAG ~<letters>`, then `, !#SN with N names` for
+several subtunes; a row a subtune, its name or `the tune`, `B bytes bound
+to B2, its table in image I`, B the tune file's bytes, B2 the bound
+tune's, I the number of its image from 1; the heading `the images: N
+images of B bytes, DTX's reader once a set of tunes that share one` with a
+row an image, `image I`, `<shape>, N tunes`, the shape `DTX3 at unit K,
+values of W`, W the width of a value in bytes, and `DTX3 at unit K, C
+columns, values of W` for a table of C columns, 34 or 38 (BINARIES.md
+1.4); the heading `the file: B bytes, the core C, the images I, the tunes
+T, the workspace and the rest W`, C, I, T and W the bytes of the core, the
+images, the bound tunes, and the remainder. The summary line is
+`ymxr-sndh: B bytes, N subtunes`.
 
 ---
 
@@ -1059,7 +1062,7 @@ and the others wait for, one second at a time, up to 180 seconds, after
 which a waiting process writes `run: a build has kept <lock> for three
 minutes` and exits with 2. Then it runs the class with `java -ea`. The build
 needs Java 23, Maven, rmac (`-Drmac=PATH` names another), and DTX `0.12.0`
-and YMXS `0.8.0` in the local Maven repository, `mvn install` in each
+and YMXS `0.9.0` in the local Maven repository, `mvn install` in each
 checkout. `.github/workflows/test.yml` does that on GitHub runners, in jobs
 that run at once, each with Go, rmac, unicorn and DTX's `dtx-write` on it so
 that no check skips: `bin/suite` (19.6) with `-Drig.shard=none`, every test
@@ -1077,7 +1080,7 @@ caller starts it from the Actions tab or by `gh workflow run test.yml`.
 ./cmd/...`, with the 68000 binaries and DTX's forty images
 embedded; it runs by itself. The Go tree requires the modules
 `github.com/odipar/dtx/go v0.12.0` and `github.com/odipar/ymxs/go
-v0.8.0`, which a build fetches.
+v0.9.0`, which a build fetches.
 
 **19.4 Parity.** `ParityTest` runs the two trees on one input and
 requires the same exit code, the same bytes on standard output and, with

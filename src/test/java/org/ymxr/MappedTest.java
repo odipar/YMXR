@@ -236,14 +236,14 @@ final class MappedTest {
     }
 
     @Test
-    void theVersionLinesNameTheFiveVersionsRead() {
-        byte[] twelve = file();
-        Tune.putWord(twelve, 4, Tune.CUT + 1);
-        assertEquals("version 12 is not 7, 8, 9, 10 or 11", assertThrows(
-                IllegalArgumentException.class, () -> TuneFile.read(twelve)).getMessage());
+    void theVersionLinesNameTheSixVersionsRead() {
+        byte[] thirteen = file();
+        Tune.putWord(thirteen, 4, Tune.COPY + 1);
+        assertEquals("version 13 is not 7, 8, 9, 10, 11 or 12", assertThrows(
+                IllegalArgumentException.class, () -> TuneFile.read(thirteen)).getMessage());
         byte[] six = file();
         Tune.putWord(six, 4, 6);
-        assertEquals("version 6 has a DTX2 table, and this reads 7, 8, 9, 10 or 11: write"
+        assertEquals("version 6 has a DTX2 table, and this reads 7, 8, 9, 10, 11 or 12: write"
                 + " the tune again with ym-to-ymxr or ymxs-to-ymxr", assertThrows(
                 IllegalArgumentException.class, () -> TuneFile.read(six)).getMessage());
     }

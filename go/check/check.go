@@ -225,7 +225,8 @@ func min(a, b int) int {
 // (SPEC.md 6.4, rules 2(b), 2(i), 3(c)). A stop ignores those two columns.
 func Places(file ymxr.File) []string {
 	var lines []string
-	sources := len(file.Sources)
+	// S counts copy from frame, source S without a table (3.1.7)
+	sources := file.Count()
 	// the kept cut of each effect after the row, and the source last
 	// started on it, 0 before the first start (SPEC.md 1.11.3)
 	var kept, last [4]int
@@ -272,7 +273,11 @@ func Places(file ymxr.File) []string {
 				recuts := source&0x80 == 0 && cut&0x80 != 0
 				if (starts || recuts) && kept[i] > 0 && last[i] > 0 {
 					under := file.Cuts[kept[i]-1]
-					rows := file.Sources[last[i]-1].Rows()
+					// copy from frame is a source of one row (3.1.7)
+					rows := 1
+					if last[i] <= len(file.Sources) {
+						rows = file.Sources[last[i]-1].Rows()
+					}
 					if under.Last >= rows {
 						lines = append(lines, fmt.Sprintf("%d: effect %d runs source %d of %s"+
 							" under cut %d, rows %d to %d", r, i, last[i],

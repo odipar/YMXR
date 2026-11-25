@@ -79,6 +79,9 @@ final class Columns {
     /** Effects-used bit 6: version 11, its cut columns and cut index
      *  (SPEC.md 3.3). */
     static final int CUTS = 0x40;
+    /** Effects-used bit 7: version 12, a row starts copy from frame, the
+     *  last entry of the source index (SPEC.md 3.1.7, 3.3). */
+    static final int COPIES = 0x80;
 
     /** Bit 4 of a control column: the count column beside it is 0, and
      *  that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9). */
@@ -188,6 +191,11 @@ final class Columns {
     /** Whether the effects byte marks the cut columns, bit 6. */
     static boolean cuts(int effects) {
         return (effects & CUTS) != 0;
+    }
+
+    /** Whether the effects byte marks copy from frame, bit 7. */
+    static boolean copies(int effects) {
+        return (effects & COPIES) != 0;
     }
 
     /** The column count of a table of that effects byte: 30, with four

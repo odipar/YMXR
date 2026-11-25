@@ -167,6 +167,29 @@ func poolSources(tunes [][]byte) sourcePool {
 	return pool
 }
 
+// readable is the tune file read, as every binder reads it.
+func readable(tuneFile []byte) (ymxr.File, error) {
+	return ymxr.Read(tuneFile)
+}
+
+// BoundVersion is the version a bound tune of the tune file records, the layout of
+// its header and index (BINARIES.md 1.2): the tune file's, and for a tune
+// file of version 12 the version of its columns, 11 where it cuts a source,
+// 10 where it maps a value and cuts none, and 9 otherwise. Bit 7 of its
+// effects byte marks copy from frame, which the index leaves out: copy from
+// frame is source S, the tables plus 1 (SPEC.md 3.1.7).
+func BoundVersion(tune ymxr.File) int {
+	switch {
+	case tune.Version != ymxr.VersionCopy:
+		return tune.Version
+	case ymxr.HasCuts(tune.Effects):
+		return ymxr.VersionCut
+	case ymxr.HasMapping(tune.Effects):
+		return ymxr.Version
+	}
+	return ymxr.Unmapped
+}
+
 // Bind is the set of tunes bound with as few images as the figures allow.
 func Bind(tuneFiles [][]byte) (Set, error) {
 	// A tune joins the first group whose image would carry its table: the
@@ -177,7 +200,7 @@ func Bind(tuneFiles [][]byte) (Set, error) {
 	image := make([]int, len(tuneFiles))
 	table := make([]int, len(tuneFiles))
 	for i, file := range tuneFiles {
-		read, err := ymxr.Read(file)
+		read, err := readable(file)
 		if err != nil {
 			return Set{}, err
 		}
@@ -259,7 +282,7 @@ func shape(dtx3 []byte) (string, error) {
 // DTX1 tables, packaged DTX3 image and, in version 10, transformation
 // block (doc/BINARIES.md 1).
 func Bound(tuneFile []byte) ([]byte, error) {
-	read, err := ymxr.Read(tuneFile)
+	read, err := readable(tuneFile)
 	if err != nil {
 		return nil, err
 	}
@@ -404,9 +427,11 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	version := BoundVersion(read)
+	// the tables; copy from frame, source S, is the count plus 1
 	count := len(read.Sources)
 	from := ymxr.IndexAt(read.Version)
-	index := BoundIndex(read.Version)
+	index := BoundIndex(version)
 	tables := make([][]byte, count)
 	for i := 0; i < count; i++ {
 		at := ymxr.GetLong(tuneFile, from+4*i) &^ ymxr.Counted
@@ -424,7 +449,7 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	here := ymxr.Align(index + 4*count)
 	var cuts []byte
 	cutsAt := 0
-	if read.Version == ymxr.VersionCut {
+	if version == ymxr.VersionCut {
 		at := ymxr.GetLong(tuneFile, ymxr.CutsAt)
 		cuts = tuneFile[at : at+2+8*ymxr.GetWord(tuneFile, at)]
 		cutsAt = here
@@ -449,7 +474,8 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	bound := make([]byte, here)
 	copy(bound, tuneFile[:ymxr.TableAt])
 	copy(bound, BoundMagic)
-	ymxr.PutWord(bound, 4, ymxr.GetWord(tuneFile, 4))
+	ymxr.PutWord(bound, 4, version)
+	bound[ymxr.CountAt] = byte(count)
 	ymxr.PutLong(bound, StateAt, state)
 	ymxr.PutLong(bound, ImageAt, imageAt)
 	// Where this tune's table is in the image it is packaged into. An
@@ -459,7 +485,7 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	if block != nil {
 		ymxr.PutLong(bound, BoundTransformationsAt, blockAt)
 	}
-	if read.Version == ymxr.VersionCut {
+	if version == ymxr.VersionCut {
 		ymxr.PutLong(bound, BoundCutsAt, cutsAt)
 		copy(bound[cutsAt:], cuts)
 	}

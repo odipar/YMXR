@@ -120,6 +120,22 @@ A block is the code and data a player runs for one part of a song:
   source to a mapping not 0 (SPEC.md 1.10);
 - a lookup kind's block, such as `lt`, is init's loop over the kind's
   instances, which a song needs where it needs an instance of the kind;
+- `copy`, in a core with the lookup, is copy from frame: the frame values,
+  the start of copy from frame, the frame's register steps that leave a
+  register copy from frame runs on to the ticks, and init's work for a
+  tune that copies from frame, which a song needs where a row of a tune
+  starts it, bit 7 of the tune's effects byte (SPEC.md 3.1.7). Copy from
+  frame runs the handler of its target's registers: the general handler
+  on a register of seven bits or fewer, `counted` on one that reads every
+  bit of its byte, `envelope` on `setEnvelope`, `two` on another target of
+  two registers and `three` on a target of three. For a handler other
+  than the general one, the effect needs that handler's block on it, its
+  kind's block and `several`, and where a recut moves copy from frame to
+  the counted kind of its target's columns, that kind's blocks, as the
+  effect's cut block reads them. In a
+  core without the lookup, `copy` is init's test that reports -1 for a
+  tune that copies from frame, which a link leaves out, since such a song
+  links on the core with the lookup;
 - `align`, in a core with the deferred start and the lookup, is the gap
   before the second bank, which every song needs.
 
@@ -411,14 +427,15 @@ measures it against the linked core.
 
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
-10,014 bytes, the core with the deferred start in, of 15,268 bytes, the
-core with the lookup in, of 25,974 bytes, or the core with the lookup
-and the deferred start in, of 41,022 bytes.
+10,022 bytes, the core with the deferred start in, of 15,276 bytes, the
+core with the lookup in, of 27,918 bytes, or the core with the lookup
+and the deferred start in, of 42,476 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
+| `copy-from-frame.ymxr` | the lookup | square, square2, three, three1, several, effect0, effect1, effect2, effects, copy | 8,898 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
@@ -437,12 +454,12 @@ and the deferred start in, of 41,022 bytes.
 | `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3, effects | 6,698 |
 
 A tune of general sources alone, with no effect, links 1,336 bytes, 13%
-of the core: the blocks are 8,678 bytes of it. `voices.ymxr` runs all
+of the core: the blocks are 8,686 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
 start of several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup
-instances of 3 kinds and links 15,470 bytes of 41,022: the 36 instances
-and the 7 loops of init it leaves out are 14,258 bytes, and the gaps it
-keeps are 750 bytes shorter than in the core.
+instances of 3 kinds and links 15,470 bytes of 42,476: the 36 instances
+and the 7 loops of init it leaves out are 13,966 bytes, and the gaps it
+keeps are 640 bytes shorter than in the core.
 
 ## The check
 
@@ -457,14 +474,14 @@ keeps are 750 bytes shorter than in the core.
   for it, cut out of the SNDH file, against the model. It first requires
   the tool's core to be the rig's link of the assembled core, its
   patched longs aside, and the player in the core to be the player
-  assembled alone. The 18 tunes of the kit play their whole length as
+  assembled alone. The 19 tunes of the kit play their whole length as
   the specification reads on linked players of the plain core, `-lean`,
   `-abs -perf`, `-lean -abs` and `-perf -lean`, and the 11 dumps of
   `ym/test` on the plain core. Under `-defer -map` the 20 tunes of the
   check of deferred starts, and under `-map` the 33 tunes of the check
-  of tunes that map a value and the 13 of the check of cuts, play every
-  tick against the model on the players linked for them, with each of
-  those switches.
+  of tunes that map a value, the 13 of the check of cuts and the 4 of the
+  check of copy from frame, play every tick against the model on the
+  players linked for them, with each of those switches.
 - RigCallsTest runs `-linked -kit -defer -map` at `-frames24` with each
   of the eight sets of `-abs`, `-lean` and `-perf`, in the four jobs of
   cores of the workflow: the kit, the 20 tunes of the deferred starts,

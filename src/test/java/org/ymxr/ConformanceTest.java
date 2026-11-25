@@ -83,7 +83,7 @@ final class ConformanceTest {
 
     /** The version word in {@code wrong-version}: one past the highest
      *  version the reader reads (SPEC.md 3.3.5). */
-    static final int WRONG_VERSION = Tune.CUT + 1;
+    static final int WRONG_VERSION = Tune.COPY + 1;
 
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(
@@ -163,6 +163,12 @@ final class ConformanceTest {
                     + " one that includes it, a start under the whole table, a deferred"
                     + " start under a cut of a source that plays once, and a recut while"
                     + " it is pending"),
+            Fixture.built("copy-from-frame", "`CopyTest.tune`", () -> schema(CopyTest.tune()),
+                    "version 12 at 50 Hz: copy from frame, index entry 0, on `setR13` on"
+                    + " Timer A from row 0 and on `setVoiceB` on Timer D from row 1, beside a"
+                    + " square on R10 on Timer B; rows that set R13, R2 and R9 while copy from"
+                    + " frame runs on them, which the frame leaves to the ticks, and a stop"
+                    + " of each at row 3, after which the frame writes R2 and R9 at row 0"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
@@ -724,7 +730,8 @@ final class ConformanceTest {
                 || !(ramp.mapping().parts().get(0) instanceof Transformation steps)) {
             throw new AssertionError("row 0 starts no source on Timer D through a transformation");
         }
-        int keys = Collections.max(Tunes.values(Tunes.source(ramp.connection())));
+        int keys = Collections.max(Tunes.values(
+                java.util.Objects.requireNonNull(Tunes.source(ramp.connection()))));
         for (Path at : List.of(KIT.resolve("README.md"), KIT.resolve("SOURCES.md"))) {
             String text = Files.readString(at);
             int start = text.indexOf("### Mapped transformations");
@@ -789,7 +796,7 @@ final class ConformanceTest {
             throw new AssertionError("row " + FALL + " starts no source on Timer B");
         }
         Timing rate = fall.timing();
-        long ticks = (long) Tunes.size(Tunes.rows(Tunes.source(fall.connection())))
+        long ticks = (long) Tunes.size(fall.connection())
                 * Chip.divides(rate.prescaler()) * Chip.ticks(rate.count());
         assertTrue(rate.timerReset() && ticks * mapped().rate()
                 > (long) (PENDING - FALL) * Chip.CLOCK, "the fall ends before row " + PENDING);

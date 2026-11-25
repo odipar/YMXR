@@ -38,6 +38,15 @@ YMXR_init:
                 btst    #4,WS_EFFECTS(a6)       ; a tune that defers a start
                 bne     .bad6                   ; needs a core with them
                 .endif
+                .if     YMXR_MAP=0
+; A tune that copies from frame needs the core with the lookup (3.1.7):
+; the block copy, which a link keeps for a song a tune of which copies
+; from frame alone, and such a song links on that core (doc/LINKER.md).
+                PIECE   copy_5
+                tst.b   WS_EFFECTS(a6)
+                bmi     .bad6
+                ENDPIECE copy_5
+                .endif
                 .if     YMXR_MAP
 ; Version 10 bound layout: signed transformation-block offset at 24,
 ; source index at 28 (BINARIES.md 1.2). Version 11: the block at 24, or 0
@@ -179,6 +188,13 @@ YMXR_init:
                 dbra    d1,.source
                 ENDPIECE effects_1
 .resolved:
+                .if     YMXR_MAP
+; A tune that copies from frame: copy from frame as source S, and the
+; start of several columns aimed at ymxr_copywide (copy.S).
+                PIECE   copy_1
+                bsr     ymxr_copyinit
+                ENDPIECE copy_1
+                .endif
 
 ; The row's columns, as the table's column map defines them (DTX, abi.md
 ; 2 and SPEC.md 2.4): a live column is its slot's ring, slot times N past
@@ -220,6 +236,12 @@ YMXR_init:
                 .endif
                 bsr     ymxr_col
 .away:          dbra    d2,.site
+                .if     YMXR_MAP
+; And its register steps' read sites, with the branch to them (play.S).
+                PIECE   copy_2
+                bsr     ymxr_copysites
+                ENDPIECE copy_2
+                .endif
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the

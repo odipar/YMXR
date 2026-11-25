@@ -174,8 +174,8 @@ final class BinariesTest {
         Tune.putWord(core, Sndh.CORE_FLAGS_AT, Sndh.CORE_PCREL);
         IllegalArgumentException wrong = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.checkCore(core, false, false, true, false, true, Tune.VERSION));
-        assertEquals("the core's flags at 22 read 4, and a subtune that maps a value or cuts a"
-                + " source needs bit 4 set", wrong.getMessage());
+        assertEquals("the core's flags at 22 read 4, and a subtune that maps a value, cuts a"
+                + " source or copies from frame needs bit 4 set", wrong.getMessage());
         IllegalArgumentException of = assertThrows(IllegalArgumentException.class,
                 () -> Sndh.of(core, List.of(fade()), new Sndh.Options("Fade", null, null, false,
                         false)));

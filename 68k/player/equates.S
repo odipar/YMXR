@@ -81,6 +81,11 @@ DT_COLUMNS      equ     8
 DT_REPEAT       equ     10
 DT_PAYLOAD      equ     16
 
+; The distance from one register's frame value to the next (copy.S,
+; ymxr_fv): a frame value, its register, and the header of the next one's
+; source of one row.
+FV_STRIDE       equ     14
+
 ; The workspace.
 WS_TUNE         equ     0               ; the bound tune
 WS_IMAGE        equ     4               ; the image in it

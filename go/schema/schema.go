@@ -66,9 +66,14 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 		repeat = at
 	}
 	sources := ymxs.Sources(tune)
-	if len(sources) > ymxr.Most {
+	// Copy from frame is source S, after the tables (SPEC.md 3.1.7).
+	count := len(sources)
+	if copiesFrom(rows) {
+		count++
+	}
+	if count > ymxr.Most {
 		return Made{}, fmt.Errorf("the tune runs %d sources, and a source column numbers"+
-			" %d", len(sources), ymxr.Most)
+			" %d", count, ymxr.Most)
 	}
 	// Transformation numbers follow YMXS first-use order. Ignore remaps on
 	// timers outside the tune; the count limit applies only when an
@@ -172,6 +177,20 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	return Made{Columns: columns, Sources: ymxr.Passed(built), Rate: tune.Rate}, nil
 }
 
+// copiesFrom reports whether a row starts copy from frame (SPEC.md 3.1.7).
+func copiesFrom(rows []ymxs.Row) bool {
+	for _, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			if start, ok := one.Effect.(ymxs.Start); ok {
+				if _, copies := start.Connection.(ymxs.CopyFromFrame); copies {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // selects reports whether any row sets one of the four columns from first
 // to a number 1 to 127, a transformation or a cut (SPEC.md 3.3.5).
 func selects(column [][]byte, first int) bool {
@@ -235,12 +254,24 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		if err != nil {
 			return 0, err
 		}
+		_, copies := e.Connection.(ymxs.CopyFromFrame)
+		if mapping != 0 && copies {
+			return 0, fmt.Errorf("row %d: copy from frame on %s through transformation %d,"+
+				" which this version leaves to a later one (SPEC.md section 8)", at,
+				ymxs.TargetName(runs), mapping)
+		}
+		maps.copies[i] = copies
 		reaches := ymxs.TargetNumber(runs)
 		if reaches != target[i] {
 			out[t] = byte(0x80 | reaches)
 			target[i] = reaches
 		}
-		out[t+1] = byte(0x80 | (indexOf(sources, ymxs.ConnectionSource(e.Connection)) + 1))
+		// Copy from frame is source S, after the tables (3.1.7).
+		number := indexOf(sources, ymxs.ConnectionSource(e.Connection)) + 1
+		if copies {
+			number = len(sources) + 1
+		}
+		out[t+1] = byte(0x80 | number)
 		maps.start(out, i, mapping, runs, e.Deferred)
 		timing := e.Timing
 		now, err := selectOf(timing.Prescaler)
@@ -271,10 +302,14 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			out[t+3] = byte(rate)
 		}
 		kept.keep(i, one)
+		used := 1 << i
 		if deferred {
-			return 1<<i | ymxr.Defers, nil
+			used |= ymxr.Defers
 		}
-		return 1 << i, nil
+		if copies {
+			used |= ymxr.Copies
+		}
+		return used, nil
 	case ymxs.Retune:
 		now, err := selectOf(e.Timing.Prescaler)
 		if err != nil {
@@ -335,7 +370,7 @@ func (r *rates) keep(i int, one ymxs.Effect) {
 		if !e.Deferred {
 			r.selects[i], _ = selectOf(e.Timing.Prescaler)
 			r.count[i] = e.Timing.Count
-			_, r.counting[i] = ymxs.SourceRows(ymxs.ConnectionSource(e.Connection)).Repeat()
+			r.counting[i] = ymxs.ConnectionRepeats(e.Connection)
 		}
 	case ymxs.Retune:
 		r.selects[i], _ = selectOf(e.Timing.Prescaler)
@@ -410,7 +445,7 @@ func cutsOf(rows []ymxs.Row, claimed [4]bool) cutting {
 			var cut ymxs.Cut
 			switch e := one.Effect.(type) {
 			case ymxs.Start:
-				if e.Cut == ymxs.Whole(ymxs.ConnectionSource(e.Connection)) {
+				if e.Cut == ymxs.ConnectionWhole(e.Connection) {
 					continue
 				}
 				cut = e.Cut
@@ -456,7 +491,7 @@ func indexOfCut(list []ymxs.Cut, cut ymxs.Cut) int {
 func (c *cutting) value(one ymxs.Effect, claimed bool) int {
 	switch e := one.(type) {
 	case ymxs.Start:
-		if e.Cut == ymxs.Whole(ymxs.ConnectionSource(e.Connection)) {
+		if e.Cut == ymxs.ConnectionWhole(e.Connection) {
 			return 0
 		}
 		return indexOfCut(c.list, e.Cut) + 1
@@ -541,6 +576,10 @@ type mappings struct {
 	// runs records the latest start's target, or the first start's target
 	// before one occurs. Used for remap diagnostics.
 	runs [4]ymxs.Target
+
+	// copies marks the effects whose last start in row order is copy from
+	// frame, whose mapping is 0 (rule 2(j)).
+	copies [4]bool
 }
 
 // transforms reports whether an encoded start or remap uses a
@@ -656,6 +695,11 @@ func (m *mappings) remap(out []byte, i int, mapping ymxs.Mapping, at int) error 
 	if err != nil {
 		return err
 	}
+	if number != 0 && m.copies[i] {
+		return fmt.Errorf("row %d: a remap through transformation %d of copy from frame on"+
+			" %s, which this version leaves to a later one (SPEC.md section 8)", at, number,
+			ymxs.TargetName(m.runs[i]))
+	}
 	if m.running[i] == number {
 		return nil
 	}
@@ -731,8 +775,19 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			}
 			source := ymxs.ConnectionSource(start.Connection)
 			runs := ymxs.ConnectionTarget(start.Connection)
-			n := indexOf(sources, source)
 			number := ymxs.TargetNumber(runs)
+			if source == nil {
+				// copy from frame has no table, and its marker is the
+				// player's (SPEC.md 3.1.7); its target is one this version
+				// encodes
+				if number >= len(ymxr.Marker) {
+					return marks{}, fmt.Errorf("copy from frame runs on %s, a target this"+
+						" version leaves to a later one (SPEC.md section 8)",
+						ymxs.TargetName(runs))
+				}
+				continue
+			}
+			n := indexOf(sources, source)
 			through := !ymxs.IsIdentity(start.Mapping)
 			identity[n] = identity[n] || !through
 			out.mixer[n] = out.mixer[n] || through && number == ymxr.MixerTarget

@@ -60,7 +60,7 @@ func Header(tune ymxr.File) string {
 		}
 		line.WriteByte(']')
 	}
-	if tune.Version == ymxr.VersionCut {
+	if ymxr.HasCuts(tune.Effects) {
 		line.WriteString(",\"cuts\":[")
 		for n, one := range tune.Cuts {
 			if n > 0 {
@@ -116,7 +116,7 @@ func Trace(tune ymxr.File, calls int) []byte {
 			if tune.Version >= ymxr.Version {
 				fmt.Fprintf(&out, ",\"mapping\":%d", e.Mapping)
 			}
-			if tune.Version == ymxr.VersionCut {
+			if tune.Version >= ymxr.VersionCut {
 				fmt.Fprintf(&out, ",\"cut\":%d", e.Cut)
 			}
 			out.WriteByte('}')

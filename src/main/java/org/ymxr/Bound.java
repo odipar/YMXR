@@ -161,6 +161,27 @@ final class Bound {
         return shared ? new SourcePool(tables, offsets, bytes) : SourcePool.EMPTY;
     }
 
+    /** The tune file read, as every binder reads it. */
+    static TuneFile readable(byte[] tuneFile) {
+        return TuneFile.read(tuneFile);
+    }
+
+    /**
+     * The version a bound tune of the tune file records, the layout of its
+     * header and index (BINARIES.md 1.2): the tune file's, and for a tune
+     * file of version 12 the version of its columns, 11 where it cuts a
+     * source, 10 where it maps a value and cuts none, and 9 otherwise. Bit
+     * 7 of its effects byte marks copy from frame, which the index leaves
+     * out: copy from frame is source S, the tables plus 1 (SPEC.md 3.1.7).
+     */
+    static int layout(TuneFile tune) {
+        if (tune.version() != Tune.COPY) {
+            return tune.version();
+        }
+        return Columns.cuts(tune.effects()) ? Tune.CUT
+                : Columns.maps(tune.effects()) ? Tune.VERSION : Tune.UNMAPPED;
+    }
+
     /** The set of tunes bound with as few images as the figures allow. */
     static Set of(List<byte[]> tuneFiles) {
         // A tune joins the first group whose image would carry its table:
@@ -171,7 +192,7 @@ final class Bound {
         int[] image = new int[tuneFiles.size()];
         int[] table = new int[tuneFiles.size()];
         for (int i = 0; i < tuneFiles.size(); i++) {
-            String key = shape(TuneFile.read(tuneFiles.get(i)).dtx3());
+            String key = shape(readable(tuneFiles.get(i)).dtx3());
             int at = keys.indexOf(key);
             if (at < 0) {
                 at = keys.size();
@@ -234,7 +255,7 @@ final class Bound {
      * transformation block (doc/BINARIES.md 1).
      */
     static byte[] of(byte[] tuneFile) {
-        byte[] image = Packager.image(TuneFile.read(tuneFile).dtx3());
+        byte[] image = Packager.image(readable(tuneFile).dtx3());
         return build(tuneFile, image,
                 Tune.getLong(image, FORMAT_AT + FORMAT_TABLE_AT),
                 Tune.getLong(image, FORMAT_AT + FORMAT_STATE_AT));
@@ -462,9 +483,10 @@ final class Bound {
     private static byte[] build(byte[] tuneFile, byte @Nullable [] image, int table,
                                 int state) {
         TuneFile tune = TuneFile.read(tuneFile);
-        int version = tune.version();
-        int from = Tune.indexAt(version);
+        int version = layout(tune);
+        int from = Tune.indexAt(tune.version());
         int index = indexAt(version);
+        // the tables; copy from frame, source S, is the count plus 1
         int count = tune.sources().size();
         byte[][] tables = new byte[count][];
         for (int i = 0; i < count; i++) {
@@ -505,6 +527,7 @@ final class Bound {
         System.arraycopy(tuneFile, 0, bound, 0, Tune.TABLE_AT);
         System.arraycopy(MAGIC, 0, bound, 0, 4);
         Tune.putWord(bound, 4, version);
+        bound[Tune.COUNT_AT] = (byte) count;
         Tune.putLong(bound, STATE_AT, state);
         Tune.putLong(bound, IMAGE_AT, imageAt);
         // Where this tune's table is in the image it is packaged into. An

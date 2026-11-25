@@ -497,9 +497,10 @@ final class LinkTest {
         for (String name : names) {
             TuneFile tune = TuneFile.read(Files.readAllBytes(KIT.resolve(name)));
             boolean defers = (tune.effects() & Columns.DEFERS) != 0;
-            // a tune that maps a value or cuts a source links from a core
-            // with the lookup in
-            boolean maps = (tune.effects() & (Columns.MAPS | Columns.CUTS)) != 0;
+            // a tune that maps a value, cuts a source or copies from frame
+            // links from a core with the lookup in
+            boolean maps = (tune.effects() & (Columns.MAPS | Columns.CUTS | Columns.COPIES))
+                    != 0;
             assertTrue(Link.links(defers, maps), name);
             Binaries.Binary binary = Binaries.binary(false, false, true, defers, maps);
             byte[] carried = Binaries.carried(binary.name());

@@ -1023,7 +1023,8 @@ final class ConsistencyTest {
         }
         Matcher tunes = wrapped("`doc/conformance/tunes/` has (\\w+) tune files: (\\w+) a reader"
                 + " reads, (\\w+) of version (\\d+), (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr`,"
-                + " and (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr` and `([\\w-]+)\\.ymxr`, and"
+                + " (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr` and `([\\w-]+)\\.ymxr`, and"
+                + " (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr`, and"
                 + " `wrong-version\\.ymxr`, version `\\$([0-9A-F]{4})`").matcher(guide);
         assertTrue(tunes.find(), "writing.md has no count of the kit's tune files");
         assertEquals(files.size(), spelled(tunes.group(1)), "the kit's tune files");
@@ -1034,7 +1035,7 @@ final class ConsistencyTest {
             int version = (file[4] & 0xFF) << 8 | file[5] & 0xFF;
             String name = one.getFileName().toString();
             if (name.equals("wrong-version.ymxr")) {
-                assertEquals(Integer.parseInt(tunes.group(12), 16), version,
+                assertEquals(Integer.parseInt(tunes.group(15), 16), version,
                         "wrong-version.ymxr's version");
                 assertTrue(!Tune.reads(version), "wrong-version.ymxr is one a reader"
                         + " reads");
@@ -1045,8 +1046,8 @@ final class ConsistencyTest {
         }
         assertEquals(read, spelled(tunes.group(2)), "the kit's tune files a reader reads");
         assertEquals(List.of(Integer.parseInt(tunes.group(4)), Integer.parseInt(tunes.group(6)),
-                Integer.parseInt(tunes.group(9))), List.copyOf(versions.keySet()),
-                "the versions of the kit's tune files");
+                Integer.parseInt(tunes.group(9)), Integer.parseInt(tunes.group(13))),
+                List.copyOf(versions.keySet()), "the versions of the kit's tune files");
         assertEquals(versions.getOrDefault(Integer.parseInt(tunes.group(4)), List.of()).size(),
                 spelled(tunes.group(3)), "the kit's tune files of version " + tunes.group(4));
         assertEquals(List.of(tunes.group(7) + ".ymxr"),
@@ -1057,6 +1058,10 @@ final class ConsistencyTest {
                 versions.get(Integer.parseInt(tunes.group(9))),
                 "the kit's tune files of version " + tunes.group(9));
         assertEquals(2, spelled(tunes.group(8)), "the count of version " + tunes.group(9));
+        assertEquals(List.of(tunes.group(14) + ".ymxr"),
+                versions.get(Integer.parseInt(tunes.group(13))),
+                "the kit's tune files of version " + tunes.group(13));
+        assertEquals(1, spelled(tunes.group(12)), "the count of version " + tunes.group(13));
         String manifest = read(Path.of("doc/conformance/MANIFEST.txt"));
         for (Path one : files) {
             assertTrue(manifest.contains(" tunes/" + one.getFileName() + "\n"),

@@ -59,7 +59,7 @@ var Blocks = func() []string {
 			all = append(all, fmt.Sprintf("%s%d", kind, i))
 		}
 	}
-	return append(all, "align")
+	return append(all, "copy", "align")
 }()
 
 // Piece is a run of bytes of a core a player linked for one song leaves
@@ -301,6 +301,17 @@ func BlocksOf(tunes []ymxr.File) []string {
 			if tune.Effects&ymxr.Defers != 0 && sets(tune, ymxr.Effect+4*i+2, ymxr.Deferred) {
 				needed[fmt.Sprintf("defer%d", i)] = true
 			}
+			for _, target := range CopiesOf(tune, i) {
+				// copy from frame runs the handler of its target's
+				// registers, of the kinds the start of several columns
+				// finds in its tables (copy.S)
+				needed["copy"] = true
+				if kind := CopyKind(target); kind != "general" {
+					needed[kind] = true
+					needed[fmt.Sprintf("%s%d", kind, i)] = true
+					needed["several"] = true
+				}
+			}
 			for _, s := range Started(tune, i) {
 				source := tune.Sources[s-1]
 				kind := Kind(source, tune.Counted[s-1])
@@ -321,6 +332,73 @@ func BlocksOf(tunes []ymxr.File) []string {
 		}
 	}
 	return ordered
+}
+
+// countedRegisters are the registers that read every bit of their byte, a
+// bit a register: R0, R2, R4, R7, R11 and R12 (SPEC.md 2.1.2).
+const countedRegisters = 0x1895
+
+// CopyKind is the handler kind copy from frame runs on a target (copy.S): the
+// general handler, in the effect's block, for a register of seven bits or
+// fewer; the counted handler for one that reads every bit; and the handler of
+// the target's columns for a target of several registers, the counted one of
+// two for setEnvelope.
+func CopyKind(target int) string {
+	switch {
+	case target < 14 && countedRegisters>>target&1 != 0:
+		return "counted"
+	case target < 14:
+		return "general"
+	case target == 20:
+		return "envelope"
+	case target >= 17 && target <= 21:
+		return "three"
+	}
+	return "two"
+}
+
+// CopyCounted is the counted kind of the target's columns, which copy from
+// frame runs once a recut moves it there, through mapping 0 (rule 2(j);
+// 68k/player/cut.S, ymxr_recut).
+func CopyCounted(target int) string {
+	switch {
+	case target < 14:
+		return "counted"
+	case target >= 17 && target <= 21 && target != 20:
+		return "countedthree"
+	}
+	return "envelope"
+}
+
+// CopiesOf is the kept targets of effect i at each start of copy from frame,
+// source S of a tune of version 12 (SPEC.md 3.1.7): the target column last set
+// on the effect, through the wrap, 0 before a row sets it, each once in the
+// order of the first start on it.
+func CopiesOf(tune ymxr.File, i int) []int {
+	if !tune.Copies() {
+		return nil
+	}
+	var out []int
+	seen := map[int]bool{}
+	t := ymxr.Effect + 4*i
+	kept := 0
+	rows, repeat := tune.Table.Rows(), tune.Table.Repeat()
+	for pass := 0; pass < 2; pass++ {
+		from := 0
+		if pass == 1 {
+			from = repeat
+		}
+		for r := from; r < rows; r++ {
+			if target := int(tune.Table.Column(t)[r]); target&0x80 != 0 {
+				kept = target & 0x7F
+			}
+			if int(tune.Table.Column(t + 1)[r]) == 0x80|tune.Count() && !seen[kept] {
+				seen[kept] = true
+				out = append(out, kept)
+			}
+		}
+	}
+	return out
 }
 
 // CutsOf is whether effect i cuts a source: the tune is of version 11,
@@ -604,13 +682,21 @@ func countedRow(tune ymxr.File, row int, all *[4]under, add func(string)) {
 			}
 		}
 		for r := range one.runs {
-			if !r.counting || r.source < 1 || r.source > len(tune.Sources) {
+			if !r.counting {
 				continue
 			}
-			source := tune.Sources[r.source-1]
-			kind := Kind(source, true)
-			if r.mapping != 0 {
-				kind = countedLookup(source.Columns(), r.target)
+			var kind string
+			switch {
+			case tune.Copies() && r.source == tune.Count():
+				kind = CopyCounted(r.target)
+			case r.source >= 1 && r.source <= len(tune.Sources):
+				source := tune.Sources[r.source-1]
+				kind = Kind(source, true)
+				if r.mapping != 0 {
+					kind = countedLookup(source.Columns(), r.target)
+				}
+			default:
+				continue
 			}
 			add(kind)
 			add(fmt.Sprintf("%s%d", kind, i))

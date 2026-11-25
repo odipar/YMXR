@@ -21,6 +21,10 @@ const Maps = 0x20
 // (SPEC.md 3.3).
 const Cuts = 0x40
 
+// Copies is effects-used bit 7: version 12, a row starts copy from frame,
+// the last entry of the source index (SPEC.md 3.1.7, 3.3).
+const Copies = 0x80
+
 // CutColumn is the first cut column where the tune maps a value, and All
 // the column count of a table that maps a value and cuts a source
 // (SPEC.md 3.3.5). Where the tune maps none, the cut columns are 30 to 33.
@@ -56,6 +60,11 @@ func HasMapping(effects int) bool {
 // HasCuts is whether the effects byte marks the cut columns, bit 6.
 func HasCuts(effects int) bool {
 	return effects&Cuts != 0
+}
+
+// HasCopies is whether the effects byte marks copy from frame, bit 7.
+func HasCopies(effects int) bool {
+	return effects&Copies != 0
 }
 
 // ColumnCount is the column count of a table of that effects byte: 30,
