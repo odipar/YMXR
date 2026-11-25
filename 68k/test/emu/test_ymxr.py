@@ -952,17 +952,18 @@ class Model:
         if r[t] & 0x80:
             fx["target"] = r[t] & 0x7F
         fx["restart"] = False
-        # Whether a tick since the frame before performed a pending start:
-        # the player settles the record at this frame, after a recut, so a
-        # recut on this frame reads the start as pending (68k/player/effect.S,
-        # _retune; cut.S, ymxr_recut)
-        switched = fx.pop("switched", False)
         # Whether this row writes the timer a select. A stopped timer starts
         # on one, bit 6 set or clear (SPEC.md 1.9), so a restart is due for
         # a stopped timer on the select alone.
         fx["selected"] = False
         fx["reset_place"] = False
         fx["set"] = bool((r[t] | r[t + 1] | r[t + 2] | m | x) & 0x80) or r[t + 3] != 0
+        # Whether a tick performed a pending start since the effect's last
+        # row that set a column of it: the player settles the record at the
+        # first such row, after a recut, and the effect's head skips a row
+        # that sets none of its columns, so a recut on that row reads the
+        # start as pending (68k/player/effect.S, _retune; cut.S, ymxr_recut)
+        switched = fx.pop("switched", False) if fx["set"] else fx.get("switched", False)
         if not r[t + 1] & 0x80 and m & 0x80:
             # Remap changes kept and running mappings, preserving
             # source, place and rate. Use timer state before any reset
