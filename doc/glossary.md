@@ -91,9 +91,10 @@ repository encodes YMXS's structure and reads DTX's table.
 | square wave | A source of two rows, a level and 0, repeating to row 0. | terminology.md, 5. Effects |
 | state block | The bytes DTX's reader keeps for a table while it reads it, sized by the image's format block; the host allocates them at the end of the workspace. | BINARIES.md 1 |
 | stop | A source column set to 0: the player writes select 0 to the timer's control register and clears its pending bit. | SPEC.md 1.8 |
+| sync | Of a voice: 0 written to the two registers of its period, a wait of at least 9 cycles of the chip's clock, then the period written, fine then coarse, so the square's next edge falls one period later. A row syncs the voices bit 5 of their coarse columns marks, in version 13, and a tick of `syncToneA` to `syncToneC` syncs its voice. | YMXS, SPEC.md 3.9; SPEC.md 1.12 |
 | sync buzzer | A source of one row run on `setR13`: each tick restarts the envelope, so the rate of the timer is the pitch. | terminology.md, 5. Effects |
 | table | `R` rows of `C` columns, every value `W` bytes, repeating at `RR`. A tune's table and a source's are one kind: the player reads one a row a frame and the other a row a tick. | terminology.md, 3. Tables, rows and procedures |
-| target | The procedure a tick calls with a source's row (YMXS, SPEC.md 3.1). `setR0` to `setR13`, 0 to 13, write the row to that register, and `setToneA` to `setNoiseC`, 14 to 24, write two or three (SPEC.md 2.1); an effect's target column numbers one, and 25 to 127 are unassigned. | YMXS, SPEC.md 3.1; SPEC.md 2.1 |
+| target | The procedure a tick calls with a source's row (YMXS, SPEC.md 3.1). `setR0` to `setR13`, 0 to 13, write the row to that register, and `setToneA` to `setNoiseC`, 14 to 24, write two or three, and `syncToneA` to `syncToneC`, 25 to 27, sync a voice and write its period (SPEC.md 2.1); an effect's target column numbers one, and 28 to 127 are unassigned. | YMXS, SPEC.md 3.1; SPEC.md 2.1 |
 | target column | Column 14 + 4i of effect i: bit 7 the set bit, bits 6 to 0 the target number, 0 to 127. | SPEC.md 1.8 |
 | tick | One interrupt of a timer: one row of its source read and written by its target. | terminology.md, 4. Frames and ticks |
 | timer | One of the MFP's four. It counts the divided clock down from its count and raises an interrupt at zero. | terminology.md, 2. The timers |

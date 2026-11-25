@@ -114,22 +114,24 @@ more. A reader that reads the block through its index reads past the list,
 and a block without the tag after byte M - O has no list. A bound tune of
 version 11 also copies the *cut index* unchanged: bytes Q to Q + 8U + 1 of
 the tune file, Q the header's long at 20 and U the word at Q (SPEC.md
-3.5.2). A tune file of version 12 binds at the layout of version 11 where
-bit 6 of its effects used is 1, of version 10 where bit 5 is 1 and bit 6
-is 0, and of version 9 otherwise, its effects byte as the tune file has
-it, bit 7 at 1: its source index lists the tables, entries 1 to S - 1 of
-the tune file, and copy from frame is source `S` + 1 (SPEC.md 3.1.7).
+3.5.2). A tune file of version 12 or 13 binds at the layout of version 11
+where bit 6 of its effects used is 1, of version 10 where bit 5 is 1 and
+bit 6 is 0, and of version 9 otherwise, its effects byte as the tune file
+has it. Where bit 7 is 1 its source index lists the tables, entries 1 to S
+- 1 of the tune file, and copy from frame is source `S` + 1 (SPEC.md
+3.1.7). Bit 7 of byte 10 marks a tune file of version 13, a tune that
+syncs a voice (SPEC.md 1.12).
 
 **1.2 Layout.**
 
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version of the tune file bound (SPEC.md 3.3.5): $0009, $000A for a tune that maps a value, $000B for a tune that cuts a source, and $0007 or $0008 for a tune file of that version; for a tune file of version 12, the version of its layout (1.1) |
+| 4 | 2 | the version of the tune file bound (SPEC.md 3.3.5): $0009, $000A for a tune that maps a value, $000B for a tune that cuts a source, and $0007 or $0008 for a tune file of that version; for a tune file of version 12 or 13, the version of its layout (1.1) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
-| 9 | 1 | `S`, the source count, from the tune file; in a tune file of version 12, its count less 1, the tables (1.1) |
-| 10 | 2 | bytes 10 and 11 of the tune file, copied; the player skips them |
+| 9 | 1 | `S`, the source count, from the tune file; where bit 7 of the effects used is 1, its count less 1, the tables (1.1) |
+| 10 | 2 | bytes 10 and 11 of the tune file, copied, with bit 7 of byte 10 set for a tune file of version 13 (1.1); the player reads that bit alone. In a tune file bit 7 of byte 10 is 0: the name is within 32,768 bytes of the start (SPEC.md 3.3) |
 | 12 | 4 | the state block's bytes, unsigned: the format block's field at +4 of the image the table is in |
 | 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
 | 20 | 4 | where this tune's table is, from the image's first byte, unsigned: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
@@ -188,11 +190,13 @@ fields.
 2. The field at 16 and the field at 8; where bit 4 of the field at 8 is
    set and the player is assembled without the deferred start (2.1),
    report -1 and stop. In a player assembled with the lookup, report -1
-   and stop where bit 5 is set and the version is $0007 to $0009, or
-   $000B with the field at 24 at 0; and where bit 6 is set and the
-   version is other than $000B, or clear and the version is $000B. In a
-   player assembled without the lookup, report -1 and stop where bit 7
-   is set (SPEC.md 3.1.7).
+   and stop where bit 5 is set and the version is $0007 to $0009, or $000B
+   with the field at 24 at 0; and where bit 6 is set and the version is
+   other than $000B, or clear and the version is $000B. In a player
+   assembled without the lookup, report -1 and stop where bit 7 is set
+   (SPEC.md 3.1.7). Then the field at 10: report -1 and stop where its bit
+   7 is set, a tune that syncs a voice (SPEC.md 1.12), which this version
+   of the player leaves to a later one.
 3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
@@ -212,8 +216,9 @@ fields.
    5.6 in their form.
 7. Report 0.
 
-The player skips fields 6, 10 and 12. The host supplies the frame clock
-(5.4) and allocates the workspace sized by field 12 (5.2).
+The player skips field 6, field 10 other than bit 7 of its first byte, and
+field 12. The host supplies the frame clock (5.4) and allocates the
+workspace sized by field 12 (5.2).
 
 ---
 

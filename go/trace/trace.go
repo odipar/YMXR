@@ -25,7 +25,7 @@ func Calls(table *dtx.Table) int {
 func Header(tune ymxr.File) string {
 	var line bytes.Buffer
 	fmt.Fprintf(&line, "{\"rate\":%d,\"effects\":%d,\"sources\":[", tune.FrameRate,
-		tune.Effects)
+		tune.Effects&0xFF)
 	for i, s := range tune.Sources {
 		if i > 0 {
 			line.WriteByte(',')
@@ -100,7 +100,24 @@ func Trace(tune ymxr.File, calls int) []byte {
 				first = false
 			}
 		}
-		out.WriteString("},\"e\":{")
+		out.WriteByte('}')
+		// SPEC.md 7.3: in version 13 the voices the row syncs, after w,
+		// where it syncs one.
+		if model.Syncs != 0 {
+			out.WriteString(",\"s\":[")
+			first = true
+			for v := 0; v < 3; v++ {
+				if model.Syncs&(1<<v) != 0 {
+					if !first {
+						out.WriteByte(',')
+					}
+					fmt.Fprintf(&out, "\"%c\"", 'A'+v)
+					first = false
+				}
+			}
+			out.WriteByte(']')
+		}
+		out.WriteString(",\"e\":{")
 		first = true
 		for i := 0; i < 4; i++ {
 			e := model.Effect[i]

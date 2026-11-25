@@ -182,17 +182,19 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 12, which a writer writes where a row starts copy from
-# frame, and which the binder binds at the layout of 9, 10 or 11; 11,
+# (BINARIES.md 1): 13, which a writer writes where a row syncs a voice,
+# and 12, which it writes where a row starts copy from frame, each of
+# which the binder binds at the layout of 9, 10 or 11; 11,
 # which it writes where a row cuts a source, 10, which it writes where a
 # row maps a value, 9, which it writes otherwise, 8, read as 9, and 7,
 # whose control columns have bit 3 at 0, each a tune whose table is DTX3,
 # which a reader reads.
-TUNE_VERSIONS = (12, 11, 10, 9, 8, 7)
+TUNE_VERSIONS = (13, 12, 11, 10, 9, 8, 7)
 WRITTEN = 9
 MAPPED = 10
 CUT = 11
 COPY = 12
+SYNC = 13
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
@@ -446,7 +448,7 @@ def needs(effects):
 
 
 def layout_of(effects):
-    """The version a binder binds a tune file of version 12 at: the
+    """The version a binder binds a tune file of version 12 or 13 at: the
     layout of 11 where a row cuts a source, of 10 where a row maps a value,
     and of 9 otherwise (BINARIES.md 1.2)."""
     return CUT if effects & 0x40 else MAPPED if effects & 0x20 else WRITTEN
@@ -2507,14 +2509,14 @@ def pending_stops(title, at, rows, code, symbols):
 
 def tune_file(file):
     """Tune-file header fields: version, source count, DTX3 offset,
-    optional transformation-index offset of versions 10 to 12, and
-    source-index offset: 16, 20 in version 10, and 24 in versions 11 and
-    12 after the cut index's (SPEC.md 3.3).
+    optional transformation-index offset of versions 10 to 13, and
+    source-index offset: 16, 20 in version 10, and 24 in versions 11 to
+    13 after the cut index's (SPEC.md 3.3).
     """
     version = struct.unpack(">H", file[4:6])[0]
     return (version, file[9], long_at(file, 12),
             long_at(file, 16) if version >= MAPPED else None,
-            {MAPPED: 20, CUT: 24, COPY: 24}.get(version, 16))
+            {MAPPED: 20, CUT: 24, COPY: 24, SYNC: 24}.get(version, 16))
 
 
 def edited(file, edits):
@@ -4008,8 +4010,17 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
     tune.written = version
-    assert tune.version == (layout_of(tune.effects) if version == COPY else version), \
+    assert tune.version == (layout_of(tune.effects) if version in (COPY, SYNC)
+                            else version), \
         "the binder wrote version %d of a tune file of %d" % (tune.version, version)
+    assert bool(bound[10] & 0x80) == (version == SYNC), \
+        "bit 7 of byte 10 of the bound tune of a tune file of version %d" % version
+    if version == SYNC:
+        # a tune that syncs a voice: this player reports -1 for it
+        # (BINARIES.md 1.5)
+        assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
+            & 0xFFFFFFFF == 0xFFFFFFFF, "init took a tune that syncs a voice"
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0), [], 0, []), [], None
     defer, lookup = needs(tune.effects)
     have = ("ymxr_bank1" in symbols, "ymxr_look" in symbols)
     if (defer and not have[0]) or (lookup and not have[1]):
@@ -8539,8 +8550,11 @@ def main():
                 line += ", a tick at %d boundaries of the frame" % len(boundaries)
             if refills_of:
                 measured[os.path.basename(ym)[:-3].replace("  ", " ")] = refills_of
-            if kit:
+            if kit and frames:
                 line += ", the player's frames are the reader's entries"
+            elif kit:
+                # a tune of version 13, which syncs a voice (check)
+                line += ", init reports -1 for a tune that syncs a voice"
             if cost and perf:
                 line += ", no cost figures: the monitor's cycles run inside the call"
             if cost and not perf:

@@ -65,6 +65,7 @@ final class Link {
             }
         }
         all.add("copy");
+        all.add("sync");
         all.add("align");
         return List.copyOf(all);
     }
@@ -95,7 +96,7 @@ final class Link {
      * sets the effect's cut column, needs its paths that read the column,
      * {@code cut0} for effect 0, the cut's routines, its remap, and the
      * counted kinds and {@code several} that {@link #counted} reads in its
-     * rows.
+     * rows. A tune of version 13, which syncs a voice, needs {@code sync}.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
@@ -103,6 +104,9 @@ final class Link {
         for (TuneFile tune : tunes) {
             if (tune.version() == Tune.VERSION || Columns.maps(tune.effects())) {
                 needed.add("lookup");
+            }
+            if (Columns.syncs(tune.effects())) {
+                needed.add("sync");
             }
             for (String lookup : lookups(tune)) {
                 needed.add(lookup);

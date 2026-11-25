@@ -44,6 +44,10 @@ type Replay struct {
 	Written         [14]int
 	Effect          [4]Effect
 	EnvelopeWritten bool
+	// Syncs is the voices the last row syncs, bit 0 voice A to bit 2 voice
+	// C: bit 5 of each coarse column in version 13, read on every row
+	// (SPEC.md 1.12).
+	Syncs int
 
 	table *dtx.Table
 	row   int
@@ -78,6 +82,12 @@ func (m *Replay) Step() {
 	r := make([]byte, columns)
 	for c := 0; c < columns; c++ {
 		r[c] = m.table.Column(c)[m.row]
+	}
+	m.Syncs = 0
+	for v := 0; ymxr.HasSyncs(m.effects) && v < 3; v++ {
+		if r[1+2*v]&ymxr.Sync != 0 {
+			m.Syncs |= 1 << v
+		}
 	}
 	m.row++
 	if m.row == m.table.Rows() {

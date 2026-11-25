@@ -160,7 +160,7 @@ row or the source and exits 1.
 | a source of two or three columns of more than 65,534 rows | a player keeps the stride of its columns, align(R), in a word (3.1.3, section 8) |
 | a count past 255 | the count column is the timer's data register, a byte (1.9) |
 | a start, or a remap on a timer of the tune, through a transformation for a value other than the last of its target | the mapping column maps the last value alone (1.10) |
-| a target past 24 | 25 to 127 are left to a later version (2.1, section 8) |
+| a target past 27 | 28 to 127 are left to a later version (2.1, section 8) |
 | a source on two targets whose markers are in different columns | a source has one marker column (SPEC.md 6, rule 2(d)) |
 | a source on `setR7` and on `setR0`, `setR2`, `setR4`, `setR11` or `setR12` | every row of a source on `setR7` has the two port directions, bits 7 and 6 (SPEC.md 6, rule 2(f)) |
 | a value past 127 in the marker's column of a marked source | bit 7 of that column is the marker (3.2) |

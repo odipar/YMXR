@@ -59,7 +59,7 @@ var Blocks = func() []string {
 			all = append(all, fmt.Sprintf("%s%d", kind, i))
 		}
 	}
-	return append(all, "copy", "align")
+	return append(all, "copy", "sync", "align")
 }()
 
 // Piece is a run of bytes of a core a player linked for one song leaves
@@ -269,12 +269,16 @@ func Kind(source *dtx.Table, counted bool) string {
 // that cuts a source, in a tune of version 11 whose row sets the effect's
 // cut column, needs its paths that read the column, cut0 for effect 0, the
 // cut's routines, its remap, and the counted kinds and several that
-// CountedOf reads in its rows.
+// CountedOf reads in its rows. A tune of version 13, which syncs a voice,
+// needs sync.
 func BlocksOf(tunes []ymxr.File) []string {
 	needed := map[string]bool{"align": true}
 	for _, tune := range tunes {
 		if tune.Version == ymxr.Version || ymxr.HasMapping(tune.Effects) {
 			needed["lookup"] = true
+		}
+		if ymxr.HasSyncs(tune.Effects) {
+			needed["sync"] = true
 		}
 		for _, lookup := range LookupsOf(tune) {
 			needed[lookup] = true

@@ -82,6 +82,16 @@ final class Columns {
     /** Effects-used bit 7: version 12, a row starts copy from frame, the
      *  last entry of the source index (SPEC.md 3.1.7, 3.3). */
     static final int COPIES = 0x80;
+    /** A bit above the effects byte, which the file leaves out: a row
+     *  syncs a voice, at its frame or through a target of a sync, which
+     *  version 13 marks (SPEC.md 1.12, 3.3.5). */
+    static final int SYNCS = 0x100;
+    /** Bit 5 of a coarse column, 1, 3 or 5, in version 13: the row syncs
+     *  the voice, read on every row (SPEC.md 1.2.2, 1.12). */
+    static final int SYNC = 0x20;
+    /** The first target of a sync, `syncToneA`; 26 and 27 are `syncToneB`
+     *  and `syncToneC` (SPEC.md 2.1). */
+    static final int SYNC_TARGET = 25;
 
     /** Bit 4 of a control column: the count column beside it is 0, and
      *  that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9). */
@@ -98,10 +108,11 @@ final class Columns {
      *  register, so the marker is in their one column where the
      *  register leaves bit 7 and the source is counted where it does not;
      *  14 to 19 mark the coarse nibble, 20, `setEnvelope`, writes two
-     *  whole bytes and is counted, 21 marks the envelope shape, and 22 to
-     *  24 the noise period. */
+     *  whole bytes and is counted, 21 marks the envelope shape, 22 to 24
+     *  the noise period, and 25 to 27, the targets of a sync, the coarse
+     *  nibble. */
     static final int[] MARKER = {-1, 0, -1, 0, -1, 0, 0, -1, 0, 0, 0, -1, -1, 0,
-                                 1, 1, 1, 1, 1, 1, -1, 2, 0, 0, 0};
+                                 1, 1, 1, 1, 1, 1, -1, 2, 0, 0, 0, 1, 1, 1};
 
     /** Bits 7 and 6 of R7, the directions of the two I/O ports, which an
      *  Atari ST writes as 1 (SPEC.md 1.4.2). A row's write reads them
@@ -196,6 +207,12 @@ final class Columns {
     /** Whether the effects byte marks copy from frame, bit 7. */
     static boolean copies(int effects) {
         return (effects & COPIES) != 0;
+    }
+
+    /** Whether a row syncs a voice, at its frame or through a target of a
+     *  sync: the bit above the effects byte (SPEC.md 3.3.5). */
+    static boolean syncs(int effects) {
+        return (effects & SYNCS) != 0;
     }
 
     /** The column count of a table of that effects byte: 30, with four

@@ -644,6 +644,35 @@ final class ParityTest {
         both("ymxr-sndh", mapped, "-silent");
     }
 
+    /**
+     * Version 13 in both trees: a tune that syncs a voice converted from its
+     * structure and read back, its record and its check, the files of
+     * version 13 written wrong, its bound tune and its SNDH file, and a tune
+     * that syncs at its frame alone (SPEC.md 1.12, 3.3.4, 3.3.5; BINARIES.md
+     * 1.2).
+     */
+    @Test
+    void aTuneThatSyncsReadsTheSameInBothTrees() throws Exception {
+        byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.tune())).getBytes(StandardCharsets.UTF_8), "-silent");
+        assertEquals(Tune.SYNC, Tune.getWord(file, 4));
+        both("ymxr-trace", file);
+        both("ymxr-check", file);
+        for (java.util.Map.Entry<String, byte[]> one : SyncTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+        }
+        both("ymxr-bind", file, "-silent");
+        both("ymxr-sndh", file, "-silent");
+        byte[] frames = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.frames())).getBytes(StandardCharsets.UTF_8), "-silent");
+        both("ymxr-trace", frames);
+        both("ymxr-bind", frames, "-silent");
+        both("ymxr-sndh", frames, "-silent");
+    }
+
     private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {
         byte[] structure = org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
                 .getBytes(StandardCharsets.UTF_8);

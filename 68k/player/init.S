@@ -47,6 +47,14 @@ YMXR_init:
                 bmi     .bad6
                 ENDPIECE copy_5
                 .endif
+; A tune that syncs a voice, which bit 7 of byte 10 of the bound tune marks
+; (BINARIES.md 1.5): this player leaves the sync to a later version and
+; reports -1. The block sync, which a link keeps for a song a tune of which
+; syncs a voice (doc/LINKER.md).
+                PIECE   sync_1
+                tst.b   TF_SYNC(a0)
+                bmi     .bad6
+                ENDPIECE sync_1
                 .if     YMXR_MAP
 ; Version 10 bound layout: signed transformation-block offset at 24,
 ; source index at 28 (BINARIES.md 1.2). Version 11: the block at 24, or 0

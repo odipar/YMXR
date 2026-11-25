@@ -27,7 +27,7 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,634 | 3,120 |
+| init | 1,642 | 3,128 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
 | the frame | 2,678 | 4,910 |
 | the frame's read-site tables | 156 | 284 |
@@ -49,7 +49,7 @@ player and of the player with the lookup in:
 | the cut's routines | | 2,674 |
 | copy from frame's routines and frame values | | 1,160 |
 | the lookup instances and the gaps before them, ten kinds | | 6,908 |
-| the player | 9,330 | 27,256 |
+| the player | 9,338 | 27,264 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -135,6 +135,9 @@ A block is the code and data a player runs for one part of a song:
   block reads. In a core without the lookup, `copy` is init's test that
   reports -1 for a tune that copies from frame, which a link leaves out,
   since such a song links on the core with the lookup;
+- `sync` is init's test that reports -1 for a tune that syncs a voice, bit
+  7 of byte 10 of its bound tune (BINARIES.md 1.5), which a song needs
+  where a tune of it is of version 13 (SPEC.md 1.12);
 - `align`, in a core with the deferred start and the lookup, is the gap
   before the second bank, which every song needs.
 
@@ -426,15 +429,16 @@ measures it against the linked core.
 
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
-10,022 bytes, the core with the deferred start in, of 15,276 bytes, the
-core with the lookup in, of 28,048 bytes, or the core with the lookup
-and the deferred start in, of 43,142 bytes.
+10,030 bytes, the core with the deferred start in, of 15,284 bytes, the
+core with the lookup in, of 28,056 bytes, or the core with the lookup
+and the deferred start in, of 43,150 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
 | `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,346 |
+| `sync.ymxr` | the lookup | two, two2, envelope, envelope0, envelope3, several, effect0, effect2, effect3, effects, map3, lookup, lf, lf3, copy, sync | 12,382 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
@@ -452,13 +456,16 @@ and the deferred start in, of 43,142 bytes.
 | `turrican.ymxr` | plain | effect1, effects | 2,682 |
 | `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3, effects | 6,698 |
 
-A tune of general sources alone, with no effect, links 1,336 bytes, 13%
-of the core: the blocks are 8,686 bytes of it. `voices.ymxr` runs all
-four effects, keeps a handler of two or three columns on each and the
-start of several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup
-instances of 3 kinds and links 15,470 bytes of 43,142: the 36 instances
-and the 7 loops of init it leaves out are 14,290 bytes, and the gaps it
-keeps are 734 bytes shorter than in the core.
+A tune of general sources alone, with no effect, links 1,336 bytes, 13% of
+the core: the blocks are 8,694 bytes of it. `voices.ymxr` runs all four
+effects, keeps a handler of two or three columns on each and the start of
+several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup instances
+of 3 kinds and links 15,470 bytes of 43,150: the 36 instances and the 7
+loops of init it leaves out are 14,290 bytes, and the gaps it keeps are
+734 bytes shorter than in the core. `sync.ymxr` keeps 1 lookup instance of
+1 kind and links 12,382 bytes of 28,056: the 39 instances and the 9 loops
+of init it leaves out are 7,660 bytes, and the gaps it keeps are 2 bytes
+shorter than in the core.
 
 ## The check
 

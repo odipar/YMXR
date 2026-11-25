@@ -34,7 +34,7 @@ final class Trace {
      */
     static String header(TuneFile tune) {
         StringBuilder line = new StringBuilder("{\"rate\":").append(tune.frameRate())
-                .append(",\"effects\":").append(tune.effects()).append(",\"sources\":[");
+                .append(",\"effects\":").append(tune.effects() & 0xFF).append(",\"sources\":[");
         for (int i = 0; i < tune.sources().size(); i++) {
             Table s = tune.sources().get(i);
             line.append(i == 0 ? "" : ",").append("{\"rows\":[");
@@ -99,7 +99,20 @@ final class Trace {
                     first = false;
                 }
             }
-            line.append("},\"e\":{");
+            line.append('}');
+            // SPEC.md 7.3: in version 13 the voices the row syncs, after w,
+            // where it syncs one.
+            if (model.syncs != 0) {
+                line.append(",\"s\":[");
+                for (int v = 0; v < 3; v++) {
+                    if ((model.syncs & 1 << v) != 0) {
+                        line.append(Integer.bitCount(model.syncs & (1 << v) - 1) == 0 ? "" : ",")
+                                .append('"').append((char) ('A' + v)).append('"');
+                    }
+                }
+                line.append(']');
+            }
+            line.append(",\"e\":{");
             first = true;
             for (int i = 0; i < 4; i++) {
                 Replay.Effect e = model.effect[i];

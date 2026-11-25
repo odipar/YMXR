@@ -50,6 +50,7 @@ TF_VERSION      equ     4
 TF_RATE         equ     6
 TF_EFFECTS      equ     8
 TF_SOURCES      equ     9
+TF_SYNC         equ     10              ; bit 7: a tune that syncs a voice
 TF_STATE        equ     12
 TF_IMAGE        equ     16
 TF_TABLE        equ     20              ; where this tune's table is in it

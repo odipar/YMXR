@@ -24,8 +24,9 @@ import org.dtx.Table;
  *  offset  bytes  what it is
  *  0       4      YMXR
  *  4       2      the version, $0009, $000A where a row maps a value,
- *                 $000B where a row cuts a source, or $000C where a row
- *                 starts copy from frame
+ *                 $000B where a row cuts a source, $000C where a row
+ *                 starts copy from frame, or $000D where a row syncs a
+ *                 voice
  *  6       2      the frame rate, in Hz
  *  8       1      effects used: bits 3 to 0 the effects, bit 4 a deferred
  *                 start, bit 5 the mapping columns, bit 6 the cut columns,
@@ -33,13 +34,14 @@ import org.dtx.Table;
  *  9       1      S, the source count, 0 to 127
  *  10      2      where the name begins, or zero where the tune has none
  *  12      4      where the DTX3 table begins
- *  16      4      versions 10 to 12: where the transformation index
- *                 begins, 0 in versions 11 and 12 where bit 5 is clear
- *  20      4      versions 11 and 12: where the cut index begins, 0 in
- *                 version 12 where bit 6 is clear
+ *  16      4      versions 10 to 13: where the transformation index
+ *                 begins, 0 in versions 11 to 13 where bit 5 is clear
+ *  20      4      versions 11 to 13: where the cut index begins, 0 in
+ *                 versions 12 and 13 where bit 6 is clear
  *  16..24  4S     the source index, at 16, at 20 in version 10 and at 24
- *                 in versions 11 and 12: where source 1 to S's DTX1 table
- *                 begins, and in version 12 entry S 0, copy from frame
+ *                 in versions 11 to 13: where source 1 to S's DTX1 table
+ *                 begins, and where bit 7 is set entry S 0, copy from
+ *                 frame
  *          ..     the name, its bytes and a zero, where there is one
  *          ..     where bit 5 is set: the transformation index, on a long,
  *                 a word T and T longs, each where a transformation begins
@@ -75,12 +77,20 @@ final class Tune {
     static final int CUT = 0x000B;
 
     /**
-     * The highest supported version, written where a row starts copy from
-     * frame: the header of version 11, the mapping and the cut columns
+     * The version written where a row starts copy from frame and syncs
+     * no voice: the header of version 11, the mapping and the cut columns
      * where bits 5 and 6 of the effects used are set, and index entry S 0
      * (SPEC.md 3.1.7, 3.3.5).
      */
     static final int COPY = 0x000C;
+
+    /**
+     * The highest supported version, written where a row syncs a voice, at
+     * its frame or through a target of a sync: the header of version 12,
+     * bit 7 of the effects used where a row starts copy from frame, and bit
+     * 5 of each coarse column read on every row (SPEC.md 1.12, 3.3.5).
+     */
+    static final int SYNC = 0x000D;
 
     /** Writer version for identity-only tunes: thirty DTX3 columns without
      *  a transformation index. Deferred starts remain available (SPEC.md
@@ -97,24 +107,26 @@ final class Tune {
 
     /** The versions a reader reads, as its report names them. */
     static final String READS = OLDEST + ", " + DEFERRED + ", " + UNMAPPED + ", " + VERSION
-            + ", " + CUT + " or " + COPY;
+            + ", " + CUT + ", " + COPY + " or " + SYNC;
 
     /** Whether a reader reads a file of that version. */
     static boolean reads(int version) {
-        return version >= OLDEST && version <= COPY;
+        return version >= OLDEST && version <= SYNC;
     }
 
-    /** The version a writer writes for a table of that effects byte: 12
-     *  where it copies from frame, 11 where it cuts a source, 10 where it
-     *  maps a value and cuts none, and 9 otherwise (SPEC.md 3.3.5). */
+    /** The version a writer writes for a table of those effects: 13 where
+     *  a row syncs a voice, 12 where it copies from frame, 11 where it cuts
+     *  a source, 10 where it maps a value and cuts none, and 9 otherwise
+     *  (SPEC.md 3.3.5). */
     static int version(int effects) {
-        return Columns.copies(effects) ? COPY : Columns.cuts(effects) ? CUT
-                : Columns.maps(effects) ? VERSION : UNMAPPED;
+        return Columns.syncs(effects) ? SYNC : Columns.copies(effects) ? COPY
+                : Columns.cuts(effects) ? CUT : Columns.maps(effects) ? VERSION : UNMAPPED;
     }
 
     /** The column count of a table of that version and effects byte: 34
      *  in version 10, 34 or 38 in version 11 by bit 5, 30, 34 or 38 in
-     *  version 12 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md 3.3.3). */
+     *  versions 12 and 13 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md
+     *  3.3.3). */
     static int columns(int version, int effects) {
         return version >= CUT ? Columns.count(effects)
                 : version == VERSION ? Columns.MAPPED : Columns.C;
@@ -122,7 +134,7 @@ final class Tune {
 
     /**
      * Source-index offset: 16 in versions 7 to 9; 20 in version 10, after
-     * the transformation-index pointer; 24 in versions 11 and 12, after the
+     * the transformation-index pointer; 24 in versions 11 to 13, after the
      * cut-index pointer (SPEC.md 3.3).
      */
     static int indexAt(int version) {

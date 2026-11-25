@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.Set;
 import org.ymxs.YMXS.Row;
 import org.ymxs.YMXS.Table;
 import org.ymxs.YMXS.Tune;
@@ -38,7 +39,7 @@ final class Padding {
     static final int SHORT = 64;
 
     /** A row that sets no register and leaves every timer running. */
-    static final Row UNSET = new Row(Map.of(), Map.of());
+    static final Row UNSET = new Row(Map.of(), Map.of(), Set.of());
 
     private Padding() {
     }

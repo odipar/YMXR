@@ -57,11 +57,17 @@ const Version = 0x000A
 // 3.3.5).
 const VersionCut = 0x000B
 
-// VersionCopy is the highest supported version, written where a row starts
-// copy from frame: the header of version 11, the mapping and the cut
+// VersionCopy is the version written where a row starts copy from frame
+// and syncs no voice: the header of version 11, the mapping and the cut
 // columns where bits 5 and 6 of the effects used are set, and index entry S
 // 0 (SPEC.md 3.1.7, 3.3.5).
 const VersionCopy = 0x000C
+
+// VersionSync is the highest supported version, written where a row syncs a
+// voice, at its frame or through a target of a sync: the header of version
+// 12, bit 7 of the effects used where a row starts copy from frame, and bit
+// 5 of each coarse column read on every row (SPEC.md 1.12, 3.3.5).
+const VersionSync = 0x000D
 
 // Unmapped is the writer version for identity-only tunes. It uses
 // thirty DTX3 columns without a transformation index. Deferred starts
@@ -77,19 +83,22 @@ const VersionDeferred = 0x0008
 const Oldest = 0x0007
 
 // Reads is the versions a reader reads, as its report names them.
-var Reads = fmt.Sprintf("%d, %d, %d, %d, %d or %d", Oldest, VersionDeferred, Unmapped,
-	Version, VersionCut, VersionCopy)
+var Reads = fmt.Sprintf("%d, %d, %d, %d, %d, %d or %d", Oldest, VersionDeferred, Unmapped,
+	Version, VersionCut, VersionCopy, VersionSync)
 
 // ReadsVersion is whether a reader reads a file of that version.
 func ReadsVersion(version int) bool {
-	return version >= Oldest && version <= VersionCopy
+	return version >= Oldest && version <= VersionSync
 }
 
-// VersionOf is the version a writer writes for a table of that effects
-// byte: 12 where it copies from frame, 11 where it cuts a source, 10 where
-// it maps a value and cuts none, and 9 otherwise (SPEC.md 3.3.5).
+// VersionOf is the version a writer writes for a table of those effects: 13
+// where a row syncs a voice, 12 where it copies from frame, 11 where it cuts
+// a source, 10 where it maps a value and cuts none, and 9 otherwise
+// (SPEC.md 3.3.5).
 func VersionOf(effects int) int {
 	switch {
+	case HasSyncs(effects):
+		return VersionSync
 	case HasCopies(effects):
 		return VersionCopy
 	case HasCuts(effects):
@@ -102,10 +111,10 @@ func VersionOf(effects int) int {
 
 // ColumnsOf is the column count of a table of that version and effects
 // byte: 34 in version 10, 34 or 38 in version 11 by bit 5, 30, 34 or 38 in
-// version 12 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md 3.3.3).
+// versions 12 and 13 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md 3.3.3).
 func ColumnsOf(version, effects int) int {
 	switch version {
-	case VersionCut, VersionCopy:
+	case VersionCut, VersionCopy, VersionSync:
 		return ColumnCount(effects)
 	case Version:
 		return Mapped
@@ -126,11 +135,11 @@ const (
 const Counted = 1 << 31
 
 // IndexAt returns the source-index offset: 16 in versions 7 to 9; 20 in
-// version 10, after the transformation-index pointer; 24 in versions 11 and
-// 12, after the cut-index pointer (SPEC.md 3.3).
+// version 10, after the transformation-index pointer; 24 in versions 11 to
+// 13, after the cut-index pointer (SPEC.md 3.3).
 func IndexAt(version int) int {
 	switch version {
-	case VersionCut, VersionCopy:
+	case VersionCut, VersionCopy, VersionSync:
 		return CutsAt + 4
 	case Version:
 		return TransformationsAt + 4
@@ -876,9 +885,9 @@ func Read(file []byte) (File, error) {
 	}
 	effects := int(file[EffectsAt])
 	// SPEC.md 3.3: bit 5 of the effects used is 1 in version 10, either in
-	// versions 11 and 12, and 0 in versions 7 to 9; bit 6 is 1 in version 11,
-	// either in version 12, and 0 in every other version; bit 7 is 1 in
-	// version 12 and 0 in every other version.
+	// versions 11 to 13, and 0 in versions 7 to 9; bit 6 is 1 in version 11,
+	// either in versions 12 and 13, and 0 in every other version; bit 7 is 1
+	// in version 12, either in version 13, and 0 in every other version.
 	maps := HasMapping(effects)
 	if version == Version && !maps || version < Version && maps {
 		return File{}, fmt.Errorf("version %d with bit 5 of the effects used %s", version,
@@ -890,7 +899,7 @@ func Read(file []byte) (File, error) {
 			setOrClear(cutting))
 	}
 	copies := HasCopies(effects)
-	if copies != (version == VersionCopy) {
+	if version == VersionCopy && !copies || version < VersionCopy && copies {
 		return File{}, fmt.Errorf("version %d with bit 7 of the effects used %s", version,
 			setOrClear(copies))
 	}
@@ -920,8 +929,8 @@ func Read(file []byte) (File, error) {
 	if index+4*count > len(file) {
 		return File{}, fmt.Errorf("the source index at %d is outside the file", index)
 	}
-	// SPEC.md 3.1.7: in version 12 index entry S is copy from frame, 0, and
-	// every entry before it is the offset of a table.
+	// SPEC.md 3.1.7: where bit 7 is set index entry S is copy from frame, 0,
+	// and every entry before it is the offset of a table.
 	if copies && (count == 0 || GetLong(file, index+4*(count-1)) != 0) {
 		return File{}, fmt.Errorf("version %d with source %d other than copy from frame",
 			version, count)
@@ -999,6 +1008,11 @@ func Read(file []byte) (File, error) {
 				source.Columns(), source.Width())
 		}
 		sources = append(sources, source)
+	}
+	// SPEC.md 3.3.5: version 13 is a tune that syncs a voice, which the
+	// effects carry in the bit above their byte.
+	if version == VersionSync {
+		effects |= Syncs
 	}
 	return File{Version: version, FrameRate: GetWord(file, FrameRateAt),
 		Effects: effects, Dtx3: dtx3, Table: table, Sources: sources,

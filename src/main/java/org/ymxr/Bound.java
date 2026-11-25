@@ -50,6 +50,12 @@ final class Bound {
     static final byte[] MAGIC = {'Y', 'M', 'X', 'B'};
 
     static final int STATE_AT = 12;
+    /** The byte of the bound tune whose bit 7, SYNC_MARK, marks a tune file
+     *  of version 13, a tune that syncs a voice: byte 10, the high byte of
+     *  the name's offset, whose bit 7 is 0 in a tune file, the name being
+     *  within 32,768 bytes of the start (BINARIES.md 1.2). */
+    static final int SYNC_AT = 10;
+    static final int SYNC_MARK = 0x80;
     static final int IMAGE_AT = 16;
     static final int TABLE_AT = 20;
     static final int INDEX_AT = 24;
@@ -169,13 +175,14 @@ final class Bound {
     /**
      * The version a bound tune of the tune file records, the layout of its
      * header and index (BINARIES.md 1.2): the tune file's, and for a tune
-     * file of version 12 the version of its columns, 11 where it cuts a
-     * source, 10 where it maps a value and cuts none, and 9 otherwise. Bit
-     * 7 of its effects byte marks copy from frame, which the index leaves
-     * out: copy from frame is source S, the tables plus 1 (SPEC.md 3.1.7).
+     * file of version 12 or 13 the version of its columns, 11 where it cuts
+     * a source, 10 where it maps a value and cuts none, and 9 otherwise.
+     * Bit 7 of its effects byte marks copy from frame, which the index
+     * leaves out: copy from frame is source S, the tables plus 1 (SPEC.md
+     * 3.1.7). Bit 7 of byte 10 marks a tune file of version 13 (SYNC_AT).
      */
     static int layout(TuneFile tune) {
-        if (tune.version() != Tune.COPY) {
+        if (tune.version() < Tune.COPY) {
             return tune.version();
         }
         return Columns.cuts(tune.effects()) ? Tune.CUT
@@ -527,6 +534,9 @@ final class Bound {
         System.arraycopy(tuneFile, 0, bound, 0, Tune.TABLE_AT);
         System.arraycopy(MAGIC, 0, bound, 0, 4);
         Tune.putWord(bound, 4, version);
+        if (tune.version() == Tune.SYNC) {
+            bound[SYNC_AT] |= (byte) SYNC_MARK;
+        }
         bound[Tune.COUNT_AT] = (byte) count;
         Tune.putLong(bound, STATE_AT, state);
         Tune.putLong(bound, IMAGE_AT, imageAt);
