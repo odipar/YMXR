@@ -3634,12 +3634,16 @@ def lookup_kind(model, i):
 
 def copy_regions(symbols):
     """Cycle-counter regions of the register steps of a frame of copy
-    from frame (68k/player/play.S, ymxr_cregs): the read of the effects'
-    records, ymxr_cbit with it, up to the first read of a register
-    column, and the steps a register from there."""
-    steps = CODE + min(symbols["k_%d" % n] for n in range(14))
-    return {"copy records": (CODE + symbols["ymxr_cbit"], steps),
-            "copy registers": (steps, CODE + symbols["ymxr_copysites"])}
+    from frame (68k/player/play.S, ymxr_cregs): the test of the mark and
+    the mask up to ymxr_cread; the read of the effects' records from there
+    up to ymxr_csteps, and ymxr_cbit, which that read calls; the steps a
+    register from ymxr_csteps; and the stubs that mark a row
+    (68k/player/copy.S, ymxr_csome)."""
+    return {"copy bit": (CODE + symbols["ymxr_cbit"], CODE + symbols["ymxr_cregs"]),
+            "copy test": (CODE + symbols["ymxr_cregs"], CODE + symbols["ymxr_cread"]),
+            "copy records": (CODE + symbols["ymxr_cread"], CODE + symbols["ymxr_csteps"]),
+            "copy registers": (CODE + symbols["ymxr_csteps"], CODE + symbols["ymxr_copysites"]),
+            "copy marks": (CODE + symbols["ymxr_csome"], CODE + symbols["ymxr_csomeend"])}
 
 
 def copy_kind(model, i, deferred=True):
@@ -3691,12 +3695,18 @@ def lookup_regions(symbols):
 # and the remap, from its head or past its tests; and the remap in each
 # effect's frame code, counted from its first instruction to the branch it
 # ends at, or to the return of the routine it calls.
-ROUTINES = ("ymxr_lstart", "ymxr_remap", "ymxr_rmove")
+ROUTINES = ("ymxr_lstart", "ymxr_copylook", "ymxr_remap", "ymxr_rmove")
 REMAPS = ("ymxr_tick%d_remap", "ymxr_tick%d_remapped")
 # The routines of a start under a cut and of a recut, each counted from
 # its call to its return, apart from those of ROUTINES (performance.md,
 # A cut); R4.5 counts both apart.
 CUT_ROUTINES = ("ymxr_kone", "ymxr_kstart", "ymxr_recut")
+# The routine of a start of copy from frame through the identity, counted
+# from its entry to the return after the call of ymxr_widestart that init
+# aims at it (copy.S, ymxr_copywide), apart from those of ROUTINES, where
+# ymxr_copylook, its start through a transformation, is (performance.md,
+# Copy from frame); R4.5 counts both apart.
+COPY_ROUTINES = ("ymxr_copystart",)
 
 
 def routine_calls(code, symbols):
@@ -3704,6 +3714,9 @@ def routine_calls(code, symbols):
     of CUT_ROUTINES, and the end of each effect's remap (REMAPS).
     """
     called = {symbols[name] for name in ROUTINES + CUT_ROUTINES if name in symbols}
+    if "ymxr_copystart" in symbols:
+        # ymxr_copystart returns where ymxr_widestart would
+        called.add(symbols["ymxr_widestart"])
     return [at + 4 for at in range(0, len(code) - 3, 2)
             if code[at:at + 2] == b"\x61\x00"
             and at + 2 + struct.unpack(">h", code[at + 2:at + 4])[0] in called] + [
@@ -4054,10 +4067,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     # Measure each call of a routine of ROUTINES from entry after bsr
     # to the instruction after its rts (routine_calls), and each call of
     # one of CUT_ROUTINES apart, in "cut".
-    routine = {"cycles": 0, "cut": 0, "at": None, "into": "cycles"}
+    routine = {"cycles": 0, "cut": 0, "copy": 0, "at": None, "into": "cycles"}
     looking = ()
     if cycles and "copy" in cycles.regions:
-        looking = tuple(lookup_regions(symbols)) + ("routine", "cut routine")
+        looking = tuple(lookup_regions(symbols)) + ("routine", "cut routine", "copy routine")
 
         def entering(into):
             def entered(mu, address, size, data):
@@ -4071,7 +4084,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                 routine[routine["into"]] += cycles.counter.cycles - routine["at"]
                 routine["at"] = None
         for names, into in ((ROUTINES + tuple(REMAPS[0] % i for i in range(4)), "cycles"),
-                            (CUT_ROUTINES, "cut")):
+                            (CUT_ROUTINES, "cut"), (COPY_ROUTINES, "copy")):
             for name in names:
                 if name in symbols:
                     m.mu.hook_add(UC_HOOK_CODE, entering(into), begin=CODE + symbols[name],
@@ -4203,9 +4216,18 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     # columns', and whether its row sets a column of any effect
     steps = []
     # each frame of a tune that copies from frame: the cycles of its
-    # register steps, those of the records' read among them, and each
-    # effect after the frame (copy_read)
+    # register steps, those of the records' read among them, each effect
+    # after the frame, those of the test of the mark, and those of the
+    # stubs that mark a row with the count of their calls (copy_read)
     copied = []
+    marked = [0]
+    if cycles and tune.copy and "ymxr_csome" in symbols:
+        def mark(mu, address, size, data):
+            marked[0] += 1
+        size = symbols["ymxr_csome2"] - symbols["ymxr_csome"]
+        for k in range(4):
+            at = CODE + symbols["ymxr_csome"] + k * size
+            m.mu.hook_add(UC_HOOK_CODE, mark, begin=at, end=at)
     for f in range(frames):
         playing["frame"] = f
         if cycles:
@@ -4213,6 +4235,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         spent_before = dict(cycles.spent) if cycles else {}
         spent_before["routine"] = routine["cycles"]
         spent_before["cut routine"] = routine["cut"]
+        spent_before["copy routine"] = routine["copy"]
         copies.clear()
         before = cycles.cycles if cycles else 0
         image_before = cycles.image if cycles else 0
@@ -4267,6 +4290,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         if looking:
             spent = dict(cycles.spent, routine=routine["cycles"])
             spent["cut routine"] = routine["cut"]
+            spent["copy routine"] = routine["copy"]
             delta = {name: spent[name] - spent_before[name] for name in looking}
             delta["starts"] = tuple(begun["starts"])
             begun["starts"].clear()
@@ -4276,10 +4300,18 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                           cycles.spent["registers"] - spent_before["registers"],
                           any(model.fx[i]["set"] for i in range(4)), model.playing))
         if cycles and "copy records" in cycles.regions:
-            copied.append((sum(cycles.spent[name] - spent_before[name] for name in
-                               ("registers", "copy records", "copy registers")),
-                           cycles.spent["copy records"] - spent_before["copy records"],
-                           [copy_kind(model, i) for i in range(4)]))
+            def spent_in(*names):
+                return sum(cycles.spent[name] - spent_before[name] for name in names)
+            copied.append((spent_in("registers", "copy test", "copy bit", "copy records",
+                                    "copy registers"),
+                           spent_in("copy bit", "copy records"),
+                           [copy_kind(model, i) for i in range(4)],
+                           spent_in("copy test"), spent_in("copy marks"), marked[0],
+                           # armed, from the row that arms it to the row that
+                           # settles it (Model.step)
+                           any(model.fx[i]["pending"] or model.fx[i].get("switched")
+                               for i in range(4))))
+            marked[0] = 0
         assert masked(m.psg) == masked(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
             assert entries[f] == entry(model, model.row_writes), \
@@ -5462,10 +5494,10 @@ def copy_read(code, symbols, cycles_of):
     the lookup in and with the deferred start in as well where the tune
     defers a start: each tick by its handler's columns, against the
     counted handler's under a cut; the register steps of each frame
-    against the frame's on the same rows (frame_registers), the read of
-    the effects' records apart; a start at the frame by its target's
-    columns; and each tune's costliest call, whole and as R4.5 counts
-    it."""
+    against the frame's on the same rows (frame_registers), the records
+    read again or the mask kept apart, and the stubs that mark a row; a
+    start at the frame by its target's columns; and each tune's costliest
+    call, whole and as R4.5 counts it."""
     text = open(os.path.join(ROOT, "doc", "performance.md")).read()
     if "\n## Copy from frame\n" not in text:
         return ["performance.md has no section on copy from frame"]
@@ -5485,7 +5517,7 @@ def copy_read(code, symbols, cycles_of):
                          % (m.groups(), tuple(str(w) for w in want)))
 
     ticked, starts, played = {}, {}, []
-    more, records, steps, none = set(), set(), set(), set()
+    steps, reread, kept, marks, wrong = set(), {}, {}, set(), []
     for title, at in copy_cases():
         spans = []
         result = check(at, code, symbols, CyclesOn(cycles_of), spans=spans)
@@ -5495,12 +5527,19 @@ def copy_read(code, symbols, cycles_of):
                 ticked.setdefault(kind.replace(" alone", ""), set()).update(spent)
         copied = result[5][10]
         plain = frame_registers(at, code, symbols, cycles_of, len(copied))
-        for (whole, read, kinds), own in zip(copied, plain):
-            more.add(whole - own)
-            records.add(read)
-            steps.add(whole - read - own)
-            if not any(kinds):
-                none.add(read)
+        for f, ((whole, read, kinds, test, marked, calls, pending), own) in enumerate(
+                zip(copied, plain)):
+            steps.add(whole - test - read - own)
+            if read:
+                reread.setdefault(defers, set()).add(test + read)
+            else:
+                kept.setdefault(defers, set()).add(test)
+            if calls:
+                marks.add(marked / calls)
+            # the records read again after a row that marks the frame and
+            # while a deferred start is armed, and on no other frame
+            if bool(read) != bool(calls or pending):
+                wrong.append((title, f, read, calls, pending))
         # each start of copy from frame at the frame, from _now to the
         # rate, by the frame it is in
         begun = {}
@@ -5509,10 +5548,14 @@ def copy_read(code, symbols, cycles_of):
             if label == "now" and kind and not kind.startswith("pending"):
                 starts.setdefault((defers, kind), set()).add(n)
                 begun[f] = begun.get(f, 0) + 1
-        apart = [c - spent["routine"] - spent["cut routine"]
-                 for c, (_, spent, _) in zip(result[2], result[5][8])]
-        f = apart.index(max(apart))
-        played.append((title, defers, max(result[2]), max(apart), f, begun.get(f, 0)))
+        cost = result[2]
+        apart = [c - spent["routine"] - spent["cut routine"] - spent["copy routine"]
+                 for c, (_, spent, _) in zip(cost, result[5][8])]
+        f = cost.index(max(cost))
+        played.append((title, defers, max(cost), max(apart), f, begun.get(f, 0)))
+    if wrong:
+        stale.append("the frame reads the effects' records again on frames other than those a"
+                     " row marks or an armed start: %s" % wrong[:4])
     reads(r"The rig counts the figures below on the (\w+) tunes of its check of copy from"
           r" frame, on the player as it is with the lookup in, and with the deferred start in"
           r" as well on the (\w+) that defer a start\.",
@@ -5546,14 +5589,20 @@ def copy_read(code, symbols, cycles_of):
         stale.append("a tick of copy from frame runs another path than the end of a pass: %s"
                      % left)
 
-    # the register steps of a frame against the frame's on the same rows
-    reads(r"they cost ([\d,]+(?: to [\d,]+)?) cycles more than the frame's steps on the same"
+    # the register steps of a frame against the frame's on the same rows,
+    # the records read again or the mask kept, and the stubs that mark a row
+    figure = r"([\d,]+(?: to [\d,]+)?)"
+    reads(r"and the steps a register cost %s cycles more than the frame's steps on the same"
           r" rows, which the rig counts by playing each tune again with the frame's steps and"
-          r" without a tick\. Of the difference, ([\d,]+(?: to [\d,]+)?) cycles are the read of"
-          r" the effects' records and ([\d,]+(?: to [\d,]+)?) the steps a register",
-          span(more), span(records), span(steps))
-    reads(r"and costs ([\d,]+(?: to [\d,]+)?) cycles on the frames of these tunes where no"
-          r" effect copies from frame\.", span(none or {0}))
+          r" without a tick\." % figure, span(steps))
+    reads(r"Such a read costs %s cycles, and %s with the deferred start in, by the effects whose"
+          r" timers count and the columns of their handlers\." % (figure, figure),
+          span(reread.get(False, {0})), span(reread.get(True, {0})))
+    reads(r"uses the mask the last read found: %s cycles, and %s with the deferred start in,"
+          r" where it tests each effect's pending start as well\." % (figure, figure),
+          span(kept.get(False, {0})), span(kept.get(True, {0})))
+    reads(r"A row marks the frame in a stub of each effect whose columns it sets"
+          r" \(ymxr_csome\), %s cycles," % figure, span({round(n) for n in marks} or {0}))
 
     # a start at the frame, by the target's columns, on either player
     for columns, kind in (("one", "1"), ("two", "2"), ("three", "3")):
@@ -5590,11 +5639,14 @@ def copy_read(code, symbols, cycles_of):
         if not near(row, (whole, apart)):
             stale.append("performance.md reads the costliest call of %s as %s, and the rig"
                          " counts %s" % (title, row, (whole, apart)))
-    past = [one for one in played if one[3] > budget]
+    within = max(one[3] for one in played)
+    past = [one for one in played if one[2] > budget]
     begun = {one[5] for one in past}
-    reads(r"(\w+) of the (\w+) pass R4\.5's ([\d,]+) as it counts them, each at its first row,"
-          r" which starts copy from frame on (\w+(?: or \w+)?) effects\.",
-          WORDS.get(len(past), str(len(past))).capitalize(), WORDS.get(len(played)), budget,
+    reads(r"Every call of the (\w+) is within R4\.5's ([\d,]+) as it counts them, the costliest"
+          r" at ([\d,]+)\. Counted whole, (\w+) pass(?:es)? it, each at its first row, which"
+          r" starts copy from frame on (\w+(?: or \w+)?) effects\.",
+          WORDS.get(len(played)), budget, within if within <= budget else None,
+          WORDS.get(len(past), str(len(past))),
           " or ".join(WORDS.get(n, str(n)) for n in sorted(begun))
           if all(one[4] == 0 for one in past) else None)
     return stale
@@ -7932,6 +7984,12 @@ def that_map(count):
     return ", %d that map%s a value" % (count, "s" if count == 1 else "")
 
 
+def that_copy(count):
+    """The clause of a set's line that counts its subtunes that copy from
+    frame, where it has one."""
+    return ", %d that cop%s from frame" % (count, "ies" if count == 1 else "y") if count else ""
+
+
 def patched_code_follows_the_subtune(defines, tunes):
     """Verify init output depends only on the selected subtune. Compare a
     fresh initialization with initialization after each other subtune in
@@ -8026,7 +8084,8 @@ def patched_code_follows_the_subtune(defines, tunes):
     return "%d subtunes in one SNDH file of ymxr-sndh on %s%s: the code after any one" \
         " then another is the code after the other alone, %d ordered pairs%s%s" % (
             len(files), core_name(flags),
-            that_map(sum(1 for _, file in files if file[8] & 0x20)) if flags & 16 else "",
+            (that_map(sum(1 for _, file in files if file[8] & 0x20))
+             + that_copy(sum(1 for _, file in files if file[8] & 0x80))) if flags & 16 else "",
             pairs,
             "" if left == 0 else "; %d past the displacement's reach left out" % left,
             "" if others == 0 else "; %d at a rate other than the first's left out" % others)
@@ -8398,10 +8457,11 @@ def main():
                   " key's write before its page read" % core(defines, lookup[0][1]))
         if wanted("sets"):
             print("    %s" % patched_code_follows_the_subtune(defines, tunes))
-            # the fixtures after a mapped tune of each lookup kind, on the
-            # core with the lookup in
+            # the fixtures after a mapped tune of each lookup kind and a
+            # tune that copies from frame, on the core with the lookup in
             print("    %s" % patched_code_follows_the_subtune(
-                defines, [at for _, at, kinds in lookup][:SET_MAPPED] + tunes))
+                defines, [at for _, at, kinds in lookup][:SET_MAPPED] + [copy_cases()[0][1]]
+                + tunes))
         for name, run in (("switches", lambda: switches(defines)),
                           ("unplaced", lambda: unplaced(code, symbols)),
                           ("deferred", lambda: deferred(*deferring(defines))),

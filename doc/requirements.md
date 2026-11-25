@@ -122,11 +122,11 @@ Go tree read. Note: they change in that repository.
   cost with it.
 - **R4.5** A play call costs at most 6,656 cycles, 13 scanlines of 512,
   with the ticks, the routines of a start or a remap through a
-  transformation and those of a start under a cut and of a recut counted
-  apart (performance.md, A remap at the frame and A cut); performance.md
-  records the costliest call of each tune and the cycles of each of
-  those routines. Note: a demo budgets for the worst frame; R4.4 bounds
-  the average.
+  transformation, those of a start under a cut and of a recut, and those
+  of a start of copy from frame counted apart (performance.md, A remap at
+  the frame, A cut and Copy from frame); performance.md records the
+  costliest call of each tune and the cycles of each of those routines.
+  Note: a demo budgets for the worst frame; R4.4 bounds the average.
 - **R4.6** A player keeps every value it requires of a row it has read:
   the kept value of an effect is its target, its select and its count,
   and in version 10 its mapping (SPEC.md 1.10.3). R3.6 leaves an unset

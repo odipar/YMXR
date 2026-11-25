@@ -125,6 +125,26 @@ ymxr_cbit:      sub.l   a6,d5
 ; d3 is 0.
 ymxr_cregs:     move.l  a6,-(sp)
                 lea     ymxr_fv(pc),a6
+; The registers change with a row that sets a column of an effect, which
+; marks the frame (copy.S, ymxr_csome), and with a tick that performs an
+; armed start (4.8), so the records are read again where a row marked the
+; frame or a start is armed: on every other frame d3 is the mask the last
+; read found.
+                tst.b   WS_CDIRTY(a0)
+                bne.s   ymxr_cread
+                .if     YMXR_DEFER
+                tst.b   WS_FX+FX_PENDING(a0)
+                bne.s   ymxr_cread
+                tst.b   WS_FX+FX_SIZE+FX_PENDING(a0)
+                bne.s   ymxr_cread
+                tst.b   WS_FX+FX_SIZE+FX_SIZE+FX_PENDING(a0)
+                bne.s   ymxr_cread
+                tst.b   WS_FX+FX_SIZE+FX_SIZE+FX_SIZE+FX_PENDING(a0)
+                bne.s   ymxr_cread
+                .endif
+                move.w  ymxr_cmask-ymxr_fv(a6),d3
+                bra.w   ymxr_csteps
+ymxr_cread:     sf      WS_CDIRTY(a0)
                 moveq   #0,d3
                 lea     WS_FX+FX_SIZE+FX_SIZE+FX_SIZE(a0),a4    ; effect 3's
                 lea     ymxr_timers+8+8+8(pc),a5                ; record, timer
@@ -173,7 +193,8 @@ ymxr_cregs:     move.l  a6,-(sp)
 .next:          lea     -FX_SIZE(a4),a4
                 subq.l  #8,a5
                 dbra    d4,.fx
-                movea.l a6,a3                   ; the frame values
+                move.w  d3,ymxr_cmask-ymxr_fv(a6)
+ymxr_csteps:    movea.l a6,a3                   ; the frame values
                 movea.l (sp)+,a6
                 KTONE   _0,_1,$0000,$0100,0,1
                 KTONE   _2,_3,$0200,$0300,2,3
@@ -206,12 +227,15 @@ ymxr_cregs:     move.l  a6,-(sp)
                 movep.w d1,(a2)
 .played:        bra.w   ymxr_played
 
-; The read sites of ymxr_cregs, as the frame's are written (ymxr_col), on
-; every init, so each subtune of a set finds them as it finds them alone;
-; and for a tune that copies from frame the branch to them over the first
-; read of ymxr_regs, which ymxr_copyinit writes back as the frame's read
-; before init writes the frame's sites. a0 the table's payload, d3 N, a4
-; ymxr_frame, a6 the workspace; every register kept.
+; The read sites of ymxr_cregs, as the frame's are written (ymxr_col), and
+; each effect's read at the head of the paths of a row that sets its
+; columns copied into its ymxr_csome (copy.S), on every init, so each
+; subtune of a set finds them as it finds them alone; and for a tune that
+; copies from frame the branch to ymxr_cregs over the first read of
+; ymxr_regs and a bsr.w to each ymxr_csome over the read it copies, which
+; ymxr_copyinit writes back as the frame's reads before init writes the
+; frame's sites. a0 the table's payload, d3 N, a4 ymxr_frame, a6 the
+; workspace; every register kept.
 ymxr_copysites: movem.l d0-d4/a1/a3/a5,-(sp)
                 lea     ymxr_kreads(pc),a3
                 moveq   #0,d1
@@ -221,7 +245,25 @@ ymxr_copysites: movem.l d0-d4/a1/a3/a5,-(sp)
                 bsr     ymxr_col
                 addq.w  #1,d1
                 dbra    d2,.site
+; Each effect the link kept, effect 3 first, as ymxr_overs has the heads.
+                lea     ymxr_overs(pc),a3
+                lea     ymxr_csome(pc),a5
+                moveq   #3,d2
+.some:          move.w  (a3)+,d4
+                btst    d2,ymxr_k_effect+1(pc)
+                beq.s   .snext
+                lea     (a4,d4.w),a1
+                lea     SOME_AT(a1),a1          ; the read
+                move.l  (a1),4(a5)              ; after the stub's st
                 btst    #7,WS_EFFECTS(a6)       ; copy from frame (3.1.7)
+                beq.s   .snext
+                move.w  #$6100,(a1)+            ; bsr.w
+                move.l  a5,d0
+                sub.l   a1,d0
+                move.w  d0,(a1)
+.snext:         lea     CSOME_SIZE(a5),a5
+                dbra    d2,.some
+                btst    #7,WS_EFFECTS(a6)
                 beq.s   .done
                 lea     ymxr_regs(pc),a1
                 move.w  #$6000,(a1)+            ; bra.w
@@ -229,7 +271,8 @@ ymxr_copysites: movem.l d0-d4/a1/a3/a5,-(sp)
                 move.l  a3,d0
                 sub.l   a1,d0
                 move.w  d0,(a1)
-.done:          movem.l (sp)+,d0-d4/a1/a3/a5
+                st      WS_CDIRTY(a6)           ; the first frame reads the
+.done:          movem.l (sp)+,d0-d4/a1/a3/a5    ; records
                 rts
 
 ; The read sites of ymxr_cregs, one a register in column order, as

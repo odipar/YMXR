@@ -427,14 +427,14 @@ measures it against the linked core.
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
 10,022 bytes, the core with the deferred start in, of 15,276 bytes, the
-core with the lookup in, of 27,966 bytes, or the core with the lookup
-and the deferred start in, of 42,524 bytes.
+core with the lookup in, of 28,048 bytes, or the core with the lookup
+and the deferred start in, of 43,142 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
-| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,216 |
+| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,346 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
@@ -456,9 +456,9 @@ A tune of general sources alone, with no effect, links 1,336 bytes, 13%
 of the core: the blocks are 8,686 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
 start of several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup
-instances of 3 kinds and links 15,470 bytes of 42,524: the 36 instances
-and the 7 loops of init it leaves out are 13,874 bytes, and the gaps it
-keeps are 686 bytes shorter than in the core.
+instances of 3 kinds and links 15,470 bytes of 43,142: the 36 instances
+and the 7 loops of init it leaves out are 14,290 bytes, and the gaps it
+keeps are 734 bytes shorter than in the core.
 
 ## The check
 

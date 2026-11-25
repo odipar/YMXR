@@ -101,6 +101,11 @@ WS_ARMING       equ     22              ; a byte: set while a deferred start
 WS_VECTOR       equ     21              ; a byte: the MFP's vector register as
                                         ; init found it, kept where the player
                                         ; runs automatic end of interrupt
+WS_CDIRTY       equ     23              ; a byte: set by init and by each row
+                                        ; that sets a column of an effect, in a
+                                        ; tune that copies from frame, so the
+                                        ; frame reads the effects' records
+                                        ; again (play.S, ymxr_cregs)
 WS_SOURCES      equ     24              ; a source's first row and its loop
                                         ; cell, eight bytes each, resolved at
                                         ; init: the source column's seven bits

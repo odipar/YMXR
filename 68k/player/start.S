@@ -47,6 +47,13 @@ WIDEN_CALL      equ     ymxr_tick0_widen-ymxr_tick0_over+4
                 .if     (ymxr_tick3_widen-ymxr_tick3_over+4)<>WIDEN_CALL
                 .error  "effect 3 lays its start of several columns out apart from effect 0"
                 .endif
+; The distance of the read at the head of the paths of a row that sets a
+; column of the effect, which init writes a bsr.w over in a tune that
+; copies from frame (copy.S, ymxr_csome).
+SOME_AT         equ     ymxr_tick0_some-ymxr_tick0_over
+                .if     (ymxr_tick3_some-ymxr_tick3_over)<>SOME_AT
+                .error  "effect 3 lays its head out apart from effect 0"
+                .endif
 WIDE_ONE        equ     ymxr_e_effect0_1-ymxr_tick0_wide-2      ; and the square's
 WIDE_WIDEN      equ     ymxr_tick0_widen-ymxr_tick0_wide-2
 RESET_DONE      equ     ymxr_tick0_done-ymxr_tick0_reset-2

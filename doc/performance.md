@@ -881,9 +881,9 @@ tick reads an absolute address. Each handler gains a stub: an instance of
 the wide handler is 138 bytes against 134, and of the marked shape of two
 columns 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 27,256 bytes against 9,330,
-and 28,290 against 8,988 where a tick reads an absolute address. With the
-deferred start in as well, 41,814 against 14,584, and 44,116 against
+The lookup in, `YMXR_MAP=1`, makes the player 27,338 bytes against 9,330,
+and 28,372 against 8,988 where a tick reads an absolute address. With the
+deferred start in as well, 42,432 against 14,584, and 43,966 against
 14,438.
 
 ## A cut
@@ -982,16 +982,16 @@ which starts four sources: 9,722 cycles, four through a transformation,
 two of them under a cut, and 9,486, four of two and three columns under a
 cut.
 
-The player with the lookup in is 27,256 bytes against 21,966 in release
-0.15.0, before the cut, and 28,290 against 23,256 where a tick reads an
-absolute address; with the deferred start in as well, 41,814 against
-35,908, and 44,116 against 37,954. Of the 5,290 bytes it is longer than in
+The player with the lookup in is 27,338 bytes against 21,966 in release
+0.15.0, before the cut, and 28,372 against 23,256 where a tick reads an
+absolute address; with the deferred start in as well, 42,432 against
+35,908, and 43,966 against 37,954. Of the 5,372 bytes it is longer than in
 that release, 3,208 are the cut's blocks, which a link leaves out of the
 player of a song that cuts no source (LINKER.md): 2,688 of routines and
 130 of each effect's frame code. With the deferred start in, the blocks
-are 3,682 of the 5,906. The blocks of copy from frame, which a link keeps
-only for a song that copies from frame, are 1,872 bytes of the rest, and
-1,950 with the deferred start in (Copy from frame).
+are 3,682 of the 6,524. The blocks of copy from frame, which a link keeps
+only for a song that copies from frame, are 2,002 bytes of the rest, and
+2,104 with the deferred start in (Copy from frame).
 
 ## Copy from frame
 
@@ -1002,14 +1002,14 @@ source of one row with one row a pass, so every tick reads the last row of
 the source and runs the counted handler's path at the end of a pass (A
 tick, A counted tick of two columns), and through a transformation the
 counted lookup instance's. A frame of such a tune runs the register steps
-of the block `copy` in place of the frame's (LINKER.md): they read the
-registers copy from frame runs on out of the record of each effect whose
-timer counts, keep each value they read, masked to its register's width,
-as its frame value, and write the chip where the register is outside
-those. Init aims the frame and the starts at the block only for a tune
-that copies from frame, so every other tune runs the frame and the ticks
-it ran in the release before, at the same cycles, and a song of such tunes
-links the same player as in that release.
+of the block `copy` in place of the frame's (LINKER.md): they find the
+registers copy from frame runs on (below), keep each value they read,
+masked to its register's width, as its frame value, and write the chip
+where the register is outside those. Init aims the frame, the starts and
+the head of each effect's paths at the block only for a tune that copies
+from frame, so every other tune runs the frame and the ticks it ran in the
+release before, at the same cycles, and a song of such tunes links the
+same player as in that release.
 
 The rig counts the figures below on the five tunes of its check of copy
 from frame, on the player as it is with the lookup in, and with the
@@ -1026,16 +1026,23 @@ deferred start in as well on the two that defer a start. A tick:
 Through the identity and on one column through a transformation, each
 figure is the counted handler's at the end of a pass under a cut (A cut).
 
-A frame runs the block's register steps, and they cost 604 to 1,684
-cycles more than the frame's steps on the same rows, which the rig counts
-by playing each tune again with the frame's steps and without a tick. Of
-the difference, 584 to 1,584 cycles are the read of the effects' records
-and 20 to 156 the steps a register, each of which keeps the value it
-reads as the frame value and tests whether a tick writes the register.
-The read runs on every frame of such a tune: it reads the record of each
-effect whose timer counts and each column of its handler, where the
-effect copies from frame and where it plays a source, and costs 890
-cycles on the frames of these tunes where no effect copies from frame.
+A frame runs the block's register steps, and the steps a register cost 36
+to 172 cycles more than the frame's steps on the same rows, which the rig
+counts by playing each tune again with the frame's steps and without a
+tick. Each keeps the value it reads as the frame value and tests whether a
+tick writes the register. Before the steps, the frame finds the registers
+the ticks write. It reads the effects' records for them again on two
+kinds of frame: after a row that sets a column of an effect, which can
+start, stop, aim or settle the effect's handler, and from the row that
+arms a deferred start to the row that settles it, since a tick performs
+the start in between (A deferred start). Such a read costs 618 to 1,618
+cycles, and 888 to 1,466 with the deferred start in, by the effects whose
+timers count and the columns of their handlers. Every other frame tests
+the mark of such a row and uses the mask the last read found: 62 cycles,
+and 142 with the deferred start in, where it tests each effect's pending
+start as well. A row marks the frame in a stub of each effect whose
+columns it sets (ymxr_csome), 44 cycles, which init reaches from a
+`bsr.w` over the read at the head of the effect's paths.
 
 A start of copy from frame at the frame, counted from the effect's start
 in the frame code to its rate as A cut counts one, by its target's
@@ -1052,16 +1059,19 @@ column costs 464 cycles (A cut). Through a transformation, on the player
 with the deferred start in, a start of one column costs 1,380 to 1,624
 cycles.
 
-A start of copy from frame runs inside the play call, and R4.5 counts it
-with the call. Each tune's costliest call, whole and as R4.5 counts it:
+A start of copy from frame runs a routine inside the play call,
+ymxr_copystart through the identity and ymxr_copylook through a
+transformation, and R4.5 counts both apart, as it counts those of a cut (A
+cut). Each tune's costliest call, whole and as R4.5 counts it:
 
 | tune | the costliest call | as R4.5 counts it |
 |---|---|---|
-| copy from frame on a register of each kind of handler | 8486 | 8486 |
-| copy from frame on targets of two and three registers | 8928 | 8928 |
-| copy from frame replaced and replacing, at the frame and deferred, and recut | 7520 | 7520 |
-| copy from frame beside a mapped source, its timer remapped to mapping 0 | 4378 | 3884 |
-| copy from frame through transformations, remapped, deferred and beside a mapped source | 10016 | 9482 |
+| copy from frame on a register of each kind of handler | 8736 | 5612 |
+| copy from frame on targets of two and three registers | 9178 | 5684 |
+| copy from frame replaced and replacing, at the frame and deferred, and recut | 7720 | 5950 |
+| copy from frame beside a mapped source, its timer remapped to mapping 0 | 4528 | 3420 |
+| copy from frame through transformations, remapped, deferred and beside a mapped source | 10266 | 6060 |
 
-Four of the five pass R4.5's 6,656 as it counts them, each at its first
-row, which starts copy from frame on three or four effects.
+Every call of the five is within R4.5's 6,656 as it counts them, the
+costliest at 6,060. Counted whole, four pass it, each at its first row,
+which starts copy from frame on three or four effects.

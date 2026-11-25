@@ -53,6 +53,28 @@ ymxr_fvend:
                 .endif
 ymxr_fv0:       dc.b    $00,$00,$00,$00,$00,$00,$00,$C0,$00,$00,$00,$00,$00,$00
                 .even
+; The registers the ticks of copy from frame write, a bit each, as the
+; frame last read them out of the effects' records (play.S, ymxr_cregs).
+ymxr_cmask:     dc.w    0
+
+; Each effect's read of its control column at the head of the paths of a
+; row that sets a column of the effect (EFFECT, _some), in a tune that
+; copies from frame: init writes a bsr.w over that read to here, and this
+; read as it wrote that one. Such a row can start, stop, aim or settle
+; the effect's handler, so the stub marks the frame, which reads the
+; effects' records again (play.S, ymxr_cregs). Effect 3 first, as
+; ymxr_overs has the heads.
+                .macro  CSOME
+                st      WS_CDIRTY(a0)
+                move.b  $7FFF(a1),d2
+                rts
+                .endm
+ymxr_csome:     CSOME
+ymxr_csome2:    CSOME
+                CSOME
+                CSOME
+ymxr_csomeend:
+CSOME_SIZE      equ     ymxr_csome2-ymxr_csome
 
 ; The targets of several registers as copy from frame reads them: a
 ; register and the column of copy from frame that writes it, which is the
@@ -256,18 +278,19 @@ ymxr_lcalls:    dc.w    ymxr_tick3_lcall-ymxr_frame+2,ymxr_tick2_lcall-ymxr_fram
 
 ; Init's work on every tune, in a core with the block copy, after the
 ; sources are resolved (4.1). On every tune: the frame's first read at
-; ymxr_regs written back as the move into d2 that READ2 assembles, where a
-; tune before this one wrote the branch of ymxr_copysites over it, so the
-; site loop writes it as it writes it alone (ymxr_col reads the opcode);
-; the frame values at 0; and each call of ymxr_widestart aimed back, each
-; effect's the link kept and the arming's in a core with the deferred
-; start, which every link keeps. On a tune that copies from frame: copy
-; from frame as source S, after the tables, its first row the frame
-; values and its tag -8; bit 2 of d5, a tag among the sources, so each
-; effect's start keeps the test of the shapes; and those calls aimed here.
-; A set inits one loaded copy for each subtune, so each write is made on
-; every init. a6 the workspace; d5 the bits of the shapes. Every other
-; register kept.
+; ymxr_regs and each effect's read at the head of the paths of a row that
+; sets its columns written back as the move into d2 that READ2 assembles,
+; where a tune before this one wrote a branch of ymxr_copysites over it,
+; so the site loop writes them as it writes them alone (ymxr_col reads the
+; opcode); the frame values at 0; and each call of ymxr_widestart aimed
+; back, each effect's the link kept and the arming's in a core with the
+; deferred start, which every link keeps. On a tune that copies from
+; frame: copy from frame as source S, after the tables, its first row the
+; frame values and its tag -8; bit 2 of d5, a tag among the sources, so
+; each effect's start keeps the test of the shapes; and those calls aimed
+; here. A set inits one loaded copy for each subtune, so each write is
+; made on every init. a6 the workspace; d5 the bits of the shapes. Every
+; other register kept.
 ymxr_copyinit:  movem.l d0-d4/a1-a4,-(sp)
                 lea     ymxr_regs(pc),a1
                 move.w  #$1429,(a1)             ; move.b d16(a1),d2
@@ -299,6 +322,7 @@ ymxr_copyinit:  movem.l d0-d4/a1-a4,-(sp)
                 btst    d2,ymxr_k_effect+1(pc)
                 beq.s   .next
                 lea     (a4,d4.w),a1            ; the effect's head
+                move.w  #$1429,SOME_AT(a1)      ; move.b d16(a1),d2
                 lea     WIDEN_CALL(a1),a1
                 move.l  a3,d1
                 sub.l   a1,d1
