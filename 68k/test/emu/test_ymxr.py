@@ -554,11 +554,6 @@ TARGETS.update({14: [(0, 0), (1, 1)], 15: [(2, 0), (3, 1)], 16: [(4, 0), (5, 1)]
 # value. Sole value for setRn, the coarse nibble for setToneX, volume for
 # voice/noise, high envelope byte for setEnvelope, or shape for
 # setBuzzer (SPEC.md 1.10.1, 2.1).
-# The targets copy from frame runs a counted handler on: a register whose
-# column fills its byte, R0, R2, R4, R7, R11 and R12, and setEnvelope
-# (SPEC.md 2.1.2; 68k/player/copy.S).
-COPY_COUNTED = (0, 2, 4, 7, 11, 12, 20)
-
 LAST_VALUE = {n: 0 for n in range(14)}
 LAST_VALUE.update({14: 1, 15: 1, 16: 1, 17: 2, 18: 2, 19: 2, 20: 1, 21: 2,
                    22: 1, 23: 1, 24: 1})
@@ -1164,9 +1159,11 @@ class Model:
             return None
         if self.copying(i):
             # the frame value of each register of the target, R7's with
-            # bits 7 and 6 at 1, through mapping 0 (SPEC.md 5.1, rule 2(j))
-            return [(register, self.fv[register] | (0xC0 if register == 7 else 0))
-                    for register, _ in TARGETS[fx["using"]]]
+            # bits 7 and 6 at 1, the last value through the tick's mapping
+            # (SPEC.md 2.1.5, 5.1)
+            return [(register, self.through(i, c, self.fv[register]
+                                            | (0xC0 if register == 7 else 0)))
+                    for register, c in TARGETS[fx["using"]]]
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return [(register, self.through(i, c, columns[c][fx["place"]]))
                 for register, c in TARGETS[fx["using"]]]
@@ -1182,7 +1179,9 @@ class Model:
         if not fx["run"] or c != LAST_VALUE[fx["using"]]:
             return byte
         entries = self.tune.transformations[fx["run"] - 1]
-        counted = self.tune.counted[fx["source"]]
+        # copy from frame reads its key in the form of its handler's column
+        # (2.1.5): counted where the register fills its byte
+        counted = self.counted(i)
         if counted and fx["using"] == 7:
             assert byte & 0xC0 == 0xC0, \
                 "a row of %02x on setR7 through a transformation, its port bits clear" % byte
@@ -1201,7 +1200,7 @@ class Model:
         (68k/player/lookup_pages.S, ymxr_fill).
         """
         fx = self.fx[i]
-        counted = self.tune.counted[fx["source"]]
+        counted = self.counted(i)
         if counted and fx["using"] == 7:
             return "ports"
         if not counted and LAST_VALUE[fx["using"]] == TARGETS[fx["using"]][-1][1]:
@@ -1230,9 +1229,9 @@ class Model:
         the player's counted handler runs (68k/player/ticks.S, TICKC)."""
         fx = self.fx[i]
         if self.copying(i):
-            # copy from frame on a register that fills its byte, and on
-            # setEnvelope, runs a counted handler (68k/player/copy.S)
-            return fx["using"] in COPY_COUNTED
+            # copy from frame runs the counted handler of its target's
+            # columns (68k/player/copy.S)
+            return True
         return fx["source"] != 0 and self.tune.counted[fx["source"]]
 
     def counting(self, i):
@@ -1793,6 +1792,10 @@ def reaches(model, i, kind):
         x = r[model.tune.cut_at + i]
         if x & 0x7F if x & 0x80 else fx["cut"]:
             return False
+    if source == model.tune.copy:
+        # copy from frame starts on a counted kind, in the window of every
+        # kind (68k/player/copy.S, ymxr_copylook)
+        return kind == "window"
     at, R, RR, columns = model.tune.sources[source]
     if kind == "window counted once":
         return bool(r[t + 2] & 0x80) and model.tune.counted[source] and R == RR == 1
@@ -2291,7 +2294,24 @@ def copy_cases():
          {"A": {0: start(1, 9, 16, 96, mapping=[1]), 8: ("remap", 0), 12: ("remap", [1])},
           "B": {0: start(0, 10, 4, 150), 6: ("remap", 0), 9: start(0, 10, 4, 150, 0, 0)}},
          {"r7": {0: 56}, "r10": {0: 9, 2: 31, 5: 0, 7: 14, 11: 3, 14: 22}},
-         [("halves", [v // 2 for v in range(32)])])]
+         [("halves", [v // 2 for v in range(32)])]),
+        ("copy from frame through transformations, remapped, deferred and beside a"
+         " mapped source", 16, 0,
+         [("loop of four", [15, 12, 9, 6], 0)],
+         {"A": {0: start(0, 13, 16, 96, mapping=[1]), 4: ("remap", [4]), 8: ("remap", 0),
+                12: ("remap", [1])},
+          "B": {0: start(0, 12, 50, 100, mapping=[2]), 6: start(0, 12, 50, 100, 0, 0),
+                10: start(0, 12, 50, 100, 0, 0, mapping=[2])},
+          "C": {0: start(1, 8, 64, 200, mapping=[3])},
+          "D": {0: start(0, 18, 4, 150), 5: start(0, 18, 4, 150, 0, 0, 1, [0, 0, 5]),
+                11: ("remap", 0)}},
+         {"r7": {0: 56}, "r13": {0: 3, 2: 9, 5: 14, 9: 0, 13: 7},
+          "r12": {0: 200, 3: 17, 7: 0, 11: 99, 14: 255},
+          "r2": {0: 40, 4: 0, 8: 250}, "r3": {0: 5, 6: 12},
+          "r9": {0: 30, 3: 7, 7: 16, 12: 1}},
+         [("down", [15 - v for v in range(16)]), ("bytes down", [255 - v for v in range(256)]),
+          ("volume down", [31 - v for v in range(32)]), ("half", [v // 2 for v in range(16)]),
+          ("volume half", [v // 2 for v in range(32)])])]
     for title, rows, repeat, sources, timers, sets, through in cases:
         tune = effects_tune(title, rows, sources, timers, registers=registers(rows, sets),
                             repeat=repeat, transformations=through, copies=True)

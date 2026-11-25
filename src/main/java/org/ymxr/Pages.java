@@ -170,32 +170,11 @@ final class Pages {
     }
 
     /** The form of copy from frame on {@code target}, the form of the
-     *  source its target's handler runs (SPEC.md 3.4.4): on a register of
-     *  seven bits or fewer marked, on setR7 the ports' and on another
-     *  register plain; on setEnvelope, whose registers fill their bytes,
-     *  plain; and on every other target a marked source's of its columns. */
+     *  counted source its target's handler runs (SPEC.md 3.4.4): the ports'
+     *  on setR7 and plain on every other target. */
     static int copyForm(int target) {
-        if (target < 14) {
-            if (target == MIXER) {
-                return PORTS;
-            }
-            return (WHOLE_BYTES >> target & 1) != 0 ? PLAIN : MARKED;
-        }
-        if (target == ENVELOPE) {
-            return PLAIN;
-        }
-        if (target >= 17 && target <= BUZZER) {
-            return target == BUZZER ? MARKED : PLAIN;
-        }
-        return target >= NOISE ? PLAIN : MARKED;
+        return target == MIXER ? PORTS : PLAIN;
     }
-
-    /** The registers whose column fills its byte, a bit a register: R0, R2,
-     *  R4, R7, R11 and R12 (SPEC.md 2.1.2). */
-    private static final int WHOLE_BYTES = 0x1895;
-
-    /** setEnvelope, a target of two registers that fill their bytes. */
-    private static final int ENVELOPE = 20;
 
     /**
      * The form source {@code s} runs on {@code target} through a

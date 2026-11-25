@@ -95,9 +95,10 @@ q\{col}:
 ; The reads and the writes of the register steps of a frame that copies
 ; from frame (play.S, ymxr_cregs): each read at a separate site, k_n, which
 ; init writes as it writes c_n; each write the byte the frame writes to the
-; register, kept as its frame value FV_STRIDE bytes a register from a3,
-; and written to the chip where the register's bit of d3, the registers
-; the ticks of copy from frame write, is 0 (SPEC.md 3.1.7, 4.4).
+; register, kept as its frame value masked to the register's width,
+; FV_STRIDE bytes a register from a3, and written to the chip where the
+; register's bit of d3, the registers the ticks of copy from frame write,
+; is 0 (SPEC.md 3.1.7, 4.4).
                 .macro  KREAD   col
 k\{col}:
                 move.b  $7FFF(a1),d1
@@ -106,10 +107,12 @@ k\{col}:
 k\{col}:
                 move.b  $7FFF(a1),d2
                 .endm
-                .macro  KWRITE  col,select,rn
+                .macro  KWRITE  col,select,rn,mask
                 KREAD   \col
                 bpl.s   .no\~
-                move.b  d1,\rn*FV_STRIDE(a3)
+                move.b  d1,d0
+                and.b   #\mask,d0
+                move.b  d0,\rn*FV_STRIDE(a3)
                 btst    #\rn,d3
                 bne.s   .no\~
                 move.w  #\select,d0
@@ -146,7 +149,9 @@ k\{col}:
                 movep.w d0,(a2)
 .nf\~:          tst.b   d2
                 bpl.s   .nc\~
-                move.b  d2,\cn*FV_STRIDE(a3)
+                move.b  d2,d0
+                and.b   #$0F,d0
+                move.b  d0,\cn*FV_STRIDE(a3)
                 btst    #\cn,d3
                 bne.s   .nc\~
                 move.w  #\csel,d1

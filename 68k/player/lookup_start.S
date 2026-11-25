@@ -162,6 +162,10 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
 ; d5 the kind, d0 the loop cell, a4 the first row, and the stride in the
 ; high word of d1. The descriptor, the instance and the page byte of the
 ; effect's first fallback page for the instance into the record's cache.
+; the path of the kinds, which ymxr_copylook enters with d5 the kind, a4
+; the first row and d0 the loop cell (copy.S): equates, so the local labels
+; around them stay in scope
+ymxr_lkind      equ     *
 .kind:          move.w  d5,d3
                 mulu    #KD_SIZE,d3
                 lea     ymxr_kinds(pc),a2
@@ -243,6 +247,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 moveq   #0,d6
                 move.b  FX_TARGET(a3),d6
                 lsl.w   #3,d6
+ymxr_lwmap      equ     *                       ; ymxr_copylook's map instead
                 lea     ymxr_wide-(14*8)(pc),a1
                 adda.w  d6,a1
                 move.w  KD_CELLS(a2),d7

@@ -27,9 +27,9 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,626 | 3,112 |
+| init | 1,634 | 3,120 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
-| the frame | 2,678 | 4,206 |
+| the frame | 2,678 | 4,910 |
 | the frame's read-site tables | 156 | 284 |
 | the general handler, four effects | 320 | 320 |
 | the square's | 112 | 112 |
@@ -47,8 +47,9 @@ player and of the player with the lookup in:
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
 | the lookup's routines | | 3,458 |
 | the cut's routines | | 2,674 |
-| the lookup instances and the gaps before them, ten kinds | | 6,788 |
-| the player | 9,322 | 25,264 |
+| copy from frame's routines and frame values | | 1,160 |
+| the lookup instances and the gaps before them, ten kinds | | 6,908 |
+| the player | 9,330 | 27,256 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -121,21 +122,19 @@ A block is the code and data a player runs for one part of a song:
 - a lookup kind's block, such as `lt`, is init's loop over the kind's
   instances, which a song needs where it needs an instance of the kind;
 - `copy`, in a core with the lookup, is copy from frame: the frame values,
-  the start of copy from frame, the frame's register steps that leave a
-  register copy from frame runs on to the ticks, and init's work for a
-  tune that copies from frame, which a song needs where a row of a tune
-  starts it, bit 7 of the tune's effects byte (SPEC.md 3.1.7). Copy from
-  frame runs the handler of its target's registers: the general handler
-  on a register of seven bits or fewer, `counted` on one that reads every
-  bit of its byte, `envelope` on `setEnvelope`, `two` on another target of
-  two registers and `three` on a target of three. For a handler other
-  than the general one, the effect needs that handler's block on it, its
-  kind's block and `several`, and where a recut moves copy from frame to
-  the counted kind of its target's columns, that kind's blocks, as the
-  effect's cut block reads them. In a
-  core without the lookup, `copy` is init's test that reports -1 for a
-  tune that copies from frame, which a link leaves out, since such a song
-  links on the core with the lookup;
+  the start of copy from frame, at the frame and through a
+  transformation, the frame's register steps that leave a register copy
+  from frame runs on to the ticks, and init's work for a tune that copies
+  from frame, which a song needs where a row of a tune starts it, bit 7 of
+  the tune's effects byte (SPEC.md 3.1.7). Copy from frame runs the counted
+  handler of its target's columns, `counted`, `envelope` or
+  `countedthree`, so the effect needs that handler's block on it, its
+  kind's block and `several`; through a transformation, the counted lookup
+  instance of its columns, as the lookup instances below read them; and
+  where a recut moves it under a cut, the counted kind the effect's cut
+  block reads. In a core without the lookup, `copy` is init's test that
+  reports -1 for a tune that copies from frame, which a link leaves out,
+  since such a song links on the core with the lookup;
 - `align`, in a core with the deferred start and the lookup, is the gap
   before the second bank, which every song needs.
 
@@ -428,14 +427,14 @@ measures it against the linked core.
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
 10,022 bytes, the core with the deferred start in, of 15,276 bytes, the
-core with the lookup in, of 27,918 bytes, or the core with the lookup
-and the deferred start in, of 42,476 bytes.
+core with the lookup in, of 27,966 bytes, or the core with the lookup
+and the deferred start in, of 42,524 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
-| `copy-from-frame.ymxr` | the lookup | square, square2, three, three1, several, effect0, effect1, effect2, effects, copy | 8,898 |
+| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,216 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
@@ -457,9 +456,9 @@ A tune of general sources alone, with no effect, links 1,336 bytes, 13%
 of the core: the blocks are 8,686 bytes of it. `voices.ymxr` runs all
 four effects, keeps a handler of two or three columns on each and the
 start of several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup
-instances of 3 kinds and links 15,470 bytes of 42,476: the 36 instances
-and the 7 loops of init it leaves out are 13,966 bytes, and the gaps it
-keeps are 640 bytes shorter than in the core.
+instances of 3 kinds and links 15,470 bytes of 42,524: the 36 instances
+and the 7 loops of init it leaves out are 13,874 bytes, and the gaps it
+keeps are 686 bytes shorter than in the core.
 
 ## The check
 

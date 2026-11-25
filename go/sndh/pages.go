@@ -174,35 +174,15 @@ func pagesPlay(tune ymxr.File, columns [][]byte, row int, effects []*pagesEffect
 	}
 }
 
-// CopyForm is the form of copy from frame on target, the form of the source
-// its target's handler runs (SPEC.md 3.4.4): on a register of seven bits or
-// fewer marked, on setR7 the ports' and on another register plain; on
-// setEnvelope, whose registers fill their bytes, plain; and on every other
-// target a marked source's of its columns.
+// CopyForm is the form of copy from frame on target, the form of the counted
+// source its target's handler runs (SPEC.md 3.4.4): the ports' on setR7 and
+// plain on every other target.
 func CopyForm(target int) int {
-	switch {
-	case target == pagesMixer:
+	if target == pagesMixer {
 		return PagePorts
-	case target < 14 && wholeBytes>>target&1 != 0:
-		return PagePlain
-	case target < 14:
-		return PageMarked
-	case target == 20:
-		return PagePlain
-	case target >= 17 && target <= pagesBuzzer:
-		if target == pagesBuzzer {
-			return PageMarked
-		}
-		return PagePlain
-	case target >= pagesNoise:
-		return PagePlain
 	}
-	return PageMarked
+	return PagePlain
 }
-
-// wholeBytes is the registers whose column fills its byte, a bit a register:
-// R0, R2, R4, R7, R11 and R12 (SPEC.md 2.1.2).
-const wholeBytes = 0x1895
 
 // PageForm is the form source s runs on target through a
 // transformation, or -1 for a square or a source of one row in a tune whose

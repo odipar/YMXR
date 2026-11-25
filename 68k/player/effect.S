@@ -389,7 +389,8 @@ q\{ct}:         bra.w   \{tick}_done
                 move.b  ymxr_htab+(LOOK_KINDS*((\fx-WS_FX)/FX_SIZE))(pc),d5 ; lookup kind, the page byte
                 move.w  #\vector,d1             ; of its page 0 and the vector
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                bsr.w   ymxr_lstart
+\{tick}_lcall   equ     *                       ; aimed at ymxr_copylook in a
+                bsr.w   ymxr_lstart             ; tune that copies from frame
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 ; Remap entry (SPEC.md 1.10.2). Init redirects _unset here for a tune

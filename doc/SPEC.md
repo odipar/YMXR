@@ -522,10 +522,9 @@ source column is written unchanged.
 The marker and port directions remain source bits, independent of the
 lookup entry. A key above the last key of transformation n, E - 1, is left
 to a later version (section 8). On copy from frame (3.1.7) b is the frame
-value of the register, in the row of the table its column has: the
-marker's column for a register of seven bits or fewer, setR7's for R7,
-with bits 7 and 6 at 1 (1.4.2), and any other column for a register whose
-column fills its byte.
+value of the register, which has no marker: the row of any other column,
+and on `setR7` the row of setR7's column, b with bits 7 and 6 at 1
+(1.4.2).
 
 ### 2.2 The sources
 
@@ -917,16 +916,13 @@ targets and 1 on the others, and for three columns 1 on `setBuzzer` and 0
 on the voices. A square and a source of one row (4.3) have no form in
 version 10, and form 1 in version 11 and in version 12 where a row cuts a
 source, where a tick under a cut 1 to 127 reads them as a marked source of
-one column (5.1). Copy from frame has the form of the source its target's
-handler runs (3.1.7): on a target of one register, form 1 where the
-register is of seven bits or fewer, 2 on `setR7` and 0 on the others; on
-`setEnvelope`, whose two registers fill their bytes, 0; and on every other
-target the form of a marked source of its columns. A writer reads the rows
-in order, row 0 to R - 1 and then rows RR to R - 1 again until each effect
-is at row RR as a pass before left it, with four values an effect the tune
-runs: the kept target and the kept mapping (4.3, 1.10.3), whether a start
-runs it, false at row 0, and the forms its timer may run, none at row 0.
-In a row of the effect:
+one column (5.1). Copy from frame has the form of a counted source
+(3.1.7): 0, and 2 on `setR7`. A writer reads the rows in order, row 0 to R
+- 1 and then rows RR to R - 1 again until each effect is at row RR as a
+pass before left it, with four values an effect the tune runs: the kept
+target and the kept mapping (4.3, 1.10.3), whether a start runs it, false
+at row 0, and the forms its timer may run, none at row 0. In a row of the
+effect:
 
 - a stop makes the third false and the fourth none, its mapping column
   unread;

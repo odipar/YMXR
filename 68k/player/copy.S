@@ -10,17 +10,16 @@
 
                 PIECE   copy_4
 ; The frame value of each register, R0 to R13, FV_STRIDE bytes apart: the
-; byte the frame last wrote to it, R7's with the ports' bits (1.4.2), and
-; the register's number in the byte after it. Copy from frame is a source
-; of one row repeating to row 0 whose column a register is the register's
-; frame value: the general handler reads the marker in bit 7 of a register
-; of seven bits or fewer, which a column's set bit leaves there, and the
-; counted handler counts the one row of a register that reads every bit
-; of its byte. Each frame value is the first row of a source of one
-; column, behind a source's header (DTX, SPEC.md 1): R 1, C 1 and RR 0,
-; which the start, the recut and a deferred start read as they read a
-; table's. Init writes the values of ymxr_fv0, the frame value 0 of each,
-; before the first frame.
+; value the frame last wrote to it, masked to the register's width, R7's
+; with the ports' bits (1.4.2), and the register's number in the byte
+; after it. Copy from frame is a source of one row repeating to row 0
+; whose column a register is the register's frame value, which a counted
+; handler runs, one row left and one row a pass, so a frame value has no
+; marker and is the key of a transformation as it is (2.1.5). Each frame
+; value is the first row of a source of one column, behind a source's
+; header (DTX, SPEC.md 1): R 1, C 1 and RR 0, which the start, the recut
+; and a deferred start read as they read a table's. Init writes the values
+; of ymxr_fv0, the frame value 0 of each, before the first frame.
                 .macro  FVROW   rn
                 dc.b    0,\rn                   ; the frame value, its register
                 dc.l    1                       ; R, C and RR of the next
@@ -52,13 +51,8 @@ ymxr_fvend:
                 .if     (ymxr_fvend-ymxr_fv)<>(14*FV_STRIDE)
                 .error  "ymxr_fv: a frame value is FV_STRIDE bytes from the next"
                 .endif
-ymxr_fv0:       dc.b    $00,$80,$00,$80,$00,$80,$80,$C0,$80,$80,$80,$00,$00,$80
+ymxr_fv0:       dc.b    $00,$00,$00,$00,$00,$00,$00,$C0,$00,$00,$00,$00,$00,$00
                 .even
-
-; The registers that read every bit of their byte, a bit a register: R0,
-; R2, R4, R7, R11 and R12 (SPEC.md 2.1.2). Copy from frame on one runs
-; the counted handler.
-COPY_COUNTED    equ     $1895
 
 ; The targets of several registers as copy from frame reads them: a
 ; register and the column of copy from frame that writes it, which is the
@@ -85,8 +79,8 @@ ymxr_copywide:  cmp.l   #-7,d0
                 beq.s   ymxr_copystart
                 bra.w   ymxr_widestart
 
-; A start of copy from frame on effect d4: the handler of the kept
-; target's registers aimed at their frame values, a source of one row
+; A start of copy from frame on effect d4: the counted handler of the
+; kept target's columns aimed at their frame values, a source of one row
 ; repeating to row 0 at row 0 (SPEC.md 3.1.7, 5.1). The registers and the
 ; return are those of ymxr_widestart: a3 the record, its mirror where a
 ; deferred start is armed (4.8), a5 the handler, and NZ, a source of
@@ -112,33 +106,13 @@ ymxr_copystart:
                 move.b  FX_TARGET(a3),d5
                 cmp.w   #14,d5
                 bcc.w   .wide
-; A target of one register: its frame value, the place and the loop cell.
+; A target of one register: the counted handler at its frame value, the
+; place and the loop cell, one row left and one row a pass.
                 move.w  d5,d4
                 mulu    #FV_STRIDE,d4
                 adda.w  d4,a4
                 move.l  a4,d0
-                move.w  #COPY_COUNTED,d4
-                btst    d5,d4
-                bne.s   .counted
-                lea     ymxr_at_tick(pc),a5
-                bsr.w   .instance
-                move.w  sr,-(sp)
-                ori.w   #$0700,sr
-                move.b  d5,TICK_SEL(a5)
-                .if     YMXR_PCREL
-                lea     TICK_PTR(a5),a2         ; the place and the cell, each
-                move.l  a4,d1                   ; a displacement from the
-                sub.l   a2,d1                   ; instruction that reads the
-                move.w  d1,TICK_PTR(a5)         ; row
-                move.w  d1,TICK_CELL(a5)
-                .else
-                move.l  a4,TICK_PTR(a5)
-                move.l  a4,TICK_CELL(a5)
-                .endif
-                clr.b   FX_SHAPE(a3)
-                move.l  a4,FX_FIRST(a3)
-                bra.w   .aimed
-.counted:       lea     ymxr_at_counted(pc),a5
+                lea     ymxr_at_counted(pc),a5
                 bsr.w   .instance
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
@@ -153,43 +127,37 @@ ymxr_copystart:
                 move.l  a4,TICKC_PTR(a5)
                 move.l  a4,TICKC_CELL(a5)
                 .endif
-                move.w  #1,TICKC_LEFT(a5)       ; one row, and a pass through
-                move.w  #1,TICKC_RELD(a5)       ; the loop of one
+                move.w  #1,TICKC_LEFT(a5)
+                move.w  #1,TICKC_RELD(a5)
                 move.b  #4,FX_SHAPE(a3)
                 move.l  a4,FX_FIRST(a3)
                 bra.w   .aimed
-; A target of several registers: the slots of the map, each column at its
-; register's frame value.
+; A target of several registers: the counted handler of its columns, the
+; slots of the map, each column at its register's frame value.
 .wide:          move.w  d5,d4
                 sub.w   #14,d4
                 lsl.w   #3,d4
                 lea     ymxr_wcopy(pc),a2
                 adda.w  d4,a2
                 cmp.b   #20,d5                  ; setEnvelope: two registers
-                beq.w   .envelope               ; that read every bit
+                beq.w   .two
                 cmp.b   #17,d5
                 bcs.w   .two
                 cmp.b   #21,d5
                 bhi.w   .two
-                lea     ymxr_at_three(pc),a5    ; setVoice and setBuzzer
+                lea     ymxr_at_countedthree(pc),a5 ; setVoice and setBuzzer
                 bsr.w   .instance
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
-                WSLOT   TW3_SEL1,TW3_PTR1,TW3_CELLS,FX_FIRST,0
-                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+CELL_SIZE,FX_FIRST2,2
-                WSLOT   TW3_SEL3,TW3_PTR3,TW3_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
-                move.b  #3,FX_SHAPE(a3)
+                WSLOT   TWCT_SEL1,TWCT_PTR1,TWCT_CELLS,FX_FIRST,0
+                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_SIZE,FX_FIRST2,2
+                WSLOT   TWCT_SEL3,TWCT_PTR3,TWCT_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
+                move.w  #1,TWCT_LEFT(a5)
+                move.w  #1,TWCT_RELD(a5)
+                move.b  #6,FX_SHAPE(a3)
                 bra.w   .aimed
-.two:           lea     ymxr_at_two(pc),a5      ; setTone and setNoise
-                bsr.w   .instance
-                move.w  sr,-(sp)
-                ori.w   #$0700,sr
-                WSLOT   TW2_SEL1,TW2_PTR1,TW2_CELLS,FX_FIRST,0
-                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+CELL_SIZE,FX_FIRST2,2
-                move.b  #2,FX_SHAPE(a3)
-                bra.w   .aimed
-.envelope:      lea     ymxr_at_envelope(pc),a5
-                bsr.w   .instance
+.two:           lea     ymxr_at_envelope(pc),a5 ; setTone, setNoise and
+                bsr.w   .instance               ; setEnvelope
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 WSLOT   TWC_SEL1,TWC_PTR1,TWC_CELLS,FX_FIRST,0
@@ -224,6 +192,67 @@ ymxr_copystart:
 .bank:
                 .endif
                 rts
+
+; A start through a transformation in a tune that copies from frame (3.1.7,
+; 2.1.5): init aims each call of ymxr_lstart here, the frame's and the
+; arming's, and a source other than copy from frame goes on to it. Copy
+; from frame starts on the counted lookup instance of its target's
+; columns, at the frame values, through the path of the kinds of
+; ymxr_lstart: on a register, its frame value the first row and the loop
+; cell; on a target of several registers, a register a column, FV_STRIDE
+; bytes apart, which ymxr_wcopy maps in place of ymxr_wide while the path
+; runs. The registers, the return and the arming are ymxr_lstart's, a1 and
+; a2 kept across the map's write.
+ymxr_copylook:  move.w  d3,d0
+                lsl.w   #3,d0
+                cmp.l   #-8,WS_SOURCES-4(a0,d0.w)   ; copy from frame's tag
+                bne.w   ymxr_lstart
+                moveq   #0,d3
+                move.b  FX_TARGET(a3),d3        ; the target
+                lea     ymxr_copykinds(pc),a4
+                moveq   #0,d0
+                move.b  (a4,d3.w),d0            ; the kind of its handler
+                lea     ymxr_fv(pc),a4          ; row 0 of each register
+                cmp.w   #14,d3
+                bcc.s   .wide
+                mulu    #FV_STRIDE,d3
+                adda.w  d3,a4                   ; the register's frame value
+                move.w  d0,d5
+                move.l  a4,d0                   ; its loop cell
+                bra.w   ymxr_lkind
+.wide:          move.w  d0,d5
+                move.l  a4,d0                   ; column 0's loop cell
+                swap    d1
+                move.w  #FV_STRIDE,d1           ; the stride, the high word
+                swap    d1
+                movem.l a1-a2,-(sp)
+                lea     ymxr_lwmap+2(pc),a1     ; the map, the registers
+                lea     ymxr_wcopy-(14*8)(pc),a2
+                move.l  a2,d3
+                sub.l   a1,d3
+                move.w  d3,(a1)
+                movem.l (sp)+,a1-a2
+                bsr.w   ymxr_lkind
+                movem.l a1-a2,-(sp)
+                lea     ymxr_lwmap+2(pc),a1     ; and ymxr_wide again
+                lea     ymxr_wide-(14*8)(pc),a2
+                move.l  a2,d3
+                sub.l   a1,d3
+                move.w  d3,(a1)
+                movem.l (sp)+,a1-a2
+                rts
+
+; The counted lookup kind copy from frame runs on each target, 0 to 24,
+; the index ymxr_lstart reads: 1 on a register, 6 on the tones and
+; setEnvelope, 7 on the noises, 8 on setBuzzer and 9 on the voices.
+ymxr_copykinds: dc.b    1,1,1,1,1,1,1,1,1,1,1,1,1,1
+                dc.b    6,6,6,9,9,9,6,8,7,7,7
+                .even
+
+; Each effect's call of ymxr_lstart at the frame, effect 3 first, as
+; ymxr_overs has the heads: its displacement from ymxr_frame.
+ymxr_lcalls:    dc.w    ymxr_tick3_lcall-ymxr_frame+2,ymxr_tick2_lcall-ymxr_frame+2
+                dc.w    ymxr_tick1_lcall-ymxr_frame+2,ymxr_tick0_lcall-ymxr_frame+2
 
 ; Init's work on every tune, in a core with the block copy, after the
 ; sources are resolved (4.1). On every tune: the frame's first read at
@@ -277,6 +306,32 @@ ymxr_copyinit:  movem.l d0-d4/a1-a4,-(sp)
 .next:          dbra    d2,.each
                 .if     YMXR_DEFER
                 lea     ymxr_arm_wide+2(pc),a1  ; the arming's (deferred.S)
+                move.l  a3,d1
+                sub.l   a1,d1
+                move.w  d1,(a1)
+                .endif
+; Each call of ymxr_lstart aimed here or back: each effect's the link
+; kept, with the effect's remap, and the arming's two.
+                lea     ymxr_lstart(pc),a3
+                btst    #7,WS_EFFECTS(a6)
+                beq.s   .look
+                lea     ymxr_copylook(pc),a3
+.look:          lea     ymxr_lcalls(pc),a2
+                moveq   #3,d2
+.leach:         move.w  (a2)+,d4
+                btst    d2,ymxr_k_map+1(pc)
+                beq.s   .lnext
+                lea     (a4,d4.w),a1
+                move.l  a3,d1
+                sub.l   a1,d1
+                move.w  d1,(a1)
+.lnext:         dbra    d2,.leach
+                .if     YMXR_DEFER
+                lea     ymxr_arm_look1+2(pc),a1
+                move.l  a3,d1
+                sub.l   a1,d1
+                move.w  d1,(a1)
+                lea     ymxr_arm_look2+2(pc),a1
                 move.l  a3,d1
                 sub.l   a1,d1
                 move.w  d1,(a1)

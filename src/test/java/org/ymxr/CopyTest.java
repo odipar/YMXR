@@ -175,8 +175,8 @@ class CopyTest {
 
     /** Copy from frame through a transformation, at a start and at a remap
      *  of its timer (rule 2(j)): the mapping column selects each, and the
-     *  list of pages has both in the form of setR13's register, of four
-     *  bits, marked (SPEC.md 3.4.4). */
+     *  list of pages has both in the form of a counted source, plain
+     *  (SPEC.md 3.4.4). */
     @Test
     void copyFromFrameRunsThroughATransformation() {
         byte[] file = ConformanceTest.schema(mapped()).file();
@@ -186,7 +186,7 @@ class CopyTest {
         byte[] column = read.table().column(read.mapping(0));
         assertEquals(0x81, column[0] & 0xFF, "the start's mapping column");
         assertEquals(0x82, column[2] & 0xFF, "the remap's mapping column");
-        assertArrayEquals(new byte[] {'Y', 'P', 2, 0, Pages.MARKED, 1, 0, Pages.MARKED, 2},
+        assertArrayEquals(new byte[] {'Y', 'P', 2, 0, Pages.PLAIN, 1, 0, Pages.PLAIN, 2},
                 Pages.of(read), "the pages of copy from frame on setR13");
     }
 
