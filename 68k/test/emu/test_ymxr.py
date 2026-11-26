@@ -4097,7 +4097,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         m = Machine(code, symbols, moved)
         assert m.call("init", a0=FILE, a1=workspace) & 0xFFFFFFFF == 0xFFFFFFFF, \
             "init took a bound tune of version %d" % past
-        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0), [], 0, []), [], None
+        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0), [], 0, [], symbols), [], None
     bound = bind(file, work)
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
@@ -4513,7 +4513,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     assert m.byte(MFP + 0x1D) & 0x70 == nibble, "stop moved Timer C's nibble"
     return (frames, ticks, cost, tick_cost, tick_cycles,
             (costliest[0], tune.R, tune.RR, advance, steps, tune.effects, patched,
-             (len(bound), long_at(bound, 12)), lookups, len(tune.rows[0]), copied),
+             (len(bound), long_at(bound, 12)), lookups, len(tune.rows[0]), copied, symbols),
             boundaries, refill_parts(refills_of, file, bound, tune))
 
 
@@ -8723,6 +8723,11 @@ def main():
     footprints = {}                     # the bound tune's bytes and its state block's, by tune
     general = {}                        # every tick's cost the fixtures counted, by kind
     walker = None                       # the register steps walked, once a count runs
+    # A run of the eleven fixtures under ym/test, the tunes of the tables
+    # of performance.md and plan.md, reads its figures against those
+    # documents; a run of the kit, the corpus or named tunes prints its
+    # figures alone.
+    fixtures = not args and wide is None and not kit
     stale = []
     wrong = []
     measured = {}                       # the refill parts by tune, with -refill
@@ -8779,10 +8784,20 @@ def main():
                 # here counts: 44 and 20 from the manual, the 64 that
                 # separates performance.md's 96 from its 160.
                 ticked = int(round((tick_cycles + ENTRY * ticks) / float(frames)))
-                if costs and where[4] and PCREL and not LEAN:
+                # The walk reads the tone steps from their first read, at
+                # the addresses of the player check played the tune on: the
+                # build with the lookup in where the tune needs it. Init
+                # writes a bra.w over that read for a tune that copies from
+                # frame or syncs a voice, to ymxr_cregs or ymxr_sregs; the
+                # walk models neither, so it skips such a tune, and the
+                # rig's count alone measures its register steps.
+                played = where[11]
+                regs = played["ymxr_regs"]
+                if costs and where[4] and PCREL and not LEAN \
+                        and where[6][regs:regs + 2] != b"\x60\x00":
                     # the walk of the frame procedure, frame by frame, is the rig's count
                     walker = walker or FrameWalk(cycles_of, code, symbols)
-                    tune_walk = FrameWalk(cycles_of, where[6], symbols)
+                    tune_walk = FrameWalk(cycles_of, where[6], played)
                     for f, (_, counted, _, row) in enumerate(where[4]):
                         if tune_walk.registers(row) != counted:
                             stale.append("%s frame %d: the walk of the register steps reads %d,"
@@ -8814,7 +8829,7 @@ def main():
                 # frame (plays).
                 if PCREL and MAP and not DEFER and not LEAN and said:
                     plays[stem] = (said, counted, where[6], where[5], where[9])
-                if PCREL and not DEFER and not MAP and not where[5] & 0x20 \
+                if fixtures and PCREL and not DEFER and not MAP and not where[5] & 0x20 \
                         and (not said or said[0] != counted[0] or not near(said[1:], counted[1:])):
                     stale.append("performance.md says %s for %s, and the rig counts %s" % (
                         said, stem, counted))
@@ -8823,7 +8838,7 @@ def main():
                 against = re.search(r"^\| %s \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$"
                                     % re.escape(stem),
                                     open(os.path.join(ROOT, "doc", "performance.md")).read(), re.M)
-                if PCREL and not DEFER and not MAP and not where[5] & 0x20 and (
+                if fixtures and PCREL and not DEFER and not MAP and not where[5] & 0x20 and (
                         not against or not near((int(against.group(2)), int(against.group(4))),
                                                 (average, max(cost)))):
                     stale.append("performance.md's table against 0.4.22 reads %s for %s, and the"
@@ -8926,11 +8941,11 @@ def main():
             wrong.append(os.path.basename(ym))
             said = str(failed).strip().split("\n")[0]
             print("%-45s FAILED: %s" % (os.path.basename(ym), said[:120]))
-    if costs and not args and wide is None and not kit and not LEAN:
+    if costs and fixtures and not LEAN:
         # a run over the eleven fixtures reads the section on a counted
         # tick of two columns against the kit's tunes of that shape
         stale += counted_read(code, symbols, cycles_of, general)
-    if costs and MAP and not args and wide is None and not kit and not DEFER \
+    if costs and MAP and fixtures and not DEFER \
             and (PCREL or not LEAN):
         # For eleven fixtures with lookup support, verify A tick through
         # a transformation, A remap at the frame and The cost of 34
@@ -8941,14 +8956,14 @@ def main():
             # as it is
             stale += cut_read(code, symbols, cycles_of, general)
             stale += copy_read(code, symbols, cycles_of)
-    if costs and not args and wide is None and not kit and PCREL and not LEAN:
+    if costs and fixtures and PCREL and not LEAN:
         # plan.md's shares, gates and parts over the eleven fixtures
         stale += plan_read(walker or FrameWalk(cycles_of, code, symbols), tunes, measured)
-    if footprints and not args and wide is None and not kit and PCREL and not LEAN:
+    if footprints and fixtures and PCREL and not LEAN:
         # the bound tunes and their state blocks against performance.md's
         # table of them
         stale += footprint_read(footprints)
-    if savings and not args and wide is None and not kit and PCREL and not LEAN and not MAP:
+    if savings and fixtures and PCREL and not LEAN and not MAP:
         # a run over the eleven fixtures reads the section against YMX's
         # dense columns as the rig counts them
         stale += dense_read(savings, costs)
@@ -8957,7 +8972,7 @@ def main():
         # performance.md that read them back: a run over the eleven fixtures
         # reads every figure of The play call the table does not carry.
         stale += refills(measured, tunes, code, symbols, cycles_of,
-                         not args and wide is None and not kit)
+                         fixtures)
     assert not stale, "\n".join(sorted(set(stale)))
     played = len(tunes) - len(another)
     if wrong:
