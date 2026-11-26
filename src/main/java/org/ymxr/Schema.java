@@ -768,8 +768,9 @@ final class Schema {
                 if (source == null) {
                     // copy from frame has no table, and its marker is the
                     // player's (SPEC.md 3.1.7); its target is one this
-                    // version encodes
-                    if (number >= Columns.MARKER.length) {
+                    // version encodes, and a target of a sync is a later
+                    // version's (rule 2(b), 8.10)
+                    if (number >= Columns.SYNC_TARGET) {
                         throw new IllegalArgumentException("copy from frame runs on "
                                 + Tunes.name(Tunes.target(start.connection()))
                                 + ", a target this version leaves to a later one"
@@ -781,7 +782,7 @@ final class Schema {
                 boolean through = !Tunes.isIdentity(start.mapping());
                 identity[n] |= !through;
                 mixer[n] |= through && number == Columns.MIXER_TARGET;
-                if (number >= Columns.MARKER.length) {
+                if (number >= Columns.SYNC_TARGET) {
                     throw new IllegalArgumentException("the source " + Tunes.name(source)
                             + " runs on " + Tunes.name(Tunes.target(start.connection()))
                             + ", a target this version leaves to a later one"

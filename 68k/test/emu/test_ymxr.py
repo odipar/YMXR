@@ -550,7 +550,8 @@ TARGETS.update({14: [(0, 0), (1, 1)], 15: [(2, 0), (3, 1)], 16: [(4, 0), (5, 1)]
                 17: [(0, 0), (8, 2), (1, 1)], 18: [(2, 0), (9, 2), (3, 1)],
                 19: [(4, 0), (10, 2), (5, 1)],
                 20: [(11, 0), (12, 1)], 21: [(11, 0), (12, 1), (13, 2)],
-                22: [(8, 1), (6, 0)], 23: [(9, 1), (6, 0)], 24: [(10, 1), (6, 0)]})
+                22: [(8, 1), (6, 0)], 23: [(9, 1), (6, 0)], 24: [(10, 1), (6, 0)],
+                25: [(0, 0), (1, 1)], 26: [(2, 0), (3, 1)], 27: [(4, 0), (5, 1)]})
 
 # Source column eligible for the optional lookup: the target's last
 # value. Sole value for setRn, the coarse nibble for setToneX, volume for
@@ -718,7 +719,15 @@ def entry(model, writes):
             # the kept cut after the row (7.3)
             one["cut"] = fx["cut"]
         e[str(i)] = one
-    return {"result": 0, "w": w, "e": e}
+    out = {"result": 0, "w": w}
+    if model.tune.syncs:
+        # the voices whose bit 5 the row sets, a voice the frame leaves to
+        # an effect among them (SPEC.md 7.3)
+        s = ["ABC"[v] for v in range(3) if model.playing[2 * v + 1] & 0x20]
+        if s:
+            out["s"] = s
+    out["e"] = e
+    return out
 
 
 def long_at(d, at):
@@ -738,6 +747,8 @@ class Tune:
         self.written = self.version
         self.rate = struct.unpack(">H", file[6:8])[0]
         self.effects = file[8]
+        # a tune file of version 13, which syncs a voice (BINARIES.md 1.2)
+        self.syncs = bool(file[10] & 0x80)
         count = file[9]
         # The tables, and copy from frame, source S, past them where bit 7
         # of the effects byte is 1: the index lists the tables alone, so S
@@ -1111,7 +1122,23 @@ class Model:
             self.fv[register] = value
         copied = {register for i in range(4) if self.fx[i]["running"] and self.copying(i)
                   for register, _ in TARGETS[self.fx[i]["using"]]}
-        return [(register, value) for register, value in writes if register not in copied]
+        left = [(register, value) for register, value in writes if register not in copied]
+        if not self.tune.syncs:
+            return left
+        # The sync of each voice whose bit 5 the row sets and on a register
+        # of whose period no effect runs: 0 to the two registers of each,
+        # then each frame value, before the row's other writes (SPEC.md
+        # 4.4.1).
+        r = self.playing
+        busy = {register for i in range(4) if self.fx[i]["running"]
+                for register, _ in TARGETS.get(self.fx[i]["using"], [])}
+        synced = [v for v in range(3)
+                  if r[2 * v + 1] & 0x20 and not {2 * v, 2 * v + 1} & busy]
+        zeros = [(register, 0) for v in synced for register in (2 * v, 2 * v + 1)]
+        periods = [(register, self.fv[register]) for v in synced
+                   for register in (2 * v, 2 * v + 1)]
+        return zeros + periods + [(register, value) for register, value in left
+                                  if register > 5 or register // 2 not in synced]
 
     def tick(self, i):
         """The writes a tick of effect i makes, one a register of its
@@ -3198,7 +3225,9 @@ def mapped_sizes():
                   r" in, the blocks are ([\d,]+) of the ([\d,]+)\. The blocks of copy from"
                   r" frame, which a link keeps only for a song that copies from frame, are"
                   r" ([\d,]+) bytes of the rest, and ([\d,]+) with the deferred start in \(Copy"
-                  r" from frame\)\.", said)
+                  r" from frame\)\. The blocks of the sync, which a link keeps only for a"
+                  r" song that syncs a voice, are ([\d,]+) bytes, and ([\d,]+) with the"
+                  r" deferred start in \(LINKER\.md\)\.", said)
     assert m, "performance.md's section on a cut has no sizes of the player with the cut in"
     read = [int(x.replace(",", "")) for x in m.groups()]
 
@@ -3214,7 +3243,10 @@ def mapped_sizes():
                sum(v for name, v in now.items() if not re.match(r"cut\d_", name)),
                next(iter(effects)) if len(effects) == 1 else effects,
                sum(now_defer.values()), sizes[(True, True, True)] - read[5],
-               sum(pieces(False, "copy").values()), sum(pieces(True, "copy").values())]
+               sum(v for name, v in pieces(False, "copy").items() if name.startswith("copy_")),
+               sum(v for name, v in pieces(True, "copy").items() if name.startswith("copy_")),
+               sum(pieces(False, "sync").values()) + sum(pieces(False, "copysync").values()),
+               sum(pieces(True, "sync").values()) + sum(pieces(True, "copysync").values())]
     assert read == counted, \
         "performance.md reads the player with the cut in as %s, and the rig counts %s" % (
             read, counted)
@@ -4015,12 +4047,6 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
         "the binder wrote version %d of a tune file of %d" % (tune.version, version)
     assert bool(bound[10] & 0x80) == (version == SYNC), \
         "bit 7 of byte 10 of the bound tune of a tune file of version %d" % version
-    if version == SYNC:
-        # a tune that syncs a voice: this player reports -1 for it
-        # (BINARIES.md 1.5)
-        assert Machine(code, symbols, bound).call("init", a0=FILE, a1=workspace) \
-            & 0xFFFFFFFF == 0xFFFFFFFF, "init took a tune that syncs a voice"
-        return 0, 0, [], {}, 0, (0, 0, 0, [], [], 0, b"", (0, 0), [], 0, []), [], None
     defer, lookup = needs(tune.effects)
     have = ("ymxr_bank1" in symbols, "ymxr_look" in symbols)
     if (defer and not have[0]) or (lookup and not have[1]):
@@ -8550,11 +8576,8 @@ def main():
                 line += ", a tick at %d boundaries of the frame" % len(boundaries)
             if refills_of:
                 measured[os.path.basename(ym)[:-3].replace("  ", " ")] = refills_of
-            if kit and frames:
+            if kit:
                 line += ", the player's frames are the reader's entries"
-            elif kit:
-                # a tune of version 13, which syncs a voice (check)
-                line += ", init reports -1 for a tune that syncs a voice"
             if cost and perf:
                 line += ", no cost figures: the monitor's cycles run inside the call"
             if cost and not perf:

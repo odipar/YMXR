@@ -59,7 +59,7 @@ replaces it.
 
 **4. The tunes.** Each is a `.ymxr` beside its `.rows`; the tunes differ
 in what they reach. Every tune names the targets `SPEC.md` 2.1 assigns, 0
-to 27, selects 1 to 7, sources 0 to `S`, 0 the stop (`SPEC.md` 1.8), in
+to 24, selects 1 to 7, sources 0 to `S`, 0 the stop (`SPEC.md` 1.8), in
 version 10 mappings 0 to `T`, 0 the identity (`SPEC.md` 1.10), and in
 version 11 cuts 0 to `U`, 0 the whole table (`SPEC.md` 1.11), and
 satisfies `SPEC.md` 6 but for two conditions in one tune: a source with
@@ -88,7 +88,7 @@ a reader does with a file outside those is outside this task.
 | `cut.ymxr` | 25 |
 | `cuts.ymxr` | 21 |
 | `copy-from-frame.ymxr` | 9 |
-| `sync.ymxr` | 17 |
+| `sync.ymxr` | 33 |
 | `wrong-version.ymxr` | 0 |
 
 The count is the first line and `R` + `R` - `RR` frames for a tune that

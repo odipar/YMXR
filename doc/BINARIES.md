@@ -194,9 +194,9 @@ fields.
    with the field at 24 at 0; and where bit 6 is set and the version is
    other than $000B, or clear and the version is $000B. In a player
    assembled without the lookup, report -1 and stop where bit 7 is set
-   (SPEC.md 3.1.7). Then the field at 10: report -1 and stop where its bit
-   7 is set, a tune that syncs a voice (SPEC.md 1.12), which this version
-   of the player leaves to a later one.
+   (SPEC.md 3.1.7). Then the field at 10: where its bit 7 is set, a tune
+   that syncs a voice, aim the frame's register steps of R0 to R5 at the
+   sync's (SPEC.md 4.4.1).
 3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
@@ -245,7 +245,7 @@ Each of the eight has a twin with `-defer` before `.bin`, assembled with
 the deferred start in, `YMXR_DEFER=1`, whose flags word is the eight's
 plus 8: `YMXR_sndh-defer.bin` reads 12. Init of a core without it
 reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
-core with it is 5,254 bytes larger.
+core with it is 5,374 bytes larger.
 
 Each of the sixteen has a twin with `-map` before `.bin`, assembled with
 optional lookup support, `YMXR_MAP=1` (SPEC.md 1.10, 1.11). Its flags word
@@ -255,7 +255,7 @@ is the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 reports -1 for a tune of version 10, whose effects byte sets bit 5, of
 version 11, whose effects byte sets bit 6, and of a tune whose effects
 byte sets bit 7, which copies from frame (SPEC.md 3.3);
-`YMXR_sndh-map.bin` is 18,026 bytes larger than `YMXR_sndh.bin`. The field
+`YMXR_sndh-map.bin` is 18,746 bytes larger than `YMXR_sndh.bin`. The field
 at 26 of a core with the lookup in is the offset of its first handler:
 every byte from there to the core's end is a handler, an installer, the
 monitor's counter or padding. The padding puts every lookup handler's page

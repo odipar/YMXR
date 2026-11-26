@@ -457,8 +457,8 @@ its period, R0 and R1 for voice A, R2 and R3 for voice B, R4 and R5 for
 voice C, fine then coarse; wait at least 36 cycles of an 8 MHz 68000, 9
 cycles of the chip's clock (YMXS, SPEC.md 3.9.2); then write the period to
 the two registers, fine then coarse. A frame syncs the voices its row
-marks (4.4.1), and a tick of a target of a sync, 25 to 27, syncs its voice
-(2.1, 5.1).
+marks (4.4.1); a tick of a target of a sync, 25 to 27, is a later
+version's (2.1, section 8).
 
 ---
 
@@ -477,7 +477,7 @@ under them (R3.2).
 | 20 | `setEnvelope`: R11 R12 | 2 | 1, the period's high byte | 1, the period's high byte |
 | 21 | `setBuzzer`: R11 R12 R13 | 3 | 2, the shape | 2, the shape |
 | 22, 23, 24 | `setNoiseA`, `setNoiseB`, `setNoiseC`: R6 R8, R6 R9, R6 R10 | 2 | 0, the noise period | 1, the volume |
-| 25, 26, 27 | `syncToneA`, `syncToneB`, `syncToneC`: R0 R1, R2 R3, R4 R5, after a sync of the voice (1.12.2) | 2 | 1, the coarse nibble | 1, the coarse nibble |
+| 25, 26, 27 | `syncToneA`, `syncToneB`, `syncToneC`: R0 R1, R2 R3, R4 R5, after a sync of the voice (1.12.2), whose tick a later version defines (section 8) | 2 | 1, the coarse nibble | 1, the coarse nibble |
 | 28 to 127 | unassigned; a later version assigns them (section 8) |  |  |  |
 
 **2.1.1** A tick writes a source's row to the registers of its target,
@@ -1332,13 +1332,6 @@ mapping (2.1.5); at step 3 its row is the last of cut 0, the one row of
 the source, so the place stays at row 0, and step 5 performs a start
 pending on the timer.
 
-A tick of a target of a sync, 25 to 27 (2.1), syncs its voice (1.12.2):
-before step 1 it writes 0 to the two registers of the voice's period,
-fine then coarse, and waits, and steps 1 and 2 then write the period, the
-fine column and then the coarse nibble, the marker's column. From the
-first 0 to the write of step 2 the tick runs at interrupt level 7, so a
-tick of another timer due then is served after it (5.1.2).
-
 **5.1.1** A player runs the MFP in the mode the host leaves it, bit 3 of
 `$FFFA17` at 1, and performs step 6. A player that clears bit 3 at 4.1,
 automatic end of interrupt, omits step 6, keeps the interrupt level
@@ -1423,10 +1416,10 @@ numbers the maps assign.**
   (7.3). A writer leaves out a remap or a recut on the timer of such an
   effect, a timer outside the tune (YMXS, SPEC.md 1.10, 4.3).
 - 2(b) A source column is 0 or 1 to S, S the source count (3.3); a target
-  column is a target this version encodes, 0 to 24, and 25 to 27 in
-  version 13 (2.1); a mapping column is 0 to T, T the transformation count
-  (3.4); a cut column is 0 to U, U the cut count (3.5). A source of C
-  columns runs on a target of C registers (2.1.2).
+  column is a target this version plays, 0 to 24 (2.1, section 8); a
+  mapping column is 0 to T, T the transformation count (3.4); a cut column
+  is 0 to U, U the cut count (3.5). A source of C columns runs on a target
+  of C registers (2.1.2).
 - 2(c) A start whose target column is unset runs on the kept target, the
   last target column set on the effect in frame order, through the wrap
   (4.5). A writer reads the rows in order with the kept target of each
@@ -1901,3 +1894,9 @@ target (1.10.1).
 **8.8** A cut of more than 65,535 rows (1.11), a counted source of more
 than 65,535 rows (3.1), and a source of two or three columns of more than
 65,534 rows (3.1.3).
+
+**8.10** A tick of a target of a sync, 25 to 27 (2.1): it syncs the
+voice of its target (1.12.2) and writes the source's row as 5.1 steps 1
+and 2 do, the sync at interrupt level 7 from the first 0 to the write of
+step 2 (YMXS, SPEC.md 3.9.4). Rule 2(b) keeps a writer of this version
+clear of a start on one.

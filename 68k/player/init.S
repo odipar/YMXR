@@ -47,13 +47,11 @@ YMXR_init:
                 bmi     .bad6
                 ENDPIECE copy_5
                 .endif
-; A tune that syncs a voice, which bit 7 of byte 10 of the bound tune marks
-; (BINARIES.md 1.5): this player leaves the sync to a later version and
-; reports -1. The block sync, which a link keeps for a song a tune of which
-; syncs a voice (doc/LINKER.md).
+; The first reads of the register steps put back before the read sites
+; are written, for the block sync, which a link keeps for a song a tune of
+; which syncs a voice (sync.S, doc/LINKER.md).
                 PIECE   sync_1
-                tst.b   TF_SYNC(a0)
-                bmi     .bad6
+                bsr     ymxr_syncfix
                 ENDPIECE sync_1
                 .if     YMXR_MAP
 ; Version 10 bound layout: signed transformation-block offset at 24,
@@ -250,6 +248,11 @@ YMXR_init:
                 bsr     ymxr_copysites
                 ENDPIECE copy_2
                 .endif
+; And the sync's: its frame values, its read sites, and for a tune that
+; syncs a voice the branch to its register steps (sync.S).
+                PIECE   sync_2
+                bsr     ymxr_syncinit
+                ENDPIECE sync_2
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the

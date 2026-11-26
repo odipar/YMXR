@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,65 +17,80 @@ import org.ymxs.Chip;
 import org.ymxs.Tunes;
 import org.ymxs.YMXS.Cut;
 import org.ymxs.YMXS.Effect;
-import org.ymxs.YMXS.Identity;
 import org.ymxs.YMXS.Pair;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Row;
+import org.ymxs.YMXS.Single;
 import org.ymxs.YMXS.Timer;
-import org.ymxs.YMXS.Transformation;
 import org.ymxs.YMXS.Two;
 import org.ymxs.YMXS.Voice;
 
 /**
  * A tune that syncs a voice, written as version 13 and read back: bit 5 of
- * each coarse column marks a voice the row syncs, read on every row, and
- * targets 25 to 27 sync their voice at a tick (SPEC.md 1.12, 2.1, 3.3.5).
- * Its record (7.3), the errors of such a file (3.3.4), and the binder, which
- * binds it at the layout of version 9, 10 or 11 with bit 7 of byte 10 set
- * (BINARIES.md 1.2).
+ * each coarse column marks a voice the row syncs, read on every row (SPEC.md
+ * 1.12, 3.3.5). Its record (7.3), the errors of such a file (3.3.4), and the
+ * binder, which binds it at the layout of version 9, 10 or 11 with bit 7 of
+ * byte 10 set (BINARIES.md 1.2).
  */
 class SyncTest {
 
-    /** The tune of the YMXS conformance kit's {@code sync.json}: row 0
-     *  syncs the three voices; copy from frame on syncToneA on Timer A from
-     *  row 1, a source of two rows on syncToneB on Timer B from row 3, and
-     *  copy from frame on syncToneC on Timer C from row 4, its coarse value
-     *  through a transformation; rows 2, 5, 6 and 7 sync a voice, row 5
-     *  while Timer A runs on it; Timers A and B stop at row 6, and C at row
-     *  7. */
+    /** Syncs at frames beside two effects, for the kit: rows 0, 5, 9 and 13
+     *  sync voice A, which no effect runs on; copy from frame runs on
+     *  setToneB on Timer A from row 1 to row 9, so the frame leaves the
+     *  syncs of voice B at rows 3 and 8 to it and makes the one at row 12;
+     *  a source of four rows runs on setToneC on Timer B from row 2, and a
+     *  deferred start at row 5 of a drum on setR8 waits for its last row
+     *  at about one tick a frame, so the frame leaves the syncs of voice C
+     *  at rows 5 to 7 to the running source and makes those at rows 11 and
+     *  14, after the drum took the timer and after the stop at row 13. */
     static org.ymxs.YMXS.Tune tune() {
-        Pair pulse = new Pair("pulse", Tunes.repeating(List.of(new Two(150, 0),
-                new Two(140, 0)), 0));
-        Transformation up = new Transformation("coarse up", List.of(1, 2, 3, 4, 5, 6, 7, 8,
-                9, 10, 11, 12, 13, 14, 15, 15));
+        Pair tone = new Pair("tone C", Tunes.repeating(List.of(new Two(50, 2),
+                new Two(55, 2), new Two(60, 2), new Two(65, 2)), 0));
+        Single drum = new Single("drum", Tunes.once(List.of(15, 12, 9, 6)));
         List<Map<Timer, Effect>> effects = new ArrayList<>();
-        for (int r = 0; r < 8; r++) {
+        for (int r = 0; r < 16; r++) {
             effects.add(new EnumMap<>(Timer.class));
         }
-        effects.get(1).put(Timer.A, Tunes.copying(Tunes.target(25), Chip.prescaler(4), 100,
+        effects.get(1).put(Timer.A, Tunes.copying(Tunes.target(15), Chip.prescaler(4), 100,
                 true, true, false, Tunes.NO_PARTS, new Cut(0, 0)));
-        effects.get(3).put(Timer.B, Tunes.starting(Tunes.target(26), pulse,
-                Chip.prescaler(10), 80, true, true, false, Tunes.NO_PARTS, new Cut(0, 1)));
-        effects.get(4).put(Timer.C, Tunes.copying(Tunes.target(27), Chip.prescaler(4), 120,
-                true, true, false, Tunes.mapping(new Identity(), up), new Cut(0, 0)));
-        effects.get(6).put(Timer.A, Tunes.STOP);
-        effects.get(6).put(Timer.B, Tunes.STOP);
-        effects.get(7).put(Timer.C, Tunes.STOP);
+        effects.get(10).put(Timer.A, Tunes.STOP);
+        effects.get(2).put(Timer.B, Tunes.starting(Tunes.target(16), tone,
+                Chip.prescaler(200), 255, true, true, false, Tunes.NO_PARTS, new Cut(0, 3)));
+        effects.get(5).put(Timer.B, Tunes.starting(Tunes.target(8), drum,
+                Chip.prescaler(200), 255, false, true, true, Tunes.NO_PARTS, new Cut(0, 3)));
+        effects.get(13).put(Timer.B, Tunes.STOP);
         Map<Register, Integer> first = new EnumMap<>(Register.class);
         first.putAll(Map.of(Register.R0, 200, Register.R1, 1, Register.R2, 100,
                 Register.R3, 0, Register.R4, 50, Register.R5, 2, Register.R7, 56));
         first.putAll(Map.of(Register.R8, 15, Register.R9, 15, Register.R10, 15));
-        List<Map<Register, Integer>> registers = List.of(first, Map.of(),
-                Map.of(Register.R0, 180), Map.of(), Map.of(), Map.of(), Map.of(),
-                Map.of(Register.R4, 60));
-        List<Set<Voice>> syncs = List.of(Set.of(Voice.A, Voice.B, Voice.C), Set.of(),
-                Set.of(Voice.B), Set.of(), Set.of(), Set.of(Voice.A), Set.of(Voice.A),
-                Set.of(Voice.C));
+        List<Map<Register, Integer>> registers = new ArrayList<>();
+        for (int r = 0; r < 16; r++) {
+            registers.add(Map.of());
+        }
+        registers.set(0, first);
+        registers.set(3, Map.of(Register.R2, 90));
+        registers.set(5, Map.of(Register.R0, 150));
+        registers.set(9, Map.of(Register.R0, 120));
+        registers.set(10, Map.of(Register.R2, 80));
+        List<Set<Voice>> syncs = new ArrayList<>();
+        for (int r = 0; r < 16; r++) {
+            Set<Voice> one = EnumSet.noneOf(Voice.class);
+            if (r == 0 || r == 5 || r == 9 || r == 13) {
+                one.add(Voice.A);
+            }
+            if (r == 0 || r == 3 || r == 8 || r == 12) {
+                one.add(Voice.B);
+            }
+            if (r == 0 || r == 5 || r == 6 || r == 7 || r == 11 || r == 14) {
+                one.add(Voice.C);
+            }
+            syncs.add(one);
+        }
         List<Row> rows = new ArrayList<>();
-        for (int r = 0; r < 8; r++) {
+        for (int r = 0; r < 16; r++) {
             rows.add(new Row(registers.get(r), effects.get(r), syncs.get(r)));
         }
-        return new org.ymxs.YMXS.Tune("Sync squares", "", "SyncTest", 50,
+        return new org.ymxs.YMXS.Tune("Syncs at frames", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
     }
 
@@ -103,25 +119,23 @@ class SyncTest {
     void aTuneThatSyncsIsVersionThirteen() {
         byte[] file = file();
         assertEquals(Tune.SYNC, Tune.getWord(file, 4));
-        assertEquals(Columns.COPIES | Columns.MAPS | 0x0D, file[Tune.EFFECTS_AT] & 0xFF,
-                "effects 0, 2 and 3, the mapping columns, and copy from frame");
-        assertEquals(2, file[Tune.COUNT_AT] & 0xFF, "pulse and copy from frame");
-        assertEquals(0, entry(file, 2), "index entry S is copy from frame");
+        assertEquals(Columns.COPIES | Columns.DEFERS | 0x05, file[Tune.EFFECTS_AT] & 0xFF,
+                "effects 0 and 2, a deferred start, and copy from frame");
+        assertEquals(3, file[Tune.COUNT_AT] & 0xFF, "two tables and copy from frame");
+        assertEquals(0, entry(file, 3), "index entry S is copy from frame");
         TuneFile read = TuneFile.read(file);
         assertEquals(Tune.SYNC, read.version());
         assertTrue(Columns.syncs(read.effects()) && read.copies());
-        assertEquals(Columns.MAPPED, read.table().columns(), "the mapping columns");
+        assertEquals(Columns.C, read.table().columns(), "no mapping and no cut columns");
         byte[] a = read.table().column(1);
         byte[] b = read.table().column(3);
         byte[] c = read.table().column(5);
         assertEquals(0x80 | Columns.SYNC | 1, a[0] & 0xFF, "row 0 sets R1 to 1 and syncs A");
         assertEquals(0x80 | Columns.SYNC | 0, b[0] & 0xFF, "row 0 sets R3 to 0 and syncs B");
-        assertEquals(Columns.SYNC, b[2] & 0xFF, "row 2 syncs B and leaves R3 unset");
-        assertEquals(Columns.SYNC, a[5] & 0xFF, "row 5 syncs A while Timer A runs on it");
-        assertEquals(Columns.SYNC, c[7] & 0xFF, "row 7 syncs C and sets R4 alone");
+        assertEquals(Columns.SYNC, b[3] & 0xFF, "row 3 syncs B and leaves R3 unset");
+        assertEquals(Columns.SYNC, a[5] & 0xFF, "row 5 syncs A and leaves R1 unset");
+        assertEquals(Columns.SYNC, c[6] & 0xFF, "row 6 syncs C while Timer B runs on it");
         assertEquals(0, a[1] & 0xFF, "row 1 syncs no voice");
-        assertEquals(0x80 | 25, read.table().column(Columns.EFFECT)[1] & 0xFF,
-                "the start of row 1 on syncToneA");
     }
 
     @Test
@@ -138,16 +152,15 @@ class SyncTest {
 
     @Test
     void theRecordListsTheVoicesEachRowSyncs() {
-        String record = new String(Trace.record(file(), 8), StandardCharsets.UTF_8);
+        String record = new String(Trace.record(file(), 16), StandardCharsets.UTF_8);
         List<String> lines = record.lines().toList();
-        assertTrue(lines.get(0).startsWith("{\"rate\":50,\"effects\":173,\"sources\":["),
+        assertTrue(lines.get(0).startsWith("{\"rate\":50,\"effects\":149,\"sources\":["),
                 lines.get(0));
         assertTrue(lines.get(1).contains("},\"s\":[\"A\",\"B\",\"C\"],\"e\":{}}"), lines.get(1));
         assertTrue(!lines.get(2).contains("\"s\""), "row 1 syncs no voice: " + lines.get(2));
-        assertTrue(lines.get(2).contains("\"0\":{\"target\":25,\"source\":2,"), lines.get(2));
-        assertTrue(lines.get(3).contains("{\"0\":180},\"s\":[\"B\"],"), lines.get(3));
-        assertTrue(lines.get(6).contains("\"w\":{},\"s\":[\"A\"],"),
-                "a voice whose sync the frame leaves to an effect: " + lines.get(6));
+        assertTrue(lines.get(4).contains("{\"2\":90},\"s\":[\"B\"],"),
+                "a voice whose sync the frame leaves to an effect: " + lines.get(4));
+        assertTrue(lines.get(6).contains("{\"0\":150},\"s\":[\"A\",\"C\"],"), lines.get(6));
     }
 
     /** Files of version 13 written wrong, each with the line a reader reports
@@ -156,8 +169,8 @@ class SyncTest {
         byte[] file = file();
         Map<String, byte[]> out = new LinkedHashMap<>();
         byte[] table = file.clone();
-        Tune.putLong(table, Tune.indexAt(Tune.SYNC) + 4, entry(file, 1));
-        out.put("version 13 with source 2 other than copy from frame", table);
+        Tune.putLong(table, Tune.indexAt(Tune.SYNC) + 8, entry(file, 1));
+        out.put("version 13 with source 3 other than copy from frame", table);
         byte[] later = file.clone();
         Tune.putWord(later, 4, Tune.SYNC + 1);
         out.put("version 14 is not " + Tune.READS, later);
@@ -176,17 +189,17 @@ class SyncTest {
     }
 
     /** The binder binds a tune file of version 13 at the layout of its
-     *  columns, version 10 for this one, which maps a value: the effects
-     *  byte as the file has it, the S - 1 tables in the index, and bit 7 of
-     *  byte 10 set; a tune of version 12 keeps that bit clear (BINARIES.md
-     *  1.2). */
+     *  columns, version 9 for this one, which maps no value and cuts no
+     *  source: the effects byte as the file has it, the S - 1 tables in the
+     *  index, and bit 7 of byte 10 set; a tune of version 12 keeps that bit
+     *  clear (BINARIES.md 1.2). */
     @Test
     void theBinderMarksATuneThatSyncs() {
         byte[] tune = file();
         byte[] bound = Bound.of(tune);
-        assertEquals(Tune.VERSION, Tune.getWord(bound, 4));
+        assertEquals(Tune.UNMAPPED, Tune.getWord(bound, 4));
         assertEquals(tune[Tune.EFFECTS_AT], bound[Tune.EFFECTS_AT]);
-        assertEquals(1, bound[Tune.COUNT_AT]);
+        assertEquals(2, bound[Tune.COUNT_AT]);
         assertEquals(Bound.SYNC_MARK, bound[Bound.SYNC_AT] & Bound.SYNC_MARK);
         assertEquals(tune[Bound.SYNC_AT + 1], bound[Bound.SYNC_AT + 1], "byte 11 as it is");
         byte[] frames = Bound.of(ConformanceTest.schema(frames()).file());

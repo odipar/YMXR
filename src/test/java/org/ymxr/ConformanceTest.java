@@ -170,13 +170,12 @@ final class ConformanceTest {
                     + " frame runs on them, which the frame leaves to the ticks, and a stop"
                     + " of each at row 3, after which the frame writes R2 and R9 at row 0"),
             Fixture.built("sync", "`SyncTest.tune`", () -> schema(SyncTest.tune()),
-                    "version 13 at 50 Hz: a row that syncs the three voices, bit 5 of each"
-                    + " coarse column; copy from frame on `syncToneA` on Timer A from row 1, a"
-                    + " source of two rows on `syncToneB` on Timer B from row 3, and copy from"
-                    + " frame on `syncToneC` on Timer C from row 4, its coarse value through a"
-                    + " transformation; a row that syncs voice A while Timer A runs on it,"
-                    + " whose sync the frame leaves to the effect, and rows that sync a voice"
-                    + " and leave its period unset"),
+                    "version 13 at 50 Hz: rows that sync a voice, bit 5 of each coarse"
+                    + " column, a row that syncs the three and rows that sync one and leave"
+                    + " its period unset; copy from frame on `setToneB` on Timer A, whose"
+                    + " voice's syncs the frame leaves to it, and on Timer B a source on"
+                    + " `setToneC` and a deferred start of a drum on `setR8` that stays"
+                    + " pending across three rows that sync voice C"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));

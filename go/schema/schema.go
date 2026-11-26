@@ -797,8 +797,9 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			if source == nil {
 				// copy from frame has no table, and its marker is the
 				// player's (SPEC.md 3.1.7); its target is one this version
-				// encodes
-				if number >= len(ymxr.Marker) {
+				// encodes, and a target of a sync is a later version's
+				// (rule 2(b), 8.10)
+				if number >= ymxr.SyncTarget {
 					return marks{}, fmt.Errorf("copy from frame runs on %s, a target this"+
 						" version leaves to a later one (SPEC.md section 8)",
 						ymxs.TargetName(runs))
@@ -809,7 +810,7 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			through := !ymxs.IsIdentity(start.Mapping)
 			identity[n] = identity[n] || !through
 			out.mixer[n] = out.mixer[n] || through && number == ymxr.MixerTarget
-			if number >= len(ymxr.Marker) {
+			if number >= ymxr.SyncTarget {
 				return marks{}, fmt.Errorf("the source %s runs on %s, a target this"+
 					" version leaves to a later one (SPEC.md section 8)",
 					ymxs.SourceName(source), ymxs.TargetName(runs))

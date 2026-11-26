@@ -504,7 +504,8 @@ final class ParityTest {
      * Compare every YMXS conformance tune through both encoders: file
      * or error, exit status, record and check. YMXR rejects the
      * transformation fixture's lookups before the last setVoiceB value
-     * (SPEC.md 6.5).
+     * (SPEC.md 6.5), and the sync fixture's start on a target of a sync,
+     * which rule 2(b) leaves to a later version (8.10).
      */
     @Test
     void everyTuneOfTheYmxsKitConvertsTheSameInBothTrees() throws Exception {
@@ -531,6 +532,12 @@ final class ParityTest {
         assertEquals(1, mapped.exit(), mapped.said());
         assertTrue(mapped.said().endsWith("ymxs-to-ymxr: row 2: the mapping maps value 0 of"
                 + " setVoiceB, and a mapping column maps its value 2 alone\n"), mapped.said());
+        Ran synced = same("ymxs-to-ymxr", Files.readAllBytes(kit.resolve("sync.json")),
+                "-silent");
+        assertEquals(1, synced.exit(), synced.said());
+        assertTrue(synced.said().endsWith("ymxs-to-ymxr: copy from frame runs on syncToneA, a"
+                + " target this version leaves to a later one (SPEC.md section 8)\n"),
+                synced.said());
     }
 
     /**
