@@ -504,8 +504,9 @@ final class ParityTest {
      * Compare every YMXS conformance tune through both encoders: file
      * or error, exit status, record and check. YMXR rejects the
      * transformation fixture's lookups before the last setVoiceB value
-     * (SPEC.md 6.5), and the sync fixture's start on a target of a sync,
-     * which rule 2(b) leaves to a later version (8.10).
+     * (SPEC.md 6.5), and the sync fixture's start of a target of a sync
+     * through a transformation, which rule 2(k) leaves to a later version
+     * (8.10).
      */
     @Test
     void everyTuneOfTheYmxsKitConvertsTheSameInBothTrees() throws Exception {
@@ -535,9 +536,9 @@ final class ParityTest {
         Ran synced = same("ymxs-to-ymxr", Files.readAllBytes(kit.resolve("sync.json")),
                 "-silent");
         assertEquals(1, synced.exit(), synced.said());
-        assertTrue(synced.said().endsWith("ymxs-to-ymxr: copy from frame runs on syncToneA, a"
-                + " target this version leaves to a later one (SPEC.md section 8)\n"),
-                synced.said());
+        assertTrue(synced.said().endsWith("ymxs-to-ymxr: row 4: the mapping maps syncToneC"
+                + " through a transformation, which this version leaves to a later one (SPEC.md"
+                + " section 8)\n"), synced.said());
     }
 
     /**
@@ -673,6 +674,17 @@ final class ParityTest {
         }
         both("ymxr-bind", file, "-silent");
         both("ymxr-sndh", file, "-silent");
+        byte[] targets = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.targets())).getBytes(StandardCharsets.UTF_8), "-silent");
+        both("ymxr-trace", targets);
+        both("ymxr-sndh", targets, "-silent");
+        assertWrong(SyncTest.throughATransformation(), "row 4: the mapping maps syncToneC"
+                + " through a transformation, which this version leaves to a later one (SPEC.md"
+                + " section 8)");
+        assertWrong(SyncTest.underACut(), "row 3: syncToneB runs under a cut, which this"
+                + " version leaves to a later one (SPEC.md section 8)");
+        assertWrong(SyncTest.deferred(), "row 3: syncToneB starts deferred, which this"
+                + " version leaves to a later one (SPEC.md section 8)");
         byte[] frames = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
                 SyncTest.frames())).getBytes(StandardCharsets.UTF_8), "-silent");
         both("ymxr-trace", frames);

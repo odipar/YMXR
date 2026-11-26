@@ -346,6 +346,9 @@ ymxr_widestart:
 .two:           moveq   #2,d4
                 move.w  -4(a2,d1.w),d1
                 lea     ymxr_at_two(pc),a5
+; The handler of the kind a5's table names, which the start of a target
+; of a sync enters with its registers set as here (sync.S).
+ymxr_wstart_handler equ *
 .handler:       move.w  d6,d0                   ; this effect's handler, out
                 add.w   d0,d0                   ; of the kind's table
                 adda.w  (a5,d0.w),a5

@@ -195,6 +195,8 @@ MAPPED = 10
 CUT = 11
 COPY = 12
 SYNC = 13
+# The first target of a sync, syncToneA (SPEC.md 2.1).
+SYNC_TARGET = 25
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
@@ -559,7 +561,7 @@ TARGETS.update({14: [(0, 0), (1, 1)], 15: [(2, 0), (3, 1)], 16: [(4, 0), (5, 1)]
 # setBuzzer (SPEC.md 1.10.1, 2.1).
 LAST_VALUE = {n: 0 for n in range(14)}
 LAST_VALUE.update({14: 1, 15: 1, 16: 1, 17: 2, 18: 2, 19: 2, 20: 1, 21: 2,
-                   22: 1, 23: 1, 24: 1})
+                   22: 1, 23: 1, 24: 1, 25: 1, 26: 1, 27: 1})
 
 
 def assemble(source="YMXR.S", defines=(), sources=None):
@@ -1187,16 +1189,20 @@ class Model:
         fx = self.fx[i]
         if not fx["running"]:
             return None
+        # a target of a sync writes 0 to the two registers of its voice's
+        # period first, fine then coarse (SPEC.md 5.1)
+        zeros = ([(register, 0) for register, _ in TARGETS[fx["using"]]]
+                 if fx["using"] >= SYNC_TARGET else [])
         if self.copying(i):
             # the frame value of each register of the target, R7's with
             # bits 7 and 6 at 1, the last value through the tick's mapping
             # (SPEC.md 2.1.5, 5.1)
-            return [(register, self.through(i, c, self.fv[register]
-                                            | (0xC0 if register == 7 else 0)))
-                    for register, c in TARGETS[fx["using"]]]
+            return zeros + [(register, self.through(i, c, self.fv[register]
+                                                    | (0xC0 if register == 7 else 0)))
+                            for register, c in TARGETS[fx["using"]]]
         at, R, RR, columns = self.tune.sources[fx["source"]]
-        return [(register, self.through(i, c, columns[c][fx["place"]]))
-                for register, c in TARGETS[fx["using"]]]
+        return zeros + [(register, self.through(i, c, columns[c][fx["place"]]))
+                        for register, c in TARGETS[fx["using"]]]
 
     def through(self, i, c, byte):
         """Apply the running mapping to source byte in column c. Identity
@@ -1266,9 +1272,16 @@ class Model:
 
     def counting(self, i):
         """Whether effect i runs the player's counted handler: on a
-        counted source, and on a source of any shape that a start under a
-        cut or a recut aimed it at (68k/player/cut.S)."""
-        return self.counted(i) or (self.fx[i]["source"] != 0 and self.fx[i]["counting"])
+        counted source, on a source of any shape that a start under a cut
+        or a recut aimed it at (68k/player/cut.S), and on a target of a
+        sync, whose handler is the counted one of two columns
+        (68k/player/handlers.S)."""
+        return self.counted(i) or (self.fx[i]["source"] != 0 and (
+            self.fx[i]["counting"] or self.syncing(i)))
+
+    def syncing(self, i):
+        """Whether effect i runs on a target of a sync (SPEC.md 5.1)."""
+        return self.fx[i]["running"] and self.fx[i]["using"] >= SYNC_TARGET
 
     def square(self, i):
         """Whether effect i's source is two rows repeating to row 0, which
@@ -3225,9 +3238,9 @@ def mapped_sizes():
                   r" in, the blocks are ([\d,]+) of the ([\d,]+)\. The blocks of copy from"
                   r" frame, which a link keeps only for a song that copies from frame, are"
                   r" ([\d,]+) bytes of the rest, and ([\d,]+) with the deferred start in \(Copy"
-                  r" from frame\)\. The blocks of the sync, which a link keeps only for a"
-                  r" song that syncs a voice, are ([\d,]+) bytes, and ([\d,]+) with the"
-                  r" deferred start in \(LINKER\.md\)\.", said)
+                  r" from frame\)\. The blocks of the sync and of the handler of its targets,"
+                  r" which a link keeps only for a song that syncs a voice, are ([\d,]+) bytes,"
+                  r" and ([\d,]+) with the deferred start in \(LINKER\.md\)\.", said)
     assert m, "performance.md's section on a cut has no sizes of the player with the cut in"
     read = [int(x.replace(",", "")) for x in m.groups()]
 
@@ -3245,6 +3258,7 @@ def mapped_sizes():
                sum(now_defer.values()), sizes[(True, True, True)] - read[5],
                sum(v for name, v in pieces(False, "copy").items() if name.startswith("copy_")),
                sum(v for name, v in pieces(True, "copy").items() if name.startswith("copy_")),
+               # the pieces of sync, synced and copysync
                sum(pieces(False, "sync").values()) + sum(pieces(False, "copysync").values()),
                sum(pieces(True, "sync").values()) + sum(pieces(True, "copysync").values())]
     assert read == counted, \
@@ -3928,6 +3942,8 @@ def running(m, symbols, model, i, said, ticked=False):
         # lookup_checks.S, the assertions after it)
         if fx["run"]:
             name = lookup_kind(model, i)
+        elif model.syncing(i):
+            name = "syn"
         elif model.counting(i):
             name = {0: "cnt", 2: "env", 3: "cwide"}[model.wide(i)]
         else:
@@ -6629,8 +6645,18 @@ def hatari(ym, code, symbols, perf=False):
         ends = [symbols["ymxr_inst1"], symbols["ymxr_inst2"], symbols["ymxr_inst3"], last]
         installers = [(base + symbols["ymxr_inst%d" % i], base + ends[i]) for i in range(4)]
 
+    # the register steps of a tune that syncs, the frame's, and each
+    # effect's handler of a target of a sync from its head (68k/player/
+    # sync.S, handlers.S)
+    synced = [(base + symbols["ymxr_sregs"], base + symbols["ymxr_syncfix"])]
+    if "ymxr_skregs" in symbols:
+        synced.append((base + symbols["ymxr_skregs"], base + symbols["ymxr_treads"]))
+    syn = symbols["ymxr_syn1"] - symbols["ymxr_syn0"]
+    syns = [(base + symbols["ymxr_syn%d_head" % i], base + symbols["ymxr_syn%d_head" % i] + syn)
+            for i in range(4)]
+
     def where(pc):
-        if frame[0] <= pc < frame[1]:
+        if frame[0] <= pc < frame[1] or any(lo <= pc < hi for lo, hi in synced):
             return "frame"
         if stop[0] <= pc < stop[1]:
             return "stop"
@@ -6648,6 +6674,7 @@ def hatari(ym, code, symbols, perf=False):
                     or cnts[i][0] <= pc < cnts[i][1]
                     or envs[i][0] <= pc < envs[i][1]
                     or cwides[i][0] <= pc < cwides[i][1]
+                    or syns[i][0] <= pc < syns[i][1]
                     or any(lo <= pc < hi for lo, hi in looks[i])):
                 return i
         return None
@@ -6665,6 +6692,8 @@ def hatari(ym, code, symbols, perf=False):
     last = 0                            # the video cycle of the latest line
     wrapped = False                     # a video frame began in this frame
     frame_cycles = 0
+    stamped = []                        # every chip write, with its owner
+                                        # and its video cycle
 
     def since(video_cyc):
         """A write's MFP clocks from the frame's VBL exception. A tick the
@@ -6699,6 +6728,9 @@ def hatari(ym, code, symbols, perf=False):
             pc = int(w.group(3), 16)
             if pc < ROM:
                 current.append((where(pc), int(w.group(1), 16), int(w.group(2), 16)))
+                cyc = CYCLE.search(line)
+                stamped.append((where(pc), int(w.group(1), 16), int(w.group(2), 16),
+                                int(cyc.group(1)) if cyc else None))
             continue
         w = MFPW.search(line)
         if w:
@@ -6750,6 +6782,16 @@ def hatari(ym, code, symbols, perf=False):
         """The frame's events against the model. The model is left as the
         frame leaves it."""
         model.begin()
+        # the effects as the frame opens, for a frame the trace has no chip
+        # write of in a tune that syncs a voice
+        before_ticks = None
+        if tune.syncs:
+            before_ticks = copy.copy(model)
+            before_ticks.fx = copy.deepcopy(model.fx)
+            before_ticks.fv = list(model.fv)
+        # each effect as its step found it, for a tick between the two
+        # writes of a stop
+        prestep = {}
         stepped = [False, False, False, False]
         writes = []
         want = None
@@ -6760,6 +6802,7 @@ def hatari(ym, code, symbols, perf=False):
             """Effects 0 to i stepped, in the order the frame runs them."""
             for j in range(i + 1):
                 if not stepped[j]:
+                    prestep[j] = copy.deepcopy(model.fx[j])
                     model.step(j)
                     stepped[j] = True
 
@@ -6842,7 +6885,25 @@ def hatari(ym, code, symbols, perf=False):
                 if not stepped[kind]:
                     marks.append((at, kind, snapshot()))
                 fx = model.fx[kind]
-                assert fx["running"], "frame %d: a tick of effect %d with no source running" % (f, kind)
+                if stepped[kind] and not fx["running"] and prestep.get(kind, {}).get("running"):
+                    # a tick latched before the step's stop runs between its
+                    # two writes, the timer's stop and its pending bit's
+                    # clear, and reads the source the step stopped (SPEC.md
+                    # 2.3.3, 4.2.1)
+                    stopped = model.fx[kind]
+                    model.fx[kind] = copy.deepcopy(prestep[kind])
+                    w, then = model.tick(kind)
+                    got = wrote(at, kind, len(w))
+                    model.fx[kind] = stopped
+                    assert got is not None and masked(got) == masked(w), \
+                        "frame %d: a tick of effect %d after its stop wrote %s, not %s" % (
+                            f, kind, got, w)
+                    counted[kind] += 1
+                    at += len(w)
+                    continue
+                assert fx["running"], \
+                    "frame %d: a tick of effect %d with no source running; the frame's events %s" % (
+                        f, kind, events)
                 before = dict(fx)
                 w, then = model.tick(kind)
                 got = wrote(at, kind, len(w))
@@ -6897,6 +6958,15 @@ def hatari(ym, code, symbols, perf=False):
         upto(3)
         if want is None:
             want = model.writes()
+        if not writes and want and tune.syncs:
+            # a frame the trace has no chip write of has no place among its
+            # ticks, and its step 4 may come before them: the syncs it
+            # leaves to an effect are those of the effects before the ticks
+            # (SPEC.md 4.4.1)
+            for j in range(4):
+                before_ticks.step(j)
+            if not before_ticks.writes():
+                want = []
         assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
     for f, (events, clocks, stops, installed) in enumerate(frames[first:first + STUB_FRAMES]):
@@ -6951,7 +7021,28 @@ def hatari(ym, code, symbols, perf=False):
     stopped = [(reg, value) for events, _, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
                for kind, reg, value in events if kind == "stop"]
     assert masked(stopped) == masked(HUSHED), "the stop wrote %s" % stopped
-    return played, sum(counted)
+    # Each sync, at a frame or at a tick: 0 to a voice's fine and coarse
+    # registers, and that voice's period 0 until its next fine write, whose
+    # distance from the coarse 0 is the wait, 36 cycles or more (SPEC.md
+    # 1.12.2; YMXS, SPEC.md 3.9.2). Hatari's ST counts video cycles at the
+    # CPU's clock.
+    # One pass: the cycle of each voice's coarse 0, the second write of a
+    # pair of zeros of one owner, until the voice's next fine write.
+    waits = []
+    zeroed = {}
+    for k, (owner, reg, value, at) in enumerate(stamped):
+        if reg in (0, 2, 4) and reg in zeroed:
+            if at is not None and at >= zeroed[reg]:
+                waits.append(at - zeroed[reg])
+            del zeroed[reg]
+        if reg in (1, 3, 5) and value == 0 and at is not None and k > 0:
+            prior = stamped[k - 1]
+            if prior[1] == reg - 1 and prior[2] == 0 and prior[0] == owner:
+                zeroed[reg - 1] = at
+    if tune.syncs:
+        assert waits, "a tune that syncs a voice has no sync on Hatari"
+        assert min(waits) >= 36, "a sync waits %d cycles, below 36" % min(waits)
+    return played, sum(counted), waits
 
 
 # The vector the 68000 runs where an interrupt acknowledge finds no
@@ -8418,7 +8509,7 @@ def main():
         # No dump converts to a target of several registers, to a counted
         # source, to a deferred start, to a mapped value, to a cut or to
         # copy from frame, so the kit's tunes of versions 4 to 6, its
-        # deferred tune and its tunes of versions 10 to 12 go on the end of
+        # deferred tune and its tunes of versions 10 to 13 go on the end of
         # a run on a real MFP: with the dumps before them every handler
         # shape of the player is read there against the same model as the
         # rest, the counted shapes of one column and of several and the
@@ -8429,7 +8520,8 @@ def main():
                              for one in ("voices.ymxr", "counted.ymxr",
                                          "envelope-counted.ymxr", "deferred.ymxr",
                                          "mapped.ymxr", "cut.ymxr", "cuts.ymxr",
-                                         "copy-from-frame.ymxr")]
+                                         "copy-from-frame.ymxr", "sync.ymxr",
+                                         "sync-targets.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]
@@ -8557,8 +8649,11 @@ def main():
                 print(line)
                 continue
             if real:
-                frames, ticks = hatari(ym, code, symbols, perf)
-                print("%-45s %6d frames, %6d ticks on Hatari's MFP" % (os.path.basename(ym), frames, ticks))
+                frames, ticks, waits = hatari(ym, code, symbols, perf)
+                print("%-45s %6d frames, %6d ticks on Hatari's MFP%s" % (
+                    os.path.basename(ym), frames, ticks,
+                    ", %d syncs, the shortest wait %d cycles" % (len(waits), min(waits))
+                    if waits else ""))
                 continue
             playing = (code, symbols)
             if LINKED:

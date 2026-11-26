@@ -227,10 +227,32 @@
 ; that order, and the places, the registers and the loop cells are the
 ; immediates it patches, so this handler uses no register either. A tune
 ; whose sources are one column enters none of this.
-                .macro  TICKW   name,columns,counted,eoi,eoir,ctrl,keep,ier,bit,colour,inst
+                .macro  TICKW   name,columns,counted,eoi,eoir,ctrl,keep,ier,bit,colour,inst,sync
+; With \sync, the handler of a target of a sync (SPEC.md 5.1): the head
+; below, before the first byte, which the first select's slot branches
+; to; the slot keeps the register at +3, where a start writes it and the
+; remap and the recut read it. At level 7 the head writes 0 to the two
+; registers the selects name, fine then coarse, then selects the first
+; and goes back to its write, so the instructions from the second 0 to
+; that write are the wait (YMXS, SPEC.md 3.9.2).
+                .if     \sync
+\{name}_head:   move.w  #$2700,sr
+                move.b  \{name}_sel1+3(pc),YM_SELECT.w
+                move.b  #0,YM_SELECT+2.w
+                move.b  \{name}_sel2+3(pc),YM_SELECT.w
+                move.b  #0,YM_SELECT+2.w
+\{name}_wait:   move.b  \{name}_sel1+3(pc),YM_SELECT.w
+                bra.w   \{name}_ptr1
+                .endif
 \name:
                 MARK    \colour
+                .if     \sync
+\{name}_sel1:   bra.s   \{name}_head
+                dc.b    0,8                     ; +3: the first register
+                dc.w    0
+                .else
 \{name}_sel1:   move.b  #8,YM_SELECT.w          ; +3: the first register
+                .endif
                 .if     YMXR_PCREL
 \{name}_ptr1:   move.b  \{name}_cells(pc),YM_SELECT+2.w ; +2: the first place
 \{name}_sel2:   move.b  #8,YM_SELECT.w

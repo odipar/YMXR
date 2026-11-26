@@ -18,7 +18,7 @@ final class Link {
     /** The handler kinds that are blocks: the general handler is in each
      *  effect's block. */
     static final List<String> KINDS = List.of("square", "one", "counted", "two", "three",
-            "envelope", "countedthree");
+            "envelope", "countedthree", "synced");
 
     /** The lookup kinds, each a block on each effect: the general, the
      *  counted, two columns, noise, buzzer, voice, the counted of two
@@ -147,11 +147,20 @@ final class Link {
                     needed.add(kind + i);
                     needed.add("several");
                 }
+                Map<Integer, Set<Integer>> targets = targets(tune, i);
                 for (int s : started(tune, i)) {
                     Table source = tune.sources().get(s - 1);
                     boolean counted = tune.counted().get(s - 1);
                     String kind = kind(source, counted);
-                    if (KINDS.contains(kind)) {
+                    Set<Integer> on = targets.getOrDefault(s, Set.of());
+                    // a target of a sync runs its handler at every shape of
+                    // source (start.S, ymxr_widestart)
+                    if (on.stream().anyMatch(n -> n >= Columns.SYNC_TARGET)) {
+                        needed.add("synced");
+                        needed.add("synced" + i);
+                    }
+                    if (KINDS.contains(kind)
+                            && on.stream().anyMatch(n -> n < Columns.SYNC_TARGET)) {
                         needed.add(kind);
                         needed.add(kind + i);
                     }
@@ -174,6 +183,9 @@ final class Link {
      *  counted handler of the target's columns, whose count of one row ends
      *  each pass, so a frame value has no marker. */
     static String copyKind(int target) {
+        if (target >= Columns.SYNC_TARGET) {
+            return "synced";
+        }
         return switch (copyColumns(target)) {
             case 1 -> "counted";
             case 2 -> "envelope";
@@ -211,6 +223,29 @@ final class Link {
                 }
                 if ((table.column(t + 1)[r] & 0xFF) == (0x80 | tune.count())) {
                     out.add(kept);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** The kept targets of effect i at each start of each table source,
+     *  by source number: the target column last set on the effect, through
+     *  the wrap, 0 before a row sets it. */
+    static Map<Integer, Set<Integer>> targets(TuneFile tune, int i) {
+        Map<Integer, Set<Integer>> out = new java.util.HashMap<>();
+        Table table = tune.table();
+        int t = Columns.EFFECT + 4 * i;
+        int kept = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int r = pass == 0 ? 0 : table.repeat(); r < table.rows(); r++) {
+                int target = table.column(t)[r] & 0xFF;
+                if ((target & 0x80) != 0) {
+                    kept = target & 0x7F;
+                }
+                int s = table.column(t + 1)[r] & 0xFF;
+                if ((s & 0x80) != 0 && (s & 0x7F) > 0 && (s & 0x7F) <= tune.sources().size()) {
+                    out.computeIfAbsent(s & 0x7F, k -> new LinkedHashSet<>()).add(kept);
                 }
             }
         }

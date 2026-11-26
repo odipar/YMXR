@@ -1,7 +1,7 @@
 # The conformance kit
 
-**1.** The kit is 21 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
-beside its `.rows` (3), and a reference record of each (SPEC.md 7): 19,033
+**1.** The kit is 22 tunes under `tunes/`, each a `.ymxr` (SPEC.md 3.3)
+beside its `.rows` (3), and a reference record of each (SPEC.md 7): 19,050
 entries, one line each, the first line of each record among them. The kit
 tests the two documents, [SPEC.md](../SPEC.md) and YMXS's `doc/SPEC.md`:
 an implementer who has read them alone writes a reader (2), and a record
@@ -32,7 +32,8 @@ built (`preempt`, `retune`). Code builds `four-timers`, `voices`,
 `mapped` as a YMXS structure that the schema of `ymxs-to-ymxr` writes at
 version 10, and `cut` and `cuts` as YMXS structures it writes at version
 11, the window of YMXS's `doc/tunes/cut.json` and the cuts of the YMXS
-kit's `cuts.json`; `sync` as a YMXS structure it writes at version 13;
+kit's `cuts.json`; `sync` and `sync-targets` as YMXS structures it writes
+at version 13, the second the YMXS kit's `sync.json` under the identity;
 `wrong-version` is `chambers` with the version word $000E. The published
 music belongs to its composers, and the repository's LICENSE excludes it:
 a copy of the kit has the tunes for the exercise alone.
@@ -413,6 +414,7 @@ Two places changed for entries that left output as it is:
 | `cuts` | version 11 at 50 Hz; a cut that excludes its source's repeat row and one that includes it, a start under the whole table, a deferred start under a cut of a source that plays once, and a recut while it is pending |
 | `copy-from-frame` | version 12 at 50 Hz; copy from frame, source S and index entry 0, on `setR13` on Timer A from row 0 and on `setVoiceB` on Timer D from row 1, beside a square on R10 on Timer B: the rows set R13, R2 and R9 while copy from frame runs on them, and the record reports those writes as the frame's (SPEC.md 7.3); bit 7 of the effects used |
 | `sync` | version 13 at 50 Hz; bit 5 of each coarse column, the voices a row syncs, read on every row, a row that syncs a voice and leaves its period unset among them, and the record's `s` (SPEC.md 1.12, 7.3); copy from frame and a source on the periods of two voices, whose syncs the frame leaves to them, and a deferred start pending across rows that sync (4.4.1) |
+| `sync-targets` | version 13 at 50 Hz; `syncToneA`, `syncToneB` and `syncToneC`, targets 25 to 27, each tick a sync of its voice (SPEC.md 5.1): copy from frame on two of them and a source of two rows on the third, beside rows that sync at their frame |
 | `wrong-version` | the version word $000E: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in

@@ -109,6 +109,7 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .include "player/handlers.S"
 
                 .if     YMXR_MAP=0
+                SYNCED
                 HANDLERS
                 HANDLEQU
                 .endif
@@ -131,6 +132,7 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .include "player/lookup_ref.S"
                 .include "player/cut.S"
                 .include "player/copy.S"
+                SYNCED
                 HANDLERS
                 HANDLEQU
                 .include "player/lookup_checks.S"

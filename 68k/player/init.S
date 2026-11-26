@@ -253,6 +253,11 @@ YMXR_init:
                 PIECE   sync_2
                 bsr     ymxr_syncinit
                 ENDPIECE sync_2
+; And each effect's start of several columns aimed at the targets of a
+; sync for a tune that syncs, or back (sync.S).
+                PIECE   synced_3
+                bsr     ymxr_syncaim
+                ENDPIECE synced_3
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
@@ -465,6 +470,37 @@ YMXR_init:
                 lea     TWCT_SIZE(a5),a5
 .nolinkcwide:     dbra    d2,.linkcwide
                 ENDPIECE countedthree_1
+; The handlers of a target of a sync, linked as the counted handler of two
+; columns is, an instance its head and that handler, in bank 0 alone
+; (handlers.S).
+                PIECE   synced_1
+                tst.w   d6
+                bne.s   .linkedsyn
+                lea     ymxr_syn0(pc),a5
+                move.b  ymxr_k_synced+1(pc),d4
+                moveq   #3,d2
+.linksyn:       lsr.b   #1,d4
+                bcc.s   .nolinksyn
+                lea     TWC_CELLS(a5),a3
+                move.l  a3,TWC_LOOPT(a5)
+                move.l  a3,TWC_LOOP1R(a5)
+                addq.l  #CELL_SIZE,a3
+                move.l  a3,TWC_LOOP2R(a5)
+                lea     TWC_PTR1(a5),a3
+                move.l  a3,TWC_STEP1(a5)
+                move.l  a3,TWC_LOOP1W(a5)
+                lea     TWC_PTR2(a5),a3
+                move.l  a3,TWC_STEP2(a5)
+                move.l  a3,TWC_LOOP2W(a5)
+                lea     TWC_LEFT(a5),a3
+                move.l  a3,TWC_CNT(a5)
+                move.l  a3,TWC_RELDA(a5)
+                move.l  a3,TWC_PARK(a5)
+                move.w  #1,TWC_LEFT(a5)
+                lea     TWS_SIZE(a5),a5
+.nolinksyn:     dbra    d2,.linksyn
+.linkedsyn:
+                ENDPIECE synced_1
                 .if     YMXR_MAP
 ; Link lookup instances as above, selecting page 0 from the bank's
 ; page-byte table. Clearing the records below leaves every page

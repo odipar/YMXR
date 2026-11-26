@@ -25,6 +25,29 @@
                 ENDPIECE defer3_2
                 .endm
 
+; The handlers of a target of a sync (SPEC.md 5.1), one an effect, before
+; the first handler of bank 0, so that no byte of them is between that
+; handler and the pages of the lookup, whose reach is measured from it
+; (BINARIES.md 5.6). Each is the counted handler of two columns with the
+; sync at its head, laid out as that handler past its first byte, so every
+; offset of it is TWC_'s. A start on a target of a sync is never deferred
+; (SPEC.md rule 2(k)), so they are in bank 0 alone, and a start armed over
+; a running one goes into bank 1.
+                .macro  SYNCED
+                PIECE   synced0_1
+                TICKW   ymxr_syn0,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,1
+                ENDPIECE synced0_1
+                PIECE   synced1_1
+                TICKW   ymxr_syn1,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,1
+                ENDPIECE synced1_1
+                PIECE   synced2_1
+                TICKW   ymxr_syn2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,1
+                ENDPIECE synced2_1
+                PIECE   synced3_1
+                TICKW   ymxr_syn3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,1
+                ENDPIECE synced3_1
+                .endm
+
                 .macro  HANDLERS
 ; ---------------------------------------------------------------- ticks
 
@@ -83,57 +106,57 @@
 ; The handlers of a target that writes two registers, and of one that
 ; writes three: one an effect, as the three above are.
                 PIECE   two0_1
-                TICKW   ymxr_two0,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_two0,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE two0_1
                 PIECE   two1_1
-                TICKW   ymxr_two1,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_two1,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE two1_1
                 PIECE   two2_1
-                TICKW   ymxr_two2,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_two2,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE two2_1
                 PIECE   two3_1
-                TICKW   ymxr_two3,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_two3,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE two3_1
 
                 PIECE   three0_1
-                TICKW   ymxr_three0,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_three0,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE three0_1
                 PIECE   three1_1
-                TICKW   ymxr_three1,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_three1,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE three1_1
                 PIECE   three2_1
-                TICKW   ymxr_three2,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_three2,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE three2_1
                 PIECE   three3_1
-                TICKW   ymxr_three3,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_three3,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE three3_1
 
 ; The counted shape of two columns: `setEnvelope` writes R11 and R12 and
 ; both read every bit of their byte, so the rows of a source on it are
 ; whole bytes and a tick counts them (SPEC.md 2.1.3, 3.1.6).
                 PIECE   envelope0_1
-                TICKW   ymxr_env0,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_env0,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE envelope0_1
                 PIECE   envelope1_1
-                TICKW   ymxr_env1,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_env1,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE envelope1_1
                 PIECE   envelope2_1
-                TICKW   ymxr_env2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_env2,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE envelope2_1
                 PIECE   envelope3_1
-                TICKW   ymxr_env3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_env3,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE envelope3_1
                 PIECE   countedthree0_1
-                TICKW   ymxr_cwide0,3,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_cwide0,3,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE countedthree0_1
                 PIECE   countedthree1_1
-                TICKW   ymxr_cwide1,3,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_cwide1,3,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE countedthree1_1
                 PIECE   countedthree2_1
-                TICKW   ymxr_cwide2,3,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_cwide2,3,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE countedthree2_1
                 PIECE   countedthree3_1
-                TICKW   ymxr_cwide3,3,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_cwide3,3,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE countedthree3_1
                 .if     YMXR_MAP
 ; Bank-0 lookup instances follow identity handlers. Pad each of eight
@@ -672,52 +695,52 @@ ymxr_bank1:
                 TICKC   ymxr_cnt3b,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
                 ENDPIECE counted3_2
                 PIECE2  two0_2,two0_1
-                TICKW   ymxr_two0b,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_two0b,2,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE two0_2
                 PIECE2  two1_2,two1_1
-                TICKW   ymxr_two1b,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_two1b,2,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE two1_2
                 PIECE2  two2_2,two2_1
-                TICKW   ymxr_two2b,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_two2b,2,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE two2_2
                 PIECE2  two3_2,two3_1
-                TICKW   ymxr_two3b,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_two3b,2,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE two3_2
                 PIECE2  three0_2,three0_1
-                TICKW   ymxr_three0b,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_three0b,3,0,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE three0_2
                 PIECE2  three1_2,three1_1
-                TICKW   ymxr_three1b,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_three1b,3,0,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE three1_2
                 PIECE2  three2_2,three2_1
-                TICKW   ymxr_three2b,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_three2b,3,0,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE three2_2
                 PIECE2  three3_2,three3_1
-                TICKW   ymxr_three3b,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_three3b,3,0,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE three3_2
                 PIECE2  envelope0_2,envelope0_1
-                TICKW   ymxr_env0b,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_env0b,2,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE envelope0_2
                 PIECE2  envelope1_2,envelope1_1
-                TICKW   ymxr_env1b,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_env1b,2,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE envelope1_2
                 PIECE2  envelope2_2,envelope2_1
-                TICKW   ymxr_env2b,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_env2b,2,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE envelope2_2
                 PIECE2  envelope3_2,envelope3_1
-                TICKW   ymxr_env3b,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_env3b,2,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE envelope3_2
                 PIECE2  countedthree0_2,countedthree0_1
-                TICKW   ymxr_cwide0b,3,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0
+                TICKW   ymxr_cwide0b,3,1,$DF,$FFFFFA0F,$FFFFFA19,$F0,$FFFFFA07,5,$070,ymxr_inst0,0
                 ENDPIECE countedthree0_2
                 PIECE2  countedthree1_2,countedthree1_1
-                TICKW   ymxr_cwide1b,3,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1
+                TICKW   ymxr_cwide1b,3,1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,$007,ymxr_inst1,0
                 ENDPIECE countedthree1_2
                 PIECE2  countedthree2_2,countedthree2_1
-                TICKW   ymxr_cwide2b,3,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2
+                TICKW   ymxr_cwide2b,3,1,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,$707,ymxr_inst2,0
                 ENDPIECE countedthree2_2
                 PIECE2  countedthree3_2,countedthree3_1
-                TICKW   ymxr_cwide3b,3,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3
+                TICKW   ymxr_cwide3b,3,1,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,$077,ymxr_inst3,0
                 ENDPIECE countedthree3_2
                 .if     YMXR_MAP
                 PIECE2  lt0_3,lt0_1
@@ -1259,6 +1282,17 @@ TWCT_PTR3        equ     ymxr_cwide0_ptr3-ymxr_cwide0+2
 TWCT_STEP3       equ     ymxr_cwide0_step3-ymxr_cwide0+2
 TWCT_LOOP3R      equ     ymxr_cwide0_loop3-ymxr_cwide0+2
 TWCT_LOOP3W      equ     ymxr_cwide0_loop3-ymxr_cwide0+6
+
+; The handler of a target of a sync: TWC_'s offsets from its first byte
+; on, the head before it, and an instance the head and the handler.
+TWS_HEAD        equ     ymxr_syn0-ymxr_p_synced0_1
+TWS_SIZE        equ     ymxr_e_synced0_1-ymxr_p_synced0_1
+                .if     (ymxr_e_synced0_1-ymxr_syn0)<>TWC_SIZE
+                .error  "the handler of a target of a sync is laid out apart from TWC"
+                .endif
+                .if     (ymxr_syn0_ptr1-ymxr_syn0)<>(ymxr_env0_ptr1-ymxr_env0)
+                .error  "the handler of a target of a sync has its place apart from TWC"
+                .endif
 
                 .if     YMXR_DEFER
 ; A pending start (SPEC.md 4.8): bank 1 at a fixed distance from bank 0;
