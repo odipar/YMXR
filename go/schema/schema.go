@@ -87,6 +87,9 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	// D; a start under the whole table of its source selects cut 0 (SPEC.md
 	// 3.5.1).
 	cuts := cutsOf(rows, maps.claimed)
+	if err := syncCuts(rows); err != nil {
+		return Made{}, err
+	}
 	if len(cuts.list) > ymxr.MostCuts {
 		return Made{}, fmt.Errorf("the tune cuts through %d cuts, and a cut column numbers"+
 			" %d", len(cuts.list), ymxr.MostCuts)
@@ -193,6 +196,37 @@ func copiesFrom(rows []ymxs.Row) bool {
 		}
 	}
 	return false
+}
+
+// syncCuts reports a target of a sync under a cut or deferred, which is a
+// later version's (SPEC.md rule 2(k), section 8): a start on one under a cut
+// other than the whole table of its source, a recut of a timer whose last
+// start is on one, and a deferred start on one.
+func syncCuts(rows []ymxs.Row) error {
+	runs := map[ymxs.Timer]ymxs.Target{}
+	for at, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			on := runs[one.Timer]
+			start, starts := one.Effect.(ymxs.Start)
+			if starts {
+				on = ymxs.ConnectionTarget(start.Connection)
+			}
+			_, sync := on.(ymxs.SyncTone)
+			_, recut := one.Effect.(ymxs.Recut)
+			if sync && (starts && start.Cut != ymxs.ConnectionWhole(start.Connection) || recut) {
+				return fmt.Errorf("row %d: %s runs under a cut, which this version leaves to a"+
+					" later one (SPEC.md section 8)", at, ymxs.TargetName(on))
+			}
+			if sync && starts && start.Deferred {
+				return fmt.Errorf("row %d: %s starts deferred, which this version leaves to a"+
+					" later one (SPEC.md section 8)", at, ymxs.TargetName(on))
+			}
+			if starts {
+				runs[one.Timer] = on
+			}
+		}
+	}
+	return nil
 }
 
 // syncsFrom reports whether a row syncs a voice, at its frame or through a
@@ -679,6 +713,13 @@ func (m *mappings) number(mapping ymxs.Mapping, target ymxs.Target, at int) (int
 	if err != nil {
 		return 0, err
 	}
+	// the lookup of a target of a sync is a later version's (SPEC.md
+	// section 8)
+	if _, sync := target.(ymxs.SyncTone); sync && numbers[0] != 0 {
+		return 0, fmt.Errorf("row %d: the mapping maps %s through a transformation, which"+
+			" this version leaves to a later one (SPEC.md section 8)", at,
+			ymxs.TargetName(target))
+	}
 	return numbers[0], nil
 }
 
@@ -797,9 +838,8 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			if source == nil {
 				// copy from frame has no table, and its marker is the
 				// player's (SPEC.md 3.1.7); its target is one this version
-				// encodes, and a target of a sync is a later version's
-				// (rule 2(b), 8.10)
-				if number >= ymxr.SyncTarget {
+				// encodes
+				if number >= len(ymxr.Marker) {
 					return marks{}, fmt.Errorf("copy from frame runs on %s, a target this"+
 						" version leaves to a later one (SPEC.md section 8)",
 						ymxs.TargetName(runs))
@@ -810,7 +850,7 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			through := !ymxs.IsIdentity(start.Mapping)
 			identity[n] = identity[n] || !through
 			out.mixer[n] = out.mixer[n] || through && number == ymxr.MixerTarget
-			if number >= ymxr.SyncTarget {
+			if number >= len(ymxr.Marker) {
 				return marks{}, fmt.Errorf("the source %s runs on %s, a target this"+
 					" version leaves to a later one (SPEC.md section 8)",
 					ymxs.SourceName(source), ymxs.TargetName(runs))

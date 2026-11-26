@@ -15,7 +15,8 @@ import (
 
 // Kinds are the handler kinds that are blocks: the general handler is in
 // each effect's block.
-var Kinds = []string{"square", "one", "counted", "two", "three", "envelope", "countedthree"}
+var Kinds = []string{"square", "one", "counted", "two", "three", "envelope", "countedthree",
+	"synced"}
 
 // Lookups are the lookup kinds, each a block on each effect: the general,
 // the counted, two columns, noise, buzzer, voice, the counted of two
@@ -318,10 +319,25 @@ func BlocksOf(tunes []ymxr.File) []string {
 				needed[fmt.Sprintf("%s%d", kind, i)] = true
 				needed["several"] = true
 			}
+			targets := TargetsOf(tune, i)
 			for _, s := range Started(tune, i) {
 				source := tune.Sources[s-1]
 				kind := Kind(source, tune.Counted[s-1])
-				if kind != "general" {
+				synced, other := false, false
+				for target := range targets[s] {
+					if target >= ymxr.SyncTarget {
+						synced = true
+					} else {
+						other = true
+					}
+				}
+				// a target of a sync runs its handler at every shape of
+				// source (start.S, ymxr_widestart)
+				if synced {
+					needed["synced"] = true
+					needed[fmt.Sprintf("synced%d", i)] = true
+				}
+				if kind != "general" && other {
 					needed[kind] = true
 					needed[fmt.Sprintf("%s%d", kind, i)] = true
 				}
@@ -344,6 +360,9 @@ func BlocksOf(tunes []ymxr.File) []string {
 // counted handler of the target's columns, whose count of one row ends each
 // pass, so a frame value has no marker.
 func CopyKind(target int) string {
+	if target >= ymxr.SyncTarget {
+		return "synced"
+	}
 	switch CopyColumns(target) {
 	case 1:
 		return "counted"
@@ -351,6 +370,36 @@ func CopyKind(target int) string {
 		return "envelope"
 	}
 	return "countedthree"
+}
+
+// TargetsOf is the kept targets of effect i at each start of each table
+// source, by source number: the target column last set on the effect,
+// through the wrap, 0 before a row sets it.
+func TargetsOf(tune ymxr.File, i int) map[int]map[int]bool {
+	out := map[int]map[int]bool{}
+	table := tune.Table
+	t := ymxr.Effect + 4*i
+	kept := 0
+	for pass := 0; pass < 2; pass++ {
+		from := 0
+		if pass == 1 {
+			from = table.Repeat()
+		}
+		for r := from; r < table.Rows(); r++ {
+			target := int(table.Column(t)[r])
+			if target&0x80 != 0 {
+				kept = target & 0x7F
+			}
+			s := int(table.Column(t + 1)[r])
+			if s&0x80 != 0 && s&0x7F > 0 && s&0x7F <= len(tune.Sources) {
+				if out[s&0x7F] == nil {
+					out[s&0x7F] = map[int]bool{}
+				}
+				out[s&0x7F][kept] = true
+			}
+		}
+	}
+	return out
 }
 
 // CopyLookup is the lookup kind copy from frame runs on a target through a

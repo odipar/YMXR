@@ -16,6 +16,10 @@ ymxr_k_two:     dc.w    $000F
 ymxr_k_three:   dc.w    $000F
 ymxr_k_envelope: dc.w   $000F
 ymxr_k_countedthree: dc.w $000F
+; The handlers of a target of a sync, a piece of their kind's block.
+                PIECE   synced_6
+ymxr_k_synced:  dc.w    $000F
+                ENDPIECE synced_6
 ; The effects that keep the remap's piece, the cut's and the deferred
 ; start's of their frame code, a bit an effect: init aims an effect's
 ; branches at the three where its bit is set and the tune maps a value,
@@ -91,12 +95,25 @@ ymxr_wide:      dc.b    0,0,  1,1,  0,0,  0,0   ; 14 setToneA:     R0 R1
                 dc.b    8,1,  6,0,  0,0,  0,0   ; 22 setNoiseA:    R6 R8
                 dc.b    9,1,  6,0,  0,0,  0,0   ; 23 setNoiseB:    R6 R9
                 dc.b   10,1,  6,0,  0,0,  0,0   ; 24 setNoiseC:    R6 R10
+                ENDPIECE several_2
+; The targets of a sync, the map's rows after setNoiseC, a piece of the
+; block of their handler (handlers.S).
+                PIECE   synced_5
+                dc.b    0,0,  1,1,  0,0,  0,0   ; 25 syncToneA:    R0 R1
+                dc.b    2,0,  3,1,  0,0,  0,0   ; 26 syncToneB:    R2 R3
+                dc.b    4,0,  5,1,  0,0,  0,0   ; 27 syncToneC:    R4 R5
+                ENDPIECE synced_5
+                PIECE   several_3
                 AT      counted,ymxr_cnt
                 AT      two,ymxr_two
                 AT      three,ymxr_three
                 AT      envelope,ymxr_env
                 AT      countedthree,ymxr_cwide
-                ENDPIECE several_2
+                ENDPIECE several_3
+; The handler of a target of a sync, a piece of its kind's block.
+                PIECE   synced_2
+                AT      synced,ymxr_syn
+                ENDPIECE synced_2
 
 ; A parked place: a marker with no loop cell, so a tick of a timer no row
 ; has started writes $80 to R0 and stops its timer (SPEC.md 5.2.1).

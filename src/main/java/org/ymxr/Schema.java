@@ -104,6 +104,7 @@ final class Schema {
         // A to D; a start under the whole table of its source selects cut 0
         // (SPEC.md 3.5.1).
         List<Cut> cuts = cuts(rows, timers);
+        syncCuts(rows);
         if (cuts.size() > Columns.MOST_CUTS) {
             throw new IllegalArgumentException("the tune cuts through " + cuts.size()
                     + " cuts, and a cut column numbers " + Columns.MOST_CUTS);
@@ -180,6 +181,36 @@ final class Schema {
             }
         }
         return false;
+    }
+
+    /** A target of a sync under a cut or deferred is a later version's
+     *  (SPEC.md rule 2(k), section 8): a start on one under a cut other than
+     *  the whole table of its source, a recut of a timer whose last start is
+     *  on one, and a deferred start on one. */
+    private static void syncCuts(List<Row> rows) {
+        Map<Timer, Target> runs = new java.util.EnumMap<>(Timer.class);
+        for (int at = 0; at < rows.size(); at++) {
+            for (Map.Entry<Timer, Effect> one : Tunes.effects(rows.get(at)).entrySet()) {
+                Target on = one.getValue() instanceof Start start
+                        ? Tunes.target(start.connection()) : runs.get(one.getKey());
+                if (one.getValue() instanceof Start start && on instanceof SyncTone
+                        && !start.cut().equals(Tunes.whole(start.connection()))
+                        || one.getValue() instanceof Recut && on instanceof SyncTone) {
+                    throw new IllegalArgumentException("row " + at + ": " + Tunes.name(on)
+                            + " runs under a cut, which this version leaves to a later one"
+                            + " (SPEC.md section 8)");
+                }
+                if (one.getValue() instanceof Start start && on instanceof SyncTone
+                        && start.deferred()) {
+                    throw new IllegalArgumentException("row " + at + ": " + Tunes.name(on)
+                            + " starts deferred, which this version leaves to a later one"
+                            + " (SPEC.md section 8)");
+                }
+                if (one.getValue() instanceof Start start) {
+                    runs.put(one.getKey(), Tunes.target(start.connection()));
+                }
+            }
+        }
     }
 
     /** Whether a row syncs a voice, at its frame or through a start on a
@@ -673,7 +704,15 @@ final class Schema {
                         + last + " alone");
             }
         }
-        return Tunes.number(list, parts.get(last));
+        int number = Tunes.number(list, parts.get(last));
+        // the lookup of a target of a sync is a later version's (SPEC.md
+        // section 8)
+        if (number != 0 && target instanceof SyncTone) {
+            throw new IllegalArgumentException("row " + at + ": the mapping maps "
+                    + Tunes.name(target) + " through a transformation, which this version"
+                    + " leaves to a later one (SPEC.md section 8)");
+        }
+        return number;
     }
 
     /** The count column, which is the timer's data register (SPEC.md 1.9).
@@ -768,9 +807,8 @@ final class Schema {
                 if (source == null) {
                     // copy from frame has no table, and its marker is the
                     // player's (SPEC.md 3.1.7); its target is one this
-                    // version encodes, and a target of a sync is a later
-                    // version's (rule 2(b), 8.10)
-                    if (number >= Columns.SYNC_TARGET) {
+                    // version encodes
+                    if (number >= Columns.MARKER.length) {
                         throw new IllegalArgumentException("copy from frame runs on "
                                 + Tunes.name(Tunes.target(start.connection()))
                                 + ", a target this version leaves to a later one"
@@ -782,7 +820,7 @@ final class Schema {
                 boolean through = !Tunes.isIdentity(start.mapping());
                 identity[n] |= !through;
                 mixer[n] |= through && number == Columns.MIXER_TARGET;
-                if (number >= Columns.SYNC_TARGET) {
+                if (number >= Columns.MARKER.length) {
                     throw new IllegalArgumentException("the source " + Tunes.name(source)
                             + " runs on " + Tunes.name(Tunes.target(start.connection()))
                             + ", a target this version leaves to a later one"

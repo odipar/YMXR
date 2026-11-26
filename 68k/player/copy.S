@@ -179,6 +179,10 @@ ymxr_copystart:
                 move.b  #6,FX_SHAPE(a3)
                 bra.w   .aimed
 .two:           lea     ymxr_at_envelope(pc),a5 ; setTone, setNoise and
+; The counted handler of two columns of the kind a5's table names, which
+; copy from frame on a target of a sync enters with its registers set as
+; here (sync.S).
+ymxr_copy_twoat equ *
                 bsr.w   .instance               ; setEnvelope
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr

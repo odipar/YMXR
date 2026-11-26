@@ -318,3 +318,107 @@ ymxr_sreads:    dc.w    s_0-ymxr_frame+2,s_1-ymxr_frame+2,s_2-ymxr_frame+2
                 .else
                 ENDPIECE sync_3
                 .endif
+
+; The block of the handler of a target of a sync (handlers.S), which a
+; link keeps for a song that starts a source on one: the start of several
+; columns that sends a start on a target of a sync to that handler, and
+; init's aim of each effect's call at it.
+                PIECE   synced_4
+; The start of several columns of a tune that syncs a voice: init aims
+; each effect's call of ymxr_widestart and the arming's here for such a
+; tune alone, so every other tune runs the start it ran before. A start
+; on a target of a sync, the record's or, where a deferred start is armed,
+; the mirror's (4.8), runs the counted handler of two columns with the
+; sync at its head, whose offsets are TWC_'s, at every shape of source of
+; two columns: copy from frame's frame values, or the source's rows, R out
+; of its header. Every other start goes on to ymxr_widestart, or in a
+; tune that copies from frame to ymxr_copywide. The registers are those
+; of ymxr_widestart; a3 and d5 clobbered before it.
+ymxr_syncwide:  move.w  d4,d5
+                mulu    #FX_SIZE,d5
+                lea     WS_FX(a0),a3
+                adda.w  d5,a3                   ; the effect's record
+                .if     YMXR_DEFER
+                tst.b   WS_ARMING(a0)
+                beq.s   .rec
+                lea     ARMOFF(a3),a3
+.rec:
+                .endif
+                cmp.b   #25,FX_TARGET(a3)       ; a target of a sync (SPEC.md
+                bcc.s   .sync                   ; 5.1)
+                .if     YMXR_MAP
+                tst.b   WS_EFFECTS(a0)          ; copy from frame
+                bmi.w   ymxr_copywide
+                .endif
+                bra.w   ymxr_widestart
+.sync:          move.l  d6,-(sp)                ; the effect, as the two starts
+                move.w  d4,d6                   ; keep it
+                .if     YMXR_MAP
+                cmp.l   #-7,d0                  ; copy from frame
+                beq.s   .copy
+                .endif
+                lea     WS_WIDE(a0),a2
+                move.l  -8(a2,d1.w),d5          ; the source's loop cell
+                moveq   #4,d4                   ; the counted shape of two
+                lea     ymxr_at_synced(pc),a5   ; columns
+                move.w  DT_ROWS-DT_PAYLOAD+2(a4),-(sp)  ; R
+                move.w  -4(a2,d1.w),d1          ; the stride
+                bra.w   ymxr_wstart_handler
+                .if     YMXR_MAP
+; Copy from frame, a source of one row at row 0 whose columns are the
+; frame values of the target's registers (copy.S, ymxr_copystart).
+.copy:          moveq   #1,d0
+                move.l  d0,FX_ROWS(a3)
+                lea     ymxr_fv(pc),a4
+                move.l  a4,d0                   ; the loop cell
+                moveq   #0,d3                   ; the place, row 0
+                moveq   #FV_STRIDE,d1
+                moveq   #0,d5
+                move.b  FX_TARGET(a3),d5
+                move.w  d5,d4
+                sub.w   #25,d4                  ; the row of setToneA to setToneC
+                lsl.w   #3,d4                   ; in the map, whose registers
+                lea     ymxr_wcopy(pc),a2       ; are the target's (copy.S)
+                adda.w  d4,a2
+                lea     ymxr_at_synced(pc),a5
+                bra.w   ymxr_copy_twoat
+                .endif
+
+; Init's aim of each effect's call of ymxr_widestart that the link kept,
+; and the arming's: ymxr_syncwide for a tune that syncs a voice, bit 7 of
+; byte 10 of its bound tune (BINARIES.md 1.5), and otherwise ymxr_widestart,
+; or ymxr_copywide for a tune that copies from frame, as ymxr_copyinit
+; aims them, on every init. a6 the workspace; every register kept.
+ymxr_syncaim:   movem.l d1-d2/d4/a1-a4,-(sp)
+                lea     ymxr_widestart(pc),a3
+                .if     YMXR_MAP
+                tst.b   WS_EFFECTS(a6)          ; copy from frame
+                bpl.s   .tune
+                lea     ymxr_copywide(pc),a3
+.tune:
+                .endif
+                movea.l WS_TUNE(a6),a1
+                tst.b   TF_SYNC(a1)
+                bpl.s   .aim
+                lea     ymxr_syncwide(pc),a3
+.aim:           lea     ymxr_frame(pc),a4
+                lea     ymxr_overs(pc),a2
+                moveq   #3,d2
+.each:          move.w  (a2)+,d4
+                btst    d2,ymxr_k_effect+1(pc)
+                beq.s   .next
+                lea     (a4,d4.w),a1            ; the effect's head
+                lea     WIDEN_CALL(a1),a1
+                move.l  a3,d1
+                sub.l   a1,d1
+                move.w  d1,(a1)
+.next:          dbra    d2,.each
+                .if     YMXR_DEFER
+                lea     ymxr_arm_wide+2(pc),a1  ; the arming's (deferred.S)
+                move.l  a3,d1
+                sub.l   a1,d1
+                move.w  d1,(a1)
+                .endif
+                movem.l (sp)+,d1-d2/d4/a1-a4
+                rts
+                ENDPIECE synced_4

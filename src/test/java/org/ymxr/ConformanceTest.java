@@ -176,6 +176,12 @@ final class ConformanceTest {
                     + " voice's syncs the frame leaves to it, and on Timer B a source on"
                     + " `setToneC` and a deferred start of a drum on `setR8` that stays"
                     + " pending across three rows that sync voice C"),
+            Fixture.built("sync-targets", "`SyncTest.targets`", () -> schema(SyncTest.targets()),
+                    "version 13 at 50 Hz: the targets of a sync, `syncToneA` to `syncToneC`;"
+                    + " copy from frame on `syncToneA` on Timer A and on `syncToneC` on Timer"
+                    + " C, and a source of two rows on `syncToneB` on Timer B, each tick a"
+                    + " sync of its voice; rows that sync a voice at their frame, one while"
+                    + " Timer A runs on it, whose sync the frame leaves to the effect"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
