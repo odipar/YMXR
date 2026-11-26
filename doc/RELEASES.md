@@ -31,11 +31,58 @@ against the assembly the build makes, so one that does not match what rmac
 writes today fails the build.
 
 A player pins a version of this format: a tune file is 9, 10 where a row
-maps a value, and 11 where a row cuts a source (SPEC.md 3.3.5), and a
-bound tune the version of the tune file bound (BINARIES.md 1), and a
-release's number names the tools rather than either.
+maps a value, 11 where a row cuts a source, 12 where a row starts copy from
+frame and 13 where a row syncs a voice (SPEC.md 3.3.5), and a bound tune
+the version of the tune file bound (BINARIES.md 1), and a release's number
+names the tools rather than either.
 
 ## Published
+
+### 0.18.0, 2026-11-26
+
+<https://github.com/odipar/YMXR/releases/tag/v0.18.0>, built from the commit
+tagged `v0.18.0`.
+
+A tune that copies from frame converts to a tune file of version 12, and
+one that syncs a voice to version 13: YMXS 0.9.0's copy from frame and YMXS
+0.10.0's sync (SPEC.md 3.3.5). YMXR requires YMXS 0.10.0. A tune that does
+neither converts to the file 0.17.0 writes and links the player 0.17.0
+links.
+
+- **Copy from frame** is source S of a tune of version 12, index entry 0. A
+  start of it plays the frame values of the target's registers, each masked
+  to its register's width, on the counted handler of the target's columns,
+  one row a pass, through the identity or a transformation (SPEC.md 3.1.7,
+  rule 2(j)). The cores with the lookup, `YMXR_MAP=1`, play it, and init of
+  every other core reports -1 for such a tune. A frame reads the effects'
+  records for the registers the ticks write after a row that sets a column
+  of an effect, 618 to 1,618 cycles, and every other frame costs 62
+  (performance.md, Copy from frame). The kit's `copy-from-frame.ymxr` links
+  9,346 bytes.
+- **The sync of a voice.** Bit 5 of a coarse column marks a voice the row
+  syncs: at the frame the player writes 0 to the voice's two period
+  registers, waits at least 36 cycles, and writes their frame values
+  (SPEC.md 4.4.1). A start on `syncToneA` to `syncToneC`, targets 25 to 27,
+  runs a handler that does the same at every tick (5.1). Every core plays
+  the sync, and a song that syncs a voice links the blocks `sync` and
+  `synced`, 1,736 bytes of the plain player. Under Hatari the kit's
+  `sync-targets.ymxr` makes 276,768 syncs over 2,000 frames, the shortest
+  wait 56 cycles. A target of a sync through a transformation, under a cut
+  or started deferred is section 8's (8.10), and the converters report an
+  error for a start of one.
+- **A set** stores a transformation once where two subtunes index it;
+  0.17.0 stored it in each block that indexed it (BINARIES.md 3.1). Play
+  and the ticks run the cycles they ran.
+- **The rig** switches the kit's subtunes as the program stub does, exit
+  then init, and plays each after the switch against the same subtune on a
+  fresh machine. The Hatari pass plays the core with the lookup and reads
+  each sync's wait.
+
+Against 0.17.0's Go tools, the eleven dumps of `ym/test` convert to the
+same tune files and link the same SNDH files on the plain core, `-lean`,
+`-abs` and `-perf -lean -abs`, and the kit's tunes of versions 9 to 11
+check the same and link the same SNDH files. `bin/suite`: 384 tests, 0
+skipped.
 
 ### 0.17.0, 2026-11-24
 
