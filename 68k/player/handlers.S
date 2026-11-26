@@ -1288,6 +1288,22 @@ TWCT_LOOP3W      equ     ymxr_cwide0_loop3-ymxr_cwide0+6
 ; instance the head, the handler and the ends.
 TWS_HEAD        equ     ymxr_syn0-ymxr_p_synced0_1
 TWS_SIZE        equ     ymxr_e_synced0_1-ymxr_p_synced0_1
+; The slot's displacement and its two values, the way to the general head
+; and the head the frame writes; that head's room, the handler's first
+; place and its end of interrupt, which a head the frame writes reaches or
+; copies (sync.S, ymxr_sheads); and with the lookup and the monitor in, the
+; end those of copy from frame branch to.
+TWS_SLOT        equ     ymxr_syn0_sel1-ymxr_syn0+1
+TWS_TOGEN       equ     ymxr_syn0_gen-ymxr_syn0_sel1-2
+TWS_TOREG       equ     ymxr_syn0_hreg-ymxr_syn0_sel1-2
+TWS_REG         equ     ymxr_syn0_hreg-ymxr_syn0
+TWS_PTR1        equ     ymxr_syn0_ptr1-ymxr_syn0
+                .if     YMXR_AEOI=0
+TWS_EOI         equ     ymxr_syn0_eoi-ymxr_syn0
+                .endif
+                .if     YMXR_MAP&YMXR_PERF
+TWS_TAIL        equ     ymxr_syn0_htail-ymxr_syn0
+                .endif
                 .if     (ymxr_syn0_odd-ymxr_syn0)<>TWC_SIZE
                 .error  "the handler of a target of a sync is laid out apart from TWC"
                 .endif

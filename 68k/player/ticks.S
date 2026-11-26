@@ -234,8 +234,21 @@
 ; even, 1 and 2 where the fine register's 0 is the second and 3 and 4
 ; where the coarse one's is; HOLD_F's \steps 1 odd and 2 even; \fine 1 where
 ; the fine is 0 and the coarse write ends the steps. HOLD_T
-; times a tick's sync (ticks.S) and HOLD_F a frame's (sync.S). The rig
-; reads each sync's steps under Hatari (68k/test/emu/test_ymxr.py).
+; times a tick's sync (ticks.S) and HOLD_F a frame's (sync.S); HOLD_CE
+; and HOLD_FE are the nops of the even heads the frame writes, of copy
+; from frame and of a source's rows, whose odd heads keep the period at 0
+; for one step with none (sync.S, ymxr_hro to ymxr_hce). The rig reads
+; each sync's steps under Hatari (68k/test/emu/test_ymxr.py).
+HOLD_CE         equ     8
+HOLD_FE         equ     8
+; The room a handler of a target of a sync has for the head the frame
+; writes (TICKW, sync.S): the longest head, copy from frame's even one
+; where the lookup is in, and a source's even one otherwise.
+                .if     YMXR_MAP
+HREG            equ     2*HOLD_CE+42
+                .else
+HREG            equ     2*HOLD_FE+24
+                .endif
 HOLD_TF10       equ     0
 HOLD_TF11       equ     5
 HOLD_TF20       equ     8
@@ -369,7 +382,11 @@ HOLD_F21        equ     6
 ; or of its coarse where the fine is 0 (SPEC.md 1.12.3). HOLD_T times
 ; those steps: even where the voice's bit of ymxr_seven is 1 (sync.S), odd
 ; otherwise. Where the fine register's value is 0 the head goes on past
-; the handler, after its last rte.
+; the handler, after its last rte. This general head reads the chip, the
+; row and ymxr_seven at every tick; the frame aims the slot instead at a
+; head it has written, of a source's rows or of copy from frame, odd or
+; even, where those reads would come out one way until the next frame
+; (sync.S, ymxr_sheads).
                 .if     \sync
 \{name}_head:   move.l  d0,-(sp)
                 move.b  \{name}_sel1+3(pc),YM_SELECT.w
@@ -388,11 +405,22 @@ HOLD_F21        equ     6
 \{name}_ev:     FINE0   \name
                 beq.w   \{name}_even0
                 bra.w   \{name}_even
+; The head the frame writes, of a source's rows or of copy from frame, odd
+; or even, which the slot branches to once the frame has written it
+; (sync.S, ymxr_sheads): HREG bytes, room for the longest of the heads it
+; copies in (sync.S, ymxr_hro to ymxr_hce).
+\{name}_hreg:
+                .rept   HREG
+                dc.b    0
+                .endr
+; The slot's way to the general head, which a bra.s does not reach past
+; that room.
+\{name}_gen:    bra.w   \{name}_head
                 .endif
 \name:
                 MARK    \colour
                 .if     \sync
-\{name}_sel1:   bra.s   \{name}_head
+\{name}_sel1:   bra.s   \{name}_gen
                 dc.b    0,8                     ; +3: the first register
                 dc.w    0
                 .else
@@ -439,7 +467,7 @@ HOLD_F21        equ     6
                 .endif
                 COUNT   PERF_ON,PERF_DROP
                 .if     YMXR_AEOI=0
-                move.b  #\eoi,\eoir.w
+\{name}_eoi:    move.b  #\eoi,\eoir.w
                 .endif
                 rte
 \{name}_last:
@@ -548,6 +576,16 @@ HOLD_F21        equ     6
                 HOLD_T  4,1
                 move.b  \{name}_sel1+3(pc),YM_SELECT.w
                 bra.w   \{name}_ptr1
+                .if     YMXR_MAP&YMXR_PERF
+; The end of the heads of copy from frame the frame writes in a build with
+; the monitor, whose count reads its accumulator through the program
+; counter, so a copied head branches here (sync.S, ymxr_hco).
+\{name}_htail:  COUNT   PERF_LOOP,0
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+                .endif
                 .endif
                 .endm
 

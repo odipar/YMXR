@@ -8600,7 +8600,7 @@ def main():
         # No dump converts to a target of several registers, to a counted
         # source, to a deferred start, to a mapped value, to a cut or to
         # copy from frame, so the kit's tunes of versions 4 to 6, its
-        # deferred tune and its tunes of versions 10 to 13 go on the end of
+        # deferred tune and its tunes of versions 10 to 14 go on the end of
         # a run on a real MFP: with the dumps before them every handler
         # shape of the player is read there against the same model as the
         # rest, the counted shapes of one column and of several and the
@@ -8613,7 +8613,7 @@ def main():
                                          "mapped.ymxr", "cut.ymxr", "cuts.ymxr",
                                          "copy-from-frame.ymxr", "sync.ymxr",
                                          "sync-targets.ymxr", "sync-volume.ymxr",
-                                         "sync-even.ymxr")]
+                                         "sync-even.ymxr", "sync-heads.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]

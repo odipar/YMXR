@@ -194,6 +194,12 @@ final class ConformanceTest {
                     + " than 0; a square of four rows on `syncToneA` on Timer A, two of its"
                     + " rows a fine of 0, whose syncs two rows make even; and a row that lists"
                     + " voice C among its even syncs without a sync"),
+            Fixture.built("sync-heads", "`SyncTest.heads`", () -> schema(SyncTest.heads()),
+                    "version 14 at 50 Hz: copy from frame on `syncToneA` on Timer A and on"
+                    + " `syncToneC` on Timer C, and a source of four rows with no fine of 0"
+                    + " on `syncToneB` on Timer B, each synced odd and even by the rows;"
+                    + " rows that set the fine frame value of voice A and then of voice C to"
+                    + " 0 and back"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
