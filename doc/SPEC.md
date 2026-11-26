@@ -1896,9 +1896,10 @@ of `mapped.ymxr`, a tune of version 10, of `cut.ymxr`, a tune of version
 11, of `cuts.ymxr`, a tune of version 11, and of `copy-from-frame.ymxr`, a
 tune of version 12, of `sync.ymxr`, a tune of version 13, of
 `sync-targets.ymxr`, a tune of version 13, of `sync-volume.ymxr`, a tune
-of version 13, of `sync-even.ymxr`, a tune of version 14, and the empty
-record of `wrong-version.ymxr` included, each with the sha256 and the
-length `MANIFEST.txt` lists.
+of version 13, of `sync-even.ymxr`, a tune of version 14, of
+`sync-heads.ymxr`, a tune of version 14, and the empty record of
+`wrong-version.ymxr` included, each with the sha256 and the length
+`MANIFEST.txt` lists.
 
 ---
 

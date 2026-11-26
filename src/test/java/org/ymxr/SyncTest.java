@@ -232,6 +232,55 @@ class SyncTest {
                 Tunes.repeating(rows, 0));
     }
 
+    /** The heads the frame writes of the handlers of a target of a sync,
+     *  for the kit: copy from frame on syncToneA on Timer A from row 1 to
+     *  row 14 and on syncToneC on Timer C from row 3 to row 14, and a source
+     *  of four rows with no fine of 0 on syncToneB on Timer B from row 2
+     *  to row 13, each odd and even by the rows' even syncs. Row 8 sets
+     *  voice A's fine frame value to 0 and row 9 back, and row 10 voice
+     *  C's and row 11 back, so those frames and the frames after them run
+     *  the general head. */
+    static org.ymxs.YMXS.Tune heads() {
+        Pair steps = new Pair("steps", Tunes.repeating(List.of(new Two(150, 0),
+                new Two(140, 0), new Two(130, 1), new Two(120, 0)), 0));
+        int count = 16;
+        List<Map<Timer, Effect>> effects = new ArrayList<>();
+        List<Map<Register, Integer>> registers = new ArrayList<>();
+        for (int r = 0; r < count; r++) {
+            effects.add(new EnumMap<>(Timer.class));
+            registers.add(new EnumMap<>(Register.class));
+        }
+        effects.get(1).put(Timer.A, Tunes.copying(Tunes.target(25), Chip.prescaler(10), 100,
+                true, true, false, Tunes.NO_PARTS, new Cut(0, 0)));
+        effects.get(2).put(Timer.B, Tunes.starting(Tunes.target(26), steps,
+                Chip.prescaler(10), 80, true, true, false, Tunes.NO_PARTS, new Cut(0, 3)));
+        effects.get(3).put(Timer.C, Tunes.copying(Tunes.target(27), Chip.prescaler(10), 120,
+                true, true, false, Tunes.NO_PARTS, new Cut(0, 0)));
+        effects.get(13).put(Timer.B, Tunes.STOP);
+        effects.get(14).put(Timer.A, Tunes.STOP);
+        effects.get(14).put(Timer.C, Tunes.STOP);
+        registers.get(0).putAll(Map.of(Register.R0, 200, Register.R1, 1, Register.R2, 100,
+                Register.R3, 0, Register.R4, 50, Register.R5, 2, Register.R7, 56));
+        registers.get(0).putAll(Map.of(Register.R8, 15, Register.R9, 15, Register.R10, 15));
+        registers.get(6).put(Register.R0, 180);
+        registers.get(8).putAll(Map.of(Register.R0, 0, Register.R1, 2));
+        registers.get(9).put(Register.R0, 160);
+        registers.get(10).putAll(Map.of(Register.R4, 0, Register.R5, 1));
+        registers.get(11).put(Register.R4, 70);
+        Map<Integer, Set<Voice>> evens = Map.of(3, Set.of(Voice.A), 4, Set.of(Voice.A, Voice.B),
+                5, Set.of(Voice.B), 6, Set.of(Voice.C), 7, Set.of(Voice.A, Voice.C),
+                8, Set.of(Voice.A), 10, Set.of(Voice.C), 11, Set.of(Voice.B),
+                12, Set.of(Voice.A, Voice.C));
+        List<Row> rows = new ArrayList<>();
+        for (int r = 0; r < count; r++) {
+            Set<Voice> syncs = r == 0 ? Set.of(Voice.A, Voice.B, Voice.C) : Set.of();
+            rows.add(new Row(registers.get(r), effects.get(r), syncs,
+                    evens.getOrDefault(r, Set.of())));
+        }
+        return new org.ymxs.YMXS.Tune("Heads of a sync", "", "SyncTest", 50,
+                Tunes.repeating(rows, 0));
+    }
+
     /** {@link #targets} with one start changed at row {@code at} on timer
      *  {@code timer}. */
     static org.ymxs.YMXS.Tune changed(int at, Timer timer, Effect effect) {

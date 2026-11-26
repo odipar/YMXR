@@ -430,6 +430,20 @@ ymxr_arm_wide   equ     *
                 move.w  (a2),INST_BACKW(a4)     ; back at the switch or the
                 move.l  a2,INST_BACKA(a4)       ; drop
                 move.l  a2,FX_HOOK(a3)
+                .if     YMXR_MAP
+; The handler of a target of a sync, whose first instruction alone is a
+; bra.s, back to its general head, whose path reaches the hook: a head of
+; copy from frame the frame wrote ends before it (sync.S, ymxr_sheads),
+; and the frame writes one only while no start is armed. A piece of the
+; block copysync, which a link keeps for a song that copies from frame
+; and syncs a voice.
+                PIECE   copysync_7
+                cmp.b   #$60,TWS_SLOT-1(a5)
+                bne.s   .slot
+                move.b  #TWS_TOGEN,TWS_SLOT(a5)
+.slot:
+                ENDPIECE copysync_7
+                .endif
                 ori.w   #$0700,sr               ; the timer still running, and
                 movea.w 2(a6),a5                ; the hook in place: one test
                 move.b  (a5),d5                 ; and one word against a tick

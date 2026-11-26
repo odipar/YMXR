@@ -222,18 +222,33 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 ; select register; d0 to d4 and a3 to a5 clobbered.
 ymxr_sregs:     lea     ymxr_sfv(pc),a3
                 lea     ymxr_srow(pc),a4
+                ENDPIECE sync_3
+; The general heads while the row's values change, and the heads the
+; frame writes after them, in a tune that starts a source on a target of a
+; sync (ymxr_sheads): pieces of that handler's block.
+                PIECE   synced_7
+                moveq   #0,d0
+                bsr.w   ymxr_sheads
+                ENDPIECE synced_7
+                PIECE   sync_8
                 moveq   #0,d4                   ; the voices the row syncs
                 SVOICE  s,_0,_1,0,0,0,1
                 SVOICE  s,_2,_3,1,2,2,1
                 SVOICE  s,_4,_5,2,4,4,1
                 SSYNC   1
+                ENDPIECE sync_8
+                PIECE   synced_8
+                moveq   #1,d0
+                bsr.w   ymxr_sheads
+                ENDPIECE synced_8
+                PIECE   sync_9
                 STONE   0,0,$0000,$0100,0,1,0
                 STONE   1,2,$0200,$0300,2,3,0
                 STONE   2,4,$0400,$0500,4,5,0
                 bra.w   ymxr_noise
 
                 .if     YMXR_MAP
-                ENDPIECE sync_3
+                ENDPIECE sync_9
 ; The block copysync, which a link keeps for a song that copies from frame
 ; and syncs a voice (doc/LINKER.md): the register steps of R0 to R5 of a
 ; frame of a tune that syncs a voice and copies from frame (play.S,
@@ -243,11 +258,24 @@ ymxr_sregs:     lea     ymxr_sfv(pc),a3
 ; from frame write, which the frame leaves to them.
                 PIECE   copysync_1
 ymxr_skregs:    lea     ymxr_srow(pc),a4
+                ENDPIECE copysync_1
+; The heads as in ymxr_sregs.
+                PIECE   synced_9
+                moveq   #0,d0
+                bsr.w   ymxr_sheads
+                ENDPIECE synced_9
+                PIECE   copysync_5
                 moveq   #0,d4
                 SVOICE  t,_0,_1,0,0,0,FV_STRIDE
                 SVOICE  t,_2,_3,1,2,2*FV_STRIDE,FV_STRIDE
                 SVOICE  t,_4,_5,2,4,4*FV_STRIDE,FV_STRIDE
                 SSYNC   FV_STRIDE
+                ENDPIECE copysync_5
+                PIECE   synced_10
+                moveq   #1,d0
+                bsr.w   ymxr_sheads
+                ENDPIECE synced_10
+                PIECE   copysync_6
                 STONE   0,0,$0000,$0100,0,1,1
                 STONE   1,2,$0200,$0300,2,3,1
                 STONE   2,4,$0400,$0500,4,5,1
@@ -256,7 +284,7 @@ ymxr_skregs:    lea     ymxr_srow(pc),a4
 ; of copy from frame.
 ymxr_treads:    dc.w    t_0-ymxr_frame+2,t_1-ymxr_frame+2,t_2-ymxr_frame+2
                 dc.w    t_3-ymxr_frame+2,t_4-ymxr_frame+2,t_5-ymxr_frame+2
-                ENDPIECE copysync_1
+                ENDPIECE copysync_6
                 PIECE   sync_4
                 .endif
 
@@ -293,10 +321,52 @@ ymxr_syncinit:  movem.l d0-d4/a1/a3/a5,-(sp)
                 moveq   #18-1,d0
 .clear:         clr.b   (a3)+
                 dbra    d0,.clear
+                .if     YMXR_MAP
+                ENDPIECE sync_5
+                .else
+                ENDPIECE sync_9
+                .endif
+; In a tune that starts a source on a target of a sync, each effect's
+; byte of ymxr_sfx 0, and the sources of two values none of whose rows has
+; a fine of 0, a bit each (ymxr_sclean), off each source's first column: a
+; piece of that handler's block.
+                PIECE   synced_11
+                lea     ymxr_sfx(pc),a3
+                clr.l   (a3)
+                lea     ymxr_sclean(pc),a3
+                clr.l   (a3)
+                clr.l   4(a3)
+                clr.l   8(a3)
+                clr.l   12(a3)
+                movea.l WS_TUNE(a6),a1
+                moveq   #0,d1
+                move.b  TF_SOURCES(a1),d1       ; S
+                lea     WS_SOURCES(a6),a1
+                moveq   #0,d4                   ; the source
+.scan:          cmp.w   d1,d4
+                bcc.s   .scanned
+                movea.l (a1),a5                 ; its first row
+                cmp.w   #2,DT_COLUMNS-DT_PAYLOAD(a5)
+                bne.s   .nextsrc
+                move.l  DT_ROWS-DT_PAYLOAD(a5),d2   ; R
+                beq.s   .nextsrc
+.fine:          tst.b   (a5)+
+                beq.s   .nextsrc                ; a fine of 0
+                subq.l  #1,d2
+                bne.s   .fine
+                move.w  d4,d0
+                lsr.w   #3,d0
+                bset    d4,(a3,d0.w)            ; bit s mod 8
+.nextsrc:       addq.l  #8,a1
+                addq.w  #1,d4
+                bra.s   .scan
+.scanned:
+                ENDPIECE synced_11
+                PIECE   sync_10
                 lea     ymxr_sreads(pc),a3
                 bsr.w   .sites
                 .if     YMXR_MAP
-                ENDPIECE sync_5
+                ENDPIECE sync_10
                 PIECE   copysync_3
                 lea     ymxr_treads(pc),a3
                 bsr.w   .sites
@@ -342,7 +412,7 @@ ymxr_sreads:    dc.w    s_0-ymxr_frame+2,s_1-ymxr_frame+2,s_2-ymxr_frame+2
                 .if     YMXR_MAP
                 ENDPIECE sync_7
                 .else
-                ENDPIECE sync_3
+                ENDPIECE sync_10
                 .endif
 
 ; The block of the handler of a target of a sync (handlers.S), which a
@@ -379,10 +449,29 @@ ymxr_syncwide:  move.w  d4,d5
                 bra.w   ymxr_widestart
 .sync:          move.l  d6,-(sp)                ; the effect, as the two starts
                 move.w  d4,d6                   ; keep it
+; The handler's slot at the general head, which runs every source and
+; every chip right: a frame aims it at a head it has written (ymxr_sheads).
+; And ymxr_sfx's byte of the effect: 1 for a source whose bit of
+; ymxr_sclean is 1, 0 for any other and for copy from frame.
+                lea     ymxr_at_synced(pc),a5
+                move.w  d6,d5
+                add.w   d5,d5
+                adda.w  (a5,d5.w),a5
+                move.b  #TWS_TOGEN,TWS_SLOT(a5)
+                lea     ymxr_sfx(pc),a5
+                clr.b   (a5,d6.w)
                 .if     YMXR_MAP
                 cmp.l   #-7,d0                  ; copy from frame
                 beq.s   .copy
                 .endif
+                move.w  d1,d4                   ; eight times the source's
+                lsr.w   #3,d4                   ; number, which is 1 for the
+                subq.w  #1,d4                   ; first: the source
+                move.w  d4,d0
+                lsr.w   #3,d0
+                lea     ymxr_sclean(pc),a2
+                btst    d4,(a2,d0.w)            ; bit s mod 8 of byte s / 8
+                sne     (a5,d6.w)
                 lea     WS_WIDE(a0),a2
                 move.l  -8(a2,d1.w),d5          ; the source's loop cell
                 moveq   #4,d4                   ; the counted shape of two
@@ -446,5 +535,220 @@ ymxr_syncaim:   movem.l d1-d2/d4/a1-a4,-(sp)
                 move.w  d1,(a1)
                 .endif
                 movem.l (sp)+,d1-d2/d4/a1-a4
+                rts
+
+; Each effect's 1 where its start on a target of a sync was of a source
+; whose bit of ymxr_sclean is 1, and 0 otherwise (ymxr_syncwide).
+ymxr_sfx:       dc.b    0,0,0,0
+                .even
+; The sources of two values none of whose rows has a fine of 0, the first
+; value 0, a bit a source, bit s of byte s / 8 source s, which init writes
+; (ymxr_syncinit): the heads of a source's rows read no row (ymxr_sheads).
+ymxr_sclean:    dc.l    0,0,0,0
+; The end of a head of copy from frame: with the monitor in, a bra.w to
+; the handler's end (ticks.S, \{name}_htail), and otherwise the handler's
+; end of interrupt, which the frame copies, and the rte.
+                .macro  HEND    t
+                .if     YMXR_PERF
+\{t}_e:         bra.w   *
+                .else
+                .if     YMXR_AEOI=0
+\{t}_e:         move.b  #0,$FFFFFA0F.w
+                .endif
+                rte
+                .endif
+                .endm
+
+; A head copied into the handler of a5's room, a4 left at the room. a3
+; and d6 clobbered.
+                .macro  HCOPY   t
+                lea     \t(pc),a3
+                lea     TWS_REG(a5),a4
+                moveq   #(\{t}end-\t)/2-1,d6
+.c\~:           move.w  (a3)+,(a4)+
+                dbra    d6,.c\~
+                lea     TWS_REG(a5),a4
+                .endm
+
+; The registers and values of a head of copy from frame at a4: d1 the
+; fine register, d0 the fine frame value, a1 the frame values (copy.S,
+; ymxr_fv) at the fine's.
+                .macro  CPATCH  t
+                move.b  d1,10(a4)               ; the second 0's register
+                move.b  d1,\{t}_f-\t+2(a4)
+                move.b  d0,\{t}_f-\t+4(a4)
+                addq.b  #1,d1                   ; the coarse register
+                move.b  d1,2(a4)                ; the first 0's
+                move.b  d1,\{t}_c-\t+2(a4)
+                move.b  FV_STRIDE(a1),\{t}_c-\t+4(a4)
+                subq.b  #1,d1
+                .if     YMXR_PERF
+                move.w  #TWS_TAIL-TWS_REG-(\{t}_e-\t)-2,\{t}_e-\t+2(a4)
+                .else
+                .if     YMXR_AEOI=0
+                move.l  TWS_EOI+2(a5),\{t}_e-\t+2(a4)
+                .endif
+                .endif
+                .endm
+
+; The heads the frame copies into a handler's room (ticks.S, TICKW,
+; \{name}_hreg) and then writes the registers and values of: a source's
+; rows, odd and even, which go on to the handler's write of the row's
+; fine; and with the lookup in, copy from frame, odd and even, its frame
+; values as immediates. The chip's fine and the fine written are other
+; than 0, so the coarse 0 is first and the fine 0 second, the fine stays
+; selected, and the steps run from the fine 0 to the write of the fine:
+; one step odd, and even HOLD_FE's or HOLD_CE's nops more (ticks.S).
+; A bra.w reaches the handler, whose displacement the frame writes.
+                .even
+ymxr_hro:       move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register
+                move.b  #0,YM_SELECT.w          ; +3: the fine register
+                move.b  #0,YM_SELECT+2.w
+ymxr_hro_b:     bra.w   *                       ; the handler's first place
+ymxr_hroend:
+ymxr_hre:       move.l  #$01000000,YM_SELECT.w
+                move.b  #0,YM_SELECT.w
+                move.b  #0,YM_SELECT+2.w
+                .if     HOLD_FE>0
+                .rept   HOLD_FE
+                nop
+                .endr
+                .endif
+ymxr_hre_b:     bra.w   *
+ymxr_hreend:
+                .if     YMXR_MAP
+; Copy from frame: the four writes of the period, each a register and a
+; value. The second 0 has an absolute long address, whose 4 cycles more
+; make the time from it to the fine's write one step.
+ymxr_hco:       move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register
+                move.l  #$00000000,(YM_SELECT).l ; +2: the fine register
+ymxr_hco_f:     move.l  #$00000000,YM_SELECT.w ; +2: the fine register, +4: the fine
+ymxr_hco_c:     move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register, +4: the coarse
+                HEND    ymxr_hco
+ymxr_hcoend:
+ymxr_hce:       move.l  #$01000000,YM_SELECT.w
+                move.l  #$00000000,(YM_SELECT).l
+                .if     HOLD_CE>0
+                .rept   HOLD_CE
+                nop
+                .endr
+                .endif
+ymxr_hce_f:     move.l  #$00000000,YM_SELECT.w
+ymxr_hce_c:     move.l  #$01000000,YM_SELECT.w
+                HEND    ymxr_hce
+ymxr_hceend:
+                .endif
+                .if     (ymxr_hroend-ymxr_hro>HREG)|(ymxr_hreend-ymxr_hre>HREG)
+                .error  "a head of a source's rows is longer than a handler's room"
+                .endif
+                .if     YMXR_MAP
+                .if     (ymxr_hcoend-ymxr_hco>HREG)|(ymxr_hceend-ymxr_hce>HREG)
+                .error  "a head of copy from frame is longer than a handler's room"
+                .endif
+                .endif
+
+; The heads the frame writes of the handlers of a target of a sync
+; (ticks.S, TICKW), for each effect that runs one with no start armed:
+; with d0 0 each aimed at its general head, before the row's values
+; change; otherwise each written and aimed at its even or its odd head, by
+; the voice's bit of ymxr_seven, where the general head's reads would
+; come out one way until the next frame. A source's rows: where none has
+; a fine of 0 (ymxr_sfx) and the chip's fine is other than 0, the voice's
+; registers. Copy from frame: where the voice's fine frame value and the
+; chip's fine are other than 0, those and the voice's frame values
+; (copy.S, ymxr_fv). A tick runs the head the slot aims at and one byte
+; moves the slot, so the frame runs at its level. The target is read
+; before the table of those handlers, which a link keeps for a song that
+; starts a source on a target of a sync, and the tune's effects before
+; the frame values, which it keeps for a song that copies from frame. a0
+; the workspace, a2 the select register; every register kept.
+ymxr_sheads:    movem.l d0-d2/d5-d6/a1/a3-a6,-(sp)
+                move.b  d0,d2
+                lea     ymxr_timers(pc),a6
+                moveq   #0,d5                   ; the effect
+.each:          btst    d5,WS_EFFECTS(a0)
+                beq.w   .next
+                move.w  d5,d1
+                mulu    #FX_SIZE,d1
+                lea     WS_FX(a0),a1
+                adda.w  d1,a1                   ; the effect's record
+                moveq   #0,d1
+                move.b  FX_TARGET(a1),d1
+                sub.w   #25,d1                  ; a target of a sync, of voice
+                bcs.w   .next                   ; d1
+                cmp.w   #3,d1
+                bcc.w   .next
+                .if     YMXR_DEFER
+                tst.b   FX_PENDING(a1)          ; a start armed, whose hook the
+                bne.w   .next                   ; general head's path reaches
+                .endif
+                movea.w 2(a6),a5                ; the timer's control register
+                move.b  (a5),d0
+                and.b   6(a6),d0                ; its select, 0 where stopped
+                beq.w   .next
+                movea.w (a6),a5
+                movea.l (a5),a5                 ; the running handler
+                lea     ymxr_at_synced(pc),a4
+                move.w  d5,d0
+                add.w   d0,d0
+                adda.w  (a4,d0.w),a4            ; the effect's handler of a
+                cmpa.l  a4,a5                   ; target of a sync
+                bne.w   .next
+                add.w   d1,d1                   ; the fine register
+                .if     YMXR_MAP
+                tst.b   WS_EFFECTS(a0)          ; copy from frame
+                bpl.s   .rows
+                move.w  d1,d6
+                mulu    #FV_STRIDE,d6
+                lea     ymxr_fv(pc),a3
+                adda.w  d6,a3                   ; the fine's frame value, which
+                cmpa.l  FX_FIRST(a1),a3         ; copy from frame's place at
+                beq.w   .copy                   ; row 0 is
+                .endif
+.rows:          lea     ymxr_sfx(pc),a3
+                tst.b   (a3,d5.w)
+                beq.w   .next
+                tst.b   d2
+                beq.s   .gen
+                move.b  d1,(a2)                 ; the chip's fine
+                tst.b   (a2)
+                beq.w   .next
+                btst    d1,ymxr_seven(pc)
+                bne.s   .reven
+                HCOPY   ymxr_hro
+                move.w  #TWS_PTR1-TWS_REG-(ymxr_hro_b-ymxr_hro)-2,ymxr_hro_b-ymxr_hro+2(a4)
+                bra.s   .rregs
+.reven:         HCOPY   ymxr_hre
+                move.w  #TWS_PTR1-TWS_REG-(ymxr_hre_b-ymxr_hre)-2,ymxr_hre_b-ymxr_hre+2(a4)
+.rregs:         move.b  d1,11(a4)               ; the fine register
+                addq.b  #1,d1
+                move.b  d1,2(a4)                ; the coarse register
+                move.b  #TWS_TOREG,TWS_SLOT(a5)
+                bra.w   .next
+.gen:           move.b  #TWS_TOGEN,TWS_SLOT(a5)
+                bra.w   .next
+                .if     YMXR_MAP
+.copy:          tst.b   d2
+                beq.s   .gen
+                move.b  (a3),d0                 ; the fine frame value
+                beq.w   .next
+                move.b  d1,(a2)                 ; the chip's fine
+                tst.b   (a2)
+                beq.w   .next
+                movea.l a3,a1                   ; the frame values
+                btst    d1,ymxr_seven(pc)
+                bne.s   .ceven
+                HCOPY   ymxr_hco
+                CPATCH  ymxr_hco
+                bra.s   .caim
+.ceven:         HCOPY   ymxr_hce
+                CPATCH  ymxr_hce
+.caim:          move.b  #TWS_TOREG,TWS_SLOT(a5)
+                .endif
+.next:          addq.l  #8,a6
+                addq.w  #1,d5
+                cmp.w   #4,d5
+                bne.w   .each
+                movem.l (sp)+,d0-d2/d5-d6/a1/a3-a6
                 rts
                 ENDPIECE synced_4
