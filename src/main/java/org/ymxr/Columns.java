@@ -89,6 +89,14 @@ final class Columns {
     /** Bit 5 of a coarse column, 1, 3 or 5, in version 13: the row syncs
      *  the voice, read on every row (SPEC.md 1.2.2, 1.12). */
     static final int SYNC = 0x20;
+    /** A bit above the effects byte, which the file leaves out: a row
+     *  lists a voice among its even syncs, which version 14 marks (SPEC.md
+     *  1.12, 3.3.5). */
+    static final int EVENS = 0x200;
+    /** Bit 4 of a coarse column, 1, 3 or 5, in version 14: the voice's
+     *  syncs during the row are even, read on every row (SPEC.md 1.2.2,
+     *  1.12). */
+    static final int EVEN = 0x10;
     /** The first target of a sync, `syncToneA`; 26 and 27 are `syncToneB`
      *  and `syncToneC` (SPEC.md 2.1). */
     static final int SYNC_TARGET = 25;
@@ -213,6 +221,12 @@ final class Columns {
      *  sync: the bit above the effects byte (SPEC.md 3.3.5). */
     static boolean syncs(int effects) {
         return (effects & SYNCS) != 0;
+    }
+
+    /** Whether a row lists a voice among its even syncs: the bit above the
+     *  effects byte that version 14 marks (SPEC.md 3.3.5). */
+    static boolean evens(int effects) {
+        return (effects & EVENS) != 0;
     }
 
     /** The column count of a table of that effects byte: 30, with four

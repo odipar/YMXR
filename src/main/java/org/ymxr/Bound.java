@@ -534,7 +534,7 @@ final class Bound {
         System.arraycopy(tuneFile, 0, bound, 0, Tune.TABLE_AT);
         System.arraycopy(MAGIC, 0, bound, 0, 4);
         Tune.putWord(bound, 4, version);
-        if (tune.version() == Tune.SYNC) {
+        if (tune.version() >= Tune.SYNC) {
             bound[SYNC_AT] |= (byte) SYNC_MARK;
         }
         bound[Tune.COUNT_AT] = (byte) count;

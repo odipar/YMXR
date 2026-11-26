@@ -167,7 +167,8 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
         // SPEC.md 3.3.5: version 13 is a tune that syncs a voice, which the
         // effects carry in the bit above their byte.
         return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT),
-                effects | (version == Tune.SYNC ? Columns.SYNCS : 0), dtx3, table, sources,
+                effects | (version >= Tune.SYNC ? Columns.SYNCS : 0)
+                        | (version == Tune.EVEN ? Columns.EVENS : 0), dtx3, table, sources,
                 counted, transformations, cutList);
     }
 

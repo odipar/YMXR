@@ -39,7 +39,7 @@ final class Padding {
     static final int SHORT = 64;
 
     /** A row that sets no register and leaves every timer running. */
-    static final Row UNSET = new Row(Map.of(), Map.of(), Set.of());
+    static final Row UNSET = new Row(Map.of(), Map.of(), Set.of(), Set.of());
 
     private Padding() {
     }

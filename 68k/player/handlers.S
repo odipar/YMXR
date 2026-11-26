@@ -1284,10 +1284,11 @@ TWCT_LOOP3R      equ     ymxr_cwide0_loop3-ymxr_cwide0+2
 TWCT_LOOP3W      equ     ymxr_cwide0_loop3-ymxr_cwide0+6
 
 ; The handler of a target of a sync: TWC_'s offsets from its first byte
-; on, the head before it, and an instance the head and the handler.
+; on, the head before it and the head's four ends after it, and an
+; instance the head, the handler and the ends.
 TWS_HEAD        equ     ymxr_syn0-ymxr_p_synced0_1
 TWS_SIZE        equ     ymxr_e_synced0_1-ymxr_p_synced0_1
-                .if     (ymxr_e_synced0_1-ymxr_syn0)<>TWC_SIZE
+                .if     (ymxr_syn0_odd-ymxr_syn0)<>TWC_SIZE
                 .error  "the handler of a target of a sync is laid out apart from TWC"
                 .endif
                 .if     (ymxr_syn0_ptr1-ymxr_syn0)<>(ymxr_env0_ptr1-ymxr_env0)

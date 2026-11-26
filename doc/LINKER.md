@@ -48,11 +48,11 @@ player and of the player with the lookup in:
 | the lookup's routines | | 3,458 |
 | the cut's routines | | 2,674 |
 | copy from frame's routines and frame values | | 1,160 |
-| the sync's register steps, frame values and init's work | 794 | 794 |
-| the register steps of a tune that syncs and copies from frame | | 720 |
-| the handlers of a target of a sync, four effects, their start and their map's rows | 840 | 910 |
+| the sync's register steps, frame values and init's work | 1,310 | 1,310 |
+| the register steps of a tune that syncs and copies from frame | | 1,234 |
+| the handlers of a target of a sync, four effects, their start and their map's rows | 2,216 | 2,286 |
 | the lookup instances and the gaps before them, ten kinds | | 6,988 |
-| the player | 11,066 | 29,862 |
+| the player | 12,958 | 32,254 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -145,11 +145,11 @@ A block is the code and data a player runs for one part of a song:
   block reads. In a core without the lookup, `copy` is init's test that
   reports -1 for a tune that copies from frame, which a link leaves out,
   since such a song links on the core with the lookup;
-- `sync` is the sync at a frame: the register steps of R0 to R5 of a
-  tune that syncs a voice, their frame values, the target each effect's
-  running handler writes, and init's work for such a tune, bit 7 of byte
-  10 of its bound tune (BINARIES.md 1.5), which a song needs where a tune
-  of it is of version 13 (SPEC.md 4.4.1);
+- `sync` is the sync at a frame: the register steps of R0 to R5 of a tune
+  that syncs a voice, their frame values, the target each effect's running
+  handler writes, and init's work for such a tune, bit 7 of byte 10 of its
+  bound tune (BINARIES.md 1.5), which a song needs where a tune of it is
+  of version 13 or 14 (SPEC.md 4.4.1);
 - `copysync`, in a core with the lookup, is the register steps of R0 to
   R5 of a tune that syncs a voice and copies from frame, and init's work
   for them, which a song needs where a tune of it does both;
@@ -165,7 +165,7 @@ A block is the code and data a player runs for one part of a song:
 | `three` | 140 | in `several` | marked, three columns |
 | `envelope` | 134 | in `several` | counted, two columns |
 | `countedthree` | 162 | in `several` | counted, three columns |
-| `synced` | 172 | in `several` | two columns on a target of a sync, at every shape (SPEC.md 5.1) |
+| `synced` | 516 | in `several` | two columns on a target of a sync, at every shape (SPEC.md 5.1) |
 
 Sizes are in bytes, of the plain core. An effect's block is its frame
 code but for the two starts, 412 to 432 bytes, its general handler, 80,
@@ -445,18 +445,19 @@ measures it against the linked core.
 
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
-11,758 bytes, the core with the deferred start in, of 17,168 bytes, the
-core with the lookup in, of 30,654 bytes, or the core with the lookup
-and the deferred start in, of 45,496 bytes.
+13,650 bytes, the core with the deferred start in, of 19,060 bytes, the
+core with the lookup in, of 32,964 bytes, or the core with the lookup
+and the deferred start in, of 48,318 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
 | `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,346 |
-| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 11,046 |
-| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 12,606 |
-| `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 14,188 |
+| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 13,108 |
+| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 13,636 |
+| `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 15,048 |
+| `sync-even.ymxr` | plain | synced, synced0, several, effect0, effects, sync | 6,160 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
@@ -474,16 +475,16 @@ and the deferred start in, of 45,496 bytes.
 | `turrican.ymxr` | plain | effect1, effects | 2,682 |
 | `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3, effects | 6,698 |
 
-A tune of general sources alone, with no effect, links 1,336 bytes, 11% of
-the core: the blocks are 10,422 bytes of it. `voices.ymxr` runs all four
+A tune of general sources alone, with no effect, links 1,336 bytes, 10% of
+the core: the blocks are 12,314 bytes of it. `voices.ymxr` runs all four
 effects, keeps a handler of two or three columns on each and the start of
 several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup instances
-of 3 kinds and links 15,470 bytes of 45,496: the 36 instances and the 7
-loops of init it leaves out are 13,906 bytes, and the gaps it keeps are
-670 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
-instances of 1 kind and links 14,188 bytes of 45,496: the 38 instances and
-the 9 loops of init it leaves out are 14,990 bytes, and the gaps it keeps
-are 168 bytes shorter than in the core.
+of 3 kinds and links 15,470 bytes of 48,318: the 36 instances and the 7
+loops of init it leaves out are 14,226 bytes, and the gaps it keeps are
+766 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
+instances of 1 kind and links 15,048 bytes of 48,318: the 38 instances and
+the 9 loops of init it leaves out are 15,310 bytes, and the gaps it keeps
+are 264 bytes shorter than in the core.
 
 ## The check
 
@@ -498,7 +499,7 @@ are 168 bytes shorter than in the core.
   it, cut out of the SNDH file, against the model. It first requires the
   tool's core to be the rig's link of the assembled core, its patched
   longs aside, and the player in the core to be the player assembled
-  alone. The 22 tunes of the kit play their whole length as the
+  alone. The 23 tunes of the kit play their whole length as the
   specification reads on linked players of the plain core, `-lean`, `-abs
   -perf`, `-lean -abs` and `-perf -lean`, and the 11 dumps of `ym/test` on
   the plain core. Under `-defer -map` the 20 tunes of the check of

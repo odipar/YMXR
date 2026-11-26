@@ -227,22 +227,167 @@
 ; that order, and the places, the registers and the loop cells are the
 ; immediates it patches, so this handler uses no register either. A tune
 ; whose sources are one column enters none of this.
+; The steps of a sync (YMXS, SPEC.md 3.9.2): nops between the 0 that sets
+; a voice's period to 0 and the write that sets it other than 0, so the
+; instructions between them are a whole number of steps of the tone
+; generator, 32 cycles each on an ST: HOLD_T's \path 1 and 3 odd, 2 and 4
+; even, 1 and 2 where the fine register's 0 is the second and 3 and 4
+; where the coarse one's is; HOLD_F's \steps 1 odd and 2 even; \fine 1 where
+; the fine is 0 and the coarse write ends the steps. HOLD_T
+; times a tick's sync (ticks.S) and HOLD_F a frame's (sync.S). The rig
+; reads each sync's steps under Hatari (68k/test/emu/test_ymxr.py).
+HOLD_TF10       equ     0
+HOLD_TF11       equ     5
+HOLD_TF20       equ     8
+HOLD_TF21       equ     13
+HOLD_TS10       equ     10
+HOLD_TS11       equ     15
+HOLD_TS20       equ     2
+HOLD_TS21       equ     7
+HOLD_F10        equ     3
+HOLD_F11        equ     14
+HOLD_F20        equ     11
+HOLD_F21        equ     6
+                .macro  HOLD_T  path,fine
+                .if     (\path=1)&(\fine=0)
+                .if     HOLD_TF10>0
+                .rept   HOLD_TF10
+                nop
+                .endr
+                .endif
+                .endif
+                .if     (\path=1)&(\fine=1)
+                .if     HOLD_TF11>0
+                .rept   HOLD_TF11
+                nop
+                .endr
+                .endif
+                .endif
+                .if     (\path=2)&(\fine=0)
+                .if     HOLD_TF20>0
+                .rept   HOLD_TF20
+                nop
+                .endr
+                .endif
+                .endif
+                .if     (\path=2)&(\fine=1)
+                .if     HOLD_TF21>0
+                .rept   HOLD_TF21
+                nop
+                .endr
+                .endif
+                .endif
+                .if     (\path=3)&(\fine=0)
+                .if     HOLD_TS10>0
+                .rept   HOLD_TS10
+                nop
+                .endr
+                .endif
+                .endif
+                .if     (\path=3)&(\fine=1)
+                .if     HOLD_TS11>0
+                .rept   HOLD_TS11
+                nop
+                .endr
+                .endif
+                .endif
+                .if     (\path=4)&(\fine=0)
+                .if     HOLD_TS20>0
+                .rept   HOLD_TS20
+                nop
+                .endr
+                .endif
+                .endif
+                .if     (\path=4)&(\fine=1)
+                .if     HOLD_TS21>0
+                .rept   HOLD_TS21
+                nop
+                .endr
+                .endif
+                .endif
+                .endm
+                .macro  HOLD_F  steps,fine
+                .if     \steps=1
+                .if     \fine=0
+                .rept   HOLD_F10
+                nop
+                .endr
+                .else
+                .rept   HOLD_F11
+                nop
+                .endr
+                .endif
+                .else
+                .if     \fine=0
+                .rept   HOLD_F20
+                nop
+                .endr
+                .else
+                .rept   HOLD_F21
+                nop
+                .endr
+                .endif
+                .endif
+                .endm
+
+; Whether the row's fine at the place of \name's first column is 0, in Z;
+; d0 clobbered (a0 kept where a row is read through an absolute address).
+                .macro  FINE0   name
+                .if     YMXR_PCREL
+                move.w  \{name}_ptr1+2(pc),d0
+                move.b  \{name}_ptr1+2(pc,d0.w),d0
+                .else
+                move.l  a0,-(sp)
+                movea.l \{name}_ptr1+2(pc),a0
+                tst.b   (a0)
+                movea.l (sp)+,a0
+                .endif
+                .endm
+
+; FINE0 from past the handler, beyond the reach of a byte's displacement.
+                .macro  FINE0F  name
+                move.l  a0,-(sp)
+                .if     YMXR_PCREL
+                lea     \{name}_ptr1+2(pc),a0
+                adda.w  (a0),a0
+                .else
+                movea.l \{name}_ptr1+2(pc),a0
+                .endif
+                tst.b   (a0)
+                movea.l (sp)+,a0
+                .endm
+
                 .macro  TICKW   name,columns,counted,eoi,eoir,ctrl,keep,ier,bit,colour,inst,sync
 ; With \sync, the handler of a target of a sync (SPEC.md 5.1): the head
 ; below, before the first byte, which the first select's slot branches
 ; to; the slot keeps the register at +3, where a start writes it and the
-; remap and the recut read it. At level 7 the head writes 0 to the two
-; registers the selects name, fine then coarse, then selects the first
-; and goes back to its write, so the instructions from the second 0 to
-; that write are the wait (YMXS, SPEC.md 3.9.2).
+; remap and the recut read it. At the timer's level, which masks every
+; other timer, the head writes 0 to the two registers the selects name,
+; the coarse one first unless the chip's value of the fine one is 0, and
+; goes back to the handler's write with the fine register selected, so the
+; period is 0 from the second 0 to the handler's write of the row's fine,
+; or of its coarse where the fine is 0 (SPEC.md 1.12.3). HOLD_T times
+; those steps: even where the voice's bit of ymxr_seven is 1 (sync.S), odd
+; otherwise. Where the fine register's value is 0 the head goes on past
+; the handler, after its last rte.
                 .if     \sync
-\{name}_head:   move.w  #$2700,sr
+\{name}_head:   move.l  d0,-(sp)
                 move.b  \{name}_sel1+3(pc),YM_SELECT.w
-                move.b  #0,YM_SELECT+2.w
+                move.b  YM_SELECT.w,d0          ; the fine register's value
+                beq.w   \{name}_ffirst
                 move.b  \{name}_sel2+3(pc),YM_SELECT.w
-                move.b  #0,YM_SELECT+2.w
-\{name}_wait:   move.b  \{name}_sel1+3(pc),YM_SELECT.w
-                bra.w   \{name}_ptr1
+                move.b  #0,YM_SELECT+2.w        ; the coarse 0 first
+                move.b  \{name}_sel1+3(pc),YM_SELECT.w
+\{name}_fine:   moveq   #0,d0
+                move.b  \{name}_sel1+3(pc),d0   ; the voice's bit: 0, 2 or 4
+                btst    d0,ymxr_seven(pc)
+                bne.s   \{name}_ev
+                FINE0   \name
+                beq.w   \{name}_odd0
+                bra.w   \{name}_odd
+\{name}_ev:     FINE0   \name
+                beq.w   \{name}_even0
+                bra.w   \{name}_even
                 .endif
 \name:
                 MARK    \colour
@@ -349,6 +494,60 @@
                 .endif
                 .if     YMXR_DEFER
 \{name}_hook:   bra.w   \inst                   ; a pending start, as above
+                .endif
+                .if     \sync
+; The ends of the head: the second 0, then HOLD_T's steps, odd or even,
+; and where the row's fine is 0 those of the coarse write. Where the fine
+; register's 0 is the second it stays selected for the handler's write;
+; where the coarse one's is, the steps select the fine register.
+\{name}_odd:    move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  1,0
+                bra.w   \{name}_ptr1
+\{name}_even:   move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  2,0
+                bra.w   \{name}_ptr1
+\{name}_odd0:   move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  1,1
+                bra.w   \{name}_ptr1
+\{name}_even0:  move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  2,1
+                bra.w   \{name}_ptr1
+\{name}_ffirst: move.b  #0,YM_SELECT+2.w        ; a fine of 0, selected: its 0 first
+                move.b  \{name}_sel2+3(pc),YM_SELECT.w
+                moveq   #0,d0
+                move.b  \{name}_sel1+3(pc),d0
+                btst    d0,ymxr_seven(pc)
+                bne.s   \{name}_sev
+                FINE0F  \name
+                beq.w   \{name}_sodd0
+                bra.w   \{name}_sodd
+\{name}_sev:    FINE0F  \name
+                beq.w   \{name}_seven0
+                bra.w   \{name}_seven
+\{name}_sodd:   move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  3,0
+                move.b  \{name}_sel1+3(pc),YM_SELECT.w
+                bra.w   \{name}_ptr1
+\{name}_seven:  move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  4,0
+                move.b  \{name}_sel1+3(pc),YM_SELECT.w
+                bra.w   \{name}_ptr1
+\{name}_sodd0:  move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  3,1
+                move.b  \{name}_sel1+3(pc),YM_SELECT.w
+                bra.w   \{name}_ptr1
+\{name}_seven0: move.l  (sp)+,d0
+                move.b  #0,YM_SELECT+2.w
+                HOLD_T  4,1
+                move.b  \{name}_sel1+3(pc),YM_SELECT.w
+                bra.w   \{name}_ptr1
                 .endif
                 .endm
 

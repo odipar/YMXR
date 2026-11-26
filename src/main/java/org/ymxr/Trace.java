@@ -100,18 +100,11 @@ final class Trace {
                 }
             }
             line.append('}');
-            // SPEC.md 7.3: in version 13 the voices the row syncs, after w,
-            // where it syncs one.
-            if (model.syncs != 0) {
-                line.append(",\"s\":[");
-                for (int v = 0; v < 3; v++) {
-                    if ((model.syncs & 1 << v) != 0) {
-                        line.append(Integer.bitCount(model.syncs & (1 << v) - 1) == 0 ? "" : ",")
-                                .append('"').append((char) ('A' + v)).append('"');
-                    }
-                }
-                line.append(']');
-            }
+            // SPEC.md 7.3: in version 13 and 14 the voices the row syncs,
+            // after w, where it syncs one, and in version 14 the voices of
+            // its even syncs, after them, where it lists one.
+            voices(line, "s", model.syncs);
+            voices(line, "even", model.evens);
             line.append(",\"e\":{");
             first = true;
             for (int i = 0; i < 4; i++) {
@@ -194,5 +187,22 @@ final class Trace {
         }
         tool.report(Report.count(rows.length, "byte", "bytes") + " of rows");
         Out.write(tool, rows);
+    }
+
+    /** The voices of {@code mask}, bit 0 voice A to bit 2 voice C, as the
+     *  key {@code key} and a list of letters, where the mask has one
+     *  (SPEC.md 7.3). */
+    private static void voices(StringBuilder line, String key, int mask) {
+        if (mask == 0) {
+            return;
+        }
+        line.append(",\"").append(key).append("\":[");
+        for (int v = 0; v < 3; v++) {
+            if ((mask & 1 << v) != 0) {
+                line.append(Integer.bitCount(mask & (1 << v) - 1) == 0 ? "" : ",")
+                        .append('"').append((char) ('A' + v)).append('"');
+            }
+        }
+        line.append(']');
     }
 }

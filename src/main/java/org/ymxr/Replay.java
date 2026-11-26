@@ -39,9 +39,13 @@ final class Replay {
     final int[] registers = new int[14];
     final int[] written = new int[14];
     /** The voices the last row syncs, bit 0 voice A to bit 2 voice C: bit
-     *  5 of each coarse column in version 13, read on every row (SPEC.md
-     *  1.12). */
+     *  5 of each coarse column in version 13 and 14, read on every row
+     *  (SPEC.md 1.12). */
     int syncs;
+    /** The voices whose syncs during the last row are even, bit 0 voice A
+     *  to bit 2 voice C: bit 4 of each coarse column in version 14, read on
+     *  every row (SPEC.md 1.12). */
+    int evens;
     final Effect[] effect = new Effect[4];
     boolean envelopeWritten;
     private final Table table;
@@ -69,8 +73,10 @@ final class Replay {
             r[c] = table.column(c)[row];
         }
         syncs = 0;
+        evens = 0;
         for (int v = 0; Columns.syncs(effects) && v < 3; v++) {
             syncs |= (r[1 + 2 * v] & Columns.SYNC) != 0 ? 1 << v : 0;
+            evens |= Columns.evens(effects) && (r[1 + 2 * v] & Columns.EVEN) != 0 ? 1 << v : 0;
         }
         row++;
         if (row == table.rows()) {
