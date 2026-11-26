@@ -220,13 +220,13 @@ frame against a model of SPEC.md 4 and 5 built from the tune's tables,
 and reports the frame and the register that differ; `-hatari` plays it on
 a real MFP (tools.md 17.1).
 
-**8.3** `doc/conformance/tunes/` has twenty-two tune files: twenty-one a
+**8.3** `doc/conformance/tunes/` has twenty-three tune files: twenty-two a
 reader reads, fifteen of version 9, one of version 10, `mapped.ymxr`, two
 of version 11, `cut.ymxr` and `cuts.ymxr`, one of version 12,
-`copy-from-frame.ymxr`, and two of version 13, `sync-targets.ymxr` and
-`sync.ymxr`; and `wrong-version.ymxr`, version `$000E`, which a reader
-rejects (7); `MANIFEST.txt` lists the sha256 and the size of the record of
-each, the rejected one's empty.
+`copy-from-frame.ymxr`, and three of version 13, `sync-targets.ymxr`,
+`sync-volume.ymxr` and `sync.ymxr`; and `wrong-version.ymxr`, version
+`$000E`, which a reader rejects (7); `MANIFEST.txt` lists the sha256 and
+the size of the record of each, the rejected one's empty.
 
 ---
 

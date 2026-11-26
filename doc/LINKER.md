@@ -456,6 +456,7 @@ and the deferred start in, of 45,496 bytes.
 | `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,346 |
 | `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 11,046 |
 | `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 12,606 |
+| `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 14,188 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
@@ -479,7 +480,10 @@ effects, keeps a handler of two or three columns on each and the start of
 several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup instances
 of 3 kinds and links 15,470 bytes of 45,496: the 36 instances and the 7
 loops of init it leaves out are 13,906 bytes, and the gaps it keeps are
-670 bytes shorter than in the core.
+670 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
+instances of 1 kind and links 14,188 bytes of 45,496: the 38 instances and
+the 9 loops of init it leaves out are 14,990 bytes, and the gaps it keeps
+are 168 bytes shorter than in the core.
 
 ## The check
 
@@ -494,7 +498,7 @@ loops of init it leaves out are 13,906 bytes, and the gaps it keeps are
   it, cut out of the SNDH file, against the model. It first requires the
   tool's core to be the rig's link of the assembled core, its patched
   longs aside, and the player in the core to be the player assembled
-  alone. The 21 tunes of the kit play their whole length as the
+  alone. The 22 tunes of the kit play their whole length as the
   specification reads on linked players of the plain core, `-lean`, `-abs
   -perf`, `-lean -abs` and `-perf -lean`, and the 11 dumps of `ym/test` on
   the plain core. Under `-defer -map` the 20 tunes of the check of

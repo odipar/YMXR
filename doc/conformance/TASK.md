@@ -90,6 +90,7 @@ a reader does with a file outside those is outside this task.
 | `copy-from-frame.ymxr` | 9 |
 | `sync.ymxr` | 33 |
 | `sync-targets.ymxr` | 17 |
+| `sync-volume.ymxr` | 25 |
 | `wrong-version.ymxr` | 0 |
 
 The count is the first line and `R` + `R` - `RR` frames for a tune that

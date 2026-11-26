@@ -137,6 +137,52 @@ class SyncTest {
                 Tunes.repeating(rows, 0));
     }
 
+    /** A target of a sync beside volumes through transformations, for the
+     *  kit: a square of two rows on syncToneA on Timer A from row 1 under
+     *  the identity, a sample of ten rows on setR8, the volume of voice A,
+     *  through "half volume" on Timer B from row 2, and the same sample on
+     *  setR10 through "inverted", deferred, on Timer D from row 3. Rows 0
+     *  and 8 sync voice A at their frame, row 8 while Timer A runs on it,
+     *  and row 6 sets R0 under it. Timer A stops at row 9, B at 10 and D
+     *  at 11. */
+    static org.ymxs.YMXS.Tune volume() {
+        Pair pulse = new Pair("pulse", Tunes.repeating(List.of(new Two(150, 0),
+                new Two(140, 0)), 0));
+        Single sample = Tunes.repeating("sample", List.of(15, 13, 10, 6, 2, 0, 3, 8, 12, 14),
+                0);
+        Transformation half = new Transformation("half volume", List.of(0, 0, 1, 1, 2, 2, 3,
+                3, 4, 4, 5, 5, 6, 6, 7, 7));
+        Transformation inverted = new Transformation("inverted", List.of(15, 14, 13, 12, 11,
+                10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0));
+        List<Map<Timer, Effect>> effects = new ArrayList<>();
+        for (int r = 0; r < 12; r++) {
+            effects.add(new EnumMap<>(Timer.class));
+        }
+        effects.get(1).put(Timer.A, Tunes.starting(Tunes.target(25), pulse, Chip.prescaler(4),
+                100, true, true, false, Tunes.NO_PARTS, new Cut(0, 1)));
+        effects.get(2).put(Timer.B, Tunes.starting(Tunes.target(8), sample,
+                Chip.prescaler(10), 80, true, true, false, Tunes.mapping(half), new Cut(0, 9)));
+        effects.get(3).put(Timer.D, Tunes.starting(Tunes.target(10), sample,
+                Chip.prescaler(16), 100, true, true, true, Tunes.mapping(inverted),
+                new Cut(0, 9)));
+        effects.get(9).put(Timer.A, Tunes.STOP);
+        effects.get(10).put(Timer.B, Tunes.STOP);
+        effects.get(11).put(Timer.D, Tunes.STOP);
+        Map<Register, Integer> first = new EnumMap<>(Register.class);
+        first.putAll(Map.of(Register.R0, 200, Register.R1, 1, Register.R2, 100,
+                Register.R3, 0, Register.R4, 50, Register.R5, 2, Register.R7, 56));
+        first.putAll(Map.of(Register.R8, 15, Register.R9, 15, Register.R10, 15));
+        List<Row> rows = new ArrayList<>();
+        for (int r = 0; r < 12; r++) {
+            Map<Register, Integer> registers = r == 0 ? first
+                    : r == 6 ? Map.of(Register.R0, 180) : Map.of();
+            Set<Voice> syncs = r == 0 || r == 8 ? Set.of(Voice.A) : Set.of();
+            rows.add(new Row(registers, effects.get(r), syncs));
+        }
+        return new org.ymxs.YMXS.Tune("Sync square under a mapped volume", "", "SyncTest", 50,
+                Tunes.repeating(rows, 0));
+    }
+
     /** {@link #targets} with one start changed at row {@code at} on timer
      *  {@code timer}. */
     static org.ymxs.YMXS.Tune changed(int at, Timer timer, Effect effect) {
