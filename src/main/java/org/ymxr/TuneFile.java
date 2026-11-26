@@ -12,8 +12,9 @@ import org.dtx.Table;
  * and cut n are at index n - 1; source key k selects entry k. A file
  * without mapping columns has an empty transformation list, and one without
  * cut columns an empty cut list (SPEC.md 3.3, 3.4, 3.5). The sources are
- * the tables; in version 12 copy from frame is source S, after them, and
- * has none (3.1.7).
+ * the tables; in version 12, and in version 13 where bit 7 of the effects
+ * used is set, copy from frame is source S, after them, and has none
+ * (3.1.7). In version 13 the effects carry {@link Columns#SYNCS} (3.3.5).
  */
 record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table table,
                 List<Table> sources, List<Boolean> counted, List<byte[]> transformations,
@@ -64,9 +65,10 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
         }
         int effects = file[Tune.EFFECTS_AT] & 0xFF;
         // SPEC.md 3.3: bit 5 of the effects used is 1 in version 10, either
-        // in versions 11 and 12, and 0 in versions 7 to 9; bit 6 is 1 in
-        // version 11, either in version 12, and 0 in every other version;
-        // bit 7 is 1 in version 12 and 0 in every other version.
+        // in versions 11 to 13, and 0 in versions 7 to 9; bit 6 is 1 in
+        // version 11, either in versions 12 and 13, and 0 in every other
+        // version; bit 7 is 1 in version 12, either in version 13, and 0 in
+        // every other version.
         boolean maps = Columns.maps(effects);
         if (version == Tune.VERSION && !maps || version < Tune.VERSION && maps) {
             throw new IllegalArgumentException("version " + version + " with bit 5 of the"
@@ -78,7 +80,7 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
                     + " effects used " + (cuts ? "set" : "clear"));
         }
         boolean copies = Columns.copies(effects);
-        if (copies != (version == Tune.COPY)) {
+        if (version == Tune.COPY && !copies || version < Tune.COPY && copies) {
             throw new IllegalArgumentException("version " + version + " with bit 7 of the"
                     + " effects used " + (copies ? "set" : "clear"));
         }
@@ -98,8 +100,8 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
             throw new IllegalArgumentException("the source index at " + index
                     + " is outside the file");
         }
-        // SPEC.md 3.1.7: in version 12 index entry S is copy from frame, 0,
-        // and every entry before it is the offset of a table.
+        // SPEC.md 3.1.7: where bit 7 is set index entry S is copy from
+        // frame, 0, and every entry before it is the offset of a table.
         if (copies && (count == 0 || Tune.getLong(file, index + 4 * (count - 1)) != 0)) {
             throw new IllegalArgumentException("version " + version + " with source "
                     + count + " other than copy from frame");
@@ -162,8 +164,11 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
             }
             sources.add(source);
         }
-        return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT), effects, dtx3,
-                table, sources, counted, transformations, cutList);
+        // SPEC.md 3.3.5: version 13 is a tune that syncs a voice, which the
+        // effects carry in the bit above their byte.
+        return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT),
+                effects | (version == Tune.SYNC ? Columns.SYNCS : 0), dtx3, table, sources,
+                counted, transformations, cutList);
     }
 
     /**

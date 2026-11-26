@@ -88,6 +88,7 @@ a reader does with a file outside those is outside this task.
 | `cut.ymxr` | 25 |
 | `cuts.ymxr` | 21 |
 | `copy-from-frame.ymxr` | 9 |
+| `sync.ymxr` | 33 |
 | `wrong-version.ymxr` | 0 |
 
 The count is the first line and `R` + `R` - `RR` frames for a tune that

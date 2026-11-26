@@ -120,6 +120,7 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .endif
 
                 .include "player/tables.S"
+                .include "player/sync.S"
 
                 .if     YMXR_MAP
                 .include "player/lookup_start.S"

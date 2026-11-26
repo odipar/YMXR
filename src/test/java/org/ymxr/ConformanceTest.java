@@ -83,7 +83,7 @@ final class ConformanceTest {
 
     /** The version word in {@code wrong-version}: one past the highest
      *  version the reader reads (SPEC.md 3.3.5). */
-    static final int WRONG_VERSION = Tune.COPY + 1;
+    static final int WRONG_VERSION = Tune.SYNC + 1;
 
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(
@@ -169,6 +169,13 @@ final class ConformanceTest {
                     + " square on R10 on Timer B; rows that set R13, R2 and R9 while copy from"
                     + " frame runs on them, which the frame leaves to the ticks, and a stop"
                     + " of each at row 3, after which the frame writes R2 and R9 at row 0"),
+            Fixture.built("sync", "`SyncTest.tune`", () -> schema(SyncTest.tune()),
+                    "version 13 at 50 Hz: rows that sync a voice, bit 5 of each coarse"
+                    + " column, a row that syncs the three and rows that sync one and leave"
+                    + " its period unset; copy from frame on `setToneB` on Timer A, whose"
+                    + " voice's syncs the frame leaves to it, and on Timer B a source on"
+                    + " `setToneC` and a deferred start of a drum on `setR8` that stays"
+                    + " pending across three rows that sync voice C"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
@@ -320,7 +327,7 @@ final class ConformanceTest {
                 Register.R7, 0x38);
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < effects.size(); r++) {
-            rows.add(new Row(r == 0 ? first : Map.of(), effects.get(r)));
+            rows.add(new Row(r == 0 ? first : Map.of(), effects.get(r), Set.of()));
         }
         return new org.ymxs.YMXS.Tune("mapped", "", "ConformanceTest", 50,
                 Tunes.repeating(rows, REPEAT));
@@ -342,13 +349,13 @@ final class ConformanceTest {
         rows.add(new Row(Map.of(Register.R7, 63), Map.of(Timer.A, new Start(
                 new OneConnection(Tunes.setting(Register.R8), triangle),
                 new Timing(Chip.prescaler(4), 40, true, true), false, Tunes.NO_PARTS,
-                new Cut(0, 15)))));
+                new Cut(0, 15))), Set.of()));
         int[][] windows = {{2, 17}, {4, 19}, {6, 21}, {8, 23}, {10, 25}, {12, 27}, {14, 29},
                            {16, 31}, {16, 23}, {20, 23}};
         for (int[] one : windows) {
-            rows.add(new Row(Map.of(), Map.of(Timer.A, new Recut(new Cut(one[0], one[1])))));
+            rows.add(new Row(Map.of(), Map.of(Timer.A, new Recut(new Cut(one[0], one[1]))), Set.of()));
         }
-        rows.add(new Row(Map.of(Register.R8, 0), Map.of(Timer.A, Tunes.STOP)));
+        rows.add(new Row(Map.of(Register.R8, 0), Map.of(Timer.A, Tunes.STOP), Set.of()));
         return new org.ymxs.YMXS.Tune("cut", "", "ConformanceTest", 50,
                 Tunes.repeating(rows, 0));
     }
@@ -382,7 +389,7 @@ final class ConformanceTest {
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < effects.size(); r++) {
             rows.add(new Row(r == 0 ? Map.of(Register.R7, 63)
-                    : r == 4 ? Map.of(Register.R8, 0, Register.R9, 0) : Map.of(), effects.get(r)));
+                    : r == 4 ? Map.of(Register.R8, 0, Register.R9, 0) : Map.of(), effects.get(r), Set.of()));
         }
         return new org.ymxs.YMXS.Tune("cuts", "", "ConformanceTest", 50,
                 Tunes.repeating(rows, 0));
@@ -579,7 +586,7 @@ final class ConformanceTest {
             assertEquals(lines, Long.parseLong(row.group(1).replace(",", "")),
                     "TASK.md's lines for " + f.name());
         }
-        Matcher count = Pattern.compile("([\\d,]+) entries").matcher(readme);
+        Matcher count = Pattern.compile("([\\d,]+)\\s+entries").matcher(readme);
         assertTrue(count.find(), "README.md does not count the entries");
         assertEquals(entries, Long.parseLong(count.group(1).replace(",", "")), "README.md's entry count");
         Matcher version = Pattern.compile("version word \\$([0-9A-Fa-f]{4})").matcher(text);

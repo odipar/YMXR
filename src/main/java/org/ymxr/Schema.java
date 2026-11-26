@@ -23,10 +23,12 @@ import org.ymxs.YMXS.Row;
 import org.ymxs.YMXS.Source;
 import org.ymxs.YMXS.Start;
 import org.ymxs.YMXS.Stop;
+import org.ymxs.YMXS.SyncTone;
 import org.ymxs.YMXS.Target;
 import org.ymxs.YMXS.Timer;
 import org.ymxs.YMXS.Timing;
 import org.ymxs.YMXS.Transformation;
+import org.ymxs.YMXS.Voice;
 
 /**
  * Encodes YMXS tune data as YMXR columns (doc/ymxs.md). Every converter
@@ -137,6 +139,7 @@ final class Schema {
             Row row = rows.get(f);
             byte[] out = new byte[Columns.ALL];
             registers(row, out);
+            syncs(row, out);
             for (Map.Entry<Timer, Effect> one : Tunes.effects(row).entrySet()) {
                 int i = effect(one.getKey());
                 used |= effect(out, i, one.getValue(), sources, kept, padded.frames()[f]);
@@ -159,7 +162,8 @@ final class Schema {
             }
         }
         Columns columns = new Columns(table, repeat,
-                used | (maps ? Columns.MAPS : 0) | (cutting ? Columns.CUTS : 0),
+                used | (maps ? Columns.MAPS : 0) | (cutting ? Columns.CUTS : 0)
+                        | (syncs(rows) ? Columns.SYNCS : 0),
                 maps ? tables(list) : List.of(), cutting ? cuts : List.of());
         return new Made(columns, new Sources(sources(sources, markers(rows, sources))),
                 tune.rate());
@@ -171,6 +175,23 @@ final class Schema {
             for (Effect one : row.effects().values()) {
                 if (one instanceof Start start
                         && start.connection() instanceof CopyFromFrame) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a row syncs a voice, at its frame or through a start on a
+     *  target of a sync (SPEC.md 1.12, 3.3.5). */
+    private static boolean syncs(List<Row> rows) {
+        for (Row row : rows) {
+            if (!row.syncs().isEmpty()) {
+                return true;
+            }
+            for (Effect one : row.effects().values()) {
+                if (one instanceof Start start
+                        && Tunes.target(start.connection()) instanceof SyncTone) {
                     return true;
                 }
             }
@@ -470,6 +491,15 @@ final class Schema {
         }
     }
 
+    /** Bit 5 of the coarse column of each voice the row syncs, which the
+     *  row sets or leaves unset as the structure has it (SPEC.md 1.2.2,
+     *  1.12). */
+    private static void syncs(Row row, byte[] out) {
+        for (Voice voice : row.syncs()) {
+            out[Chip.number(Chip.coarse(voice))] |= (byte) Columns.SYNC;
+        }
+    }
+
     /**
      * Encodes one effect operation into its four columns and optional
      * mapping column, updating effects-used bits. {@code at} is the
@@ -738,8 +768,9 @@ final class Schema {
                 if (source == null) {
                     // copy from frame has no table, and its marker is the
                     // player's (SPEC.md 3.1.7); its target is one this
-                    // version encodes
-                    if (number >= Columns.MARKER.length) {
+                    // version encodes, and a target of a sync is a later
+                    // version's (rule 2(b), 8.10)
+                    if (number >= Columns.SYNC_TARGET) {
                         throw new IllegalArgumentException("copy from frame runs on "
                                 + Tunes.name(Tunes.target(start.connection()))
                                 + ", a target this version leaves to a later one"
@@ -751,7 +782,7 @@ final class Schema {
                 boolean through = !Tunes.isIdentity(start.mapping());
                 identity[n] |= !through;
                 mixer[n] |= through && number == Columns.MIXER_TARGET;
-                if (number >= Columns.MARKER.length) {
+                if (number >= Columns.SYNC_TARGET) {
                     throw new IllegalArgumentException("the source " + Tunes.name(source)
                             + " runs on " + Tunes.name(Tunes.target(start.connection()))
                             + ", a target this version leaves to a later one"

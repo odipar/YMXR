@@ -25,6 +25,19 @@ const Cuts = 0x40
 // the last entry of the source index (SPEC.md 3.1.7, 3.3).
 const Copies = 0x80
 
+// Syncs is a bit above the effects byte, which the file leaves out: a row
+// syncs a voice, at its frame or through a target of a sync, which version
+// 13 marks (SPEC.md 1.12, 3.3.5).
+const Syncs = 0x100
+
+// Sync is bit 5 of a coarse column, 1, 3 or 5, in version 13: the row syncs
+// the voice, read on every row (SPEC.md 1.2.2, 1.12).
+const Sync = 0x20
+
+// SyncTarget is the first target of a sync, syncToneA; 26 and 27 are
+// syncToneB and syncToneC (SPEC.md 2.1).
+const SyncTarget = 25
+
 // CutColumn is the first cut column where the tune maps a value, and All
 // the column count of a table that maps a value and cuts a source
 // (SPEC.md 3.3.5). Where the tune maps none, the cut columns are 30 to 33.
@@ -65,6 +78,12 @@ func HasCuts(effects int) bool {
 // HasCopies is whether the effects byte marks copy from frame, bit 7.
 func HasCopies(effects int) bool {
 	return effects&Copies != 0
+}
+
+// HasSyncs is whether a row syncs a voice, at its frame or through a target
+// of a sync: the bit above the effects byte (SPEC.md 3.3.5).
+func HasSyncs(effects int) bool {
+	return effects&Syncs != 0
 }
 
 // ColumnCount is the column count of a table of that effects byte: 30,
@@ -156,9 +175,10 @@ const MostMixerKey = 0xFF &^ Ports
 // marker is in their one column where the register leaves bit 7 and
 // the source is counted where it does not; 14 to 19 mark the coarse
 // nibble, 20, setEnvelope, writes two whole bytes and is counted, 21
-// marks the envelope shape, and 22 to 24 the noise period.
+// marks the envelope shape, 22 to 24 the noise period, and 25 to 27, the
+// targets of a sync, the coarse nibble.
 var Marker = []int{-1, 0, -1, 0, -1, 0, 0, -1, 0, 0, 0, -1, -1, 0,
-	1, 1, 1, 1, 1, 1, -1, 2, 0, 0, 0}
+	1, 1, 1, 1, 1, 1, -1, 2, 0, 0, 0, 1, 1, 1}
 
 // BesideColumn and BesideBit are, for a column that fills its byte, the
 // column and bit beside it that keep its 0 a value (SPEC.md 1.1).

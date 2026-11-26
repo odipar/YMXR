@@ -962,7 +962,8 @@ final class ConsistencyTest {
     /** A count spelled out, one to twenty. */
     private static final List<String> SPELLED = List.of("zero", "one", "two", "three", "four",
             "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen",
-            "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty");
+            "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+            "twenty-one");
 
     static int spelled(String word) {
         int at = SPELLED.indexOf(word);
@@ -1021,10 +1022,11 @@ final class ConsistencyTest {
         try (Stream<Path> at = Files.list(kit)) {
             files = at.filter(one -> one.toString().endsWith(".ymxr")).sorted().toList();
         }
-        Matcher tunes = wrapped("`doc/conformance/tunes/` has (\\w+) tune files: (\\w+) a reader"
-                + " reads, (\\w+) of version (\\d+), (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr`,"
-                + " (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr` and `([\\w-]+)\\.ymxr`, and"
-                + " (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr`, and"
+        Matcher tunes = wrapped("`doc/conformance/tunes/` has ([\\w-]+) tune files: ([\\w-]+) a"
+                + " reader reads, (\\w+) of version (\\d+), (\\w+) of version (\\d+),"
+                + " `([\\w-]+)\\.ymxr`, (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr` and"
+                + " `([\\w-]+)\\.ymxr`, (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr`, and"
+                + " (\\w+) of version (\\d+), `([\\w-]+)\\.ymxr`; and"
                 + " `wrong-version\\.ymxr`, version `\\$([0-9A-F]{4})`").matcher(guide);
         assertTrue(tunes.find(), "writing.md has no count of the kit's tune files");
         assertEquals(files.size(), spelled(tunes.group(1)), "the kit's tune files");
@@ -1035,7 +1037,7 @@ final class ConsistencyTest {
             int version = (file[4] & 0xFF) << 8 | file[5] & 0xFF;
             String name = one.getFileName().toString();
             if (name.equals("wrong-version.ymxr")) {
-                assertEquals(Integer.parseInt(tunes.group(15), 16), version,
+                assertEquals(Integer.parseInt(tunes.group(18), 16), version,
                         "wrong-version.ymxr's version");
                 assertTrue(!Tune.reads(version), "wrong-version.ymxr is one a reader"
                         + " reads");
@@ -1046,7 +1048,8 @@ final class ConsistencyTest {
         }
         assertEquals(read, spelled(tunes.group(2)), "the kit's tune files a reader reads");
         assertEquals(List.of(Integer.parseInt(tunes.group(4)), Integer.parseInt(tunes.group(6)),
-                Integer.parseInt(tunes.group(9)), Integer.parseInt(tunes.group(13))),
+                Integer.parseInt(tunes.group(9)), Integer.parseInt(tunes.group(13)),
+                Integer.parseInt(tunes.group(16))),
                 List.copyOf(versions.keySet()), "the versions of the kit's tune files");
         assertEquals(versions.getOrDefault(Integer.parseInt(tunes.group(4)), List.of()).size(),
                 spelled(tunes.group(3)), "the kit's tune files of version " + tunes.group(4));
@@ -1062,6 +1065,10 @@ final class ConsistencyTest {
                 versions.get(Integer.parseInt(tunes.group(13))),
                 "the kit's tune files of version " + tunes.group(13));
         assertEquals(1, spelled(tunes.group(12)), "the count of version " + tunes.group(13));
+        assertEquals(List.of(tunes.group(17) + ".ymxr"),
+                versions.get(Integer.parseInt(tunes.group(16))),
+                "the kit's tune files of version " + tunes.group(16));
+        assertEquals(1, spelled(tunes.group(15)), "the count of version " + tunes.group(16));
         String manifest = read(Path.of("doc/conformance/MANIFEST.txt"));
         for (Path one : files) {
             assertTrue(manifest.contains(" tunes/" + one.getFileName() + "\n"),
@@ -1362,7 +1369,7 @@ final class ConsistencyTest {
                     "SPEC.md 2.1: the last value is the last column of a source, " + target.group());
             rows++;
         }
-        assertEquals(6, rows, "SPEC.md 2.1's targets read as " + rows + " rows");
+        assertEquals(7, rows, "SPEC.md 2.1's targets read as " + rows + " rows");
         Matcher fifth = wrapped("In version (\\d+) column (\\d+) \\+ i is a fifth, the effect's"
                 + " mapping column").matcher(spec);
         assertTrue(fifth.find(), "SPEC.md 1.8.1 has no mapping column");

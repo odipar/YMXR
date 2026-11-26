@@ -44,8 +44,9 @@ ymxr_regs:
                 TONE    _4,_5,$0400,$0500
 ; 5: the noise period, and the envelope period beside the shape's bits:
 ;    a period byte is written where it is not 0, and a 0 where its bit in
-;    the shape column is set.
-                WRITE   _6,$0600
+;    the shape column is set. The sync's register steps of R0 to R5 come
+;    back here (sync.S).
+ymxr_noise:     WRITE   _6,$0600
                 READ2   _13
                 RESERVED _11,6,$0B00
                 RESERVED _12,5,$0C00
@@ -199,7 +200,7 @@ ymxr_csteps:    movea.l a6,a3                   ; the frame values
                 KTONE   _0,_1,$0000,$0100,0,1
                 KTONE   _2,_3,$0200,$0300,2,3
                 KTONE   _4,_5,$0400,$0500,4,5
-                KWRITE  _6,$0600,6,$1F
+ymxr_cnoise:    KWRITE  _6,$0600,6,$1F
                 KREAD2  _13
                 KRESERVED _11,6,$0B00,11
                 KRESERVED _12,5,$0C00,12

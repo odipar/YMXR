@@ -126,6 +126,7 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 		}
 		out := make([]byte, ymxr.All)
 		registers(rows[f], out)
+		syncs(rows[f], out)
 		for _, one := range ymxs.Effects(rows[f]) {
 			i, err := effectOf(one.Timer)
 			if err != nil {
@@ -154,6 +155,9 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	// mapping columns where a row selects a transformation, and the cut
 	// columns where a row selects a cut 1 to 127, after the mapping columns
 	// (SPEC.md 3.3.5).
+	if syncsFrom(rows) {
+		used |= ymxr.Syncs
+	}
 	columns := ymxr.Columns{Column: append([][]byte(nil), column[:ymxr.C]...),
 		Repeat: repeat, Effects: used}
 	if selects(column, ymxr.MappingColumn) {
@@ -191,6 +195,24 @@ func copiesFrom(rows []ymxs.Row) bool {
 	return false
 }
 
+// syncsFrom reports whether a row syncs a voice, at its frame or through a
+// start on a target of a sync (SPEC.md 1.12, 3.3.5).
+func syncsFrom(rows []ymxs.Row) bool {
+	for _, row := range rows {
+		if row.Syncs != [3]bool{} {
+			return true
+		}
+		for _, one := range ymxs.Effects(row) {
+			if start, ok := one.Effect.(ymxs.Start); ok {
+				if _, sync := ymxs.ConnectionTarget(start.Connection).(ymxs.SyncTone); sync {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // selects reports whether any row sets one of the four columns from first
 // to a number 1 to 127, a transformation or a cut (SPEC.md 3.3.5).
 func selects(column [][]byte, first int) bool {
@@ -218,6 +240,17 @@ func registers(row ymxs.Row, out []byte) {
 			}
 		} else {
 			out[c] |= byte(0x80 | value)
+		}
+	}
+}
+
+// syncs writes bit 5 of the coarse column of each voice the row syncs, which
+// the row sets or leaves unset as the structure has it (SPEC.md 1.2.2,
+// 1.12).
+func syncs(row ymxs.Row, out []byte) {
+	for v, voice := range ymxs.Voices {
+		if row.Syncs[v] {
+			out[ymxs.Number(ymxs.Coarse(voice))] |= ymxr.Sync
 		}
 	}
 }
@@ -764,8 +797,9 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			if source == nil {
 				// copy from frame has no table, and its marker is the
 				// player's (SPEC.md 3.1.7); its target is one this version
-				// encodes
-				if number >= len(ymxr.Marker) {
+				// encodes, and a target of a sync is a later version's
+				// (rule 2(b), 8.10)
+				if number >= ymxr.SyncTarget {
 					return marks{}, fmt.Errorf("copy from frame runs on %s, a target this"+
 						" version leaves to a later one (SPEC.md section 8)",
 						ymxs.TargetName(runs))
@@ -776,7 +810,7 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			through := !ymxs.IsIdentity(start.Mapping)
 			identity[n] = identity[n] || !through
 			out.mixer[n] = out.mixer[n] || through && number == ymxr.MixerTarget
-			if number >= len(ymxr.Marker) {
+			if number >= ymxr.SyncTarget {
 				return marks{}, fmt.Errorf("the source %s runs on %s, a target this"+
 					" version leaves to a later one (SPEC.md section 8)",
 					ymxs.SourceName(source), ymxs.TargetName(runs))

@@ -448,13 +448,14 @@ final class Sndh {
     /** The version a set of these tune files binds at, and the version of
      *  a multi file of them: 11 where one of them is version 11, 10 where
      *  one is version 10 and none 11, and 9 otherwise, a tune file of
-     *  version 12 counted at the version it binds at (tools.md 11.1). */
+     *  version 12 or 13 counted at the version it binds at (tools.md
+     *  11.1). */
     static int binds(List<byte[]> tuneFiles) {
         int most = Tune.UNMAPPED;
         for (byte[] tune : tuneFiles) {
             if (tune.length >= Tune.INDEX_AT) {
                 int version = Tune.getWord(tune, 4);
-                if (version == Tune.COPY) {
+                if (version == Tune.COPY || version == Tune.SYNC) {
                     int effects = tune[8] & 0xFF;
                     version = Columns.cuts(effects) ? Tune.CUT
                             : Columns.maps(effects) ? Tune.VERSION : Tune.UNMAPPED;

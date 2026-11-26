@@ -46,21 +46,22 @@
                  .macro  WRITE   col,select
 --- a/68k/player/play.S
 +++ b/68k/player/play.S
-@@ -43,10 +43,11 @@
+@@ -43,11 +43,11 @@
                  TONE    _2,_3,$0200,$0300
                  TONE    _4,_5,$0400,$0500
  ; 5: the noise period, and the envelope period beside the shape's bits:
 -;    a period byte is written where it is not 0, and a 0 where its bit in
--;    the shape column is set.
+-;    the shape column is set. The sync's register steps of R0 to R5 come
+-;    back here (sync.S).
 +;    where the shape column is 0, no bit beside is set, and a period byte
 +;    is written where it is not 0, with no further test.
-                 WRITE   _6,$0600
+ ymxr_noise:     WRITE   _6,$0600
                  READ2   _13
 +                beq.w   ymxr_plain
                  RESERVED _11,6,$0B00
                  RESERVED _12,5,$0C00
  ; 6: the volumes.
-@@ -61,14 +62,29 @@
+@@ -62,14 +62,29 @@
                  move.b  d1,d0
                  movep.w d0,(a2)
  .no7:
@@ -92,7 +93,7 @@
  ; The row is written: the next one is read now, after every write this
  ; call makes, so no part of the advance's cost is between a host's clock
  ; and the chip.
-@@ -188,6 +204,9 @@
+@@ -373,6 +388,9 @@
                  dc.w    q_24-ymxr_frame+2,24,q_25-ymxr_frame+2,25
                  dc.w    q_26-ymxr_frame+2,26,q_27-ymxr_frame+2,27
                  dc.w    q_28-ymxr_frame+2,28,q_29-ymxr_frame+2,29
