@@ -83,7 +83,7 @@ final class ConformanceTest {
 
     /** The version word in {@code wrong-version}: one past the highest
      *  version the reader reads (SPEC.md 3.3.5). */
-    static final int WRONG_VERSION = Tune.SYNC + 1;
+    static final int WRONG_VERSION = Tune.EVEN + 1;
 
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(
@@ -188,6 +188,12 @@ final class ConformanceTest {
                     + " through a transformation on Timer B, and a deferred start of it on"
                     + " `setR10` through another on Timer D; rows that sync voice A at their"
                     + " frame, one while Timer A runs on it"),
+            Fixture.built("sync-even", "`SyncTest.evens`", () -> schema(SyncTest.evens()),
+                    "version 14 at 50 Hz: rows that sync each voice at their frame, odd and"
+                    + " even, bit 4 of the coarse column, to periods whose fine is 0 and other"
+                    + " than 0; a square of four rows on `syncToneA` on Timer A, two of its"
+                    + " rows a fine of 0, whose syncs two rows make even; and a row that lists"
+                    + " voice C among its even syncs without a sync"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
@@ -339,7 +345,7 @@ final class ConformanceTest {
                 Register.R7, 0x38);
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < effects.size(); r++) {
-            rows.add(new Row(r == 0 ? first : Map.of(), effects.get(r), Set.of()));
+            rows.add(new Row(r == 0 ? first : Map.of(), effects.get(r), Set.of(), Set.of()));
         }
         return new org.ymxs.YMXS.Tune("mapped", "", "ConformanceTest", 50,
                 Tunes.repeating(rows, REPEAT));
@@ -361,13 +367,13 @@ final class ConformanceTest {
         rows.add(new Row(Map.of(Register.R7, 63), Map.of(Timer.A, new Start(
                 new OneConnection(Tunes.setting(Register.R8), triangle),
                 new Timing(Chip.prescaler(4), 40, true, true), false, Tunes.NO_PARTS,
-                new Cut(0, 15))), Set.of()));
+                new Cut(0, 15))), Set.of(), Set.of()));
         int[][] windows = {{2, 17}, {4, 19}, {6, 21}, {8, 23}, {10, 25}, {12, 27}, {14, 29},
                            {16, 31}, {16, 23}, {20, 23}};
         for (int[] one : windows) {
-            rows.add(new Row(Map.of(), Map.of(Timer.A, new Recut(new Cut(one[0], one[1]))), Set.of()));
+            rows.add(new Row(Map.of(), Map.of(Timer.A, new Recut(new Cut(one[0], one[1]))), Set.of(), Set.of()));
         }
-        rows.add(new Row(Map.of(Register.R8, 0), Map.of(Timer.A, Tunes.STOP), Set.of()));
+        rows.add(new Row(Map.of(Register.R8, 0), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of()));
         return new org.ymxs.YMXS.Tune("cut", "", "ConformanceTest", 50,
                 Tunes.repeating(rows, 0));
     }
@@ -401,7 +407,7 @@ final class ConformanceTest {
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < effects.size(); r++) {
             rows.add(new Row(r == 0 ? Map.of(Register.R7, 63)
-                    : r == 4 ? Map.of(Register.R8, 0, Register.R9, 0) : Map.of(), effects.get(r), Set.of()));
+                    : r == 4 ? Map.of(Register.R8, 0, Register.R9, 0) : Map.of(), effects.get(r), Set.of(), Set.of()));
         }
         return new org.ymxs.YMXS.Tune("cuts", "", "ConformanceTest", 50,
                 Tunes.repeating(rows, 0));

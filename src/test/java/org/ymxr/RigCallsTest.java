@@ -358,7 +358,7 @@ final class RigCallsTest {
             argv.addAll(core);
             return argv;
         }, (argv, said) -> assertTrue(said.startsWith("0\n")
-                        && said.contains("22 tunes play as the specification reads")
+                        && said.contains("23 tunes play as the specification reads")
                         && said.contains("deferred starts: 20 tunes")
                         && said.contains("tunes that map a value: 33 tunes")
                         && said.contains("cuts: 13 tunes")
@@ -534,7 +534,7 @@ final class RigCallsTest {
                     argv.add("-onlyswitches");
                     return argv;
                 }, (argv, said) -> assertTrue(said.startsWith("0\n")
-                        && said.contains("switches: the kit's 21 tunes at 50 Hz")
+                        && said.contains("switches: the kit's 22 tunes at 50 Hz")
                         && said.contains("with a deferred start's hook in place: " + plays),
                         () -> RIG + " " + String.join(" ", argv)
                                 + " does not switch the kit's subtunes:\n" + said));

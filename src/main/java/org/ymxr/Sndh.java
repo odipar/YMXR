@@ -455,7 +455,7 @@ final class Sndh {
         for (byte[] tune : tuneFiles) {
             if (tune.length >= Tune.INDEX_AT) {
                 int version = Tune.getWord(tune, 4);
-                if (version == Tune.COPY || version == Tune.SYNC) {
+                if (version == Tune.COPY || version == Tune.SYNC || version == Tune.EVEN) {
                     int effects = tune[8] & 0xFF;
                     version = Columns.cuts(effects) ? Tune.CUT
                             : Columns.maps(effects) ? Tune.VERSION : Tune.UNMAPPED;

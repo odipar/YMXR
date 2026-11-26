@@ -63,11 +63,17 @@ const VersionCut = 0x000B
 // 0 (SPEC.md 3.1.7, 3.3.5).
 const VersionCopy = 0x000C
 
-// VersionSync is the highest supported version, written where a row syncs a
-// voice, at its frame or through a target of a sync: the header of version
-// 12, bit 7 of the effects used where a row starts copy from frame, and bit
-// 5 of each coarse column read on every row (SPEC.md 1.12, 3.3.5).
+// VersionSync is the version written where a row syncs a voice, at its frame
+// or through a target of a sync, and lists none among its even syncs: the
+// header of version 12, bit 7 of the effects used where a row starts copy
+// from frame, and bit 5 of each coarse column read on every row (SPEC.md
+// 1.12, 3.3.5).
 const VersionSync = 0x000D
+
+// VersionEven is the highest supported version, written where a row lists a
+// voice among its even syncs: version 13 with bit 4 of each coarse column
+// read on every row (SPEC.md 1.12, 3.3.5).
+const VersionEven = 0x000E
 
 // Unmapped is the writer version for identity-only tunes. It uses
 // thirty DTX3 columns without a transformation index. Deferred starts
@@ -83,20 +89,22 @@ const VersionDeferred = 0x0008
 const Oldest = 0x0007
 
 // Reads is the versions a reader reads, as its report names them.
-var Reads = fmt.Sprintf("%d, %d, %d, %d, %d, %d or %d", Oldest, VersionDeferred, Unmapped,
-	Version, VersionCut, VersionCopy, VersionSync)
+var Reads = fmt.Sprintf("%d, %d, %d, %d, %d, %d, %d or %d", Oldest, VersionDeferred, Unmapped,
+	Version, VersionCut, VersionCopy, VersionSync, VersionEven)
 
 // ReadsVersion is whether a reader reads a file of that version.
 func ReadsVersion(version int) bool {
-	return version >= Oldest && version <= VersionSync
+	return version >= Oldest && version <= VersionEven
 }
 
-// VersionOf is the version a writer writes for a table of those effects: 13
-// where a row syncs a voice, 12 where it copies from frame, 11 where it cuts
-// a source, 10 where it maps a value and cuts none, and 9 otherwise
-// (SPEC.md 3.3.5).
+// VersionOf is the version a writer writes for a table of those effects: 14
+// where a row lists a voice among its even syncs, 13 where a row syncs a
+// voice, 12 where it copies from frame, 11 where it cuts a source, 10 where
+// it maps a value and cuts none, and 9 otherwise (SPEC.md 3.3.5).
 func VersionOf(effects int) int {
 	switch {
+	case HasEvens(effects):
+		return VersionEven
 	case HasSyncs(effects):
 		return VersionSync
 	case HasCopies(effects):
@@ -114,7 +122,7 @@ func VersionOf(effects int) int {
 // versions 12 and 13 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md 3.3.3).
 func ColumnsOf(version, effects int) int {
 	switch version {
-	case VersionCut, VersionCopy, VersionSync:
+	case VersionCut, VersionCopy, VersionSync, VersionEven:
 		return ColumnCount(effects)
 	case Version:
 		return Mapped
@@ -139,7 +147,7 @@ const Counted = 1 << 31
 // 13, after the cut-index pointer (SPEC.md 3.3).
 func IndexAt(version int) int {
 	switch version {
-	case VersionCut, VersionCopy, VersionSync:
+	case VersionCut, VersionCopy, VersionSync, VersionEven:
 		return CutsAt + 4
 	case Version:
 		return TransformationsAt + 4
@@ -1009,10 +1017,14 @@ func Read(file []byte) (File, error) {
 		}
 		sources = append(sources, source)
 	}
-	// SPEC.md 3.3.5: version 13 is a tune that syncs a voice, which the
-	// effects carry in the bit above their byte.
-	if version == VersionSync {
+	// SPEC.md 3.3.5: version 13 is a tune that syncs a voice, and version
+	// 14 one that lists a voice among its even syncs, which the effects carry
+	// in the bits above their byte.
+	if version >= VersionSync {
 		effects |= Syncs
+	}
+	if version == VersionEven {
+		effects |= Evens
 	}
 	return File{Version: version, FrameRate: GetWord(file, FrameRateAt),
 		Effects: effects, Dtx3: dtx3, Table: table, Sources: sources,

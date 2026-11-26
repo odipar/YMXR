@@ -164,7 +164,8 @@ final class Schema {
         }
         Columns columns = new Columns(table, repeat,
                 used | (maps ? Columns.MAPS : 0) | (cutting ? Columns.CUTS : 0)
-                        | (syncs(rows) ? Columns.SYNCS : 0),
+                        | (syncs(rows) || evens(rows) ? Columns.SYNCS : 0)
+                        | (evens(rows) ? Columns.EVENS : 0),
                 maps ? tables(list) : List.of(), cutting ? cuts : List.of());
         return new Made(columns, new Sources(sources(sources, markers(rows, sources))),
                 tune.rate());
@@ -522,13 +523,27 @@ final class Schema {
         }
     }
 
-    /** Bit 5 of the coarse column of each voice the row syncs, which the
-     *  row sets or leaves unset as the structure has it (SPEC.md 1.2.2,
-     *  1.12). */
+    /** Bit 5 of the coarse column of each voice the row syncs, and bit 4
+     *  of each voice the row lists among its even syncs, which the row sets
+     *  or leaves unset as the structure has it (SPEC.md 1.2.2, 1.12). */
     private static void syncs(Row row, byte[] out) {
         for (Voice voice : row.syncs()) {
             out[Chip.number(Chip.coarse(voice))] |= (byte) Columns.SYNC;
         }
+        for (Voice voice : row.evenSyncs()) {
+            out[Chip.number(Chip.coarse(voice))] |= (byte) Columns.EVEN;
+        }
+    }
+
+    /** Whether a row lists a voice among its even syncs (SPEC.md 1.12,
+     *  3.3.5). */
+    private static boolean evens(List<Row> rows) {
+        for (Row row : rows) {
+            if (!row.evenSyncs().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

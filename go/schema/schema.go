@@ -158,8 +158,11 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	// mapping columns where a row selects a transformation, and the cut
 	// columns where a row selects a cut 1 to 127, after the mapping columns
 	// (SPEC.md 3.3.5).
-	if syncsFrom(rows) {
+	if syncsFrom(rows) || evensFrom(rows) {
 		used |= ymxr.Syncs
+	}
+	if evensFrom(rows) {
+		used |= ymxr.Evens
 	}
 	columns := ymxr.Columns{Column: append([][]byte(nil), column[:ymxr.C]...),
 		Repeat: repeat, Effects: used}
@@ -278,15 +281,29 @@ func registers(row ymxs.Row, out []byte) {
 	}
 }
 
-// syncs writes bit 5 of the coarse column of each voice the row syncs, which
-// the row sets or leaves unset as the structure has it (SPEC.md 1.2.2,
-// 1.12).
+// syncs writes bit 5 of the coarse column of each voice the row syncs, and
+// bit 4 of each voice the row lists among its even syncs, which the row sets
+// or leaves unset as the structure has it (SPEC.md 1.2.2, 1.12).
 func syncs(row ymxs.Row, out []byte) {
 	for v, voice := range ymxs.Voices {
 		if row.Syncs[v] {
 			out[ymxs.Number(ymxs.Coarse(voice))] |= ymxr.Sync
 		}
+		if row.EvenSyncs[v] {
+			out[ymxs.Number(ymxs.Coarse(voice))] |= ymxr.Even
+		}
 	}
+}
+
+// evensFrom reports whether a row lists a voice among its even syncs
+// (SPEC.md 1.12, 3.3.5).
+func evensFrom(rows []ymxs.Row) bool {
+	for _, row := range rows {
+		if row.EvenSyncs != [3]bool{} {
+			return true
+		}
+	}
+	return false
 }
 
 // effect encodes one effect operation into its four columns and

@@ -724,9 +724,9 @@ writes the marker's bit into R12 with the value, a period 32,768 more than
 the row's, which the kit's `envelope` tune does on its first source's last
 two rows, 800 and then 33,696, its 928 with the marker.
 
-The player is 11,066 bytes, 1,592 of them the counted shapes' twelve
+The player is 12,958 bytes, 1,592 of them the counted shapes' twelve
 instances, four each of one, two and three columns. Where a tick reads
-an absolute address, 10,764 bytes and 1,696, instances of 144 bytes
+an absolute address, 12,656 bytes and 1,696, instances of 144 bytes
 against the marked shape's 122 for two columns.
 
 ## A tick through an absolute address
@@ -794,7 +794,7 @@ reports -1 for one further off (BINARIES.md 1.5), and the layouts put a
 tune's DTX1 tables before its image and a set's subtunes before the
 images, so the rows of the tune a host loads are beside the player at any
 length of image. A host that places them further off assembles this build,
-which is 10,764 bytes against 11,066. Two figures move against each other:
+which is 12,656 bytes against 12,958. Two figures move against each other:
 a place is a word where it was a long, which shortens a timer's handlers
 by 52 bytes, and a start does the arithmetic that turns a row's address
 into a displacement, 38 bytes more of the timer's frame code. The init and
@@ -876,15 +876,15 @@ target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
 The second bank, the installers, the stubs and the stop's write-back make
-the player 16,476 bytes against 11,066, and 16,370 against 10,764 where a
+the player 18,368 bytes against 12,958, and 18,262 against 12,656 where a
 tick reads an absolute address. Each handler gains a stub: an instance of
 the wide handler is 138 bytes against 134, and of the marked shape of two
 columns 116 against 112.
 
-The lookup in, `YMXR_MAP=1`, makes the player 29,944 bytes against 11,066,
-and 30,978 against 10,764 where a tick reads an absolute address. With the
-deferred start in as well, 44,786 against 16,476, and 46,832 against
-16,370.
+The lookup in, `YMXR_MAP=1`, makes the player 32,254 bytes against 12,958,
+and 33,544 against 12,656 where a tick reads an absolute address. With the
+deferred start in as well, 47,608 against 18,368, and 49,142 against
+18,262.
 
 ## A cut
 
@@ -982,19 +982,19 @@ which starts four sources: 9,722 cycles, four through a transformation,
 two of them under a cut, and 9,486, four of two and three columns under a
 cut.
 
-The player with the lookup in is 29,944 bytes against 21,966 in release
-0.15.0, before the cut, and 30,978 against 23,256 where a tick reads an
-absolute address; with the deferred start in as well, 44,786 against
-35,908, and 46,832 against 37,954. Of the 7,978 bytes it is longer than in
-that release, 3,208 are the cut's blocks, which a link leaves out of the
-player of a song that cuts no source (LINKER.md): 2,688 of routines and
-130 of each effect's frame code. With the deferred start in, the blocks
-are 3,682 of the 8,878. The blocks of copy from frame, which a link keeps
-only for a song that copies from frame, are 2,002 bytes of the rest, and
-2,104 with the deferred start in (Copy from frame). The blocks of the sync
-and of the handler of its targets, which a link keeps only for a song that
-syncs a voice, are 2,526 bytes, and 2,802 with the deferred start in
-(LINKER.md).
+The player with the lookup in is 32,254 bytes against 21,966 in release
+0.15.0, before the cut, and 33,544 against 23,256 where a tick reads an
+absolute address; with the deferred start in as well, 47,608 against
+35,908, and 49,142 against 37,954. Of the 10,288 bytes it is longer than
+in that release, 3,208 are the cut's blocks, which a link leaves out of
+the player of a song that cuts no source (LINKER.md): 2,688 of routines
+and 130 of each effect's frame code. With the deferred start in, the
+blocks are 3,682 of the 11,700. The blocks of copy from frame, which a
+link keeps only for a song that copies from frame, are 2,002 bytes of the
+rest, and 2,104 with the deferred start in (Copy from frame). The blocks
+of the sync and of the handler of its targets, which a link keeps only for
+a song that syncs a voice, are 4,932 bytes, and 5,208 with the deferred
+start in (LINKER.md).
 
 ## Copy from frame
 

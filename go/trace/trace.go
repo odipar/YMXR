@@ -101,22 +101,11 @@ func Trace(tune ymxr.File, calls int) []byte {
 			}
 		}
 		out.WriteByte('}')
-		// SPEC.md 7.3: in version 13 the voices the row syncs, after w,
-		// where it syncs one.
-		if model.Syncs != 0 {
-			out.WriteString(",\"s\":[")
-			first = true
-			for v := 0; v < 3; v++ {
-				if model.Syncs&(1<<v) != 0 {
-					if !first {
-						out.WriteByte(',')
-					}
-					fmt.Fprintf(&out, "\"%c\"", 'A'+v)
-					first = false
-				}
-			}
-			out.WriteByte(']')
-		}
+		// SPEC.md 7.3: in version 13 and 14 the voices the row syncs, after
+		// w, where it syncs one, and in version 14 the voices of its even
+		// syncs, after them, where it lists one.
+		voices(&out, "s", model.Syncs)
+		voices(&out, "even", model.Evens)
 		out.WriteString(",\"e\":{")
 		first = true
 		for i := 0; i < 4; i++ {
@@ -155,4 +144,24 @@ func Record(file []byte, calls int) []byte {
 		calls = Calls(tune.Table)
 	}
 	return Trace(tune, calls)
+}
+
+// voices writes the voices of mask, bit 0 voice A to bit 2 voice C, as the
+// key and a list of letters, where the mask has one (SPEC.md 7.3).
+func voices(out *bytes.Buffer, key string, mask int) {
+	if mask == 0 {
+		return
+	}
+	fmt.Fprintf(out, ",\"%s\":[", key)
+	first := true
+	for v := 0; v < 3; v++ {
+		if mask&(1<<v) != 0 {
+			if !first {
+				out.WriteByte(',')
+			}
+			fmt.Fprintf(out, "\"%c\"", 'A'+v)
+			first = false
+		}
+	}
+	out.WriteByte(']')
 }

@@ -485,7 +485,7 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	copy(bound, tuneFile[:ymxr.TableAt])
 	copy(bound, BoundMagic)
 	ymxr.PutWord(bound, 4, version)
-	if read.Version == ymxr.VersionSync {
+	if read.Version >= ymxr.VersionSync {
 		bound[SyncAt] |= SyncMark
 	}
 	bound[ymxr.CountAt] = byte(count)

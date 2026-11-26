@@ -182,19 +182,21 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 13, which a writer writes where a row syncs a voice,
+# (BINARIES.md 1): 14, which a writer writes where a row lists a voice
+# among its even syncs, 13, which it writes where a row syncs a voice,
 # and 12, which it writes where a row starts copy from frame, each of
 # which the binder binds at the layout of 9, 10 or 11; 11,
 # which it writes where a row cuts a source, 10, which it writes where a
 # row maps a value, 9, which it writes otherwise, 8, read as 9, and 7,
 # whose control columns have bit 3 at 0, each a tune whose table is DTX3,
 # which a reader reads.
-TUNE_VERSIONS = (13, 12, 11, 10, 9, 8, 7)
+TUNE_VERSIONS = (14, 13, 12, 11, 10, 9, 8, 7)
 WRITTEN = 9
 MAPPED = 10
 CUT = 11
 COPY = 12
 SYNC = 13
+EVEN = 14
 # The first target of a sync, syncToneA (SPEC.md 2.1).
 SYNC_TARGET = 25
 
@@ -728,6 +730,12 @@ def entry(model, writes):
         s = ["ABC"[v] for v in range(3) if model.playing[2 * v + 1] & 0x20]
         if s:
             out["s"] = s
+    if model.tune.written == EVEN:
+        # in version 14 the voices whose bit 4 the row sets, its even syncs
+        # (SPEC.md 7.3)
+        even = ["ABC"[v] for v in range(3) if model.playing[2 * v + 1] & 0x10]
+        if even:
+            out["even"] = even
     out["e"] = e
     return out
 
@@ -916,6 +924,23 @@ class Model:
         self.row_writes = []
         self.fv_at = None
         self.fv_stride = None
+        # the value of each register as the writes the model makes leave it,
+        # 0 before the first: a sync orders its writes by the values (YMXS,
+        # SPEC.md 3.9.1)
+        self.chip = [0] * 14
+
+    def apply(self, writes):
+        """The chip after writes."""
+        for register, value in writes or []:
+            self.chip[register] = value
+
+    def synced(self, fine, coarse, f, c):
+        """The four writes of a sync of the voice of fine register f and
+        coarse register c to the period fine, coarse: 0 to the two, the
+        coarse one first unless the chip's value of the fine one is 0, then
+        the two values, fine then coarse (SPEC.md 1.12.3)."""
+        zeros = [(f, 0), (c, 0)] if self.chip[f] == 0 else [(c, 0), (f, 0)]
+        return zeros + [(f, fine), (c, coarse)]
 
     def copying(self, i):
         """Whether effect i's source is copy from frame."""
@@ -941,7 +966,9 @@ class Model:
         self.begin()
         for i in range(4):
             self.step(i)
-        return self.writes()
+        writes = self.writes()
+        self.apply(writes)
+        return writes
 
     def begin(self):
         """The row this frame plays, read and the next one placed."""
@@ -1128,19 +1155,19 @@ class Model:
         if not self.tune.syncs:
             return left
         # The sync of each voice whose bit 5 the row sets and on a register
-        # of whose period no effect runs: 0 to the two registers of each,
-        # then each frame value, before the row's other writes (SPEC.md
+        # of whose period no effect runs, one after another, each to the
+        # voice's frame values, before the row's other writes (SPEC.md
         # 4.4.1).
         r = self.playing
         busy = {register for i in range(4) if self.fx[i]["running"]
                 for register, _ in TARGETS.get(self.fx[i]["using"], [])}
         synced = [v for v in range(3)
                   if r[2 * v + 1] & 0x20 and not {2 * v, 2 * v + 1} & busy]
-        zeros = [(register, 0) for v in synced for register in (2 * v, 2 * v + 1)]
-        periods = [(register, self.fv[register]) for v in synced
-                   for register in (2 * v, 2 * v + 1)]
-        return zeros + periods + [(register, value) for register, value in left
-                                  if register > 5 or register // 2 not in synced]
+        syncs = []
+        for v in synced:
+            syncs += self.synced(self.fv[2 * v], self.fv[2 * v + 1], 2 * v, 2 * v + 1)
+        return syncs + [(register, value) for register, value in left
+                        if register > 5 or register // 2 not in synced]
 
     def tick(self, i):
         """The writes a tick of effect i makes, one a register of its
@@ -1148,6 +1175,7 @@ class Model:
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
         write = self.ticking(i)
+        self.apply(write)
         # Under a cut 1 to 127 the source ends on the cut's last row L. A
         # source whose column fills its byte ends on the row its count
         # runs out at; every other ends on the marker, bit 7 of the
@@ -1189,20 +1217,23 @@ class Model:
         fx = self.fx[i]
         if not fx["running"]:
             return None
-        # a target of a sync writes 0 to the two registers of its voice's
-        # period first, fine then coarse (SPEC.md 5.1)
-        zeros = ([(register, 0) for register, _ in TARGETS[fx["using"]]]
-                 if fx["using"] >= SYNC_TARGET else [])
         if self.copying(i):
             # the frame value of each register of the target, R7's with
             # bits 7 and 6 at 1, the last value through the tick's mapping
             # (SPEC.md 2.1.5, 5.1)
-            return zeros + [(register, self.through(i, c, self.fv[register]
-                                                    | (0xC0 if register == 7 else 0)))
-                            for register, c in TARGETS[fx["using"]]]
-        at, R, RR, columns = self.tune.sources[fx["source"]]
-        return zeros + [(register, self.through(i, c, columns[c][fx["place"]]))
-                        for register, c in TARGETS[fx["using"]]]
+            writes = [(register, self.through(i, c, self.fv[register]
+                                              | (0xC0 if register == 7 else 0)))
+                      for register, c in TARGETS[fx["using"]]]
+        else:
+            at, R, RR, columns = self.tune.sources[fx["source"]]
+            writes = [(register, self.through(i, c, columns[c][fx["place"]]))
+                      for register, c in TARGETS[fx["using"]]]
+        if fx["using"] >= SYNC_TARGET:
+            # a target of a sync syncs its voice to the row's two values
+            # (SPEC.md 5.1)
+            (f, fine), (c, coarse) = writes
+            return self.synced(fine, coarse, f, c)
+        return writes
 
     def through(self, i, c, byte):
         """Apply the running mapping to source byte in column c. Identity
@@ -1416,6 +1447,10 @@ class Machine:
         self.psg = []
         self.mfp = []
         self.select = None
+        # each register's value as the writes leave it, which a read of the
+        # select register reads where it selects the register: a sync reads
+        # the coarse register's value (68k/player/ticks.S, sync.S)
+        self.regs = [0] * 16
         self.stray = []
         self.palette = []
         # The image of a bound tune: DTX's init writes the ring's size into
@@ -1432,6 +1467,13 @@ class Machine:
         # pixels: the raster monitor waits for it, and a value that never
         # moved would run the wait to its ceiling
         mu.hook_add(UC_HOOK_MEM_READ, self._beam, begin=VIDEO, end=VIDEO + 1)
+        mu.hook_add(UC_HOOK_MEM_READ, self._register, begin=PSG, end=PSG + 1)
+
+    def _register(self, mu, access, address, size, value, data):
+        """A read of the select register: the value of the register it
+        selects."""
+        if self.select is not None:
+            mu.mem_write(PSG, bytes([self.regs[self.select & 0x0F]]))
 
     def image(self, at, tune_bytes):
         """Reader image in the bound tune at at, ending at the optional
@@ -1477,6 +1519,8 @@ class Machine:
                     self.select = byte
                 elif at == PSG + 2:
                     self.psg.append((self.select, byte))
+                    if self.select is not None:
+                        self.regs[self.select & 0x0F] = byte
         elif MFP <= address < MFP + 0x40:
             for lane in range(size):
                 byte = (value >> (8 * (size - 1 - lane))) & 0xFF
@@ -4058,10 +4102,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
     tune.written = version
-    assert tune.version == (layout_of(tune.effects) if version in (COPY, SYNC)
+    assert tune.version == (layout_of(tune.effects) if version in (COPY, SYNC, EVEN)
                             else version), \
         "the binder wrote version %d of a tune file of %d" % (tune.version, version)
-    assert bool(bound[10] & 0x80) == (version == SYNC), \
+    assert bool(bound[10] & 0x80) == (version in (SYNC, EVEN)), \
         "bit 7 of byte 10 of the bound tune of a tune file of version %d" % version
     defer, lookup = needs(tune.effects)
     have = ("ymxr_bank1" in symbols, "ymxr_look" in symbols)
@@ -4230,6 +4274,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             timers.apply(m.mfp)
             assert timers.mode[i] == 0, \
                 "effect %d: a tick with no source connected left its timer running" % i
+    # the chip as the machine has it, which a sync's writes are ordered by
+    model.chip = list(m.regs[:14])
     ticks = 0
     tick_cost = {}
     tick_cycles = 0                     # every tick's instructions
@@ -4508,6 +4554,10 @@ VBLA = re.compile(r"^VBL=(\d+) clock=(\d+)")
 VBLV = re.compile(r"^VBL \d+ video_cyc=(\d+) pending_cyc=(\d+)")
 VIDEO_CYC = re.compile(r"video_cyc=(\d+)")
 CYCLE = re.compile(r"video_cyc=(\d+)")
+
+# A video frame of the ST under Hatari, at 50 Hz: 313 lines of 512 cycles,
+# the cycles a write's video_cyc counts to before it starts again at 0.
+VIDEO_FRAME = 313 * 512
 
 # The ST's CPU, cycles a second: the clock a trace counts in.
 CPU_CLOCK = 8021247.0
@@ -6694,6 +6744,7 @@ def hatari(ym, code, symbols, perf=False):
     frame_cycles = 0
     stamped = []                        # every chip write, with its owner
                                         # and its video cycle
+    stamped_frame = []                  # the frame each write is in
 
     def since(video_cyc):
         """A write's MFP clocks from the frame's VBL exception. A tick the
@@ -6731,6 +6782,7 @@ def hatari(ym, code, symbols, perf=False):
                 cyc = CYCLE.search(line)
                 stamped.append((where(pc), int(w.group(1), 16), int(w.group(2), 16),
                                 int(cyc.group(1)) if cyc else None))
+                stamped_frame.append(len(frames))
             continue
         w = MFPW.search(line)
         if w:
@@ -6789,6 +6841,7 @@ def hatari(ym, code, symbols, perf=False):
             before_ticks = copy.copy(model)
             before_ticks.fx = copy.deepcopy(model.fx)
             before_ticks.fv = list(model.fv)
+            before_ticks.chip = list(model.chip)
         # each effect as its step found it, for a tick between the two
         # writes of a stop
         prestep = {}
@@ -6859,7 +6912,8 @@ def hatari(ym, code, symbols, perf=False):
 
         def snapshot():
             return (copy.deepcopy(model.fx), list(model.fv), list(model.row_writes),
-                    list(stepped), list(writes), copy.deepcopy(want), list(counted))
+                    list(stepped), list(writes), copy.deepcopy(want), list(counted),
+                    list(model.chip))
 
         at = 0
         while at < len(events):
@@ -6872,6 +6926,7 @@ def hatari(ym, code, symbols, perf=False):
                 upto(3)
                 if want is None:
                     want = model.writes()
+                    model.apply(want)    # the chip the frame's syncs leave
                 writes.append((reg, value))
             elif kind in (0, 1, 2, 3):
                 if not stepped[kind] and not model.fx[kind]["running"]:
@@ -6905,10 +6960,12 @@ def hatari(ym, code, symbols, perf=False):
                     "frame %d: a tick of effect %d with no source running; the frame's events %s" % (
                         f, kind, events)
                 before = dict(fx)
+                chip = list(model.chip)    # a sync orders its writes by it
                 w, then = model.tick(kind)
                 got = wrote(at, kind, len(w))
                 if not stepped[kind] and (got is None or masked(got) != masked(w)):
                     model.fx[kind] = before    # the tick came after the effect step
+                    model.chip = list(chip)
                     tried.add(at)
                     upto(kind)
                     assert model.fx[kind]["running"], \
@@ -6923,6 +6980,7 @@ def hatari(ym, code, symbols, perf=False):
                     upto(3)
                     steps = row_writes(model.playing)
                     kept = model.fv
+                    model.chip = list(chip)
                     for k in range(len(steps) + 1):
                         model.fv = list(values)
                         for register, value in steps[:k]:
@@ -6933,14 +6991,17 @@ def hatari(ym, code, symbols, perf=False):
                             w = stored
                             break
                     model.fv = kept
+                    model.chip = list(chip)
+                    model.apply(w)
                 if got is None or masked(got) != masked(w):
                     back = next((mark for mark in reversed(marks)
                                  if mark[1] == kind and mark[0] not in tried), None)
                     if back is not None:
-                        mat, _, (fxs, fv, rw, was, wrote_, wanted, ticks) = back
+                        mat, _, (fxs, fv, rw, was, wrote_, wanted, ticks, chip) = back
                         tried.add(mat)
                         del marks[marks.index(back):]
                         model.fx, model.fv, model.row_writes = copy.deepcopy(fxs), list(fv), list(rw)
+                        model.chip = list(chip)
                         stepped[:], writes[:], counted[:] = was, wrote_, ticks
                         want = copy.deepcopy(wanted)
                         upto(kind)
@@ -6958,6 +7019,7 @@ def hatari(ym, code, symbols, perf=False):
         upto(3)
         if want is None:
             want = model.writes()
+            model.apply(want)
         if not writes and want and tune.syncs:
             # a frame the trace has no chip write of has no place among its
             # ticks, and its step 4 may come before them: the syncs it
@@ -6969,6 +7031,7 @@ def hatari(ym, code, symbols, perf=False):
                 want = []
         assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
+    row_evens = []
     for f, (events, clocks, stops, installed) in enumerate(frames[first:first + STUB_FRAMES]):
         if model.row == tune.R:
             # past the last row of a tune that plays once the call reports the
@@ -6979,6 +7042,9 @@ def hatari(ym, code, symbols, perf=False):
             break
         was = list(counted)
         replay(events, f)
+        # bit 4 of each coarse column of the row, the voices whose syncs
+        # during it are even (SPEC.md 1.12)
+        row_evens.append(sum(1 << v for v in range(3) if model.playing[2 * v + 1] & 0x10))
         played += 1
         timers.apply([(reg, value) for kind, reg, value in events if kind == "mfp"])
         for i in range(4):
@@ -7021,27 +7087,51 @@ def hatari(ym, code, symbols, perf=False):
     stopped = [(reg, value) for events, _, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
                for kind, reg, value in events if kind == "stop"]
     assert masked(stopped) == masked(HUSHED), "the stop wrote %s" % stopped
-    # Each sync, at a frame or at a tick: 0 to a voice's fine and coarse
-    # registers, and that voice's period 0 until its next fine write, whose
-    # distance from the coarse 0 is the wait, 36 cycles or more (SPEC.md
-    # 1.12.2; YMXS, SPEC.md 3.9.2). Hatari's ST counts video cycles at the
-    # CPU's clock.
-    # One pass: the cycle of each voice's coarse 0, the second write of a
-    # pair of zeros of one owner, until the voice's next fine write.
+    # Each sync, at a frame or at a tick: the time a voice's period is 0,
+    # from the write that sets the second of its registers to 0, a write of
+    # 0 to the first just before it, to the write that sets one of them
+    # other than 0, is a whole number n of steps of the tone generator, 32
+    # cycles each, n odd or even as bit 4 of the voice's coarse column of
+    # the row says, that of the frame's row or of the row before, which
+    # the ticks of the frame read until its register steps (YMXS, SPEC.md
+    # 3.9.2; SPEC.md 1.12). Hatari's ST counts video cycles at the CPU's
+    # clock.
     waits = []
-    zeroed = {}
+    regs = {}
+    since = {}
+    def zero(v):
+        return regs.get(2 * v, 1) == 0 and regs.get(2 * v + 1, 1) & 0x0F == 0
     for k, (owner, reg, value, at) in enumerate(stamped):
-        if reg in (0, 2, 4) and reg in zeroed:
-            if at is not None and at >= zeroed[reg]:
-                waits.append(at - zeroed[reg])
-            del zeroed[reg]
-        if reg in (1, 3, 5) and value == 0 and at is not None and k > 0:
-            prior = stamped[k - 1]
-            if prior[1] == reg - 1 and prior[2] == 0 and prior[0] == owner:
-                zeroed[reg - 1] = at
+        if reg > 5:
+            continue
+        v = reg // 2
+        was = zero(v)
+        regs[reg] = value
+        if at is None:
+            since.pop(v, None)
+            continue
+        prior = stamped[k - 1] if k > 0 else None
+        if zero(v) and not was and prior and prior[0] == owner and prior[2] == 0 \
+                and prior[1] == (reg ^ 1):
+            since[v] = (at, stamped_frame[k] - first)
+        elif was and not zero(v) and v in since:
+            start, f = since.pop(v)
+            # a span across the start of a video frame, where the trace's
+            # video cycles start again at 0
+            span = at - start if at >= start else at - start + VIDEO_FRAME
+            waits.append(span)
+            assert span >= 32 and span % 32 == 0, \
+                "frame %d: a sync keeps voice %s's period at 0 for %d cycles, not a whole" \
+                " number of steps of 32" % (f, "ABC"[v], span)
+            if 0 <= f < len(row_evens):
+                said = {bool(row_evens[f] >> v & 1)} | (
+                    {bool(row_evens[f - 1] >> v & 1)} if f > 0 else set())
+                even = span // 32 % 2 == 0
+                assert even in said, "frame %d: a sync of voice %s is %d steps, %s where the" \
+                    " row says %s" % (f, "ABC"[v], span // 32, "even" if even else "odd",
+                                      "even" if True in said else "odd")
     if tune.syncs:
         assert waits, "a tune that syncs a voice has no sync on Hatari"
-        assert min(waits) >= 36, "a sync waits %d cycles, below 36" % min(waits)
     return played, sum(counted), waits
 
 
@@ -8315,15 +8405,16 @@ def switches(defines):
 
         def kept(self):
             return ([bytes(self.m.mu.mem_read(at, n)) for at, n in regions],
-                    copy.deepcopy(self.timers.__dict__), self.m.select)
+                    copy.deepcopy(self.timers.__dict__), self.m.select, list(self.m.regs))
 
         def back(self, kept):
-            memory, timers, select = kept
+            memory, timers, select, regs = kept
             for (at, n), one in zip(regions, memory):
                 self.m.mu.mem_write(at, one)
             self.m.mu.ctl_flush_tb()
             self.timers.__dict__.update(copy.deepcopy(timers))
             self.m.select = select
+            self.m.regs = list(regs)
 
     count = len(files)
     alone = {}
@@ -8521,7 +8612,8 @@ def main():
                                          "envelope-counted.ymxr", "deferred.ymxr",
                                          "mapped.ymxr", "cut.ymxr", "cuts.ymxr",
                                          "copy-from-frame.ymxr", "sync.ymxr",
-                                         "sync-targets.ymxr")]
+                                         "sync-targets.ymxr", "sync-volume.ymxr",
+                                         "sync-even.ymxr")]
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]

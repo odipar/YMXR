@@ -34,6 +34,15 @@ const Syncs = 0x100
 // the voice, read on every row (SPEC.md 1.2.2, 1.12).
 const Sync = 0x20
 
+// Evens is a bit above the effects byte, which the file leaves out: a row
+// lists a voice among its even syncs, which version 14 marks (SPEC.md 1.12,
+// 3.3.5).
+const Evens = 0x200
+
+// Even is bit 4 of a coarse column, 1, 3 or 5, in version 14: the voice's
+// syncs during the row are even, read on every row (SPEC.md 1.2.2, 1.12).
+const Even = 0x10
+
 // SyncTarget is the first target of a sync, syncToneA; 26 and 27 are
 // syncToneB and syncToneC (SPEC.md 2.1).
 const SyncTarget = 25
@@ -84,6 +93,12 @@ func HasCopies(effects int) bool {
 // of a sync: the bit above the effects byte (SPEC.md 3.3.5).
 func HasSyncs(effects int) bool {
 	return effects&Syncs != 0
+}
+
+// HasEvens is whether a row lists a voice among its even syncs: the bit
+// above the effects byte that version 14 marks (SPEC.md 3.3.5).
+func HasEvens(effects int) bool {
+	return effects&Evens != 0
 }
 
 // ColumnCount is the column count of a table of that effects byte: 30,

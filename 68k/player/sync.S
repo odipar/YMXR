@@ -18,6 +18,12 @@
 ymxr_sfv:       dc.b    0,0,0,0,0,0
 ymxr_srow:      dc.b    0,0,0,0,0,0
 ymxr_srun:      dc.b    0,0,0,0
+; The voices whose syncs during the row are even, bit 0 voice A, bit 2
+; voice B and bit 4 voice C, the number of the voice's fine register:
+; bit 4 of each coarse column, read on every row and written once a
+; frame, before its syncs, which the frame's and every tick's sync read
+; (SPEC.md 1.12).
+ymxr_seven:     dc.b    0,0
 ; The voices whose period a target writes, bit 0 voice A to bit 2 voice C,
 ; targets 0 to 27 (SPEC.md 2.1).
 ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
@@ -29,8 +35,9 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 ; it writes the frame's (ymxr_col), labelled \p and the column: the two
 ; bytes into ymxr_srow at a4, \ro and \ro + 1; the frame value of each
 ; column the row sets at a3, \fo and \fo + \stride, the coarse one masked
-; to its four bits; and the voice's bit into d4 where bit 5 of the coarse
-; column is 1, read on every row (1.12.1).
+; to its four bits; the voice's bit into d4 where bit 5 of the coarse
+; column is 1, and bit 8 + \ro of d4 where bit 4 is 1, read on every row
+; (1.12.1).
                 .macro  SVOICE  p,fine,coarse,v,ro,fo,stride
 \{p}\{coarse}:  move.b  $7FFF(a1),d2
 \{p}\{fine}:    move.b  $7FFF(a1),d1
@@ -47,7 +54,10 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 .nc\~:          btst    #5,d2
                 beq.s   .ns\~
                 bset    #\v,d4
-.ns\~:
+.ns\~:          btst    #4,d2
+                beq.s   .ne\~
+                bset    #8+\ro,d4
+.ne\~:
                 .endm
 
 ; With the deferred start, effect i's running target into ymxr_srun, at
@@ -89,11 +99,10 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 .endm
 
 ; The running targets, and the sync of the voices of d4 an effect leaves
-; (1.12.2): 0 to the two registers of each, fine then coarse, a wait, and
-; each frame value at a3, \stride bytes apart, fine then coarse. The
-; instructions from the last 0 to the first frame value are the wait, at
-; least 36 cycles (YMXS, SPEC.md 3.9.2), and a tick within them lengthens
-; it.
+; (1.12.3), one after another in the order A, B, C at level 7: each as
+; SYNC1 writes it, with the frame values at a3, \stride bytes apart. The
+; even bits of the row, bits 8 to 15 of d4, reach ymxr_seven first, at
+; 10 from a4, so the ticks of the frame read them.
                 .macro  SSYNC   stride
                 .if     YMXR_DEFER
                 SKEEP   0,WS_FX,$134
@@ -101,6 +110,9 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 SKEEP   2,WS_FX+FX_SIZE+FX_SIZE,$120
                 SKEEP   3,WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,$114
                 .endif
+                move.w  d4,d0
+                lsr.w   #8,d0
+                move.b  d0,10(a4)               ; ymxr_seven
                 tst.b   d4
                 beq.w   .done\~
                 lea     ymxr_svoice(pc),a5
@@ -110,49 +122,63 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 SBUSY   3,WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,$FFFFFA1D,$70
                 tst.b   d4
                 beq.w   .done\~
-                btst    #0,d4
-                beq.s   .zb\~
-                move.w  #$0000,d0
-                movep.w d0,(a2)
-                move.w  #$0100,d0
-                movep.w d0,(a2)
-.zb\~:          btst    #1,d4
-                beq.s   .zc\~
-                move.w  #$0200,d0
-                movep.w d0,(a2)
-                move.w  #$0300,d0
-                movep.w d0,(a2)
-.zc\~:          btst    #2,d4
-                beq.s   .pa\~
-                move.w  #$0400,d0
-                movep.w d0,(a2)
-                move.w  #$0500,d0
-                movep.w d0,(a2)
-.pa\~:          btst    #0,d4
-                beq.s   .pb\~
-                move.w  #$0000,d0
-                move.b  0(a3),d0
-                movep.w d0,(a2)
-                move.w  #$0100,d0
-                move.b  \stride(a3),d0
-                movep.w d0,(a2)
-.pb\~:          btst    #1,d4
-                beq.s   .pc\~
-                move.w  #$0200,d0
-                move.b  2*\stride(a3),d0
-                movep.w d0,(a2)
-                move.w  #$0300,d0
-                move.b  3*\stride(a3),d0
-                movep.w d0,(a2)
-.pc\~:          btst    #2,d4
-                beq.s   .done\~
-                move.w  #$0400,d0
-                move.b  4*\stride(a3),d0
-                movep.w d0,(a2)
-                move.w  #$0500,d0
-                move.b  5*\stride(a3),d0
-                movep.w d0,(a2)
+                move.w  sr,-(sp)
+                move.w  #$2700,sr
+                SYNC1   0,\stride
+                SYNC1   1,\stride
+                SYNC1   2,\stride
+                move.w  (sp)+,sr
 .done\~:
+                .endm
+
+; The sync of voice \v where bit \v of d4 is 1 (YMXS, SPEC.md 3.9): 0 to
+; its two registers, the coarse one first unless the chip's value of the
+; fine one is 0, then its frame values, fine then coarse, the steps between
+; of HOLD_F:
+; even where bit 2 * \v + 8 of d4 is 1, and those of the coarse write where
+; the fine is 0. a2 the select register; d0 to d2 clobbered.
+                .macro  SYNC1   v,stride
+                btst    #\v,d4
+                beq.w   .no\~
+                move.w  #(2*\v)<<8,d0
+                move.b  2*\v*\stride(a3),d0
+                move.w  #(2*\v+1)<<8,d1
+                move.b  (2*\v+1)*\stride(a3),d1
+                move.b  #2*\v,(a2)
+                move.b  (a2),d2
+                beq.s   .ff\~
+                move.b  #2*\v+1,(a2)
+                move.b  #0,2(a2)
+                move.b  #2*\v,(a2)
+                bra.s   .steps\~
+.ff\~:          move.b  #0,2(a2)
+                move.b  #2*\v+1,(a2)
+.steps\~:       tst.b   d0
+                beq.s   .z\~
+                btst    #2*\v+8,d4
+                bne.s   .e\~
+                move.b  #0,2(a2)
+                HOLD_F  1,0
+                movep.w d0,0(a2)
+                movep.w d1,0(a2)
+                bra.w   .no\~
+.e\~:           move.b  #0,2(a2)
+                HOLD_F  2,0
+                movep.w d0,0(a2)
+                movep.w d1,0(a2)
+                bra.w   .no\~
+.z\~:           btst    #2*\v+8,d4
+                bne.s   .ez\~
+                move.b  #0,2(a2)
+                HOLD_F  1,1
+                movep.w d0,0(a2)
+                movep.w d1,0(a2)
+                bra.s   .no\~
+.ez\~:          move.b  #0,2(a2)
+                HOLD_F  2,1
+                movep.w d0,0(a2)
+                movep.w d1,0(a2)
+.no\~:
                 .endm
 
 ; A voice the sync left out: the row's columns of its period out of
@@ -264,7 +290,7 @@ ymxr_syncfix:   move.l  a5,-(sp)
 ; workspace; every register kept.
 ymxr_syncinit:  movem.l d0-d4/a1/a3/a5,-(sp)
                 lea     ymxr_sfv(pc),a3
-                moveq   #16-1,d0
+                moveq   #18-1,d0
 .clear:         clr.b   (a3)+
                 dbra    d0,.clear
                 lea     ymxr_sreads(pc),a3

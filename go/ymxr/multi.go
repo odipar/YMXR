@@ -45,7 +45,7 @@ func BindsAt(tunes [][]byte) int {
 			continue
 		}
 		version := GetWord(tune, 4)
-		if version == VersionCopy || version == VersionSync {
+		if version == VersionCopy || version == VersionSync || version == VersionEven {
 			switch effects := int(tune[8]); {
 			case HasCuts(effects):
 				version = VersionCut

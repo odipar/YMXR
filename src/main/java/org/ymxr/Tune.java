@@ -85,12 +85,18 @@ final class Tune {
     static final int COPY = 0x000C;
 
     /**
-     * The highest supported version, written where a row syncs a voice, at
-     * its frame or through a target of a sync: the header of version 12,
-     * bit 7 of the effects used where a row starts copy from frame, and bit
-     * 5 of each coarse column read on every row (SPEC.md 1.12, 3.3.5).
+     * The version written where a row syncs a voice, at its frame or
+     * through a target of a sync, and lists none among its even syncs: the
+     * header of version 12, bit 7 of the effects used where a row starts
+     * copy from frame, and bit 5 of each coarse column read on every row
+     * (SPEC.md 1.12, 3.3.5).
      */
     static final int SYNC = 0x000D;
+
+    /** The highest supported version, written where a row lists a voice
+     *  among its even syncs: version 13 with bit 4 of each coarse column
+     *  read on every row (SPEC.md 1.12, 3.3.5). */
+    static final int EVEN = 0x000E;
 
     /** Writer version for identity-only tunes: thirty DTX3 columns without
      *  a transformation index. Deferred starts remain available (SPEC.md
@@ -107,19 +113,21 @@ final class Tune {
 
     /** The versions a reader reads, as its report names them. */
     static final String READS = OLDEST + ", " + DEFERRED + ", " + UNMAPPED + ", " + VERSION
-            + ", " + CUT + ", " + COPY + " or " + SYNC;
+            + ", " + CUT + ", " + COPY + ", " + SYNC + " or " + EVEN;
 
     /** Whether a reader reads a file of that version. */
     static boolean reads(int version) {
-        return version >= OLDEST && version <= SYNC;
+        return version >= OLDEST && version <= EVEN;
     }
 
-    /** The version a writer writes for a table of those effects: 13 where
-     *  a row syncs a voice, 12 where it copies from frame, 11 where it cuts
-     *  a source, 10 where it maps a value and cuts none, and 9 otherwise
-     *  (SPEC.md 3.3.5). */
+    /** The version a writer writes for a table of those effects: 14 where
+     *  a row lists a voice among its even syncs, 13 where a row syncs a
+     *  voice, 12 where it copies from frame, 11 where it cuts a source, 10
+     *  where it maps a value and cuts none, and 9 otherwise (SPEC.md
+     *  3.3.5). */
     static int version(int effects) {
-        return Columns.syncs(effects) ? SYNC : Columns.copies(effects) ? COPY
+        return Columns.evens(effects) ? EVEN : Columns.syncs(effects) ? SYNC
+                : Columns.copies(effects) ? COPY
                 : Columns.cuts(effects) ? CUT : Columns.maps(effects) ? VERSION : UNMAPPED;
     }
 

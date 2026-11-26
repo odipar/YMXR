@@ -45,9 +45,13 @@ type Replay struct {
 	Effect          [4]Effect
 	EnvelopeWritten bool
 	// Syncs is the voices the last row syncs, bit 0 voice A to bit 2 voice
-	// C: bit 5 of each coarse column in version 13, read on every row
+	// C: bit 5 of each coarse column in version 13 and 14, read on every row
 	// (SPEC.md 1.12).
 	Syncs int
+	// Evens is the voices whose syncs during the last row are even, bit 0
+	// voice A to bit 2 voice C: bit 4 of each coarse column in version 14,
+	// read on every row (SPEC.md 1.12).
+	Evens int
 
 	table *dtx.Table
 	row   int
@@ -84,9 +88,13 @@ func (m *Replay) Step() {
 		r[c] = m.table.Column(c)[m.row]
 	}
 	m.Syncs = 0
+	m.Evens = 0
 	for v := 0; ymxr.HasSyncs(m.effects) && v < 3; v++ {
 		if r[1+2*v]&ymxr.Sync != 0 {
 			m.Syncs |= 1 << v
+		}
+		if ymxr.HasEvens(m.effects) && r[1+2*v]&ymxr.Even != 0 {
+			m.Evens |= 1 << v
 		}
 	}
 	m.row++

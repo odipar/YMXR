@@ -114,24 +114,25 @@ more. A reader that reads the block through its index reads past the list,
 and a block without the tag after byte M - O has no list. A bound tune of
 version 11 also copies the *cut index* unchanged: bytes Q to Q + 8U + 1 of
 the tune file, Q the header's long at 20 and U the word at Q (SPEC.md
-3.5.2). A tune file of version 12 or 13 binds at the layout of version 11
-where bit 6 of its effects used is 1, of version 10 where bit 5 is 1 and
-bit 6 is 0, and of version 9 otherwise, its effects byte as the tune file
-has it. Where bit 7 is 1 its source index lists the tables, entries 1 to S
+3.5.2). A tune file of version 12, 13 or 14 binds at the layout of version
+11 where bit 6 of its effects used is 1, of version 10 where bit 5 is 1
+and bit 6 is 0, and of version 9 otherwise, its effects byte as the tune
+file has it. Where bit 7 is 1 its source index lists the tables, entries 1
+to S
 - 1 of the tune file, and copy from frame is source `S` + 1 (SPEC.md
-3.1.7). Bit 7 of byte 10 marks a tune file of version 13, a tune that
-syncs a voice (SPEC.md 1.12).
+  3.1.7). Bit 7 of byte 10 marks a tune file of version 13 or 14, a tune
+  that syncs a voice (SPEC.md 1.12).
 
 **1.2 Layout.**
 
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version of the tune file bound (SPEC.md 3.3.5): $0009, $000A for a tune that maps a value, $000B for a tune that cuts a source, and $0007 or $0008 for a tune file of that version; for a tune file of version 12 or 13, the version of its layout (1.1) |
+| 4 | 2 | the version of the tune file bound (SPEC.md 3.3.5): $0009, $000A for a tune that maps a value, $000B for a tune that cuts a source, and $0007 or $0008 for a tune file of that version; for a tune file of version 12, 13 or 14, the version of its layout (1.1) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
 | 9 | 1 | `S`, the source count, from the tune file; where bit 7 of the effects used is 1, its count less 1, the tables (1.1) |
-| 10 | 2 | bytes 10 and 11 of the tune file, copied, with bit 7 of byte 10 set for a tune file of version 13 (1.1); the player reads that bit alone. In a tune file bit 7 of byte 10 is 0: the name is within 32,768 bytes of the start (SPEC.md 3.3) |
+| 10 | 2 | bytes 10 and 11 of the tune file, copied, with bit 7 of byte 10 set for a tune file of version 13 or 14 (1.1); the player reads that bit alone. In a tune file bit 7 of byte 10 is 0: the name is within 32,768 bytes of the start (SPEC.md 3.3) |
 | 12 | 4 | the state block's bytes, unsigned: the format block's field at +4 of the image the table is in |
 | 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
 | 20 | 4 | where this tune's table is, from the image's first byte, unsigned: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
@@ -255,7 +256,7 @@ is the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 reports -1 for a tune of version 10, whose effects byte sets bit 5, of
 version 11, whose effects byte sets bit 6, and of a tune whose effects
 byte sets bit 7, which copies from frame (SPEC.md 3.3);
-`YMXR_sndh-map.bin` is 18,896 bytes larger than `YMXR_sndh.bin`. The field
+`YMXR_sndh-map.bin` is 19,314 bytes larger than `YMXR_sndh.bin`. The field
 at 26 of a core with the lookup in is the offset of its first handler:
 every byte from there to the core's end is a handler, an installer, the
 monitor's counter or padding. The padding puts every lookup handler's page

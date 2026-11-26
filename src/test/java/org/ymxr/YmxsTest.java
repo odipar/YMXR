@@ -111,7 +111,7 @@ final class YmxsTest {
     private static Row row(Map<Register, Integer> registers, Timer timer, Effect effect) {
         Map<Timer, Effect> effects = new EnumMap<>(Timer.class);
         effects.put(timer, effect);
-        return new Row(registers, effects, Set.of());
+        return new Row(registers, effects, Set.of(), Set.of());
     }
 
     /** A start of {@code source} on {@code register} through the identity. */
@@ -163,7 +163,7 @@ final class YmxsTest {
         rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, stopped, false)));
         rows.add(row(Map.of(), Timer.A, start(Register.R8, fall, same, true)));
         rows.add(row(Map.of(), Timer.A, new org.ymxs.YMXS.Retune(same)));
-        rows.add(new Row(Map.of(), Map.of(), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(), Set.of(), Set.of()));
         return built(rows, 0);
     }
 
@@ -184,12 +184,12 @@ final class YmxsTest {
         first.put(Timer.A, start(Register.R8, loud, stopped, false));
         first.put(Timer.D, start(Register.R10, soft,
                 new Timing(Chip.prescaler(4), 100, true, false), false));
-        rows.add(new Row(Map.of(), first, Set.of()));
+        rows.add(new Row(Map.of(), first, Set.of(), Set.of()));
         rows.add(row(Map.of(), Timer.A, start(Register.R8, soft, kept, false)));
         rows.add(row(Map.of(), Timer.A, start(Register.R8, four, kept, false)));
         rows.add(row(Map.of(), Timer.A, start(Register.R9, four, kept, false)));
         rows.add(row(Map.of(), Timer.D, start(Register.R10, loud, kept, false)));
-        rows.add(new Row(Map.of(), Map.of(), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(), Set.of(), Set.of()));
         return built(rows, 1);
     }
 
@@ -218,7 +218,7 @@ final class YmxsTest {
         for (int most : new int[] {10, 5, 0}) {
             rows.add(row(Map.of(), Timer.A, new Remap(Tunes.mapping(volume(most)))));
         }
-        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of()));
         return built(rows, 0);
     }
 
@@ -229,11 +229,11 @@ final class YmxsTest {
         Timing stopped = new Timing(Chip.prescaler(4), 100, true, true);
         List<Row> rows = new ArrayList<>();
         rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, stopped, false)));
-        rows.add(new Row(Map.of(), Map.of(), Set.of()));
-        rows.add(new Row(Map.of(), Map.of(), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(), Set.of(), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(), Set.of(), Set.of()));
         rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, stopped, false,
                 Tunes.mapping(volume(15)))));
-        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of()));
         return built(rows, 1);
     }
 
@@ -244,7 +244,7 @@ final class YmxsTest {
         rows.add(row(Map.of(), Timer.A, start(Register.R8, loud,
                 new Timing(Chip.prescaler(4), 100, true, true), false)));
         rows.add(row(Map.of(), Timer.A, new Remap(Tunes.NO_PARTS)));
-        rows.add(new Row(Map.of(), Map.of(), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(), Set.of(), Set.of()));
         return built(rows, 0);
     }
 
@@ -264,7 +264,7 @@ final class YmxsTest {
         both.put(Timer.B, Tunes.start(new org.ymxs.YMXS.ThreeConnection(
                 new org.ymxs.YMXS.SetVoice(org.ymxs.YMXS.Voice.A), voice), stopped, false,
                 Tunes.NO_PARTS));
-        return built(List.of(new Row(Map.of(), both, Set.of()), new Row(Map.of(), Map.of(), Set.of())), 0);
+        return built(List.of(new Row(Map.of(), both, Set.of(), Set.of()), new Row(Map.of(), Map.of(), Set.of(), Set.of())), 0);
     }
 
     /** The line the writer reports for {@code tune}. */
@@ -303,7 +303,7 @@ final class YmxsTest {
         Map<Timer, Effect> effects = new EnumMap<>(Timer.class);
         effects.put(one, first);
         effects.put(two, second);
-        return new Row(Map.of(), effects, Set.of());
+        return new Row(Map.of(), effects, Set.of(), Set.of());
     }
 
     private static final Timing STOPPED = new Timing(Chip.prescaler(4), 100, true, true);
@@ -637,7 +637,7 @@ final class YmxsTest {
         Tune tune = built(List.of(
                 row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false, v10)),
                 row(Map.of(), Timer.A, start(Register.R8, soft, kept, false, v10)),
-                new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of()),
+                new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of()),
                 row(Map.of(), Timer.A, start(Register.R8, loud, STOPPED, false, v10)),
                 row(Map.of(), Timer.A, start(Register.R8, soft, kept, false)),
                 Tunes.EMPTY), 5);
@@ -893,7 +893,7 @@ final class YmxsTest {
         rows.add(row(Map.of(), Timer.A, Tunes.start(new org.ymxs.YMXS.TwoConnection(
                 new org.ymxs.YMXS.SetNoise(org.ymxs.YMXS.Voice.A), hiss), STOPPED, false,
                 Tunes.mapping(divided("half", 32, 2), Tunes.IDENTITY))));
-        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of()));
         return built(rows, 1);
     }
 
@@ -1084,7 +1084,7 @@ final class YmxsTest {
         rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, new Timing(
                 Chip.prescaler(4), 90, false, false), false)));
         // the timer stopped, then started again at the rate it last ran
-        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of()));
+        rows.add(new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of()));
         rows.add(row(Map.of(), Timer.A, start(Register.R8, loud, new Timing(
                 Chip.prescaler(4), 90, false, false), false)));
         byte[][] column = Schema.of(built(rows, 0)).columns().column;
@@ -1141,7 +1141,7 @@ final class YmxsTest {
         return built(List.of(
                 row(Map.of(), Timer.A, start(Register.R8, LOUD, STOPPED, false)),
                 row(Map.of(), Timer.A, start(Register.R8, SOFT, rate(4, 100), false)),
-                new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of())), 1);
+                new Row(Map.of(), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of())), 1);
     }
 
     /** The same start at the repeat row, and on the last row a deferred
@@ -1377,8 +1377,8 @@ final class YmxsTest {
 
     @Test
     void aRegisterOfZeroSetsTheBitBesideIt() {
-        List<Row> rows = List.of(new Row(Map.of(Register.R0, 0, Register.R11, 0), Map.of(), Set.of()),
-                new Row(Map.of(Register.R0, 64), Map.of(), Set.of()));
+        List<Row> rows = List.of(new Row(Map.of(Register.R0, 0, Register.R11, 0), Map.of(), Set.of(), Set.of()),
+                new Row(Map.of(Register.R0, 64), Map.of(), Set.of(), Set.of()));
         byte[][] column = Schema.of(built(rows, 0)).columns().column;
         assertEquals(0, column[0][0] & 0xFF, "a fine byte of 0 is the column's 0");
         assertEquals(0x40, column[1][0] & 0xFF, "and bit 6 of the column beside it (1.2)");

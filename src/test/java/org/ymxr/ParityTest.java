@@ -653,6 +653,22 @@ final class ParityTest {
     }
 
     /**
+     * Version 14 in both trees: a tune of even syncs converted from its
+     * structure to the same bytes, read, checked, bound and written to an
+     * SNDH file the same (SPEC.md 1.12.2, 3.3.5; BINARIES.md 1.2).
+     */
+    @Test
+    void aTuneOfEvenSyncsReadsTheSameInBothTrees() throws Exception {
+        byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.evens())).getBytes(StandardCharsets.UTF_8), "-silent");
+        assertEquals(Tune.EVEN, Tune.getWord(file, 4));
+        both("ymxr-trace", file);
+        both("ymxr-check", file);
+        both("ymxr-bind", file, "-silent");
+        both("ymxr-sndh", file, "-silent");
+    }
+
+    /**
      * Version 13 in both trees: a tune that syncs a voice converted from its
      * structure and read back, its record and its check, the files of
      * version 13 written wrong, its bound tune and its SNDH file, and a tune
