@@ -182,6 +182,12 @@ final class ConformanceTest {
                     + " C, and a source of two rows on `syncToneB` on Timer B, each tick a"
                     + " sync of its voice; rows that sync a voice at their frame, one while"
                     + " Timer A runs on it, whose sync the frame leaves to the effect"),
+            Fixture.built("sync-volume", "`SyncTest.volume`", () -> schema(SyncTest.volume()),
+                    "version 13 at 50 Hz: a square on `syncToneA` on Timer A under the"
+                    + " identity beside a sample on `setR8`, the volume of the synced voice,"
+                    + " through a transformation on Timer B, and a deferred start of it on"
+                    + " `setR10` through another on Timer D; rows that sync voice A at their"
+                    + " frame, one while Timer A runs on it"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
