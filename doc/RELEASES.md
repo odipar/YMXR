@@ -32,11 +32,57 @@ writes today fails the build.
 
 A player pins a version of this format: a tune file is 9, 10 where a row
 maps a value, 11 where a row cuts a source, 12 where a row starts copy from
-frame and 13 where a row syncs a voice (SPEC.md 3.3.5), and a bound tune
-the version of the tune file bound (BINARIES.md 1), and a release's number
-names the tools rather than either.
+frame, 13 where a row syncs a voice and 14 where a row lists a voice among
+its even syncs (SPEC.md 3.3.5), and a bound tune the version of the tune
+file bound (BINARIES.md 1), and a release's number names the tools rather
+than either.
 
 ## Published
+
+### 0.19.0, 2026-11-26
+
+<https://github.com/odipar/YMXR/releases/tag/v0.19.0>, built from the commit
+tagged `v0.19.0`.
+
+A sync keeps a voice's period at 0 for an exact odd or even number of
+steps of the tone generator, and a tune that lists a voice among its even
+syncs converts to a tune file of version 14: YMXS 0.11.0's even syncs
+(SPEC.md 1.12.3, 3.3.5). YMXR requires YMXS 0.11.0. A tick of a target of
+a sync runs a head the frame writes. A tune that syncs no voice converts
+to the file 0.18.0 writes and links the player 0.18.0 links.
+
+- **Exact syncs.** From the write after which both registers of a
+  voice's period are 0 to the write after which one is other than 0, the
+  period is 0 for a whole number of steps, 32 cycles each: odd, or even
+  where bit 4 of the voice's coarse column is 1, read on every row
+  (SPEC.md 1.12.2, 1.12.3). At the frame and at a tick the player writes
+  0 to the coarse register first unless the chip's value of the fine one
+  is 0, and the Hatari pass reads each sync's steps (#400).
+- **Ticks of a target of a sync.** Each handler of one has a room before
+  its slot, into which the frame writes, every frame, the head its effect
+  needs: for copy from frame the four writes of the period as `move.l`
+  immediates, and for a source none of whose rows has a fine of 0 the
+  registers as immediates. A tick of copy from frame is 126 cycles for an
+  odd sync and 158 for an even one, against 330 in 0.18.0, and a tick of
+  such a source 232 and 264, against 284. The general head runs the first
+  tick after a start, a frame whose fine is 0 or changes from 0, a timer
+  with a deferred start armed, and a source with a row whose fine is 0
+  (#403).
+- **The kit** has `sync-volume`, a target of a sync beside volumes
+  through transformations (#398), and `sync-even` (#400) and `sync-heads`
+  (#403), both of version 14: 25 tunes and 19,141 entries.
+- **The rig's** `-kit -cycles` plays every kit tune (#401).
+
+The player is 13,584 bytes against 11,066 in 0.18.0, 33,244 with the
+lookup in against 29,944, and 19,002 with the deferred start in against
+16,476; the bytes it gained are in the blocks a link keeps for a song
+that syncs a voice.
+
+Against 0.18.0's Go tools, the eleven dumps of `ym/test` convert to the
+same tune files and link the same SNDH files on the plain core, `-lean`,
+`-abs` and `-perf -lean -abs`; the kit's tunes of versions 9 to 12 check
+the same and link the same SNDH files, and those of version 13 check the
+same. `bin/suite`: 386 tests, 0 skipped.
 
 ### 0.18.0, 2026-11-26
 
