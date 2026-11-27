@@ -3688,6 +3688,24 @@ def wholebyte(code, symbols):
             % (frames, ticks))
 
 
+def aimed(m, symbols, i):
+    """Whether the frame aimed effect i's vector at its handler of copy
+    from frame (68k/player/copy.S, ymxr_cx0, ymxr_cxon)."""
+    if "ymxr_cx0" not in symbols:
+        return False
+    at = CODE + symbols["ymxr_cx%d" % i]
+    return at <= m.long(TIMER[i]["vector"]) < at + symbols["ymxr_cx1"] - symbols["ymxr_cx0"]
+
+
+def vector_of(m, symbols, i):
+    """Effect i's vector, or where the frame aimed it at its handler of
+    copy from frame (aimed), the handler the effect's record names, which
+    ymxr_xback keeps."""
+    if aimed(m, symbols, i):
+        return m.long(CODE + symbols["ymxr_xback"] + 4 * i)
+    return m.long(TIMER[i]["vector"])
+
+
 def handler_at(m, symbols, name, i):
     """Resolve effect i's handler by shape name: tick, sq, one, cnt, two,
     three, env or cwide, or a lookup kind.
@@ -3699,7 +3717,7 @@ def handler_at(m, symbols, name, i):
         # a player without the deferred start has bank 0 alone
         return at
     bank = symbols["ymxr_bank1"] - symbols["ymxr_tick0"]
-    return at + bank if m.long(TIMER[i]["vector"]) == at + bank else at
+    return at + bank if vector_of(m, symbols, i) == at + bank else at
 
 
 def lookup_kind(model, i):
@@ -3729,13 +3747,15 @@ def copy_regions(symbols):
     from frame (68k/player/play.S, ymxr_cregs): the test of the mark and
     the mask up to ymxr_cread; the read of the effects' records from there
     up to ymxr_csteps, and ymxr_cbit, which that read calls; the steps a
-    register from ymxr_csteps; and the stubs that mark a row
-    (68k/player/copy.S, ymxr_csome)."""
+    register from ymxr_csteps; the stubs that mark a row
+    (68k/player/copy.S, ymxr_csome); and the test and the aim of a vector
+    at a handler of copy from frame, ymxr_cxon, which the steps call."""
     return {"copy bit": (CODE + symbols["ymxr_cbit"], CODE + symbols["ymxr_cregs"]),
             "copy test": (CODE + symbols["ymxr_cregs"], CODE + symbols["ymxr_cread"]),
             "copy records": (CODE + symbols["ymxr_cread"], CODE + symbols["ymxr_csteps"]),
             "copy registers": (CODE + symbols["ymxr_csteps"], CODE + symbols["ymxr_copysites"]),
-            "copy marks": (CODE + symbols["ymxr_csome"], CODE + symbols["ymxr_csomeend"])}
+            "copy marks": (CODE + symbols["ymxr_csome"], CODE + symbols["ymxr_csomeend"]),
+            "copy aim": (CODE + symbols["ymxr_cxon"], CODE + symbols["ymxr_e_copy_4"])}
 
 
 def copy_kind(model, i, deferred=True):
@@ -4012,9 +4032,9 @@ def running(m, symbols, model, i, said, ticked=False):
     first = TARGETS[fx["using"]][0][0]
     assert m.byte(at + sel) == first, \
         "%seffect %d's handler selects R%d first, not R%d" % (said, i, m.byte(at + sel), first)
-    assert m.long(TIMER[i]["vector"]) == at, \
+    assert vector_of(m, symbols, i) == at, \
         "%seffect %d's vector is at %x, not at its handler at %x" % (
-            said, i, m.long(TIMER[i]["vector"]), at)
+            said, i, vector_of(m, symbols, i), at)
 
 
 def pages(m, symbols, model, i, at, name, said):
@@ -4409,7 +4429,8 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                            # armed, from the row that arms it to the row that
                            # settles it (Model.step)
                            any(model.fx[i]["pending"] or model.fx[i].get("switched")
-                               for i in range(4))))
+                               for i in range(4)),
+                           spent_in("copy aim")))
             marked[0] = 0
         assert masked(m.psg) == masked(want), "frame %d writes %s, not %s" % (f, m.psg, want)
         if kit:
@@ -4459,8 +4480,10 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             # the counted handler a cut runs, where the cut leaves the
             # square's or the one-row source's handler running
             crun = fx["crun"] and model.counting(i)
-            # copy from frame, by the columns of its handler (copy_read)
+            # copy from frame, by the columns of its handler (copy_read),
+            # and whether the tick runs the handler of copy from frame
             copy = copy_kind(model, i, deferred=False)
+            moved = copy and aimed(m, symbols, i)
             want, then = model.tick(i)
             if cycles:
                 cycles._settle(None)
@@ -4483,7 +4506,7 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
                 if mapping:
                     kind = "mapped " + kind
                 if copy:
-                    kind = "copy %s %s" % (copy, then)
+                    kind = "copy %s %s" % (copy, "move" if moved else then)
                 elif crun:
                     # the counted handler of a cut, by the source's shape
                     kind = "cut %s%s %s" % ("mapped " if mapping else "",
@@ -5540,17 +5563,21 @@ def cut_read(code, symbols, cycles_of, general):
 
 
 # The rows of the table of a tick of copy from frame (performance.md, Copy
-# from frame), each with the kind check counts the tick under (copy_kind)
-# and the row of the table of a cut whose column under a cut is the same
-# path, or None.
-COPY_TICKS = (("one column", "1",
+# from frame), each with the kind check counts the tick under (copy_kind,
+# then move where the tick runs the handler of copy from frame and loop at
+# the end of a pass) and the row of the table of a cut whose column under
+# a cut is the same path, or None.
+COPY_TICKS = (("one column", "1 move", None),
+              ("two columns", "2 move", None),
+              ("three columns", "3 move", None),
+              ("one column, on the counted handler", "1 loop",
                "one column, the end of a pass, the place to its loop row"),
-              ("two columns", "2",
+              ("two columns, on the counted handler", "2 loop",
                "two columns, the end of a pass, the places to its loop row"),
-              ("three columns", "3",
+              ("three columns, on the counted handler", "3 loop",
                "three columns, the end of a pass, the places to its loop row"),
-              ("one column, through a transformation", "mapped 1", None),
-              ("three columns, through a transformation", "mapped 3", None))
+              ("one column, through a transformation", "mapped 1 loop", None),
+              ("three columns, through a transformation", "mapped 3 loop", None))
 
 
 def frame_registers(at, code, symbols, cycles_of, frames):
@@ -5620,7 +5647,7 @@ def copy_read(code, symbols, cycles_of):
                          % (m.groups(), tuple(str(w) for w in want)))
 
     ticked, starts, played = {}, {}, []
-    steps, reread, kept, marks, wrong = set(), {}, {}, set(), []
+    steps, reread, kept, marks, aims, wrong = set(), {}, {}, set(), set(), []
     for title, at in copy_cases():
         spans = []
         result = check(at, code, symbols, CyclesOn(cycles_of), spans=spans)
@@ -5630,9 +5657,10 @@ def copy_read(code, symbols, cycles_of):
                 ticked.setdefault(kind.replace(" alone", ""), set()).update(spent)
         copied = result[5][10]
         plain = frame_registers(at, code, symbols, cycles_of, len(copied))
-        for f, ((whole, read, kinds, test, marked, calls, pending), own) in enumerate(
+        for f, ((whole, read, kinds, test, marked, calls, pending, aim), own) in enumerate(
                 zip(copied, plain)):
             steps.add(whole - test - read - own)
+            aims.add(aim)
             if read:
                 reread.setdefault(defers, set()).add(test + read)
             else:
@@ -5669,7 +5697,7 @@ def copy_read(code, symbols, cycles_of):
     alike = True
     for row, kind, under in COPY_TICKS:
         m = re.search(r"^\| %s \| (\d+) \|$" % re.escape(row), section, re.M)
-        counted = ticked.get("copy %s loop" % kind, set())
+        counted = ticked.get("copy %s" % kind, set())
         if not m or not near(int(m.group(1)), counted):
             stale.append("performance.md reads the tick of copy from frame on %s as %s, and the"
                          " rig counts %s" % (row, m and m.group(1), sorted(counted)))
@@ -5685,11 +5713,15 @@ def copy_read(code, symbols, cycles_of):
         stale.append("a tick of copy from frame costs %s, and a tick of the counted handler at"
                      " the end of a pass under a cut is another figure" % (
                          {kind: sorted(spent) for kind, spent in ticked.items()}))
-    reads(r"Through the identity and on one column through a transformation, each figure is the"
+    reads(r"Through the identity a tick runs the handler of copy from frame of its timer, a"
+          r" `move\.l` of a register and its frame value a column, from the frame that aims the"
+          r" vector at it \(copy\.S, ymxr_cxon\), and the counted handler before that frame\. On"
+          r" the counted handler and on one column through a transformation, each figure is the"
           r" counted handler's at the end of a pass under a cut \(A cut\)\.")
-    left = sorted(kind for kind in ticked if not kind.endswith((" loop", " switch")))
+    left = sorted(kind for kind in ticked if not kind.endswith((" loop", " switch", " move")))
     if left:
-        stale.append("a tick of copy from frame runs another path than the end of a pass: %s"
+        stale.append("a tick of copy from frame runs another path than the end of a pass or"
+                     " the handler of copy from frame: %s"
                      % left)
 
     # the register steps of a frame against the frame's on the same rows,
@@ -5698,6 +5730,9 @@ def copy_read(code, symbols, cycles_of):
     reads(r"and the steps a register cost %s cycles more than the frame's steps on the same"
           r" rows, which the rig counts by playing each tune again with the frame's steps and"
           r" without a tick\." % figure, span(steps))
+    reads(r"The steps end in the test of one effect for its handler of copy from frame, and the"
+          r" aim of the effect's vector at it where the effect can run it, on a frame that reads"
+          r" no record \(copy\.S, ymxr_cxon\): %s cycles a frame\." % figure, span(aims))
     reads(r"Such a read costs %s cycles, and %s with the deferred start in, by the effects whose"
           r" timers count and the columns of their handlers\." % (figure, figure),
           span(reread.get(False, {0})), span(reread.get(True, {0})))
@@ -6704,6 +6739,13 @@ def hatari(ym, code, symbols, perf=False):
     syn = symbols["ymxr_syn1"] - symbols["ymxr_syn0"]
     syns = [(base + symbols["ymxr_syn%d_head" % i], base + symbols["ymxr_syn%d_head" % i] + syn)
             for i in range(4)]
+    # each effect's handler of copy from frame, in a core with the lookup
+    # (68k/player/copy.S)
+    cxs = [(0, 0)] * 4
+    if "ymxr_cx0" in symbols:
+        cx = symbols["ymxr_cx1"] - symbols["ymxr_cx0"]
+        cxs = [(base + symbols["ymxr_cx%d" % i], base + symbols["ymxr_cx%d" % i] + cx)
+               for i in range(4)]
 
     def where(pc):
         if frame[0] <= pc < frame[1] or any(lo <= pc < hi for lo, hi in synced):
@@ -6725,6 +6767,7 @@ def hatari(ym, code, symbols, perf=False):
                     or envs[i][0] <= pc < envs[i][1]
                     or cwides[i][0] <= pc < cwides[i][1]
                     or syns[i][0] <= pc < syns[i][1]
+                    or cxs[i][0] <= pc < cxs[i][1]
                     or any(lo <= pc < hi for lo, hi in looks[i])):
                 return i
         return None

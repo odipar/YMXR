@@ -62,19 +62,49 @@ ymxr_cmask:     dc.w    0
 ; copies from frame: init writes a bsr.w over that read to here, and this
 ; read as it wrote that one. Such a row can start, stop, aim or settle
 ; the effect's handler, so the stub marks the frame, which reads the
-; effects' records again (play.S, ymxr_cregs). Effect 3 first, as
-; ymxr_overs has the heads.
-                .macro  CSOME
+; effects' records again (play.S, ymxr_cregs). Before the read, a vector
+; the frame aimed at the effect's handler of copy from frame (ymxr_cxon)
+; goes back to the handler the effect's record names, which a start, a
+; stop, an arming and a place's reset read through the vector. Effect 3
+; first, as ymxr_overs has the heads, each with its vector; CSOME_READ is
+; the read's offset.
+                .macro  CSOME   i,vector
                 st      WS_CDIRTY(a0)
-                move.b  $7FFF(a1),d2
+                btst    #\i,ymxr_xon(pc)
+                beq.s   .k\~
+                move.l  4*\i+ymxr_xback(pc),\vector.w
+                move.l  a2,-(sp)
+                lea     ymxr_xon(pc),a2
+                bclr    #\i,(a2)
+                movea.l (sp)+,a2
+.k\~:           move.b  $7FFF(a1),d2
                 rts
                 .endm
-ymxr_csome:     CSOME
-ymxr_csome2:    CSOME
-                CSOME
-                CSOME
+ymxr_csome:     CSOME   3,$114
+ymxr_csome2:    CSOME   2,$120
+                CSOME   1,$110
+                CSOME   0,$134
 ymxr_csomeend:
 CSOME_SIZE      equ     ymxr_csome2-ymxr_csome
+CSOME_READ      equ     ymxr_csome2-ymxr_csome-6
+; Each effect's handler the record names where the frame aimed its vector
+; at its handler of copy from frame (ymxr_cxon); each register's
+; immediate, which the frame writes each value it keeps to as well
+; (columns.S, CPUT): the value of the move.l of the handler of copy from
+; frame the frame last aimed a vector at for the register, or ymxr_cspare;
+; each register's owner, the effect of that handler plus 1, or 0; and a
+; bit each, the effects whose vectors the frame aimed and those it tests
+; on the next frames that read no record, bit 7 set where the frame read
+; the records.
+ymxr_xback:     dc.l    0,0,0,0
+ymxr_cptr:
+                .rept   14
+                dc.l    0
+                .endr
+ymxr_cown:      dc.b    0,0,0,0,0,0,0,0,0,0,0,0,0,0
+ymxr_xon:       dc.b    0
+ymxr_xnew:      dc.b    0
+ymxr_cspare:    dc.w    0
 
 ; The targets of several registers as copy from frame reads them: a
 ; register and the column of copy from frame that writes it, which is the
@@ -296,6 +326,17 @@ ymxr_lcalls:    dc.w    ymxr_tick3_lcall-ymxr_frame+2,ymxr_tick2_lcall-ymxr_fram
 ; made on every init. a6 the workspace; d5 the bits of the shapes. Every
 ; other register kept.
 ymxr_copyinit:  movem.l d0-d4/a1-a4,-(sp)
+                lea     ymxr_xback(pc),a1
+                moveq   #4-1,d0
+.xb:            clr.l   (a1)+
+                dbra    d0,.xb
+                lea     ymxr_cspare(pc),a2      ; ymxr_cptr follows
+                moveq   #14-1,d0
+.cp:            move.l  a2,(a1)+
+                dbra    d0,.cp
+                moveq   #4-1,d0                 ; the owners, the aimed and
+.cl:            clr.l   (a1)+                   ; those to test
+                dbra    d0,.cl
                 lea     ymxr_regs(pc),a1
                 move.w  #$1429,(a1)             ; move.b d16(a1),d2
                 lea     ymxr_fv(pc),a3
@@ -366,4 +407,158 @@ ymxr_copyinit:  movem.l d0-d4/a1-a4,-(sp)
                 .endif
                 movem.l (sp)+,d0-d4/a1-a4
                 rts
+
+; The handler of copy from frame through the identity on effect \i's
+; timer, which the frame aims the vector at (ymxr_cxon): three writes of a
+; register and its frame value, each a move.l whose immediate the frame
+; writes, entered at the first, the second or the third for three, two or
+; one columns, so it reads no place, no counter and no loop cell. With the
+; monitor in each entry marks first.
+                .macro  CXH     name,eoi,eoir,colour
+                .if     YMXR_PERF
+\{name}_e3:     MARK    \colour
+                bra.s   \{name}_w3
+\{name}_e2:     MARK    \colour
+                bra.s   \{name}_w2
+\{name}_e1:     MARK    \colour
+                bra.s   \{name}_w1
+                .endif
+\{name}_w3:     move.l  #$08000000,YM_SELECT.w  ; +2: the register, +4: the value
+\{name}_w2:     move.l  #$08000000,YM_SELECT.w
+\{name}_w1:     move.l  #$08000000,YM_SELECT.w
+                .if     YMXR_NEST
+                move.w  #$2500,sr
+                .endif
+                COUNT   PERF_ONEROW,PERF_DROP
+                .if     YMXR_AEOI=0
+                move.b  #\eoi,\eoir.w
+                .endif
+                rte
+                .endm
+ymxr_cx0:       CXH     ymxr_cx0,$DF,$FFFFFA0F,$070
+ymxr_cx1:       CXH     ymxr_cx1,$EF,$FFFFFA11,$007
+ymxr_cx2:       CXH     ymxr_cx2,$FE,$FFFFFA0F,$707
+ymxr_cx3:       CXH     ymxr_cx3,$DF,$FFFFFA11,$077
+CX_SIZE         equ     ymxr_cx1-ymxr_cx0
+CX_W3           equ     ymxr_cx0_w3-ymxr_cx0
+                .if     YMXR_PERF
+CX_E3           equ     ymxr_cx0_e3-ymxr_cx0
+CX_ESTEP        equ     ymxr_cx0_e2-ymxr_cx0_e3
+                .endif
+
+; The handler of copy from frame of an effect the frame tests, one effect
+; a frame that reads no record, effect 3 first, after a frame that read
+; the records marked the four (play.S, ymxr_cread), so a start costs no
+; more. The frame aims the effect's vector at it where the effect runs
+; copy from frame through the identity, on a target other than a target
+; of a sync (sync.S, ymxr_sheads), on a counted handler of one to three
+; columns, with its timer counting and no start armed, and where no other
+; aimed effect's handler of copy from frame writes one of its registers:
+; each column's register and frame value written into a slot, the slot's
+; value the register's immediate (ymxr_cptr) and the effect its owner
+; (ymxr_cown), the record's handler kept in ymxr_xback, and the vector at
+; the entry, written last. A frame value's register is the byte after it
+; (FVROW). a0 the workspace; d0 to d5 and a1 to a5 clobbered.
+ymxr_cxon:      move.b  ymxr_xnew(pc),d0        ; the effects to test
+                bne.s   .some
+                rts
+.some:          lea     ymxr_xnew(pc),a5
+                bclr    #7,(a5)                 ; set where the frame read
+                beq.s   .test                   ; the records
+                rts
+.test:          moveq   #3,d4
+.find:          btst    d4,d0
+                dbne    d4,.find
+                bclr    d4,(a5)
+                move.b  ymxr_xon-ymxr_xnew(a5),d5   ; the effects aimed
+                btst    d4,d5
+                bne.w   .out
+                btst    d4,WS_EFFECTS(a0)
+                beq.w   .out
+                lea     ymxr_timers(pc),a3
+                move.w  d4,d1
+                lsl.w   #3,d1
+                adda.w  d1,a3                   ; the effect's timer
+                movea.w 2(a3),a2                ; its control register
+                move.b  (a2),d1
+                and.b   6(a3),d1                ; its select, 0 where stopped
+                beq.w   .out
+                move.w  d4,d1
+                mulu    #FX_SIZE,d1
+                lea     WS_FX(a0),a1
+                adda.w  d1,a1                   ; the effect's record
+                cmp.b   #25,FX_TARGET(a1)       ; a target of a sync
+                bcc.w   .out
+                .if     YMXR_DEFER
+                tst.b   FX_PENDING(a1)          ; a start armed, whose hook the
+                bne.w   .out                    ; counted handler's path reaches
+                .endif
+                tst.b   FX_RUN(a1)              ; the identity
+                bne.w   .out
+                moveq   #0,d1
+                move.b  FX_SHAPE(a1),d1
+                subq.w  #4,d1                   ; the counted shapes of one to
+                bcs.w   .out                    ; three columns, columns less 1
+                cmp.w   #3,d1
+                bcc.w   .out
+                lea     ymxr_fv(pc),a4
+                lea     ymxr_cown(pc),a3
+                lea     FX_FIRST(a1),a2         ; a column's place, a long each
+                move.w  d1,d2
+.chk:           move.l  (a2)+,d0
+                sub.l   a4,d0                   ; among the frame values: copy
+                cmp.l   #13*FV_STRIDE,d0        ; from frame
+                bhi.w   .out
+                move.b  1(a4,d0.w),d0           ; the register
+                moveq   #0,d3
+                move.b  (a3,d0.w),d3            ; its owner
+                beq.s   .free
+                subq.w  #1,d3
+                cmp.w   d4,d3
+                beq.s   .free
+                btst    d3,d5                   ; aimed: the register's
+                bne.w   .out                    ; immediate is that handler's
+.free:          dbra    d2,.chk
+                bset    d4,ymxr_xon-ymxr_xnew(a5)
+                move.w  d4,d2
+                mulu    #CX_SIZE,d2
+                lea     ymxr_cx0(pc),a4
+                adda.w  d2,a4                   ; the effect's handler
+                moveq   #2,d3
+                sub.w   d1,d3                   ; the slots before the first
+                move.w  d3,d2                   ; column's
+                lsl.w   #3,d2
+                lea     CX_W3(a4,d2.w),a5       ; the first column's slot
+                lea     FX_FIRST(a1),a2
+                moveq   #1,d5
+                add.w   d4,d5                   ; the owner, the effect plus 1
+.col:           movea.l (a2)+,a1                ; the column's frame value
+                moveq   #0,d2
+                move.b  1(a1),d2                ; the register
+                move.b  d2,2(a5)
+                move.b  (a1),4(a5)              ; the value
+                move.b  d5,(a3,d2.w)
+                add.w   d2,d2
+                add.w   d2,d2
+                lea     4(a5),a1
+                move.l  a1,d0
+                lea     ymxr_cptr(pc),a1
+                move.l  d0,(a1,d2.w)            ; the register's immediate
+                addq.l  #8,a5
+                dbra    d1,.col
+                .if     YMXR_PERF
+                mulu    #CX_ESTEP,d3
+                lea     CX_E3(a4,d3.w),a5
+                .else
+                lsl.w   #3,d3
+                lea     CX_W3(a4,d3.w),a5
+                .endif
+                lea     ymxr_timers(pc),a3
+                lsl.w   #3,d4
+                movea.w (a3,d4.w),a3            ; the timer's vector
+                lsr.w   #1,d4
+                lea     ymxr_xback(pc),a2
+                move.l  (a3),(a2,d4.w)          ; the record's handler, kept
+                move.l  a5,(a3)
+.out:           rts
                 ENDPIECE copy_4

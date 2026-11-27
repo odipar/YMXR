@@ -35,22 +35,29 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 ; it writes the frame's (ymxr_col), labelled \p and the column: the two
 ; bytes into ymxr_srow at a4, \ro and \ro + 1; the frame value of each
 ; column the row sets at a3, \fo and \fo + \stride, the coarse one masked
-; to its four bits; the voice's bit into d4 where bit 5 of the coarse
-; column is 1, and bit 8 + \ro of d4 where bit 4 is 1, read on every row
-; (1.12.1).
-                .macro  SVOICE  p,fine,coarse,v,ro,fo,stride
+; to its four bits, and with \imm at 1 to the register's immediate as
+; well (columns.S, CPUT); the voice's bit into d4 where bit 5 of the
+; coarse column is 1, and bit 8 + \ro of d4 where bit 4 is 1, read on
+; every row (1.12.1).
+                .macro  SVOICE  p,fine,coarse,v,ro,fo,stride,imm
 \{p}\{coarse}:  move.b  $7FFF(a1),d2
 \{p}\{fine}:    move.b  $7FFF(a1),d1
                 bne.s   .fs\~
                 btst    #6,d2
                 beq.s   .nf\~
 .fs\~:          move.b  d1,\fo(a3)
+                .if     \imm
+                CPUT    \ro,d1
+                .endif
 .nf\~:          move.b  d1,\ro(a4)
                 move.b  d2,\ro+1(a4)
                 bpl.s   .nc\~
                 move.b  d2,d0
                 and.b   #$0F,d0
                 move.b  d0,\fo+\stride(a3)
+                .if     \imm
+                CPUT    \ro+1,d0
+                .endif
 .nc\~:          btst    #5,d2
                 beq.s   .ns\~
                 bset    #\v,d4
@@ -232,9 +239,9 @@ ymxr_sregs:     lea     ymxr_sfv(pc),a3
                 ENDPIECE synced_7
                 PIECE   sync_8
                 moveq   #0,d4                   ; the voices the row syncs
-                SVOICE  s,_0,_1,0,0,0,1
-                SVOICE  s,_2,_3,1,2,2,1
-                SVOICE  s,_4,_5,2,4,4,1
+                SVOICE  s,_0,_1,0,0,0,1,0
+                SVOICE  s,_2,_3,1,2,2,1,0
+                SVOICE  s,_4,_5,2,4,4,1,0
                 SSYNC   1
                 ENDPIECE sync_8
                 PIECE   synced_8
@@ -266,9 +273,9 @@ ymxr_skregs:    lea     ymxr_srow(pc),a4
                 ENDPIECE synced_9
                 PIECE   copysync_5
                 moveq   #0,d4
-                SVOICE  t,_0,_1,0,0,0,FV_STRIDE
-                SVOICE  t,_2,_3,1,2,2*FV_STRIDE,FV_STRIDE
-                SVOICE  t,_4,_5,2,4,4*FV_STRIDE,FV_STRIDE
+                SVOICE  t,_0,_1,0,0,0,FV_STRIDE,1
+                SVOICE  t,_2,_3,1,2,2*FV_STRIDE,FV_STRIDE,1
+                SVOICE  t,_4,_5,2,4,4*FV_STRIDE,FV_STRIDE,1
                 SSYNC   FV_STRIDE
                 ENDPIECE copysync_5
                 PIECE   synced_10

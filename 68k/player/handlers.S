@@ -625,9 +625,6 @@ ymxr_w_lg1_1 equ     ymxr_refat+2
                 LHALT   ymxr_clhalt1,$EF,$FFFFFA11,$FFFFFA1D,$F0,$FFFFFA09,4,30
                 LHALT   ymxr_clhalt2,$FE,$FFFFFA0F,$FFFFFA1B,$F0,$FFFFFA07,0,30
                 LHALT   ymxr_clhalt3,$DF,$FFFFFA11,$FFFFFA1D,$0F,$FFFFFA09,5,30
-                .if     YMXR_PERF
-ymxr_perf_acc:  dc.w    0                       ; the ticks' counted cost
-                .endif                          ; since the last call
                 .if     YMXR_DEFER
                 INSTALLERS
                 PIECE   align_1

@@ -133,6 +133,12 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .include "player/cut.S"
                 .include "player/copy.S"
                 SYNCED
+; The ticks' counted cost since the last call, with the monitor in: here,
+; before the handlers, both the frame's read of it and the lookup
+; instances' at the end of the player reach it.
+                .if     YMXR_PERF
+ymxr_perf_acc:  dc.w    0
+                .endif
                 HANDLERS
                 HANDLEQU
                 .include "player/lookup_checks.S"
