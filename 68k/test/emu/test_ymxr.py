@@ -1152,6 +1152,8 @@ class Model:
         copied = {register for i in range(4) if self.fx[i]["running"] and self.copying(i)
                   for register, _ in TARGETS[self.fx[i]["using"]]}
         left = [(register, value) for register, value in writes if register not in copied]
+        # the voices the frame syncs, which the Hatari pass times (hatari)
+        self.synced_now = []
         if not self.tune.syncs:
             return left
         # The sync of each voice whose bit 5 the row sets and on a register
@@ -1163,6 +1165,7 @@ class Model:
                 for register, _ in TARGETS.get(self.fx[i]["using"], [])}
         synced = [v for v in range(3)
                   if r[2 * v + 1] & 0x20 and not {2 * v, 2 * v + 1} & busy]
+        self.synced_now = synced
         syncs = []
         for v in synced:
             syncs += self.synced(self.fv[2 * v], self.fv[2 * v + 1], 2 * v, 2 * v + 1)
@@ -6785,8 +6788,10 @@ def hatari(ym, code, symbols, perf=False):
     last = 0                            # the video cycle of the latest line
     wrapped = False                     # a video frame began in this frame
     frame_cycles = 0
-    stamped = []                        # every chip write, with its owner
-                                        # and its video cycle
+    stamped = []                        # every chip write, with its owner,
+                                        # its video cycle and whether a
+                                        # handler of a target of a sync
+                                        # wrote it
     stamped_frame = []                  # the frame each write is in
 
     def since(video_cyc):
@@ -6824,7 +6829,8 @@ def hatari(ym, code, symbols, perf=False):
                 current.append((where(pc), int(w.group(1), 16), int(w.group(2), 16)))
                 cyc = CYCLE.search(line)
                 stamped.append((where(pc), int(w.group(1), 16), int(w.group(2), 16),
-                                int(cyc.group(1)) if cyc else None))
+                                int(cyc.group(1)) if cyc else None,
+                                any(lo <= pc < hi for lo, hi in syns)))
                 stamped_frame.append(len(frames))
             continue
         w = MFPW.search(line)
@@ -7075,6 +7081,7 @@ def hatari(ym, code, symbols, perf=False):
         assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
     row_evens = []
+    synced_at = []                      # the voices each frame syncs
     for f, (events, clocks, stops, installed) in enumerate(frames[first:first + STUB_FRAMES]):
         if model.row == tune.R:
             # past the last row of a tune that plays once the call reports the
@@ -7085,6 +7092,7 @@ def hatari(ym, code, symbols, perf=False):
             break
         was = list(counted)
         replay(events, f)
+        synced_at.append(set(getattr(model, "synced_now", [])))
         # bit 4 of each coarse column of the row, the voices whose syncs
         # during it are even (SPEC.md 1.12)
         row_evens.append(sum(1 << v for v in range(3) if model.playing[2 * v + 1] & 0x10))
@@ -7138,13 +7146,16 @@ def hatari(ym, code, symbols, perf=False):
     # the row says, that of the frame's row or of the row before, which
     # the ticks of the frame read until its register steps (YMXS, SPEC.md
     # 3.9.2; SPEC.md 1.12). Hatari's ST counts video cycles at the CPU's
-    # clock.
+    # clock. A sync is the frame's where the model's frame syncs the voice,
+    # and a tick's where a handler of a target of a sync writes the zeros:
+    # a row that sets a period of 0 keeps it there for the music, as a
+    # dump of version 9 does.
     waits = []
     regs = {}
     since = {}
     def zero(v):
         return regs.get(2 * v, 1) == 0 and regs.get(2 * v + 1, 1) & 0x0F == 0
-    for k, (owner, reg, value, at) in enumerate(stamped):
+    for k, (owner, reg, value, at, by_sync) in enumerate(stamped):
         if reg > 5:
             continue
         v = reg // 2
@@ -7154,9 +7165,12 @@ def hatari(ym, code, symbols, perf=False):
             since.pop(v, None)
             continue
         prior = stamped[k - 1] if k > 0 else None
-        if zero(v) and not was and prior and prior[0] == owner and prior[2] == 0 \
-                and prior[1] == (reg ^ 1):
-            since[v] = (at, stamped_frame[k] - first)
+        f = stamped_frame[k] - first
+        syncing = by_sync or (owner == "frame" and 0 <= f < len(synced_at)
+                              and v in synced_at[f])
+        if syncing and zero(v) and not was and prior and prior[0] == owner \
+                and prior[2] == 0 and prior[1] == (reg ^ 1):
+            since[v] = (at, f)
         elif was and not zero(v) and v in since:
             start, f = since.pop(v)
             # a span across the start of a video frame, where the trace's
