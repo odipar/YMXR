@@ -219,7 +219,7 @@ final class Ym {
             if (reg[13] >= 0) {
                 registers.put(Register.R13, reg[13]);
             }
-            rows.add(new Row(registers, effects, Set.of(), Set.of()));
+            rows.add(new Row(registers, effects, Set.of(), Map.of()));
         }
         // The keyframe's stop is for an effect that ran up to the repeat
         // row, or runs into the wrap, so that the wrap resumes from a known
@@ -235,7 +235,7 @@ final class Ym {
                 }
             }
             rows.set(repeat, new Row(rows.get(repeat).registers(), keyframe,
-                    rows.get(repeat).syncs(), Set.of()));
+                    rows.get(repeat).syncs(), Map.of()));
         }
         Table<Row> table = repeat < frames ? Tunes.repeating(rows, repeat) : Tunes.once(rows);
         return new Tune(song.name().strip(), song.author().strip(), "ym-to-ymxs",

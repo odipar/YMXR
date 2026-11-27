@@ -8,15 +8,15 @@ a few cycles more a call.
 ## The corpus
 
 The player of each of the 544 dumps links from the plain core. The
-floor, 1,336 bytes, is 86% of the 841,684 bytes of the 544 players. The
+floor, 1,340 bytes, is 86% of the 843,860 bytes of the 544 players. The
 link keeps one of four sets of blocks:
 
 | blocks kept | dumps | bytes |
 |---|---|---|
-| none | 461 | 1,336 |
-| effect1, effects | 69 | 2,672 |
-| square, square0, effect0, effects | 12 | 2,842 |
-| square, square0, square1, effect0, effect1, effects | 2 | 3,658 |
+| none | 461 | 1,340 |
+| effect1, effects | 69 | 2,676 |
+| square, square0, effect0, effects | 12 | 2,846 |
+| square, square0, square1, effect0, effect1, effects | 2 | 3,662 |
 
 Before the block of the effects (LINKER.md, plan item 14) and one copy
 of steps 6 and 7, the floor was 2,752 bytes and the 544 players were
@@ -96,21 +96,21 @@ the second copy of steps 6 and 7:
 
 | dump | blocks kept | bytes | with the second copy |
 |---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | none | 1,336 | 1,466 |
-| Chambers of Shaolin 5 - you blew it! | none | 1,336 | 1,466 |
-| Circus Attractions  2 | none | 1,336 | 1,466 |
-| DBA 2 | square, square0, effect0, effects | 2,842 | 2,972 |
-| DBA 5 | square, square0, effect0, effects | 2,842 | 2,972 |
-| Digidrum preempt, built | square, square0, effect0, effect1, effects | 3,506 | 3,636 |
-| Retrigger retune, built | one, one0, effect0, effects | 2,746 | 2,876 |
-| Synergy Credits | square, square0, square1, effect0, effect1, effects | 3,658 | 3,788 |
-| Turrican - world 4-3 | effect1, effects | 2,672 | 2,802 |
-| Turrican 2 - world completed 1 | effect1, effects | 2,672 | 2,802 |
-| capture | none | 1,336 | 1,466 |
+| Big - Samantha Fox Strip Poker 6 | none | 1,340 | 1,470 |
+| Chambers of Shaolin 5 - you blew it! | none | 1,340 | 1,470 |
+| Circus Attractions  2 | none | 1,340 | 1,470 |
+| DBA 2 | square, square0, effect0, effects | 2,846 | 2,976 |
+| DBA 5 | square, square0, effect0, effects | 2,846 | 2,976 |
+| Digidrum preempt, built | square, square0, effect0, effect1, effects | 3,510 | 3,640 |
+| Retrigger retune, built | one, one0, effect0, effects | 2,750 | 2,880 |
+| Synergy Credits | square, square0, square1, effect0, effect1, effects | 3,662 | 3,792 |
+| Turrican - world 4-3 | effect1, effects | 2,676 | 2,806 |
+| Turrican 2 - world completed 1 | effect1, effects | 2,676 | 2,806 |
+| capture | none | 1,340 | 1,470 |
 
-The floor of the plain core is 1,336 bytes, and 1,466 with the second
+The floor of the plain core is 1,340 bytes, and 1,470 with the second
 copy of steps 6 and 7. The floor of the core with the deferred start in
-is 2,142 bytes, of the core with the lookup in 2,468, and of the core
+is 2,146 bytes, of the core with the lookup in 2,468, and of the core
 with the lookup and the deferred start in 3,738.
 
 ## The cores with the lookup

@@ -58,7 +58,7 @@ class CopyTest {
                 Map.of());
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < 4; r++) {
-            rows.add(new Row(registers.get(r), effects.get(r), Set.of(), Set.of()));
+            rows.add(new Row(registers.get(r), effects.get(r), Set.of(), Map.of()));
         }
         return new org.ymxs.YMXS.Tune("copy", "", "CopyTest", 50, Tunes.repeating(rows, 0));
     }
@@ -166,10 +166,10 @@ class CopyTest {
         List<Row> rows = new ArrayList<>(tune().table().rows());
         Map<Timer, Effect> mapped = new EnumMap<>(rows.get(0).effects());
         mapped.put(Timer.A, copying(13, 16, 96, Tunes.mapping(half)));
-        rows.set(0, new Row(rows.get(0).registers(), mapped, Set.of(), Set.of()));
+        rows.set(0, new Row(rows.get(0).registers(), mapped, Set.of(), Map.of()));
         Map<Timer, Effect> remapped = new EnumMap<>(rows.get(2).effects());
         remapped.put(Timer.A, new Remap(Tunes.mapping(third)));
-        rows.set(2, new Row(rows.get(2).registers(), remapped, Set.of(), Set.of()));
+        rows.set(2, new Row(rows.get(2).registers(), remapped, Set.of(), Map.of()));
         return new org.ymxs.YMXS.Tune("copy mapped", "", "CopyTest", 50,
                 Tunes.repeating(rows, 0));
     }

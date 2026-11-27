@@ -832,12 +832,8 @@ ymxr_col:       lea     (a4,d4.w),a5            ; the operand
                 mulu.w  d3,d4                   ; its slot times N
                 move.w  d4,d0
                 bra.s   .put
-                .if     YMXR_MAP
 .value:         lea     8(a0),a1                ; the values, behind the map
                 adda.w  DT_COLUMNS-DT_PAYLOAD(a0),a1    ; of C columns
-                .else
-.value:         lea     8+YMXR_COLUMNS(a0),a1   ; the values, behind the map
-                .endif
                 subq.w  #1,d0
                 bmi.s   .at
 .before:        cmp.b   #$FF,8(a0,d0.w)

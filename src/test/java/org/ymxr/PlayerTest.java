@@ -330,21 +330,20 @@ final class PlayerTest {
         assertTrue(e.size() > 20, "the player's equates read as " + e.size());
         assertEquals(java.nio.ByteBuffer.wrap(Bound.MAGIC).getInt(), e.get("YMXR_MAGIC"),
                 "the player's magic is the bound tune's");
-        // Version 9 has thirty columns and source index at 24. Version
-        // 10 adds mapping columns, block pointer at 24 and source index
-        // after it, and version 11 cut columns, the cut index at 28 and
-        // the source index after it (BINARIES.md 1.2; SPEC.md 3.3.5).
+        // Version 9 has its source index at 24. Version 10 adds the block
+        // pointer at 24 and the source index after it, and version 11 the
+        // cut index at 28 and the source index after it; the player reads
+        // the column count off the table's header (BINARIES.md 1.2; SPEC.md
+        // 3.3.5).
         for (boolean defer : new boolean[] {false, true}) {
             Map<String, Integer> plain = equates(defer, false);
             Map<String, Integer> mapped = equates(defer, true);
             assertEquals(Tune.UNMAPPED, plain.get("YMXR_VERSION"),
                     "the version the player reads (SPEC.md 3.3.5)");
-            assertEquals(Columns.C, plain.get("YMXR_COLUMNS"));
             assertEquals(Bound.indexAt(Tune.UNMAPPED), plain.get("TF_INDEX"));
             assertTrue(!plain.containsKey("TF_TRANS"), "TF_TRANS without the lookup");
             assertEquals(Tune.CUT, mapped.get("YMXR_VERSION"),
                     "the version the player with the lookup reads");
-            assertEquals(Columns.ALL, mapped.get("YMXR_COLUMNS"));
             assertEquals(Bound.TRANSFORMATIONS_AT, mapped.get("TF_TRANS"));
             assertEquals(Bound.indexAt(Tune.VERSION),
                     Objects.requireNonNull(mapped.get("TF_TRANS")) + 4,

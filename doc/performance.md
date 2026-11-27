@@ -723,9 +723,9 @@ value, a period 32,768 more than the row's, which the kit's `envelope`
 tune does on its first source's last two rows, 800 and then 33,696, its
 928 with the marker.
 
-The player is 12,406 bytes, 1,224 of them the counted shapes' twelve
+The player is 12,410 bytes, 1,224 of them the counted shapes' twelve
 instances, four each of one, two and three columns. Where a tick reads an
-absolute address, 12,082 bytes and 1,320, instances of 110 bytes against
+absolute address, 12,086 bytes and 1,320, instances of 110 bytes against
 the marked shape's 102 for two columns.
 
 ## A tick through an absolute address
@@ -792,7 +792,7 @@ reports -1 for one further off (BINARIES.md 1.5), and the layouts put a
 tune's DTX1 tables before its image and a set's subtunes before the
 images, so the rows of the tune a host loads are beside the player at any
 length of image. A host that places them further off assembles this build,
-which is 12,082 bytes against 12,406. Two figures move against each other:
+which is 12,086 bytes against 12,410. Two figures move against each other:
 a place is a word where it was a long, which shortens a timer's handlers
 by 48 bytes, and a start does the arithmetic that turns a row's address
 into a displacement, 38 bytes more of the timer's frame code. The init and
@@ -874,15 +874,15 @@ target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
 The second bank, the installers, the stubs and the stop's write-back make
-the player 17,272 bytes against 12,406, and 17,128 against 12,082 where a
+the player 17,276 bytes against 12,410, and 17,132 against 12,086 where a
 tick reads an absolute address. Each handler gains a stub: an instance of
 the wide handler is 106 bytes against 102, and of the marked shape of two
 columns 98 against 94.
 
-The lookup in, `YMXR_MAP=1`, makes the player 31,842 bytes against 12,406,
-and 31,348 against 12,082 where a tick reads an absolute address. With the
-deferred start in as well, 44,768 against 17,272, and 44,520 against
-17,128.
+The lookup in, `YMXR_MAP=1`, makes the player 31,842 bytes against 12,410,
+and 31,348 against 12,086 where a tick reads an absolute address. With the
+deferred start in as well, 44,768 against 17,276, and 44,520 against
+17,132.
 
 ## A cut
 

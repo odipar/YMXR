@@ -182,21 +182,23 @@ STUB_FRAMES = 2000
 # read rather than the tune.
 STUB_CLOCKS = 600
 # The versions of a tune file (SPEC.md 3.3.5) and of a bound tune
-# (BINARIES.md 1): 14, which a writer writes where a row lists a voice
-# among its even syncs, 13, which it writes where a row syncs a voice,
-# and 12, which it writes where a row starts copy from frame, each of
-# which the binder binds at the layout of 9, 10 or 11; 11,
+# (BINARIES.md 1): 15, which a writer writes where a row has a sync length
+# above 1, 14, which a reader reads, its bit 4 of a coarse column a sync
+# length of 2, 13, which a writer writes where a row syncs a voice, and 12,
+# which it writes where a row starts copy from frame, each of which the
+# binder binds at the layout of 9, 10 or 11; 11,
 # which it writes where a row cuts a source, 10, which it writes where a
 # row maps a value, 9, which it writes otherwise, 8, read as 9, and 7,
 # whose control columns have bit 3 at 0, each a tune whose table is DTX3,
 # which a reader reads.
-TUNE_VERSIONS = (14, 13, 12, 11, 10, 9, 8, 7)
+TUNE_VERSIONS = (15, 14, 13, 12, 11, 10, 9, 8, 7)
 WRITTEN = 9
 MAPPED = 10
 CUT = 11
 COPY = 12
 SYNC = 13
 EVEN = 14
+LENGTH = 15
 # The first target of a sync, syncToneA (SPEC.md 2.1).
 SYNC_TARGET = 25
 
@@ -731,11 +733,19 @@ def entry(model, writes):
         if s:
             out["s"] = s
     if model.tune.written == EVEN:
-        # in version 14 the voices whose bit 4 the row sets, its even syncs
-        # (SPEC.md 7.3)
+        # in version 14 the voices whose bit 4 the row sets, a sync length
+        # of 2 (SPEC.md 7.3)
         even = ["ABC"[v] for v in range(3) if model.playing[2 * v + 1] & 0x10]
         if even:
             out["even"] = even
+    if model.tune.written == LENGTH:
+        # in version 15 the voices whose sync length is above 1, each with
+        # its length, bits 2 to 0 of its column and 1 (SPEC.md 1.12.2, 7.3)
+        lengths = {"ABC"[v]: (model.playing[model.tune.length_at + v] & 7) + 1
+                   for v in range(3)}
+        lengths = {voice: n for voice, n in lengths.items() if n > 1}
+        if lengths:
+            out["lengths"] = lengths
     out["e"] = e
     return out
 
@@ -757,8 +767,11 @@ class Tune:
         self.written = self.version
         self.rate = struct.unpack(">H", file[6:8])[0]
         self.effects = file[8]
-        # a tune file of version 13, which syncs a voice (BINARIES.md 1.2)
+        # a tune file of versions 13 to 15, which syncs a voice, and of
+        # version 15, whose table has the sync length columns (BINARIES.md
+        # 1.2)
         self.syncs = bool(file[10] & 0x80)
+        self.lengths = bool(file[10] & 0x40)
         count = file[9]
         # The tables, and copy from frame, source S, past them where bit 7
         # of the effects byte is 1: the index lists the tables alone, so S
@@ -847,6 +860,9 @@ class Tune:
         self.R = long_at(header, 4)
         self.RR = long_at(header, 10)
         assert len(self.rows) == self.R
+        # the sync length columns, the last three of a table of version 15
+        # (SPEC.md 1.12.2)
+        self.length_at = struct.unpack(">H", header[8:10])[0] - 3 if self.lengths else None
         # a source: (the offset of its first row in the file, R, RR, a
         # column a value of the row). DTX1 lays a table out column by
         # column and pads each column to a word, so column i is a
@@ -4130,11 +4146,13 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
     assert bound is not None, "the binder rejected the tune"
     tune = Tune(bound, work)
     tune.written = version
-    assert tune.version == (layout_of(tune.effects) if version in (COPY, SYNC, EVEN)
+    assert tune.version == (layout_of(tune.effects) if version in (COPY, SYNC, EVEN, LENGTH)
                             else version), \
         "the binder wrote version %d of a tune file of %d" % (tune.version, version)
-    assert bool(bound[10] & 0x80) == (version in (SYNC, EVEN)), \
+    assert bool(bound[10] & 0x80) == (version in (SYNC, EVEN, LENGTH)), \
         "bit 7 of byte 10 of the bound tune of a tune file of version %d" % version
+    assert bool(bound[10] & 0x40) == (version == LENGTH), \
+        "bit 6 of byte 10 of the bound tune of a tune file of version %d" % version
     defer, lookup = needs(tune.effects)
     have = ("ymxr_bank1" in symbols, "ymxr_look" in symbols)
     if (defer and not have[0]) or (lookup and not have[1]):

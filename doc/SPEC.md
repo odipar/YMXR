@@ -9,16 +9,16 @@ target, source and timer maps (2), file layout (3), frames (4), ticks (5),
 writer rules and checks (6), reader output (7), and later versions (8).
 
 A tune's table is a DTX table (DTX, SPEC.md 1) of one width (R1.1), a
-byte, the width of a register: 38 columns of the 128 R3.4 allows, each one
-byte, so a row is 38 bytes, in version 11 for a tune that maps a value; 34
-in version 10 and in version 11 for a tune that maps none; and columns 0
-to 29, a row of 30 bytes, in versions 7 to 9. In versions 12 to 15 a row
-is 30 bytes and 4 more for each of the mapping and the cut columns the
-tune uses, and in version 15 3 more, the sync length columns (3.3.5).
-YMXS, SPEC.md 2 to 6 define what each register reaches, what a target, a
-source and a rate are, what a frame and a tick do with them, and the rules
-of the structure; this document defines the encoding of each and cites the
-rest.
+byte, the width of a register: 41 columns of the 128 R3.4 allows, each one
+byte, so a row is 41 bytes, in version 15 for a tune that maps a value and
+cuts a source; 38 in version 11 for a tune that maps a value; 34 in
+version 10 and in version 11 for a tune that maps none; and columns 0 to
+29, a row of 30 bytes, in versions 7 to 9. In versions 12 to 15 a row is
+30 bytes and 4 more for each of the mapping and the cut columns the tune
+uses, and in version 15 3 more, the sync length columns (3.3.5). YMXS,
+SPEC.md 2 to 6 define what each register reaches, what a target, a source
+and a rate are, what a frame and a tick do with them, and the rules of the
+structure; this document defines the encoding of each and cites the rest.
 
 **Conventions.** A clause is cited by number, 4.3 or 1.1.2, and a step
 within one as 4.3 step 2; a rule of section 6 as rule 1 and a condition
@@ -113,7 +113,9 @@ version assigns it (R6.2, section 8).
 | 32 | effect 2 mapping |
 | 33 | effect 3 mapping |
 | 34 to 37 | effect 0 to 3 cut, in version 11 where the tune maps a value, and at 30 to 33 where it maps none (1.11) |
-| 30 to 40 | in version 15, the sync length of voice A, B and C, three columns after the mapping and the cut columns the tune uses (1.12.2) |
+| 38 | voice A sync length, in version 15 where the tune maps a value and cuts a source, and at 30 or 34 where it uses fewer of those groups (1.12.2) |
+| 39 | voice B sync length |
+| 40 | voice C sync length |
 
 ### 1.1 The set bit
 
@@ -1657,7 +1659,9 @@ padded rows.
 ### 6.3 The padding
 
 An *unset row* leaves every column unset: the frame that reads it leaves
-every register and every timer as it is, one frame long.
+every register and every timer as it is, one frame long. In version 15 its
+sync lengths are those of the row before it, so the ticks of its frame
+have the lengths they had (1.12.2, 5.1).
 
 Initial condition: the table has R rows and a repeat row RR, present, or
 absent for a tune that plays once; the unit k is 2 or 4 (k = 1 divides

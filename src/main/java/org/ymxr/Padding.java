@@ -38,8 +38,12 @@ final class Padding {
      *  again keep the period the tune had, for a match a column. */
     static final int SHORT = 64;
 
-    /** A row that sets no register and leaves every timer running. */
-    static final Row UNSET = new Row(Map.of(), Map.of(), Set.of(), Set.of());
+    /** A row that sets no register and leaves every timer running, with
+     *  the sync lengths of {@code before}, the row before it, so the ticks
+     *  of its frame have the lengths they had (SPEC.md 1.12.2, 6.3). */
+    static Row unset(Row before) {
+        return new Row(Map.of(), Map.of(), Set.of(), before.syncSteps());
+    }
 
     private Padding() {
     }
@@ -66,7 +70,7 @@ final class Padding {
         int at = repeat.isPresent() ? repeat.getAsInt() : -1;
         if (unit > 1 && at >= 0 && at % unit != 0) {
             int added = unit - at % unit;
-            rows.addAll(at, Collections.nCopies(added, UNSET));
+            rows.addAll(at, Collections.nCopies(added, unset(rows.get(at - 1))));
             frames.addAll(at, Collections.nCopies(added, -1));
             report.note(noted(added, at, true, unit));
             at += added;
@@ -86,7 +90,7 @@ final class Padding {
             } else {
                 int added = unit - rows.size() % unit;
                 report.note(noted(added, rows.size(), false, unit));
-                rows.addAll(Collections.nCopies(added, UNSET));
+                rows.addAll(Collections.nCopies(added, unset(rows.get(rows.size() - 1))));
                 frames.addAll(Collections.nCopies(added, -1));
             }
         }

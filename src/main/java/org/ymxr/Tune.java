@@ -86,17 +86,22 @@ final class Tune {
 
     /**
      * The version written where a row syncs a voice, at its frame or
-     * through a target of a sync, and lists none among its even syncs: the
-     * header of version 12, bit 7 of the effects used where a row starts
-     * copy from frame, and bit 5 of each coarse column read on every row
-     * (SPEC.md 1.12, 3.3.5).
+     * through a target of a sync, and every sync length is 1: the header
+     * of version 12, bit 7 of the effects used where a row starts copy from
+     * frame, and bit 5 of each coarse column read on every row (SPEC.md
+     * 1.12, 3.3.5).
      */
     static final int SYNC = 0x000D;
 
-    /** The highest supported version, written where a row lists a voice
-     *  among its even syncs: version 13 with bit 4 of each coarse column
-     *  read on every row (SPEC.md 1.12, 3.3.5). */
+    /** Version 13 with bit 4 of each coarse column read on every row, a
+     *  sync length of 2 or 1, which a reader reads and a writer writes as
+     *  version 15 (SPEC.md 1.12.2, 3.3.5). */
     static final int EVEN = 0x000E;
+
+    /** The highest supported version, written where a row has a sync
+     *  length above 1: version 13 with the three sync length columns after
+     *  the mapping and the cut columns (SPEC.md 1.12.2, 3.3.5). */
+    static final int LENGTH = 0x000F;
 
     /** Writer version for identity-only tunes: thirty DTX3 columns without
      *  a transformation index. Deferred starts remain available (SPEC.md
@@ -113,30 +118,32 @@ final class Tune {
 
     /** The versions a reader reads, as its report names them. */
     static final String READS = OLDEST + ", " + DEFERRED + ", " + UNMAPPED + ", " + VERSION
-            + ", " + CUT + ", " + COPY + ", " + SYNC + " or " + EVEN;
+            + ", " + CUT + ", " + COPY + ", " + SYNC + ", " + EVEN + " or " + LENGTH;
 
     /** Whether a reader reads a file of that version. */
     static boolean reads(int version) {
-        return version >= OLDEST && version <= EVEN;
+        return version >= OLDEST && version <= LENGTH;
     }
 
-    /** The version a writer writes for a table of those effects: 14 where
-     *  a row lists a voice among its even syncs, 13 where a row syncs a
-     *  voice, 12 where it copies from frame, 11 where it cuts a source, 10
-     *  where it maps a value and cuts none, and 9 otherwise (SPEC.md
-     *  3.3.5). */
+    /** The version of a table of those effects: 15 where a row has a sync
+     *  length above 1, 13 where a row syncs a voice, 12 where it copies from
+     *  frame, 11 where it cuts a source, 10 where it maps a value and cuts
+     *  none, and 9 otherwise (SPEC.md 3.3.5); and 14 for the columns of a
+     *  file of version 14 read back. */
     static int version(int effects) {
-        return Columns.evens(effects) ? EVEN : Columns.syncs(effects) ? SYNC
+        return Columns.lengths(effects) ? LENGTH : Columns.evens(effects) ? EVEN
+                : Columns.syncs(effects) ? SYNC
                 : Columns.copies(effects) ? COPY
                 : Columns.cuts(effects) ? CUT : Columns.maps(effects) ? VERSION : UNMAPPED;
     }
 
     /** The column count of a table of that version and effects byte: 34
      *  in version 10, 34 or 38 in version 11 by bit 5, 30, 34 or 38 in
-     *  versions 12 and 13 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md
-     *  3.3.3). */
+     *  versions 12 to 14 by bits 5 and 6, 33, 37 or 41 in version 15, and
+     *  30 in 7 to 9 (SPEC.md 3.3.3). */
     static int columns(int version, int effects) {
-        return version >= CUT ? Columns.count(effects)
+        return version >= CUT
+                ? Columns.count(version == LENGTH ? effects | Columns.LENGTHS : effects)
                 : version == VERSION ? Columns.MAPPED : Columns.C;
     }
 
@@ -698,6 +705,9 @@ final class Tune {
         if (c < Columns.EFFECT) {
             return "R" + c;
         }
+        if (c >= Columns.LENGTH) {
+            return "voice " + (char) ('A' + c - Columns.LENGTH) + " sync length";
+        }
         if (c >= Columns.CUT) {
             return "effect " + (c - Columns.CUT) + " cut";
         }
@@ -714,9 +724,14 @@ final class Tune {
     }
 
     /** Column label for a report in the table of that effects byte, whose
-     *  cut columns are 30 to 33 where it has no mapping columns (SPEC.md
+     *  cut columns are 30 to 33 where it has no mapping columns, and whose
+     *  sync length columns follow the groups it has (SPEC.md 1.12.2,
      *  3.3.5). */
     static String name(int c, int effects) {
+        int length = Columns.length(effects, 0);
+        if (length >= 0 && c >= length) {
+            return name(Columns.LENGTH + c - length);
+        }
         if (c >= Columns.MAPPING && Columns.cuts(effects) && !Columns.maps(effects)) {
             return "effect " + (c - Columns.MAPPING) + " cut";
         }
