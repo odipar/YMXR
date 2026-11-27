@@ -57,12 +57,15 @@ const (
 )
 
 // SyncAt is the byte of the bound tune whose bit 7, SyncMark, marks a tune
-// file of version 13, a tune that syncs a voice: byte 10, the high byte of
-// the name's offset, whose bit 7 is 0 in a tune file, the name being within
-// 32,768 bytes of the start (BINARIES.md 1.2).
+// file of version 13, 14 or 15, a tune that syncs a voice, and bit 6,
+// LengthMark, one of version 15, whose table has the sync length columns:
+// byte 10, the high byte of the name's offset, whose bits 7 and 6 are 0 in
+// a tune file, the name being within 16,384 bytes of the start (BINARIES.md
+// 1.2).
 const (
-	SyncAt   = 10
-	SyncMark = 0x80
+	SyncAt     = 10
+	SyncMark   = 0x80
+	LengthMark = 0x40
 )
 
 // BoundIndex returns the source-index offset: 24 in versions 7 to 9; 28
@@ -183,11 +186,12 @@ func readable(tuneFile []byte) (ymxr.File, error) {
 
 // BoundVersion is the version a bound tune of the tune file records, the layout of
 // its header and index (BINARIES.md 1.2): the tune file's, and for a tune
-// file of version 12 or 13 the version of its columns, 11 where it cuts a
+// file of version 12 to 15 the version of its columns, 11 where it cuts a
 // source, 10 where it maps a value and cuts none, and 9 otherwise. Bit 7 of
 // its effects byte marks copy from frame, which the index leaves out: copy
-// from frame is source S, the tables plus 1 (SPEC.md 3.1.7). Bit 7 of byte
-// 10 marks a tune file of version 13 (SyncAt).
+// from frame is source S, the tables plus 1 (SPEC.md 3.1.7). Bits 7 and 6
+// of byte 10 mark a tune file of versions 13 to 15 and of version 15
+// (SyncAt).
 func BoundVersion(tune ymxr.File) int {
 	switch {
 	case tune.Version < ymxr.VersionCopy:
@@ -487,6 +491,9 @@ func build(tuneFile, image []byte, table, state int) ([]byte, error) {
 	ymxr.PutWord(bound, 4, version)
 	if read.Version >= ymxr.VersionSync {
 		bound[SyncAt] |= SyncMark
+	}
+	if read.Version == ymxr.VersionLength {
+		bound[SyncAt] |= LengthMark
 	}
 	bound[ymxr.CountAt] = byte(count)
 	ymxr.PutLong(bound, StateAt, state)

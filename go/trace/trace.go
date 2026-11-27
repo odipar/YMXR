@@ -101,11 +101,15 @@ func Trace(tune ymxr.File, calls int) []byte {
 			}
 		}
 		out.WriteByte('}')
-		// SPEC.md 7.3: in version 13 and 14 the voices the row syncs, after
-		// w, where it syncs one, and in version 14 the voices of its even
-		// syncs, after them, where it lists one.
+		// SPEC.md 7.3: in versions 13 to 15 the voices the row syncs, after
+		// w, where it syncs one; after them, in version 14 the voices whose
+		// bit 4 the row sets, and in version 15 the sync length of each voice
+		// whose length is above 1.
 		voices(&out, "s", model.Syncs)
 		voices(&out, "even", model.Evens)
+		if ymxr.HasLengths(tune.Effects) {
+			lengths(&out, model.Lengths)
+		}
 		out.WriteString(",\"e\":{")
 		first = true
 		for i := 0; i < 4; i++ {
@@ -144,6 +148,27 @@ func Record(file []byte, calls int) []byte {
 		calls = Calls(tune.Table)
 	}
 	return Trace(tune, calls)
+}
+
+// lengths writes the sync lengths above 1 of the three voices, as lengths
+// and an object of each voice's letter and its length, where a voice has one
+// (SPEC.md 7.3).
+func lengths(out *bytes.Buffer, of [3]int) {
+	first := true
+	for v := 0; v < 3; v++ {
+		if of[v] > 1 {
+			if first {
+				out.WriteString(",\"lengths\":{")
+			} else {
+				out.WriteByte(',')
+			}
+			fmt.Fprintf(out, "\"%c\":%d", 'A'+v, of[v])
+			first = false
+		}
+	}
+	if !first {
+		out.WriteByte('}')
+	}
 }
 
 // voices writes the voices of mask, bit 0 voice A to bit 2 voice C, as the

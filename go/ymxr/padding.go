@@ -14,8 +14,12 @@ import (
 // column.
 const Short = 64
 
-// Unset is the row that leaves every register as it is and every timer running.
-var Unset = ymxs.Row{}
+// Unset is the row that leaves every register as it is and every timer
+// running, with the sync lengths of before, the row before it, so the
+// ticks of its frame have the lengths they had (SPEC.md 1.12.2, 6.3).
+func Unset(before ymxs.Row) ymxs.Row {
+	return ymxs.Row{SyncSteps: before.SyncSteps}
+}
 
 // PadToUnit is tune with rows added so that its table packs at unit,
 // each addition noted on said (SPEC.md 6, rule 6), and the frame of the
@@ -47,7 +51,7 @@ func PadToUnit(tune ymxs.Tune, unit int, said *report.Report) (ymxs.Tune, []int)
 	at, repeats := tune.Table.Repeat()
 	if unit > 1 && repeats && at%unit != 0 {
 		added := unit - at%unit
-		rows = append(rows[:at], append(unsetRows(added), rows[at:]...)...)
+		rows = append(rows[:at], append(unsetRows(added, rows[at-1]), rows[at:]...)...)
 		frames = append(frames[:at], append(unsetFrames(added), frames[at:]...)...)
 		said.Note(noted(added, at, true, unit))
 		at += added
@@ -70,7 +74,7 @@ func PadToUnit(tune ymxs.Tune, unit int, said *report.Report) (ymxs.Tune, []int)
 		} else {
 			added := unit - len(rows)%unit
 			said.Note(noted(added, len(rows), false, unit))
-			rows = append(rows, unsetRows(added)...)
+			rows = append(rows, unsetRows(added, rows[len(rows)-1])...)
 			frames = append(frames, unsetFrames(added)...)
 		}
 	}
@@ -87,10 +91,10 @@ func PadToUnit(tune ymxs.Tune, unit int, said *report.Report) (ymxs.Tune, []int)
 		Rate: tune.Rate, Table: table}, frames
 }
 
-func unsetRows(n int) []ymxs.Row {
+func unsetRows(n int, before ymxs.Row) []ymxs.Row {
 	out := make([]ymxs.Row, n)
 	for i := range out {
-		out[i] = Unset
+		out[i] = Unset(before)
 	}
 	return out
 }
