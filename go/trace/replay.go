@@ -45,13 +45,17 @@ type Replay struct {
 	Effect          [4]Effect
 	EnvelopeWritten bool
 	// Syncs is the voices the last row syncs, bit 0 voice A to bit 2 voice
-	// C: bit 5 of each coarse column in version 13 and 14, read on every row
+	// C: bit 5 of each coarse column in versions 13 to 15, read on every row
 	// (SPEC.md 1.12).
 	Syncs int
-	// Evens is the voices whose syncs during the last row are even, bit 0
-	// voice A to bit 2 voice C: bit 4 of each coarse column in version 14,
-	// read on every row (SPEC.md 1.12).
+	// Evens is the voices whose bit 4 the last row sets, bit 0 voice A to
+	// bit 2 voice C, in version 14, a sync length of 2, read on every row
+	// (SPEC.md 1.12.2).
 	Evens int
+	// Lengths is the sync length of each voice in the last row, A, B and C,
+	// 1 to 8: the sync length column and 1 in version 15, 2 where bit 4 is
+	// set in version 14, and 1 otherwise (SPEC.md 1.12.2).
+	Lengths [3]int
 
 	table *dtx.Table
 	row   int
@@ -95,6 +99,16 @@ func (m *Replay) Step() {
 		}
 		if ymxr.HasEvens(m.effects) && r[1+2*v]&ymxr.Even != 0 {
 			m.Evens |= 1 << v
+		}
+		// bits 2 to 0 of the sync length column, the length less 1; bits 7
+		// to 3 are unassigned and left unread (SPEC.md 1.12.2)
+		switch {
+		case ymxr.HasLengths(m.effects):
+			m.Lengths[v] = int(r[ymxr.LengthColumnOf(m.effects, v)]&7) + 1
+		case m.Evens&(1<<v) != 0:
+			m.Lengths[v] = 2
+		default:
+			m.Lengths[v] = 1
 		}
 	}
 	m.row++

@@ -101,7 +101,7 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 				" rows at most", cut.First, cut.Last, length, ymxr.MostCountedRows)
 		}
 	}
-	column := make([][]byte, ymxr.All)
+	column := make([][]byte, ymxr.Whole)
 	for c := range column {
 		column[c] = make([]byte, size)
 	}
@@ -127,9 +127,10 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 			maps.wrap()
 			cuts.wrap()
 		}
-		out := make([]byte, ymxr.All)
+		out := make([]byte, ymxr.Whole)
 		registers(rows[f], out)
 		syncs(rows[f], out)
+		lengths(rows[f], out)
 		for _, one := range ymxs.Effects(rows[f]) {
 			i, err := effectOf(one.Timer)
 			if err != nil {
@@ -142,7 +143,7 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 			}
 			used |= runs
 		}
-		for c := 0; c < ymxr.All; c++ {
+		for c := 0; c < ymxr.Whole; c++ {
 			column[c][f] = out[c]
 		}
 	}
@@ -156,13 +157,12 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	}
 	// A table has a group of four columns where the tune uses it: the
 	// mapping columns where a row selects a transformation, and the cut
-	// columns where a row selects a cut 1 to 127, after the mapping columns
-	// (SPEC.md 3.3.5).
-	if syncsFrom(rows) || evensFrom(rows) {
+	// columns where a row selects a cut 1 to 127, after the mapping columns;
+	// and the three sync length columns after both where a row has a sync
+	// length above 1 (SPEC.md 1.12.2, 3.3.5).
+	long := lengthy(column)
+	if syncsFrom(rows) || long {
 		used |= ymxr.Syncs
-	}
-	if evensFrom(rows) {
-		used |= ymxr.Evens
 	}
 	columns := ymxr.Columns{Column: append([][]byte(nil), column[:ymxr.C]...),
 		Repeat: repeat, Effects: used}
@@ -183,6 +183,10 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 		for _, one := range cuts.list {
 			columns.Cuts = append(columns.Cuts, ymxr.Cut{First: one.First, Last: one.Last})
 		}
+	}
+	if long {
+		columns.Column = append(columns.Column, column[ymxr.LengthColumn:ymxr.Whole]...)
+		columns.Effects |= ymxr.Lengths
 	}
 	return Made{Columns: columns, Sources: ymxr.Passed(built), Rate: tune.Rate}, nil
 }
@@ -281,26 +285,34 @@ func registers(row ymxs.Row, out []byte) {
 	}
 }
 
-// syncs writes bit 5 of the coarse column of each voice the row syncs, and
-// bit 4 of each voice the row lists among its even syncs, which the row sets
-// or leaves unset as the structure has it (SPEC.md 1.2.2, 1.12).
+// syncs writes bit 5 of the coarse column of each voice the row syncs,
+// which the row sets or leaves unset as the structure has it (SPEC.md
+// 1.2.2, 1.12).
 func syncs(row ymxs.Row, out []byte) {
 	for v, voice := range ymxs.Voices {
 		if row.Syncs[v] {
 			out[ymxs.Number(ymxs.Coarse(voice))] |= ymxr.Sync
 		}
-		if row.EvenSyncs[v] {
-			out[ymxs.Number(ymxs.Coarse(voice))] |= ymxr.Even
-		}
 	}
 }
 
-// evensFrom reports whether a row lists a voice among its even syncs
-// (SPEC.md 1.12, 3.3.5).
-func evensFrom(rows []ymxs.Row) bool {
-	for _, row := range rows {
-		if row.EvenSyncs != [3]bool{} {
-			return true
+// lengths writes the sync length less 1 of each voice, the row's syncSteps
+// of the voice and 1 where it has none, in the sync length columns of the
+// layout of 41 (SPEC.md 1.12.2; YMXS, SPEC.md 1.6).
+func lengths(row ymxs.Row, out []byte) {
+	for v, voice := range ymxs.Voices {
+		out[ymxr.LengthColumn+v] = byte(ymxs.Steps(row, voice) - 1)
+	}
+}
+
+// lengthy reports whether a row has a sync length above 1, a sync length
+// column other than 0 (SPEC.md 1.12.2, 3.3.5).
+func lengthy(column [][]byte) bool {
+	for c := ymxr.LengthColumn; c < ymxr.Whole; c++ {
+		for _, value := range column[c] {
+			if value != 0 {
+				return true
+			}
 		}
 	}
 	return false

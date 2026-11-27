@@ -34,14 +34,20 @@ const Syncs = 0x100
 // the voice, read on every row (SPEC.md 1.2.2, 1.12).
 const Sync = 0x20
 
-// Evens is a bit above the effects byte, which the file leaves out: a row
-// lists a voice among its even syncs, which version 14 marks (SPEC.md 1.12,
-// 3.3.5).
+// Evens is a bit above the effects byte, which the file leaves out: a tune
+// file of version 14, whose bit 4 of a coarse column is a sync length of 2,
+// read on every row (SPEC.md 1.12.2, 3.3.5).
 const Evens = 0x200
 
 // Even is bit 4 of a coarse column, 1, 3 or 5, in version 14: the voice's
-// syncs during the row are even, read on every row (SPEC.md 1.2.2, 1.12).
+// sync length in the row is 2, and 1 where the bit is 0 (SPEC.md 1.2.2,
+// 1.12.2).
 const Even = 0x10
+
+// Lengths is a bit above the effects byte, which the file leaves out: a row
+// has a sync length above 1, and the table has the three sync length
+// columns, which version 15 marks (SPEC.md 1.12.2, 3.3.5).
+const Lengths = 0x400
 
 // SyncTarget is the first target of a sync, syncToneA; 26 and 27 are
 // syncToneB and syncToneC (SPEC.md 2.1).
@@ -54,6 +60,18 @@ const (
 	CutColumn = 34
 	All       = 38
 )
+
+// LengthColumn is the first sync length column in the layout of 41 a writer
+// writes the rows in, voice A's, before the groups a tune leaves unused are
+// dropped; and Whole is that layout's column count (SPEC.md 1.12.2).
+const (
+	LengthColumn = 38
+	Whole        = 41
+)
+
+// MostSyncLength is the most steps a sync keeps a voice's period at 0: a
+// sync length column is the length less 1 in three bits (SPEC.md 1.12.2).
+const MostSyncLength = 8
 
 // MostCuts is the cut limit: cut numbers 1 to 127 select a cut of the
 // index; 0 is the whole table (SPEC.md 1.11).
@@ -95,15 +113,22 @@ func HasSyncs(effects int) bool {
 	return effects&Syncs != 0
 }
 
-// HasEvens is whether a row lists a voice among its even syncs: the bit
-// above the effects byte that version 14 marks (SPEC.md 3.3.5).
+// HasEvens is whether the file is of version 14, whose bit 4 of a coarse
+// column is a sync length: the bit above the effects byte that version 14
+// marks (SPEC.md 3.3.5).
 func HasEvens(effects int) bool {
 	return effects&Evens != 0
 }
 
+// HasLengths is whether the table has the sync length columns: the bit
+// above the effects byte that version 15 marks (SPEC.md 1.12.2, 3.3.5).
+func HasLengths(effects int) bool {
+	return effects&Lengths != 0
+}
+
 // ColumnCount is the column count of a table of that effects byte: 30,
-// with four mapping columns where bit 5 is 1 and four cut columns where
-// bit 6 is 1 (SPEC.md 3.3.5).
+// with four mapping columns where bit 5 is 1, four cut columns where bit 6
+// is 1 and three sync length columns in version 15 (SPEC.md 3.3.5).
 func ColumnCount(effects int) int {
 	count := C
 	if HasMapping(effects) {
@@ -112,7 +137,19 @@ func ColumnCount(effects int) int {
 	if HasCuts(effects) {
 		count += 4
 	}
+	if HasLengths(effects) {
+		count += 3
+	}
 	return count
+}
+
+// LengthColumnOf is voice v's sync length column, after the mapping and
+// the cut columns, or -1 where the table has none (SPEC.md 1.12.2).
+func LengthColumnOf(effects, v int) int {
+	if !HasLengths(effects) {
+		return -1
+	}
+	return ColumnCount(effects) - 3 + v
 }
 
 // MappingColumnOf is effect i's mapping column, 30 + i, or -1 where the
