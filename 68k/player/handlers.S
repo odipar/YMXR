@@ -1285,8 +1285,30 @@ TWS_EOI         equ     ymxr_syn0_eoi-ymxr_syn0
                 .if     YMXR_MAP&YMXR_PERF
 TWS_TAIL        equ     ymxr_syn0_htail-ymxr_syn0
                 .endif
-                .if     (ymxr_syn0_odd-ymxr_syn0)<>TWC_SIZE
+                .if     (ymxr_syn0_tails-ymxr_syn0)<>TWC_SIZE
                 .error  "the handler of a target of a sync is laid out apart from TWC"
+                .endif
+; The general head's registers, which a start writes (sync.S,
+; ymxr_syncwide): the fine register at six sites and the coarse at two; and
+; its two parity words, which the frame writes: the first word of the
+; path's read of the row's fine, which goes on to the odd steps, or a
+; bra.s to the even ones.
+TWS_F1          equ     ymxr_syn0_hf1-ymxr_syn0+3
+TWS_F2          equ     ymxr_syn0_hf2-ymxr_syn0+3
+TWS_F3          equ     ymxr_syn0_sf1-ymxr_syn0+3
+TWS_F4          equ     ymxr_syn0_sf2-ymxr_syn0+3
+TWS_F5          equ     ymxr_syn0_sf3-ymxr_syn0+3
+TWS_F6          equ     ymxr_syn0_sf4-ymxr_syn0+3
+TWS_C1          equ     ymxr_syn0_hc1-ymxr_syn0+3
+TWS_C2          equ     ymxr_syn0_hc2-ymxr_syn0+2
+TWS_MPAR        equ     ymxr_syn0_mpar-ymxr_syn0
+TWS_FPAR        equ     ymxr_syn0_fpar-ymxr_syn0
+TWS_EVW         equ     $6000|(ymxr_syn0_ev-ymxr_syn0_mpar-2)
+TWS_SEVW        equ     $6000|(ymxr_syn0_sev-ymxr_syn0_fpar-2)
+                .if     YMXR_PCREL
+TWS_ODDW        equ     $303A                   ; move.w d16(pc),d0
+                .else
+TWS_ODDW        equ     $2F08                   ; move.l a0,-(sp)
                 .endif
                 .if     (ymxr_syn0_ptr1-ymxr_syn0)<>(ymxr_env0_ptr1-ymxr_env0)
                 .error  "the handler of a target of a sync has its place apart from TWC"

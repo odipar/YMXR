@@ -256,7 +256,7 @@ is the original plus 16: `YMXR_sndh-map.bin` reads 20, and
 reports -1 for a tune of version 10, whose effects byte sets bit 5, of
 version 11, whose effects byte sets bit 6, and of a tune whose effects
 byte sets bit 7, which copies from frame (SPEC.md 3.3);
-`YMXR_sndh-map.bin` is 19,390 bytes larger than `YMXR_sndh.bin`. The field
+`YMXR_sndh-map.bin` is 19,454 bytes larger than `YMXR_sndh.bin`. The field
 at 26 of a core with the lookup in is the offset of its first handler:
 every byte from there to the core's end is a handler, an installer or
 padding. The padding puts every lookup handler's page displacement on its

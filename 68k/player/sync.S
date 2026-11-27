@@ -465,6 +465,32 @@ ymxr_syncwide:  move.w  d4,d5
                 add.w   d5,d5
                 adda.w  (a5,d5.w),a5
                 move.b  #TWS_TOGEN,TWS_SLOT(a5)
+; The general head's registers, immediates there: the target's voice v,
+; its fine register 2v and coarse 2v + 1. And its parity words by the
+; voice's bit of ymxr_seven, which the frame writes from then on
+; (ymxr_sheads). At level 7, as a tick of the running handler reads them.
+                move.w  sr,-(sp)
+                ori.w   #$0700,sr
+                moveq   #0,d5
+                move.b  FX_TARGET(a3),d5
+                sub.w   #25,d5
+                add.w   d5,d5                   ; the fine register
+                move.b  d5,TWS_F1(a5)
+                move.b  d5,TWS_F2(a5)
+                move.b  d5,TWS_F3(a5)
+                move.b  d5,TWS_F4(a5)
+                move.b  d5,TWS_F5(a5)
+                move.b  d5,TWS_F6(a5)
+                move.w  #TWS_ODDW,TWS_MPAR(a5)
+                move.w  #TWS_ODDW,TWS_FPAR(a5)
+                btst    d5,ymxr_seven(pc)
+                beq.s   .odd
+                move.w  #TWS_EVW,TWS_MPAR(a5)
+                move.w  #TWS_SEVW,TWS_FPAR(a5)
+.odd:           addq.b  #1,d5                   ; the coarse register
+                move.b  d5,TWS_C1(a5)
+                move.b  d5,TWS_C2(a5)
+                move.w  (sp)+,sr
                 lea     ymxr_sfx(pc),a5
                 clr.b   (a5,d6.w)
                 .if     YMXR_MAP
@@ -655,11 +681,13 @@ ymxr_hceend:
                 .endif
 
 ; The heads the frame writes of the handlers of a target of a sync
-; (ticks.S, TICKW), for each effect that runs one with no start armed:
-; with d0 0 each aimed at its general head, before the row's values
-; change; otherwise each written and aimed at its even or its odd head, by
-; the voice's bit of ymxr_seven, where the general head's reads would
-; come out one way until the next frame. A source's rows: where none has
+; (ticks.S, TICKW), for each effect that runs one: with d0 other than 0,
+; after the row's values change, the general head's parity words by the
+; voice's bit of ymxr_seven, a start armed or not; and with no start
+; armed, with d0 0 each aimed at its general head, before the row's values
+; change, and otherwise each written and aimed at its even or its odd
+; head, by that bit, where the general head's reads would come out one
+; way until the next frame. A source's rows: where none has
 ; a fine of 0 (ymxr_sfx) and the chip's fine is other than 0, the voice's
 ; registers. Copy from frame: where the voice's fine frame value and the
 ; chip's fine are other than 0, those and the voice's frame values
@@ -685,14 +713,6 @@ ymxr_sheads:    movem.l d0-d2/d5-d6/a1/a3-a6,-(sp)
                 bcs.w   .next                   ; d1
                 cmp.w   #3,d1
                 bcc.w   .next
-                .if     YMXR_DEFER
-                tst.b   FX_PENDING(a1)          ; a start armed, whose hook the
-                bne.w   .next                   ; general head's path reaches
-                .endif
-                movea.w 2(a6),a5                ; the timer's control register
-                move.b  (a5),d0
-                and.b   6(a6),d0                ; its select, 0 where stopped
-                beq.w   .next
                 movea.w (a6),a5
                 movea.l (a5),a5                 ; the running handler
                 lea     ymxr_at_synced(pc),a4
@@ -702,6 +722,25 @@ ymxr_sheads:    movem.l d0-d2/d5-d6/a1/a3-a6,-(sp)
                 cmpa.l  a4,a5                   ; target of a sync
                 bne.w   .next
                 add.w   d1,d1                   ; the fine register
+                tst.b   d2
+                beq.s   .parity
+                move.w  #TWS_ODDW,d0            ; the general head's parity
+                move.w  #TWS_ODDW,d6            ; words
+                btst    d1,ymxr_seven(pc)
+                beq.s   .podd
+                move.w  #TWS_EVW,d0
+                move.w  #TWS_SEVW,d6
+.podd:          move.w  d0,TWS_MPAR(a5)
+                move.w  d6,TWS_FPAR(a5)
+.parity:
+                .if     YMXR_DEFER
+                tst.b   FX_PENDING(a1)          ; a start armed, whose hook the
+                bne.w   .next                   ; general head's path reaches
+                .endif
+                movea.w 2(a6),a3                ; the timer's control register
+                move.b  (a3),d0
+                and.b   6(a6),d0                ; its select, 0 where stopped
+                beq.w   .next
                 .if     YMXR_MAP
                 tst.b   WS_EFFECTS(a0)          ; copy from frame
                 bpl.s   .rows
