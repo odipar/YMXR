@@ -100,3 +100,16 @@ CELL_SIZE       equ     2
                 .else
 CELL_SIZE       equ     4
                 .endif
+; The word of a place a counted handler compares with its last row's place:
+; the displacement, or the low word of the row's address.
+PLACE_LO        equ     CELL_SIZE-2
+; A handler's loop cell is the immediate of a move to the column's place,
+; the head of the path that ends a pass: the loop word, that move's first
+; word, where the source repeats, and a bra.s to the halt where it plays
+; once (ticks.S, TICK). From one column's cell to the next is the move.
+                .if     YMXR_PCREL
+LOOPW           equ     $33FC           ; move.w #imm,abs.l
+                .else
+LOOPW           equ     $23FC           ; move.l #imm,abs.l
+                .endif
+CELL_STRIDE     equ     6+CELL_SIZE

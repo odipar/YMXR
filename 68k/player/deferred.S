@@ -261,6 +261,7 @@ ymxr_arm_look2  equ     *
                 move.l  d3,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 .endif
+                LOOPHD  TICK_CELL,TICK_ONCEW
                 clr.b   FX_SHAPE+ARMOFF(a3)
                 .if     YMXR_MAP
                 bra.w   .single

@@ -73,13 +73,17 @@
 ; is used: the place is the write's operand, stepped in place. The
 ; interrupt level drops once the select and the value are written, so a
 ; higher timer may nest, and the in-service bit is cleared by hand, as
-; software end-of-interrupt mode asks.
+; software end-of-interrupt mode asks. The loop cell, the place of row
+; RR, is the immediate of the move at the head of the marker's path; a
+; start writes a bra.s to the halt over that move's first word where the
+; source plays once (TICK_ONCEW), and the move's first word where it
+; repeats (LOOPW).
                 .macro  TICK    name,eoi,eoir,ctrl,keep,ier,bit,colour,inst
 \name:
                 MARK    \colour
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
                 .if     YMXR_PCREL
-                move.b  \{name}_cell(pc),YM_SELECT+2.w ; +8: the place, a
+                move.b  \{name}_last(pc),YM_SELECT+2.w ; +8: the place, a
                 .else                           ; displacement under YMXR_PCREL
                 move.b  ($12345678).l,YM_SELECT+2.w ; +8: the place
                 .endif
@@ -101,14 +105,10 @@
 \{name}_last:
 \{name}_mark:
                 .if     YMXR_PCREL
-                tst.w   ($12345678).l           ; +2: the loop cell
-                beq.s   \{name}_halt
-                move.w  ($12345678).l,($12345678).l ; +10 the cell, +14 the
-                .else                           ; place
-                tst.l   ($12345678).l           ; +2: the loop cell
-                beq.s   \{name}_halt
-                move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
-                .endif
+                move.w  #0,($12345678).l        ; +2 the loop cell, +4 the
+                .else                           ; place's address
+                move.l  #0,($12345678).l        ; +2 the loop cell, +6 the
+                .endif                          ; place's address
                 COUNT   PERF_LOOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
@@ -126,12 +126,6 @@
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_cell:
-                .if     YMXR_PCREL
-                dc.w    0                       ; the loop cell
-                .else
-                dc.l    0                       ; the loop cell
-                .endif
                 .if     YMXR_DEFER
 ; A start pending on the timer writes one word at the head of the last
 ; row's path, a bra.s here, so the source ends at its last row and the
@@ -142,15 +136,17 @@
 
 ; A tick of a source whose one column fills its byte: every bit of the
 ; byte is the register's, so bit 7 is a value rather than a marker and
-; the end of the source is in a counter beside the place. A word
-; counts the rows left; the subq that steps it leaves Z on the row last,
-; and the loop reloads it with the rows of a pass through the loop. The
-; place is stepped after that test, so the last row leaves it at R - 1
-; (SPEC.md 5.1 step 5), as the handler above does. The register, the
-; place, the counter and that reload are the immediates a start patches,
-; so this handler uses no register either. A source whose column leaves
-; bit 7 runs the handler above, which reads the marker and costs 20
-; cycles less (doc/performance.md).
+; the end of a pass is the place of the last row, an immediate the
+; handler compares the place with: Z on the row last. Under YMXR_PCREL=0
+; the compare reads the low word of the place's address, which differs
+; between any two rows of a pass of fewer than 65,536 rows. The place is
+; stepped after that test, so the last row leaves it at R - 1 (SPEC.md 5.1
+; step 5), as the handler above does. The register, the place and the
+; last row's place are the immediates a start patches, with the loop cell
+; and the loop word as the handler above has them, so this handler uses
+; no register either. A source whose column leaves bit 7 runs the
+; handler above, which reads the marker and costs 20 cycles less
+; (doc/performance.md).
 ;
 ; The two branch targets are named rather than local: the labels the
 ; patching reads are between a branch and its target, and a label ends
@@ -160,12 +156,12 @@
                 MARK    \colour
 \{name}_row:    move.b  #8,YM_SELECT.w          ; +3: the target register
                 .if     YMXR_PCREL
-                move.b  \{name}_cell(pc),YM_SELECT+2.w ; +8: the place, a
+                move.b  \{name}_last(pc),YM_SELECT+2.w ; +8: the place, a
                 .else                           ; displacement under YMXR_PCREL
                 move.b  ($12345678).l,YM_SELECT+2.w
                 .endif
-\{name}_cnt:    subq.w  #1,($12345678).l        ; +2: the rows left
-                beq.s   \{name}_last
+\{name}_cnt:    cmpi.w  #0,($12345678).l        ; +2 the last row's place, +4
+                beq.s   \{name}_last            ; the place's address
                 .if     YMXR_NEST
                 move.w  #$2500,sr
                 .endif
@@ -180,40 +176,27 @@
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
+; The last row leaves the place where it is, so a select after this tick
+; reads the last row again and stops the timer again.
 \{name}_last:
 \{name}_mark:
                 .if     YMXR_PCREL
-                tst.w   ($12345678).l           ; +2: the loop cell
-                beq.s   \{name}_halt
-                move.w  ($12345678).l,($12345678).l ; +10 the cell, +14 the
-                .else                           ; place
-                tst.l   ($12345678).l           ; +2: the loop cell
-                beq.s   \{name}_halt
-                move.l  ($12345678).l,($12345678).l ; +10 the cell, +14 the place
-                .endif
-\{name}_reld:   move.w  #1,($12345678).l        ; +2: the rows of a pass, +4:
-                COUNT   PERF_LOOP,0             ; the counter
+                move.w  #0,($12345678).l        ; +2 the loop cell, +4 the
+                .else                           ; place's address
+                move.l  #0,($12345678).l        ; +2 the loop cell, +6 the
+                .endif                          ; place's address
+                COUNT   PERF_LOOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_halt:
-\{name}_park:   addq.w  #1,($12345678).l        ; keep the last row for a
-                                                ; select after this tick
-                andi.b  #\keep,\ctrl.w
+\{name}_halt:   andi.b  #\keep,\ctrl.w
                 move.b  #255-(1<<\bit),(\ier+4).w
-                COUNT   PERF_STOP+20,0
+                COUNT   PERF_STOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_cell:
-                .if     YMXR_PCREL
-                dc.w    0                       ; the loop cell
-                .else
-                dc.l    0                       ; the loop cell
-                .endif
-\{name}_left:   dc.w    0                       ; the rows left
                 .if     YMXR_DEFER
 \{name}_hook:   bra.w   \inst                   ; a pending start, as above
                 .endif
@@ -224,9 +207,9 @@
 ; not the last, and the column the target names for the marker written
 ; last, so the move that writes it leaves the marker in N and this
 ; handler tests it as the general one does. A start puts the columns in
-; that order, and the places, the registers and the loop cells are the
-; immediates it patches, so this handler uses no register either. A tune
-; whose sources are one column enters none of this.
+; that order, and the places, the registers, the loop cells and the loop
+; word are the immediates it patches, so this handler uses no register
+; either. A tune whose sources are one column enters none of this.
 ; The steps of a sync (YMXS, SPEC.md 3.9.2): nops between the 0 that sets
 ; a voice's period to 0 and the write that sets it other than 0, so the
 ; instructions between them are a whole number of steps of the tone
@@ -427,12 +410,12 @@ HOLD_F21        equ     6
 \{name}_sel1:   move.b  #8,YM_SELECT.w          ; +3: the first register
                 .endif
                 .if     YMXR_PCREL
-\{name}_ptr1:   move.b  \{name}_cells(pc),YM_SELECT+2.w ; +2: the first place
+\{name}_ptr1:   move.b  \{name}_last(pc),YM_SELECT+2.w ; +2: the first place
 \{name}_sel2:   move.b  #8,YM_SELECT.w
-\{name}_ptr2:   move.b  \{name}_cells(pc),YM_SELECT+2.w
+\{name}_ptr2:   move.b  \{name}_last(pc),YM_SELECT+2.w
                 .if     \columns=3
 \{name}_sel3:   move.b  #8,YM_SELECT.w
-\{name}_ptr3:   move.b  \{name}_cells(pc),YM_SELECT+2.w
+\{name}_ptr3:   move.b  \{name}_last(pc),YM_SELECT+2.w
                 .endif
                 .else
 \{name}_ptr1:   move.b  ($12345678).l,YM_SELECT+2.w ; +2: the first place
@@ -444,11 +427,11 @@ HOLD_F21        equ     6
                 .endif
                 .endif
                 .if     \counted
-\{name}_cnt:    subq.w  #1,($12345678).l        ; +2: the rows left, which a
-                beq.s   \{name}_last            ; source of whole bytes ends on
-                .else
-                bmi.s   \{name}_last            ; the marker of the row last
-                .endif                          ; written
+\{name}_cnt:    cmpi.w  #0,($12345678).l        ; +2 the last row's place, +4
+                beq.s   \{name}_last            ; the first place's address:
+                .else                           ; a source of whole bytes
+                bmi.s   \{name}_last            ; ends on its last row, a
+                .endif                          ; marked one on the marker
                 .if     YMXR_NEST
                 move.w  #$2500,sr
                 .endif
@@ -470,56 +453,35 @@ HOLD_F21        equ     6
 \{name}_eoi:    move.b  #\eoi,\eoir.w
                 .endif
                 rte
+; The head of the path that ends a pass, as the general handler has it: a
+; column's loop cell, the move's immediate, to its place, the loop word
+; where the source repeats and a bra.s to the halt where it plays once.
 \{name}_last:
                 .if     YMXR_PCREL
-\{name}_loopt:  tst.w   ($12345678).l           ; the loop cell of column 0
-                beq.s   \{name}_halt
-\{name}_loop1:  move.w  ($12345678).l,($12345678).l ; the cell, the place
-\{name}_loop2:  move.w  ($12345678).l,($12345678).l
+\{name}_loop1:  move.w  #0,($12345678).l        ; +2 the cell, +4 the place's
+\{name}_loop2:  move.w  #0,($12345678).l        ; address
                 .if     \columns=3
-\{name}_loop3:  move.w  ($12345678).l,($12345678).l
+\{name}_loop3:  move.w  #0,($12345678).l
                 .endif
                 .else
-\{name}_loopt:  tst.l   ($12345678).l           ; the loop cell of column 0
-                beq.s   \{name}_halt
-\{name}_loop1:  move.l  ($12345678).l,($12345678).l ; the cell, the place
-\{name}_loop2:  move.l  ($12345678).l,($12345678).l
+\{name}_loop1:  move.l  #0,($12345678).l        ; +2 the cell, +6 the place's
+\{name}_loop2:  move.l  #0,($12345678).l        ; address
                 .if     \columns=3
-\{name}_loop3:  move.l  ($12345678).l,($12345678).l
+\{name}_loop3:  move.l  #0,($12345678).l
                 .endif
                 .endif
-                .if     \counted
-\{name}_reld:   move.w  #1,($12345678).l        ; +2: the rows of a pass, +4:
-                .endif                          ; the counter
                 COUNT   PERF_LOOP,0
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_halt:
-                .if     \counted
-\{name}_park:   addq.w  #1,($12345678).l        ; keep the last row for a
-                .endif                          ; select after this tick
-                andi.b  #\keep,\ctrl.w
+\{name}_halt:   andi.b  #\keep,\ctrl.w
                 move.b  #255-(1<<\bit),(\ier+4).w
-                .if     \counted
-                COUNT   PERF_STOP+20,0
-                .else
                 COUNT   PERF_STOP,0
-                .endif
                 .if     YMXR_AEOI=0
                 move.b  #\eoi,\eoir.w
                 .endif
                 rte
-\{name}_cells:
-                .if     YMXR_PCREL
-                dc.w    0,0,0                   ; the loop cell a column
-                .else
-                dc.l    0,0,0                   ; the loop cell a column
-                .endif
-                .if     \counted
-\{name}_left:   dc.w    0                       ; the rows left
-                .endif
                 .if     YMXR_DEFER
 \{name}_hook:   bra.w   \inst                   ; a pending start, as above
                 .endif
@@ -652,6 +614,18 @@ HOLD_F21        equ     6
                 .endif
                 .endm
 
+; The loop word of the handler a5, whose first loop cell is at \cell: the
+; loop's first move where Z is clear, the move or test before this macro
+; having read that cell, and \once, a bra.s to the halt, where Z is set
+; and the source plays once. Where the source repeats, one branch runs.
+                .macro  LOOPHD  cell,once
+                bne.s   .l\~
+                move.w  #\once,\cell-2(a5)
+                bra.s   .d\~
+.l\~:           move.w  #LOOPW,\cell-2(a5)
+.d\~:
+                .endm
+
 ; The word a hook writes: a bra.s to the stub, or a nop where the stub
 ; follows the word, as in a one-row handler of the lean tick, whose word
 ; is its rte; a bra.s of 0 would read the next word as a displacement.
@@ -665,9 +639,9 @@ HOLD_F21        equ     6
 
 ; The handlers of a target that writes several registers, the same way:
 ; a register and a place a column, a place a column stepped, the loop
-; cell read and the cells written into the places. The two macro
-; instances lay out two shapes, so a shape's offsets are its four
-; handlers'.
+; cells written into the places, and the head of the path that ends a
+; pass with the word that halts there. The two macro instances lay out
+; two shapes, so a shape's offsets are its four handlers'.
                 .macro  TWAT    p,name
 \{p}_SEL1       equ     \{name}_sel1-\name+3
 \{p}_PTR1       equ     \{name}_ptr1-\name+2
@@ -675,13 +649,11 @@ HOLD_F21        equ     6
 \{p}_PTR2       equ     \{name}_ptr2-\name+2
 \{p}_STEP1      equ     \{name}_step1-\name+2
 \{p}_STEP2      equ     \{name}_step2-\name+2
-\{p}_LOOPT      equ     \{name}_loopt-\name+2
-\{p}_LOOP1R     equ     \{name}_loop1-\name+2
-\{p}_LOOP1W     equ     \{name}_loop1-\name+6
-\{p}_LOOP2R     equ     \{name}_loop2-\name+2
-\{p}_LOOP2W     equ     \{name}_loop2-\name+6
-\{p}_CELLS      equ     \{name}_cells-\name
-\{p}_LAST       equ     \{name}_loopt-\name
+\{p}_LOOP1W     equ     \{name}_loop1-\name+2+CELL_SIZE
+\{p}_LOOP2W     equ     \{name}_loop2-\name+2+CELL_SIZE
+\{p}_CELLS      equ     \{name}_loop1-\name+2
+\{p}_LAST       equ     \{name}_last-\name
+\{p}_ONCEW      equ     $6000|(\{name}_halt-\{name}_last-2)
                 .if     YMXR_DEFER
 \{p}_HOOK       equ     \{name}_hook-\name
                 .endif

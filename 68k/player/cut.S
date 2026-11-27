@@ -78,18 +78,11 @@ ymxr_xpass:     move.l  DT_REPEAT-DT_PAYLOAD(a4),d3     ; RR
 ; The operands of a counted kind under a cut, at level 7: in the handler
 ; a5, which the descriptor a2 describes, each column's place at row d3
 ; and its loop cell at row d5, 0 where d5 is -1, past the column's row 0
-; in the record a3 (FX_FIRST, FX_FIRST2, FX_FIRST3); the rows left, d1
-; less d3 plus 1, and the rows of a pass, d6. Under YMXR_PCREL a place
-; and a cell are displacements from the column's read. d0, d4, d6, d7
-; and a1 clobbered.
+; in the record a3 (FX_FIRST, FX_FIRST2, FX_FIRST3); and the last row's
+; place, row d1, the first place's word and d1 less d3. Under
+; YMXR_PCREL a place and a cell are displacements from the column's read.
+; d0, d4, d6, d7 and a1 clobbered.
 ymxr_xput:      movem.l d2/a2,-(sp)
-                move.l  d1,d0
-                sub.l   d3,d0
-                addq.l  #1,d0
-                move.w  KD_LEFT(a2),d4
-                move.w  d0,(a5,d4.w)            ; the rows left
-                move.w  KD_RELD(a2),d4
-                move.w  d6,(a5,d4.w)            ; the rows of a pass
                 move.w  KD_COLS(a2),d7
                 move.w  KD_CELLS(a2),d4
                 lea     FX_FIRST(a3),a1
@@ -121,9 +114,21 @@ ymxr_xput:      movem.l d2/a2,-(sp)
                 move.l  d2,(a5,d0.w)
                 .endif
                 addq.l  #4,a2
-                addq.w  #CELL_SIZE,d4
+                add.w   #CELL_STRIDE,d4
                 dbra    d7,.col
-                movem.l (sp)+,d2/a2
+                movea.l 4(sp),a2                ; the descriptor
+                move.w  KD_LASTP(a2),d4
+                move.w  d1,d0
+                sub.w   d3,d0
+                add.w   TICK_PTR+PLACE_LO(a5),d0
+                move.w  d0,(a5,d4.w)            ; the last row's place
+                move.w  KD_CELLS(a2),d4         ; the loop word, before the
+                tst.l   d5                      ; first loop cell
+                bpl.s   .loop
+                move.w  KD_ONCEW(a2),-2(a5,d4.w)
+                bra.s   .head
+.loop:          move.w  #LOOPW,-2(a5,d4.w)
+.head:          movem.l (sp)+,d2/a2
                 rts
 
 ; The fill kind of the lookup kind d2 on the record's shape d0, d1 the
@@ -180,29 +185,21 @@ ymxr_xpage:     movem.l d1/a4,-(sp)
 
 ; The operands of the counted kind of one column under a cut, at level
 ; 7, as ymxr_xput writes them: in the instance a5, the place at row d0
-; and the loop cell at row d3, 0 where d3 is -1, past row 0 at a4; the
-; rows left, L in d1 less d0 plus 1; and the rows of a pass, L + 1 less
-; d3, and 1 where d3 is -1. d1 and d4 clobbered.
+; and the loop cell at row d3, 0 where d3 is -1, past row 0 at a4; and
+; the last row's place, row L in d1. d1 and d4 clobbered.
                 .macro  KPUT1
-                move.l  d1,d4
-                sub.l   d3,d4
-                addq.l  #1,d4                   ; the rows of a pass
-                tst.l   d3
-                bpl.s   .pass\~
-                moveq   #1,d4
-.pass\~:        move.w  d4,TICKC_RELD(a5)
-                sub.l   d0,d1
-                addq.l  #1,d1
-                move.w  d1,TICKC_LEFT(a5)       ; the rows left
-                move.l  a4,d1
-                add.l   d0,d1                   ; the place
+                sub.l   d0,d1                   ; the rows past the place
+                move.l  a4,d4
+                add.l   d0,d4                   ; the place
                 .if     YMXR_PCREL
-                sub.l   a5,d1
-                sub.w   #TICKC_PTR,d1
-                move.w  d1,TICKC_PTR(a5)
+                sub.l   a5,d4
+                sub.w   #TICKC_PTR,d4
+                move.w  d4,TICKC_PTR(a5)
                 .else
-                move.l  d1,TICKC_PTR(a5)
+                move.l  d4,TICKC_PTR(a5)
                 .endif
+                add.w   d4,d1
+                move.w  d1,TICKC_LASTP(a5)      ; the last row's place
                 moveq   #0,d1                   ; the loop cell, 0 where the
                 tst.l   d3                      ; source plays once
                 bmi.s   .cell\~
@@ -218,6 +215,7 @@ ymxr_xpage:     movem.l d1/a4,-(sp)
                 .else
                 move.l  d1,TICKC_CELL(a5)
                 .endif
+                LOOPHD  TICKC_CELL,TICKC_ONCEW
                 .endm
 
 ; The rows F and L of the running cut of the record a3 in d0 and d1, out
@@ -342,25 +340,22 @@ ymxr_kone:      tst.b   FX_RUN(a3)
                 bra.w   .rows
 ; Each column's register and row 0 out of the target's row, its row 0 at
 ; the stride times its column past the source's first row, then its
-; place and its loop cell, and the rows left and the rows of a pass, as
-; ymxr_xput writes them.
+; place and its loop cell, and the last row's place, as ymxr_xput writes
+; them: the rows past the place, to which the first place's word adds.
 .columns:       and.b   #$7F,d5
                 move.b  d5,FX_SHAPE(a3)
-                move.l  d1,d4
-                sub.l   d3,d4
-                addq.l  #1,d4                   ; the rows of a pass
-                tst.l   d3
-                bpl.s   .pass
-                moveq   #1,d4
-.pass:          move.w  KD_RELD(a6),d5
-                move.w  d4,(a5,d5.w)
-                sub.l   d0,d1
-                addq.l  #1,d1
-                move.w  KD_LEFT(a6),d5
-                move.w  d1,(a5,d5.w)            ; the rows left
+                sub.l   d0,d1                   ; the rows past the place
+                move.w  KD_LASTP(a6),d5
+                move.w  d1,(a5,d5.w)
                 move.l  a2,-(sp)                ; the vector's address
+                move.w  d5,-(sp)
                 lea     FX_FIRST(a3),a2
                 move.w  KD_CELLS(a6),d4
+                tst.l   d3                      ; the loop word, before the
+                bpl.s   .loop                   ; first loop cell
+                move.w  KD_ONCEW(a6),-2(a5,d4.w)
+                bra.s   .col
+.loop:          move.w  #LOOPW,-2(a5,d4.w)
 .col:           move.w  KD_SEL(a6),d5
                 move.b  (a1)+,(a5,d5.w)         ; the register
                 move.b  (a1)+,d5                ; the column it writes, 0
@@ -395,9 +390,12 @@ ymxr_kone:      tst.b   FX_RUN(a3)
                 .else
                 move.l  d5,(a5,d4.w)
                 .endif
-                addq.w  #CELL_SIZE,d4
+                add.w   #CELL_STRIDE,d4
                 addq.l  #4,a6
                 dbra    d7,.col
+                move.w  (sp)+,d5
+                move.w  TICK_PTR+PLACE_LO(a5),d1
+                add.w   d1,(a5,d5.w)            ; the last row's place
                 movea.l (sp)+,a2
                 move.l  a5,(a2)                 ; the vector
                 move.w  (sp)+,sr
@@ -806,16 +804,19 @@ ymxr_recut:     lea     ymxr_park(pc),a4
 .fwplace:       moveq   #7,d5
                 add.b   d7,d5
                 move.b  d5,FX_SHAPE(a3)         ; 8 or 9
-                move.w  KD_RELD(a6),d5
-                move.w  d6,(a5,d5.w)            ; the rows of a pass
-                sub.l   d0,d1
-                addq.l  #1,d1
-                move.w  KD_LEFT(a6),d5
-                move.w  d1,(a5,d5.w)            ; the rows left
+                sub.l   d0,d1                   ; the rows past the place, to
+                move.w  KD_LASTP(a6),d5         ; which the first place's word
+                move.w  d1,(a5,d5.w)            ; adds below
+                move.w  d5,-(sp)
                 movea.w d2,a2
                 movea.l (a2),a2                 ; the running handler
                 lea     FX_FIRST(a3),a4
                 move.w  KD_CELLS(a6),d4
+                tst.l   d3                      ; the loop word, before the
+                bpl.s   .fwloop                 ; first loop cell
+                move.w  KD_ONCEW(a6),-2(a5,d4.w)
+                bra.s   .fwcol
+.fwloop:        move.w  #LOOPW,-2(a5,d4.w)
 .fwcol:         move.w  KD_SEL(a1),d5
                 move.b  (a2,d5.w),d1            ; the column's register
                 move.w  KD_SEL(a6),d5
@@ -844,10 +845,13 @@ ymxr_recut:     lea     ymxr_park(pc),a4
                 .else
                 move.l  d5,(a5,d4.w)
                 .endif
-                addq.w  #CELL_SIZE,d4
+                add.w   #CELL_STRIDE,d4
                 addq.l  #4,a1
                 addq.l  #4,a6
                 dbra    d7,.fwcol
+                move.w  (sp)+,d5
+                move.w  TICK_PTR+PLACE_LO(a5),d1
+                add.w   d1,(a5,d5.w)            ; the last row's place
                 movea.w d2,a2
                 move.l  a5,(a2)                 ; the vector
                 move.w  (sp)+,sr
@@ -1126,7 +1130,7 @@ ymxr_xplace:    btst    #7,FX_ACUT(a3)
                 lsl.w   #KD_SHIFT,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
-                move.w  KD_LEFT(a2),d5
+                move.w  KD_LASTP(a2),d5
                 move.w  KD_COLS(a2),d4
                 lea     FX_FIRST+ARMOFF(a3),a1
 .col:           moveq   #0,d0
@@ -1144,16 +1148,17 @@ ymxr_xplace:    btst    #7,FX_ACUT(a3)
                 dbra    d4,.col
                 tst.w   d5
                 beq.s   .done
-                sub.l   d3,d1
-                addq.l  #1,d1
-                move.w  d1,(a5,d5.w)            ; the rows left
+                sub.l   d3,d1                   ; the rows past the place
+                add.w   TICK_PTR+PLACE_LO(a5),d1
+                move.w  d1,(a5,d5.w)            ; the last row's place
 .done:          movem.l (sp)+,d0-d5/a1-a2/a4-a5
 .kept:          rts
                 .endif
 
 ; The place's reset in a tune that cuts a source (SPEC.md 4.3 step 6):
 ; under a cut 1 to 127, the place in every column at row F of the running
-; cut and L - F + 1 rows left, through the kind of the running handler;
+; cut and the last row's place at row L, through the kind of the running
+; handler;
 ; under cut 0, ymxr_widereset's; and of a source of one row, none, at
 ; either. a3 the record and d3 the effect; clobbers d0 to d5, a3 and
 ; a5.
@@ -1170,8 +1175,7 @@ ymxr_xreset:    cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
                 cmp.b   #4,d0
                 bne.s   .kinds
 .one:           XROWS
-                sub.l   d0,d1
-                addq.l  #1,d1                   ; L - F + 1 rows left
+                sub.l   d0,d1                   ; L - F, the rows past row F
                 add.l   FX_FIRST(a3),d0         ; row F
                 lea     ymxr_timers(pc),a5
                 lsl.w   #3,d3
@@ -1188,7 +1192,8 @@ ymxr_xreset:    cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
                 .else
                 move.l  d0,TICKC_PTR(a5)
                 .endif
-                move.w  d1,TICKC_LEFT(a5)
+                add.w   d0,d1
+                move.w  d1,TICKC_LASTP(a5)      ; the last row's place
                 move.w  (sp)+,sr
                 lea     YM_SELECT.w,a2
                 rts
@@ -1196,8 +1201,7 @@ ymxr_xreset:    cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
                 bsr.w   ymxr_xcut               ; F and L
                 move.l  d0,d6                   ; row F
                 move.l  d1,d7
-                sub.l   d0,d7
-                addq.l  #1,d7                   ; L - F + 1 rows left
+                sub.l   d0,d7                   ; L - F, the rows past row F
                 lea     ymxr_timers(pc),a5
                 lsl.w   #3,d3
                 movea.w (a5,d3.w),a5
@@ -1209,7 +1213,7 @@ ymxr_xreset:    cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
 .kind:          lsl.w   #KD_SHIFT,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
-                move.w  KD_LEFT(a2),d5
+                move.w  KD_LASTP(a2),d5
                 move.w  KD_COLS(a2),d4
                 lea     FX_FIRST(a3),a1         ; a column's place at row 0
                 move.w  sr,-(sp)
@@ -1227,7 +1231,8 @@ ymxr_xreset:    cmp.b   #1,FX_SHAPE(a3)         ; a source of one row is at
                 .endif
                 addq.l  #4,a2
                 dbra    d4,.col
-                move.w  d7,(a5,d5.w)            ; every kind a cut runs counts
+                add.w   TICK_PTR+PLACE_LO(a5),d7 ; every kind a cut runs
+                move.w  d7,(a5,d5.w)            ; counts: the last row's place
                 move.w  (sp)+,sr
                 movem.l (sp)+,d6-d7/a1-a2
                 rts

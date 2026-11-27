@@ -27,35 +27,35 @@ player and of the player with the lookup in:
 | region | plain | with the lookup |
 |---|---|---|
 | the jump table | 12 | 12 |
-| init | 1,736 | 3,222 |
+| init | 1,562 | 2,786 |
 | `YMXR_stop` and `YMXR_play` | 208 | 208 |
-| the frame | 2,678 | 4,910 |
+| the frame | 2,742 | 4,974 |
 | the frame's read-site tables | 156 | 284 |
-| the general handler, four effects | 320 | 320 |
+| the general handler, four effects | 272 | 272 |
 | the square's | 112 | 112 |
 | the one-row source's | 80 | 80 |
-| the counted handler of one column | 408 | 408 |
-| the handler of two columns | 448 | 448 |
-| the handler of three columns | 560 | 560 |
-| the counted handler of two columns | 536 | 536 |
-| the counted handler of three columns | 648 | 648 |
-| the place's reset of several columns | 284 | 116 |
-| the start of several columns | 1,004 | 1,004 |
+| the counted handler of one column | 304 | 304 |
+| the handler of two columns | 376 | 376 |
+| the handler of three columns | 480 | 480 |
+| the counted handler of two columns | 408 | 408 |
+| the counted handler of three columns | 512 | 512 |
+| the place's reset of several columns | 308 | 124 |
+| the start of several columns | 1,066 | 1,066 |
 | `ymxr_rem` | 64 | 64 |
 | the mask words | 16 | 40 |
 | the tables of the instances of the general handler, the square and the one-row source | | 24 |
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
-| the lookup's routines | | 3,458 |
-| the cut's routines | | 2,674 |
-| copy from frame's routines, handlers and frame values | | 1,818 |
+| the lookup's routines | | 3,496 |
+| the cut's routines | | 2,730 |
+| copy from frame's routines, handlers and frame values | | 1,816 |
 | the sync's register steps, frame values and init's work | 1,310 | 1,310 |
 | the register steps of a tune that syncs and copies from frame | | 1,270 |
-| the handlers of a target of a sync, four effects, their start and their map's rows | 2,216 | 2,286 |
-| the lookup instances and the gaps before them, ten kinds | | 7,098 |
-| the player | 13,584 | 34,170 |
+| the handlers of a target of a sync, four effects, their start and their map's rows | 2,088 | 2,158 |
+| the lookup instances and the gaps before them, ten kinds | | 5,934 |
+| the player | 12,864 | 32,236 |
 
-The handlers are 3,112 bytes of the plain player. A song whose sources are
-general and square sources runs 432 of them.
+The handlers are 2,544 bytes of the plain player. A song whose sources are
+general and square sources runs 384 of them.
 
 ## Blocks
 
@@ -160,30 +160,30 @@ A block is the code and data a player runs for one part of a song:
 |---|---|---|---|
 | `square` | 28 | 124 | one column, two rows, repeating to row 0 |
 | `one` | 20 | 44 | one column, one row, repeating to row 0 |
-| `counted` | 102 | in `several` | counted, one column |
-| `two` | 112 | in `several` | marked, two columns |
-| `three` | 140 | in `several` | marked, three columns |
-| `envelope` | 134 | in `several` | counted, two columns |
-| `countedthree` | 162 | in `several` | counted, three columns |
-| `synced` | 560 | in `several` | two columns on a target of a sync, at every shape (SPEC.md 5.1) |
+| `counted` | 76 | in `several` | counted, one column |
+| `two` | 94 | in `several` | marked, two columns |
+| `three` | 120 | in `several` | marked, three columns |
+| `envelope` | 102 | in `several` | counted, two columns |
+| `countedthree` | 128 | in `several` | counted, three columns |
+| `synced` | 528 | in `several` | two columns on a target of a sync, at every shape (SPEC.md 5.1) |
 
 Sizes are in bytes, of the plain core. An effect's block is its frame
-code but for the two starts, 412 to 432 bytes, its general handler, 80,
+code but for the two starts, 428 to 448 bytes, its general handler, 68,
 and its timer code, which sizes.md lists with the pieces of `effects`;
-`several` is 1,288 bytes of routines and 128 of tables.
+`several` is 1,374 bytes of routines and 128 of tables.
 
 | lookup kind | an instance | init's loop | a source of the kind, mapped to a target |
 |---|---|---|---|
-| `lk` | 70 | 84 | one column, of the general handler |
-| `lc` | 96 | 102 | counted, one column |
-| `lt` | 102 | 98 | marked, two columns, below `setNoiseA` |
-| `ln` | 102 | 98 | marked, two columns, `setNoiseA` or past it |
-| `lb` | 130 | 116 | marked, three columns, `setBuzzer` |
-| `lv` | 130 | 116 | marked, three columns, another target |
-| `le` | 128 | 120 | counted, two columns, below `setNoiseA` |
-| `lf` | 128 | 120 | counted, two columns, `setNoiseA` or past it |
-| `lg` | 156 | 138 | counted, three columns, `setBuzzer` |
-| `lh` | 156 | 138 | counted, three columns, another target |
+| `lk` | 60 | 72 | one column, of the general handler |
+| `lc` | 68 | 76 | counted, one column |
+| `lt` | 86 | 80 | marked, two columns, below `setNoiseA` |
+| `ln` | 86 | 80 | marked, two columns, `setNoiseA` or past it |
+| `lb` | 112 | 92 | marked, three columns, `setBuzzer` |
+| `lv` | 112 | 92 | marked, three columns, another target |
+| `le` | 94 | 88 | counted, two columns, below `setNoiseA` |
+| `lf` | 94 | 88 | counted, two columns, `setNoiseA` or past it |
+| `lg` | 120 | 100 | counted, three columns, `setBuzzer` |
+| `lh` | 120 | 100 | counted, three columns, another target |
 
 Sizes are in bytes, of the core with the lookup in and without the
 deferred start. A gap is 0 to 255 bytes. A square and a source of one
@@ -445,47 +445,47 @@ measures it against the linked core.
 
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
-14,276 bytes, the core with the deferred start in, of 19,694 bytes, the
-core with the lookup in, of 34,880 bytes, or the core with the lookup
-and the deferred start in, of 49,744 bytes.
+13,556 bytes, the core with the deferred start in, of 18,422 bytes, the
+core with the lookup in, of 32,946 bytes, or the core with the lookup
+and the deferred start in, of 45,872 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
-| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 10,126 |
-| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,844 |
-| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 14,474 |
-| `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 15,852 |
-| `sync-even.ymxr` | plain | synced, synced0, several, effect0, effects, sync | 6,654 |
-| `sync-heads.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,844 |
-| `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
-| `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
-| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
-| `deferred.ymxr` | the deferred start | effect0, effect3, effects, defer0, defer3 | 4,828 |
-| `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0, effects | 4,302 |
-| `envelope.ymxr` | plain | two, two0, several, effect0, effects | 4,258 |
+| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,998 |
+| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,702 |
+| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 14,206 |
+| `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 15,636 |
+| `sync-even.ymxr` | plain | synced, synced0, several, effect0, effects, sync | 6,666 |
+| `sync-heads.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,702 |
+| `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,706 |
+| `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,260 |
+| `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,494 |
+| `deferred.ymxr` | the deferred start | effect0, effect3, effects, defer0, defer3 | 4,814 |
+| `envelope-counted.ymxr` | plain | envelope, envelope0, several, effect0, effects | 4,314 |
+| `envelope.ymxr` | plain | two, two0, several, effect0, effects | 4,298 |
 | `fine-zero.ymxr` | plain | none | 1,336 |
-| `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3, effects | 4,908 |
-| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, effects, map0, map1, map2, map3, defer2, lookup, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,470 |
+| `four-timers.ymxr` | plain | square, square0, one, one2, effect0, effect1, effect2, effect3, effects | 4,910 |
+| `mapped.ymxr` | the lookup and the deferred start | square, square2, counted, counted1, two, two3, several, effect0, effect1, effect2, effect3, effects, map0, map1, map2, map3, defer2, lookup, lk, lk0, lk2, lc, lc1, lt, lt3, align | 15,156 |
 | `plays-once.ymxr` | plain | none | 1,336 |
-| `preempt.ymxr` | plain | square, square0, effect0, effect1, effects | 3,512 |
-| `retune.ymxr` | plain | one, one0, effect0, effects | 2,756 |
-| `synergy.ymxr` | plain | square, square0, square1, effect0, effect1, effects | 3,664 |
-| `turrican-2.ymxr` | plain | effect1, effects | 2,682 |
-| `turrican.ymxr` | plain | effect1, effects | 2,682 |
-| `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3, effects | 6,698 |
+| `preempt.ymxr` | plain | square, square0, effect0, effect1, effects | 3,506 |
+| `retune.ymxr` | plain | one, one0, effect0, effects | 2,746 |
+| `synergy.ymxr` | plain | square, square0, square1, effect0, effect1, effects | 3,658 |
+| `turrican-2.ymxr` | plain | effect1, effects | 2,672 |
+| `turrican.ymxr` | plain | effect1, effects | 2,672 |
+| `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3, effects | 6,668 |
 
-A tune of general sources alone, with no effect, links 1,336 bytes, 9% of
-the core: the blocks are 12,940 bytes of it. `voices.ymxr` runs all four
+A tune of general sources alone, with no effect, links 1,336 bytes, 10% of
+the core: the blocks are 12,220 bytes of it. `voices.ymxr` runs all four
 effects, keeps a handler of two or three columns on each and the start of
-several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup instances
-of 3 kinds and links 15,470 bytes of 49,744: the 36 instances and the 7
-loops of init it leaves out are 13,934 bytes, and the gaps it keeps are
-656 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
-instances of 1 kind and links 15,852 bytes of 49,744: the 38 instances and
-the 9 loops of init it leaves out are 15,018 bytes, and the gaps it keeps
-are 154 bytes shorter than in the core.
+several columns, and links 6,668. `mapped.ymxr` keeps 4 lookup instances
+of 3 kinds and links 15,156 bytes of 45,872: the 36 instances and the 7
+loops of init it leaves out are 11,780 bytes, and the gaps it keeps are
+402 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
+instances of 1 kind and links 15,636 bytes of 45,872: the 38 instances and
+the 9 loops of init it leaves out are 12,428 bytes, and the gaps it keeps
+are 304 bytes shorter than in the core.
 
 ## The check
 

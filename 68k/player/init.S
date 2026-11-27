@@ -156,19 +156,15 @@ YMXR_init:
                 bset    d2,d5
                 bra.s   .cell
 ; A source whose one column fills its byte: its rows carry no marker, so
-; the rows of a pass and the rows of the loop are in the table beside,
-; with its loop cell, and the tag in the cell's place sends a start to
-; the routine every effect shares, which tells this tag from the tags of
-; a source of several columns. A counted source of several columns: the
-; stride from one column to the next and R are beside its loop cell, and
-; a start reads the rows of a pass through the loop off the cell and the
-; first row (SPEC.md 3.1.6).
+; R is in the table beside, with its loop cell, and the tag in the
+; cell's place sends a start to the routine every effect shares, which
+; tells this tag from the tags of a source of several columns. A counted
+; source of several columns: the stride from one column to the next and
+; R are beside its loop cell (SPEC.md 3.1.6).
 .counted:       move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
                 cmp.w   #1,DT_COLUMNS(a3)       ; a counted source of several
                 bne.s   .ccolumns               ; columns
                 move.w  d2,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
-                sub.l   DT_REPEAT(a3),d2
-                move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R less RR, the loop
                 moveq   #-5,d0
                 bra.s   .tagged
 .ccolumns:      move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R, beside the stride
@@ -361,11 +357,11 @@ YMXR_init:
 .nosq:          dbra    d2,.sq
                 ENDPIECE square_1
 
-; The handlers of several columns: the loop cells they read and the
-; places they step are in the handler, so one link writes every address
-; the loop path and the step read, as a general handler's link does. A
-; start writes the values, and no timer reaches one of these handlers
-; before a start has aimed its vector there.
+; The handlers of several columns: the places they step are in the
+; handler, so one link writes every address the loop path and the step
+; write, as a general handler's link does. A start writes the values,
+; the loop cells and the loop word, and no timer reaches one of these
+; handlers before a start has aimed its vector there.
                 PIECE   two_1
                 lea     ymxr_two0(pc),a5
                 adda.w  d6,a5
@@ -373,11 +369,6 @@ YMXR_init:
                 moveq   #3,d2
 .linktwo:       lsr.b   #1,d4
                 bcc.s   .nolinktwo
-                lea     TW2_CELLS(a5),a3
-                move.l  a3,TW2_LOOPT(a5)
-                move.l  a3,TW2_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TW2_LOOP2R(a5)
                 lea     TW2_PTR1(a5),a3
                 move.l  a3,TW2_STEP1(a5)
                 move.l  a3,TW2_LOOP1W(a5)
@@ -394,13 +385,6 @@ YMXR_init:
                 moveq   #3,d2
 .linkthree:     lsr.b   #1,d4
                 bcc.s   .nolinkthree
-                lea     TW3_CELLS(a5),a3
-                move.l  a3,TW3_LOOPT(a5)
-                move.l  a3,TW3_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TW3_LOOP2R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TW3_LOOP3R(a5)
                 lea     TW3_PTR1(a5),a3
                 move.l  a3,TW3_STEP1(a5)
                 move.l  a3,TW3_LOOP1W(a5)
@@ -420,22 +404,14 @@ YMXR_init:
                 moveq   #3,d2
 .linkenv:       lsr.b   #1,d4
                 bcc.s   .nolinkenv
-                lea     TWC_CELLS(a5),a3
-                move.l  a3,TWC_LOOPT(a5)
-                move.l  a3,TWC_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TWC_LOOP2R(a5)
                 lea     TWC_PTR1(a5),a3
                 move.l  a3,TWC_STEP1(a5)
                 move.l  a3,TWC_LOOP1W(a5)
                 lea     TWC_PTR2(a5),a3
                 move.l  a3,TWC_STEP2(a5)
                 move.l  a3,TWC_LOOP2W(a5)
-                lea     TWC_LEFT(a5),a3
-                move.l  a3,TWC_CNT(a5)
-                move.l  a3,TWC_RELDA(a5)
-                move.l  a3,TWC_PARK(a5)
-                move.w  #1,TWC_LEFT(a5)
+                lea     TWC_PTR1+PLACE_LO(a5),a3
+                move.l  a3,TWC_CNT(a5)          ; the first place, compared
                 lea     TWC_SIZE(a5),a5
 .nolinkenv:     dbra    d2,.linkenv
                 ENDPIECE envelope_1
@@ -446,13 +422,6 @@ YMXR_init:
                 moveq   #3,d2
 .linkcwide:       lsr.b   #1,d4
                 bcc.s   .nolinkcwide
-                lea     TWCT_CELLS(a5),a3
-                move.l  a3,TWCT_LOOPT(a5)
-                move.l  a3,TWCT_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TWCT_LOOP2R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TWCT_LOOP3R(a5)
                 lea     TWCT_PTR1(a5),a3
                 move.l  a3,TWCT_STEP1(a5)
                 move.l  a3,TWCT_LOOP1W(a5)
@@ -462,11 +431,8 @@ YMXR_init:
                 lea     TWCT_PTR3(a5),a3
                 move.l  a3,TWCT_STEP3(a5)
                 move.l  a3,TWCT_LOOP3W(a5)
-                lea     TWCT_LEFT(a5),a3
-                move.l  a3,TWCT_CNT(a5)
-                move.l  a3,TWCT_RELDA(a5)
-                move.l  a3,TWCT_PARK(a5)
-                move.w  #1,TWCT_LEFT(a5)
+                lea     TWCT_PTR1+PLACE_LO(a5),a3
+                move.l  a3,TWCT_CNT(a5)         ; the first place, compared
                 lea     TWCT_SIZE(a5),a5
 .nolinkcwide:     dbra    d2,.linkcwide
                 ENDPIECE countedthree_1
@@ -481,22 +447,14 @@ YMXR_init:
                 moveq   #3,d2
 .linksyn:       lsr.b   #1,d4
                 bcc.s   .nolinksyn
-                lea     TWC_CELLS(a5),a3
-                move.l  a3,TWC_LOOPT(a5)
-                move.l  a3,TWC_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TWC_LOOP2R(a5)
                 lea     TWC_PTR1(a5),a3
                 move.l  a3,TWC_STEP1(a5)
                 move.l  a3,TWC_LOOP1W(a5)
                 lea     TWC_PTR2(a5),a3
                 move.l  a3,TWC_STEP2(a5)
                 move.l  a3,TWC_LOOP2W(a5)
-                lea     TWC_LEFT(a5),a3
-                move.l  a3,TWC_CNT(a5)
-                move.l  a3,TWC_RELDA(a5)
-                move.l  a3,TWC_PARK(a5)
-                move.w  #1,TWC_LEFT(a5)
+                lea     TWC_PTR1+PLACE_LO(a5),a3
+                move.l  a3,TWC_CNT(a5)          ; the first place, compared
                 lea     TWS_SIZE(a5),a5
 .nolinksyn:     dbra    d2,.linksyn
 .linkedsyn:
@@ -969,15 +927,14 @@ ymxr_kept:      and.w   #$FF,d0
 .register:      moveq   #1,d0
 .done:          rts
 
-; a5 a tick handler: its operands linked, its place parked.
+; a5 a tick handler: its operands linked, its place parked and its loop
+; word the halt's, so a tick before the first start stops the timer.
                 PIECE   effects_6
 ymxr_link:
                 lea     TICK_PTR(a5),a3
                 move.l  a3,TICK_STEP(a5)
                 move.l  a3,TICK_LOOPW(a5)
-                lea     TICK_CELL(a5),a3
-                move.l  a3,TICK_LOOPT(a5)
-                move.l  a3,TICK_LOOPR(a5)
+                move.w  #TICK_ONCEW,TICK_LAST(a5)
                 .if     YMXR_PCREL
                 clr.w   TICK_CELL(a5)
                 lea     ymxr_park(pc),a3
@@ -994,26 +951,22 @@ ymxr_link:
                 ENDPIECE effects_6
 
                 PIECE   counted_2
-; a5 a counted handler, the same way: its operands linked, its counter
-; at 1 and its cell at 0, so a tick before the first start writes the
-; parked marker and stops the timer, as the handler above does.
+; a5 a counted handler, the same way: its operands linked, its last
+; row's place at its place, its cell at 0 and its loop word the halt's,
+; so a tick before the first start writes the parked marker and stops the
+; timer, as the handler above does.
 ymxr_linkc:
                 lea     TICKC_PTR(a5),a3
                 move.l  a3,TICKC_STEP(a5)
                 move.l  a3,TICKC_LOOPW(a5)
-                lea     TICKC_CELL(a5),a3
-                move.l  a3,TICKC_LOOPT(a5)
-                move.l  a3,TICKC_LOOPR(a5)
+                lea     TICKC_PTR+PLACE_LO(a5),a3
+                move.l  a3,TICKC_CNTA(a5)       ; the place, compared
+                move.w  #TICKC_ONCEW,TICKC_LAST(a5)
                 .if     YMXR_PCREL
                 clr.w   TICKC_CELL(a5)
                 .else
                 clr.l   TICKC_CELL(a5)
                 .endif
-                lea     TICKC_LEFT(a5),a3
-                move.l  a3,TICKC_CNTA(a5)
-                move.l  a3,TICKC_RELDA(a5)
-                move.l  a3,TICKC_PARK(a5)
-                move.w  #1,TICKC_LEFT(a5)
                 lea     ymxr_park(pc),a3
                 .if     YMXR_PCREL
                 suba.l  a5,a3
@@ -1022,6 +975,7 @@ ymxr_linkc:
                 .else
                 move.l  a3,TICKC_PTR(a5)
                 .endif
+                move.w  a3,TICKC_LASTP(a5)      ; the place's word
                 clr.b   TICKC_SEL(a5)           ; R0, as init leaves the kept
                 rts                             ; target (SPEC.md 5.2.1)
                 ENDPIECE counted_2

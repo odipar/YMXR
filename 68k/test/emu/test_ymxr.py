@@ -541,8 +541,8 @@ def equate(name, symbols=None):
 PCREL = True
 
 TICK_SEL = TICK_PTR = SQ_SEL = SQ_VAL = SQ_MASK = ONE_SEL = ONE_VAL = 0
-TICKC_SEL = TICKC_PTR = TICKC_LEFT = 0
-TWC_SEL1 = TWC_PTR1 = TWC_LEFT = 0
+TICKC_SEL = TICKC_PTR = 0
+TWC_SEL1 = TWC_PTR1 = 0
 TW_SEL1 = TW_PTR1 = (0, 0)
 
 # The registers a target writes and the column of the row each writes,
@@ -1358,7 +1358,8 @@ class Model:
     def left(self, i):
         """The rows a counted handler has left: from the row its place
         is at to the last row of the running cut, the end of the source
-        under cut 0 (68k/player/ticks.S, TICKC)."""
+        under cut 0: one more than the handler's last row's place less
+        its place (68k/player/ticks.S, TICKC)."""
         fx = self.fx[i]
         at, R, RR, columns = self.tune.sources[fx["source"]]
         return self.rows_of(fx["crun"], R)[1] - fx["place"] + 1
@@ -4017,11 +4018,15 @@ def running(m, symbols, model, i, said, ticked=False):
         assert m.place(at, TICK_PTR) == place, \
             "%seffect %d's place is %x, not %x" % (said, i, m.place(at, TICK_PTR), place)
         if model.counting(i):
+            # the last row's place less the place: the word of the place
+            # the compare reads, the displacement or the address's low word
             offset = name.upper() if fx["run"] else {0: "TICKC", 2: "TWC", 3: "TWCT"}[model.wide(i)]
-            left = equate(offset + "_LEFT", symbols)
-            assert m.word(at + left) == model.left(i), \
+            lastp = equate(offset + "_LASTP", symbols)
+            low = TICK_PTR + (0 if PCREL else 2)
+            left = ((m.word(at + lastp) - m.word(at + low)) & 0xFFFF) + 1
+            assert left == model.left(i), \
                 "%seffect %d has %d rows left, not %d" % (
-                    said, i, m.word(at + left), model.left(i))
+                    said, i, left, model.left(i))
         if fx["run"]:
             pages(m, symbols, model, i, at, name, said)
         sel = TICK_SEL
@@ -4919,7 +4924,7 @@ def mapped_read(code, symbols, cycles_of, general, plays):
         stale.append("performance.md has no row for the ticks %s" % unread)
     # each against the identity's tick of its shape
     more = re.search(r"Each figure is the tick of the identity's handler of that shape and (\d+)"
-                     r" cycles, (\d+) on the path that loops, and (\d+) when a counted source stops",
+                     r" cycles, and (\d+) when a source stops",
                      " ".join(ticks_at.split()))
     paired = Counter()
     for kind, spent in sorted(ticked.items()):
@@ -4928,8 +4933,9 @@ def mapped_read(code, symbols, cycles_of, general, plays):
                 or base.startswith(("square", "one")):
             continue
         loops = " loop" in kind
-        counted_stop = base.startswith("counted ") and " stop" in base
-        want = more and int(more.group(3 if counted_stop else 2 if loops else 1))
+        # a stop branches to the effect's halt through the instance's
+        # bra.w after its loop, which the loop word reaches
+        want = more and int(more.group(2 if "stop" in base.split() else 1))
         if len(spent) != 1 or len(identity[base]) != 1 or \
                 next(iter(spent)) - next(iter(identity[base])) != want:
             stale.append("the tick %s is %s through a transformation and %s through the identity,"
@@ -5435,8 +5441,8 @@ def cut_read(code, symbols, cycles_of, general):
         elif all(len(one) == 1 for one in counted):
             more.setdefault("on" if then == "on" else "end", set()).add(
                 next(iter(counted[1])) - next(iter(counted[0])))
-    reads(r"The counter of rows left costs (\d+) cycles a row written on each of the (\w+),"
-          r" and (\d+) at the end of a pass",
+    reads(r"The compare of the place with the last row's place costs (\d+) cycles a row"
+          r" written on each of the (\w+), and (\d+) at the end of a pass",
           span(more.get("on", {0})), WORDS[len({columns for _, columns, _ in CUT_TICKS})],
           span(more.get("end", {0})))
     square = (ticked.get("cut a square on", set()), ticked.get("cut a square loop", set()))
@@ -8670,8 +8676,8 @@ def main():
     code, symbols = build(defines)
     FILE = placed(len(code))
     global TICK_SEL, TICK_PTR, SQ_SEL, SQ_VAL, SQ_MASK, ONE_SEL, ONE_VAL, TW_SEL1, TW_PTR1
-    global TICKC_SEL, TICKC_PTR, TICKC_LEFT
-    global TWC_SEL1, TWC_PTR1, TWC_LEFT
+    global TICKC_SEL, TICKC_PTR
+    global TWC_SEL1, TWC_PTR1
     TICK_SEL = equate("TICK_SEL", symbols)
     TICK_PTR = equate("TICK_PTR", symbols)
     SQ_SEL = equate("SQ_SEL", symbols)
@@ -8685,8 +8691,6 @@ def main():
     TICKC_PTR = equate("TICKC_PTR", symbols)
     TWC_SEL1 = equate("TWC_SEL1", symbols)
     TWC_PTR1 = equate("TWC_PTR1", symbols)
-    TWC_LEFT = equate("TWC_LEFT", symbols)
-    TICKC_LEFT = equate("TICKC_LEFT", symbols)
     print("the player: %d bytes%s%s%s%s, the tune at $%X" % (
         len(code), ", the raster monitor in" if perf else "",
         ", the lean tick" if LEAN else "",
