@@ -1278,6 +1278,18 @@ TWS_SLOT        equ     ymxr_syn0_sel1-ymxr_syn0+1
 TWS_TOGEN       equ     ymxr_syn0_gen-ymxr_syn0_sel1-2
 TWS_TOREG       equ     ymxr_syn0_hreg-ymxr_syn0_sel1-2
 TWS_REG         equ     ymxr_syn0_hreg-ymxr_syn0
+; The head the frame writes is 8 bytes into the room, past the move a
+; tick of the other parity runs first (sync.S, ymxr_sheads), and the
+; slot's value at it is TWS_TOHEAD; the second of the two pieces the frame
+; writes for the general head is 12 bytes in, TWS_TOB, and the general
+; head is TWS_GENH from the handler's first byte.
+TWS_HREG        equ     TWS_REG+8
+TWS_TOHEAD      equ     TWS_TOREG+8
+TWS_TOB         equ     TWS_TOREG+12
+TWS_GENH        equ     ymxr_syn0_head-ymxr_syn0
+                .if     TWS_TOREG<-128
+                .error  "the slot does not reach the room of the handler of a target of a sync"
+                .endif
 TWS_PTR1        equ     ymxr_syn0_ptr1-ymxr_syn0
                 .if     YMXR_AEOI=0
 TWS_EOI         equ     ymxr_syn0_eoi-ymxr_syn0
@@ -1291,10 +1303,10 @@ TWS_TAIL        equ     ymxr_syn0_htail-ymxr_syn0
 ; The general head's registers, which a start writes (sync.S,
 ; ymxr_syncwide): the fine register at six sites and the coarse at two; and
 ; its two parity words, which the frame writes: the first word of the
-; path's read of the row's fine, which goes on to the odd steps, or a
+; path's test of the row's fine, which goes on to the odd steps, or a
 ; bra.s to the even ones.
 TWS_F1          equ     ymxr_syn0_hf1-ymxr_syn0+3
-TWS_F2          equ     ymxr_syn0_hf2-ymxr_syn0+3
+TWS_F2          equ     ymxr_syn0_hf2-ymxr_syn0+2
 TWS_F3          equ     ymxr_syn0_sf1-ymxr_syn0+3
 TWS_F4          equ     ymxr_syn0_sf2-ymxr_syn0+3
 TWS_F5          equ     ymxr_syn0_sf3-ymxr_syn0+3
@@ -1305,6 +1317,7 @@ TWS_MPAR        equ     ymxr_syn0_mpar-ymxr_syn0
 TWS_FPAR        equ     ymxr_syn0_fpar-ymxr_syn0
 TWS_EVW         equ     $6000|(ymxr_syn0_ev-ymxr_syn0_mpar-2)
 TWS_SEVW        equ     $6000|(ymxr_syn0_sev-ymxr_syn0_fpar-2)
+TWS_MODDW       equ     $4A00                   ; tst.b d0
                 .if     YMXR_PCREL
 TWS_ODDW        equ     $303A                   ; move.w d16(pc),d0
                 .else

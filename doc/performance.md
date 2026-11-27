@@ -723,9 +723,9 @@ value, a period 32,768 more than the row's, which the kit's `envelope`
 tune does on its first source's last two rows, 800 and then 33,696, its
 928 with the marker.
 
-The player is 12,406 bytes, 1,224 of them the counted shapes' twelve
+The player is 12,584 bytes, 1,224 of them the counted shapes' twelve
 instances, four each of one, two and three columns. Where a tick reads an
-absolute address, 12,082 bytes and 1,320, instances of 110 bytes against
+absolute address, 12,236 bytes and 1,320, instances of 110 bytes against
 the marked shape's 102 for two columns.
 
 ## A tick through an absolute address
@@ -792,11 +792,11 @@ reports -1 for one further off (BINARIES.md 1.5), and the layouts put a
 tune's DTX1 tables before its image and a set's subtunes before the
 images, so the rows of the tune a host loads are beside the player at any
 length of image. A host that places them further off assembles this build,
-which is 12,082 bytes against 12,406. Two figures move against each other:
+which is 12,236 bytes against 12,584. Two figures move against each other:
 a place is a word where it was a long, which shortens a timer's handlers
 by 48 bytes, and a start does the arithmetic that turns a row's address
 into a displacement, 38 bytes more of the timer's frame code. The init and
-the routines the four timers share, the reach check among them, are 364
+the routines the four timers share, the reach check among them, are 388
 bytes more.
 
 What the two cores do to a tune, under Hatari over 900 frames of Turrican -
@@ -874,15 +874,15 @@ target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
 The second bank, the installers, the stubs and the stop's write-back make
-the player 17,272 bytes against 12,406, and 17,128 against 12,082 where a
+the player 17,450 bytes against 12,584, and 17,282 against 12,236 where a
 tick reads an absolute address. Each handler gains a stub: an instance of
 the wide handler is 106 bytes against 102, and of the marked shape of two
 columns 98 against 94.
 
-The lookup in, `YMXR_MAP=1`, makes the player 31,842 bytes against 12,406,
-and 31,348 against 12,082 where a tick reads an absolute address. With the
-deferred start in as well, 44,768 against 17,272, and 44,520 against
-17,128.
+The lookup in, `YMXR_MAP=1`, makes the player 31,972 bytes against 12,584,
+and 31,478 against 12,236 where a tick reads an absolute address. With the
+deferred start in as well, 44,386 against 17,450, and 44,650 against
+17,282.
 
 ## A cut
 
@@ -981,18 +981,18 @@ which starts four sources: 9,772 cycles, four through a transformation,
 two of them under a cut, and 9,562, four of two and three columns under a
 cut.
 
-The player with the lookup in is 31,842 bytes against 21,966 in release
-0.15.0, before the cut, and 31,348 against 23,256 where a tick reads an
-absolute address; with the deferred start in as well, 44,768 against
-35,908, and 44,520 against 37,954. Of the 9,876 bytes it is longer than in
+The player with the lookup in is 31,972 bytes against 21,966 in release
+0.15.0, before the cut, and 31,478 against 23,256 where a tick reads an
+absolute address; with the deferred start in as well, 44,386 against
+35,908, and 44,650 against 37,954. Of the 10,006 bytes it is longer than in
 that release, 3,264 are the cut's blocks, which a link leaves out of the
 player of a song that cuts no source (LINKER.md): 2,744 of routines and
 130 of each effect's frame code. With the deferred start in, the blocks
-are 3,740 of the 8,860. The blocks of copy from frame, which a link keeps
+are 3,740 of the 8,478. The blocks of copy from frame, which a link keeps
 only for a song that copies from frame, are 2,780 bytes of the rest, and
 2,890 with the deferred start in (Copy from frame). The blocks of the sync
 and of the handler of its targets, which a link keeps only for a song that
-syncs a voice, are 5,332 bytes, and 5,630 with the deferred start in
+syncs a voice, are 5,446 bytes, and 5,744 with the deferred start in
 (LINKER.md).
 
 ## Copy from frame

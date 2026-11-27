@@ -456,10 +456,11 @@ the two columns where the row sets the registers.
 
 **1.12.2** In version 14, bit 4 of coarse column 1, 3 or 5 is 1 where the
 syncs of voice A, B or C during the row are even (YMXS, SPEC.md 1.6,
-3.9.2): the sync of its frame and those of a target of a sync until the
-next frame. A player reads it on every row, the set bit of the column 1 or
-0 (1.1.4), and a writer sets the bit of each voice the row's `evenSyncs`
-lists.
+3.9.2): the sync of its frame, and those of a target of a sync from the
+second tick after the frame's register steps to the first tick after the
+next frame's (5.1). A player reads it on every row, the set bit of the
+column 1 or 0 (1.1.4), and a writer sets the bit of each voice the row's
+`evenSyncs` lists.
 
 **1.12.3** A *sync* of a voice, in order: write 0 to the two registers of
 its period, R0 and R1 for voice A, R2 and R3 for voice B, R4 and R5 for
@@ -469,8 +470,12 @@ period is 0 from the second 0 to the first write of the period, or to the
 coarse write where the fine value is 0, for exactly n steps of the tone
 generator, 32 cycles of an 8 MHz 68000 each: n odd where the voice's bit 4
 of the row is 0, and n even, at least 2, where it is 1 (YMXS, SPEC.md
-3.9). A frame syncs the voices its row marks, one after another (4.4.1),
-and a tick of a target of a sync, 25 to 27, syncs its voice (2.1, 5.1).
+3.9). Where the coarse 0 is first, the fine 0 comes exactly one step after
+it: for that step the period is the chip's fine value, and the square
+turns over at that step where the count of the tone generator is at or
+above the fine value. A frame syncs the voices its row marks, one after
+another (4.4.1), and a tick of a target of a sync, 25 to 27, syncs its
+voice (2.1, 5.1).
 
 ---
 
@@ -1350,10 +1355,13 @@ before step 1 it writes 0 to the two registers of the voice's period, the
 coarse one first unless the chip's value of the fine one is 0, and steps 1
 and 2 then write the period, the fine column and then the coarse nibble,
 the marker's column, after the steps of 1.12.3, odd or even by bit 4 of
-the voice's coarse column in the row the latest frame read (1.12.2). From
-the first 0 to the write of step 2 the tick runs at its timer's interrupt
-level, which masks every other timer, so a tick of another timer due then
-is served after it (5.1.2).
+the voice's coarse column in the row the latest frame read (1.12.2). The
+first tick after a frame's register steps reads the bit in the row the
+frame before read, the row whose period the voice has until that tick,
+unless the frame is the first since the timer's start or a start is
+pending on the timer (4.8). From the first 0 to the write of step 2 the
+tick runs at its timer's interrupt level, which masks every other timer,
+so a tick of another timer due then is served after it (5.1.2).
 
 **5.1.1** A player runs the MFP in the mode the host leaves it, bit 3 of
 `$FFFA17` at 1, and performs step 6. A player that clears bit 3 at 4.1,

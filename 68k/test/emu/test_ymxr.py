@@ -7157,6 +7157,7 @@ def hatari(ym, code, symbols, perf=False):
     # a row that sets a period of 0 keeps it there for the music, as a
     # dump of version 9 does.
     waits = []
+    gaps = []
     regs = {}
     since = {}
     def zero(v):
@@ -7177,6 +7178,15 @@ def hatari(ym, code, symbols, perf=False):
         if syncing and zero(v) and not was and prior and prior[0] == owner \
                 and prior[2] == 0 and prior[1] == (reg ^ 1):
             since[v] = (at, f)
+            # where the coarse register's 0 is the first, one step to the
+            # fine's: the period is the fine value alone for that step
+            # (SPEC.md 1.12.3)
+            if prior[1] & 1 and prior[3] is not None:
+                gap = at - prior[3] if at >= prior[3] else at - prior[3] + VIDEO_FRAME
+                gaps.append(gap)
+                assert gap == 32, \
+                    "frame %d: a sync writes voice %s's coarse 0 %d cycles before its fine" \
+                    " 0, not one step of 32" % (f, "ABC"[v], gap)
         elif was and not zero(v) and v in since:
             start, f = since.pop(v)
             # a span across the start of a video frame, where the trace's
@@ -7195,6 +7205,7 @@ def hatari(ym, code, symbols, perf=False):
                                       "even" if True in said else "odd")
     if tune.syncs:
         assert waits, "a tune that syncs a voice has no sync on Hatari"
+        assert gaps, "on Hatari, no sync of a tune that syncs a voice writes the coarse 0 first"
     return played, sum(counted), waits
 
 
@@ -8677,6 +8688,9 @@ def main():
                                          "copy-from-frame.ymxr", "sync.ymxr",
                                          "sync-targets.ymxr", "sync-volume.ymxr",
                                          "sync-even.ymxr", "sync-heads.ymxr")]
+            # and a hard sync whose period changes every four rows and
+            # whose timer's rate changes with it (ym/square-sync)
+            tunes.append(os.path.join(ROOT, "ym", "square-sync", "square-sync.ymxr"))
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]

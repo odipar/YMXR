@@ -119,6 +119,7 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 .endif
                 move.w  d4,d0
                 lsr.w   #8,d0
+                move.b  10(a4),11(a4)           ; the row before's
                 move.b  d0,10(a4)               ; ymxr_seven
                 tst.b   d4
                 beq.w   .done\~
@@ -140,10 +141,10 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 
 ; The sync of voice \v where bit \v of d4 is 1 (YMXS, SPEC.md 3.9): 0 to
 ; its two registers, the coarse one first unless the chip's value of the
-; fine one is 0, then its frame values, fine then coarse, the steps between
-; of HOLD_F:
-; even where bit 2 * \v + 8 of d4 is 1, and those of the coarse write where
-; the fine is 0. a2 the select register; d0 to d2 clobbered.
+; fine one is 0, the second 0 a movep.w one step after the coarse 0, then
+; its frame values, fine then coarse, the steps between of HOLD_F: even
+; where bit 2 * \v + 8 of d4 is 1, and those of the coarse write where the
+; fine is 0. a2 the select register; d0 to d2 clobbered.
                 .macro  SYNC1   v,stride
                 btst    #\v,d4
                 beq.w   .no\~
@@ -153,36 +154,36 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 move.b  (2*\v+1)*\stride(a3),d1
                 move.b  #2*\v,(a2)
                 move.b  (a2),d2
-                beq.s   .ff\~
+                bne.s   .cf\~
+                move.w  #(2*\v+1)<<8,d2
+                move.b  #0,2(a2)
+                bra.s   .zero\~
+.cf\~:          move.w  #(2*\v)<<8,d2
                 move.b  #2*\v+1,(a2)
                 move.b  #0,2(a2)
-                move.b  #2*\v,(a2)
-                bra.s   .steps\~
-.ff\~:          move.b  #0,2(a2)
-                move.b  #2*\v+1,(a2)
-.steps\~:       tst.b   d0
+                .rept   HOLD_FZ
+                nop
+                .endr
+.zero\~:        movep.w d2,0(a2)
+                tst.b   d0
                 beq.s   .z\~
                 btst    #2*\v+8,d4
                 bne.s   .e\~
-                move.b  #0,2(a2)
                 HOLD_F  1,0
                 movep.w d0,0(a2)
                 movep.w d1,0(a2)
                 bra.w   .no\~
-.e\~:           move.b  #0,2(a2)
-                HOLD_F  2,0
+.e\~:           HOLD_F  2,0
                 movep.w d0,0(a2)
                 movep.w d1,0(a2)
                 bra.w   .no\~
 .z\~:           btst    #2*\v+8,d4
                 bne.s   .ez\~
-                move.b  #0,2(a2)
                 HOLD_F  1,1
                 movep.w d0,0(a2)
                 movep.w d1,0(a2)
                 bra.s   .no\~
-.ez\~:          move.b  #0,2(a2)
-                HOLD_F  2,1
+.ez\~:          HOLD_F  2,1
                 movep.w d0,0(a2)
                 movep.w d1,0(a2)
 .no\~:
@@ -481,7 +482,7 @@ ymxr_syncwide:  move.w  d4,d5
                 move.b  d5,TWS_F4(a5)
                 move.b  d5,TWS_F5(a5)
                 move.b  d5,TWS_F6(a5)
-                move.w  #TWS_ODDW,TWS_MPAR(a5)
+                move.w  #TWS_MODDW,TWS_MPAR(a5)
                 move.w  #TWS_ODDW,TWS_FPAR(a5)
                 btst    d5,ymxr_seven(pc)
                 beq.s   .odd
@@ -493,6 +494,7 @@ ymxr_syncwide:  move.w  d4,d5
                 move.w  (sp)+,sr
                 lea     ymxr_sfx(pc),a5
                 clr.b   (a5,d6.w)
+                st      ymxr_sfresh-ymxr_sfx(a5,d6.w) ; no tick yet
                 .if     YMXR_MAP
                 cmp.l   #-7,d0                  ; copy from frame
                 beq.s   .copy
@@ -573,6 +575,10 @@ ymxr_syncaim:   movem.l d1-d2/d4/a1-a4,-(sp)
 ; Each effect's 1 where its start on a target of a sync was of a source
 ; whose bit of ymxr_sclean is 1, and 0 otherwise (ymxr_syncwide).
 ymxr_sfx:       dc.b    0,0,0,0
+; Each effect's 1 from a start on a target of a sync to the frame after
+; it, whose first tick ends no cycle of a period of the row before
+; (ymxr_sheads).
+ymxr_sfresh:    dc.b    0,0,0,0
                 .even
 ; The sources of two values none of whose rows has a fine of 0, the first
 ; value 0, a bit a source, bit s of byte s / 8 source s, which init writes
@@ -592,22 +598,23 @@ ymxr_sclean:    dc.l    0,0,0,0
                 .endif
                 .endm
 
-; A head copied into the handler of a5's room, a4 left at the room. a3
-; and d6 clobbered.
+; A head copied into the handler of a5's room at TWS_HREG, past the
+; move that a tick of the other parity runs first, a4 left at the head.
+; a3 and d6 clobbered.
                 .macro  HCOPY   t
                 lea     \t(pc),a3
-                lea     TWS_REG(a5),a4
+                lea     TWS_HREG(a5),a4
                 moveq   #(\{t}end-\t)/2-1,d6
 .c\~:           move.w  (a3)+,(a4)+
                 dbra    d6,.c\~
-                lea     TWS_REG(a5),a4
+                lea     TWS_HREG(a5),a4
                 .endm
 
 ; The registers and values of a head of copy from frame at a4: d1 the
 ; fine register, d0 the fine frame value, a1 the frame values (copy.S,
 ; ymxr_fv) at the fine's.
                 .macro  CPATCH  t
-                move.b  d1,10(a4)               ; the second 0's register
+                move.b  d1,\{t}_z-\t+2(a4)       ; the second 0's register
                 move.b  d1,\{t}_f-\t+2(a4)
                 move.b  d0,\{t}_f-\t+4(a4)
                 addq.b  #1,d1                   ; the coarse register
@@ -616,7 +623,7 @@ ymxr_sclean:    dc.l    0,0,0,0
                 move.b  FV_STRIDE(a1),\{t}_c-\t+4(a4)
                 subq.b  #1,d1
                 .if     YMXR_PERF
-                move.w  #TWS_TAIL-TWS_REG-(\{t}_e-\t)-2,\{t}_e-\t+2(a4)
+                move.w  #TWS_TAIL-TWS_HREG-(\{t}_e-\t)-2,\{t}_e-\t+2(a4)
                 .else
                 .if     YMXR_AEOI=0
                 move.l  TWS_EOI+2(a5),\{t}_e-\t+2(a4)
@@ -629,19 +636,21 @@ ymxr_sclean:    dc.l    0,0,0,0
 ; rows, odd and even, which go on to the handler's write of the row's
 ; fine; and with the lookup in, copy from frame, odd and even, its frame
 ; values as immediates. The chip's fine and the fine written are other
-; than 0, so the coarse 0 is first and the fine 0 second, the fine stays
-; selected, and the steps run from the fine 0 to the write of the fine:
-; one step odd, and even HOLD_FE's or HOLD_CE's nops more (ticks.S).
-; A bra.w reaches the handler, whose displacement the frame writes.
+; than 0, so the coarse 0 is first and the fine 0 one step after it, the
+; fine stays selected, and the steps run from the fine 0 to the write of
+; the fine: odd, and even HOLD_FE's or HOLD_CE's nops more (ticks.S). A
+; bra.w reaches the handler, whose displacement the frame writes.
                 .even
 ymxr_hro:       move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register
-                move.b  #0,YM_SELECT.w          ; +3: the fine register
-                move.b  #0,YM_SELECT+2.w
+                nop
+ymxr_hro_z:     move.l  #$00000000,YM_SELECT.w  ; +2: the fine register
+                HOLD_R
 ymxr_hro_b:     bra.w   *                       ; the handler's first place
 ymxr_hroend:
 ymxr_hre:       move.l  #$01000000,YM_SELECT.w
-                move.b  #0,YM_SELECT.w
-                move.b  #0,YM_SELECT+2.w
+                nop
+ymxr_hre_z:     move.l  #$00000000,YM_SELECT.w
+                HOLD_R
                 .if     HOLD_FE>0
                 .rept   HOLD_FE
                 nop
@@ -652,15 +661,18 @@ ymxr_hreend:
                 .if     YMXR_MAP
 ; Copy from frame: the four writes of the period, each a register and a
 ; value. The second 0 has an absolute long address, whose 4 cycles more
-; make the time from it to the fine's write one step.
+; make the time from it to the fine's write one step, and the nop before
+; it makes the time from the first 0 to it one step.
 ymxr_hco:       move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register
-                move.l  #$00000000,(YM_SELECT).l ; +2: the fine register
+                nop
+ymxr_hco_z:     move.l  #$00000000,(YM_SELECT).l ; +2: the fine register
 ymxr_hco_f:     move.l  #$00000000,YM_SELECT.w ; +2: the fine register, +4: the fine
 ymxr_hco_c:     move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register, +4: the coarse
                 HEND    ymxr_hco
 ymxr_hcoend:
 ymxr_hce:       move.l  #$01000000,YM_SELECT.w
-                move.l  #$00000000,(YM_SELECT).l
+                nop
+ymxr_hce_z:     move.l  #$00000000,(YM_SELECT).l
                 .if     HOLD_CE>0
                 .rept   HOLD_CE
                 nop
@@ -671,11 +683,14 @@ ymxr_hce_c:     move.l  #$01000000,YM_SELECT.w
                 HEND    ymxr_hce
 ymxr_hceend:
                 .endif
-                .if     (ymxr_hroend-ymxr_hro>HREG)|(ymxr_hreend-ymxr_hre>HREG)
+                .if     (ymxr_hro_z-ymxr_hro)<>(ymxr_hre_z-ymxr_hre)
+                .error  "the two heads of a source's rows have the fine register apart"
+                .endif
+                .if     (ymxr_hroend-ymxr_hro>(HREG-8))|(ymxr_hreend-ymxr_hre>(HREG-8))
                 .error  "a head of a source's rows is longer than a handler's room"
                 .endif
                 .if     YMXR_MAP
-                .if     (ymxr_hcoend-ymxr_hco>HREG)|(ymxr_hceend-ymxr_hce>HREG)
+                .if     (ymxr_hcoend-ymxr_hco>(HREG-8))|(ymxr_hceend-ymxr_hce>(HREG-8))
                 .error  "a head of copy from frame is longer than a handler's room"
                 .endif
                 .endif
@@ -687,17 +702,21 @@ ymxr_hceend:
 ; armed, with d0 0 each aimed at its general head, before the row's values
 ; change, and otherwise each written and aimed at its even or its odd
 ; head, by that bit, where the general head's reads would come out one
-; way until the next frame. A source's rows: where none has
-; a fine of 0 (ymxr_sfx) and the chip's fine is other than 0, the voice's
-; registers. Copy from frame: where the voice's fine frame value and the
-; chip's fine are other than 0, those and the voice's frame values
-; (copy.S, ymxr_fv). A tick runs the head the slot aims at and one byte
-; moves the slot, so the frame runs at its level. The target is read
+; way until the next frame. A source's rows: where none has a fine of 0
+; (ymxr_sfx) and the chip's fine is other than 0, the voice's registers.
+; Copy from frame: where the voice's fine frame value and the chip's fine
+; are other than 0, those and the voice's frame values (copy.S, ymxr_fv).
+; Where the voice's bit of the row before differs, and the frame is not
+; the first since the start (ymxr_sfresh), the first tick after the frame
+; runs that bit's parity: the head of that bit, or the general head with
+; its words, and the slot then moves to the general head with the row's
+; (SPEC.md 5.1). A tick runs the head the slot aims at and one byte moves
+; the slot, so the frame runs at its level. The target is read
 ; before the table of those handlers, which a link keeps for a song that
 ; starts a source on a target of a sync, and the tune's effects before
 ; the frame values, which it keeps for a song that copies from frame. a0
 ; the workspace, a2 the select register; every register kept.
-ymxr_sheads:    movem.l d0-d2/d5-d6/a1/a3-a6,-(sp)
+ymxr_sheads:    movem.l d0-d6/a1/a3-a6,-(sp)
                 move.b  d0,d2
                 lea     ymxr_timers(pc),a6
                 moveq   #0,d5                   ; the effect
@@ -722,11 +741,26 @@ ymxr_sheads:    movem.l d0-d2/d5-d6/a1/a3-a6,-(sp)
                 cmpa.l  a4,a5                   ; target of a sync
                 bne.w   .next
                 add.w   d1,d1                   ; the fine register
+                moveq   #0,d4
                 tst.b   d2
                 beq.s   .parity
-                move.w  #TWS_ODDW,d0            ; the general head's parity
+; d4 other than 0 where the voice's bit of the row differs from the row
+; before's, which the first tick after the frame reads, since that tick
+; ends a cycle of the period the row before set.
+                move.b  ymxr_seven(pc),d3
+                move.b  ymxr_seven+1(pc),d4
+                eor.b   d3,d4
+                btst    d1,d4
+                sne     d4
+                lea     ymxr_sfresh(pc),a3
+                tst.b   (a3,d5.w)
+                beq.s   .ticked
+                clr.b   (a3,d5.w)
+                moveq   #0,d4
+.ticked:
+                move.w  #TWS_MODDW,d0           ; the general head's parity
                 move.w  #TWS_ODDW,d6            ; words
-                btst    d1,ymxr_seven(pc)
+                btst    d1,d3
                 beq.s   .podd
                 move.w  #TWS_EVW,d0
                 move.w  #TWS_SEVW,d6
@@ -753,48 +787,104 @@ ymxr_sheads:    movem.l d0-d2/d5-d6/a1/a3-a6,-(sp)
                 .endif
 .rows:          lea     ymxr_sfx(pc),a3
                 tst.b   (a3,d5.w)
-                beq.w   .next
+                beq.w   .stubs
                 tst.b   d2
-                beq.s   .gen
+                beq.w   .gen
                 move.b  d1,(a2)                 ; the chip's fine
                 tst.b   (a2)
-                beq.w   .next
-                btst    d1,ymxr_seven(pc)
+                beq.w   .stubs
+                move.b  ymxr_seven(pc),d3       ; the row's bit, or the row
+                tst.b   d4                      ; before's where they differ
+                beq.s   .rbit
+                move.b  ymxr_seven+1(pc),d3
+.rbit:          btst    d1,d3
                 bne.s   .reven
                 HCOPY   ymxr_hro
-                move.w  #TWS_PTR1-TWS_REG-(ymxr_hro_b-ymxr_hro)-2,ymxr_hro_b-ymxr_hro+2(a4)
+                move.w  #TWS_PTR1-TWS_HREG-(ymxr_hro_b-ymxr_hro)-2,ymxr_hro_b-ymxr_hro+2(a4)
                 bra.s   .rregs
 .reven:         HCOPY   ymxr_hre
-                move.w  #TWS_PTR1-TWS_REG-(ymxr_hre_b-ymxr_hre)-2,ymxr_hre_b-ymxr_hre+2(a4)
-.rregs:         move.b  d1,11(a4)               ; the fine register
+                move.w  #TWS_PTR1-TWS_HREG-(ymxr_hre_b-ymxr_hre)-2,ymxr_hre_b-ymxr_hre+2(a4)
+.rregs:         move.b  d1,ymxr_hro_z-ymxr_hro+2(a4) ; the fine register
                 addq.b  #1,d1
                 move.b  d1,2(a4)                ; the coarse register
-                move.b  #TWS_TOREG,TWS_SLOT(a5)
-                bra.w   .next
+                bra.w   .aim
 .gen:           move.b  #TWS_TOGEN,TWS_SLOT(a5)
                 bra.w   .next
                 .if     YMXR_MAP
 .copy:          tst.b   d2
                 beq.s   .gen
                 move.b  (a3),d0                 ; the fine frame value
-                beq.w   .next
+                beq.w   .stubs
                 move.b  d1,(a2)                 ; the chip's fine
                 tst.b   (a2)
-                beq.w   .next
+                beq.w   .stubs
                 movea.l a3,a1                   ; the frame values
-                btst    d1,ymxr_seven(pc)
+                move.b  ymxr_seven(pc),d3       ; the row's bit, or the row
+                tst.b   d4                      ; before's where they differ
+                beq.s   .cbit
+                move.b  ymxr_seven+1(pc),d3
+.cbit:          btst    d1,d3
                 bne.s   .ceven
                 HCOPY   ymxr_hco
                 CPATCH  ymxr_hco
-                bra.s   .caim
+                bra.s   .aim
 .ceven:         HCOPY   ymxr_hce
                 CPATCH  ymxr_hce
-.caim:          move.b  #TWS_TOREG,TWS_SLOT(a5)
                 .endif
+; The slot at the head; where the two bits differ, at a move before it
+; that aims the slot at the general head, whose parity words are the
+; row's, for the ticks after the first.
+.aim:           move.b  #TWS_TOHEAD,TWS_SLOT(a5)
+                tst.b   d4
+                beq.w   .next
+                lea     TWS_REG(a5),a4
+                lea     TWS_SLOT(a5),a3
+                move.w  #$13FC,(a4)+            ; move.b #TWS_TOGEN,(slot).l
+                move.w  #TWS_TOGEN&$FF,(a4)+
+                move.l  a3,(a4)
+                move.b  #TWS_TOREG,TWS_SLOT(a5)
+                bra.w   .next
+; The general head, where the two bits differ: its parity words the row
+; before's, and two pieces in the room, which the slot aims at in turn and
+; each of which goes on to the general head. The first aims the slot at
+; the second, and the second writes the row's parity words and aims the
+; slot at the general head.
+.stubs:         tst.b   d4
+                beq.w   .next
+                lea     TWS_REG(a5),a4
+                lea     TWS_SLOT(a5),a3
+                move.w  #$13FC,(a4)+            ; move.b #TWS_TOB,(slot).l
+                move.w  #TWS_TOB&$FF,(a4)+
+                move.l  a3,(a4)+
+                move.w  #$6000,(a4)+            ; bra.w the general head
+                move.w  #TWS_GENH-TWS_REG-10,(a4)+
+                move.w  #$33FC,(a4)+            ; move.w #the row's word,(mpar).l
+                move.w  TWS_MPAR(a5),(a4)+
+                lea     TWS_MPAR(a5),a3
+                move.l  a3,(a4)+
+                move.w  #$33FC,(a4)+            ; and the same for fpar
+                move.w  TWS_FPAR(a5),(a4)+
+                lea     TWS_FPAR(a5),a3
+                move.l  a3,(a4)+
+                move.w  #$13FC,(a4)+            ; move.b #TWS_TOGEN,(slot).l
+                move.w  #TWS_TOGEN&$FF,(a4)+
+                lea     TWS_SLOT(a5),a3
+                move.l  a3,(a4)+
+                move.w  #$6000,(a4)+            ; bra.w the general head
+                move.w  #TWS_GENH-TWS_REG-38,(a4)
+                move.w  #TWS_MODDW,d0           ; the row before's words
+                move.w  #TWS_ODDW,d6
+                btst    d1,ymxr_seven+1(pc)
+                beq.s   .sodd
+                move.w  #TWS_EVW,d0
+                move.w  #TWS_SEVW,d6
+.sodd:          move.w  d0,TWS_MPAR(a5)
+                move.w  d6,TWS_FPAR(a5)
+                move.b  #TWS_TOREG,TWS_SLOT(a5)
 .next:          addq.l  #8,a6
                 addq.w  #1,d5
                 cmp.w   #4,d5
                 bne.w   .each
-                movem.l (sp)+,d0-d2/d5-d6/a1/a3-a6
+                movem.l (sp)+,d0-d6/a1/a3-a6
                 rts
                 ENDPIECE synced_4
