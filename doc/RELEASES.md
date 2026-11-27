@@ -39,6 +39,48 @@ than either.
 
 ## Published
 
+### 0.20.0, 2026-11-27
+
+<https://github.com/odipar/YMXR/releases/tag/v0.20.0>, built from the commit
+tagged `v0.20.0`.
+
+The ticks cost fewer cycles: copy from frame through the identity ticks
+from handlers the frame writes, every handler that steps a place ends a
+pass on immediates, and the general head of a target of a sync reads its
+registers off immediates and its parity off a word the frame writes. A
+tune converts to the file 0.19.0 writes.
+
+- **Copy from frame.** Through the identity, on a target other than a
+  target of a sync, a tick runs a handler of `move.l` immediates of the
+  registers and their frame values, which the register steps write: 56,
+  80 and 104 cycles for one, two and three columns, against 154, 218 and
+  282 in 0.19.0 (#405).
+- **The end of a pass.** A counted handler compares the place with the
+  last row's place, an immediate a start writes, and the loop cell is the
+  immediate of the move at the head of the path that ends a pass, whose
+  first word a start writes, or a `bra.s` to the halt where the source
+  plays once. The general handler's marker to row `RR` is 82 cycles
+  against 114, and the end of a pass of the counted handler of three
+  columns 214 against 282 (#407).
+- **The general head of a target of a sync.** Its registers are
+  immediates a start writes, its parity a word the frame writes, and its
+  pads shifts: a tick of its odd path is 342 cycles against 410, and a
+  handler of a target of a sync 384 bytes against 560 (#408).
+- **The rig's** Hatari pass times the syncs the model makes, where it
+  read a period a dump of version 9 sets to 0 as a sync (#406).
+
+The player is 12,406 bytes against 13,584 in 0.19.0, 31,842 with the
+lookup in against 33,244, and 17,272 with the deferred start in against
+19,002. Every call of the rig's tunes of copy from frame and of cuts is
+within R4.5's 6,656 cycles as it counts them.
+
+Against 0.19.0's Go tools, the eleven dumps of `ym/test` convert to the
+same tune files; the four that run no effect link the same SNDH files on
+the plain core, `-lean`, `-abs` and `-perf -lean -abs`, and the seven that
+run one link this release's player. The kit's tunes check the same, and
+those that run no effect link the same SNDH files. `bin/suite`: 386
+tests, 0 skipped.
+
 ### 0.19.0, 2026-11-26
 
 <https://github.com/odipar/YMXR/releases/tag/v0.19.0>, built from the commit
