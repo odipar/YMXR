@@ -1,12 +1,14 @@
 package org.ymxr;
 
 import java.util.List;
+import org.ymxs.YMXS.Cut;
 
 /**
  * Tune columns, one byte per column per frame, plus the repeat row,
- * effects used and optional transformations (SPEC.md 1). Version 9 has
- * thirty columns; version 10 adds four mapping columns. Mapping 0 uses
- * source values unchanged.
+ * effects used, optional transformations and cuts (SPEC.md 1). Version 9
+ * has thirty columns; version 10 adds four mapping columns, and version 11
+ * four cut columns after the mapping columns where the tune has them.
+ * Mapping 0 uses source values unchanged, and cut 0 is the whole table.
  *
  * <p>{@link Schema} encodes a YMXS tune; {@link Ym} imports a dump into
  * that structure. Constants here define register columns, set bits,
@@ -28,6 +30,25 @@ final class Columns {
      * (SPEC.md 3.3.5).
      */
     static final int MAPPED = 34;
+
+    /** The first cut column where the tune maps a value, and the column
+     *  count of a table that maps a value and cuts a source (SPEC.md
+     *  3.3.5). Where the tune maps none, the cut columns are 30 to 33. */
+    static final int CUT = 34;
+    static final int ALL = 38;
+
+    /** The cut limit: cut numbers 1 to 127 select a cut of the index; 0 is
+     *  the whole table (SPEC.md 1.11). */
+    static final int MOST_CUTS = 127;
+
+    /** The rows the counted handler counts, in a word: of a cut, and of a
+     *  source that fills its byte (SPEC.md section 8). */
+    static final int MOST_COUNTED_ROWS = 65535;
+
+    /** The rows of a source of two or three columns: a player keeps the
+     *  stride of its columns, align(R), in a word (SPEC.md 3.1.3, section
+     *  8). */
+    static final int MOST_WIDE_ROWS = 65534;
 
     /**
      * The transformation limit: mapping numbers 1 to 127 select
@@ -55,6 +76,30 @@ final class Columns {
      * block are present (SPEC.md 3.3).
      */
     static final int MAPS = 0x20;
+    /** Effects-used bit 6: version 11, its cut columns and cut index
+     *  (SPEC.md 3.3). */
+    static final int CUTS = 0x40;
+    /** Effects-used bit 7: version 12, a row starts copy from frame, the
+     *  last entry of the source index (SPEC.md 3.1.7, 3.3). */
+    static final int COPIES = 0x80;
+    /** A bit above the effects byte, which the file leaves out: a row
+     *  syncs a voice, at its frame or through a target of a sync, which
+     *  version 13 marks (SPEC.md 1.12, 3.3.5). */
+    static final int SYNCS = 0x100;
+    /** Bit 5 of a coarse column, 1, 3 or 5, in version 13: the row syncs
+     *  the voice, read on every row (SPEC.md 1.2.2, 1.12). */
+    static final int SYNC = 0x20;
+    /** A bit above the effects byte, which the file leaves out: a row
+     *  lists a voice among its even syncs, which version 14 marks (SPEC.md
+     *  1.12, 3.3.5). */
+    static final int EVENS = 0x200;
+    /** Bit 4 of a coarse column, 1, 3 or 5, in version 14: the voice's
+     *  syncs during the row are even, read on every row (SPEC.md 1.2.2,
+     *  1.12). */
+    static final int EVEN = 0x10;
+    /** The first target of a sync, `syncToneA`; 26 and 27 are `syncToneB`
+     *  and `syncToneC` (SPEC.md 2.1). */
+    static final int SYNC_TARGET = 25;
 
     /** Bit 4 of a control column: the count column beside it is 0, and
      *  that 0 is the value the MFP counts 256 for (SPEC.md 1.1, 1.9). */
@@ -71,10 +116,11 @@ final class Columns {
      *  register, so the marker is in their one column where the
      *  register leaves bit 7 and the source is counted where it does not;
      *  14 to 19 mark the coarse nibble, 20, `setEnvelope`, writes two
-     *  whole bytes and is counted, 21 marks the envelope shape, and 22 to
-     *  24 the noise period. */
+     *  whole bytes and is counted, 21 marks the envelope shape, 22 to 24
+     *  the noise period, and 25 to 27, the targets of a sync, the coarse
+     *  nibble. */
     static final int[] MARKER = {-1, 0, -1, 0, -1, 0, 0, -1, 0, 0, 0, -1, -1, 0,
-                                 1, 1, 1, 1, 1, 1, -1, 2, 0, 0, 0};
+                                 1, 1, 1, 1, 1, 1, -1, 2, 0, 0, 0, 1, 1, 1};
 
     /** Bits 7 and 6 of R7, the directions of the two I/O ports, which an
      *  Atari ST writes as 1 (SPEC.md 1.4.2). A row's write reads them
@@ -119,6 +165,10 @@ final class Columns {
      */
     final List<byte[]> transformations;
 
+    /** The cut index: cut n is at index n - 1, and empty below version 11
+     *  (SPEC.md 3.5). */
+    final List<Cut> cuts;
+
     /**
      * Builds columns directly: {@code column[c][frame]}, repeat row or
      * frame count for a tune played once, and effects used. This
@@ -133,15 +183,70 @@ final class Columns {
      * columns. Transformation n is at index n - 1.
      */
     Columns(byte[][] column, int repeat, int effects, List<byte[]> transformations) {
+        this(column, repeat, effects, transformations, List.of());
+    }
+
+    /** Builds columns with the lookup tables and the cuts their columns
+     *  select: transformation n and cut n are at index n - 1. */
+    Columns(byte[][] column, int repeat, int effects, List<byte[]> transformations,
+            List<Cut> cuts) {
         this.column = column;
         this.repeat = repeat;
         this.effects = effects;
         this.transformations = List.copyOf(transformations);
+        this.cuts = List.copyOf(cuts);
     }
 
-    /** The column count, 30 or 34, and a row's bytes. */
+    /** The column count, 30, 34 or 38, and a row's bytes. */
     int count() {
         return column.length;
+    }
+
+    /** Whether the effects byte marks the mapping columns, bit 5. */
+    static boolean maps(int effects) {
+        return (effects & MAPS) != 0;
+    }
+
+    /** Whether the effects byte marks the cut columns, bit 6. */
+    static boolean cuts(int effects) {
+        return (effects & CUTS) != 0;
+    }
+
+    /** Whether the effects byte marks copy from frame, bit 7. */
+    static boolean copies(int effects) {
+        return (effects & COPIES) != 0;
+    }
+
+    /** Whether a row syncs a voice, at its frame or through a target of a
+     *  sync: the bit above the effects byte (SPEC.md 3.3.5). */
+    static boolean syncs(int effects) {
+        return (effects & SYNCS) != 0;
+    }
+
+    /** Whether a row lists a voice among its even syncs: the bit above the
+     *  effects byte that version 14 marks (SPEC.md 3.3.5). */
+    static boolean evens(int effects) {
+        return (effects & EVENS) != 0;
+    }
+
+    /** The column count of a table of that effects byte: 30, with four
+     *  mapping columns where bit 5 is 1 and four cut columns where bit 6
+     *  is 1 (SPEC.md 3.3.5). */
+    static int count(int effects) {
+        return C + (maps(effects) ? 4 : 0) + (cuts(effects) ? 4 : 0);
+    }
+
+    /** Effect i's mapping column, 30 + i, or -1 where the table has no
+     *  mapping columns (SPEC.md 1.10). */
+    static int mapping(int effects, int i) {
+        return maps(effects) ? MAPPING + i : -1;
+    }
+
+    /** Effect i's cut column, 30 + i where the tune maps no value and
+     *  34 + i where it maps one, or -1 where the table has no cut columns
+     *  (SPEC.md 1.11.1). */
+    static int cut(int effects, int i) {
+        return cuts(effects) ? (maps(effects) ? CUT : MAPPING) + i : -1;
     }
 
     /** R0 to R13 of one frame with the dump's flag bits masked off, and -1

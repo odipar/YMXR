@@ -28,6 +28,13 @@
 ; vector left to the installer. It returns a5 the instance and a3 the
 ; mirror; with WS_ARMING at 1 it fills the page alone and returns a3 the
 ; record.
+;
+; This file, the remap but for cut_2 and ymxr_rehook, the page routines
+; but for ymxr_runrow, prefill's fill of the pages and the routines of
+; the lookup kinds' loops are the pieces lookup_1 to lookup_7 of the
+; block lookup, which a link keeps where a tune is of version 10 or maps
+; a value (doc/LINKER.md).
+                PIECE   lookup_1
 ymxr_lstart:    lsl.w   #3,d3                   ; the source's entry
                 movea.l WS_SOURCES-8(a0,d3.w),a4    ; its first row
                 move.l  WS_SOURCES-4(a0,d3.w),d0    ; its loop cell, or a tag
@@ -89,6 +96,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 move.l  a4,LK_PTR(a5)
                 move.l  d0,LK_CELL(a5)
                 .endif
+                LOOPHD  LK_CELL,LK_ONCEW
                 move.b  d5,LK_PAGE(a5)          ; the page byte
                 movea.w d1,a4
                 move.l  a5,(a4)                 ; the vector
@@ -155,6 +163,10 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
 ; d5 the kind, d0 the loop cell, a4 the first row, and the stride in the
 ; high word of d1. The descriptor, the instance and the page byte of the
 ; effect's first fallback page for the instance into the record's cache.
+; the path of the kinds, which ymxr_copylook enters with d5 the kind, a4
+; the first row and d0 the loop cell (copy.S): equates, so the local labels
+; around them stay in scope
+ymxr_lkind      equ     *
 .kind:          move.w  d5,d3
                 mulu    #KD_SIZE,d3
                 lea     ymxr_kinds(pc),a2
@@ -236,6 +248,7 @@ ymxr_lkwindow   equ     *                       ; inside the window: the rig's
                 moveq   #0,d6
                 move.b  FX_TARGET(a3),d6
                 lsl.w   #3,d6
+ymxr_lwmap      equ     *                       ; ymxr_copylook's map instead
                 lea     ymxr_wide-(14*8)(pc),a1
                 adda.w  d6,a1
                 move.w  KD_CELLS(a2),d7
@@ -266,7 +279,7 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 bne.s   .cols
 ; One column: the target's register at TICK_SEL and the place at
 ; TICK_PTR, as every lookup kind has them, the loop cell and, counted,
-; the rows from the place on and the rows of a pass through the loop.
+; the last row's place.
                 move.b  FX_TARGET(a3),TICK_SEL(a5)
                 .if     YMXR_PCREL
                 move.w  a4,d4
@@ -283,24 +296,18 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 move.w  KD_CELLS(a2),d4
                 move.l  d0,(a5,d4.w)
                 .endif
-                move.w  KD_LEFT(a2),d4
+                bne.s   .oloop                  ; the loop word, before the
+                move.w  KD_ONCEW(a2),-2(a5,d4.w) ; loop cell
+                bra.s   .ohead
+.oloop:         move.w  #LOOPW,-2(a5,d4.w)
+.ohead:
+                move.w  KD_LASTP(a2),d4
                 beq.s   .one1
-                move.w  FX_ROWS+2(a3),d5        ; R less the place
-                sub.w   d5,d3
-                neg.w   d3
-                move.w  d3,(a5,d4.w)
-                move.w  d5,d3                   ; R less the row the loop
-                tst.l   d0                      ; cell is at, or R where the
-                beq.s   .reld                   ; source plays once
-                move.w  d0,d4
-                .if     YMXR_PCREL
-                add.w   a5,d4
-                add.w   #TICK_PTR,d4
-                .endif
-                sub.w   a4,d4
-                sub.w   d4,d3
-.reld:          move.w  KD_RELD(a2),d4
-                move.w  d3,(a5,d4.w)
+                move.w  FX_ROWS+2(a3),d5        ; R less 1 less the place: the
+                subq.w  #1,d5                   ; rows past it
+                sub.w   d3,d5
+                add.w   TICK_PTR+PLACE_LO(a5),d5
+                move.w  d5,(a5,d4.w)            ; the last row's place
 .one1:          move.l  a4,FX_FIRST(a3)         ; the place at row 0
                 move.b  KD_SHAPE(a2),FX_SHAPE(a3)
                 .if     YMXR_DEFER
@@ -320,7 +327,12 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 .endif
 ; Several: a register, a place and a loop cell a column, as a start
 ; through the identity writes them.
-.cols:          swap    d1                      ; the stride
+.cols:          move.l  a6,d2                   ; the loop word, before the
+                bne.s   .wloop                  ; first loop cell
+                move.w  KD_ONCEW(a2),-2(a5,d7.w)
+                bra.s   .whead
+.wloop:         move.w  #LOOPW,-2(a5,d7.w)
+.whead:         swap    d1                      ; the stride
                 moveq   #0,d6                   ; four bytes a column
 .col:           move.w  KD_SEL(a2,d6.w),d2
                 move.b  (a1)+,(a5,d2.w)         ; the register
@@ -350,21 +362,16 @@ ymxr_lwindow    equ     *                       ; inside the window: the rig's
                 move.l  d5,(a5,d0.w)
                 .endif
                 addq.w  #4,d6                   ; the next column
-                addq.w  #CELL_SIZE,d7
+                add.w   #CELL_STRIDE,d7
                 dbra    d4,.col
                 swap    d1
-                move.w  KD_LEFT(a2),d4          ; counted: the rows from the
-                beq.s   .aim                    ; place on, and the rows of a
-                move.w  FX_ROWS+2(a3),d5        ; pass through the loop, R
-                move.w  d5,d0                   ; less RR, or R where it plays
-                sub.w   d3,d0                   ; once
+                move.w  KD_LASTP(a2),d4         ; counted: the last row's
+                beq.s   .aim                    ; place, R less 1 less the
+                move.w  FX_ROWS+2(a3),d0        ; place past the first place
+                subq.w  #1,d0
+                sub.w   d3,d0
+                add.w   TICK_PTR+PLACE_LO(a5),d0
                 move.w  d0,(a5,d4.w)
-                move.l  a6,d0
-                beq.s   .pass
-                sub.w   a4,d0
-                sub.w   d0,d5
-.pass:          move.w  KD_RELD(a2),d4
-                move.w  d5,(a5,d4.w)
 ; The vector, which the installer writes for an arming, and the shape.
 .aim:
                 .if     YMXR_DEFER

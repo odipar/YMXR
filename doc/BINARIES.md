@@ -54,7 +54,7 @@ tool reads a multi file (0.4, 3.3).
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXM` |
-| 4 | 2 | the version, $0003 to $0006: the highest of the tune files in it (SPEC.md 3.3.5) |
+| 4 | 2 | the version, $0009 to $000B: $000B where a tune file in it is version 11, $000A where one is version 10 and none is 11, and $0009 otherwise, a tune file of version 12 counted at the version of its layout (1.1; SPEC.md 3.3.5) |
 | 6 | 2 | `N`, the tune count, 1 to 99 |
 | 8 | 8`N` | the entries, tune 1 to `N`: a long where its tune file begins, signed, then a long its bytes, signed |
 | 8 + 8`N` | | the names, tune 1 to `N`, each UTF-8 text ended by a zero byte |
@@ -76,7 +76,8 @@ name runs to its zero byte or the file's end.
 | condition | reported as |
 |---|---|
 | the file is under 8 bytes, or bytes 0 to 3 are other than `YMXM` | `not a YMXM file` |
-| the version is V, other than 3, 4, 5 or 6 | `version V is not 3, 4, 5 or 6` |
+| the version is V, 3, 4, 5 or 6, tune files whose tables are DTX2 (SPEC.md 3.3.5) | `version V has DTX2 tables, and this reads 7, 8, 9, 10 or 11: write the tunes again with ym-to-ymxr or ymxs-to-ymxr` |
+| the version is V, other than 3 to 11 | `version V is not 7, 8, 9, 10 or 11` |
 | `N` is outside 1 to 99 | `N tunes, and a multi file has 1 to 99` |
 | 8 + 8`N` is above F, the file's bytes | `the entries of N tunes end past the file's F bytes` |
 | entry i has A or B below 0, or A + B above F | `tune i is at A for B bytes, and the file has F` |
@@ -100,77 +101,103 @@ condition met of the table below; then reads each tune file as SPEC.md
 tables with an image in place of the tune file's DTX3 table. The packager
 builds that image using the table's unit and copies flag (DTX, SPEC.md
 2.4; abi.md 1). Every unpacked row matches the tune file byte for byte. A
-bound tune of version 10 also copies the *transformation block*
-unchanged: the index and entries, bytes O to M - 1 of the tune file.
-O is the header's long at 16; M is the highest of O + 2 + 4T and each
-P + 2 + E (SPEC.md 3.4.2). Index offsets are relative to the block, so
-moving it requires only the bound header's pointer to change. The
-*list* follows the block's byte M - O: the tag `YP`, a byte N, the
-pages, 0 to 255, then for each page its effect, 0 to 3, its form, 0 to
-2, and its transformation, 1 to T, a byte each, the pages of SPEC.md
-3.4.4 in that order, the first 255 where the rules list more. A reader
-that reads the block through its index reads past the list, and a
-block without the tag after byte M - O has no list.
+bound tune of version 10, and of version 11 where bit 5 of the effects
+used is 1, also copies the *transformation block* unchanged: the index and
+entries, bytes O to M - 1 of the tune file. O is the header's long at 16;
+M is the highest of O + 2 + 4T and each P + 2 + E (SPEC.md 3.4.2). Index
+offsets are relative to the block, so moving it requires only the bound
+header's pointer to change. The *list* follows the block's byte M - O: the
+tag `YP`, a byte N, the pages, 0 to 255, then for each page its effect, 0
+to 3, its form, 0 to 2, and its transformation, 1 to T, a byte each, the
+pages of SPEC.md 3.4.4 in that order, the first 255 where the rules list
+more. A reader that reads the block through its index reads past the list,
+and a block without the tag after byte M - O has no list. A bound tune of
+version 11 also copies the *cut index* unchanged: bytes Q to Q + 8U + 1 of
+the tune file, Q the header's long at 20 and U the word at Q (SPEC.md
+3.5.2). A tune file of version 12, 13 or 14 binds at the layout of version
+11 where bit 6 of its effects used is 1, of version 10 where bit 5 is 1
+and bit 6 is 0, and of version 9 otherwise, its effects byte as the tune
+file has it. Where bit 7 is 1 its source index lists the tables, entries 1
+to S
+- 1 of the tune file, and copy from frame is source `S` + 1 (SPEC.md
+  3.1.7). Bit 7 of byte 10 marks a tune file of version 13 or 14, a tune
+  that syncs a voice (SPEC.md 1.12).
 
 **1.2 Layout.**
 
 | offset | bytes | what it is |
 |---|---|---|
 | 0 | 4 | `YMXB` |
-| 4 | 2 | the version of the tune file bound (SPEC.md 3.3.5): $0009, $000A for a tune that maps a value, and $0007 or $0008 for a tune file of that version |
+| 4 | 2 | the version of the tune file bound (SPEC.md 3.3.5): $0009, $000A for a tune that maps a value, $000B for a tune that cuts a source, and $0007 or $0008 for a tune file of that version; for a tune file of version 12, 13 or 14, the version of its layout (1.1) |
 | 6 | 2 | the frame rate, in Hz, from the tune file |
 | 8 | 1 | effects used, from the tune file |
-| 9 | 1 | `S`, the source count, from the tune file |
-| 10 | 2 | bytes 10 and 11 of the tune file, copied; the player skips them |
+| 9 | 1 | `S`, the source count, from the tune file; where bit 7 of the effects used is 1, its count less 1, the tables (1.1) |
+| 10 | 2 | bytes 10 and 11 of the tune file, copied, with bit 7 of byte 10 set for a tune file of version 13 or 14 (1.1); the player reads that bit alone. In a tune file bit 7 of byte 10 is 0: the name is within 32,768 bytes of the start (SPEC.md 3.3) |
 | 12 | 4 | the state block's bytes, unsigned: the format block's field at +4 of the image the table is in |
 | 16 | 4 | where the image begins, signed: past the DTX1 tables in a bound tune written alone (1.3), and past the subtunes in an SNDH file (3.1) |
 | 20 | 4 | where this tune's table is, from the image's first byte, unsigned: the format block's field at +8 for an image of one table, and the offset the packager reports for the table in an image of several (1.4) |
 | 24 | 4`S` | the source index, in versions 7 to 9: for source 1 to `S`, a long, bits 30 to 0 where its DTX1 table begins, unsigned, and bit 31 the mark of a counted source (SPEC.md 3.1.6) |
 | 24 | 4 | in version 10, where the transformation block begins, signed: past the image in a bound tune written alone (1.3), and past the images in an SNDH file (3.1) |
+| 24 | 4 | in version 11, where bit 5 of the effects used is 1, where the transformation block begins, as in version 10; 0 where bit 5 is 0 |
 | 28 | 4`S` | in version 10, the source index, as at 24 in versions 7 to 9 |
+| 28 | 4 | in version 11, where the cut index begins, signed: past the source index (1.3) |
+| 32 | 4`S` | in version 11, the source index, as at 24 in versions 7 to 9 |
+| | | in version 11, the cut index (1.1), on a long |
 | | | the DTX1 tables, source 1 to `S`, each on a long, byte for byte the tune file's |
 | | | the image, on a long, in a bound tune written alone |
-| | | in version 10, the transformation block and its list (1.1), on a long, in a bound tune written alone |
+| | | in version 10, and in version 11 where bit 5 is 1, the transformation block and its list (1.1), on a long, in a bound tune written alone |
 
-The tables come before the image so that a source's rows are within
-reach of the header at any length of image: a player whose ticks read a
-row through a displacement reaches 32,767 bytes (5.5). Transformation
-blocks follow the image: frames read them to prepare lookup pages, while
-ticks read sources and those pages. Their size therefore leaves source
-reach unchanged.
+The tables come before the image so that a source's rows are within reach
+of the header at any length of image: a player whose ticks read a row
+through a displacement reaches 32,767 bytes (5.5). Transformation blocks
+follow the image: frames read them to prepare lookup pages, while ticks
+read sources and those pages. Their size therefore leaves source reach
+unchanged. The cut index follows the source index, so a subtune whose
+source tables an SNDH file shares keeps it (3.1), and frames read it at a
+start and a recut.
 
 **1.3 A bound tune written alone.** A tool writes it from one tune file:
 bytes 6 to 11 are the tune file's; the field at 12 is the field at +4 of
 the format block of the image the packager makes of the tune's DTX3 table
-alone; the field at 20 is that format block's field at +8; DTX1 table 1
-is at align(I + 4`S`), I 24, and 28 in version 10, and each next at
-align(the end of the one before); the index is those offsets, each with
-bit 31 of the tune file's index entry; the field at 16 is align(the last
-table's end), where the image is. In version 10 the field at 24 is
-align(the image's end), where the transformation block is, and the bound
-tune ends at align(the block's end).
+alone; the field at 20 is that format block's field at +8; in version 11
+the cut index is at align(I + 4`S`), I 32, and the field at 28 is that
+offset; DTX1 table 1 is at align(I + 4`S`), I 24 in versions 7 to 9 and 28
+in version 10, or at align(the cut index's end) in version 11, and each
+next at align(the end of the one before); the index is those offsets, each
+with bit 31 of the tune file's index entry; the field at 16 is align(the
+last table's end), where the image is. In version 10, and in version 11
+where bit 5 is 1, the field at 24 is align(the image's end), where the
+transformation block is, and the bound tune ends at align(the block's
+end).
 
 **1.4 A set.** A set shares images. The *shape* of a DTX3 table is its
 variant, its unit `k`, its width `W` and its column count `C` (DTX,
-SPEC.md 1, 2.4): each table of an image defines its ring, and an image
-has the copy code where a table of it has copies (DTX, abi.md 5). A tool
-groups the tunes by shape in tune order, the first tune of a shape
-opening its group, and packages the tables of each group, in tune order,
-into one image; the field at 20 of each tune is the offset the packager
-reports for its table's header in that image. A bound tune of a set has
-the layout of 1.2 with the image and the transformation block absent and
-the field at 16, and in version 10 the field at 24, written 0; 3.1 places
-the images and the blocks and patches the fields.
+SPEC.md 1, 2.4): each table of an image defines its ring, and an image has
+the copy code where a table of it has copies (DTX, abi.md 5). A tool
+groups the tunes by shape in tune order, the first tune of a shape opening
+its group, and packages the tables of each group, in tune order, into one
+image; the field at 20 of each tune is the offset the packager reports for
+its table's header in that image. A bound tune of a set has the layout of
+1.2 with the image and the transformation block absent and the field at
+16, and in version 10, and in version 11 where bit 5 is 1, the field at
+24, written 0; 3.1 places the images and the blocks and patches the
+fields.
 
 **1.5 What the player reads.** At init (5.1), in order:
 
 1. Bytes 0 to 5; where they are other than `YMXB` and a version $0007 to
-   $0009 (SPEC.md 3.3.5), or $0007 to $000A in a player assembled with
+   $0009 (SPEC.md 3.3.5), or $0007 to $000B in a player assembled with
    the lookup (2.1), report -1 and stop.
 2. The field at 16 and the field at 8; where bit 4 of the field at 8 is
    set and the player is assembled without the deferred start (2.1),
-   report -1 and stop. In a player assembled with the lookup, where bit 5
-   is set and the version is other than $000A, report -1 and stop.
+   report -1 and stop. In a player assembled with the lookup, report -1
+   and stop where bit 5 is set and the version is $0007 to $0009, or $000B
+   with the field at 24 at 0; and where bit 6 is set and the version is
+   other than $000B, or clear and the version is $000B. In a player
+   assembled without the lookup, report -1 and stop where bit 7 is set
+   (SPEC.md 3.1.7). Then the field at 10: where its bit 7 is set, a tune
+   that syncs a voice, aim the frame's register steps of R0 to R5 at the
+   sync's (SPEC.md 4.4.1).
 3. Byte 19 of the image, the variant; where it is other than 3, report
    -1 and stop.
 4. The field at 20, then bytes 4 to 7 and 10 to 13 of the table's
@@ -178,8 +205,11 @@ the images and the blocks and patches the fields.
 5. The field at 9 and the index, then of each source's table its `R`,
    its `RR` and its rows from byte 16. A player of 5.5 measures each
    source against its handlers here and reports -1 for one past their
-   reach.
-6. In a player assembled with the lookup, a version 10 tune's list:
+   reach. Where bit 7 is set, source `S` + 1 is copy from frame, whose row
+   is the frame value of each register, 0 before the first frame (SPEC.md
+   3.1.7).
+6. In a player assembled with the lookup, the list of a tune of version
+   10, and of version 11 where bit 5 is set:
    where the tag is absent, an entry is out of range, or the list counts
    a page and the area of `a2` (5.1) is odd, below the player's last
    byte, or too near the reach for the fallback of 5.6, report -1 and
@@ -187,8 +217,9 @@ the images and the blocks and patches the fields.
    5.6 in their form.
 7. Report 0.
 
-The player skips fields 6, 10 and 12. The host supplies the frame clock
-(5.4) and allocates the workspace sized by field 12 (5.2).
+The player skips field 6, field 10 other than bit 7 of its first byte, and
+field 12. The host supplies the frame clock (5.4) and allocates the
+workspace sized by field 12 (5.2).
 
 ---
 
@@ -215,34 +246,34 @@ Each of the eight has a twin with `-defer` before `.bin`, assembled with
 the deferred start in, `YMXR_DEFER=1`, whose flags word is the eight's
 plus 8: `YMXR_sndh-defer.bin` reads 12. Init of a core without it
 reports -1 for a tune whose effects byte sets bit 4 (SPEC.md 3.3), and a
-core with it is 5,182 bytes larger.
+core with it is 4,866 bytes larger.
 
 Each of the sixteen has a twin with `-map` before `.bin`, assembled with
-optional lookup support, `YMXR_MAP=1` (SPEC.md 1.10). Its flags word is
-the original plus 16: `YMXR_sndh-map.bin` reads 20, and
-`YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to
-version 10 and every other core to version 9 (2.2), so init of a core
-without it reports -1 for a tune of version 10, whose effects byte sets
-bit 5 (SPEC.md 3.3); `YMXR_sndh-map.bin` is 12,530 bytes larger than
-`YMXR_sndh.bin`. The field at 26 of a core with the lookup in is the
-offset of its first handler: every byte from there to the core's end is
-a handler, an installer, the monitor's counter or padding. The padding
-puts every lookup handler's page displacement on its effect's offset
-modulo 256. With deferred starts, the second bank of handlers begins a
-multiple of 256 bytes from the first. The frame's routines come before
-the first handler. The page area and the fallbacks of 5.6 follow the
-core's last byte (3.1).
+optional lookup support, `YMXR_MAP=1` (SPEC.md 1.10, 1.11). Its flags word
+is the original plus 16: `YMXR_sndh-map.bin` reads 20, and
+`YMXR_sndh-defer-map.bin` 28. A core with it reads bound tunes to version
+11 and every other core to version 9 (2.2), so init of a core without it
+reports -1 for a tune of version 10, whose effects byte sets bit 5, of
+version 11, whose effects byte sets bit 6, and of a tune whose effects
+byte sets bit 7, which copies from frame (SPEC.md 3.3);
+`YMXR_sndh-map.bin` is 19,454 bytes larger than `YMXR_sndh.bin`. The field
+at 26 of a core with the lookup in is the offset of its first handler:
+every byte from there to the core's end is a handler, an installer or
+padding. The padding puts every lookup handler's page displacement on its
+effect's offset modulo 256. With deferred starts, the second bank of
+handlers begins a multiple of 256 bytes from the first. The frame's
+routines come before the first handler. The page area and the fallbacks of
+5.6 follow the core's last byte (3.1).
 
 A tool asked for a switch selects a core that has it. Where the caller
 names none of the third, the tool selects the core that reads a row
 through the program counter when the bound tunes and sources end within
 32,767 bytes of the core's first byte plus its field at 26, 0 in a core
-without the lookup, and the core that reads an absolute address for a
-file whose tunes end further off (5.5). A caller that names the third
-reads back that core, or the line of 2.10 where the file's tunes end
-past the reach. The tool enables deferred-start support if any subtune
-sets effects bit 4, and lookup support if any subtune sets bit 5. An
-identity-only set uses a core without lookup support.
+without the lookup, and the core that reads an absolute address for a file
+whose tunes end further off (5.5). A caller that names the third reads
+back that core, or the line of 2.10 where the file's tunes end past the
+reach. The tool enables deferred-start support if any subtune sets effects
+bit 4, and lookup support if any subtune sets bit 5, 6 or 7.
 
 **2.2 Layout**, from the core's first byte:
 
@@ -253,7 +284,7 @@ identity-only set uses a core without lookup support.
 | 8 | 4 | `bra.w` to play (2.9) |
 | 12 | 4 | `YMXS` |
 | 16 | 2 | the descriptor's version, 1 |
-| 18 | 2 | the highest bound tune version this core reads: 9, and 10 with the lookup in (2.1) |
+| 18 | 2 | the highest bound tune version this core reads: 9, and 11 with the lookup in (2.1) |
 | 20 | 2 | `YMXR_FIXED`, the workspace's bytes before the state block: 2,136, 2,312 with the deferred start in, 2,284 with the lookup in, and 2,460 with both |
 | 22 | 2 | flags, the word of 2.3 |
 | 24 | 2 | where the core's state byte is (2.4) |
@@ -273,7 +304,7 @@ in. The patched offsets count from the core's first byte and are even.
 | 1 | the lean tick (`YMXR_AEOI=1`, which the player's source requires with `YMXR_NEST=0`; performance.md): a tick keeps the interrupt level it entered at, and the MFP runs in automatic end-of-interrupt mode from init to stop, bit 3 of its vector register cleared at init and restored at stop | handlers of the host's MFP interrupts that run whole at the level they enter at, with the in-service bit clear; and the vector register left as the player set it between init and stop (5.2) |
 | 2 | the row read through the program counter (performance.md), which the player reads where `YMXR_PCREL` is 1, its default: a tick reads its row through a signed word displacement from the instruction that reads it, 12 cycles less a tick that writes a row | a file whose bound tunes and sources end within 32,767 bytes of the core's first byte plus its field at 26 (2.1), which the tool that writes it reads (2.10, 5.5) |
 | 3 | the deferred start (`YMXR_DEFER=1`, performance.md): the frame arms the start of SPEC.md 4.8, and the tick that reads the running source's last row performs it | this core under a tune whose effects byte sets bit 4, which init of a core with bit 3 clear reports -1 for (1.5) |
-| 4 | the lookup (`YMXR_MAP=1`, SPEC.md 1.10): the player reads bound tunes to version 10, and a tick of a source through a transformation writes the transformation's entry for the source's key | this core under a tune whose effects byte sets bit 5, a tune of version 10, which init of a core with bit 4 clear reports -1 for (1.5) |
+| 4 | the lookup (`YMXR_MAP=1`, SPEC.md 1.10, 1.11, 3.1.7): the player reads bound tunes to version 11, a tick of a source through a transformation writes the transformation's entry for the source's key, a start and a recut run a source under a cut, and a start runs copy from frame | this core under a tune whose effects byte sets bit 5, 6 or 7, a tune of version 10, 11 or 12, which init of a core with bit 4 clear reports -1 for (1.5) |
 
 **2.4 The state byte**, at the offset in the field at 24: bit 0 is
 set from init's step 8 to exit's step 1, while a tune plays; bit 1 is set
@@ -340,8 +371,21 @@ sets a rate other than the host's; a host that requires a timer's rate
 back writes the count it knows.
 
 **2.9 Play**; every register is kept. Where the state byte has bit 0
-clear, return; otherwise call the player's play with `a0` the workspace
-(5.1), and where it reports -1, set bit 1 of the state byte.
+clear, return; otherwise:
+
+1. Write $DF to ISRB: Timer C's in-service bit, bit 5, cleared, and
+   every other bit as it is (SPEC.md 2.3.2).
+2. Call the player's play with `a0` the workspace (5.1), and where it
+   reports -1, set bit 1 of the state byte.
+
+Note: a host that calls play from its Timer C handler, with the MFP in
+software end-of-interrupt mode, leaves bit 5 set until that handler
+ends, and the MFP serves Timer D, which ranks below Timer C, once the
+bit is clear. Step 1 ends the host's interrupt, so a tick of Timer D
+runs during the row, as does any other MFP interrupt of the host that
+ranks below Timer C. A host whose handler clears the bit after play
+writes a bit already clear, and under a host that calls play from the
+VBL the bit is already clear.
 
 **2.10 Errors of a core.** A tool reads a core before it writes an SNDH
 file (3) and reports the first condition met:
@@ -355,7 +399,7 @@ file (3) and reports the first condition met:
 | the lean tick is selected and bit 1 of the flags word F is clear | `the core's flags at 22 read F, and the lean tick asked for needs bit 1 set` |
 | the row read through the program counter is selected and bit 2 of the flags word F is clear | `the core's flags at 22 read F, and the row read through the program counter asked for needs bit 2 set` |
 | the effects byte of a subtune sets bit 4 and bit 3 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that defers a start needs bit 3 set` |
-| the effects byte of a subtune sets bit 5 and bit 4 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that maps a value needs bit 4 set` |
+| the effects byte of a subtune sets bit 5, 6 or 7 and bit 4 of the flags word F is clear | `the core's flags at 22 read F, and a subtune that maps a value, cuts a source or copies from frame needs bit 4 set` |
 | the row read through the program counter is selected, the core's field at 26 is 0, and the file's bound tunes and sources end B bytes past the core's first byte, B above 32,767 (5.5) | `the tunes end B bytes past the core's first byte, and a tick that reads a row through the program counter reaches 32767` |
 | the row read through the program counter is selected, the core's field at 26 is F, above 0, and the file's bound tunes and sources end B bytes past the core's first byte plus F, B above 32,767 (2.1) | `the tunes end B bytes past the core's first handler, at F, and a tick that reads a row through the program counter reaches 32767` |
 | the core has the lookup in, its field at 26 is F, and a subtune's list needs an area of 5.6 that ends past the reach with its tables and the fallback of each effect of the list alone, B bytes past the core's first byte plus F | `the page area ends B bytes past the core's first handler, at F, and a tick's page read reaches 32767` |
@@ -382,8 +426,8 @@ from H.
 | the bound tunes | subtune 1 at U + 2 + 4`N`, subtune i + 1 at even(the end of subtune i), from the core | subtune 1 to `N`, each of 1.4, its field at 16 patched with its image's offset less its offset |
 | the shared source tables | after the bound tune headers, each on a long, from the core | present when at least two subtunes share a DTX1 table |
 | the images | after the bound tunes and sources, each on a long, from the core | the images of the set (1.4), in group order |
-| the transformation blocks | from the end of the last image, each on a long, from the core | one copy of each distinct block (1.1), in first-use order, each subtune's field at 24 patched with its block's offset less its offset |
-| the workspace | W = even(the end of the last block, or of the last image where no subtune is of version 10), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
+| the transformation blocks | from the end of the last image, on a long, from the core | the index of each distinct block (1.1), each on a long, in first-use order; then each distinct transformation once, each on a long, in the order the blocks first index it; and each block's list right after the last transformation the block indexes first, or, where an earlier block indexes each of its transformations, after a copy of its shortest, the first of equal length. Each index entry is its transformation's offset from the index, and each subtune's field at 24 its block's index offset less its offset |
+| the workspace | W = even(the end of the last list, or of the last image where no subtune has a transformation block), from the core | align(the core's field at 20 + the largest state block of the set) + 2 zero bytes (2.6), last |
 
 The page area is right after the core, whose last bytes are its lookup
 handlers, so that a page is within reach of the handlers that read it:
@@ -399,12 +443,19 @@ reach of the core: a player whose ticks read a row through a
 displacement reaches 32,767 bytes (5.5).
 
 Where at least two subtunes have byte-identical DTX1 tables, the bound
-tunes end at their source indices. The shared source tables follow in
-first-use order, one copy of each distinct table. Each source index entry
-keeps bit 31 and records its table's offset from the start of that bound
-tune in bits 30 to 0. Otherwise the DTX1 tables follow each tune's source
-index as in 1.2. Transformation blocks share an offset only if the
-transformation data and the page list are byte-identical.
+tunes end at their source indices, or at their cut indices in version 11.
+The shared source tables follow in first-use order, one copy of each
+distinct table. Each source index entry keeps bit 31 and records its
+table's offset from the start of that bound tune in bits 30 to 0.
+Otherwise the DTX1 tables follow each tune's source index as in 1.2.
+
+Byte-identical blocks share one index. A transformation that two blocks
+index is stored once, and each block's list is past the furthest end of
+its index and of each transformation it indexes, the byte M - O of 1.1
+where init reads it (1.5 step 6). A frame reads a transformation through
+its index entry, so its place leaves the cycles of a frame and of a tick
+as they are. Where a set has one distinct block, its transformation
+blocks are that block byte for byte.
 
 A pad byte is zero. Every bound tune begins on an even address, as 5.1
 requires.
@@ -419,7 +470,7 @@ $20 to $7E, the others dropped. `TIME` is in the block from release
 | `SNDH` | |
 | `TITL`, the title, a zero byte | the title |
 | `COMM`, the composer, a zero byte | where the composer is other than the empty text |
-| `CONV`, `YMXR (ym-to-ymxr)`, a zero byte | the converter |
+| `CONV`, the converter, a zero byte | the converter, `YMXR (ym-to-ymxr)` where the tool's is absent or blank |
 | `##`, two decimal digits, a zero byte | `N`, 01 to 99 |
 | `TC`, the rate in decimal, a zero byte | the callback rate in Hz, where the block names Timer C |
 | `!V`, the rate in decimal, a zero byte | the rate of the set, in Hz, where the block names the VBL |
@@ -433,13 +484,14 @@ $20 to $7E, the others dropped. `TIME` is in the block from release
 
 The claims byte of the set is the claims bytes of its tunes ORed. One of
 `TC` and `!V` is in the block, the clock tag: it names the clock a
-host calls play from (5.4). The title and the composer are the tool's
-(tools.md); where the tool leaves the title to the file, of a multi file
-it is name 1, and `(untitled)` where name 1 is the empty text, and of a
-YMXS multi it is the first tune's title, and the composer the first
-tune's composer where that is other than blank. A tune file read alone
-has the empty name; the tool leaves its recorded name (SPEC.md 3.3)
-unread.
+host calls play from (5.4). The title, the composer and the converter
+are the tool's (tools.md); where the tool leaves the title to the file,
+of a multi file it is name 1, and `(untitled)` where name 1 is the empty
+text, and of a YMXS multi it is the first tune's title, the composer the
+first tune's composer where that is other than blank, and the converter
+the first tune's writer where that is other than blank. A tune file read
+alone has the empty name; the tool leaves its recorded name (SPEC.md
+3.3) unread.
 
 **3.3 Writing.** A tool with a core and `N` tune files, in order:
 
@@ -833,24 +885,27 @@ report that line alone and stop.
 
 - `{"part":"header","version":V,"rate":H,"effects":E,"sources":S,
   "stateblock":B,"image":I,"table":C}`, the fields at 4, 6, 8, 9, 12, 16
-  and 20, I the field at 16 plus the tune's first byte, which 3.1
-  patches for a subtune of an SNDH file, so that I is the image's offset
-  there, and C the field at 20 as the file has it, an offset from the
-  image's first byte. Where V is 10, `,"transformations":X` ends the
-  line, X the field at 24 plus the tune's first byte, which 3.1 patches
-  as it patches the field at 16.
+  and 20, I the field at 16 plus the tune's first byte, which 3.1 patches
+  for a subtune of an SNDH file, so that I is the image's offset there,
+  and C the field at 20 as the file has it, an offset from the image's
+  first byte. Where V is 10, or 11 with bit 5 of E set,
+  `,"transformations":X` follows, X the field at 24 plus the tune's first
+  byte, which 3.1 patches as it patches the field at 16; where V is 11,
+  `,"cuts":Q` ends the line, Q the field at 28 plus the tune's first byte.
+- `{"part":"cuts","at":Q,"count":U,"bytes":B}` where V is 11, U the word
+  at Q and B 2 + 8U: the cut index (1.3).
 - a line a source, 1 to `S`, in index order: `{"part":"source",
-  "number":i,"at":A}`, A bits 30 to 0 of the index entry, at 24, and at
-  28 where V is 10, plus the tune's first byte.
-- `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0,
-  B the file's bytes less I, or X less I where V is 10 and the field at
-  24 is above 0: the image of a bound tune written alone (1.3). A bound
+  "number":i,"at":A}`, A bits 30 to 0 of the index entry, at 24, at 28
+  where V is 10 and at 32 where V is 11, plus the tune's first byte.
+- `{"part":"image","at":I,"bytes":B}` where the field at 16 is above 0, B
+  the file's bytes less I, or X less I where V is 10 or 11 and the field
+  at 24 is above 0: the image of a bound tune written alone (1.3). A bound
   tune of a set has that field written 0 (1.4), and the line is in the
   record of the SNDH file instead (6.4).
-- `{"part":"transformations","at":X,"count":T,"bytes":B}` where V is 10
-  and the field at 24 is above 0, T the word at X and B the file's bytes
-  less X, the block, its list and its pad: the transformation block of a
-  bound tune written alone (1.3).
+- `{"part":"transformations","at":X,"count":T,"bytes":B}` where V is 10 or
+  11 and the field at 24 is above 0, T the word at X and B the file's
+  bytes less X, the block, its list and its pad: the transformation block
+  of a bound tune written alone (1.3).
 
 **6.4 An SNDH file** (3.1), after the first line:
 
@@ -893,12 +948,12 @@ report that line alone and stop.
   "at":A,"bytes":B,"version":V,"rate":R,"effects":E,"sources":S,
   "stateblock":D,"image":I,"table":C}`, A the offset subtune i has in the
   subtune table, plus H, the fields of 1.2 read at A as 6.3 reads them,
-  `transformations` among them where V is 10, its image and
-  transformations lines left out, and B the bytes to the next subtune,
-  or, for the last, to the first shared source table where present and
-  to the first image otherwise; then a line a
-  source of that subtune, as 6.3 defines them, each `at` bits 30 to 0 of
-  the index entry plus A.
+  `transformations` and `cuts` among them as 6.3 has them, its image and
+  transformations lines left out, and B the bytes to the next subtune, or,
+  for the last, to the first shared source table where present and to the
+  first image otherwise; then the cut index line and a line a source of
+  that subtune, as 6.3 defines them, each `at` bits 30 to 0 of the index
+  entry plus A.
 - `{"part":"sourcepool","at":P,"bytes":B}` where a source index entry
   of a subtune before the last points at or past the next subtune. P is
   the lowest such offset and B counts to the first image.

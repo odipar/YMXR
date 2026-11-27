@@ -65,8 +65,9 @@ func All() []string {
 // -defer for deferred starts; -map for transformation lookups.
 //
 // Without -abs, ticks use program-counter displacements. A subtune with
-// effects bit 4 requires -defer; bit 5 requires -map. Lookup cores read
-// bound versions 7 to 10; other cores read 7 to 9 (doc/BINARIES.md 2).
+// effects bit 4 requires -defer; bit 5 and bit 6 require -map. Lookup
+// cores read bound versions 7 to 11; other cores read 7 to 9
+// (doc/BINARIES.md 2).
 func Named(monitor, lean, pcrel, deferred, mapped bool) string {
 	name := "YMXR_sndh"
 	if monitor {

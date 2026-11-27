@@ -56,18 +56,20 @@ YMXR_DEFER      equ     0
 ; each bank (ymxr_lfill). Marker mirrors and setR7 port bits are prepared
 ; by ymxr_fill.
 ;
-; With lookup support, init accepts versions 7 to 10. Without it, init
-; accepts 7 to 9 and reports -1 for 10. Code from ymxr_tick0 onward
-; contains handlers, installers and alignment padding; tools measure
-; source reach from there (BINARIES.md 2.1).
+; With lookup support, init accepts versions 7 to 11, and version 11 adds
+; the cut (SPEC.md 1.11), which the core's descriptor records (BINARIES.md
+; 2.2). Without it, init accepts 7 to 9 and reports -1 for 10 and 11. Code
+; from ymxr_tick0 onward contains handlers, installers and alignment
+; padding; tools measure source reach from there (BINARIES.md 2.1).
                 .if     ^^defined YMXR_MAP
                 .else
 YMXR_MAP        equ     0
                 .endif
                 .if     YMXR_MAP
-YMXR_VERSION    equ     $000A           ; reads versions 7 to 10,
-                                        ; including mapping columns
-YMXR_COLUMNS    equ     34
+YMXR_VERSION    equ     $000B           ; the descriptor's version:
+                                        ; versions 7 to 11, including
+                                        ; mapping and cut columns
+YMXR_COLUMNS    equ     38
                 .else
 YMXR_VERSION    equ     $0009           ; the version it reads, a bound tune
                                         ; whose table is DTX3 (SPEC.md 3.3.5),
@@ -98,3 +100,16 @@ CELL_SIZE       equ     2
                 .else
 CELL_SIZE       equ     4
                 .endif
+; The word of a place a counted handler compares with its last row's place:
+; the displacement, or the low word of the row's address.
+PLACE_LO        equ     CELL_SIZE-2
+; A handler's loop cell is the immediate of a move to the column's place,
+; the head of the path that ends a pass: the loop word, that move's first
+; word, where the source repeats, and a bra.s to the halt where it plays
+; once (ticks.S, TICK). From one column's cell to the next is the move.
+                .if     YMXR_PCREL
+LOOPW           equ     $33FC           ; move.w #imm,abs.l
+                .else
+LOOPW           equ     $23FC           ; move.l #imm,abs.l
+                .endif
+CELL_STRIDE     equ     6+CELL_SIZE

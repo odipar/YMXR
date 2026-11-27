@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The two trees against each other, byte for byte.
@@ -39,15 +40,20 @@ import org.junit.jupiter.api.Test;
  */
 final class ParityTest {
 
+    /** The folder of every file the tests here write, which JUnit removes
+     *  after the last of them. */
+    private static Path scratch;
+
     /** Where the Go tools are built, once for every test here. */
     private static @Nullable Path built;
 
     @BeforeAll
-    static void buildTheGoTree() throws IOException, InterruptedException {
+    static void buildTheGoTree(@TempDir Path folder) throws IOException, InterruptedException {
+        scratch = folder;
         Assumptions.assumeTrue(onThePath("go"), "no go on the path");
         Assumptions.assumeTrue(Files.exists(Path.of("target/classes/org/ymxr/Tune.class")),
                 "the Java tools are not built");
-        Path into = Files.createTempDirectory("ymxr-go");
+        Path into = Files.createTempDirectory(scratch, "ymxr-go");
         Process ran = new ProcessBuilder("go", "build", "-o", into + "/", "./cmd/...")
                 .directory(Path.of("go").toFile())
                 .redirectErrorStream(true)
@@ -73,7 +79,7 @@ final class ParityTest {
     /** {@code tool} run on {@code in}, out of the tree {@code where} names. */
     private static Ran ran(Path where, String tool, byte[] in, String... flags)
             throws IOException, InterruptedException {
-        Path input = Files.createTempFile("in", ".bin");
+        Path input = Files.createTempFile(scratch, "in", ".bin");
         Files.write(input, in);
         List<String> command = new ArrayList<>(List.of(where.resolve(tool).toString()));
         command.addAll(List.of(flags));
@@ -334,12 +340,13 @@ final class ParityTest {
             assertEquals(Sndh.CORE_PCREL | Sndh.CORE_MAP, Tune.getWord(sndh,
                     Sndh.even(Tune.getWord(sndh, 2) + 2) + Sndh.CORE_FLAGS_AT));
             String said = steady(made.said());
-            assertTrue(said.contains("; the lookup in: a subtune maps a value\n")
+            assertTrue(said.contains("; the lookup in: a subtune maps a value, cuts a source or"
+                            + " copies from frame\n")
                     && said.contains("the images: " + (in == tune ? "1 image" : "2 images")
                     + " of "), said);
             both("ymxr-prg", sndh);
             String layout = new String(both("ymxr-layout", sndh), StandardCharsets.US_ASCII);
-            assertTrue(layout.contains("\"version\":10,") && layout.contains("\"binds\":10,"),
+            assertTrue(layout.contains("\"version\":10,") && layout.contains("\"binds\":11,"),
                     layout);
         }
         for (String tool : List.of("ymxs-to-sndh", "ymxs-to-prg")) {
@@ -363,7 +370,8 @@ final class ParityTest {
         Ran chosen = same("ymxr-sndh", far, "-carried");
         assertTrue(steady(chosen.said()).contains("ticks that read a row through an absolute"
                 + " address: the tunes end past the 32767 bytes a displacement reaches; the"
-                + " lookup in: a subtune maps a value\n"), chosen.said());
+                + " lookup in: a subtune maps a value, cuts a source or copies from frame\n"),
+                chosen.said());
         assertEquals(Sndh.CORE_MAP, Tune.getWord(chosen.out(),
                 Sndh.even(Tune.getWord(chosen.out(), 2) + 2) + Sndh.CORE_FLAGS_AT));
         Ran asked = same("ymxr-sndh", far, "-carried", "-pcrel", "-silent");
@@ -496,7 +504,9 @@ final class ParityTest {
      * Compare every YMXS conformance tune through both encoders: file
      * or error, exit status, record and check. YMXR rejects the
      * transformation fixture's lookups before the last setVoiceB value
-     * (SPEC.md 6.5).
+     * (SPEC.md 6.5), and the sync fixture's start of a target of a sync
+     * through a transformation, which rule 2(k) leaves to a later version
+     * (8.10).
      */
     @Test
     void everyTuneOfTheYmxsKitConvertsTheSameInBothTrees() throws Exception {
@@ -523,6 +533,12 @@ final class ParityTest {
         assertEquals(1, mapped.exit(), mapped.said());
         assertTrue(mapped.said().endsWith("ymxs-to-ymxr: row 2: the mapping maps value 0 of"
                 + " setVoiceB, and a mapping column maps its value 2 alone\n"), mapped.said());
+        Ran synced = same("ymxs-to-ymxr", Files.readAllBytes(kit.resolve("sync.json")),
+                "-silent");
+        assertEquals(1, synced.exit(), synced.said());
+        assertTrue(synced.said().endsWith("ymxs-to-ymxr: row 4: the mapping maps syncToneC"
+                + " through a transformation, which this version leaves to a later one (SPEC.md"
+                + " section 8)\n"), synced.said());
     }
 
     /**
@@ -546,6 +562,150 @@ final class ParityTest {
                     + " and on setR0, and every row of a source on setR7 has bits 7 and 6 set"
                     + " (SPEC.md rule 2(f))");
         }
+    }
+
+    /**
+     * Version 11 in both trees: the kit's two tunes under a cut converted
+     * from their structures and read back, a recut outside the tune left
+     * out, the files of version 11 written wrong, the check's lines of the
+     * cut columns, the bound tune, the layout and the multi file of version
+     * 11, more cuts than a cut column numbers, a cut and a counted source of
+     * more rows than the counted handler counts, a source of two or three
+     * columns of more than 65,534 rows, and the SNDH file of each, whose
+     * core the link keeps by the walk of its rows (SPEC.md 1.11, 3.1.3,
+     * 3.3.4, 3.5, 6.4, 6.5, section 8; BINARIES.md 0, 1; doc/LINKER.md).
+     */
+    @Test
+    void aTuneUnderACutReadsTheSameInBothTrees() throws Exception {
+        for (org.ymxs.YMXS.Tune tune : List.of(ConformanceTest.cut(), ConformanceTest.cuts(),
+                YmxsTest.recut(org.ymxs.YMXS.Timer.D), YmxsTest.keptCuts())) {
+            byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(tune))
+                    .getBytes(StandardCharsets.UTF_8), "-silent");
+            both("ymxr-trace", file);
+            both("ymxr-check", file);
+            both("ymxr-layout", both("ymxr-bind", file));
+            both("ymxr-sndh", file, "-silent");
+        }
+        // the blocks the link keeps under a cut, by the walk of the rows
+        both("ymxr-sndh", LinkTest.cutAlone(), "-silent");
+        both("ymxr-sndh", LinkTest.recut(false), "-silent");
+        both("ymxr-sndh", LinkTest.recut(true), "-silent");
+        for (int columns = 1; columns <= 3; columns++) {
+            both("ymxr-sndh", LinkTest.oneRow(columns), "-silent");
+        }
+        for (java.util.Map.Entry<String, byte[]> one : CutTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+        }
+        for (java.util.Map.Entry<List<String>, byte[]> one : CutTest.unchecked().entrySet()) {
+            assertEquals("standard input:\n  " + String.join("\n  ", one.getKey()) + "\n",
+                    new String(both("ymxr-check", one.getValue()), StandardCharsets.UTF_8));
+        }
+        byte[] cut = Files.readAllBytes(Path.of("doc/conformance/tunes/cut.ymxr"));
+        byte[] multi = multiOf(List.of(cut, MappedTest.file()));
+        assertEquals(Tune.CUT, Tune.getWord(multi, 4), "a set with a tune that cuts a source");
+        both("ymxr-layout", multi);
+        assertWrong(YmxsTest.manyCuts(), "the tune cuts through 128 cuts, and a cut column"
+                + " numbers 127");
+        assertWrong(YmxsTest.longCut(), "the tune cuts rows 0 to 65535, 65536 rows, and a cut"
+                + " is 65535 rows at most");
+        assertWrong(YmxsTest.longCounted(), "the source tall fills its byte and has 65536 rows,"
+                + " and such a source is 65535 rows at most");
+        List<Integer> columns = List.of(2, 2, 3);
+        List<org.ymxs.YMXS.Tune> wide = YmxsTest.wide(Columns.MOST_WIDE_ROWS + 1);
+        for (int k = 0; k < wide.size(); k++) {
+            assertWrong(wide.get(k), "the source tall has " + columns.get(k) + " columns and"
+                    + " 65535 rows, and such a source is 65534 rows at most");
+        }
+    }
+
+
+    /**
+     * Version 12 in both trees: a tune that copies from frame converted from
+     * its structure and read back, its record and its check, the files of
+     * version 12 written wrong, its bound tune and its SNDH file, and the
+     * writer's lines of copy from frame through a transformation (SPEC.md
+     * 3.1.7, 3.3.4, 3.3.5, rule 2(j), 8.9; BINARIES.md 1.2).
+     */
+    @Test
+    void aTuneThatCopiesFromFrameReadsTheSameInBothTrees() throws Exception {
+        byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                CopyTest.tune())).getBytes(StandardCharsets.UTF_8), "-silent");
+        assertEquals(Tune.COPY, Tune.getWord(file, 4));
+        both("ymxr-trace", file);
+        both("ymxr-check", file);
+        for (java.util.Map.Entry<String, byte[]> one : CopyTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+        }
+        both("ymxr-bind", file, "-silent");
+        both("ymxr-sndh", file, "-silent");
+        both("ymxr-sndh", file, "-silent", "-carried");
+        byte[] mapped = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                CopyTest.mapped())).getBytes(StandardCharsets.UTF_8), "-silent");
+        both("ymxr-trace", mapped);
+        both("ymxr-bind", mapped, "-silent");
+        both("ymxr-sndh", mapped, "-silent");
+    }
+
+    /**
+     * Version 14 in both trees: a tune of even syncs converted from its
+     * structure to the same bytes, read, checked, bound and written to an
+     * SNDH file the same (SPEC.md 1.12.2, 3.3.5; BINARIES.md 1.2).
+     */
+    @Test
+    void aTuneOfEvenSyncsReadsTheSameInBothTrees() throws Exception {
+        byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.evens())).getBytes(StandardCharsets.UTF_8), "-silent");
+        assertEquals(Tune.EVEN, Tune.getWord(file, 4));
+        both("ymxr-trace", file);
+        both("ymxr-check", file);
+        both("ymxr-bind", file, "-silent");
+        both("ymxr-sndh", file, "-silent");
+    }
+
+    /**
+     * Version 13 in both trees: a tune that syncs a voice converted from its
+     * structure and read back, its record and its check, the files of
+     * version 13 written wrong, its bound tune and its SNDH file, and a tune
+     * that syncs at its frame alone (SPEC.md 1.12, 3.3.4, 3.3.5; BINARIES.md
+     * 1.2).
+     */
+    @Test
+    void aTuneThatSyncsReadsTheSameInBothTrees() throws Exception {
+        byte[] file = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.tune())).getBytes(StandardCharsets.UTF_8), "-silent");
+        assertEquals(Tune.SYNC, Tune.getWord(file, 4));
+        both("ymxr-trace", file);
+        both("ymxr-check", file);
+        for (java.util.Map.Entry<String, byte[]> one : SyncTest.wrong().entrySet()) {
+            Ran java = same("ymxr-trace", one.getValue());
+            assertEquals(1, java.exit(), java.said());
+            assertTrue(java.said().contains("does not read: " + one.getKey() + "\n"),
+                    java.said());
+        }
+        both("ymxr-bind", file, "-silent");
+        both("ymxr-sndh", file, "-silent");
+        byte[] targets = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.targets())).getBytes(StandardCharsets.UTF_8), "-silent");
+        both("ymxr-trace", targets);
+        both("ymxr-sndh", targets, "-silent");
+        assertWrong(SyncTest.throughATransformation(), "row 4: the mapping maps syncToneC"
+                + " through a transformation, which this version leaves to a later one (SPEC.md"
+                + " section 8)");
+        assertWrong(SyncTest.underACut(), "row 3: syncToneB runs under a cut, which this"
+                + " version leaves to a later one (SPEC.md section 8)");
+        assertWrong(SyncTest.deferred(), "row 3: syncToneB starts deferred, which this"
+                + " version leaves to a later one (SPEC.md section 8)");
+        byte[] frames = both("ymxs-to-ymxr", org.ymxs.Text.write(org.ymxs.Tunes.multi(
+                SyncTest.frames())).getBytes(StandardCharsets.UTF_8), "-silent");
+        both("ymxr-trace", frames);
+        both("ymxr-bind", frames, "-silent");
+        both("ymxr-sndh", frames, "-silent");
     }
 
     private static void assertWrong(org.ymxs.YMXS.Tune tune, String line) throws Exception {
@@ -775,6 +935,40 @@ final class ParityTest {
     }
 
     /**
+     * The CONV tag in both trees (BINARIES.md 3.2): the converter
+     * {@code -wWRITER} names, or the writer of a structure's first tune,
+     * and {@code YMXR (ym-to-ymxr)} where both are blank; and the text
+     * {@code ymxr-sndh} reports among the tags (tools.md 12.4).
+     */
+    @Test
+    void theConverterIsTheSameInBothTrees() throws Exception {
+        org.ymxs.YMXS.Tune fade = YmxsTest.fade();
+        assertEquals("YmxsTest", fade.writer());
+        byte[] json = org.ymxs.Text.write(new org.ymxs.YMXS.Multi(List.of(fade)))
+                .getBytes(StandardCharsets.UTF_8);
+        assertEquals("YmxsTest", conv(both("ymxs-to-sndh", json, "-silent")));
+        assertEquals("RhYMe 0.8", conv(both("ymxs-to-sndh", json, "-silent", "-wRhYMe 0.8")));
+        org.ymxs.YMXS.Tune blank = new org.ymxs.YMXS.Tune(fade.title(), fade.composer(), "",
+                fade.rate(), fade.table());
+        byte[] none = org.ymxs.Text.write(new org.ymxs.YMXS.Multi(List.of(blank)))
+                .getBytes(StandardCharsets.UTF_8);
+        assertEquals(Sndh.CONVERTER, conv(both("ymxs-to-sndh", none, "-silent")));
+        byte[] program = both("ymxs-to-prg", json, "-silent", "-wRhYMe 0.8");
+        assertTrue(new String(program, StandardCharsets.ISO_8859_1).contains("CONVRhYMe 0.8\0"),
+                "the program has the SNDH file's CONV tag");
+        byte[] tune = both("ymxs-to-ymxr", json, "-silent");
+        assertEquals(Sndh.CONVERTER, conv(both("ymxr-sndh", tune, "-silent")));
+        assertEquals(Sndh.CONVERTER, conv(both("ymxr-sndh", tune, "-silent", "-w  ")));
+        Ran named = same("ymxr-sndh", tune, "-wRhYMe 0.8");
+        assertEquals("RhYMe 0.8", conv(named.out()));
+        assertTrue(named.said().contains(", CONV RhYMe 0.8, "), named.said());
+    }
+
+    private static @Nullable String conv(byte[] sndh) {
+        return BinariesTest.tags(sndh).text().get("CONV");
+    }
+
+    /**
      * The TIME tag of a tune that plays once, in both trees. Every dump
      * under ym/test repeats, so the cases above write 0 alone: the kit's
      * set has a subtune that repeats and one of 4 frames at 50 Hz, rounded
@@ -807,7 +1001,7 @@ final class ParityTest {
         List<Path> dumps = dumps();
         byte[] one = both("ym-to-ymxr", Files.readAllBytes(dumps.get(0)), "-silent");
         byte[] two = both("ym-to-ymxr", Files.readAllBytes(dumps.get(1)), "-silent");
-        Path work = Files.createTempDirectory("ymxr-parity");
+        Path work = Files.createTempDirectory(scratch, "ymxr-parity");
         Path first = work.resolve("one.ymxr");
         Path second = work.resolve("two.ymxr");
         Files.write(first, one);
@@ -826,7 +1020,7 @@ final class ParityTest {
      *  must be the same bytes. ymxr-multi reads file names rather than
      *  standard input, so it is run here rather than through both. */
     private static byte[] multiOf(List<byte[]> tunes, String... flags) throws Exception {
-        Path work = Files.createTempDirectory("ymxr-parity");
+        Path work = Files.createTempDirectory(scratch, "ymxr-parity");
         List<String> argv = new ArrayList<>();
         for (int i = 0; i < tunes.size(); i++) {
             Path at = work.resolve("tune" + (i + 1) + ".ymxr");
@@ -883,7 +1077,7 @@ final class ParityTest {
             said.add(ran(Path.of("bin"), call[0], in,
                     Arrays.copyOfRange(call, 1, call.length)).said());
         }
-        Path work = Files.createTempDirectory("ymxr-parity");
+        Path work = Files.createTempDirectory(scratch, "ymxr-parity");
         Path one = work.resolve("one.ym");
         Files.write(one, dump);
         Ran java = ran(Path.of("bin"), "ymxr-check", new byte[0], one.toString());

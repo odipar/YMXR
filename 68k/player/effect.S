@@ -33,18 +33,38 @@
                 .endif
                 .endm
 
+; a5 the counted instance of one column of the effect whose record is at
+; fx, in bank 0: EFFECT has rmac's twenty arguments, so the record's
+; offset picks the instance.
+                .if     YMXR_MAP
+                .macro  CNTOF   fx
+                .if     (\fx-WS_FX)/FX_SIZE=0
+                lea     ymxr_cnt0(pc),a5
+                .endif
+                .if     (\fx-WS_FX)/FX_SIZE=1
+                lea     ymxr_cnt1(pc),a5
+                .endif
+                .if     (\fx-WS_FX)/FX_SIZE=2
+                lea     ymxr_cnt2(pc),a5
+                .endif
+                .if     (\fx-WS_FX)/FX_SIZE=3
+                lea     ymxr_cnt3(pc),a5
+                .endif
+                .endm
+                .endif
+
 ; One effect: the target kept, the source started or stopped, the timer's
 ; count and select written, with the timer's and the place's reset. Its
 ; frame code is pieces: the head, \{eff}_1, up to the branch that tells
 ; the shapes apart; the start of a square, square<e>_3; the start of a
-; source of one row, one<e>_3; with the lookup in, the start through a
-; transformation and the remap, map<e>_1; with the deferred start in,
-; the paths that arm and read a pending start, defer<e>_1; and the rest,
-; \{eff}_5, which play.S ends. A link leaves a piece out where the
-; effect runs none of it, and init reads the bytes of the pieces the
-; effect keeps out of ymxr_resets wherever a branch it aims reaches past
-; them.
-                .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,eff,vector,lk
+; source of one row, one<e>_3; with the lookup in, the paths that read
+; the cut column, cut<e>_1, and the start through a transformation and
+; the remap, map<e>_1; with the deferred start in, the paths that arm and
+; read a pending start, defer<e>_1; and the rest, \{eff}_5, which play.S
+; ends. A link leaves a piece out where the effect runs none of it, and
+; init reads the bytes of the pieces the effect keeps out of ymxr_resets
+; wherever a branch it aims reaches past them.
+                .macro  EFFECT  fx,ct,cs,cc,cn,cm,ctrl,data,ier,bit,keep,shift,shared,tick,sq,one,eff,vector,lk,cx
 ; The head is the effect's first read where the tune runs the effect, and
 ; a branch over its columns where it does not: init writes the one word
 ; that separates them, and the word after it has the read's
@@ -54,14 +74,22 @@ q\{ct}:         bra.w   \{tick}_done
                 QOR     \cs                     ; the set bits at once
                 QOR     \cc
                 .if     YMXR_MAP
-                QOR     \cm                     ; and the mapping's
-                .endif
-                bmi.s   \{tick}_some
+                QOR     \cm                     ; and the mapping's, or the
+                .endif                          ; cut's in a tune of version
+\{tick}_head:   bmi.s   \{tick}_some            ; 11 that maps no value
+\{tick}_count:
                 QREAD   \cn                     ; the count alone, or no column
                 beq.w   \{tick}_done
                 move.b  d1,\data.w              ; the count, the timer running on
                 move.b  d1,\fx+FX_COUNT(a0)
                 bra.w   \{tick}_done
+                .if     YMXR_MAP
+; A tune of version 11 that maps a value has its cut columns past the
+; mapping columns, and init aims the branch above here: the cut column's
+; set bit is ored with the four (SPEC.md 3.3.5).
+\{tick}_xhead:  QOR     \cx
+                bpl.s   \{tick}_count
+                .endif
 \{tick}_some:
                 READ2   \cc
                 tst.b   d2                      ; the timer's reset stops the
@@ -161,6 +189,7 @@ q\{ct}:         bra.w   \{tick}_done
                 move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 .endif
+                LOOPHD  TICK_CELL,TICK_ONCEW
                 move.l  a5,\vector.w            ; a tick due in the window
                 move.w  (sp)+,sr                ; runs the new handler
                 move.l  a4,\fx+FX_FIRST(a0)
@@ -270,6 +299,77 @@ q\{ct}:         bra.w   \{tick}_done
                 bra.w   \{tick}_rate
                 EENDPIECE one,_3,\fx
                 .if     YMXR_MAP
+                EPIECE  cut,_1,\fx
+; The paths of a tune of version 11 that read the cut column, a piece of
+; the effect's cut block (doc/LINKER.md): a link keeps it where a row
+; sets the effect's cut column, and keeps the remap's piece after it, into
+; which the start at its end falls through.
+;
+; A row of version 11 that leaves the source column unset (SPEC.md 4.3.2):
+; a recut where it sets the cut column, then the remap's test below. The
+; player makes the recut first: the recut writes the place and the loop of
+; the running handler and a remap its page, and either order leaves the
+; handler the same. A timer stopped before the row keeps its running cut,
+; its place and its handler; the control byte before the row's reset is in
+; d3 (_rmk).
+\{tick}_xunset: MREAD   \cx                     ; the cut column
+                bpl.w   \{tick}_remapck
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_CUT(a0)       ; the kept cut
+                move.b  \ctrl.w,d0
+                tst.b   d2
+                bpl.s   .xrun\~
+                btst    #6,d2
+                beq.s   .xrun\~
+                move.b  d3,d0
+.xrun\~:        and.b   #255-\keep,d0
+                beq.w   \{tick}_remapck
+                lea     \fx(a0),a3             ; the record, and the
+                CNTOF   \fx                    ; counted instance of one
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4    ; column in bank 0
+                bsr.w   ymxr_recut
+                bra.w   \{tick}_remapck
+; A start under a cut 1 to 127: the mapping column, then the counted
+; kind of the source's columns, through the identity or the mapping
+; (ymxr_kone).
+\{tick}_xcut:   RREAD   \cm                     ; the mapping column
+                bpl.s   .xmap\~
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_MAP(a0)
+.xmap\~:        lea     \fx(a0),a3             ; the record
+                move.b  FX_MAP(a3),FX_RUN(a3)
+                CNTOF   \fx                    ; the counted instance of
+                move.w  d3,d1                   ; one column in bank 0
+                moveq   #(\fx-WS_FX)/FX_SIZE,d4
+                bsr.w   ymxr_kone
+                bclr    #5,d2
+                bra.w   \{tick}_rate
+                .if     YMXR_DEFER
+; A start or a stop in a tune of version 11 that defers a start: a start
+; reads the cut column first, so an arming captures the kept cut after
+; the row (SPEC.md 4.8); a stop ignores it (4.3.2).
+\{tick}_xcheck: beq.w   \{tick}_check
+                move.w  d1,d3
+                DREAD   \cx                     ; the cut column
+                bpl.s   .xk\~
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_CUT(a0)
+.xk\~:          move.w  d3,d1                   ; the source, other than 0
+                bra.w   \{tick}_check
+                .endif
+; A start in a tune of version 11 (SPEC.md 4.3.2): the cut column read,
+; the kept cut replaced where the row sets it, and the kept cut made the
+; running cut (4.3 step 3). Under cut 0 the start is the start below, and
+; under a cut 1 to 127 the start above (_xcut). d1 is the source number.
+\{tick}_xnow:   move.w  d1,d3
+                READ    \cx                     ; the cut column
+                bpl.s   .xkept\~
+                and.b   #$7F,d1
+                move.b  d1,\fx+FX_CUT(a0)
+.xkept\~:       move.w  d3,d1
+                move.b  \fx+FX_CUT(a0),\fx+FX_CRUN(a0)  ; the kept cut runs
+                bne.w   \{tick}_xcut
+                EENDPIECE cut,_1,\fx
                 EPIECE  map,_1,\fx
 ; Start with optional lookup support (SPEC.md 1.10.2). Init redirects
 ; _now here. A set mapping column replaces kept; an unset column reuses
@@ -281,16 +381,17 @@ q\{ct}:         bra.w   \{tick}_done
                 and.b   #$7F,d1
                 move.b  d1,\fx+FX_MAP(a0)
 .kept\~:        move.b  \fx+FX_MAP(a0),\fx+FX_RUN(a0)
-                bne.s   .look\~
+                bne.s   \{tick}_look
                 sf      \fx+FX_LOK(a0)          ; the identity's handler
                 move.w  d3,d1
                 bra.w   \{tick}_start
-.look\~:        lea     \fx(a0),a3              ; the record, the effect's
+\{tick}_look:   lea     \fx(a0),a3              ; the record, the effect's
                 lea     \lk(pc),a5              ; instance of the general
                 move.b  ymxr_htab+(LOOK_KINDS*((\fx-WS_FX)/FX_SIZE))(pc),d5 ; lookup kind, the page byte
                 move.w  #\vector,d1             ; of its page 0 and the vector
                 moveq   #(\fx-WS_FX)/FX_SIZE,d4
-                bsr.w   ymxr_lstart
+\{tick}_lcall   equ     *                       ; aimed at ymxr_copylook in a
+                bsr.w   ymxr_lstart             ; tune that copies from frame
                 bclr    #5,d2
                 bra.w   \{tick}_rate
 ; Remap entry (SPEC.md 1.10.2). Init redirects _unset here for a tune
@@ -530,6 +631,14 @@ q\{ct}:         bra.w   \{tick}_done
 \{tick}_wrow:   moveq   #(\fx-WS_FX)/FX_SIZE,d3
                 bsr.w   ymxr_widereset
                 bra.s   \{tick}_done
+                .if     YMXR_MAP
+; The place's reset in a tune that cuts a source, through the running
+; cut (ymxr_xreset).
+\{tick}_xrow:   lea     \fx(a0),a3             ; the record
+                moveq   #(\fx-WS_FX)/FX_SIZE,d3
+                bsr.w   ymxr_xreset
+                bra.s   \{tick}_done
+                .endif
 
 \{tick}_place:
                 .if     YMXR_DEFER|YMXR_MAP

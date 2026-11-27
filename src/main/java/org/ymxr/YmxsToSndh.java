@@ -12,9 +12,10 @@ import org.ymxs.tool.Tool;
  * SNDH file on standard output.
  *
  * <p>Every tune of the multi is a subtune, 1 upward in its order, behind
- * one core (doc/BINARIES.md 2). The title and the composer are the first
- * tune's unless {@code -t} and {@code -c} name others, and a tune's title
- * names its subtune where the multi has several.
+ * one core (doc/BINARIES.md 2). The title, the composer and the writer
+ * are the first tune's unless {@code -t}, {@code -c} and {@code -w} name
+ * others, the writer the CONV tag's text, and a tune's title names its
+ * subtune where the multi has several.
  *
  * <p>{@code -perf} selects the core with the raster monitor in and
  * {@code -lean} the core whose ticks neither drop the interrupt level nor
@@ -44,6 +45,7 @@ public final class YmxsToSndh {
     static byte[] of(Tool tool, Multi multi, List<String> flags, Report report) {
         @Nullable String title = null;
         @Nullable String composer = null;
+        @Nullable String writer = null;
         boolean monitor = false;
         boolean lean = false;
         boolean link = true;
@@ -59,6 +61,8 @@ public final class YmxsToSndh {
                 link = false;
             } else if (flag.startsWith("-c") && !flag.startsWith("-copies")) {
                 composer = flag.substring(2);
+            } else if (flag.startsWith("-w")) {
+                writer = flag.substring(2);
             } else if (flag.equals("-perf")) {
                 monitor = true;
             } else if (flag.equals("-lean")) {
@@ -76,6 +80,9 @@ public final class YmxsToSndh {
         if (composer == null && !first.composer().isBlank()) {
             composer = first.composer().strip();
         }
+        if (writer == null && !first.writer().isBlank()) {
+            writer = first.writer().strip();
+        }
         List<String> names = new ArrayList<>();
         for (org.ymxs.YMXS.Tune tune : multi.tunes()) {
             names.add(Ymxs.title(tune));
@@ -83,7 +90,8 @@ public final class YmxsToSndh {
         List<byte[]> tunes = Ymxs.tuneFiles(tool, multi, Ymxs.Packing.of(tool, flags), report);
         try {
             return Sndh.of(tunes, new Sndh.Options(title, composer,
-                    tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link));
+                    tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link,
+                    writer));
         } catch (IllegalArgumentException wrong) {
             throw tool.wrong(Tool.WRONG, String.valueOf(wrong.getMessage()));
         }

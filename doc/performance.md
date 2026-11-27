@@ -15,17 +15,17 @@ idle past the last.
 
 | tune | frames | on average | at most | the advance on average | in the costliest frame |
 |---|---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 432 | 1048 | 2754 | 547 | 2270 |
-| Chambers of Shaolin 5 - you blew it! | 1000 | 1131 | 3780 | 575 | 3128 |
-| Circus Attractions 2 | 8 | 1458 | 1660 | 766 | 766 |
-| DBA 2 | 19444 | 1456 | 4066 | 664 | 3386 |
-| DBA 5 | 22264 | 1551 | 3784 | 740 | 2734 |
-| Digidrum preempt, built | 800 | 1624 | 3998 | 777 | 2424 |
-| Retrigger retune, built | 1200 | 1379 | 2796 | 668 | 2096 |
-| Synergy Credits | 10756 | 1995 | 5086 | 903 | 2924 |
-| Turrican - world 4-3 | 3680 | 1497 | 4362 | 779 | 3716 |
-| Turrican 2 - world completed 1 | 182 | 1362 | 4072 | 697 | 3456 |
-| capture | 1844 | 1248 | 3536 | 663 | 3048 |
+| Big - Samantha Fox Strip Poker 6 | 432 | 1088 | 2794 | 547 | 2270 |
+| Chambers of Shaolin 5 - you blew it! | 1000 | 1171 | 3820 | 575 | 3128 |
+| Circus Attractions 2 | 8 | 1485 | 1648 | 766 | 766 |
+| DBA 2 | 19444 | 1496 | 4106 | 664 | 3386 |
+| DBA 5 | 22264 | 1590 | 3824 | 740 | 2734 |
+| Digidrum preempt, built | 800 | 1648 | 4022 | 777 | 2424 |
+| Retrigger retune, built | 1200 | 1402 | 2820 | 668 | 2096 |
+| Synergy Credits | 10756 | 2021 | 5074 | 903 | 2924 |
+| Turrican - world 4-3 | 3680 | 1534 | 4402 | 779 | 3716 |
+| Turrican 2 - world completed 1 | 182 | 1401 | 4112 | 697 | 3456 |
+| capture | 1844 | 1286 | 3576 | 663 | 3048 |
 
 A table packs at unit 2 and a period of thirty rows, the column count, so
 a refill is fifteen units of two bytes, and a period's thirty turns are one
@@ -72,12 +72,12 @@ its costliest frame.
 Unit 1 packs a table smaller and costs more to decode: Turrican - world 4-3
 packs to 3,332 bytes at `-k1` against 3,600, its advance reads 929 on
 average and 4,136 in the costliest frame against 779 and 3,716, and the
-play call 1,647 on average and 4,838 at most against 1,497 and 4,362.
+play call 1,684 on average and 4,878 at most against 1,534 and 4,402.
 `-k1` packs at unit 1. Five of the eleven tunes of Scavenger's in the
 corpus pass R4.5's budget at unit 1, DBA 4's costliest frame the furthest
 at 7,214, and none of them at unit 2.
 
-The frame procedure is the rest, from 501 to 1,092 cycles on average: the
+The frame procedure is the rest, from 541 to 1,118 cycles on average: the
 fourteen register columns' tests and the writes they admit, the effects'
 columns and the call's entry and exit. The call jumps over an effect the
 tune leaves unused, and two nops replace the jump at the head of its columns
@@ -97,7 +97,7 @@ end, so each row pays for one decoder's copy at most.
 
 R4.5 budgets 6,656 cycles a frame. Every frame of every tune is within it:
 the averages by more than two thirds of it, and the costliest frame of
-every tune by 1,570 cycles or more, Synergy Credits' 5,086 the nearest.
+every tune by 1,582 cycles or more, Synergy Credits' 5,074 the nearest.
 The ticks of a frame come on top of the call, and A tick below counts them.
 
 Release 0.4.22 packed every column at unit 2 through a ring of 960 bytes.
@@ -105,22 +105,24 @@ Its play call, counted the same way on its player, against the table above:
 
 | tune | on average, 0.4.22 | on average | at most, 0.4.22 | at most |
 |---|---|---|---|---|
-| Big - Samantha Fox Strip Poker 6 | 1292 | 1048 | 1924 | 2754 |
-| Chambers of Shaolin 5 - you blew it! | 1367 | 1131 | 3258 | 3780 |
-| Circus Attractions 2 | 1446 | 1458 | 1648 | 1660 |
-| DBA 2 | 1674 | 1456 | 4272 | 4066 |
-| DBA 5 | 1754 | 1551 | 3606 | 3784 |
-| Digidrum preempt, built | 1627 | 1624 | 2762 | 3998 |
-| Retrigger retune, built | 1490 | 1379 | 2220 | 2796 |
-| Synergy Credits | 2030 | 1995 | 5094 | 5086 |
-| Turrican - world 4-3 | 1606 | 1497 | 4532 | 4362 |
-| Turrican 2 - world completed 1 | 1606 | 1362 | 4060 | 4072 |
-| capture | 1414 | 1248 | 3422 | 3536 |
+| Big - Samantha Fox Strip Poker 6 | 1292 | 1088 | 1924 | 2794 |
+| Chambers of Shaolin 5 - you blew it! | 1367 | 1171 | 3258 | 3820 |
+| Circus Attractions 2 | 1446 | 1485 | 1648 | 1648 |
+| DBA 2 | 1674 | 1496 | 4272 | 4106 |
+| DBA 5 | 1754 | 1590 | 3606 | 3824 |
+| Digidrum preempt, built | 1627 | 1648 | 2762 | 4022 |
+| Retrigger retune, built | 1490 | 1402 | 2220 | 2820 |
+| Synergy Credits | 2030 | 2021 | 5094 | 5074 |
+| Turrican - world 4-3 | 1606 | 1534 | 4532 | 4402 |
+| Turrican 2 - world completed 1 | 1606 | 1401 | 4060 | 4112 |
+| capture | 1414 | 1286 | 3422 | 3576 |
 
-The call costs less on average on ten of the eleven and 12 cycles more on
-Circus Attractions 2, and its costliest frame is higher on eight, by 12 to
-1,236 cycles, and lower on three, by 8 to 206. Under 0.4.22 the nearest
-frame to the budget was 1,562 cycles under it, and is 1,570 under it now.
+The call costs less on average on nine of the eleven, and 21 and 39
+cycles more on Digidrum preempt, built and Circus Attractions 2. Its
+costliest frame is higher on seven, by 52 to 1,260 cycles, lower on
+three, by 20 to 166, and the same on Circus Attractions 2. Under 0.4.22
+the nearest frame to the budget was 1,562 cycles under it, and is 1,582
+under it now.
 
 A tune needs its bound tune (BINARIES.md 1) and a state block in the
 workspace, the rings among them. The tools of 0.4.22 and of this release
@@ -185,7 +187,7 @@ build for reading a run rather than one to play a tune with.
 A call writes the row the call before it read, and reads the next once its
 writes are made (68k/YMXR.S), so a row's refill comes after that row's
 writes. Measured on DBA 2 over 3,000 frames,
-the call's first register write is at least 752 cycles after the VBL.
+the call's first register write is at least 772 cycles after the VBL.
 YMX writes its fourteen registers before it decodes for the same reason.
 
 Measure from the VBL, at the tune's rate. Where the program plays from Timer
@@ -244,9 +246,9 @@ within 64.
 | tune | player | on average | the 99th call in a hundred | at most |
 |---|---|---|---|---|
 | Synergy Credits | YMX 0.10.1 | 2330 | 3680 | 4716 |
-| Synergy Credits | YMXR | 1895 | 3512 | 4512 |
+| Synergy Credits | YMXR | 1932 | 3528 | 4528 |
 | Turrican - world 4-3 | YMX 0.10.1 | 1897 | 3360 | 4284 |
-| Turrican - world 4-3 | YMXR | 1540 | 3548 | 4524 |
+| Turrican - world 4-3 | YMXR | 1573 | 3584 | 4560 |
 
 These figures and the rig's are two samples: the rig counts every frame
 of the tune in 68000 cycles with no wait state, and these are the first
@@ -254,7 +256,7 @@ of the tune in 68000 cycles with no wait state, and these are the first
 fetches. Synergy Credits' costliest frame is its 5,347th, past the end of
 this run.
 
-YMXR costs a fifth less on average on Turrican - world 4-3 and a fifth less
+YMXR costs a sixth less on average on Turrican - world 4-3 and a sixth less
 on Synergy Credits, and at their worst 6 per cent more on Turrican - world
 4-3 and 4 per cent less on Synergy Credits, and the figures have two
 causes. The frame procedure here tests the fourteen register columns and
@@ -264,7 +266,7 @@ the call, where YMX writes its fourteen registers unconditionally, one
 included. Fourteen tests and a few writes cost what fourteen writes cost,
 which YMX's measurement found and its design follows; the schema adds the
 effects' columns and the entry. So YMXR's frame procedure costs less on the
-rows that set few columns, 718 on average on that tune, the rig's call there
+rows that set few columns, 755 on average on that tune, the rig's call there
 less its advance, against YMX's 908, and its average is the lower.
 
 The refill is the second cause. YMXR refills fifteen units of two bytes on
@@ -279,21 +281,20 @@ smaller of the two, twelve units against fifteen. A refill parses at most
 one operation a unit, so its unit count bounds the parse: YMX's worst frame
 parses twelve operations of twelve, and Turrican - world 4-3's heaviest
 refill here fourteen of fifteen. On Synergy Credits the run ends before
-YMXR's costliest frame, so its 4,512 at most is not that frame, which the
-rig counts at 5,086. Both players pad this tune to unit 2, YMX by
+YMXR's costliest frame, so its 4,528 at most is not that frame, which the
+rig counts at 5,074. Both players pad this tune to unit 2, YMX by
 duplicating a frame and YMXR by an unset row (SPEC.md 6, rule 6). At `-k1`
 YMXR packs it at unit 1: the refill is thirty units, and a run of the same
 length reads 5,560 at most.
 
 YMX alone writes its register columns unconditionally, dense, with the
-effects behind one bit. Counted by
-the rig against the player as it is, each register written as the player
-writes a set column, in 36 cycles, and the effects' steps behind a test of
-22, that costs 4 to 181 cycles a frame on nine of the eleven fixtures and
-saves 6 to 32 on the other two, for rewriting 1.1 to 1.7 and redefining
-five bits against R6.2. YMX's finding that a test costs what a write costs
-applies to a 30-cycle test and not to the 22 of a test that forms the select
-only where it writes.
+effects behind one bit. Counted by the rig against the player as it is,
+each register written as the player writes a set column, in 36 cycles, and
+the effects' steps behind a test of 22, that costs 22 to 141 cycles a
+frame on seven of the eleven fixtures and saves 2 to 56 on the other four,
+for rewriting 1.1 to 1.7 and redefining five bits against R6.2. YMX's
+finding that a test costs what a write costs applies to a 30-cycle test
+and not to the 22 of a test that forms the select only where it writes.
 
 ---
 
@@ -302,13 +303,13 @@ only where it writes.
 | tick | cycles |
 |---|---|
 | a row written, the place stepped | 96 |
-| the marker, the place to row `RR` | 114 |
-| the marker, the timer stopped | 124 |
+| the marker, the place to row `RR` | 82 |
+| the marker, the timer stopped | 108 |
 | a square's two rows, no place stepped | 80 |
 | a source of one row, no place stepped | 56 |
 | a row written, the tune running one effect | 88 |
-| the marker to row `RR`, one effect | 114 |
-| the marker and the stop, one effect | 124 |
+| the marker to row `RR`, one effect | 82 |
+| the marker and the stop, one effect | 108 |
 | a square's two rows, one effect | 72 |
 | a source of one row, one effect | 48 |
 
@@ -320,11 +321,11 @@ With the interrupt's entry and its `rte`, a tick is 160 cycles: 12% of an
 A source of two rows repeating to row 0 runs a separate handler
 (68k/player/ticks.S, SQUARE), which encodes both rows as immediates and
 moves between them by their difference: 80 cycles, 144 with the entry and
-the `rte`, against the 160 and 178 the two paths of the general handler
-cost. A tune whose effects are all such sources ticks 29.4 times a frame on
-Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 735, 620 and 505
-cycles a frame come off those tunes, against a play call of 1,995, 1,456
-and 1,551 (the table above).
+the `rte`, against the 160 and 146 the two paths of the general handler
+cost. A tune whose effects are all such sources ticks 29.4 times a frame
+on Synergy Credits, 24.8 on DBA 2 and 20.2 on DBA 5, so 735, 620 and 505
+cycles a frame come off those tunes, against a play call of 2,021, 1,496
+and 1,590 (the table above).
 
 A tick drops the interrupt level and writes an end of interrupt because the
 MFP runs in software end-of-interrupt mode, as TOS leaves it, and because a
@@ -335,8 +336,8 @@ uses the core assembled with `YMXR_NEST=0` and `YMXR_AEOI=1` (BINARIES.md
 | tick | as it is | lean |
 |---|---|---|
 | a row written, the place stepped | 96 | 64 |
-| the marker, the place to row `RR` | 114 | 98 |
-| the marker, the timer stopped | 124 | 108 |
+| the marker, the place to row `RR` | 82 | 66 |
+| the marker, the timer stopped | 108 | 92 |
 | a square's two rows, no place stepped | 80 | 48 |
 | a source of one row, no place stepped | 56 | 24 |
 
@@ -377,16 +378,16 @@ ticks no longer cost.
 
 A source of one row repeating runs a separate handler the same way
 (68k/player/ticks.S, ONEROW). A source of one row is the marker alone
-(SPEC.md 3.2) and its place is at row 0, so the handler encodes that row as
-an immediate, writes it, and moves no place: 48 cycles against the 114 the
-general handler's marker path costs, and 56 against 114 where the tune runs
-more than one effect. The kit's `retune` ticks 7.7 times a frame, a 383 Hz
-buzzer, so 506 cycles a frame come off it against a play call of 1,379.
-`retune` is a built tune: every source the corpus names has another shape,
-83 tunes of it naming any source (experiments.md), so what the handler
-saves is measured on this tune and the conformance kit alone. The target
-belongs to the effect on all three handlers, patched at a start out of the
-effect's record, so the handler follows the source's shape alone.
+(SPEC.md 3.2) and its place is at row 0, so the handler encodes that row
+as an immediate, writes it, and moves no place: 48 cycles against the 82
+the general handler's marker path costs, and 56 against 82 where the tune
+runs more than one effect. The kit's `retune` ticks 7.7 times a frame, a
+383 Hz buzzer, so 506 cycles a frame come off it against a play call of
+1,379. `retune` is a built tune: every source the corpus names has another
+shape, 83 tunes of it naming any source (experiments.md), so what the
+handler saves is measured on this tune and the conformance kit alone. The
+target belongs to the effect on all three handlers, patched at a start out
+of the effect's record, so the handler follows the source's shape alone.
 
 A start separates three shapes off one cell, which would cost every start
 16 cycles. Init already walks every source to resolve it, so it reads there
@@ -446,40 +447,39 @@ absolute address):
 | tick through a transformation | as it is | lean | absolute |
 |---|---|---|---|
 | a row written, the place stepped | 120 | 88 | 132 |
-| the marker, the place to row `RR` | 142 | 126 | 158 |
-| the marker, the timer stopped | 148 | 132 | 156 |
+| the marker, the place to row `RR` | 106 | 90 | 118 |
+| the marker, the timer stopped | 142 | 126 | 146 |
 | a row written, the tune running one effect | 112 | 88 | 124 |
 | counted, a row written | 140 | 108 | 152 |
-| counted, the end, the place to row `RR` | 182 | 166 | 198 |
-| counted, the end, the timer stopped | 198 | 182 | 206 |
+| counted, the end, the place to row `RR` | 126 | 110 | 138 |
+| counted, the end, the timer stopped | 162 | 146 | 166 |
 | two columns, a row written | 176 | 144 | 200 |
-| two columns, the marker, the places to row `RR` | 206 | 190 | 234 |
-| two columns, the marker, the timer stopped | 184 | 168 | 196 |
+| two columns, the marker, the places to row `RR` | 162 | 146 | 186 |
+| two columns, the marker, the timer stopped | 178 | 162 | 186 |
 | three columns, a row written | 232 | 200 | 268 |
-| three columns, the marker, the places to row `RR` | 270 | 254 | 310 |
-| three columns, the marker, the timer stopped | 220 | 204 | 236 |
+| three columns, the marker, the places to row `RR` | 218 | 202 | 254 |
+| three columns, the marker, the timer stopped | 214 | 198 | 226 |
 | two counted columns, a row written | 196 | 164 | 220 |
-| two counted columns, the end, the places to row `RR` | 246 | 230 | 274 |
-| two counted columns, the end, the timer stopped | 234 | 218 | 246 |
+| two counted columns, the end, the places to row `RR` | 182 | 166 | 206 |
+| two counted columns, the end, the timer stopped | 198 | 182 | 206 |
 
 Each figure is the tick of the identity's handler of that shape and 24
-cycles, 28 on the path that loops, and 34 when a counted source stops.
-The lookup handler uses a word branch to the halt, and a counted handler
-branches there after restoring its counter (68k/player/lookup_ticks.S,
-TICKL). As it is and lean, the 24 is the
-key's write; on the absolute build the key's write is 28 cycles, and the
-page read through the program counter, 20, is 4 less than the identity's
-read of an absolute address, 24. Init writes nops in place of the level's
-drop in the general instance on a tune that runs one effect, as it does in
-the general handler (A tick), and in no other lookup kind. The counted
-instance of one column costs 20 cycles a row more than the general one on a
-tune of several effects. The two kinds of two columns, the value mapped
-written last (`setToneX`, `setEnvelope`) or first (`setNoiseX`), cost the
-same, and so do the two of three, the value mapped last (`setBuzzer`) or in
-the middle (`setVoiceX`), and the two counted kinds of two columns. A
-square and a source of one row through a transformation run their handler
-of the identity, with entries in its immediates, and tick at the cost A
-tick counts.
+cycles, and 34 when a source stops: the 10 more is the lookup handler's
+bra.w to the halt, which its loop word reaches (68k/player/lookup_ticks.S,
+TICKL). As it is and lean, the 24 is the key's write; on the absolute
+build the key's write is 28 cycles, and the page read through the program
+counter, 20, is 4 less than the identity's read of an absolute address,
+24. Init writes nops in place of the level's drop in the general instance
+on a tune that runs one effect, as it does in the general handler (A
+tick), and in no other lookup kind. The counted instance of one column
+costs 20 cycles a row more than the general one on a tune of several
+effects. The two kinds of two columns, the value mapped written last
+(`setToneX`, `setEnvelope`) or first (`setNoiseX`), cost the same, and so
+do the two of three, the value mapped last (`setBuzzer`) or in the middle
+(`setVoiceX`), and the two counted kinds of two columns. A square and a
+source of one row through a transformation run their handler of the
+identity, with entries in its immediates, and tick at the cost A tick
+counts.
 
 ## A remap at the frame
 
@@ -525,38 +525,37 @@ copy, for rows that start or remap one effect:
 
 | the row | one column | a square | a source of one row |
 |---|---|---|---|
-| a start at row 0 | 414 to 494 | 574 | 462 |
+| a start at row 0 | 448 to 520 | 574 | 462 |
 | a remap between two transformations | 202 to 236 | 766 to 786 | 588 |
-| a remap from the identity | 1408 | 766 | 588 |
-| a remap to the identity | 1186 | 548 to 566 | 440 |
+| a remap from the identity | 1506 | 766 | 588 |
+| a remap to the identity | 1222 | 548 to 566 | 440 |
 
 The ranges are the effect, a row that resets the timer, a source that
-plays once, the half a square is at and the cache the start finds. A
-start at the running source's row, with bit 5 of the control column
-clear, reads that row as well, and on one column its remainder by R of
-the source (SPEC.md 1.8.4): 606 to 808 cycles on one column, and 736 to
-750 on a square. A remap on a stopped timer sets the
-kept mapping alone, 86 to 130 cycles. The counted kinds and the kinds of
-several columns write a register, a place and a loop cell a column: a
-start at row 0 is 1,068 to 1,654 cycles on them, a remap between two
-transformations 202, from the identity 1,536 to 2,006 and to the
-identity 1,254 to 1,750.
+plays once, the half a square is at and the cache the start finds. A start
+at the running source's row, with bit 5 of the control column clear, reads
+that row as well, and on one column its remainder by R of the source
+(SPEC.md 1.8.4): 632 to 834 cycles on one column, and 702 to 716 on a
+square. A remap on a stopped timer sets the kept mapping alone, 86 to 130
+cycles. The counted kinds and the kinds of several columns write a
+register, a place and a loop cell a column: a start at row 0 is 1,076 to
+1,698 cycles on them, a remap between two transformations 202, from the
+identity 1,594 to 2,078 and to the identity 1,284 to 1,794.
 
 Through the identity, a start at row 0 of a marked source of one column
-costs 396 cycles from the effect's start in the frame code to its rate,
-and through a transformation, the page found, 552 to 650. The lookup
-adds the page's read in the table; the cache, written where it names
-another instance; the call; and the page byte.
+costs 422 cycles from the effect's start in the frame code to its rate,
+and through a transformation, the page found, 586 to 676. The lookup adds
+the page's read in the table; the cache, written where it names another
+instance; the call; and the page byte.
 
-A start and a remap between two transformations read the page in the
-table of the source's fill kind, and where it has 0 they compare the
+A start and a remap between two transformations read the page in the table
+of the source's fill kind, and where it has 0 they compare the
 transformation and the fill kind of the effect's two fallback pages with
 the source's and fill the page not in use. A remap from the identity
-selects its page in a separate routine, 140 cycles. Switching between
-two transformations changes one page byte atomically, 8 cycles.
-Switching between identity and a lookup also moves registers, loop cells
-and places between handlers: 426 cycles on one column to 946 on three.
-Init copies each page of the list, at these costs:
+selects its page in a separate routine, 140 cycles. Switching between two
+transformations changes one page byte atomically, 8 cycles. Switching
+between identity and a lookup also moves registers, loop cells and places
+between handlers: 462 cycles on one column to 990 on three. Init copies
+each page of the list, at these costs:
 
 | the copy | the transformation's entries | cycles |
 |---|---|---|
@@ -571,20 +570,20 @@ Init copies each page of the list, at these costs:
 
 So the routines of a volume's remap between two transformations, a marked
 source of one column, cost 202 to 236 cycles, its page filled at init.
-Without the lookup a source at several volumes is a separate copy at
-each, and a change of volume is a start of another copy at the running
-source's row. On a marked source of one column, the copy as long as the
-running one, with the timer running and bits 6 and 5 of the control
-column clear, that start costs 412 cycles from the effect's start in the
-frame code to its rate, and 420 with the deferred start in, where the
-start reads the running handler through the vector. On one span, from
-effect 0's branch on the set bit of its source column to its rate, the
-copy's start costs 444 cycles, and 452 with the deferred start in, and a
-remap between two transformations, its page found and the timer running,
-254 on the core with the lookup: a change of volume through a
-transformation costs 190 cycles less there than a change of copy. Beyond
-that span the core with the lookup costs more at the head of each effect,
-in the table below, and on each tick (A tick through a transformation).
+Without the lookup a source at several volumes is a separate copy at each,
+and a change of volume is a start of another copy at the running source's
+row. On a marked source of one column, the copy as long as the running
+one, with the timer running and bits 6 and 5 of the control column clear,
+that start costs 438 cycles from the effect's start in the frame code to
+its rate, and 446 with the deferred start in, where the start reads the
+running handler through the vector. On one span, from effect 0's branch on
+the set bit of its source column to its rate, the copy's start costs 470
+cycles, and 478 with the deferred start in, and a remap between two
+transformations, its page found and the timer running, 254 on the core
+with the lookup: a change of volume through a transformation costs 216
+cycles less there than a change of copy. Beyond that span the core with
+the lookup costs more at the head of each effect, in the table below, and
+on each tick (A tick through a transformation).
 
 A page outside the area is copied at the frame, into the effect's
 fallback page not in use (BINARIES.md 5.6). With that copy, the routines
@@ -596,8 +595,8 @@ from the start's first instruction to its return:
 |---|---|---|---|---|
 | a remap between two transformations | 16 | 1062 | 374 | 688 |
 | the same | 32 | 1326 | 638 | 688 |
-| a start at row 0 | 16 | 1342 | 374 | 968 |
-| the same | 32 | 1606 | 638 | 968 |
+| a start at row 0 | 16 | 1368 | 374 | 994 |
+| the same | 32 | 1632 | 638 | 994 |
 
 The copy costs what init's copy of as many entries in the same form
 costs in the table above, and the rest is the routines less the copy.
@@ -617,8 +616,8 @@ version 9 fixtures, covering each source shape and place reset:
 | a square's start at the running source's row, after a source that steps a place | 30 |
 | a place's reset | 8 |
 | a square's place reset | -12 |
-| a counted source's place reset | 224 |
-| a place's reset of a source of several columns | 352 |
+| a counted source's place reset | 216 |
+| a place's reset of a source of several columns | 362 |
 
 The head reads the constant 0 of the effect's mapping column, and a
 start runs the branch init aims at the start through the identity, 10
@@ -652,53 +651,54 @@ R4.5 counts them:
 
 | tune | the costliest call | the costliest, the starts and remaps apart |
 |---|---|---|
-| a fade on setR8 | 2388 | 1894 |
-| a fade of setVoiceA's volume | 3482 | 1894 |
-| a mapped square and its remap | 2502 | 1894 |
-| a mapped source of one row and its remap | 2388 | 1894 |
-| a source remapped from the identity to T, to T' and back | 3094 | 2134 |
-| a remap on an idle timer and on a stopped one, each kept by a start | 2384 | 1928 |
-| an 8-bit sample on setR10 through 256 entries | 3012 | 1904 |
-| the coarse nibble of setToneA | 3270 | 2450 |
-| the shape of setBuzzer | 3580 | 1982 |
-| the volume of setNoiseA | 3500 | 1978 |
-| the high byte of setEnvelope | 3400 | 2510 |
-| a table of 10 entries on setR9 | 2420 | 1894 |
-| setR7 through a transformation | 2952 | 2354 |
-| a start through T on setToneA, the target alone to setNoiseA, a place's reset and a remap | 3470 | 1964 |
-| a start through T on setVoiceA, the target alone to setBuzzer, a place's reset and a remap | 3726 | 1964 |
-| a counted source on setR7 remapped from the identity after the target alone | 3292 | 2662 |
-| starts through a new mapping with placeReset clear while a source ticks | 2738 | 1894 |
-| a remap and a retune with timerReset on a running timer | 2420 | 1894 |
-| a remap and a retune with timerReset on a stopped timer, kept by a start | 2416 | 1938 |
-| a place's reset on a mapped square, loop and counted source, three effects | 5216 | 3104 |
-| one transformation through the mirror and through the plain fill | 2442 | 1894 |
-| a transformation of 32 entries through the mirror and through the plain fill | 2442 | 1894 |
-| squares and a loop started through a new mapping with placeReset clear | 2502 | 1894 |
-| starts with placeReset clear while a source of several columns runs | 3482 | 1894 |
-| remaps on Timers C and D, which share a control register, each idle while the other runs | 2928 | 2090 |
-| a remap and a retune with timerReset on a running square | 2502 | 1894 |
-| a stop row with the mapping column set, then a start with it unset | 2420 | 1928 |
-| a remap in the row that sets the target to setNoiseA | 3452 | 1946 |
-| a marked source on setEnvelope through T, a remap, a place's reset and a remap from the identity | 3280 | 2490 |
-| counted sources of two columns on setToneA and setNoiseA through T, a remap, a place's reset and a remap from the identity | 5764 | 3644 |
-| sources that play once on seven lookup kinds and loop on five, two effects | 5596 | 2472 |
-| sources that play once on seven lookup kinds, one effect | 3540 | 1964 |
-| four sources through 256 entries remapped in one row | 8182 | 3750 |
+| a fade on setR8 | 2480 | 1934 |
+| a fade of setVoiceA's volume | 3632 | 1934 |
+| a mapped square and its remap | 2508 | 1934 |
+| a mapped source of one row and its remap | 2396 | 1934 |
+| a source remapped from the identity to T, to T' and back | 3188 | 2200 |
+| a remap on an idle timer and on a stopped one, each kept by a start | 2418 | 1968 |
+| an 8-bit sample on setR10 through 256 entries | 3028 | 1944 |
+| the coarse nibble of setToneA | 3404 | 2502 |
+| the shape of setBuzzer | 3718 | 2022 |
+| the volume of setNoiseA | 3500 | 2018 |
+| the high byte of setEnvelope | 3518 | 2582 |
+| a table of 10 entries on setR9 | 2454 | 1934 |
+| setR7 through a transformation | 3020 | 2410 |
+| a start through T on setToneA, the target alone to setNoiseA, a place's reset and a remap | 3486 | 2004 |
+| a start through T on setVoiceA, the target alone to setBuzzer, a place's reset and a remap | 3700 | 2004 |
+| a counted source on setR7 remapped from the identity after the target alone | 3380 | 2678 |
+| starts through a new mapping with placeReset clear while a source ticks | 2752 | 1934 |
+| a remap and a retune with timerReset on a running timer | 2454 | 1934 |
+| a remap and a retune with timerReset on a stopped timer, kept by a start | 2462 | 1978 |
+| a place's reset on a mapped square, loop and counted source, three effects | 5322 | 3144 |
+| one transformation through the mirror and through the plain fill | 2588 | 1934 |
+| a transformation of 32 entries through the mirror and through the plain fill | 2588 | 1934 |
+| squares and a loop started through a new mapping with placeReset clear | 2508 | 1934 |
+| starts with placeReset clear while a source of several columns runs | 3632 | 1934 |
+| remaps on Timers C and D, which share a control register, each idle while the other runs | 2956 | 2130 |
+| a remap and a retune with timerReset on a running square | 2508 | 1934 |
+| a stop row with the mapping column set, then a start with it unset | 2454 | 1968 |
+| a remap in the row that sets the target to setNoiseA | 3468 | 1986 |
+| a marked source on setEnvelope through T, a remap, a place's reset and a remap from the identity | 3414 | 2542 |
+| counted sources of two columns on setToneA and setNoiseA through T, a remap, a place's reset and a remap from the identity | 5938 | 3748 |
+| sources that play once on seven lookup kinds and loop on five, two effects | 5868 | 2512 |
+| sources that play once on seven lookup kinds, one effect | 3574 | 2004 |
+| four sources through 256 entries remapped in one row | 8126 | 3790 |
 
-Of the 33, one passes R4.5's 6,656, at its first row, which starts
-sources on two or more effects through a transformation, and with the
-routines counted apart every call is within it. The costliest starts four
-counted sources, and its frame that remaps the four to another
-transformation costs 2,930.
+Of the 33, one passes R4.5's 6,656, at its first row, which starts sources
+on two or more effects through a transformation, and with the routines
+counted apart every call is within it. The costliest starts four counted
+sources, and its frame that remaps the four to another transformation
+costs 2,970.
 
 ## A counted tick of two columns
 
 `setEnvelope` writes R11 and R12, and both read every bit of their byte,
-so a source on that target is counted: its rows are whole bytes and a
-tick counts them (SPEC.md 2.1.3). The wide handler runs that source with
-a word counter where the marked one tests bit 7, 134 bytes an instance
-against 112, and four instances of it are beside the two marked shapes.
+so a source on that target is counted: its rows are whole bytes and a tick
+counts them (SPEC.md 2.1.3). The wide handler runs that source with a
+compare of its first place with the last row's place where the marked one
+tests bit 7, 102 bytes an instance against 94, and four instances of it
+are beside the two marked shapes.
 
 Both tunes of the kit that sweep the envelope period run one effect. Init
 writes the nops in the general handler, the square's and the one-row
@@ -710,23 +710,23 @@ columns are the player whose ticks read a row through an absolute address
 | tick | marked | counted | marked, absolute | counted, absolute |
 |---|---|---|---|---|
 | a row written, the places stepped | 152 | 172 | 176 | 196 |
-| the end, the places to row `RR` | 178 | 218 | 206 | 246 |
-| the end, the timer stopped | 160 | 200 | 172 | 212 |
+| the end, the places to row `RR` | 138 | 158 | 162 | 182 |
+| the end, the timer stopped | 144 | 164 | 152 | 172 |
 
 So 20 cycles a tick that writes a row, as the counted handler of one
-column costs against the general one, and 40 on the path that loops,
-where the counter is reloaded too. The counted handler reaches
-the half of the envelope period above a marked source's range, and plays
-the last row as written: the tick that reads the last row of a marked
-source on this target
-writes the marker's bit into R12 with the value, a period 32,768 more than
-the row's, which the kit's `envelope` tune does on its first source's last
-two rows, 800 and then 33,696, its 928 with the marker.
+column costs against the general one, and 20 on the path that loops: the
+compare of the place with the last row's place. The counted handler
+reaches the half of the envelope period above a marked source's range, and
+plays the last row as written: the tick that reads the last row of a
+marked source on this target writes the marker's bit into R12 with the
+value, a period 32,768 more than the row's, which the kit's `envelope`
+tune does on its first source's last two rows, 800 and then 33,696, its
+928 with the marker.
 
-The player is 9,454 bytes, 1,592 of them the counted shapes' twelve
-instances, four each of one, two and three columns. Where a tick reads
-an absolute address, 9,112 bytes and 1,696, instances of 144 bytes
-against the marked shape's 122 for two columns.
+The player is 12,406 bytes, 1,224 of them the counted shapes' twelve
+instances, four each of one, two and three columns. Where a tick reads an
+absolute address, 12,082 bytes and 1,320, instances of 110 bytes against
+the marked shape's 102 for two columns.
 
 ## A tick through an absolute address
 
@@ -736,21 +736,21 @@ instruction that reads it (68k/player/switches.S; BINARIES.md 5.5), for a
 host that places a tune further off than a displacement reaches. The read
 costs 20 cycles where a displacement costs 16; the step that moves the
 place is an `addq.l` on a long address, 28 against the 20 an `addq.w` on a
-displacement costs; and the loop's test and its reload move the same way,
-20 against 16 and 36 against 28. A square's handler and a one-row source's
+displacement costs; and the loop's move of a column's loop cell, an
+immediate, costs 28 against 20. A square's handler and a one-row source's
 write a value the start patched into them, so both cost the same in either
 build:
 
 | tick | cycles |
 |---|---|
 | a row written, the place stepped | 108 |
-| the marker, the place to row `RR` | 130 |
-| the marker, the timer stopped | 132 |
+| the marker, the place to row `RR` | 94 |
+| the marker, the timer stopped | 112 |
 | a square's two rows, no place stepped | 80 |
 | a source of one row, no place stepped | 56 |
 | a row written, the tune running one effect | 100 |
-| the marker to row `RR`, one effect | 130 |
-| the marker and the stop, one effect | 132 |
+| the marker to row `RR`, one effect | 94 |
+| the marker and the stop, one effect | 112 |
 | a square's two rows, one effect | 72 |
 | a source of one row, one effect | 48 |
 
@@ -761,17 +761,16 @@ of interrupt on all five:
 | tick | as it is | lean |
 |---|---|---|
 | a row written, the place stepped | 108 | 76 |
-| the marker, the place to row `RR` | 130 | 114 |
-| the marker, the timer stopped | 132 | 116 |
+| the marker, the place to row `RR` | 94 | 78 |
+| the marker, the timer stopped | 112 | 96 |
 | a square's two rows, no place stepped | 80 | 48 |
 | a source of one row, no place stepped | 56 | 24 |
 
-So the player as it is saves 12 cycles a tick that writes a row and
-steps its place, 16 on the loop and 8 on the stop: at a digidrum's 6,000
-ticks a second, 1,440 cycles a frame. A handler of two columns saves
-twice that a tick and one of three three times, since each column is a
-read and a step; the counted handler saves the same 12 as the general
-one.
+So the player as it is saves 12 cycles a tick that writes a row and steps
+its place, 12 on the loop and 4 on the stop: at a digidrum's 6,000 ticks a
+second, 1,440 cycles a frame. A handler of two columns saves twice that a
+tick and one of three three times, since each column is a read and a step;
+the counted handler saves the same 12 as the general one.
 
 The raster monitor reads this build as it reads the others, and the bar
 it burns for the ticks is the figure that moves. Under Hatari over 420
@@ -787,18 +786,18 @@ that turns a row's address into a displacement is in that window as
 well: a dozen instructions this build leaves out, which a tick of a timer
 due inside it waits for.
 
-The displacement is a signed word, so every row of every source is
-within 32,767 bytes of the handlers. Init measures each source against
-them and reports -1 for one further off (BINARIES.md 1.5), and the
-layouts put a tune's DTX1 tables before its image and a set's subtunes
-before the images, so the rows of the tune a host loads are beside the
-player at any length of image. A host that places them further off
-assembles this build, which is 9,112 bytes against 9,454. Two figures
-move against each other: a place is a word where it was a long, which
-shortens a timer's handlers by 52 bytes, and a start does the arithmetic
-that turns a row's address into a displacement, 38 bytes more of the
-timer's frame code. The init and the routines the four timers share, the
-reach check among them, are 398 bytes more.
+The displacement is a signed word, so every row of every source is within
+32,767 bytes of the handlers. Init measures each source against them and
+reports -1 for one further off (BINARIES.md 1.5), and the layouts put a
+tune's DTX1 tables before its image and a set's subtunes before the
+images, so the rows of the tune a host loads are beside the player at any
+length of image. A host that places them further off assembles this build,
+which is 12,082 bytes against 12,406. Two figures move against each other:
+a place is a word where it was a long, which shortens a timer's handlers
+by 48 bytes, and a start does the arithmetic that turns a row's address
+into a displacement, 38 bytes more of the timer's frame code. The init and
+the routines the four timers share, the reach check among them, are 364
+bytes more.
 
 What the two cores do to a tune, under Hatari over 900 frames of Turrican -
 world 4-3, counted from the frame the player first writes in: both write
@@ -826,20 +825,23 @@ alone. The figures below are counted from the 68000's instruction
 timings, on that build with the row read through the program counter,
 and start at the head of the path that ends a source.
 
-At the frame of a deferred start on a running timer the player patches
-the handler of the start's shape in the bank its vector does not point
-into, writes the rate into the effect's installer, and writes one word
-into the running handler, at the head of its last row's path: a `bra.s`
-to its stub, or a `nop` where the stub follows the word. The tick that
-reads the last row runs the stub and the installer, which writes the word
-back, stops the timer where the start sets the timer's reset, writes the
-count, the vector and the select, and returns; the next tick runs the
-armed handler.
+At the frame of a deferred start on a running timer the player patches the
+handler of the start's shape in the bank its vector does not point into,
+writes the rate into the effect's installer, and writes one word into the
+running handler, at the head of its last row's path: a `bra.s` to its
+stub, or a `nop` where the stub follows the word. The tick that reads the
+last row runs the stub and the installer, which writes the word back,
+stops the timer where the start sets the timer's reset, writes the count,
+the vector and the select, and returns; the next tick runs the armed
+handler. A stop with a start pending writes the word back and drops the
+start, since a set inits one loaded player for each subtune: a word left
+in place sends the next subtune's tick at its last row into the installer
+of the start armed before.
 
 | the tick that reads the last row | cycles |
 |---|---|
-| today's, to row `RR` | 88 |
-| today's, the timer stopped | 98 |
+| today's, to row `RR` | 56 |
+| today's, the timer stopped | 82 |
 | the switch on Timer A or B | 142 |
 | the same, with `timerReset` | 172 |
 | the switch on Timer C or D, whose control register is shared | 202 |
@@ -864,20 +866,236 @@ read the running handler through the vector, 8 or 16 cycles more than
 the build without the deferred start, which reads it at its address as
 version 7 did. On that build the play call of each of the eleven
 fixtures counts the cycles of version 7, and on this build the play call
-of Synergy Credits counts 2,005 cycles on average and 5,118 at most,
-against 1,995 and 5,086. On either build a start with bit 5 at 0, after
+of Synergy Credits counts 2,031 cycles on average and 5,106 at most,
+against 2,021 and 5,074. On either build a start with bit 5 at 0, after
 a source whose handler steps a place, compares the row number with R, 32
 cycles. A tune with bit 4 set runs each row that sets an effect's
 target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
-The second bank, the installers and the stubs make the player 14,636
-bytes against 9,454, and 14,490 against 9,112 where a tick reads an
-absolute address. Each handler gains a stub: an instance of the wide
-handler is 138 bytes against 134, and of the marked shape of two columns
-116 against 112.
+The second bank, the installers, the stubs and the stop's write-back make
+the player 17,272 bytes against 12,406, and 17,128 against 12,082 where a
+tick reads an absolute address. Each handler gains a stub: an instance of
+the wide handler is 106 bytes against 102, and of the marked shape of two
+columns 98 against 94.
 
-The lookup in, `YMXR_MAP=1`, makes the player 21,966 bytes against 9,454,
-and 23,256 against 9,112 where a tick reads an absolute address. With
-the deferred start in as well, 35,908 against 14,636, and 37,954 against
-14,490.
+The lookup in, `YMXR_MAP=1`, makes the player 31,842 bytes against 12,406,
+and 31,348 against 12,082 where a tick reads an absolute address. With the
+deferred start in as well, 44,768 against 17,272, and 44,520 against
+17,128.
+
+## A cut
+
+`YMXR_MAP=1` plays a tune that cuts a source as well, a tune of version 11
+(SPEC.md 1.11; BINARIES.md 2.1). A start or a recut under a cut 1 to 127
+runs the counted handler of the source's columns at every shape of source
+(68k/player/cut.S), and a start under cut 0 runs the handler of the
+source's shape, as in version 10. The rig counts the figures below on the
+nine tunes of its check of cuts that defer no start, on the player as it
+is.
+
+| tick | a marked source under cut 0 | under a cut |
+|---|---|---|
+| one column, a row written | 96 | 116 |
+| one column, the end of a pass, the place to its loop row | 82 | 102 |
+| one column, the end of a pass, the timer stopped | 108 | 128 |
+| two columns, a row written | 152 | 172 |
+| two columns, the end of a pass, the places to its loop row | 138 | 158 |
+| three columns, a row written | 208 | 228 |
+| three columns, the end of a pass, the places to its loop row | 194 | 214 |
+
+The compare of the place with the last row's place costs 20 cycles a row
+written on each of the three, and 20 at the end of a pass (A counted tick
+of two columns). A square that a start or a recut puts under a cut of one
+of its rows runs the counted handler, and ticks at 116 and 102 in turn
+under its two rows after that, against 80 on its handler. A recut to its
+two rows of a square on its handler, and every recut of a source of one
+row, leave that handler running. A counted source runs the counted handler
+under cut 0 as well, and ticks at the same figures under a cut. Through a
+transformation a tick under a cut costs 24 cycles more a row written and
+24 more at the end of a pass, 140 and 126 on one column. The column under
+cut 0 is of a tune of several effects; the counted handler drops the level
+on a tune of one effect as well, so a tick under a cut costs the same on
+either (A tick).
+
+A start under a cut and a recut each run a routine of the cut
+(68k/player/cut.S). A source of one column through the identity starts and
+recuts on a separate path (ymxr_kone, and the first path of ymxr_recut),
+which reads the cut's rows and the source's loop row and writes the place,
+the loop cell, the loop word and the last row's place of the counted
+handler of one column. A source of two or three columns through the
+identity starts on a second path of ymxr_kone, which reads the same and
+writes each column's register, place and loop cell, and the loop word and
+the last row's place, of the counted handler of its columns, at the
+offsets the kind's descriptor lists. A recut of a source the counted
+handler already runs writes the places, the loop cells, the loop word and
+the last row's place of that handler, and leaves its registers, its page
+byte and the vector as they are. Every other start, and a recut that moves
+a source of several columns or through a transformation to the counted
+handler, runs the general routine, which reads the source's shape and its
+kind first. A start is counted from the effect's start in the frame code
+to its rate, and a recut from the effect's branch on the set bit of its
+source column to its rate:
+
+| the source | a start under a cut | a recut on the counted handler |
+|---|---|---|
+| one column | 822 to 892 | 1066 to 1096 |
+| two columns | 1552 to 1558 | 1712 to 1752 |
+| three columns | 1774 | 1856 |
+| one column, through a transformation | 2176 to 2242 | 1442 |
+
+The ranges are the effect, the source's shape and the cut. The table's
+start puts the place at row F of the cut; a start with the place kept
+reads the running row and its remainder by R as well, 1,182 to 1,202
+cycles on one column and 1,890 on two. A recut that moves a source from
+another handler to the counted handler runs the path of one column through
+the identity on such a source, 1,058 to 1,136 cycles, the path of several
+columns through the identity on a marked source of two or three columns,
+1,894 cycles on two and 2,142 on three, and the general routine on every
+other, 3,030 cycles on a square through a transformation. A recut that
+leaves a square's or a one-row source's handler running sets the running
+cut alone: 426 cycles on a square and 314 on a source of one row. A recut
+on a stopped timer sets the kept cut alone, 116 cycles. On the same span a
+start under cut 0 at row 0 of a marked source of one column costs 490
+cycles.
+
+The routines run inside the play call, and R4.5 counts them apart, as it
+counts those of a start or a remap through a transformation. Each tune's
+costliest call, whole and as R4.5 counts it:
+
+| tune | the costliest call | as R4.5 counts it |
+|---|---|---|
+| a cut past row 0 that excludes the repeat row, its place reset, one after a recut to the whole table, and one of a source of one row under cut 0 | 3972 | 2628 |
+| starts at the running row, inside a cut and outside it | 2898 | 2258 |
+| a source that plays once under a cut, started again by a select | 2590 | 1960 |
+| a square, one row and a counted source under a cut, recut to the whole table | 4880 | 3508 |
+| a recut on a stopped timer, read by the start after it | 2632 | 1960 |
+| starts under the whole table after a cut, each place reset after, and recuts of a loop and a square started under it | 5826 | 4454 |
+| sources of two and three columns under a cut and under the whole table, recut, and a place's reset | 9562 | 5032 |
+| starts through a transformation under a cut, remaps under it, and recuts, beside a timer that maps a source under the whole table | 9772 | 4124 |
+| recuts on the timers that share a control register | 4070 | 2726 |
+
+Every call of the nine is within R4.5's 6,656 as it counts them, the
+costliest at 5,032. Counted whole, two pass it, each at its first row,
+which starts four sources: 9,772 cycles, four through a transformation,
+two of them under a cut, and 9,562, four of two and three columns under a
+cut.
+
+The player with the lookup in is 31,842 bytes against 21,966 in release
+0.15.0, before the cut, and 31,348 against 23,256 where a tick reads an
+absolute address; with the deferred start in as well, 44,768 against
+35,908, and 44,520 against 37,954. Of the 9,876 bytes it is longer than in
+that release, 3,264 are the cut's blocks, which a link leaves out of the
+player of a song that cuts no source (LINKER.md): 2,744 of routines and
+130 of each effect's frame code. With the deferred start in, the blocks
+are 3,740 of the 8,860. The blocks of copy from frame, which a link keeps
+only for a song that copies from frame, are 2,780 bytes of the rest, and
+2,890 with the deferred start in (Copy from frame). The blocks of the sync
+and of the handler of its targets, which a link keeps only for a song that
+syncs a voice, are 5,332 bytes, and 5,630 with the deferred start in
+(LINKER.md).
+
+## Copy from frame
+
+`YMXR_MAP=1` plays a tune that copies from frame as well, a tune of
+version 12 (SPEC.md 3.1.7; BINARIES.md 2.1). A start of copy from frame
+aims the counted handler of its target's columns at their frame values, a
+source of one row with one row a pass, whose ticks run the counted
+handler's path at the end of a pass (A tick, A counted tick of two
+columns), and through a transformation the counted lookup instance's.
+Through the identity, on a target other than a target of a sync, the frame
+then aims the timer's vector at the timer's handler of copy from frame: a
+`move.l` a column, whose immediates are the column's register and its
+frame value. The register steps write each frame value to its immediate as
+well. The vector goes back to the counted handler at the head of the paths
+of a row that sets a column of the effect, the paths that read the handler
+through the vector (copy.S, ymxr_cxon, ymxr_csome). A frame of such a tune
+runs the register steps of the block `copy` in place of the frame's
+(LINKER.md): they find the registers copy from frame runs on (below), keep
+each value they read, masked to its register's width, as its frame value,
+and write the chip where the register is outside those. Init aims the
+frame, the starts and the head of each effect's paths at the block only
+for a tune that copies from frame, so every other tune runs the frame and
+the ticks it ran in the release before, at the same cycles, and a song of
+such tunes links the same player as in that release.
+
+The rig counts the figures below on the five tunes of its check of copy
+from frame, on the player as it is with the lookup in, and with the
+deferred start in as well on the two that defer a start. A tick:
+
+| tick | cycles |
+|---|---|
+| one column | 56 |
+| two columns | 80 |
+| three columns | 104 |
+| one column, on the counted handler | 102 |
+| two columns, on the counted handler | 158 |
+| three columns, on the counted handler | 214 |
+| one column, through a transformation | 126 |
+| three columns, through a transformation | 238 |
+
+Through the identity a tick runs the handler of copy from frame of its
+timer, a `move.l` of a register and its frame value a column, from the
+frame that aims the vector at it (copy.S, ymxr_cxon), and the counted
+handler before that frame. On the counted handler and on one column
+through a transformation, each figure is the counted handler's at the end
+of a pass under a cut (A cut).
+
+A frame runs the block's register steps, and the steps a register cost 54
+to 418 cycles more than the frame's steps on the same rows, which the rig
+counts by playing each tune again with the frame's steps and without a
+tick. Each keeps the value it reads as the frame value, tests whether a
+tick writes the register, and where one does, writes it to its immediate
+as well (columns.S, CPUT). The steps end in the test of one effect for its
+handler of copy from frame, and the aim of the effect's vector at it where
+the effect can run it, on a frame that reads no record (copy.S,
+ymxr_cxon): 36 to 1,490 cycles a frame. A frame that reads the records
+marks the four effects for the test, and each next frame that reads no
+record tests one, effect 3 first: the frame of a start runs neither the
+test nor the aim. Before the steps, the frame finds the registers the
+ticks write. It reads the effects' records for them again on two kinds of
+frame: after a row that sets a column of an effect, which can start, stop,
+aim or settle the effect's handler, and from the row that arms a deferred
+start to the row that settles it, since a tick performs the start in
+between (A deferred start). Such a read costs 634 to 1,634 cycles, and 904
+to 1,482 with the deferred start in, by the effects whose timers count and
+the columns of their handlers. Every other frame tests the mark of such a
+row and uses the mask the last read found: 62 cycles, and 142 with the
+deferred start in, where it tests each effect's pending start as well. A
+row marks the frame in a stub of each effect whose columns it sets
+(ymxr_csome), 70 to 144 cycles, which init reaches from a `bsr.w` over the
+read at the head of the effect's paths; where the frame aimed the effect's
+vector at its handler of copy from frame, the stub aims it back at the
+counted handler before the read.
+
+A start of copy from frame at the frame, counted from the effect's start
+in the frame code to its rate as A cut counts one, by its target's
+columns:
+
+| columns | the player as it is | with the deferred start in |
+|---|---|---|
+| one | 726 to 806 | 892 to 950 |
+| two | 1044 to 1084 | 1270 to 1288 |
+| three | 1300 | 1466 |
+
+On the same span a start under cut 0 at row 0 of a marked source of one
+column costs 490 cycles (A cut). Through a transformation, on the player
+with the deferred start in, a start of one column costs 1,354 to 1,598
+cycles.
+
+A start of copy from frame runs a routine inside the play call,
+ymxr_copystart through the identity and ymxr_copylook through a
+transformation, and R4.5 counts both apart, as it counts those of a cut (A
+cut). Each tune's costliest call, whole and as R4.5 counts it:
+
+| tune | the costliest call | as R4.5 counts it |
+|---|---|---|
+| copy from frame on a register of each kind of handler | 9172 | 6048 |
+| copy from frame on targets of two and three registers | 9650 | 6148 |
+| copy from frame replaced and replacing, at the frame and deferred, and recut | 8028 | 6172 |
+| copy from frame beside a mapped source, its timer remapped to mapping 0 | 4740 | 3610 |
+| copy from frame through transformations, remapped, deferred and beside a mapped source | 10614 | 6504 |
+
+Every call of the five is within R4.5's 6,656 as it counts them, the
+costliest at 6,504. Counted whole, four pass it, each at its first row,
+which starts copy from frame on three or four effects.

@@ -30,12 +30,262 @@ and an executable built from one embeds these. `BinariesTest` reads them
 against the assembly the build makes, so one that does not match what rmac
 writes today fails the build.
 
-A player pins a version of this format: a tune file is 9, or 10 where a
-row maps a value (SPEC.md 3.3.5), and a bound tune the version of the
-tune file bound (BINARIES.md 1), and a release's number names the tools
-rather than either.
+A player pins a version of this format: a tune file is 9, 10 where a row
+maps a value, 11 where a row cuts a source, 12 where a row starts copy from
+frame, 13 where a row syncs a voice and 14 where a row lists a voice among
+its even syncs (SPEC.md 3.3.5), and a bound tune the version of the tune
+file bound (BINARIES.md 1), and a release's number names the tools rather
+than either.
 
 ## Published
+
+### 0.20.0, 2026-11-27
+
+<https://github.com/odipar/YMXR/releases/tag/v0.20.0>, built from the commit
+tagged `v0.20.0`.
+
+The ticks cost fewer cycles: copy from frame through the identity ticks
+from handlers the frame writes, every handler that steps a place ends a
+pass on immediates, and the general head of a target of a sync reads its
+registers off immediates and its parity off a word the frame writes. A
+tune converts to the file 0.19.0 writes.
+
+- **Copy from frame.** Through the identity, on a target other than a
+  target of a sync, a tick runs a handler of `move.l` immediates of the
+  registers and their frame values, which the register steps write: 56,
+  80 and 104 cycles for one, two and three columns, against 154, 218 and
+  282 in 0.19.0 (#405).
+- **The end of a pass.** A counted handler compares the place with the
+  last row's place, an immediate a start writes, and the loop cell is the
+  immediate of the move at the head of the path that ends a pass, whose
+  first word a start writes, or a `bra.s` to the halt where the source
+  plays once. The general handler's marker to row `RR` is 82 cycles
+  against 114, and the end of a pass of the counted handler of three
+  columns 214 against 282 (#407).
+- **The general head of a target of a sync.** Its registers are
+  immediates a start writes, its parity a word the frame writes, and its
+  pads shifts: a tick of its odd path is 342 cycles against 410, and a
+  handler of a target of a sync 384 bytes against 560 (#408).
+- **The rig's** Hatari pass times the syncs the model makes, where it
+  read a period a dump of version 9 sets to 0 as a sync (#406).
+
+The player is 12,406 bytes against 13,584 in 0.19.0, 31,842 with the
+lookup in against 33,244, and 17,272 with the deferred start in against
+19,002. Every call of the rig's tunes of copy from frame and of cuts is
+within R4.5's 6,656 cycles as it counts them.
+
+Against 0.19.0's Go tools, the eleven dumps of `ym/test` convert to the
+same tune files; the four that run no effect link the same SNDH files on
+the plain core, `-lean`, `-abs` and `-perf -lean -abs`, and the seven that
+run one link this release's player. The kit's tunes check the same, and
+those that run no effect link the same SNDH files. `bin/suite`: 386
+tests, 0 skipped.
+
+### 0.19.0, 2026-11-26
+
+<https://github.com/odipar/YMXR/releases/tag/v0.19.0>, built from the commit
+tagged `v0.19.0`.
+
+A sync keeps a voice's period at 0 for an exact odd or even number of
+steps of the tone generator, and a tune that lists a voice among its even
+syncs converts to a tune file of version 14: YMXS 0.11.0's even syncs
+(SPEC.md 1.12.3, 3.3.5). YMXR requires YMXS 0.11.0. A tick of a target of
+a sync runs a head the frame writes. A tune that syncs no voice converts
+to the file 0.18.0 writes and links the player 0.18.0 links.
+
+- **Exact syncs.** From the write after which both registers of a
+  voice's period are 0 to the write after which one is other than 0, the
+  period is 0 for a whole number of steps, 32 cycles each: odd, or even
+  where bit 4 of the voice's coarse column is 1, read on every row
+  (SPEC.md 1.12.2, 1.12.3). At the frame and at a tick the player writes
+  0 to the coarse register first unless the chip's value of the fine one
+  is 0, and the Hatari pass reads each sync's steps (#400).
+- **Ticks of a target of a sync.** Each handler of one has a room before
+  its slot, into which the frame writes, every frame, the head its effect
+  needs: for copy from frame the four writes of the period as `move.l`
+  immediates, and for a source none of whose rows has a fine of 0 the
+  registers as immediates. A tick of copy from frame is 126 cycles for an
+  odd sync and 158 for an even one, against 330 in 0.18.0, and a tick of
+  such a source 232 and 264, against 284. The general head runs the first
+  tick after a start, a frame whose fine is 0 or changes from 0, a timer
+  with a deferred start armed, and a source with a row whose fine is 0
+  (#403).
+- **The kit** has `sync-volume`, a target of a sync beside volumes
+  through transformations (#398), and `sync-even` (#400) and `sync-heads`
+  (#403), both of version 14: 25 tunes and 19,141 entries.
+- **The rig's** `-kit -cycles` plays every kit tune (#401).
+
+The player is 13,584 bytes against 11,066 in 0.18.0, 33,244 with the
+lookup in against 29,944, and 19,002 with the deferred start in against
+16,476; the bytes it gained are in the blocks a link keeps for a song
+that syncs a voice.
+
+Against 0.18.0's Go tools, the eleven dumps of `ym/test` convert to the
+same tune files and link the same SNDH files on the plain core, `-lean`,
+`-abs` and `-perf -lean -abs`; the kit's tunes of versions 9 to 12 check
+the same and link the same SNDH files, and those of version 13 check the
+same. `bin/suite`: 386 tests, 0 skipped.
+
+### 0.18.0, 2026-11-26
+
+<https://github.com/odipar/YMXR/releases/tag/v0.18.0>, built from the commit
+tagged `v0.18.0`.
+
+A tune that copies from frame converts to a tune file of version 12, and
+one that syncs a voice to version 13: YMXS 0.9.0's copy from frame and YMXS
+0.10.0's sync (SPEC.md 3.3.5). YMXR requires YMXS 0.10.0. A tune that does
+neither converts to the file 0.17.0 writes and links the player 0.17.0
+links.
+
+- **Copy from frame** is source S of a tune of version 12, index entry 0. A
+  start of it plays the frame values of the target's registers, each masked
+  to its register's width, on the counted handler of the target's columns,
+  one row a pass, through the identity or a transformation (SPEC.md 3.1.7,
+  rule 2(j)). The cores with the lookup, `YMXR_MAP=1`, play it, and init of
+  every other core reports -1 for such a tune. A frame reads the effects'
+  records for the registers the ticks write after a row that sets a column
+  of an effect, 618 to 1,618 cycles, and every other frame costs 62
+  (performance.md, Copy from frame). The kit's `copy-from-frame.ymxr` links
+  9,346 bytes.
+- **The sync of a voice.** Bit 5 of a coarse column marks a voice the row
+  syncs: at the frame the player writes 0 to the voice's two period
+  registers, waits at least 36 cycles, and writes their frame values
+  (SPEC.md 4.4.1). A start on `syncToneA` to `syncToneC`, targets 25 to 27,
+  runs a handler that does the same at every tick (5.1). Every core plays
+  the sync, and a song that syncs a voice links the blocks `sync` and
+  `synced`, 1,736 bytes of the plain player. Under Hatari the kit's
+  `sync-targets.ymxr` makes 276,768 syncs over 2,000 frames, the shortest
+  wait 56 cycles. A target of a sync through a transformation, under a cut
+  or started deferred is section 8's (8.10), and the converters report an
+  error for a start of one.
+- **A set** stores a transformation once where two subtunes index it;
+  0.17.0 stored it in each block that indexed it (BINARIES.md 3.1). Play
+  and the ticks run the cycles they ran.
+- **The rig** switches the kit's subtunes as the program stub does, exit
+  then init, and plays each after the switch against the same subtune on a
+  fresh machine. The Hatari pass plays the core with the lookup and reads
+  each sync's wait.
+
+Against 0.17.0's Go tools, the eleven dumps of `ym/test` convert to the
+same tune files and link the same SNDH files on the plain core, `-lean`,
+`-abs` and `-perf -lean -abs`, and the kit's tunes of versions 9 to 11
+check the same and link the same SNDH files. `bin/suite`: 384 tests, 0
+skipped.
+
+### 0.17.0, 2026-11-24
+
+<https://github.com/odipar/YMXR/releases/tag/v0.17.0>, built from the commit
+tagged `v0.17.0`.
+
+A player linked for a song is smaller, a start and a recut under a cut of
+a source of two or three columns are faster, and a stop writes back the
+hook of a deferred start pending. The tune file and the bound tune are
+0.16.0's.
+
+- **Smaller players.** Init's and stop's work for the effects is a block a
+  song keeps where it runs an effect, and the frame writes registers 11,
+  12, 8 to 10 and 7 in one copy (LINKER.md, sizes.md). A song with no
+  effect links 1,336 bytes where it linked 2,752, and the players of the
+  544 dumps of the corpus are 45% fewer bytes. The one copy costs a dump's
+  average call 24 to 40 cycles, and the costliest frame of the eleven dumps
+  of `ym/test` is Synergy Credits' 5,074 cycles, 1,582 under R4.5's
+  budget. A song that cuts a source and maps no value leaves out the
+  lookup's routines and tables, 2,672 bytes: the kit's `cut.ymxr` links
+  7,336 bytes.
+- **Faster cuts.** A start under a cut of a source of two or three columns
+  through the identity runs a separate path, 1,534 to 1,540 cycles on two
+  columns and 1,752 on three against 1,968 to 1,974 and 2,216, and a recut
+  that moves such a source to the counted handler runs another, 1,842 and
+  2,086 cycles. A recut of a square to its two rows and every recut of a
+  source of one row leave that handler running: 426 and 314 cycles, where
+  the move to the counted handler cost about 1,050. R4.5 counts the
+  routines of a start under a cut and of a recut apart, as it counts the
+  lookup's, and every call of the rig's tunes of cuts is within its 6,656
+  cycles (performance.md, A cut).
+- **The link** keeps the counted kinds and `several` that a song's rows run
+  under a cut, read by a walk of the rows, where 0.16.0's kept every
+  counted kind of an effect that cuts and `several` for every song that
+  cuts.
+- **The converter** reports a cut or a counted source of more than 65,535
+  rows, and a source of two or three columns of more than 65,534 rows,
+  which a player plays wrong (SPEC.md 8.8).
+- **A stop with a deferred start pending** writes back the word the start
+  hooked into the running handler (performance.md, A deferred start).
+  From 0.6.0 the stop left it, and the next init of the same loaded
+  player, another subtune of a set or the same one started again, ran
+  that handler with the hook in place: at its last row the tick ran the
+  installer of the start armed before, and the voice played another
+  source at another rate. A player with the deferred start in is 72 bytes
+  larger.
+
+Issues 364 to 368 are closed.
+
+### 0.16.0, 2026-11-23
+
+<https://github.com/odipar/YMXR/releases/tag/v0.16.0>, built from the commit
+tagged `v0.16.0`.
+
+A tune that cuts a source converts to a tune file of version 11: YMXS
+0.8.0's cut on a `Start` and its `Recut`, encoded as a cut column for each
+effect and a cut index, each cut a first and a last row of the source it
+runs on (SPEC.md 1.11, 3.5). The cut columns are 30 to 33 where the tune
+maps no value, and 34 to 37 past the mapping columns where it maps one. A
+tune that cuts no source converts to the file 0.15.0 writes, at version 9
+or 10.
+
+- **The converter, the reader and the check** read and write version 11 in
+  the Java and Go trees, byte for byte with each other. `ymxs-to-ymxr`
+  writes a `Start` under a cut and a `Recut`, and in version 11 a frame's
+  entry of the record ends each effect with its kept cut (SPEC.md 7.3).
+  The conformance kit gains `cut.ymxr` and `cuts.ymxr`.
+- **The player** reads version 11 in the cores with the lookup,
+  `YMXR_MAP=1`. A start or a recut under a cut runs the counted handler of
+  the source's columns at every shape of source, through the identity or a
+  transformation, and the handler ends a pass at the cut's last row, where
+  a deferred start under a cut switches. Init of every other core reports
+  -1 for such a tune (BINARIES.md 1.5), and a bound tune of version 11 is
+  version 11 ($000B).
+- **The SNDH tools** put a subtune that cuts a source on a core with the
+  lookup, and the link keeps the cut's code for a song that cuts a source
+  alone: the kit's `cut.ymxr` links 11,302 bytes of 25,592.
+- **The figures** (performance.md, A cut): a tick under a cut costs 20
+  cycles more a row written than a marked source under cut 0, and 40 more
+  at the end of a pass. At the frame a start under a cut costs 824 to 900
+  cycles on a source of one column through the identity and 1,968 to 2,216
+  on two or three columns, and a recut on the counted handler 1,106 to
+  1,790. The player with the lookup in is 24,884 bytes against 21,966,
+  2,674 of them the cut's blocks.
+
+Open questions of the cut are issues 364 to 368; one of the rig's tunes of
+cuts passes R4.5's 6,656 cycles at a row that starts four sources of two
+and three columns under a cut (368).
+
+### 0.15.0, 2026-11-09
+
+<https://github.com/odipar/YMXR/releases/tag/v0.15.0>, built from the commit
+tagged `v0.15.0`.
+
+The SNDH core's play ends the host's Timer C interrupt before it calls the
+player (BINARIES.md 2.9). A host that calls play from its Timer C handler in
+software end-of-interrupt mode, as SND Player 1.51 does, left Timer C's
+in-service bit set for the length of the call, and the MFP delayed Timer D
+until the host's handler cleared it: a tune whose effect runs Timer D fast
+crackled under such a host and played cleanly as a program. Play now writes
+$DF to ISRB first, 6 bytes in every core and 16 cycles a call. Over the
+eleven dumps under `ym/test`, the SNDH files come to 163,156 bytes, 72 more
+than under 0.14.0, 4 to 8 a file.
+
+Under Hatari, Synergy Credits on a host that calls play from Timer C at
+level 3 and leaves the bit to the operating system: under 0.14.0, 0 Timer D
+ticks ended inside a call and 126 within 400 cycles after the bit was
+cleared; under 0.15.0, 22 and 12. Timer A, which ranks above Timer C, ended
+41 and 42 ticks inside a call.
+
+The CONV tag is the text of a new flag, `-wWRITER`, of `ymxr-sndh`,
+`ymxs-to-sndh`, `ymxs-to-prg` and `bin/ymxr-set`; otherwise, of a YMXS
+structure, the first tune's writer; and `YMXR (ym-to-ymxr)` where both are
+blank (BINARIES.md 3.2). `ymxs-to-sndh` wrote `YMXR (ym-to-ymxr)` into every
+file before. The tune file and the bound tune are 0.14.0's.
 
 ### 0.14.0, 2026-11-06
 

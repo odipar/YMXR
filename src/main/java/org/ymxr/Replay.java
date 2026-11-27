@@ -24,26 +24,39 @@ final class Replay {
      * One effect after a frame: source 0 means idle. {@code set} marks
      * an effect-column write; {@code timer}, {@code place} and {@code
      * deferred} record control bits 6, 5 and 3. {@code mapping} is the
-     * kept mapping, initially 0 for identity. A deferred start can run
-     * through a different captured mapping; this model omits ticks and
-     * pending starts (SPEC.md 1.10.3, 7.3).
+     * kept mapping, initially 0 for identity, and {@code cut} the kept cut,
+     * initially 0 for the whole table. A deferred start can run through a
+     * different captured mapping and cut; this model omits ticks and
+     * pending starts (SPEC.md 1.10.3, 1.11.3, 7.3).
      */
     record Effect(int target, int source, int select, int count, boolean started,
                   boolean set, boolean timer, boolean place, boolean deferred,
-                  int mapping) {
+                  int mapping, int cut) {
         static final Effect NONE = new Effect(0, 0, 0, 0, false, false, false, false,
-                false, 0);
+                false, 0, 0);
     }
 
     final int[] registers = new int[14];
     final int[] written = new int[14];
+    /** The voices the last row syncs, bit 0 voice A to bit 2 voice C: bit
+     *  5 of each coarse column in version 13 and 14, read on every row
+     *  (SPEC.md 1.12). */
+    int syncs;
+    /** The voices whose syncs during the last row are even, bit 0 voice A
+     *  to bit 2 voice C: bit 4 of each coarse column in version 14, read on
+     *  every row (SPEC.md 1.12). */
+    int evens;
     final Effect[] effect = new Effect[4];
     boolean envelopeWritten;
     private final Table table;
+    /** The effects used, whose bits 5 and 6 lay out the columns after 29
+     *  (SPEC.md 3.3.5). */
+    private final int effects;
     private int row;
 
-    Replay(Table table) {
+    Replay(Table table, int effects) {
         this.table = table;
+        this.effects = effects;
         Arrays.fill(registers, -1);
         Arrays.fill(effect, Effect.NONE);
     }
@@ -58,6 +71,12 @@ final class Replay {
         byte[] r = new byte[table.columns()];
         for (int c = 0; c < r.length; c++) {
             r[c] = table.column(c)[row];
+        }
+        syncs = 0;
+        evens = 0;
+        for (int v = 0; Columns.syncs(effects) && v < 3; v++) {
+            syncs |= (r[1 + 2 * v] & Columns.SYNC) != 0 ? 1 << v : 0;
+            evens |= Columns.evens(effects) && (r[1 + 2 * v] & Columns.EVEN) != 0 ? 1 << v : 0;
         }
         row++;
         if (row == table.rows()) {
@@ -98,20 +117,21 @@ final class Replay {
                 place = (r[t + 2] & 0x20) != 0;
                 deferred = (r[t + 2] & Columns.DEFERRED) != 0;
             }
-            // A start or remap can replace the kept mapping. A remap
-            // preserves the source. A stop ignores its mapping column;
-            // the check reports that invalid combination (SPEC.md 1.10,
-            // 6.4).
-            int mapping = was.mapping();
-            boolean mapped = r.length > Columns.MAPPING + i
-                    && (r[Columns.MAPPING + i] & 0x80) != 0;
+            // A start or remap can replace the kept mapping, and a start or
+            // recut the kept cut. A remap and a recut preserve the source.
+            // A stop ignores its mapping and cut columns; the check reports
+            // that invalid combination (SPEC.md 1.10, 1.11, 6.4).
+            int m = Columns.mapping(effects, i);
+            int x = Columns.cut(effects, i);
+            boolean mapped = m >= 0 && (r[m] & 0x80) != 0;
+            boolean cut = x >= 0 && (r[x] & 0x80) != 0;
             boolean stop = (r[t + 1] & 0xFF) == 0x80;
-            if (mapped && !stop) {
-                mapping = r[Columns.MAPPING + i] & 0x7F;
-            }
-            boolean set = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0 || mapped;
+            int mapping = mapped && !stop ? r[m] & 0x7F : was.mapping();
+            int kept = cut && !stop ? r[x] & 0x7F : was.cut();
+            boolean set = ((r[t] | r[t + 1] | r[t + 2]) & 0x80) != 0 || r[t + 3] != 0 || mapped
+                    || cut;
             effect[i] = new Effect(target, source, select, count, started, set, timer, place,
-                    deferred, mapping);
+                    deferred, mapping, kept);
         }
         envelopeWritten = false;
         Arrays.fill(written, -1);

@@ -32,11 +32,13 @@ ymxr_kindof:    moveq   #0,d0
                 beq.s   .kind
                 addq.w  #1,d0
 .kind:          rts
-.look:          dc.b    0,0,2,4,1,6,8,0         ; by FX_SHAPE, 0 to 6
-.ident:         dc.b    10,0,12,13,11,14,15,0
+.look:          dc.b    0,0,2,4,1,6,8,1,6,8     ; by FX_SHAPE, 0 to 9
+.ident:         dc.b    10,0,12,13,11,14,15,11,14,15
 
 ; a4 the handler of the kind a2 describes, of effect d6, in bank d4. d5
-; clobbered.
+; clobbered. The remap and the lookup kinds' loops call this, ymxr_inst
+; and ymxr_page0, the piece lookup_6.
+                PIECE   lookup_6
 ymxr_at:        move.w  d6,d5
                 add.w   d5,d5
                 move.w  (a2,d5.w),d5            ; KD_AT, the effect's instance
@@ -79,25 +81,26 @@ ymxr_page0:     lea     ymxr_refat(pc),a5
                 move.b  d1,(a3)
                 move.b  d1,(a2)
                 rts
+                ENDPIECE lookup_6
 
 ; Stepping-handler kinds: the lookup kinds in page-byte-table order,
 ; then the identity kinds.
-ymxr_kinds:     KIND    ymxr_lk,1,LK_CELL,0,0,LK_PAGE,0,1,LK_SEL,LK_PTR,0,0,0,0
-                KIND    ymxr_lc,1,LC_CELL,LC_LEFT,LC_RELD,LC_PAGE,4,0,LC_SEL,LC_PTR,0,0,0,0
-                KIND    ymxr_lt,2,LT_CELLS,0,0,LT_PAGE,2,1,LT_SEL1,LT_PTR1,LT_SEL2,LT_PTR2,0,0
-                KIND    ymxr_ln,2,LN_CELLS,0,0,LN_PAGE,2,0,LN_SEL1,LN_PTR1,LN_SEL2,LN_PTR2,0,0
-                KIND    ymxr_lb,3,LB_CELLS,0,0,LB_PAGE,3,1,LB_SEL1,LB_PTR1,LB_SEL2,LB_PTR2,LB_SEL3,LB_PTR3
-                KIND    ymxr_lv,3,LV_CELLS,0,0,LV_PAGE,3,0,LV_SEL1,LV_PTR1,LV_SEL2,LV_PTR2,LV_SEL3,LV_PTR3
-                KIND    ymxr_le,2,LE_CELLS,LE_LEFT,LE_RELD,LE_PAGE,5,0,LE_SEL1,LE_PTR1,LE_SEL2,LE_PTR2,0,0
-                KIND    ymxr_lf,2,LF_CELLS,LF_LEFT,LF_RELD,LF_PAGE,5,0,LF_SEL1,LF_PTR1,LF_SEL2,LF_PTR2,0,0
-                KIND    ymxr_lg,3,LG_CELLS,LG_LEFT,LG_RELD,LG_PAGE,6,0,LG_SEL1,LG_PTR1,LG_SEL2,LG_PTR2,LG_SEL3,LG_PTR3
-                KIND    ymxr_lh,3,LH_CELLS,LH_LEFT,LH_RELD,LH_PAGE,6,0,LH_SEL1,LH_PTR1,LH_SEL2,LH_PTR2,LH_SEL3,LH_PTR3
-                KIND    ymxr_tick,1,TICK_CELL,0,0,0,0,0,TICK_SEL,TICK_PTR,0,0,0,0
-                KIND    ymxr_cnt,1,TICKC_CELL,TICKC_LEFT,TICKC_RELD,0,4,0,TICKC_SEL,TICKC_PTR,0,0,0,0
-                KIND    ymxr_two,2,TW2_CELLS,0,0,0,2,0,TW2_SEL1,TW2_PTR1,TW2_SEL2,TW2_PTR2,0,0
-                KIND    ymxr_three,3,TW3_CELLS,0,0,0,3,0,TW3_SEL1,TW3_PTR1,TW3_SEL2,TW3_PTR2,TW3_SEL3,TW3_PTR3
-                KIND    ymxr_env,2,TWC_CELLS,TWC_LEFT,TWC_RELD,0,5,0,TWC_SEL1,TWC_PTR1,TWC_SEL2,TWC_PTR2,0,0
-                KIND    ymxr_cwide,3,TWCT_CELLS,TWCT_LEFT,TWCT_RELD,0,6,0,TWCT_SEL1,TWCT_PTR1,TWCT_SEL2,TWCT_PTR2,TWCT_SEL3,TWCT_PTR3
+ymxr_kinds:     KIND    ymxr_lk,1,LK_CELL,0,LK_PAGE,0,1,LK_SEL,LK_PTR,0,0,0,0
+                KIND    ymxr_lc,1,LC_CELL,LC_LASTP,LC_PAGE,4,0,LC_SEL,LC_PTR,0,0,0,0
+                KIND    ymxr_lt,2,LT_CELLS,0,LT_PAGE,2,1,LT_SEL1,LT_PTR1,LT_SEL2,LT_PTR2,0,0
+                KIND    ymxr_ln,2,LN_CELLS,0,LN_PAGE,2,0,LN_SEL1,LN_PTR1,LN_SEL2,LN_PTR2,0,0
+                KIND    ymxr_lb,3,LB_CELLS,0,LB_PAGE,3,1,LB_SEL1,LB_PTR1,LB_SEL2,LB_PTR2,LB_SEL3,LB_PTR3
+                KIND    ymxr_lv,3,LV_CELLS,0,LV_PAGE,3,0,LV_SEL1,LV_PTR1,LV_SEL2,LV_PTR2,LV_SEL3,LV_PTR3
+                KIND    ymxr_le,2,LE_CELLS,LE_LASTP,LE_PAGE,5,0,LE_SEL1,LE_PTR1,LE_SEL2,LE_PTR2,0,0
+                KIND    ymxr_lf,2,LF_CELLS,LF_LASTP,LF_PAGE,5,0,LF_SEL1,LF_PTR1,LF_SEL2,LF_PTR2,0,0
+                KIND    ymxr_lg,3,LG_CELLS,LG_LASTP,LG_PAGE,6,0,LG_SEL1,LG_PTR1,LG_SEL2,LG_PTR2,LG_SEL3,LG_PTR3
+                KIND    ymxr_lh,3,LH_CELLS,LH_LASTP,LH_PAGE,6,0,LH_SEL1,LH_PTR1,LH_SEL2,LH_PTR2,LH_SEL3,LH_PTR3
+                KIND    ymxr_tick,1,TICK_CELL,0,0,0,0,TICK_SEL,TICK_PTR,0,0,0,0
+                KIND    ymxr_cnt,1,TICKC_CELL,TICKC_LASTP,0,4,0,TICKC_SEL,TICKC_PTR,0,0,0,0
+                KIND    ymxr_two,2,TW2_CELLS,0,0,2,0,TW2_SEL1,TW2_PTR1,TW2_SEL2,TW2_PTR2,0,0
+                KIND    ymxr_three,3,TW3_CELLS,0,0,3,0,TW3_SEL1,TW3_PTR1,TW3_SEL2,TW3_PTR2,TW3_SEL3,TW3_PTR3
+                KIND    ymxr_env,2,TWC_CELLS,TWC_LASTP,0,5,0,TWC_SEL1,TWC_PTR1,TWC_SEL2,TWC_PTR2,0,0
+                KIND    ymxr_cwide,3,TWCT_CELLS,TWCT_LASTP,0,6,0,TWCT_SEL1,TWCT_PTR1,TWCT_SEL2,TWCT_PTR2,TWCT_SEL3,TWCT_PTR3
                 .if     YMXR_DEFER
 ; The hook of each kind in the order above (SPEC.md 4.8): the offset of
 ; the head of the path that ends a source, and the word a hook writes
@@ -116,5 +119,7 @@ ymxr_hooks:     dc.w    LK_LAST,LK_HOOKW,LC_LAST,LC_HOOKW,LT_LAST,LT_HOOKW
 ymxr_refat:     dc.w    ymxr_ref0-ymxr_ref,ymxr_ref1-ymxr_ref
                 dc.w    ymxr_ref2-ymxr_ref,ymxr_ref3-ymxr_ref
 ; The table of a fill kind without pages: 0 for every transformation,
-; each page to the fallback (ymxr_prefill).
+; each page to the fallback (ymxr_prefill), the piece lookup_7.
+                PIECE   lookup_7
 ymxr_nomap:     dcb.b   128,0
+                ENDPIECE lookup_7

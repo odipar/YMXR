@@ -30,11 +30,13 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.ymxs.Chip;
 import org.ymxs.Tunes;
+import org.ymxs.YMXS.Cut;
 import org.ymxs.YMXS.Effect;
 import org.ymxs.YMXS.Mapping;
 import org.ymxs.YMXS.OneConnection;
 import org.ymxs.YMXS.Pair;
 import org.ymxs.YMXS.Part;
+import org.ymxs.YMXS.Recut;
 import org.ymxs.YMXS.Register;
 import org.ymxs.YMXS.Remap;
 import org.ymxs.YMXS.Retune;
@@ -81,7 +83,7 @@ final class ConformanceTest {
 
     /** The version word in {@code wrong-version}: one past the highest
      *  version the reader reads (SPEC.md 3.3.5). */
-    static final int WRONG_VERSION = Tune.VERSION + 1;
+    static final int WRONG_VERSION = Tune.EVEN + 1;
 
     /** SOURCES.md's rows, one a tune. */
     static final List<Fixture> FIXTURES = List.of(
@@ -153,6 +155,51 @@ final class ConformanceTest {
             Fixture.built("mapped", "`ConformanceTest.mapped`", () -> schema(mapped()),
                     "version 10 at 50 Hz; optional lookups, fades, deferred snapshots"
                     + " and kept mappings. See [Mapped transformations](#mapped-transformations)."),
+            Fixture.built("cut", "`ConformanceTest.cut`", () -> schema(cut()),
+                    "version 11 at 50 Hz: a window of 16 rows over a triangle of 32, moved"
+                    + " two rows a frame by a recut, then narrowed to 8 rows and to 4"),
+            Fixture.built("cuts", "`ConformanceTest.cuts`", () -> schema(cuts()),
+                    "version 11 at 50 Hz: a cut that excludes its source's repeat row and"
+                    + " one that includes it, a start under the whole table, a deferred"
+                    + " start under a cut of a source that plays once, and a recut while"
+                    + " it is pending"),
+            Fixture.built("copy-from-frame", "`CopyTest.tune`", () -> schema(CopyTest.tune()),
+                    "version 12 at 50 Hz: copy from frame, index entry 0, on `setR13` on"
+                    + " Timer A from row 0 and on `setVoiceB` on Timer D from row 1, beside a"
+                    + " square on R10 on Timer B; rows that set R13, R2 and R9 while copy from"
+                    + " frame runs on them, which the frame leaves to the ticks, and a stop"
+                    + " of each at row 3, after which the frame writes R2 and R9 at row 0"),
+            Fixture.built("sync", "`SyncTest.tune`", () -> schema(SyncTest.tune()),
+                    "version 13 at 50 Hz: rows that sync a voice, bit 5 of each coarse"
+                    + " column, a row that syncs the three and rows that sync one and leave"
+                    + " its period unset; copy from frame on `setToneB` on Timer A, whose"
+                    + " voice's syncs the frame leaves to it, and on Timer B a source on"
+                    + " `setToneC` and a deferred start of a drum on `setR8` that stays"
+                    + " pending across three rows that sync voice C"),
+            Fixture.built("sync-targets", "`SyncTest.targets`", () -> schema(SyncTest.targets()),
+                    "version 13 at 50 Hz: the targets of a sync, `syncToneA` to `syncToneC`;"
+                    + " copy from frame on `syncToneA` on Timer A and on `syncToneC` on Timer"
+                    + " C, and a source of two rows on `syncToneB` on Timer B, each tick a"
+                    + " sync of its voice; rows that sync a voice at their frame, one while"
+                    + " Timer A runs on it, whose sync the frame leaves to the effect"),
+            Fixture.built("sync-volume", "`SyncTest.volume`", () -> schema(SyncTest.volume()),
+                    "version 13 at 50 Hz: a square on `syncToneA` on Timer A under the"
+                    + " identity beside a sample on `setR8`, the volume of the synced voice,"
+                    + " through a transformation on Timer B, and a deferred start of it on"
+                    + " `setR10` through another on Timer D; rows that sync voice A at their"
+                    + " frame, one while Timer A runs on it"),
+            Fixture.built("sync-even", "`SyncTest.evens`", () -> schema(SyncTest.evens()),
+                    "version 14 at 50 Hz: rows that sync each voice at their frame, odd and"
+                    + " even, bit 4 of the coarse column, to periods whose fine is 0 and other"
+                    + " than 0; a square of four rows on `syncToneA` on Timer A, two of its"
+                    + " rows a fine of 0, whose syncs two rows make even; and a row that lists"
+                    + " voice C among its even syncs without a sync"),
+            Fixture.built("sync-heads", "`SyncTest.heads`", () -> schema(SyncTest.heads()),
+                    "version 14 at 50 Hz: copy from frame on `syncToneA` on Timer A and on"
+                    + " `syncToneC` on Timer C, and a source of four rows with no fine of 0"
+                    + " on `syncToneB` on Timer B, each synced odd and even by the rows;"
+                    + " rows that set the fine frame value of voice A and then of voice C to"
+                    + " 0 and back"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
@@ -209,7 +256,7 @@ final class ConformanceTest {
     /** A start of {@code source} on {@code register} with both resets. */
     private static Start start(Register register, Single source, int by, int count,
                                Mapping mapping) {
-        return new Start(new OneConnection(Tunes.setting(register), source),
+        return Tunes.start(new OneConnection(Tunes.setting(register), source),
                 new Timing(Chip.prescaler(by), count, true, true), false, mapping);
     }
 
@@ -255,7 +302,7 @@ final class ConformanceTest {
             raised.add(Math.min(k + 1, 15));
         }
         Mapping up = Tunes.mapping(Tunes.IDENTITY, new Transformation("coarse up", raised));
-        Start tone = new Start(new TwoConnection(new SetTone(Voice.C), arpeggio),
+        Start tone = Tunes.start(new TwoConnection(new SetTone(Voice.C), arpeggio),
                 new Timing(Chip.prescaler(200), 100, true, true), false, up);
         Start fading = start(Register.R8, pulse, 50, 100, Tunes.mapping(volume(15)));
         Start loud = start(Register.R9, square, 50, 140, Tunes.mapping(volume(10)));
@@ -281,7 +328,7 @@ final class ConformanceTest {
         effects.get(4).put(Timer.C, tone);
         effects.get(FALL).put(Timer.B, start(Register.R9, fall, 200, 150,
                 Tunes.mapping(volume(5))));
-        effects.get(8).put(Timer.B, new Start(new OneConnection(Tunes.setting(Register.R9),
+        effects.get(8).put(Timer.B, Tunes.start(new OneConnection(Tunes.setting(Register.R9),
                 square), new Timing(Chip.prescaler(50), 140, false, true), true,
                 Tunes.mapping(volume(10))));
         effects.get(PENDING).put(Timer.B, new Remap(Tunes.mapping(volume(12))));
@@ -304,10 +351,72 @@ final class ConformanceTest {
                 Register.R7, 0x38);
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < effects.size(); r++) {
-            rows.add(new Row(r == 0 ? first : Map.of(), effects.get(r)));
+            rows.add(new Row(r == 0 ? first : Map.of(), effects.get(r), Set.of(), Set.of()));
         }
         return new org.ymxs.YMXS.Tune("mapped", "", "ConformanceTest", 50,
                 Tunes.repeating(rows, REPEAT));
+    }
+
+    /**
+     * The window of YMXS's doc/tunes/cut.json: a triangle of 32 rows on
+     * setR8, started under the cut of rows 0 to 15, moved two rows a frame
+     * by a recut to 16 to 31, then narrowed to 16 to 23 and to 20 to 23;
+     * the last row stops it (YMXS, SPEC.md 3.7.4).
+     */
+    static org.ymxs.YMXS.Tune cut() {
+        List<Integer> values = new ArrayList<>();
+        for (int n = 0; n < 32; n++) {
+            values.add(n < 16 ? n : 31 - n);
+        }
+        Single triangle = Tunes.repeating("triangle", values, 0);
+        List<Row> rows = new ArrayList<>();
+        rows.add(new Row(Map.of(Register.R7, 63), Map.of(Timer.A, new Start(
+                new OneConnection(Tunes.setting(Register.R8), triangle),
+                new Timing(Chip.prescaler(4), 40, true, true), false, Tunes.NO_PARTS,
+                new Cut(0, 15))), Set.of(), Set.of()));
+        int[][] windows = {{2, 17}, {4, 19}, {6, 21}, {8, 23}, {10, 25}, {12, 27}, {14, 29},
+                           {16, 31}, {16, 23}, {20, 23}};
+        for (int[] one : windows) {
+            rows.add(new Row(Map.of(), Map.of(Timer.A, new Recut(new Cut(one[0], one[1]))), Set.of(), Set.of()));
+        }
+        rows.add(new Row(Map.of(Register.R8, 0), Map.of(Timer.A, Tunes.STOP), Set.of(), Set.of()));
+        return new org.ymxs.YMXS.Tune("cut", "", "ConformanceTest", 50,
+                Tunes.repeating(rows, 0));
+    }
+
+    /**
+     * The cuts of YMXS's conformance kit, cuts.json: on Timer A a wave of
+     * six rows under the cut 1 to 3, which excludes its repeat row, recut to
+     * 0 to 3, which includes it; a deferred start of a fall that plays once,
+     * under the cut 1 to 2, and a recut to 0 to 1 while it is pending. Timer B
+     * starts the wave under its whole table. The last row stops both.
+     */
+    static org.ymxs.YMXS.Tune cuts() {
+        Single wave = Tunes.repeating("wave", List.of(0, 5, 10, 15, 10, 5), 0);
+        Single fall = Tunes.once("fall", List.of(12, 8, 4, 0));
+        Timing both = new Timing(Chip.prescaler(4), 100, true, true);
+        List<Map<Timer, Effect>> effects = new ArrayList<>();
+        for (int r = 0; r < 5; r++) {
+            effects.add(new EnumMap<>(Timer.class));
+        }
+        effects.get(0).put(Timer.A, new Start(new OneConnection(Tunes.setting(Register.R8),
+                wave), both, false, Tunes.NO_PARTS, new Cut(1, 3)));
+        effects.get(1).put(Timer.A, new Recut(new Cut(0, 3)));
+        effects.get(1).put(Timer.B, new Start(new OneConnection(Tunes.setting(Register.R9),
+                wave), both, false, Tunes.NO_PARTS, new Cut(0, 5)));
+        effects.get(2).put(Timer.A, new Start(new OneConnection(Tunes.setting(Register.R8),
+                fall), new Timing(Chip.prescaler(4), 100, false, true), true, Tunes.NO_PARTS,
+                new Cut(1, 2)));
+        effects.get(3).put(Timer.A, new Recut(new Cut(0, 1)));
+        effects.get(4).put(Timer.A, Tunes.STOP);
+        effects.get(4).put(Timer.B, Tunes.STOP);
+        List<Row> rows = new ArrayList<>();
+        for (int r = 0; r < effects.size(); r++) {
+            rows.add(new Row(r == 0 ? Map.of(Register.R7, 63)
+                    : r == 4 ? Map.of(Register.R8, 0, Register.R9, 0) : Map.of(), effects.get(r), Set.of(), Set.of()));
+        }
+        return new org.ymxs.YMXS.Tune("cuts", "", "ConformanceTest", 50,
+                Tunes.repeating(rows, 0));
     }
 
     /** The tune of a fixture: converted from its dump, or built. */
@@ -457,7 +566,7 @@ final class ConformanceTest {
         }
         assertTrue(most > 13, "no tune of the kit names a target above 13,"
                 + " so this check is empty");
-        assertTrue(task.contains("0 to " + most), "TASK.md names targets up to"
+        assertTrue(task.replaceAll("\\s+", " ").contains("0 to " + most), "TASK.md names targets up to"
                 + " another number than " + most + ", which the kit reaches");
     }
 
@@ -501,7 +610,7 @@ final class ConformanceTest {
             assertEquals(lines, Long.parseLong(row.group(1).replace(",", "")),
                     "TASK.md's lines for " + f.name());
         }
-        Matcher count = Pattern.compile("([\\d,]+) entries").matcher(readme);
+        Matcher count = Pattern.compile("([\\d,]+)\\s+entries").matcher(readme);
         assertTrue(count.find(), "README.md does not count the entries");
         assertEquals(entries, Long.parseLong(count.group(1).replace(",", "")), "README.md's entry count");
         Matcher version = Pattern.compile("version word \\$([0-9A-Fa-f]{4})").matcher(text);
@@ -529,18 +638,21 @@ final class ConformanceTest {
                 numbers(task, "(\\d+) columns in a tune file of versions (\\d+) to (\\d+), and"
                         + " (\\d+) in one of version (\\d+)"), "TASK.md 3's columns by version");
         List<Integer> layout = numbers(readme, "a (\\d+)-byte header, `R` at bytes (\\d+) to"
-                + " (\\d+), `C` at (\\d+) and (\\d+), (\\d+) for a tune of version (\\d+) and"
-                + " (\\d+) for one of version (\\d+), `RR` at (\\d+) to (\\d+) and `W` ="
-                + " (\\d+) at (\\d+), then `R` rows of `C` bytes");
-        assertEquals(13, layout.size(), "README.md 3's rows file");
+                + " (\\d+), `C` at (\\d+) and (\\d+), (\\d+) for a tune of version (\\d+),"
+                + " (\\d+) for one of version (\\d+), and (\\d+) or (\\d+) for one of version"
+                + " (\\d+), `RR` at (\\d+) to (\\d+) and `W` = (\\d+) at (\\d+), then `R` rows"
+                + " of `C` bytes");
+        assertEquals(16, layout.size(), "README.md 3's rows file");
         assertEquals(List.of(Columns.C, Tune.UNMAPPED, Columns.MAPPED, Tune.VERSION),
                 layout.subList(5, 9), "README.md 3's columns by version");
+        assertEquals(List.of(Columns.MAPPED, Columns.ALL, Tune.CUT), layout.subList(9, 12),
+                "README.md 3's columns of version 11");
         int header = layout.get(0);
         // a field's name, then its offset and its bytes
         Map<String, List<Integer>> fields = new TreeMap<>(Map.of(
                 "R", List.of(layout.get(1), layout.get(2) - layout.get(1) + 1),
                 "C", List.of(layout.get(3), layout.get(4) - layout.get(3) + 1),
-                "RR", List.of(layout.get(9), layout.get(10) - layout.get(9) + 1)));
+                "RR", List.of(layout.get(12), layout.get(13) - layout.get(12) + 1)));
         Map<String, List<Integer>> listed = new TreeMap<>();
         Matcher field = Pattern.compile("^\\| (\\d+) \\| (\\d+) \\| `(R|C|RR)`,",
                 Pattern.MULTILINE).matcher(text);
@@ -585,20 +697,22 @@ final class ConformanceTest {
                         one.getValue().get(0), one.getValue().get(1)), f.name() + ".rows' "
                         + one.getKey());
             }
-            assertEquals(layout.get(11), rows[layout.get(12)] & 0xFF, f.name() + ".rows' W");
+            assertEquals(layout.get(14), rows[layout.get(15)] & 0xFF, f.name() + ".rows' W");
             assertEquals(header + table.columns() * table.rows(), rows.length,
                     f.name() + ".rows' bytes");
-            assertEquals(version == Tune.VERSION ? Columns.MAPPED : Columns.C, table.columns(),
+            assertEquals(Tune.columns(version, file[Tune.EFFECTS_AT] & 0xFF), table.columns(),
                     f.name() + "'s column count");
-            if (version != Tune.VERSION) {
+            if (version < Tune.VERSION) {
                 continue;
             }
-            mapped.add(f.name());
             String name = Pattern.quote(f.name());
             List<Integer> written = List.of(version, Tune.getWord(file, Tune.FRAME_RATE_AT));
-            assertEquals(List.of(version), numbers(readme, "`" + name + "` as a YMXS structure"
-                    + " that the schema of `ymxs-to-ymxr` writes at version (\\d+)"),
-                    "README.md 3's version of " + f.name());
+            if (version == Tune.VERSION) {
+                mapped.add(f.name());
+                assertEquals(List.of(version), numbers(readme, "`" + name + "` as a YMXS"
+                        + " structure that the schema of `ymxs-to-ymxr` writes at version (\\d+)"),
+                        "README.md 3's version of " + f.name());
+            }
             assertEquals(written, numbers(readme, "\\| `" + name + "` \\| version (\\d+) at"
                     + " (\\d+) Hz"), "README.md 6's version and rate of " + f.name());
             assertEquals(written, numbers(sources, "\\| `" + name + "` \\|[^\\n]*\\| version"
@@ -647,7 +761,8 @@ final class ConformanceTest {
                 || !(ramp.mapping().parts().get(0) instanceof Transformation steps)) {
             throw new AssertionError("row 0 starts no source on Timer D through a transformation");
         }
-        int keys = Collections.max(Tunes.values(Tunes.source(ramp.connection())));
+        int keys = Collections.max(Tunes.values(
+                java.util.Objects.requireNonNull(Tunes.source(ramp.connection()))));
         for (Path at : List.of(KIT.resolve("README.md"), KIT.resolve("SOURCES.md"))) {
             String text = Files.readString(at);
             int start = text.indexOf("### Mapped transformations");
@@ -712,7 +827,7 @@ final class ConformanceTest {
             throw new AssertionError("row " + FALL + " starts no source on Timer B");
         }
         Timing rate = fall.timing();
-        long ticks = (long) Tunes.size(Tunes.rows(Tunes.source(fall.connection())))
+        long ticks = (long) Tunes.size(fall.connection())
                 * Chip.divides(rate.prescaler()) * Chip.ticks(rate.count());
         assertTrue(rate.timerReset() && ticks * mapped().rate()
                 > (long) (PENDING - FALL) * Chip.CLOCK, "the fall ends before row " + PENDING);

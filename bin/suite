@@ -86,6 +86,17 @@ if ! (cd go && go test ./...); then
     exit 1
 fi
 
+# mvn clean removes target, the folder of the run's log, so a clean among
+# the arguments runs as a separate step before the log opens.
+for arg do
+    shift
+    if [ "$arg" = clean ]; then
+        mvn -B --no-transfer-progress -q clean
+    else
+        set -- "$@" "$arg"
+    fi
+done
+
 log=target/suite.log
 status=target/suite.status
 mkdir -p target

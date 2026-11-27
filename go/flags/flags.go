@@ -42,7 +42,7 @@ var PackingFlags = []string{"-k", "-m", "-copies"}
 
 // Tags is the tags ymxs-to-sndh reads, the two cores it selects between,
 // and the clock asked for.
-var Tags = []string{"-t", "-c", "-perf", "-lean", "-pcrel", "-abs", "-vbl", "-tc"}
+var Tags = []string{"-t", "-c", "-w", "-perf", "-lean", "-pcrel", "-abs", "-vbl", "-tc"}
 
 // Rows is the row count a program stops after.
 var Rows = []string{"-r"}
@@ -271,9 +271,9 @@ func decimal(t *tool.Tool, said, flag string) float64 {
 
 // SndhOf is the SNDH file of the multi, as the flags ask for it: every
 // tune a subtune, 1 upward in the multi's order, behind one core. The
-// title and the composer are the first tune's unless -t and -c name
-// others, and a tune's title names its subtune where the multi has
-// several.
+// title, the composer and the writer are the first tune's unless -t, -c
+// and -w name others, the writer the CONV tag's text, and a tune's title
+// names its subtune where the multi has several.
 func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 	said *report.Report) []byte {
 	return SndhWithPacker(t, multi, args, said, nil)
@@ -283,7 +283,7 @@ func SndhOf(t *tool.Tool, multi ymxs.Multi, args []string,
 func SndhWithPacker(t *tool.Tool, multi ymxs.Multi, args []string, said *report.Report,
 	plain dtx.Packer) []byte {
 	options := sndh.Options{Asked: AskedOf(t, args), Link: true}
-	title, composer := "", ""
+	title, composer, writer := "", "", ""
 	for _, flag := range args {
 		switch {
 		case flag == "-perf":
@@ -303,6 +303,8 @@ func SndhWithPacker(t *tool.Tool, multi ymxs.Multi, args []string, said *report.
 			title = flag[2:]
 		case strings.HasPrefix(flag, "-c"):
 			composer = flag[2:]
+		case strings.HasPrefix(flag, "-w"):
+			writer = flag[2:]
 		}
 	}
 	first := multi.Tunes[0]
@@ -312,8 +314,12 @@ func SndhWithPacker(t *tool.Tool, multi ymxs.Multi, args []string, said *report.
 	if composer == "" && strings.TrimSpace(first.Composer) != "" {
 		composer = strings.TrimSpace(first.Composer)
 	}
+	if writer == "" && strings.TrimSpace(first.Writer) != "" {
+		writer = strings.TrimSpace(first.Writer)
+	}
 	options.Title = title
 	options.Composer = composer
+	options.Converter = writer
 	var names []string
 	for _, tune := range multi.Tunes {
 		names = append(names, Title(tune))

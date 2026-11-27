@@ -17,8 +17,8 @@ YMXR_init:
                 bne     .bad
                 move.w  TF_VERSION(a0),d0               ; version 7 to 9, a
                 .if     YMXR_MAP                        ; DTX3 table (SPEC.md
-                subq.w  #7,d0                           ; 3.3.5), and 10
-                cmp.w   #3,d0
+                subq.w  #7,d0                           ; 3.3.5), and 10 and
+                cmp.w   #4,d0                           ; 11
                 .else
                 subq.w  #YMXR_VERSION-2,d0
                 cmp.w   #2,d0
@@ -38,22 +38,49 @@ YMXR_init:
                 btst    #4,WS_EFFECTS(a6)       ; a tune that defers a start
                 bne     .bad6                   ; needs a core with them
                 .endif
+                .if     YMXR_MAP=0
+; A tune that copies from frame needs the core with the lookup (3.1.7):
+; the block copy, which a link keeps for a song a tune of which copies
+; from frame alone, and such a song links on that core (doc/LINKER.md).
+                PIECE   copy_5
+                tst.b   WS_EFFECTS(a6)
+                bmi     .bad6
+                ENDPIECE copy_5
+                .endif
+; The first reads of the register steps put back before the read sites
+; are written, for the block sync, which a link keeps for a song a tune of
+; which syncs a voice (sync.S, doc/LINKER.md).
+                PIECE   sync_1
+                bsr     ymxr_syncfix
+                ENDPIECE sync_1
                 .if     YMXR_MAP
 ; Version 10 bound layout: signed transformation-block offset at 24,
-; source index at 28 (BINARIES.md 1.2). Earlier versions use identity
-; and a zero block pointer. Effects bit 5 marks version 10 (SPEC.md
-; 3.3.5).
+; source index at 28 (BINARIES.md 1.2). Version 11: the block at 24, or 0
+; where the tune maps no value, the cut index at 28 and the source index
+; at 32. Earlier versions use identity and a zero block pointer. Effects
+; bit 5 marks the mapping columns, and bit 6 the cut columns of version
+; 11 (SPEC.md 3.3.5).
                 moveq   #0,d1
                 subq.w  #3,d0                   ; the version less 10
-                bne.s   .v9
-                move.l  a0,d1
+                bmi.s   .v9
+                beq.s   .block
+                tst.l   TF_TRANS(a0)
+                beq.s   .v9
+.block:         move.l  a0,d1
                 add.l   TF_TRANS(a0),d1
 .v9:            move.l  d1,WS_TRANS(a6)
                 btst    #5,WS_EFFECTS(a6)
                 beq.s   .v10
                 tst.l   d1
                 beq     .bad6
-.v10:
+.v10:           btst    #6,WS_EFFECTS(a6)       ; bit 6 in version 11, and
+                beq.s   .uncut                  ; clear in every other
+                subq.w  #1,d0
+                bne     .bad6
+                bra.s   .cut
+.uncut:         subq.w  #1,d0
+                beq     .bad6
+.cut:
                 .endif
                 cmp.b   #3,IM_VARIANT(a2)       ; a DTX3 image: its rows come
                 bne     .bad6                   ; round by themselves
@@ -86,12 +113,18 @@ YMXR_init:
                 move.b  TF_SOURCES(a1),d1       ; sources, bit 1 one row
                 subq.w  #1,d1
                 bmi     .resolved
+; The loop is a piece of the block a link keeps for a song that runs an
+; effect, as the rest of init's work for the effects is: a song that runs
+; none starts no source (doc/LINKER.md).
+                PIECE   effects_1
                 lea     WS_SOURCES(a6),a4
                 moveq   #0,d4
                 .if     YMXR_MAP
-                tst.l   WS_TRANS(a6)            ; version 10: the index at 28
-                beq.s   .source
-                moveq   #4,d4
+                move.w  TF_VERSION(a1),d4       ; the index at 28 in version
+                sub.w   #9,d4                   ; 10, and at 32 in 11
+                bgt.s   .later
+                moveq   #0,d4
+.later:         lsl.w   #2,d4
                 .endif
 .source:        movea.l a1,a3
                 move.l  TF_INDEX(a3,d4.w),d0
@@ -122,6 +155,24 @@ YMXR_init:
                 not.l   d2                      ; bit 1, or -1 and bit 0
                 bset    d2,d5
                 bra.s   .cell
+; A source whose one column fills its byte: its rows carry no marker, so
+; R is in the table beside, with its loop cell, and the tag in the
+; cell's place sends a start to the routine every effect shares, which
+; tells this tag from the tags of a source of several columns. A counted
+; source of several columns: the stride from one column to the next and
+; R are beside its loop cell (SPEC.md 3.1.6).
+.counted:       move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
+                cmp.w   #1,DT_COLUMNS(a3)       ; a counted source of several
+                bne.s   .ccolumns               ; columns
+                move.w  d2,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
+                moveq   #-5,d0
+                bra.s   .tagged
+.ccolumns:      move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R, beside the stride
+                moveq   #-6,d0                  ; counted, two columns
+                cmp.w   #2,DT_COLUMNS(a3)
+                beq.s   .stride
+                moveq   #-7,d0                  ; counted, three columns
+                bra.s   .stride
 ; A source of several columns: its loop cell and the stride from one
 ; column to the next are in the table beside, and the tag in the cell's
 ; place sends a start to the handler its columns pick.
@@ -137,31 +188,15 @@ YMXR_init:
 .cell:          move.l  d0,(a4)+
                 addq.w  #4,d4
                 dbra    d1,.source
-                bra.s   .resolved
-
-; A source whose one column fills its byte: its rows carry no marker, so
-; the rows of a pass and the rows of the loop are in the table beside,
-; with its loop cell, and the tag in the cell's place sends a start to
-; the routine every effect shares, which tells this tag from the tags of
-; a source of several columns. A counted source of several columns: the
-; stride from one column to the next and R are beside its loop cell, and
-; a start reads the rows of a pass through the loop off the cell and the
-; first row (SPEC.md 3.1.6).
-.counted:       move.l  d0,WS_WIDE-WS_SOURCES-4(a4)
-                cmp.w   #1,DT_COLUMNS(a3)       ; a counted source of several
-                bne.s   .ccolumns               ; columns
-                move.w  d2,WS_WIDE-WS_SOURCES(a4)   ; R, a pass through it
-                sub.l   DT_REPEAT(a3),d2
-                move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R less RR, the loop
-                moveq   #-5,d0
-                bra.s   .tagged
-.ccolumns:      move.w  d2,WS_WIDE-WS_SOURCES+2(a4) ; R, beside the stride
-                moveq   #-6,d0                  ; counted, two columns
-                cmp.w   #2,DT_COLUMNS(a3)
-                beq.s   .stride
-                moveq   #-7,d0                  ; counted, three columns
-                bra.s   .stride
+                ENDPIECE effects_1
 .resolved:
+                .if     YMXR_MAP
+; A tune that copies from frame: copy from frame as source S, and the
+; start of several columns aimed at ymxr_copywide (copy.S).
+                PIECE   copy_1
+                bsr     ymxr_copyinit
+                ENDPIECE copy_1
+                .endif
 
 ; The row's columns, as the table's column map defines them (DTX, abi.md
 ; 2 and SPEC.md 2.4): a live column is its slot's ring, slot times N past
@@ -198,14 +233,34 @@ YMXR_init:
                 beq.s   .away
                 move.w  d1,d0
                 and.w   #$FF,d0
+                .if     YMXR_MAP
+                bsr     ymxr_xcol
+                .endif
                 bsr     ymxr_col
 .away:          dbra    d2,.site
+                .if     YMXR_MAP
+; And its register steps' read sites, with the branch to them (play.S).
+                PIECE   copy_2
+                bsr     ymxr_copysites
+                ENDPIECE copy_2
+                .endif
+; And the sync's: its frame values, its read sites, and for a tune that
+; syncs a voice the branch to its register steps (sync.S).
+                PIECE   sync_2
+                bsr     ymxr_syncinit
+                ENDPIECE sync_2
+; And each effect's start of several columns aimed at the targets of a
+; sync for a tune that syncs, or back (sync.S).
+                PIECE   synced_3
+                bsr     ymxr_syncaim
+                ENDPIECE synced_3
 
                 .if     YMXR_AEOI
                 move.b  MFP_VECTOR.w,WS_VECTOR(a6)  ; the mode kept, and the
                 bclr    #3,MFP_VECTOR.w             ; the MFP ends each
                 .endif
 
+                PIECE   effects_3
                 .if     YMXR_NEST
 ; A tune that runs one effect has no second timer to nest inside a tick,
 ; so the level that tick drops buys it no safety: two nops are where the
@@ -253,6 +308,7 @@ YMXR_init:
                 .endif
                 lea     TICK_SIZE(a5),a5
 .nolink:        dbra    d2,.link
+                ENDPIECE effects_3
                 PIECE   counted_1
                 lea     ymxr_cnt0(pc),a5
                 adda.w  d6,a5
@@ -301,11 +357,11 @@ YMXR_init:
 .nosq:          dbra    d2,.sq
                 ENDPIECE square_1
 
-; The handlers of several columns: the loop cells they read and the
-; places they step are in the handler, so one link writes every address
-; the loop path and the step read, as a general handler's link does. A
-; start writes the values, and no timer reaches one of these handlers
-; before a start has aimed its vector there.
+; The handlers of several columns: the places they step are in the
+; handler, so one link writes every address the loop path and the step
+; write, as a general handler's link does. A start writes the values,
+; the loop cells and the loop word, and no timer reaches one of these
+; handlers before a start has aimed its vector there.
                 PIECE   two_1
                 lea     ymxr_two0(pc),a5
                 adda.w  d6,a5
@@ -313,11 +369,6 @@ YMXR_init:
                 moveq   #3,d2
 .linktwo:       lsr.b   #1,d4
                 bcc.s   .nolinktwo
-                lea     TW2_CELLS(a5),a3
-                move.l  a3,TW2_LOOPT(a5)
-                move.l  a3,TW2_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TW2_LOOP2R(a5)
                 lea     TW2_PTR1(a5),a3
                 move.l  a3,TW2_STEP1(a5)
                 move.l  a3,TW2_LOOP1W(a5)
@@ -334,13 +385,6 @@ YMXR_init:
                 moveq   #3,d2
 .linkthree:     lsr.b   #1,d4
                 bcc.s   .nolinkthree
-                lea     TW3_CELLS(a5),a3
-                move.l  a3,TW3_LOOPT(a5)
-                move.l  a3,TW3_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TW3_LOOP2R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TW3_LOOP3R(a5)
                 lea     TW3_PTR1(a5),a3
                 move.l  a3,TW3_STEP1(a5)
                 move.l  a3,TW3_LOOP1W(a5)
@@ -360,22 +404,14 @@ YMXR_init:
                 moveq   #3,d2
 .linkenv:       lsr.b   #1,d4
                 bcc.s   .nolinkenv
-                lea     TWC_CELLS(a5),a3
-                move.l  a3,TWC_LOOPT(a5)
-                move.l  a3,TWC_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TWC_LOOP2R(a5)
                 lea     TWC_PTR1(a5),a3
                 move.l  a3,TWC_STEP1(a5)
                 move.l  a3,TWC_LOOP1W(a5)
                 lea     TWC_PTR2(a5),a3
                 move.l  a3,TWC_STEP2(a5)
                 move.l  a3,TWC_LOOP2W(a5)
-                lea     TWC_LEFT(a5),a3
-                move.l  a3,TWC_CNT(a5)
-                move.l  a3,TWC_RELDA(a5)
-                move.l  a3,TWC_PARK(a5)
-                move.w  #1,TWC_LEFT(a5)
+                lea     TWC_PTR1+PLACE_LO(a5),a3
+                move.l  a3,TWC_CNT(a5)          ; the first place, compared
                 lea     TWC_SIZE(a5),a5
 .nolinkenv:     dbra    d2,.linkenv
                 ENDPIECE envelope_1
@@ -386,13 +422,6 @@ YMXR_init:
                 moveq   #3,d2
 .linkcwide:       lsr.b   #1,d4
                 bcc.s   .nolinkcwide
-                lea     TWCT_CELLS(a5),a3
-                move.l  a3,TWCT_LOOPT(a5)
-                move.l  a3,TWCT_LOOP1R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TWCT_LOOP2R(a5)
-                addq.l  #CELL_SIZE,a3
-                move.l  a3,TWCT_LOOP3R(a5)
                 lea     TWCT_PTR1(a5),a3
                 move.l  a3,TWCT_STEP1(a5)
                 move.l  a3,TWCT_LOOP1W(a5)
@@ -402,14 +431,34 @@ YMXR_init:
                 lea     TWCT_PTR3(a5),a3
                 move.l  a3,TWCT_STEP3(a5)
                 move.l  a3,TWCT_LOOP3W(a5)
-                lea     TWCT_LEFT(a5),a3
-                move.l  a3,TWCT_CNT(a5)
-                move.l  a3,TWCT_RELDA(a5)
-                move.l  a3,TWCT_PARK(a5)
-                move.w  #1,TWCT_LEFT(a5)
+                lea     TWCT_PTR1+PLACE_LO(a5),a3
+                move.l  a3,TWCT_CNT(a5)         ; the first place, compared
                 lea     TWCT_SIZE(a5),a5
 .nolinkcwide:     dbra    d2,.linkcwide
                 ENDPIECE countedthree_1
+; The handlers of a target of a sync, linked as the counted handler of two
+; columns is, an instance its head and that handler, in bank 0 alone
+; (handlers.S).
+                PIECE   synced_1
+                tst.w   d6
+                bne.s   .linkedsyn
+                lea     ymxr_syn0(pc),a5
+                move.b  ymxr_k_synced+1(pc),d4
+                moveq   #3,d2
+.linksyn:       lsr.b   #1,d4
+                bcc.s   .nolinksyn
+                lea     TWC_PTR1(a5),a3
+                move.l  a3,TWC_STEP1(a5)
+                move.l  a3,TWC_LOOP1W(a5)
+                lea     TWC_PTR2(a5),a3
+                move.l  a3,TWC_STEP2(a5)
+                move.l  a3,TWC_LOOP2W(a5)
+                lea     TWC_PTR1+PLACE_LO(a5),a3
+                move.l  a3,TWC_CNT(a5)          ; the first place, compared
+                lea     TWS_SIZE(a5),a5
+.nolinksyn:     dbra    d2,.linksyn
+.linkedsyn:
+                ENDPIECE synced_1
                 .if     YMXR_MAP
 ; Link lookup instances as above, selecting page 0 from the bank's
 ; page-byte table. Clearing the records below leaves every page
@@ -450,6 +499,7 @@ YMXR_init:
                 LINKW   LH,ymxr_k_lh,9,1,1
                 ENDPIECE lh_1
                 .endif
+                PIECE   effects_4
                 .if     YMXR_DEFER
                 tst.w   d6
                 bne.s   .banked
@@ -478,6 +528,7 @@ YMXR_init:
                 .if     YMXR_DEFER
                 sf      WS_ARMING(a6)
                 .endif
+                ENDPIECE effects_4
                 .if     YMXR_MAP
                 movea.l (sp),a2                 ; the page area
                 bsr     ymxr_prefill
@@ -495,6 +546,7 @@ YMXR_init:
 ; subtune.
 ; Bit 16 of d1 and bit 8 of d0 mark a branch to the start of a source of
 ; one row, past the square's, whose bytes init adds for each effect.
+                PIECE   effects_5
                 move.l  #PICK_BOTH&$FFFF,d1
                 move.b  d5,d0
                 btst    #2,d0                   ; a tune with a source of
@@ -542,6 +594,22 @@ YMXR_init:
                 subq.l  #2,d3                   ; replaced with the read
                 move.w  d3,2(a1)
 .pick:          move.l  d0,d5
+                .if     YMXR_MAP
+; Bits 5 and 6 of the effects byte as the effect runs them, in d3: bit 6
+; where the effect keeps the cut's piece (ymxr_k_cut), and a tune of
+; version 11 otherwise as one that cuts no source. An effect that cuts
+; runs the counted handler at any shape, whose place's reset reads the
+; running cut.
+                move.b  WS_EFFECTS(a6),d3
+                and.b   #$60,d3
+                btst    d2,ymxr_k_cut+1(pc)
+                bne.s   .xkept
+                bclr    #6,d3
+.xkept:         btst    #6,d3
+                beq.s   .xreset
+                move.b  #RESET_X&$FF,d5
+.xreset:
+                .endif
                 move.w  (a2),d4
                 move.b  d5,(a4,d4.w)            ; the place's reset, at the site
                 move.w  d1,d4                   ; the table names; a branch to
@@ -588,8 +656,24 @@ YMXR_init:
 ; the tune also defers starts. That path updates the record after a tick
 ; installs a pending start; other tunes continue directly to rate
 ; processing.
-                btst    d2,ymxr_k_map+1(pc)     ; an effect that keeps the
-                beq.s   .identity               ; paths, which maps one
+;
+; For effects bit 6, version 11, in an effect that keeps the cut's
+; piece, the start and the unset source are aimed at the paths that read
+; the cut column first (_xnow, _xunset), and the timer's reset as for bit
+; 5, at the path that keeps the control byte before the reset in d3 for
+; the recut (_rmk); where the tune defers a start, the start's test as
+; well, so the arming captures the kept cut after the row (_xcheck). The
+; head ors the column at 30 + i, the cut column where the tune maps no
+; value; where it maps one, the head's branch on the set bits is aimed
+; past the count at the or of the cut column at 34 + i (_xhead). A link
+; keeps the piece where a row sets the effect's cut column, and an effect
+; without it runs the tune as one that cuts no source.
+                move.w  #HEAD_SOME,HEAD_AT(a1)
+                cmp.b   #$60,d3
+                bne.s   .head
+                move.w  #HEAD_X,HEAD_AT(a1)
+.head:          btst    d2,ymxr_k_map+1(pc)     ; an effect that keeps the
+                beq.w   .identity               ; paths, which maps one
                 .if     YMXR_DEFER
                 move.w  RES_MAP(a2),d4          ; the remap's exit, in its
                 lea     (a1,d4.w),a0            ; piece, to the rate past the
@@ -598,11 +682,23 @@ YMXR_init:
                 add.w   #REMAP_RATE,d4
                 move.w  d4,REMAP_AT(a0)
                 .endif
-                btst    #5,WS_EFFECTS(a6)
+                tst.b   d3
                 beq.s   .identity
+                btst    #6,d3
+                bne.s   .cuts
                 AIM     NOW_MAP,NOW_AT,RES_MAP
                 AIM     UNSET_MAP,UNSET_AT,RES_MAP
-                move.w  #$6000,RS_AT(a1)        ; bra.w
+                bra.s   .reset
+.cuts:          AIM     NOW_X,NOW_AT,RES_CUT
+                AIM     UNSET_X,UNSET_AT,RES_CUT
+                .if     YMXR_DEFER
+                btst    #4,WS_EFFECTS(a6)       ; and the start that defers,
+                beq.s   .reset                  ; through the cut column
+                btst    d2,ymxr_k_defer+1(pc)
+                beq.s   .reset
+                AIM     SET_X,SET_AT+2,RES_CUT
+                .endif
+.reset:         move.w  #$6000,RS_AT(a1)        ; bra.w
                 AIM     RS_MAP,RS_AT+2,RES_MAP
                 .if     YMXR_DEFER
                 btst    #4,WS_EFFECTS(a6)
@@ -621,6 +717,7 @@ YMXR_init:
                 .endif
 .unlinked:      lea     RES_SIZE(a2),a2
                 dbra    d2,.over
+                ENDPIECE effects_5
 
 ; The advance's address, written into the call that plays: a slot is
 ; a bra.w (DTX, abi.md 1), so the body is two bytes past the slot
@@ -641,13 +738,22 @@ YMXR_init:
                 jsr     (a3)                    ; a1 the row
                 movea.l (sp)+,a6
 
-; The timers the tune runs, claimed. The others are left as they are.
+; The timers the tune runs, claimed, each claim a piece of its effect's
+; block. The others are left as they are.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
+                PIECE   effect0_8
                 CLAIM   0,$FFFFFA19,$F0,$134,$FFFFFA07,5,ymxr_tick0
+                ENDPIECE effect0_8
+                PIECE   effect1_8
                 CLAIM   1,$FFFFFA1D,$F0,$110,$FFFFFA09,4,ymxr_tick1
+                ENDPIECE effect1_8
+                PIECE   effect2_8
                 CLAIM   2,$FFFFFA1B,$F0,$120,$FFFFFA07,0,ymxr_tick2
+                ENDPIECE effect2_8
+                PIECE   effect3_8
                 CLAIM   3,$FFFFFA1D,$0F,$114,$FFFFFA09,5,ymxr_tick3
+                ENDPIECE effect3_8
                 move.w  (sp)+,sr
                 .if     YMXR_MAP
                 addq.l  #4,sp
@@ -671,6 +777,7 @@ YMXR_init:
 ; ymxr_reach. Carry marks a source a displacement does not reach, which
 ; init reports -1 for. d0, d2 and a0 clobbered.
                 .if     YMXR_PCREL
+                PIECE   effects_2
 ymxr_inreach:   move.l  DT_ROWS(a3),d0
                 addq.l  #1,d0
                 and.w   #$FFFE,d0               ; align(R), a column's stride
@@ -695,6 +802,7 @@ ymxr_inreach:   move.l  DT_ROWS(a3),d0
                 rts
 .far:           ori.b   #1,ccr
                 rts
+                ENDPIECE effects_2
                 .endif
 
 ; One read site written whole, of column d0, out of the payload in a0 and
@@ -759,6 +867,29 @@ ymxr_col:       lea     (a4,d4.w),a5            ; the operand
                 move.w  d0,(a5)
                 rts
 
+                .if     YMXR_MAP
+; The column a site reads in a tune of version 11 (SPEC.md 3.3.5): a cut
+; column, 34 + i in the table of sites, is at 30 + i where the tune maps
+; no value, and a mapping column's site then reads the constant 0, past
+; the table's columns. The head's or of the column at 30 + i, an entry
+; without a piece's mark, reads that column: the cut column there. d0 the
+; column, d1 the site's entry.
+ymxr_xcol:      cmp.w   #30,d0
+                bcs.s   .done                   ; a column of every version
+                btst    #6,WS_EFFECTS(a6)
+                beq.s   .done
+                btst    #5,WS_EFFECTS(a6)
+                bne.s   .done
+                subq.w  #4,d0
+                cmp.w   #30,d0
+                bcc.s   .done                   ; a cut column, at 30 + i
+                addq.w  #4,d0
+                cmp.w   #$100,d1
+                bcs.s   .done                   ; the head's or
+                move.w  #$FF,d0                 ; a mapping column
+.done:          rts
+                .endif
+
 ; Z set where a link left out the read site. The low byte of d1 is
 ; the column, and the high byte marks an optional piece. d0 is scratch.
 ymxr_kept:      and.w   #$FF,d0
@@ -767,6 +898,9 @@ ymxr_kept:      and.w   #$FF,d0
                 cmp.w   #16,d0
                 bcs.s   .effect
                 sub.w   #16,d0                  ; a mapping column's effect
+                .if     YMXR_MAP
+                and.w   #3,d0                   ; or a cut column's
+                .endif
                 bra.s   .at
 .effect:        lsr.w   #2,d0
 .at:            btst    d0,ymxr_k_effect+1(pc)
@@ -777,6 +911,11 @@ ymxr_kept:      and.w   #$FF,d0
                 btst    d0,ymxr_k_map+1(pc)
                 rts
 .map_done:
+                btst    #10,d1
+                beq.s   .cut_done
+                btst    d0,ymxr_k_cut+1(pc)
+                rts
+.cut_done:
                 .endif
                 .if     YMXR_DEFER
                 btst    #9,d1
@@ -788,14 +927,14 @@ ymxr_kept:      and.w   #$FF,d0
 .register:      moveq   #1,d0
 .done:          rts
 
-; a5 a tick handler: its operands linked, its place parked.
+; a5 a tick handler: its operands linked, its place parked and its loop
+; word the halt's, so a tick before the first start stops the timer.
+                PIECE   effects_6
 ymxr_link:
                 lea     TICK_PTR(a5),a3
                 move.l  a3,TICK_STEP(a5)
                 move.l  a3,TICK_LOOPW(a5)
-                lea     TICK_CELL(a5),a3
-                move.l  a3,TICK_LOOPT(a5)
-                move.l  a3,TICK_LOOPR(a5)
+                move.w  #TICK_ONCEW,TICK_LAST(a5)
                 .if     YMXR_PCREL
                 clr.w   TICK_CELL(a5)
                 lea     ymxr_park(pc),a3
@@ -809,28 +948,25 @@ ymxr_link:
                 .endif
                 clr.b   TICK_SEL(a5)            ; R0, the register of the kept
                 rts                             ; target init leaves (SPEC.md 5.2.1)
+                ENDPIECE effects_6
 
                 PIECE   counted_2
-; a5 a counted handler, the same way: its operands linked, its counter
-; at 1 and its cell at 0, so a tick before the first start writes the
-; parked marker and stops the timer, as the handler above does.
+; a5 a counted handler, the same way: its operands linked, its last
+; row's place at its place, its cell at 0 and its loop word the halt's,
+; so a tick before the first start writes the parked marker and stops the
+; timer, as the handler above does.
 ymxr_linkc:
                 lea     TICKC_PTR(a5),a3
                 move.l  a3,TICKC_STEP(a5)
                 move.l  a3,TICKC_LOOPW(a5)
-                lea     TICKC_CELL(a5),a3
-                move.l  a3,TICKC_LOOPT(a5)
-                move.l  a3,TICKC_LOOPR(a5)
+                lea     TICKC_PTR+PLACE_LO(a5),a3
+                move.l  a3,TICKC_CNTA(a5)       ; the place, compared
+                move.w  #TICKC_ONCEW,TICKC_LAST(a5)
                 .if     YMXR_PCREL
                 clr.w   TICKC_CELL(a5)
                 .else
                 clr.l   TICKC_CELL(a5)
                 .endif
-                lea     TICKC_LEFT(a5),a3
-                move.l  a3,TICKC_CNTA(a5)
-                move.l  a3,TICKC_RELDA(a5)
-                move.l  a3,TICKC_PARK(a5)
-                move.w  #1,TICKC_LEFT(a5)
                 lea     ymxr_park(pc),a3
                 .if     YMXR_PCREL
                 suba.l  a5,a3
@@ -839,6 +975,7 @@ ymxr_linkc:
                 .else
                 move.l  a3,TICKC_PTR(a5)
                 .endif
+                move.w  a3,TICKC_LASTP(a5)      ; the place's word
                 clr.b   TICKC_SEL(a5)           ; R0, as init leaves the kept
                 rts                             ; target (SPEC.md 5.2.1)
                 ENDPIECE counted_2

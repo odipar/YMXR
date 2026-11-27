@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/odipar/ymxr/go/binaries"
 	"github.com/odipar/ymxr/go/ymxr"
@@ -79,8 +80,8 @@ const corePcrel = 4
 const coreDefer = 8
 
 // coreMap is core flag bit 4, transformation support (YMXR_MAP=1).
-// Effects byte bit 5 requires this core, which reads bound versions 7
-// to 10 (SPEC.md 1.10, 3.3).
+// Effects byte bit 5 and bit 6 require this core, which reads bound
+// versions 7 to 11 (SPEC.md 1.10, 1.11, 3.3).
 const coreMap = 16
 
 // pcrelReach is the bytes from the core's first byte plus its field at 26
@@ -96,8 +97,8 @@ const braW = 0x6000
 // even address, and init rounds the workspace's address up to a long.
 const WorkRounding = 2
 
-// Converter is the CONV tag's text: the player, and the converter that
-// writes its tune files.
+// Converter is the CONV tag's text where the caller names no converter:
+// the player, and the converter that writes its tune files.
 const Converter = "YMXR (ym-to-ymxr)"
 
 // timerOfEffect is the timer each of the four effects runs, a bit a timer,
@@ -142,17 +143,18 @@ const (
 )
 
 // Options is the tag block's text: the title, the composer where there is
-// one, and a name a subtune where the caller names them; and the core the
-// file uses, which Monitor and Lean select a switch of and Ticks the
-// third.
+// one, a name a subtune where the caller names them, and the converter,
+// Converter where it is blank; and the core the file uses, which Monitor
+// and Lean select a switch of and Ticks the third.
 type Options struct {
-	Title    string
-	Composer string
-	Names    []string
-	Monitor  bool
-	Lean     bool
-	Ticks    Ticks
-	Asked    Asked
+	Title     string
+	Composer  string
+	Converter string
+	Names     []string
+	Monitor   bool
+	Lean      bool
+	Ticks     Ticks
+	Asked     Asked
 	// Link links the core for the set, its blocks the subtunes need
 	// (doc/LINKER.md).
 	Link bool
@@ -206,7 +208,8 @@ func around(given []byte, tuneFiles [][]byte, options Options) ([]byte, error) {
 		}
 		claimed |= Claims(tune.Effects)
 		defers = defers || tune.Effects&ymxr.Defers != 0
-		maps = maps || tune.Effects&ymxr.Maps != 0
+		// the core with the lookup reads cuts and copy from frame too
+		maps = maps || tune.Effects&(ymxr.Maps|ymxr.Cuts|ymxr.Copies) != 0
 	}
 	if err := checkVbl(options.Asked, n, rates[0], mixed); err != nil {
 		return nil, err
@@ -434,7 +437,7 @@ func checkCore(core []byte, monitor, lean, pcrel, defers, maps bool, binds int) 
 	}
 	if maps && flags&coreMap == 0 {
 		return fmt.Errorf("the core's flags at %d read %d, and a subtune that maps a"+
-			" value needs bit 4 set", CoreFlagsAt, flags)
+			" value, cuts a source or copies from frame needs bit 4 set", CoreFlagsAt, flags)
 	}
 	return nil
 }
@@ -542,6 +545,15 @@ func mixedRate(rates []int) (int, error) {
 	return mostTicks, nil
 }
 
+// Conv is the CONV tag's text before cleaning: the converter named, or
+// Converter where it is blank.
+func Conv(options Options) string {
+	if strings.TrimSpace(options.Converter) == "" {
+		return Converter
+	}
+	return options.Converter
+}
+
 // Tags is the tag block, 'SNDH' through 'HDNS': TITL, COMM where there is
 // a composer, CONV, '##' and two digits, the clock tag and the rate, FLAG,
 // each text ended by a zero byte, a pad to an even length, FRMS with a
@@ -563,7 +575,7 @@ func tagsOf(options Options, rate, n int, frames []int, claimed int, rates []int
 	if options.Composer != "" {
 		tag(&out, "COMM", Clean(options.Composer))
 	}
-	tag(&out, "CONV", Converter)
+	tag(&out, "CONV", Clean(Conv(options)))
 	tag(&out, fmt.Sprintf("##%02d", n), "")
 	asked := AskedOf(options)
 	if rates != nil {
@@ -628,9 +640,10 @@ func seconds(frames, rate int) int {
 // bound tunes and workspace. Each entry branches to the corresponding core
 // entry. Bound tunes start at even addresses.
 //
-// Shared source tables follow the tunes, then the images. Transformation blocks
-// follow the images. Patch each tune's ImageAt and
-// BoundTransformationsAt relative to that tune (doc/BINARIES.md 3.1).
+// Shared source tables follow the tunes, then the images. The transformation
+// blocks follow the images, each distinct transformation once
+// (Transformations). Patch each tune's ImageAt and BoundTransformationsAt
+// relative to that tune (doc/BINARIES.md 3.1).
 func Combine(core []byte, set Set, tags []byte, workspace int) ([]byte, error) {
 	return combine(core, set, tags, workspace, nil)
 }
@@ -674,21 +687,19 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 		imageAt[i] = at
 		at += len(set.Images[i])
 	}
-	// Frames read the transformation blocks, including each lookup page
-	// list. Identical blocks share an offset past the images.
+	// Then the transformation blocks, which frames read, each distinct
+	// transformation once (Transformations).
 	blockAt := make([]int, n)
-	blocks := make(map[string]int)
-	for i, block := range set.Blocks {
-		if len(block) == 0 {
-			continue
+	transformations, within := Transformations(set.Blocks)
+	transformationsAt := 0
+	if len(transformations) > 0 {
+		transformationsAt = ymxr.Align(at)
+		for i, one := range within {
+			if one >= 0 {
+				blockAt[i] = transformationsAt + one
+			}
 		}
-		where, found := blocks[string(block)]
-		if !found {
-			where = ymxr.Align(at)
-			blocks[string(block)] = where
-			at = where + len(block)
-		}
-		blockAt[i] = where
+		at = transformationsAt + len(transformations)
 	}
 	at = even(at)
 	workAt := at
@@ -711,9 +722,7 @@ func combine(core []byte, set Set, tags []byte, workspace int, clock []byte) ([]
 		copy(file[at:], table)
 		at += ymxr.Align(len(table))
 	}
-	for block, where := range blocks {
-		copy(file[header+where:], block)
-	}
+	copy(file[header+transformationsAt:], transformations)
 	for i := range imageAt {
 		copy(file[header+imageAt[i]:], set.Images[i])
 	}

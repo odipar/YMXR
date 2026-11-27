@@ -82,7 +82,10 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
 
 ; ---------------------------------------------------------------- macros
 
+                .if     ^^defined YMXR_PIECES
+                .else
                 .include "player/pieces.S"
+                .endif
                 .include "player/columns.S"
                 .include "player/effect.S"
                 .include "player/ticks.S"
@@ -106,6 +109,7 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .include "player/handlers.S"
 
                 .if     YMXR_MAP=0
+                SYNCED
                 HANDLERS
                 HANDLEQU
                 .endif
@@ -117,6 +121,7 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .endif
 
                 .include "player/tables.S"
+                .include "player/sync.S"
 
                 .if     YMXR_MAP
                 .include "player/lookup_start.S"
@@ -125,6 +130,15 @@ YMXR_MAGIC      equ     $594D5842       ; YMXB, the bound tune
                 .include "player/lookup_prefill.S"
                 .include "player/lookup_kinds.S"
                 .include "player/lookup_ref.S"
+                .include "player/cut.S"
+                .include "player/copy.S"
+                SYNCED
+; The ticks' counted cost since the last call, with the monitor in: here,
+; before the handlers, both the frame's read of it and the lookup
+; instances' at the end of the player reach it.
+                .if     YMXR_PERF
+ymxr_perf_acc:  dc.w    0
+                .endif
                 HANDLERS
                 HANDLEQU
                 .include "player/lookup_checks.S"

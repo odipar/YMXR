@@ -106,6 +106,8 @@ ymxr_rmove      equ     *
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
                 move.b  KD_FILL(a2),d5
+                cmp.b   #7,FX_SHAPE(a3)         ; a marked source on a counted
+                bcc.w   .marked                 ; kind, under a cut
                 cmp.w   #1,d2                   ; a counted source on setR7
                 bne.s   .kind                   ; writes the ports' bits: R7
                 cmp.b   #7,TICK_SEL(a5)         ; in the running handler, as
@@ -160,10 +162,13 @@ ymxr_rmove      equ     *
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2                   ; from the identity's handler
                 .if     YMXR_DEFER
-                move.w  d2,d0
+                move.w  d2,-(sp)                ; the kind, to hook after the
+                .endif                          ; move writes the loop word
+                bsr     ymxr_move
+                .if     YMXR_DEFER
+                move.w  (sp)+,d0
                 bsr     ymxr_rehook
                 .endif
-                bsr     ymxr_move
                 bra     .done
 .toid:          sf      FX_LOK(a3)              ; the identity's handler
                 move.w  d3,d0
@@ -177,10 +182,13 @@ ymxr_rmove      equ     *
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2                   ; from the lookup instance
                 .if     YMXR_DEFER
-                move.w  d3,d0
+                move.w  d3,-(sp)                ; the kind, to hook after the
+                .endif                          ; move writes the loop word
+                bsr     ymxr_move
+                .if     YMXR_DEFER
+                move.w  (sp)+,d0
                 bsr     ymxr_rehook
                 .endif
-                bsr     ymxr_move
                 bra     .done
                 .if     YMXR_DEFER
 ; Fill with interrupts enabled, then re-read the vector at level 7. If a
@@ -248,18 +256,29 @@ ymxr_rlevel     equ     *                       ; between the mask and the
                 movem.l (sp)+,d2/d6-d7/a1/a6
                 lea     YM_SELECT.w,a2
                 rts
+; The marked form of the kind's page (ymxr_xfill), the piece cut_2 of the
+; cut's block.
+                ENDPIECE lookup_1
+                PIECE   cut_2
+.marked:        moveq   #0,d0
+                move.b  FX_SHAPE(a3),d0
+                bsr.w   ymxr_xfill
+                bra     .kind
+                ENDPIECE cut_2
+                PIECE   lookup_2
 
 ; The running source moved from the handler a5, which a2 describes, to
 ; the handler a4 of the same shape, which a1 describes: each column's
-; register and loop cell and the rows of a pass with interrupts on, since
-; no tick reads a handler the vector does not name; then behind level 7
-; each column's place, the rows left and the vector a6, so the next tick
-; reads the row the last one left. Under YMXR_PCREL a place and a loop
-; cell are displacements from the column's read, moved by the distance
-; between the two reads. d0 to d5 and d7 clobbered.
+; register and loop cell with interrupts on, since no tick reads a
+; handler the vector does not name; then behind level 7 each column's
+; place, the last row's place and the vector a6, so the next tick reads
+; the row the last one left. Under YMXR_PCREL a place and a loop cell are
+; displacements from the column's read, moved by the distance between the
+; two reads, and the last row's place by the first place's. d0 to d5 and
+; d7 clobbered.
 ymxr_move:      move.w  KD_COLS(a2),d4
                 moveq   #0,d3                   ; four bytes a column
-                moveq   #0,d7                   ; CELL_SIZE a column
+                moveq   #0,d7                   ; CELL_STRIDE a column
 .pre:           move.w  KD_SEL(a2,d3.w),d0
                 move.w  KD_SEL(a1,d3.w),d1
                 move.b  (a5,d0.w),(a4,d1.w)     ; the register
@@ -279,13 +298,19 @@ ymxr_move:      move.w  KD_COLS(a2),d4
                 move.l  (a5,d0.w),(a4,d1.w)
                 .endif
                 addq.w  #4,d3
-                addq.w  #CELL_SIZE,d7
+                add.w   #CELL_STRIDE,d7
                 dbra    d4,.pre
-                move.w  KD_RELD(a2),d0          ; the rows of a pass
-                beq.s   .level
-                move.w  KD_RELD(a1),d1
-                move.w  (a5,d0.w),(a4,d1.w)
-.level:         move.w  KD_COLS(a2),d4
+                move.w  KD_CELLS(a1),d1         ; the loop word, out of the
+                .if     YMXR_PCREL              ; first loop cell
+                tst.w   (a4,d1.w)
+                .else
+                tst.l   (a4,d1.w)
+                .endif
+                bne.s   .loop0
+                move.w  KD_ONCEW(a1),-2(a4,d1.w)
+                bra.s   .head
+.loop0:         move.w  #LOOPW,-2(a4,d1.w)
+.head:          move.w  KD_COLS(a2),d4
                 moveq   #0,d3
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
@@ -303,32 +328,44 @@ ymxr_move:      move.w  KD_COLS(a2),d4
                 .endif
                 addq.w  #4,d3
                 dbra    d4,.place
-                move.w  KD_LEFT(a2),d0          ; the rows left
-                beq.s   .aim
-                move.w  KD_LEFT(a1),d1
-                move.w  (a5,d0.w),(a4,d1.w)
+                move.w  KD_LASTP(a2),d0         ; the last row's place, as
+                beq.s   .aim                    ; far past the first place
+                move.w  (a5,d0.w),d2
+                sub.w   TICK_PTR+PLACE_LO(a5),d2
+                add.w   TICK_PTR+PLACE_LO(a4),d2
+                move.w  KD_LASTP(a1),d1
+                move.w  d2,(a4,d1.w)
 .aim:           move.l  a4,(a6)
                 move.w  (sp)+,sr
                 rts
+                ENDPIECE lookup_2
 
                 .if     YMXR_DEFER
 ; Move a pending hook when remapping to handler a4, kind d0 in
-; ymxr_kinds. Restore the old handler's end-path word, hook a4, and save
-; its overwritten word for installation or cancellation. Runs at level 7
-; while the vector still selects the old handler. a3=record, d6=effect;
-; clobbers d0.
+; ymxr_kinds, once the move or the recut has written a4's loop word.
+; Restore the old handler's end-path word, hook a4, and save its
+; overwritten word for installation or cancellation. Runs at level 7, so
+; no tick reads either handler before a4 is hooked. Where a4 is the hooked
+; handler, the word saved is the loop word a recut has written over the
+; hook, and a hook still in place stays. a3=record, d6=effect; clobbers
+; d0.
 ymxr_rehook:    tst.b   FX_PENDING(a3)
                 beq.s   .none
                 movem.l d1/a1-a2,-(sp)
-                movea.l FX_HOOK(a3),a2
-                move.w  FX_HOOKW(a3),(a2)       ; the handler it leaves
                 lea     ymxr_hooks(pc),a2
                 add.w   d0,d0
                 add.w   d0,d0
                 move.w  2(a2,d0.w),d1           ; the word the hook writes
                 move.w  (a2,d0.w),d0
                 lea     (a4,d0.w),a2            ; and where
-                lea     ymxr_timers(pc),a1
+                movea.l FX_HOOK(a3),a1
+                cmpa.l  a1,a2
+                bne.s   .leave
+                cmp.w   (a2),d1                 ; the same handler, hooked
+                beq.s   .kept                   ; still: as it is
+                bra.s   .save
+.leave:         move.w  FX_HOOKW(a3),(a1)       ; the handler it leaves
+.save:          lea     ymxr_timers(pc),a1
                 move.w  d6,d0
                 lsl.w   #3,d0
                 adda.w  4(a1,d0.w),a1           ; the effect's installer
@@ -337,6 +374,6 @@ ymxr_rehook:    tst.b   FX_PENDING(a3)
                 move.l  a2,INST_BACKA(a1)
                 move.l  a2,FX_HOOK(a3)
                 move.w  d1,(a2)
-                movem.l (sp)+,d1/a1-a2
+.kept:          movem.l (sp)+,d1/a1-a2
 .none:          rts
                 .endif

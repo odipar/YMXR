@@ -4,9 +4,9 @@ What a play call could cost, and what each step saves. performance.md has
 the cost today; every figure below compares with it, and each is marked as
 measured on the rig or counted from the 68000's manual.
 
-Two figures matter. A call is 1,048 to 1,995
-cycles on average by tune, and the costliest frame of a tune is 1,660 to
-5,086. R4.5 budgets 6,656 a frame and binds the costliest frame. Most of
+Two figures matter. A call is 1,088 to 2,021
+cycles on average by tune, and the costliest frame of a tune is 1,648 to
+5,074. R4.5 budgets 6,656 a frame and binds the costliest frame. Most of
 what follows moves the average, and the text points out each step that
 moves the costliest frame.
 
@@ -14,14 +14,14 @@ moves the costliest frame.
 
 ## Where the time is
 
-DTX's advance is 45 to 53 per cent of an average call and 46 to 86 per
-cent of the costliest frame: 3,716 of Turrican - world 4-3's 4,362 and
-2,924 of Synergy Credits' 5,086. A refill parses at most one ST4
+DTX's advance is 44 to 52 per cent of an average call and 46 to 85 per
+cent of the costliest frame: 3,716 of Turrican - world 4-3's 4,402 and
+2,924 of Synergy Credits' 5,074. A refill parses at most one ST4
 operation a unit at about 190 to 260 cycles each, and its window is the
 thirty columns of a table of version 9, fifteen units at unit 2, so
 fifteen operations bound the costliest frame of a tune of that version.
 
-The frame procedure is the rest, 501 to 1,092. A column the row leaves
+The frame procedure is the rest, 541 to 1,118. A column the row leaves
 unset costs 22 cycles and a tone pair 46, and most columns are unset: a
 row sets 0.6 to 13.0 of the fourteen register columns, 3.3 on the median
 tune. Whole groups go unset, and a gate can skip them; over 40,000 rows a
@@ -49,9 +49,9 @@ rest a gate reads the bit and finds the group set.
 
 ## What a sample's tick costs
 
-A square's tick is in place: 80 cycles of instructions against 96 and
-114, and 144 with the 68000's entry and the `rte` against 160 and 178.
-The rig measures it, and performance.md has the figure.
+A square's tick is in place: 80 cycles of instructions against 96 and 82,
+and 144 with the 68000's entry and the `rte` against 160 and 146. The rig
+measures it, and performance.md has the figure.
 
 A digidrum's source is many rows played once, so its tick is the row path
 every time, 160 cycles, and its place must step. Of the 96 its instructions
@@ -72,48 +72,46 @@ a group of register columns, 1 where the row sets any of them, skips the
 group on one test. Weighed when this document opened (#48), at
 62 cycles a frame over nine tunes, it was the largest step in it.
 
-Against the player as it is it saves 5 cycles a frame on the mean of
-the eleven fixtures, and it costs six of them. Five steps of the order
-below removed part of that work first: a row with the envelope columns
-unset already skips step 8, and the four before that cut the entry, the
-call, the effects' branches and their first reads. What is left to gate is
-the volume group's three columns, 66 cycles.
+Against the player as it is it saves 19 cycles a frame on the mean of the
+eleven fixtures, and it costs two of them. Four steps of the order below
+removed part of that work first: they cut the entry, the call, the
+effects' branches and their first reads. What is left to gate is the
+volume group's three columns, 66 cycles.
 
 In one place the player reads the gate's bit already: only `d2` reaches
-step 6 with a value the row set, and `d2` is column 13. A row that writes a
-volume then sets column 13, and a column 13 other than 0 is the row that
-follows the longer of the two paths the step above left it. The rig walks
-each row through the player's instructions over 40,000 rows a tune, a row
-that moves to the longer path along both, and counts a gate that skips at
-20 cycles and one that does not at 18 (`-cycles`):
+step 6 with a value the row set, and `d2` is column 13. A row that writes
+a volume then sets column 13, and steps 5 to 8 are one path for every row
+(sizes.md), so the bit costs the row the gate's test alone. The rig walks
+each row through the player's instructions over 40,000 rows a tune, and
+counts a gate that skips at 20 cycles and one that does not at 18
+(`-cycles`):
 
 | tune | rows with the volume unset | net a frame |
 |---|---|---|
-| Retrigger retune, built | 98% | -44 |
+| Retrigger retune, built | 98% | -45 |
+| Big - Samantha Fox Strip Poker 6 | 94% | -42 |
 | Digidrum preempt, built | 100% | -42 |
-| Big - Samantha Fox Strip Poker 6 | 94% | -39 |
-| Synergy Credits | 82% | -32 |
-| Chambers of Shaolin 5 - you blew it! | 86% | -30 |
-| DBA 2 | 56% | **+5** |
-| DBA 5 | 51% | **+9** |
+| Chambers of Shaolin 5 - you blew it! | 86% | -37 |
+| Synergy Credits | 82% | -34 |
+| DBA 2 | 56% | -18 |
+| DBA 5 | 51% | -15 |
+| capture | 42% | -9 |
+| Turrican - world 4-3 | 40% | -8 |
+| Circus Attractions 2 | 0% | **+18** |
 | Turrican 2 - world completed 1 | 0% | **+18** |
-| capture | 42% | **+19** |
-| Turrican - world 4-3 | 40% | **+21** |
-| Circus Attractions 2 | 0% | **+57** |
-| the mean of the eleven | | -5 |
+| the mean of the eleven | | -19 |
 
 Putting the bit in column 6 instead, which costs a read of 12 on every row
-and leaves column 13 alone, reads -7 as the mean, the better of the two,
+and leaves column 13 alone, reads -7 as the mean against column 13's -19,
 and costs four tunes: Circus Attractions 2, Turrican - world 4-3, Turrican
-2 - world completed 1 and capture. Column 13 pays for the row that moves
-to the longer path. Gating the tone group rather than the volumes, its bit
-read the same way, reads +7: its six columns are idle on 0 to 58 per cent
-of rows, and the 106 it saves on a sixth of them does not pay the 30 it
-costs on the rest.
+2 - world completed 1 and capture. Gating the tone group rather than the
+volumes, its bit read the same way, reads +7: its six columns are idle on
+0 to 58 per cent of rows, and the 106 it saves on a sixth of them does not
+pay the 30 it costs on the rest.
 
-7 cycles a frame, the better gate, is a version of the tune file, a bit's
+19 cycles a frame, the better gate, is a version of the tune file, a bit's
 meaning in SPEC.md 1.5 and 1.7, the converter, the conformance kit's
-tunes, and four tunes that read slower. The gate is left out.
+tunes, and two tunes that read slower. The gate is left out.
 
 **A thirty-first column of the same bits.** Weighed when this document
 opened (#48), against the player of then. It saves more a row, 216 where
@@ -137,9 +135,9 @@ repaired.
 
 ## The order
 
-Every step this document listed is in place, each measured on the rig when
-it landed; the player has moved since, and performance.md has the cost of a
-call now:
+Every step this document listed landed, each measured on the rig; one
+copy of steps 6 and 7 has since put the shape's test back for 130 bytes a
+player (sizes.md), and performance.md has the cost of a call now:
 
 | step | counted | measured |
 |---|---|---|
@@ -148,15 +146,15 @@ call now:
 | one branch over a run of effects | 19 | 30, 20 or 10 by the effects a tune runs |
 | an effect's head is its first read | 8 an effect | 16, 8 or 0 |
 | the shape's test dropped | 14 | 12 to 14, no tune more |
-| a separate tick for a square | 31 a tick | 80 against 96 and 114 |
+| a separate tick for a square | 31 a tick | 80 against 96 and 82 |
 | every source resolved at init | 52 a start | 21 to 38 a frame |
 | DTX's state block in a6 | 36 | 36 off the advance, 12 off the call |
 | a separate tick for a one-row source | 74 a tick | 506 a frame on the kit's retune |
 
 The first four were counted before they were built and each measured at
-its count. Synergy Credits reads 1,995 cycles a call against the 2,469
-this document opened at and 2,350 cycles of ticks against 5,380, so
-4,345 a frame against 7,849. performance.md has the call, and `-cycles`
+its count. Synergy Credits reads 2,021 cycles a call against the 2,469
+this document opened at and 4,228 cycles of ticks against 5,380, so
+6,249 a frame against 7,849. performance.md has the call, and `-cycles`
 reads all three back.
 
 What was left was the costliest frame. A refill parses at most one ST4
@@ -196,5 +194,5 @@ per cent less (performance.md). Release 0.5.0 packed at unit 1, whose
 window is 30 units, and the costliest frame of five of Scavenger's tunes
 passed the budget, DBA 4's at 7,214. The default is unit 2 again, where a
 refill of Turrican 2 - world completed 1 parses fifteen operations at its
-heaviest. The costliest frame of the eleven is Synergy Credits' 5,086,
-1,570 cycles under the budget.
+heaviest. The costliest frame of the eleven is Synergy Credits' 5,074,
+1,582 cycles under the budget.

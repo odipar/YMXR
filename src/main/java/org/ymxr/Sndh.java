@@ -6,10 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import org.dtx.Table;
 import org.jspecify.annotations.Nullable;
 import org.ymxs.tool.Tool;
@@ -96,8 +94,8 @@ final class Sndh {
 
     /**
      * core flag bit 4, transformation support (YMXR_MAP=1). Effects
-     * byte bit 5 requires this core, which reads bound versions 7 to 10
-     * (SPEC.md 1.10, 3.3).
+     * byte bit 5 and bit 6 require this core, which reads bound versions
+     * 7 to 11 (SPEC.md 1.10, 1.11, 3.3).
      */
     static final int CORE_MAP = 16;
 
@@ -114,8 +112,8 @@ final class Sndh {
      *  address, and init rounds the workspace's address up to a long. */
     static final int WORK_ROUNDING = 2;
 
-    /** The CONV tag's text: the player, and the converter that writes its
-     *  tune files. */
+    /** The CONV tag's text where the caller names no converter: the
+     *  player, and the converter that writes its tune files. */
     static final String CONVERTER = "YMXR (ym-to-ymxr)";
 
     /** The timer each of the four effects runs, a bit a timer, A to D:
@@ -149,9 +147,17 @@ final class Sndh {
      *  and a name a subtune where the caller names them; and the core the
      *  file uses, which {@code monitor} and {@code lean} select a switch
      *  of and {@code ticks} the third; and with {@code link}, the core
-     *  linked for the set, its blocks the subtunes need (doc/LINKER.md). */
+     *  linked for the set, its blocks the subtunes need (doc/LINKER.md);
+     *  and the converter, {@link #CONVERTER} where it is null or blank. */
     record Options(String title, @Nullable String composer, @Nullable List<String> names,
-            boolean monitor, boolean lean, Ticks ticks, Asked asked, boolean link) {
+            boolean monitor, boolean lean, Ticks ticks, Asked asked, boolean link,
+            @Nullable String converter) {
+
+        /** The CONV tag's text, {@link #CONVERTER} by default. */
+        Options(String title, @Nullable String composer, @Nullable List<String> names,
+                boolean monitor, boolean lean, Ticks ticks, Asked asked, boolean link) {
+            this(title, composer, names, monitor, lean, ticks, asked, link, null);
+        }
 
         /** The core as carried, not linked for the set. */
         Options(String title, @Nullable String composer, @Nullable List<String> names,
@@ -170,6 +176,13 @@ final class Sndh {
         Options(String title, @Nullable String composer, @Nullable List<String> names,
                 boolean monitor, boolean lean, Ticks ticks) {
             this(title, composer, names, monitor, lean, ticks, Asked.CHOSEN);
+        }
+
+        /** The CONV tag's text before cleaning: the converter named, or
+         *  {@link #CONVERTER} where it is null or blank. */
+        String conv() {
+            String named = converter();
+            return named == null || named.isBlank() ? CONVERTER : named;
         }
     }
 
@@ -236,7 +249,8 @@ final class Sndh {
             frames[i] = table.repeat() < table.rows() ? 0 : table.rows();
             claimed |= claims(tune.effects());
             defers |= (tune.effects() & Columns.DEFERS) != 0;
-            maps |= (tune.effects() & Columns.MAPS) != 0;
+            // the core with the lookup reads cuts and copy from frame too
+            maps |= (tune.effects() & (Columns.MAPS | Columns.CUTS | Columns.COPIES)) != 0;
         }
         checkVbl(options.asked(), n, rates[0], mixed);
         if (n > 1 && (mixed || rates[0] != 50)) {
@@ -432,15 +446,26 @@ final class Sndh {
     }
 
     /** The version a set of these tune files binds at, and the version of
-     *  a multi file of them: 10 where one of them is version 10, and 9
-     *  otherwise (tools.md 11.1). */
+     *  a multi file of them: 11 where one of them is version 11, 10 where
+     *  one is version 10 and none 11, and 9 otherwise, a tune file of
+     *  version 12 or 13 counted at the version it binds at (tools.md
+     *  11.1). */
     static int binds(List<byte[]> tuneFiles) {
+        int most = Tune.UNMAPPED;
         for (byte[] tune : tuneFiles) {
-            if (tune.length >= Tune.INDEX_AT && Tune.getWord(tune, 4) == Tune.VERSION) {
-                return Tune.VERSION;
+            if (tune.length >= Tune.INDEX_AT) {
+                int version = Tune.getWord(tune, 4);
+                if (version == Tune.COPY || version == Tune.SYNC || version == Tune.EVEN) {
+                    int effects = tune[8] & 0xFF;
+                    version = Columns.cuts(effects) ? Tune.CUT
+                            : Columns.maps(effects) ? Tune.VERSION : Tune.UNMAPPED;
+                }
+                if (version == Tune.CUT || version == Tune.VERSION) {
+                    most = Math.max(most, version);
+                }
             }
         }
-        return Tune.UNMAPPED;
+        return most;
     }
 
     /**
@@ -502,7 +527,8 @@ final class Sndh {
         }
         if (maps && (flags & CORE_MAP) == 0) {
             throw new IllegalArgumentException("the core's flags at " + CORE_FLAGS_AT + " read "
-                    + flags + ", and a subtune that maps a value needs bit 4 set");
+                    + flags + ", and a subtune that maps a value, cuts a source or copies"
+                    + " from frame needs bit 4 set");
         }
     }
 
@@ -582,7 +608,7 @@ final class Sndh {
         if (composer != null && !composer.isEmpty()) {
             tag(out, "COMM", clean(composer));
         }
-        tag(out, "CONV", CONVERTER);
+        tag(out, "CONV", clean(options.conv()));
         tag(out, String.format(Locale.ROOT, "##%02d", n), "");
         Asked clock = rates == null ? asked(options) : Asked.TIMER_C;
         tag(out, clock(claimed, rate, clock), "");
@@ -653,8 +679,8 @@ final class Sndh {
     /**
      * Combines a set with shared images: the page area follows the core,
      * bound tunes follow the subtune table, then shared source tables,
-     * images and transformation blocks. Patch each tune's offsets
-     * relative to that tune.
+     * images and transformation blocks, each distinct transformation once.
+     * Patch each tune's offsets relative to that tune.
      * A tune without a shared image is packaged separately with its
      * image and block.
      */
@@ -702,23 +728,19 @@ final class Sndh {
             imageAt[i] = at;
             at += set.images().get(i).length;
         }
-        // Frames read the transformation blocks, including each lookup
-        // page list. Identical blocks share an offset past the images.
+        // Then the transformation blocks, which frames read, each distinct
+        // transformation once (Bound.transformations).
         int[] blockAt = new int[n];
-        Map<ByteBuffer, Integer> blocks = new HashMap<>();
-        for (int i = 0; i < n; i++) {
-            byte[] block = set.blocks().get(i);
-            if (block.length == 0) {
-                continue;
+        Bound.Transformations transformations = Bound.transformations(set.blocks());
+        int transformationsAt = 0;
+        if (transformations.bytes().length > 0) {
+            transformationsAt = Tune.align(at);
+            for (int i = 0; i < n; i++) {
+                if (transformations.at()[i] >= 0) {
+                    blockAt[i] = transformationsAt + transformations.at()[i];
+                }
             }
-            ByteBuffer key = ByteBuffer.wrap(block);
-            Integer where = blocks.get(key);
-            if (where == null) {
-                where = Tune.align(at);
-                blocks.put(key, where);
-                at = where + block.length;
-            }
-            blockAt[i] = where;
+            at = transformationsAt + transformations.bytes().length;
         }
         at = even(at);
         int workAt = at;
@@ -741,10 +763,8 @@ final class Sndh {
             source.get(source.position(), file, at, source.remaining());
             at += Tune.align(source.remaining());
         }
-        for (Map.Entry<ByteBuffer, Integer> entry : blocks.entrySet()) {
-            ByteBuffer block = entry.getKey();
-            block.get(0, file, header + entry.getValue(), block.remaining());
-        }
+        System.arraycopy(transformations.bytes(), 0, file, header + transformationsAt,
+                transformations.bytes().length);
         for (int i = 0; i < imageAt.length; i++) {
             System.arraycopy(set.images().get(i), 0, file, header + imageAt[i],
                     set.images().get(i).length);
@@ -826,15 +846,17 @@ final class Sndh {
      * on standard input, an SNDH file on standard output. A multi file's
      * tunes are subtunes 1 up in its order, each named by the name the
      * multi file records for it. The title is the first tune's name unless
-     * {@code -tTITLE} names another. {@code -lean} puts the core whose
-     * ticks neither drop the interrupt level nor write an end of interrupt
-     * under the tunes, {@code -perf} puts the core with the raster monitor
-     * in there, for reading a run, and {@code -pcrel} the core whose ticks
-     * read a row through the program counter (BINARIES.md 5.5). The three
-     * are one switch each, and any two together select the core that is
-     * both, so {@code -perf -lean} reads what a lean run costs. The core
-     * is linked for the subtunes by default (doc/LINKER.md).
-     * {@code -carried} writes the full core selected by the switches.
+     * {@code -tTITLE} names another, and the CONV tag's text is
+     * {@link #CONVERTER} unless {@code -wWRITER} names another.
+     * {@code -lean} puts the core whose ticks neither drop the interrupt
+     * level nor write an end of interrupt under the tunes, {@code -perf}
+     * puts the core with the raster monitor in there, for reading a run,
+     * and {@code -pcrel} the core whose ticks read a row through the
+     * program counter (BINARIES.md 5.5). The three are one switch each,
+     * and any two together select the core that is both, so
+     * {@code -perf -lean} reads what a lean run costs. The core is linked
+     * for the subtunes by default (doc/LINKER.md). {@code -carried} writes
+     * the full core selected by the switches.
      */
     public static void main(String[] args) {
         List<String> flags = new ArrayList<>(Arrays.asList(args));
@@ -842,6 +864,7 @@ final class Sndh {
         Ymxs.only(tool, flags, Ymxs.TAGS, LINKS);
         @Nullable String title = null;
         @Nullable String composer = null;
+        @Nullable String writer = null;
         boolean monitor = false;
         boolean lean = false;
         boolean link = true;
@@ -868,6 +891,8 @@ final class Sndh {
                 title = flag.substring(2);
             } else if (flag.startsWith("-c")) {
                 composer = flag.substring(2);
+            } else if (flag.startsWith("-w")) {
+                writer = flag.substring(2);
             }
         }
         Report report = new Report(tool.reports());
@@ -891,7 +916,7 @@ final class Sndh {
             title = names.get(0).isBlank() ? "(untitled)" : names.get(0);
         }
         Options options = new Options(title, composer,
-                tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link);
+                tunes.size() > 1 ? names : null, monitor, lean, ticks, asked, link, writer);
         byte[] sndh;
         try {
             sndh = of(tunes, options);
@@ -958,14 +983,15 @@ final class Sndh {
             switches.add("the deferred start in: a subtune defers a start");
         }
         if (map) {
-            switches.add("the lookup in: a subtune maps a value");
+            switches.add("the lookup in: a subtune maps a value, cuts a source or copies"
+                    + " from frame");
         }
         report.row("the switches", switches.isEmpty() ? "none, the plain core"
                 : String.join("; ", switches));
         Prg.Tags tags = Prg.tags(sndh);
         report.say("the tags: TITL " + options.title()
                 + (options.composer() == null ? "" : ", COMM " + options.composer())
-                + ", " + tags.clock() + tags.rate() + ", FLAG ~" + tags.flag()
+                + ", CONV " + options.conv() + ", " + tags.clock() + tags.rate() + ", FLAG ~" + tags.flag()
                 + (options.names() == null ? ""
                 : ", !#SN with " + Report.count(options.names().size(), "name", "names")));
         Bound.Set set = Bound.of(tunes);

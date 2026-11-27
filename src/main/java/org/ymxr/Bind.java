@@ -63,7 +63,7 @@ final class Bind {
         // present, or at the file's end (BINARIES.md 1.3).
         TuneFile file = TuneFile.read(tune);
         int sources = file.sources().size();
-        int block = file.version() == Tune.VERSION
+        int block = file.version() >= Tune.VERSION
                 ? Tune.getLong(bound, Bound.TRANSFORMATIONS_AT) : 0;
         int ends = block > 0 ? block : bound.length;
         report.say("bound: DTX's reader for the table in place of the table");

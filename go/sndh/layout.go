@@ -82,13 +82,15 @@ func layoutMulti(out *bytes.Buffer, file []byte) {
 	}
 }
 
-// layoutBound reports the bound header, sources and image, plus the
-// transformation block in version 10 (BINARIES.md 6.3).
+// layoutBound reports the bound header, the cut index in version 11,
+// sources and image, plus the transformation block where the tune maps a
+// value (BINARIES.md 6.3).
 func layoutBound(out *bytes.Buffer, file []byte) {
 	fmt.Fprintf(out, "{\"part\":\"header\"%s}\n", boundFields(file, 0))
+	layoutCuts(out, file, 0)
 	layoutSources(out, file, 0)
 	block := 0
-	if ymxr.GetWord(file, 4) == ymxr.Version {
+	if ymxr.GetWord(file, 4) >= ymxr.Version {
 		block = signedLong(file, BoundTransformationsAt)
 	}
 	if image := signedLong(file, 16); image > 0 {
@@ -214,6 +216,7 @@ func layoutSndh(out *bytes.Buffer, file []byte, from, ends int) {
 		}
 		fmt.Fprintf(out, "{\"part\":\"tune\",\"number\":%d,\"at\":%d,\"bytes\":%d%s}\n",
 			i+1, at, upto-at, boundFields(file, at))
+		layoutCuts(out, file, at)
 		layoutSources(out, file, at)
 	}
 	if poolAt < images[0] {
@@ -301,8 +304,8 @@ func layoutTags(out *bytes.Buffer, file []byte, from int) int {
 }
 
 // layoutSources is a line a source of the bound tune at `at`, in index
-// order: the index at 24, and at 28 in version 10, each entry's bit 31
-// the mark of a counted source and outside the offset.
+// order: the index at 24, at 28 in version 10 and at 32 in version 11, each
+// entry's bit 31 the mark of a counted source and outside the offset.
 func layoutSources(out *bytes.Buffer, file []byte, at int) {
 	index := at + BoundIndex(ymxr.GetWord(file, at+4))
 	for i := 0; i < int(file[at+9]); i++ {
@@ -312,19 +315,35 @@ func layoutSources(out *bytes.Buffer, file []byte, at int) {
 }
 
 // boundFields reports the bound fields at the supplied offset,
-// resolving the image and optional version 10 transformation block
-// (BINARIES.md 1.2).
+// resolving the image, the transformation block where the tune maps a
+// value and the version 11 cut index (BINARIES.md 1.2).
 func boundFields(file []byte, at int) string {
 	fields := fmt.Sprintf(",\"version\":%d,\"rate\":%d,\"effects\":%d,\"sources\":%d,"+
 		"\"stateblock\":%d,\"image\":%d,\"table\":%d",
 		ymxr.GetWord(file, at+4), ymxr.GetWord(file, at+6), file[at+8], file[at+9],
 		ymxr.GetLong(file, at+12), at+signedLong(file, at+16),
 		ymxr.GetLong(file, at+20))
-	if ymxr.GetWord(file, at+4) == ymxr.Version {
+	version := ymxr.GetWord(file, at+4)
+	if version == ymxr.Version || version == ymxr.VersionCut && ymxr.HasMapping(int(file[at+8])) {
 		fields += fmt.Sprintf(",\"transformations\":%d",
 			at+signedLong(file, at+BoundTransformationsAt))
 	}
+	if version == ymxr.VersionCut {
+		fields += fmt.Sprintf(",\"cuts\":%d", at+signedLong(file, at+BoundCutsAt))
+	}
 	return fields
+}
+
+// layoutCuts reports the line of the cut index of the bound tune at at, in
+// version 11: where it is, its count U and its 2 + 8U bytes.
+func layoutCuts(out *bytes.Buffer, file []byte, at int) {
+	if ymxr.GetWord(file, at+4) != ymxr.VersionCut {
+		return
+	}
+	cuts := at + signedLong(file, at+BoundCutsAt)
+	count := ymxr.GetWord(file, cuts)
+	fmt.Fprintf(out, "{\"part\":\"cuts\",\"at\":%d,\"count\":%d,\"bytes\":%d}\n", cuts,
+		count, 2+8*count)
 }
 
 // signedLong is the long at `at` as a signed number, as BINARIES.md 1.2

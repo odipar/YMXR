@@ -18,7 +18,7 @@ final class Link {
     /** The handler kinds that are blocks: the general handler is in each
      *  effect's block. */
     static final List<String> KINDS = List.of("square", "one", "counted", "two", "three",
-            "envelope", "countedthree");
+            "envelope", "countedthree", "synced");
 
     /** The lookup kinds, each a block on each effect: the general, the
      *  counted, two columns, noise, buzzer, voice, the counted of two
@@ -26,10 +26,13 @@ final class Link {
     static final List<String> LOOKUPS = List.of("lk", "lc", "lt", "ln", "lb", "lv", "le", "lf", "lg", "lh");
 
     /** The blocks a core's pieces belong to, in the order the document
-     *  lists them: each handler kind, which init's loop over it is, and
-     *  its instance on each effect; the start of several columns; each
-     *  effect's frame code and general handler; each effect's remap and
-     *  deferred start; each lookup kind and its instances; and align. */
+     *  lists them: each handler kind, which init's loop over it is, and its
+     *  instance on each effect; the start of several columns; each effect's
+     *  frame code, general handler and timer code; init's and stop's work
+     *  for the effects; each effect's remap and deferred start; the cut's
+     *  routines and each effect's paths that read the cut column; the
+     *  lookup's routines and tables; each lookup kind and its instances;
+     *  and align. */
     static final List<String> BLOCKS = blocks();
 
     private static List<String> blocks() {
@@ -44,17 +47,26 @@ final class Link {
         for (int i = 0; i < 4; i++) {
             all.add("effect" + i);
         }
+        all.add("effects");
         for (String part : List.of("map", "defer")) {
             for (int i = 0; i < 4; i++) {
                 all.add(part + i);
             }
         }
+        all.add("cut");
+        for (int i = 0; i < 4; i++) {
+            all.add("cut" + i);
+        }
+        all.add("lookup");
         for (String kind : LOOKUPS) {
             all.add(kind);
             for (int i = 0; i < 4; i++) {
                 all.add(kind + i);
             }
         }
+        all.add("copy");
+        all.add("sync");
+        all.add("copysync");
         all.add("align");
         return List.copyOf(all);
     }
@@ -69,42 +81,86 @@ final class Link {
     }
 
     /**
-     * The blocks a set of tunes needs: the block of each effect a tune runs,
-     * bits 0 to 3 of its effects byte, and its remap where the tune maps a
-     * value and a row sets the effect's mapping column, and its deferred
-     * start where the tune defers a start and a row of the effect does;
-     * for each source an effect's rows
-     * start, the instance of its handler kind on that effect and the
-     * kind's loop of init; {@code several} where a start is of a counted
-     * source or one of several columns; the lookup instance of each kind
-     * an effect maps a source through, and the kind's loop of init; and
-     * {@code align}, the padding before the second bank.
+     * The blocks a set of tunes needs: {@code effects}, init's and stop's
+     * work for the effects, where a tune runs an effect; the block of each
+     * effect a tune runs, bits 0 to 3 of its effects byte, and its remap
+     * where the tune maps a value and a row sets the effect's mapping column,
+     * and its deferred start where the tune defers a start and a row of the
+     * effect does; for each source an effect's rows start, the instance of
+     * its handler kind on that effect and the kind's loop of init; {@code
+     * several} where a start is of a counted source or one of several
+     * columns; {@code lookup}, the lookup's routines and tables, where a
+     * tune is of version 10 or maps a value, bit 5 of its effects byte; the
+     * lookup instance of each kind an effect maps a source through, and the
+     * kind's loop of init; and {@code align}, the padding before the second
+     * bank. An effect that cuts a source, in a tune of version 11 whose row
+     * sets the effect's cut column, needs its paths that read the column,
+     * {@code cut0} for effect 0, the cut's routines, its remap, and the
+     * counted kinds and {@code several} that {@link #counted} reads in its
+     * rows. A tune of version 13, which syncs a voice, needs {@code sync},
+     * and {@code copysync} where it copies from frame.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();
         needed.add("align");
         for (TuneFile tune : tunes) {
+            if (tune.version() == Tune.VERSION || Columns.maps(tune.effects())) {
+                needed.add("lookup");
+            }
+            if (Columns.syncs(tune.effects())) {
+                needed.add("sync");
+                if (tune.copies()) {
+                    needed.add("copysync");
+                }
+            }
             for (String lookup : lookups(tune)) {
                 needed.add(lookup);
                 needed.add(lookup.substring(0, 2));
             }
+            needed.addAll(counted(tune));
             for (int i = 0; i < 4; i++) {
                 if ((tune.effects() & 1 << i) == 0) {
                     continue;
                 }
                 needed.add("effect" + i);
-                if ((tune.effects() & Columns.MAPS) != 0 && sets(tune, Columns.MAPPING + i, 0)) {
+                needed.add("effects");
+                boolean cuts = cuts(tune, i);
+                if (cuts) {
+                    needed.add("cut");
+                    needed.add("cut" + i);
+                    needed.add("map" + i);
+                }
+                if (Columns.maps(tune.effects()) && sets(tune, tune.mapping(i), 0)) {
                     needed.add("map" + i);
                 }
                 if ((tune.effects() & Columns.DEFERS) != 0
                         && sets(tune, Columns.EFFECT + 4 * i + 2, Columns.DEFERRED)) {
                     needed.add("defer" + i);
                 }
+                for (int target : copies(tune, i)) {
+                    // copy from frame runs the counted handler of its
+                    // target's columns, of the kinds the start of several
+                    // columns finds in its tables (copy.S)
+                    needed.add("copy");
+                    String kind = copyKind(target);
+                    needed.add(kind);
+                    needed.add(kind + i);
+                    needed.add("several");
+                }
+                Map<Integer, Set<Integer>> targets = targets(tune, i);
                 for (int s : started(tune, i)) {
                     Table source = tune.sources().get(s - 1);
                     boolean counted = tune.counted().get(s - 1);
                     String kind = kind(source, counted);
-                    if (KINDS.contains(kind)) {
+                    Set<Integer> on = targets.getOrDefault(s, Set.of());
+                    // a target of a sync runs its handler at every shape of
+                    // source (start.S, ymxr_widestart)
+                    if (on.stream().anyMatch(n -> n >= Columns.SYNC_TARGET)) {
+                        needed.add("synced");
+                        needed.add("synced" + i);
+                    }
+                    if (KINDS.contains(kind)
+                            && on.stream().anyMatch(n -> n < Columns.SYNC_TARGET)) {
                         needed.add(kind);
                         needed.add(kind + i);
                     }
@@ -121,6 +177,85 @@ final class Link {
             }
         }
         return ordered;
+    }
+
+    /** The handler kind copy from frame runs on a target (copy.S): the
+     *  counted handler of the target's columns, whose count of one row ends
+     *  each pass, so a frame value has no marker. */
+    static String copyKind(int target) {
+        if (target >= Columns.SYNC_TARGET) {
+            return "synced";
+        }
+        return switch (copyColumns(target)) {
+            case 1 -> "counted";
+            case 2 -> "envelope";
+            default -> "countedthree";
+        };
+    }
+
+    /** The lookup kind copy from frame runs on a target through a
+     *  transformation, the counted lookup kind of its columns. */
+    static String copyLookup(int target) {
+        return countedLookup(copyColumns(target), target);
+    }
+
+    /** The columns of copy from frame on a target, a register each. */
+    static int copyColumns(int target) {
+        return target < 14 ? 1 : target >= 17 && target <= 21 && target != 20 ? 3 : 2;
+    }
+
+    /** The kept targets of effect i at each start of copy from frame,
+     *  source S of a tune of version 12 (SPEC.md 3.1.7): the target column
+     *  last set on the effect, through the wrap, 0 before a row sets it. */
+    static Set<Integer> copies(TuneFile tune, int i) {
+        Set<Integer> out = new LinkedHashSet<>();
+        if (!tune.copies()) {
+            return out;
+        }
+        Table table = tune.table();
+        int t = Columns.EFFECT + 4 * i;
+        int kept = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int r = pass == 0 ? 0 : table.repeat(); r < table.rows(); r++) {
+                int target = table.column(t)[r] & 0xFF;
+                if ((target & 0x80) != 0) {
+                    kept = target & 0x7F;
+                }
+                if ((table.column(t + 1)[r] & 0xFF) == (0x80 | tune.count())) {
+                    out.add(kept);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** The kept targets of effect i at each start of each table source,
+     *  by source number: the target column last set on the effect, through
+     *  the wrap, 0 before a row sets it. */
+    static Map<Integer, Set<Integer>> targets(TuneFile tune, int i) {
+        Map<Integer, Set<Integer>> out = new java.util.HashMap<>();
+        Table table = tune.table();
+        int t = Columns.EFFECT + 4 * i;
+        int kept = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int r = pass == 0 ? 0 : table.repeat(); r < table.rows(); r++) {
+                int target = table.column(t)[r] & 0xFF;
+                if ((target & 0x80) != 0) {
+                    kept = target & 0x7F;
+                }
+                int s = table.column(t + 1)[r] & 0xFF;
+                if ((s & 0x80) != 0 && (s & 0x7F) > 0 && (s & 0x7F) <= tune.sources().size()) {
+                    out.computeIfAbsent(s & 0x7F, k -> new LinkedHashSet<>()).add(kept);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Whether effect i cuts a source: the tune is of version 11, bit 6
+     *  of its effects byte, and a row sets the effect's cut column. */
+    static boolean cuts(TuneFile tune, int i) {
+        return Columns.cuts(tune.effects()) && sets(tune, tune.cut(i), 0);
     }
 
     /** Whether a row of the tune sets column {@code c}, bit 7, with the
@@ -148,11 +283,12 @@ final class Link {
      * rows are read as a player reads them, through the repeat row until
      * each effect's state there is one it has had before, as Pages reads
      * them; a deferred start on a running timer adds its source to the
-     * ones a remap reaches.
+     * ones a remap reaches. The counted kinds under a cut are
+     * {@link #counted}'s.
      */
     static Set<String> lookups(TuneFile tune) {
         Set<String> out = new LinkedHashSet<>();
-        if (tune.version() != Tune.VERSION) {
+        if (!Columns.maps(tune.effects())) {
             return out;
         }
         Table table = tune.table();
@@ -187,7 +323,8 @@ final class Link {
     /** One row's effect columns for {@link #lookups}: a running source is
      *  kept with its target, its number times 64 plus the target. */
     private static void lookupRow(TuneFile tune, Table table, int row, int[] target,
-                                  int[] mapping, List<Set<Integer>> running, Set<String> out) {
+                                  int[] mapping, List<Set<Integer>> running,
+                                  Set<String> out) {
         for (int i = 0; i < 4; i++) {
             if ((tune.effects() & 1 << i) == 0) {
                 continue;
@@ -196,7 +333,7 @@ final class Link {
             int tg = table.column(t)[row] & 0xFF;
             int src = table.column(t + 1)[row] & 0xFF;
             int control = table.column(t + 2)[row] & 0xFF;
-            int map = table.column(Columns.MAPPING + i)[row] & 0xFF;
+            int map = table.column(tune.mapping(i))[row] & 0xFF;
             if ((tg & 0x80) != 0) {
                 target[i] = tg & 0x7F;
             }
@@ -209,9 +346,8 @@ final class Link {
                 if ((map & 0x80) != 0) {
                     mapping[i] = map & 0x7F;
                 }
-                String kind = lookup(tune, s, target[i]);
-                if (mapping[i] != 0 && kind != null) {
-                    out.add(kind + i);
+                if (mapping[i] != 0) {
+                    mapped(tune, s, target[i], i, out);
                 }
                 boolean deferred = (control & 0x80) != 0 && (control & Columns.DEFERRED) != 0;
                 if (!deferred || running.get(i).isEmpty()) {
@@ -222,19 +358,221 @@ final class Link {
                 mapping[i] = map & 0x7F;
                 if (mapping[i] != 0) {
                     for (int one : running.get(i)) {
-                        String kind = lookup(tune, one / 64, one % 64);
-                        if (kind != null) {
-                            out.add(kind + i);
-                        }
+                        mapped(tune, one / 64, one % 64, i, out);
                     }
                 }
             }
         }
     }
 
+    /** The lookup instance on effect i of source {@code s} mapped on
+     *  {@code target}, the kind of its shape. */
+    private static void mapped(TuneFile tune, int s, int target, int i, Set<String> out) {
+        String kind = lookup(tune, s, target);
+        if (kind != null) {
+            out.add(kind + i);
+        }
+    }
+
+    /**
+     * The counted kinds a tune runs under a cut, as blocks such as
+     * {@code counted} and {@code counted0}, or {@code lc} and {@code lc1}:
+     * on each effect, the counted kind of the columns of each source the
+     * counted handler runs after a start under a cut 1 to 127 or a recut,
+     * the identity's where the source runs through it and the lookup's on
+     * the source's target where it runs through a transformation; and
+     * {@code several} where a recut to cut 0 leaves a source on the
+     * counted handler, whose place's reset under cut 0 runs
+     * ymxr_widereset. The rows are read as {@link #lookups} reads
+     * them. A stop leaves the effect no source; a start runs under the
+     * kept cut, on the counted handler where that cut is 1 to 127; a
+     * deferred start on an effect that runs a source keeps the cut and the
+     * mapping of its row while it is pending and may switch at any row
+     * after it; a remap moves a source between the identity's counted kind
+     * and the lookup's; and a recut aims the counted handler, but from cut
+     * 0 to cut 0 and where a recut with no start pending leaves the
+     * square's or the one-row source's handler running under the source's
+     * whole table (68k/player/cut.S, ymxr_recut).
+     */
+    static Set<String> counted(TuneFile tune) {
+        Set<String> out = new LinkedHashSet<>();
+        if (!Columns.cuts(tune.effects())) {
+            return out;
+        }
+        Table table = tune.table();
+        Under[] under = {new Under(), new Under(), new Under(), new Under()};
+        for (int row = 0; row < table.rows(); row++) {
+            countedRow(tune, row, under, out);
+        }
+        Set<String> seen = new java.util.HashSet<>();
+        while (table.repeat() < table.rows()) {
+            if (!seen.add(Arrays.toString(under))) {
+                break;
+            }
+            for (int row = table.repeat(); row < table.rows(); row++) {
+                countedRow(tune, row, under, out);
+            }
+        }
+        return out;
+    }
+
+    /** A source an effect runs, or runs once a pending start switches: its
+     *  target, whether a cut 1 to 127 runs, its mapping, and whether the
+     *  counted handler runs it. */
+    private record Runs(int source, int target, boolean cut, int mapping, boolean counting,
+                        boolean pending) {
+    }
+
+    /** An effect's state for {@link #counted}: the kept target, cut and
+     *  mapping, and the sources it runs. */
+    private static final class Under {
+        int target;
+        int cut;
+        int mapping;
+        Set<Runs> runs = new LinkedHashSet<>();
+
+        @Override
+        public String toString() {
+            List<String> each = new ArrayList<>();
+            for (Runs one : runs) {
+                each.add(one.toString());
+            }
+            java.util.Collections.sort(each);
+            return target + " " + cut + " " + mapping + " " + each;
+        }
+    }
+
+    /** One row's effect columns for {@link #counted}. */
+    private static void countedRow(TuneFile tune, int row, Under[] under, Set<String> out) {
+        Table table = tune.table();
+        for (int i = 0; i < 4; i++) {
+            if ((tune.effects() & 1 << i) == 0) {
+                continue;
+            }
+            Under one = under[i];
+            int t = Columns.EFFECT + 4 * i;
+            int tg = table.column(t)[row] & 0xFF;
+            int src = table.column(t + 1)[row] & 0xFF;
+            int control = table.column(t + 2)[row] & 0xFF;
+            int map = Columns.maps(tune.effects()) ? table.column(tune.mapping(i))[row] & 0xFF : 0;
+            int cut = table.column(tune.cut(i))[row] & 0xFF;
+            if ((tg & 0x80) != 0) {
+                one.target = tg & 0x7F;
+            }
+            if ((src & 0x80) != 0) {
+                int s = src & 0x7F;
+                if (s == 0) {
+                    one.runs.clear();
+                    continue;
+                }
+                if ((map & 0x80) != 0) {
+                    one.mapping = map & 0x7F;
+                }
+                if ((cut & 0x80) != 0) {
+                    one.cut = cut & 0x7F;
+                }
+                boolean deferred = (control & 0x80) != 0 && (control & Columns.DEFERRED) != 0;
+                boolean pending = deferred && !one.runs.isEmpty();
+                if (!pending) {
+                    one.runs.clear();
+                }
+                one.runs.add(new Runs(s, one.target, one.cut != 0, one.mapping, one.cut != 0,
+                        pending));
+            } else {
+                if ((map & 0x80) != 0) {
+                    one.mapping = map & 0x7F;
+                    Set<Runs> next = new LinkedHashSet<>();
+                    for (Runs r : one.runs) {
+                        if (r.pending()) {
+                            next.add(r);
+                        }
+                        next.add(new Runs(r.source(), r.target(), r.cut(), one.mapping,
+                                r.counting(), false));
+                    }
+                    one.runs = next;
+                }
+                if ((cut & 0x80) != 0) {
+                    one.cut = cut & 0x7F;
+                    boolean pending = one.runs.stream().anyMatch(Runs::pending);
+                    Set<Runs> next = new LinkedHashSet<>();
+                    for (Runs r : one.runs) {
+                        if (r.pending()) {
+                            next.add(r);
+                        }
+                        boolean keeps = !r.counting() && !pending && whole(tune, r.source(), one.cut);
+                        next.add(new Runs(r.source(), r.target(), one.cut != 0, r.mapping(),
+                                keeps ? r.counting() : r.counting() || r.cut() || one.cut != 0,
+                                false));
+                    }
+                    one.runs = next;
+                }
+            }
+            for (Runs r : one.runs) {
+                String kind = null;
+                if (tune.copies() && r.source() == tune.count()) {
+                    kind = r.mapping() == 0 ? copyKind(r.target()) : copyLookup(r.target());
+                } else if (r.source() >= 1 && r.source() <= tune.sources().size()) {
+                    Table source = tune.sources().get(r.source() - 1);
+                    kind = r.mapping() == 0 ? kind(source, true)
+                            : countedLookup(source.columns(), r.target());
+                }
+                if (r.counting() && kind != null) {
+                    out.add(kind);
+                    out.add(kind + i);
+                    if (!r.cut()) {
+                        out.add("several");
+                    }
+                }
+            }
+        }
+    }
+
+    /** Whether cut {@code n} is the whole table of source {@code s}, where
+     *  a recut leaves its handler running: any cut of a source of the
+     *  one-row kind, and cut 0 and rows 0 and 1 of a square ({@link #kind};
+     *  68k/player/cut.S, ymxr_recut). A source of one row and several
+     *  columns, and one that plays once, runs another handler, which a recut
+     *  moves to the counted kind of its columns. */
+    private static boolean whole(TuneFile tune, int s, int n) {
+        if (s < 1 || s > tune.sources().size()) {
+            return false;
+        }
+        switch (kind(tune.sources().get(s - 1), tune.counted().get(s - 1))) {
+            case "one" -> {
+                return true;
+            }
+            case "square" -> {
+                if (n == 0) {
+                    return true;
+                }
+                if (n > tune.cuts().size()) {
+                    return false;
+                }
+                TuneFile.Cut cut = tune.cuts().get(n - 1);
+                return cut.first() == 0 && cut.last() == 1;
+            }
+            default -> {
+                return false;
+            }
+        }
+    }
+
+    /** The lookup's counted kind of a source of that many columns on that
+     *  target (68k/player/cut.S, ymxr_kstart). */
+    private static String countedLookup(int columns, int target) {
+        return switch (columns) {
+            case 1 -> "lc";
+            case 2 -> target >= NOISE ? "lf" : "le";
+            default -> target == BUZZER ? "lg" : "lh";
+        };
+    }
+
     /** The lookup kind of source {@code s} on {@code target}, or null for a
      *  square or a source of one row (68k/player/lookup_start.S, .kind). */
     static @org.jspecify.annotations.Nullable String lookup(TuneFile tune, int s, int target) {
+        if (tune.copies() && s == tune.count()) {
+            return copyLookup(target);
+        }
         if (s < 1 || s > tune.sources().size()) {
             return null;
         }

@@ -57,13 +57,13 @@ The calls a page makes to write a file of a structure:
 | the check of the structure | `run("ymxs-check", [], json)` |
 
 The flags are those of the executables: `-kK`, `-mN`, `-copies[S]`,
-`-tTITLE`, `-cCOMPOSER`, `-perf`, `-lean`, `-pcrel`, `-abs`, `-vbl`, and
-`-rROWS` for a program. A page checks a structure before writing a file
-of it with `ymxs-check`, YMXS's tool, built into the module from YMXS's
-source: the structure passes through to standard output, each finding
-is a warning line, and text outside the form exits 1 with standard output
-empty. `ymxs-to-sndh` and `ymxs-to-prg` run the same check as they read
-the structure.
+`-tTITLE`, `-cCOMPOSER`, `-wWRITER`, `-perf`, `-lean`, `-pcrel`, `-abs`,
+`-vbl`, and `-rROWS` for a program. A page checks a structure before
+writing a file of it with `ymxs-check`, YMXS's tool, built into the
+module from YMXS's source: the structure passes through to standard
+output, each finding is a warning line, and text outside the form exits 1
+with standard output empty. `ymxs-to-sndh` and `ymxs-to-prg` run the same
+check as they read the structure.
 
 ## From .NET in the browser
 

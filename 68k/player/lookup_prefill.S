@@ -31,7 +31,8 @@ ymxr_prefill:   movem.l d1-d7/a0-a6,-(sp)
                 lea     FX_SIZE(a3),a3
                 dbra    d0,.none
                 move.l  WS_TRANS(a0),d0
-                beq     .ok                     ; versions 7 to 9
+                beq     .ok                     ; versions 7 to 9, and 11
+                PIECE   lookup_4                ; where bit 5 is 0
                 movea.l d0,a1                   ; the block: T, then the list
                 moveq   #0,d7                   ; past the index and past each
                 move.w  (a1),d7                 ; transformation
@@ -238,6 +239,7 @@ ymxr_filled     equ     *                       ; past a page's copy: the rig's
                 addq.w  #1,d3
                 cmp.w   #4,d3
                 bcs     .effect
+                ENDPIECE lookup_4
 .ok:            lea     WS_FX(a0),a3
                 lea     ymxr_nomap-1(pc),a1
                 moveq   #3,d0
@@ -247,6 +249,7 @@ ymxr_filled     equ     *                       ; past a page's copy: the rig's
                 moveq   #0,d0
                 movem.l (sp)+,d1-d7/a0-a6
                 rts
+                PIECE   lookup_5
 .bad:           moveq   #-1,d0
                 movem.l (sp)+,d1-d7/a0-a6
                 rts
@@ -265,3 +268,4 @@ ymxr_filled     equ     *                       ; past a page's copy: the rig's
 .out:           moveq   #0,d1
 .in:            tst.w   d1
                 rts
+                ENDPIECE lookup_5

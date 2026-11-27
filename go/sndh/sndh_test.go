@@ -125,14 +125,14 @@ func TestASetOf30And34ColumnsBindsIntoTwoImages(t *testing.T) {
 	}
 }
 
-// mappingCore returns a lookup core supporting bound version 10.
+// mappingCore returns a lookup core supporting bound versions 10 and 11.
 func mappingCore(t *testing.T) []byte {
 	t.Helper()
 	core, err := binaries.Read(binaries.Named(false, false, true, false, true))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v := ymxr.GetWord(core, 18); v != ymxr.Version {
+	if v := ymxr.GetWord(core, 18); v != ymxr.VersionCut {
 		t.Fatalf("the core with the lookup reads bound tunes to version %d", v)
 	}
 	return core
@@ -244,8 +244,8 @@ func TestACoreWithoutBit4ReportsTheLineOfTheLookup(t *testing.T) {
 	_, ten := files(t)
 	core := append([]byte(nil), mappingCore(t)...)
 	ymxr.PutWord(core, sndh.CoreFlagsAt, 4)
-	line := "the core's flags at 22 read 4, and a subtune that maps a value needs bit" +
-		" 4 set"
+	line := "the core's flags at 22 read 4, and a subtune that maps a value, cuts a" +
+		" source or copies from frame needs bit 4 set"
 	if _, err := sndh.With(core, [][]byte{ten}, sndh.Options{Title: "set"}); err == nil ||
 		err.Error() != line {
 		t.Fatalf("a core with bit 4 clear reads %v, and the line is %q", err, line)
@@ -358,5 +358,50 @@ func TestASetBindsAtVersion10WhereATuneFileIs(t *testing.T) {
 	}
 	if v := sndh.Binds([][]byte{nine, ten}); v != ymxr.Version {
 		t.Fatalf("a set with version 10 binds at %d", v)
+	}
+}
+
+// transformationBlock is a tune file's block of transformations of these
+// entries, the index and each transformation on a long from the block's
+// first byte (SPEC.md 3.4.3), then the list.
+func transformationBlock(list []byte, entries ...[]byte) []byte {
+	at := 2 + 4*len(entries)
+	where := make([]int, len(entries))
+	for n, entry := range entries {
+		where[n] = ymxr.Align(at)
+		at = where[n] + 2 + len(entry)
+	}
+	out := make([]byte, at+len(list))
+	ymxr.PutWord(out, 0, len(entries))
+	for n, entry := range entries {
+		ymxr.PutLong(out, 2+4*n, where[n])
+		ymxr.PutWord(out, where[n], len(entry))
+		copy(out[where[n]+2:], entry)
+	}
+	copy(out[at:], list)
+	return out
+}
+
+// TestTransformations is BinariesTest's
+// aTransformationTwoBlocksIndexIsStoredOnce: three blocks that share
+// transformations, the first again whole, and a subtune without a block,
+// laid out in the same bytes (BINARIES.md 3.1).
+func TestTransformations(t *testing.T) {
+	a, b, c := []byte{1, 2}, []byte{3, 4, 5}, []byte{9}
+	one := transformationBlock([]byte{0x59, 0x50, 1, 0, 0, 1}, a, b)
+	two := transformationBlock([]byte{0x59, 0x50, 1, 0, 1, 2}, b, c)
+	three := transformationBlock([]byte{0x59, 0x50, 0}, a)
+	laid, at := sndh.Transformations([][]byte{one, two, three, one, nil})
+	want := "0002000000200000002400000002000000180000002400000001000000240000" +
+		"00020102" + "0003030405" + "595001000001" + "00" + "000109" +
+		"595001000102" + "000000" + "00020102" + "595000"
+	if got := fmt.Sprintf("%x", laid); got != want {
+		t.Fatalf("the transformations are %s, not %s", got, want)
+	}
+	if fmt.Sprint(at) != "[0 12 24 0 -1]" {
+		t.Fatalf("the blocks' indexes are at %v, not [0 12 24 0 -1]", at)
+	}
+	if alone, _ := sndh.Transformations([][]byte{one}); !bytes.Equal(alone, one) {
+		t.Fatalf("one block is laid out as %x, not as %x", alone, one)
 	}
 }

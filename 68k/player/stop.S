@@ -5,10 +5,24 @@ YMXR_stop:
                 movea.l a0,a6
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
+; Each release, with the write-back of its hook, is a piece of its
+; effect's block.
+                PIECE   effect0_9
                 RELEASE 0,$FFFFFA19,$F0,$FFFFFA07,5
+                UNHOOK  0
+                ENDPIECE effect0_9
+                PIECE   effect1_9
                 RELEASE 1,$FFFFFA1D,$F0,$FFFFFA09,4
+                UNHOOK  1
+                ENDPIECE effect1_9
+                PIECE   effect2_9
                 RELEASE 2,$FFFFFA1B,$F0,$FFFFFA07,0
+                UNHOOK  2
+                ENDPIECE effect2_9
+                PIECE   effect3_9
                 RELEASE 3,$FFFFFA1D,$0F,$FFFFFA09,5
+                UNHOOK  3
+                ENDPIECE effect3_9
                 move.w  (sp)+,sr
 ; The chip left as the next tune finds it. A row sets the registers it
 ; names alone (SPEC.md 4), so a tune whose first row leaves one

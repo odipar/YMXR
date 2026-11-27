@@ -7,7 +7,8 @@
 // 9. Version 10 permits a lookup on the target's last value alone.
 // Kept, running and pending mappings are tracked separately because a
 // deferred start can change the running mapping between frames (SPEC.md
-// 6, rule 2(g)).
+// 6, rule 2(g)). Version 11 adds the cut columns and the cut index, whose
+// kept, running and pending cuts follow the same rules (rule 2(i)).
 package schema
 
 import (
@@ -65,9 +66,14 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 		repeat = at
 	}
 	sources := ymxs.Sources(tune)
-	if len(sources) > ymxr.Most {
+	// Copy from frame is source S, after the tables (SPEC.md 3.1.7).
+	count := len(sources)
+	if copiesFrom(rows) {
+		count++
+	}
+	if count > ymxr.Most {
 		return Made{}, fmt.Errorf("the tune runs %d sources, and a source column numbers"+
-			" %d", len(sources), ymxr.Most)
+			" %d", count, ymxr.Most)
 	}
 	// Transformation numbers follow YMXS first-use order. Ignore remaps on
 	// timers outside the tune; the count limit applies only when an
@@ -77,7 +83,25 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 		return Made{}, fmt.Errorf("the tune maps through %d transformations, and a mapping"+
 			" column numbers %d", len(maps.list), ymxr.MostTransformations)
 	}
-	column := make([][]byte, ymxr.Mapped)
+	// Cuts are numbered in first-use order, row order then timer order A to
+	// D; a start under the whole table of its source selects cut 0 (SPEC.md
+	// 3.5.1).
+	cuts := cutsOf(rows, maps.claimed)
+	if err := syncCuts(rows); err != nil {
+		return Made{}, err
+	}
+	if len(cuts.list) > ymxr.MostCuts {
+		return Made{}, fmt.Errorf("the tune cuts through %d cuts, and a cut column numbers"+
+			" %d", len(cuts.list), ymxr.MostCuts)
+	}
+	// The counted handler counts a cut's rows in a word (SPEC.md section 8).
+	for _, cut := range cuts.list {
+		if length := cut.Last - cut.First + 1; length > ymxr.MostCountedRows {
+			return Made{}, fmt.Errorf("the tune cuts rows %d to %d, %d rows, and a cut is %d"+
+				" rows at most", cut.First, cut.Last, length, ymxr.MostCountedRows)
+		}
+	}
+	column := make([][]byte, ymxr.All)
 	for c := range column {
 		column[c] = make([]byte, size)
 	}
@@ -101,22 +125,24 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 			}
 			kept.wrap(last)
 			maps.wrap()
+			cuts.wrap()
 		}
-		out := make([]byte, ymxr.Mapped)
+		out := make([]byte, ymxr.All)
 		registers(rows[f], out)
+		syncs(rows[f], out)
 		for _, one := range ymxs.Effects(rows[f]) {
 			i, err := effectOf(one.Timer)
 			if err != nil {
 				return Made{}, err
 			}
-			runs, err := effect(out, i, one.Effect, sources, &target, &kept, &maps,
+			runs, err := effect(out, i, one.Effect, sources, &target, &kept, &maps, &cuts,
 				frames[f])
 			if err != nil {
 				return Made{}, err
 			}
 			used |= runs
 		}
-		for c := 0; c < ymxr.Mapped; c++ {
+		for c := 0; c < ymxr.All; c++ {
 			column[c][f] = out[c]
 		}
 	}
@@ -128,9 +154,20 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 	if err != nil {
 		return Made{}, err
 	}
-	columns := ymxr.Columns{Column: column[:ymxr.C], Repeat: repeat, Effects: used}
-	if mapsAValue(column) {
-		columns.Column = column
+	// A table has a group of four columns where the tune uses it: the
+	// mapping columns where a row selects a transformation, and the cut
+	// columns where a row selects a cut 1 to 127, after the mapping columns
+	// (SPEC.md 3.3.5).
+	if syncsFrom(rows) || evensFrom(rows) {
+		used |= ymxr.Syncs
+	}
+	if evensFrom(rows) {
+		used |= ymxr.Evens
+	}
+	columns := ymxr.Columns{Column: append([][]byte(nil), column[:ymxr.C]...),
+		Repeat: repeat, Effects: used}
+	if selects(column, ymxr.MappingColumn) {
+		columns.Column = append(columns.Column, column[ymxr.MappingColumn:ymxr.CutColumn]...)
 		columns.Effects |= ymxr.Maps
 		for _, one := range maps.list {
 			entries := make([]byte, len(one.Entries))
@@ -140,13 +177,83 @@ func Padded(tune ymxs.Tune, frames []int) (Made, error) {
 			columns.Transformations = append(columns.Transformations, entries)
 		}
 	}
+	if selects(column, ymxr.CutColumn) {
+		columns.Column = append(columns.Column, column[ymxr.CutColumn:ymxr.All]...)
+		columns.Effects |= ymxr.Cuts
+		for _, one := range cuts.list {
+			columns.Cuts = append(columns.Cuts, ymxr.Cut{First: one.First, Last: one.Last})
+		}
+	}
 	return Made{Columns: columns, Sources: ymxr.Passed(built), Rate: tune.Rate}, nil
 }
 
-// mapsAValue reports whether any row selects a transformation number,
-// requiring version 10 (SPEC.md 3.3.5).
-func mapsAValue(column [][]byte) bool {
-	for c := ymxr.MappingColumn; c < ymxr.Mapped; c++ {
+// copiesFrom reports whether a row starts copy from frame (SPEC.md 3.1.7).
+func copiesFrom(rows []ymxs.Row) bool {
+	for _, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			if start, ok := one.Effect.(ymxs.Start); ok {
+				if _, copies := start.Connection.(ymxs.CopyFromFrame); copies {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// syncCuts reports a target of a sync under a cut or deferred, which is a
+// later version's (SPEC.md rule 2(k), section 8): a start on one under a cut
+// other than the whole table of its source, a recut of a timer whose last
+// start is on one, and a deferred start on one.
+func syncCuts(rows []ymxs.Row) error {
+	runs := map[ymxs.Timer]ymxs.Target{}
+	for at, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			on := runs[one.Timer]
+			start, starts := one.Effect.(ymxs.Start)
+			if starts {
+				on = ymxs.ConnectionTarget(start.Connection)
+			}
+			_, sync := on.(ymxs.SyncTone)
+			_, recut := one.Effect.(ymxs.Recut)
+			if sync && (starts && start.Cut != ymxs.ConnectionWhole(start.Connection) || recut) {
+				return fmt.Errorf("row %d: %s runs under a cut, which this version leaves to a"+
+					" later one (SPEC.md section 8)", at, ymxs.TargetName(on))
+			}
+			if sync && starts && start.Deferred {
+				return fmt.Errorf("row %d: %s starts deferred, which this version leaves to a"+
+					" later one (SPEC.md section 8)", at, ymxs.TargetName(on))
+			}
+			if starts {
+				runs[one.Timer] = on
+			}
+		}
+	}
+	return nil
+}
+
+// syncsFrom reports whether a row syncs a voice, at its frame or through a
+// start on a target of a sync (SPEC.md 1.12, 3.3.5).
+func syncsFrom(rows []ymxs.Row) bool {
+	for _, row := range rows {
+		if row.Syncs != [3]bool{} {
+			return true
+		}
+		for _, one := range ymxs.Effects(row) {
+			if start, ok := one.Effect.(ymxs.Start); ok {
+				if _, sync := ymxs.ConnectionTarget(start.Connection).(ymxs.SyncTone); sync {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// selects reports whether any row sets one of the four columns from first
+// to a number 1 to 127, a transformation or a cut (SPEC.md 3.3.5).
+func selects(column [][]byte, first int) bool {
+	for c := first; c < first+4; c++ {
 		for _, value := range column[c] {
 			if value&0x80 != 0 && value&0x7F != 0 {
 				return true
@@ -174,11 +281,36 @@ func registers(row ymxs.Row, out []byte) {
 	}
 }
 
+// syncs writes bit 5 of the coarse column of each voice the row syncs, and
+// bit 4 of each voice the row lists among its even syncs, which the row sets
+// or leaves unset as the structure has it (SPEC.md 1.2.2, 1.12).
+func syncs(row ymxs.Row, out []byte) {
+	for v, voice := range ymxs.Voices {
+		if row.Syncs[v] {
+			out[ymxs.Number(ymxs.Coarse(voice))] |= ymxr.Sync
+		}
+		if row.EvenSyncs[v] {
+			out[ymxs.Number(ymxs.Coarse(voice))] |= ymxr.Even
+		}
+	}
+}
+
+// evensFrom reports whether a row lists a voice among its even syncs
+// (SPEC.md 1.12, 3.3.5).
+func evensFrom(rows []ymxs.Row) bool {
+	for _, row := range rows {
+		if row.EvenSyncs != [3]bool{} {
+			return true
+		}
+	}
+	return false
+}
+
 // effect encodes one effect operation into its four columns and
 // optional mapping column, updating effects-used bits. at is the
 // original structure row for diagnostics.
 func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
-	target *[4]int, kept *rates, maps *mappings, at int) (int, error) {
+	target *[4]int, kept *rates, maps *mappings, cuts *cutting, at int) (int, error) {
 	t := ymxr.Effect + 4*i
 	switch e := one.(type) {
 	case ymxs.Stop:
@@ -188,19 +320,36 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 		out[t+1] = byte(0x80)
 		kept.keep(i, one)
 		maps.stop(i)
+		cuts.stop(i)
+		return 0, nil
+	case ymxs.Recut:
+		// A recut on a timer outside the tune leaves every column unset, as
+		// a remap there does (SPEC.md 6, rule 2(a)). One on a timer of the
+		// tune writes the cut column where its cut differs from the running
+		// cut (rule 2(i)).
+		cuts.recut(out, i, cuts.value(one, maps.claimed[i]))
 		return 0, nil
 	case ymxs.Start:
+		// The start's cut column, where its cut differs from the kept cut; a
+		// deferred start captures it (rule 2(i)).
+		cuts.start(out, i, cuts.value(one, true), e.Deferred)
 		runs := ymxs.ConnectionTarget(e.Connection)
 		mapping, err := maps.number(e.Mapping, runs, at)
 		if err != nil {
 			return 0, err
 		}
+		_, copies := e.Connection.(ymxs.CopyFromFrame)
 		reaches := ymxs.TargetNumber(runs)
 		if reaches != target[i] {
 			out[t] = byte(0x80 | reaches)
 			target[i] = reaches
 		}
-		out[t+1] = byte(0x80 | (indexOf(sources, ymxs.ConnectionSource(e.Connection)) + 1))
+		// Copy from frame is source S, after the tables (3.1.7).
+		number := indexOf(sources, ymxs.ConnectionSource(e.Connection)) + 1
+		if copies {
+			number = len(sources) + 1
+		}
+		out[t+1] = byte(0x80 | number)
 		maps.start(out, i, mapping, runs, e.Deferred)
 		timing := e.Timing
 		now, err := selectOf(timing.Prescaler)
@@ -231,10 +380,14 @@ func effect(out []byte, i int, one ymxs.Effect, sources []ymxs.Source,
 			out[t+3] = byte(rate)
 		}
 		kept.keep(i, one)
+		used := 1 << i
 		if deferred {
-			return 1<<i | ymxr.Defers, nil
+			used |= ymxr.Defers
 		}
-		return 1 << i, nil
+		if copies {
+			used |= ymxr.Copies
+		}
+		return used, nil
 	case ymxs.Retune:
 		now, err := selectOf(e.Timing.Prescaler)
 		if err != nil {
@@ -295,7 +448,7 @@ func (r *rates) keep(i int, one ymxs.Effect) {
 		if !e.Deferred {
 			r.selects[i], _ = selectOf(e.Timing.Prescaler)
 			r.count[i] = e.Timing.Count
-			_, r.counting[i] = ymxs.SourceRows(ymxs.ConnectionSource(e.Connection)).Repeat()
+			r.counting[i] = ymxs.ConnectionRepeats(e.Connection)
 		}
 	case ymxs.Retune:
 		r.selects[i], _ = selectOf(e.Timing.Prescaler)
@@ -335,6 +488,151 @@ func ratesAfter(rows []ymxs.Row) rates {
 		}
 	}
 	return out
+}
+
+// cutting tracks the cut of each effect as mappings tracks the mapping:
+// kept for later starts, running for current ticks and pending for a
+// deferred start's captured cut, each a cut number, open or, for pending,
+// none (SPEC.md 6, rule 2(i)).
+type cutting struct {
+	kept, running, pending [4]int
+
+	// list contains the cut index, cut n at index n - 1 (SPEC.md 3.5.1).
+	list []ymxs.Cut
+
+	// uses marks the effects a start or a recut runs under a cut 1 to 127,
+	// whose three cuts the repeat row opens.
+	uses [4]bool
+}
+
+// cutsOf numbers the cuts the rows select in first-use order: row order,
+// then timer order A to D. A start under a cut other than the whole table
+// of its source selects one, and so does a recut on a timer of the tune;
+// two cuts of the same rows are one (SPEC.md 3.5.1).
+func cutsOf(rows []ymxs.Row, claimed [4]bool) cutting {
+	out := cutting{}
+	for i := range out.pending {
+		out.pending[i] = none
+	}
+	for _, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			i, err := effectOf(one.Timer)
+			if err != nil {
+				continue
+			}
+			var cut ymxs.Cut
+			switch e := one.Effect.(type) {
+			case ymxs.Start:
+				if e.Cut == ymxs.ConnectionWhole(e.Connection) {
+					continue
+				}
+				cut = e.Cut
+			case ymxs.Recut:
+				if !claimed[i] {
+					continue
+				}
+				cut = e.Cut
+			default:
+				continue
+			}
+			if !containsCut(out.list, cut) {
+				out.list = append(out.list, cut)
+			}
+		}
+	}
+	for _, row := range rows {
+		for _, one := range ymxs.Effects(row) {
+			if i, err := effectOf(one.Timer); err == nil && out.value(one.Effect, claimed[i]) > 0 {
+				out.uses[i] = true
+			}
+		}
+	}
+	return out
+}
+
+func containsCut(list []ymxs.Cut, cut ymxs.Cut) bool {
+	return indexOfCut(list, cut) >= 0
+}
+
+func indexOfCut(list []ymxs.Cut, cut ymxs.Cut) int {
+	for n, one := range list {
+		if one == cut {
+			return n
+		}
+	}
+	return -1
+}
+
+// value is the cut number a start or a recut selects: 0 for a start under
+// the whole table of its source, the number of its cut otherwise, and -1
+// for every other operation and a recut outside the tune (rule 2(i)).
+func (c *cutting) value(one ymxs.Effect, claimed bool) int {
+	switch e := one.(type) {
+	case ymxs.Start:
+		if e.Cut == ymxs.ConnectionWhole(e.Connection) {
+			return 0
+		}
+		return indexOfCut(c.list, e.Cut) + 1
+	case ymxs.Recut:
+		if !claimed {
+			return -1
+		}
+		if at := indexOfCut(c.list, e.Cut); at >= 0 {
+			return at + 1
+		}
+	}
+	return -1
+}
+
+// start writes the cut column where the start's value differs from the
+// kept cut; a deferred start makes it the pending cut (rule 2(i)).
+func (c *cutting) start(out []byte, i, value int, deferred bool) {
+	if value != c.kept[i] {
+		out[ymxr.CutColumn+i] = byte(0x80 | value)
+		c.kept[i] = value
+	}
+	if deferred {
+		if c.running[i] != value {
+			c.running[i] = open
+		}
+		c.pending[i] = value
+		return
+	}
+	c.running[i] = value
+	c.pending[i] = none
+}
+
+// recut writes the cut column where the recut's value differs from the
+// running cut, and leaves out a recut outside the tune (rule 2(i)).
+func (c *cutting) recut(out []byte, i, value int) {
+	if value < 0 || value == c.running[i] {
+		return
+	}
+	out[ymxr.CutColumn+i] = byte(0x80 | value)
+	c.kept[i] = value
+	c.running[i] = open
+	if c.pending[i] == none || c.pending[i] == value {
+		c.running[i] = value
+	}
+}
+
+// stop leaves the cut column unset, drops the pending cut and makes the
+// running cut the kept cut (rule 2(i)).
+func (c *cutting) stop(i int) {
+	c.pending[i] = none
+	c.running[i] = c.kept[i]
+}
+
+// wrap opens the three cuts of each effect that runs under a cut 1 to 127,
+// so the first later start or recut writes the column (rule 2(i)).
+func (c *cutting) wrap() {
+	for i := range c.uses {
+		if c.uses[i] {
+			c.kept[i] = open
+			c.running[i] = open
+			c.pending[i] = open
+		}
+	}
 }
 
 // mappings tracks three values per effect: kept for later starts
@@ -431,6 +729,13 @@ func (m *mappings) number(mapping ymxs.Mapping, target ymxs.Target, at int) (int
 	numbers, err := ymxs.PartNumbers(ymxs.Mapped(parts[last]), m.list)
 	if err != nil {
 		return 0, err
+	}
+	// the lookup of a target of a sync is a later version's (SPEC.md
+	// section 8)
+	if _, sync := target.(ymxs.SyncTone); sync && numbers[0] != 0 {
+		return 0, fmt.Errorf("row %d: the mapping maps %s through a transformation, which"+
+			" this version leaves to a later one (SPEC.md section 8)", at,
+			ymxs.TargetName(target))
 	}
 	return numbers[0], nil
 }
@@ -546,8 +851,19 @@ func markers(rows []ymxs.Row, sources []ymxs.Source) (marks, error) {
 			}
 			source := ymxs.ConnectionSource(start.Connection)
 			runs := ymxs.ConnectionTarget(start.Connection)
-			n := indexOf(sources, source)
 			number := ymxs.TargetNumber(runs)
+			if source == nil {
+				// copy from frame has no table, and its marker is the
+				// player's (SPEC.md 3.1.7); its target is one this version
+				// encodes
+				if number >= len(ymxr.Marker) {
+					return marks{}, fmt.Errorf("copy from frame runs on %s, a target this"+
+						" version leaves to a later one (SPEC.md section 8)",
+						ymxs.TargetName(runs))
+				}
+				continue
+			}
+			n := indexOf(sources, source)
 			through := !ymxs.IsIdentity(start.Mapping)
 			identity[n] = identity[n] || !through
 			out.mixer[n] = out.mixer[n] || through && number == ymxr.MixerTarget
@@ -603,6 +919,20 @@ func sourceTables(sources []ymxs.Source, marks marks) ([]ymxr.Source, error) {
 			marker = -1
 		}
 		counted := marker == -1
+		// A player keeps the stride of the columns, align(R), in a word
+		// (SPEC.md 3.1.3, section 8).
+		if columns := ymxs.SourceColumns(source); columns > 1 &&
+			len(values) > ymxr.MostWideRows {
+			return nil, fmt.Errorf("the source %s has %d columns and %d rows, and such a"+
+				" source is %d rows at most", ymxs.SourceName(source), columns, len(values),
+				ymxr.MostWideRows)
+		}
+		// The counted handler counts the rows in a word (SPEC.md section 8).
+		if counted && len(values) > ymxr.MostCountedRows {
+			return nil, fmt.Errorf("the source %s fills its byte and has %d rows, and such a"+
+				" source is %d rows at most", ymxs.SourceName(source), len(values),
+				ymxr.MostCountedRows)
+		}
 		// A tick of a counted source on setR7 writes the row whole, so the
 		// two port directions are in the source rather than in the
 		// player (SPEC.md rule 2(f)).

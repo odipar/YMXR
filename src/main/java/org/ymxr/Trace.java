@@ -28,11 +28,13 @@ final class Trace {
 
     /**
      * The record's header, including transformation entries after
-     * sources in version 10 (SPEC.md 7.2).
+     * sources where the file has mapping columns, and the cuts where it has
+     * cut columns; copy from frame has no table and is left out (SPEC.md
+     * 7.2).
      */
     static String header(TuneFile tune) {
         StringBuilder line = new StringBuilder("{\"rate\":").append(tune.frameRate())
-                .append(",\"effects\":").append(tune.effects()).append(",\"sources\":[");
+                .append(",\"effects\":").append(tune.effects() & 0xFF).append(",\"sources\":[");
         for (int i = 0; i < tune.sources().size(); i++) {
             Table s = tune.sources().get(i);
             line.append(i == 0 ? "" : ",").append("{\"rows\":[");
@@ -45,7 +47,7 @@ final class Trace {
             line.append("],\"repeat\":").append(s.repeat()).append('}');
         }
         line.append(']');
-        if (tune.version() == Tune.VERSION) {
+        if (Columns.maps(tune.effects())) {
             line.append(",\"transformations\":[");
             for (int n = 0; n < tune.transformations().size(); n++) {
                 byte[] entries = tune.transformations().get(n);
@@ -57,20 +59,31 @@ final class Trace {
             }
             line.append(']');
         }
+        if (Columns.cuts(tune.effects())) {
+            line.append(",\"cuts\":[");
+            for (int n = 0; n < tune.cuts().size(); n++) {
+                TuneFile.Cut one = tune.cuts().get(n);
+                line.append(n == 0 ? "" : ",").append("{\"first\":").append(one.first())
+                        .append(",\"last\":").append(one.last()).append('}');
+            }
+            line.append(']');
+        }
         return line.append("}\n").toString();
     }
 
     /**
      * Writes the header and up to {@code calls} frame entries to {@code
-     * out}, one per line. A frame reporting -1 ends the record. Version
-     * 10 effect entries report the kept mapping; ticks and
-     * pending-start mappings are outside the record (SPEC.md 7.3).
+     * out}, one per line. A frame reporting -1 ends the record. Effect
+     * entries of versions 10 to 12 report the kept mapping, and of versions
+     * 11 and 12 the kept cut; ticks and a pending start's mapping and cut
+     * are outside the record (SPEC.md 7.3).
      */
     static void trace(TuneFile tune, int calls, PrintStream out) {
         out.print(header(tune));
-        boolean mapped = tune.version() == Tune.VERSION;
+        boolean mapped = tune.version() >= Tune.VERSION;
+        boolean cuts = tune.version() >= Tune.CUT;
         Table table = tune.table();
-        Replay model = new Replay(table);
+        Replay model = new Replay(table, tune.effects());
         for (int call = 0; call < calls; call++) {
             if (model.row() == table.rows()) {
                 out.print("{\"result\":-1}\n");
@@ -86,7 +99,13 @@ final class Trace {
                     first = false;
                 }
             }
-            line.append("},\"e\":{");
+            line.append('}');
+            // SPEC.md 7.3: in version 13 and 14 the voices the row syncs,
+            // after w, where it syncs one, and in version 14 the voices of
+            // its even syncs, after them, where it lists one.
+            voices(line, "s", model.syncs);
+            voices(line, "even", model.evens);
+            line.append(",\"e\":{");
             first = true;
             for (int i = 0; i < 4; i++) {
                 Replay.Effect e = model.effect[i];
@@ -101,6 +120,9 @@ final class Trace {
                         .append(",\"deferred\":").append(e.deferred());
                 if (mapped) {
                     line.append(",\"mapping\":").append(e.mapping());
+                }
+                if (cuts) {
+                    line.append(",\"cut\":").append(e.cut());
                 }
                 line.append('}');
                 first = false;
@@ -165,5 +187,22 @@ final class Trace {
         }
         tool.report(Report.count(rows.length, "byte", "bytes") + " of rows");
         Out.write(tool, rows);
+    }
+
+    /** The voices of {@code mask}, bit 0 voice A to bit 2 voice C, as the
+     *  key {@code key} and a list of letters, where the mask has one
+     *  (SPEC.md 7.3). */
+    private static void voices(StringBuilder line, String key, int mask) {
+        if (mask == 0) {
+            return;
+        }
+        line.append(",\"").append(key).append("\":[");
+        for (int v = 0; v < 3; v++) {
+            if ((mask & 1 << v) != 0) {
+                line.append(Integer.bitCount(mask & (1 << v) - 1) == 0 ? "" : ",")
+                        .append('"').append((char) ('A' + v)).append('"');
+            }
+        }
+        line.append(']');
     }
 }

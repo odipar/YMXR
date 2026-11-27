@@ -22,21 +22,21 @@ PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
 ; of the five, and PlayerTest checks the five against those figures.
 ; Under YMXR_PCREL a row is read through a displacement rather than an
 ; absolute address: the read costs 4 cycles less, the step 8 and the
-; loop's test 4, so the three paths that read a row cost less and the two
-; that write a patched value cost what they cost.
+; loop's move of the loop cell 8, so the three paths that read a row cost
+; less and the two that write a patched value cost what they cost.
                 .if     YMXR_PCREL
 PERF_ON         equ     64      ; a row written, the place stepped
 PERF_SQ         equ     48      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     24      ; a source of one row, no place stepped
-PERF_LOOP       equ     98      ; the marker, the place to row RR
-PERF_STOP       equ     108     ; the marker, the timer stopped
+PERF_LOOP       equ     66      ; the marker, the place to row RR
+PERF_STOP       equ     92      ; the marker, the timer stopped
 PERF_SWITCH     equ     150     ; the marker, a pending start performed
                 .else
 PERF_ON         equ     76      ; a row written, the place stepped
 PERF_SQ         equ     48      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     24      ; a source of one row, no place stepped
-PERF_LOOP       equ     114     ; the marker, the place to row RR
-PERF_STOP       equ     116     ; the marker, the timer stopped
+PERF_LOOP       equ     78      ; the marker, the place to row RR
+PERF_STOP       equ     96      ; the marker, the timer stopped
 PERF_SWITCH     equ     150     ; the marker, a pending start performed
                 .endif
 
@@ -50,6 +50,7 @@ TF_VERSION      equ     4
 TF_RATE         equ     6
 TF_EFFECTS      equ     8
 TF_SOURCES      equ     9
+TF_SYNC         equ     10              ; bit 7: a tune that syncs a voice
 TF_STATE        equ     12
 TF_IMAGE        equ     16
 TF_TABLE        equ     20              ; where this tune's table is in it
@@ -58,6 +59,11 @@ TF_INDEX        equ     24
 TF_TRANS        equ     24              ; version 10: the transformations'
                                         ; block, a signed long from the
                                         ; bound tune's first byte, and the
+                                        ; source index 4 bytes on;
+                                        ; version 11: the block, or 0
+TF_CUTS         equ     28              ; version 11: the cut index, a
+                                        ; signed long from the bound
+                                        ; tune's first byte, and the
                                         ; source index 4 bytes on
                 .endif
 
@@ -76,6 +82,11 @@ DT_COLUMNS      equ     8
 DT_REPEAT       equ     10
 DT_PAYLOAD      equ     16
 
+; The distance from one register's frame value to the next (copy.S,
+; ymxr_fv): a frame value, its register, and the header of the next one's
+; source of one row.
+FV_STRIDE       equ     14
+
 ; The workspace.
 WS_TUNE         equ     0               ; the bound tune
 WS_IMAGE        equ     4               ; the image in it
@@ -91,6 +102,11 @@ WS_ARMING       equ     22              ; a byte: set while a deferred start
 WS_VECTOR       equ     21              ; a byte: the MFP's vector register as
                                         ; init found it, kept where the player
                                         ; runs automatic end of interrupt
+WS_CDIRTY       equ     23              ; a byte: set by init and by each row
+                                        ; that sets a column of an effect, in a
+                                        ; tune that copies from frame, so the
+                                        ; frame reads the effects' records
+                                        ; again (play.S, ymxr_cregs)
 WS_SOURCES      equ     24              ; a source's first row and its loop
                                         ; cell, eight bytes each, resolved at
                                         ; init: the source column's seven bits
@@ -115,7 +131,11 @@ FX_SHAPE        equ     3               ; which handler the timer's vector
                                         ; points at: 0 the general one, $FF
                                         ; the square's, 1 the one-row
                                         ; source's. The last two encode the
-                                        ; place as an immediate
+                                        ; place as an immediate. 2 and 3 the
+                                        ; handlers of two and three columns,
+                                        ; 4 to 6 the counted ones of one to
+                                        ; three, and 7 to 9 the counted ones
+                                        ; with a marked source, under a cut
 FX_FIRST        equ     4               ; the place at row 0: the running
                                         ; source's first row, and the first row
                                         ; of the column the running handler
@@ -171,6 +191,9 @@ FX_LEVEL        equ     58              ; the running square's level at row 0
 FX_RUN          equ     59              ; the running source's mapping
 FX_USE          equ     60              ; the page in use, bank 0's then 1's
 FX_LBANK        equ     62              ; the bank of the cache
+FX_ACUT         equ     63              ; an armed start's cut, and bit 7
+                                        ; where its place is the cut's
+                                        ; first row
 FX_PAGE         equ     64              ; two bytes a page, 4 a bank
 FX_LBYTE        equ     72              ; the cache: the page byte's address
 FX_LKEY         equ     76              ; a transformation, and the fill kind
@@ -184,6 +207,8 @@ FX_LLAST        equ     83
 FX_LMAPS        equ     84              ; the three fill kinds' tables
 FX_LCUR         equ     96              ; the page byte a start writes
 FX_LFB          equ     97              ; the page of the first fallback
+FX_CUT          equ     98              ; the kept cut
+FX_CRUN         equ     99              ; the running cut
 FX_SIZE         equ     100
 WS_TRANS        equ     2456            ; the transformations' block, a long
 YMXR_FIXED      equ     2460
@@ -206,6 +231,8 @@ FX_LLAST        equ     39
 FX_LMAPS        equ     40
 FX_LCUR         equ     52
 FX_LFB          equ     53
+FX_CUT          equ     54
+FX_CRUN         equ     55
 FX_SIZE         equ     56
 WS_TRANS        equ     2280
 YMXR_FIXED      equ     2284

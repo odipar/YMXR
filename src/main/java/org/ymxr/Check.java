@@ -89,7 +89,7 @@ final class Check {
         if (!wrong.isEmpty()) {
             return wrong;
         }
-        Replay model = new Replay(tune.table());
+        Replay model = new Replay(tune.table(), tune.effects());
         int[] drumEnd = {-1, -1};
         int calls = Trace.calls(tune.table());
         for (int call = 0; call < calls && wrong.size() < MOST; call++) {
@@ -204,38 +204,72 @@ final class Check {
 
     /**
      * reports source numbers above the file's source count,
-     * transformation numbers above its transformation count, and stops
-     * with a set mapping column (SPEC.md 6.4). A stop ignores that
-     * column. Starts without place reset use their current row number
-     * modulo the source length (1.8.4).
+     * transformation numbers above its transformation count, cut numbers
+     * above its cut count, stops with a set mapping or cut column, and a
+     * start or a recut under a cut that ends past the last row of the
+     * source it runs (SPEC.md 6.4, rules 2(b), 2(i), 3(c)). A stop ignores
+     * those two columns.
      */
     static List<String> places(TuneFile file) {
         Table table = file.table();
         int transformations = file.transformations().size();
+        // S counts copy from frame, source S without a table (3.1.7)
+        int sources = file.count();
+        // the kept cut of each effect after the row, and the source last
+        // started on it, 0 before the first start (SPEC.md 1.11.3)
+        int[] kept = new int[4];
+        int[] last = new int[4];
         List<String> said = new ArrayList<>();
         for (int r = 0; r < table.rows(); r++) {
             for (int i = 0; i < 4; i++) {
                 int source = table.column(Columns.EFFECT + 4 * i + 1)[r] & 0xFF;
-                if ((source & 0x80) != 0 && (source & 0x7F) > file.sources().size()) {
+                if ((source & 0x80) != 0 && (source & 0x7F) > sources) {
                     said.add(r + ": effect " + i + " starts source " + (source & 0x7F)
-                            + ", and the file has " + Report.count(file.sources().size(),
+                            + ", and the file has " + Report.count(sources,
                             "source", "sources"));
                 }
-                if (table.columns() <= Columns.MAPPING + i) {
-                    continue;
-                }
-                int mapping = table.column(Columns.MAPPING + i)[r] & 0xFF;
-                if ((mapping & 0x80) == 0) {
-                    continue;
-                }
-                if (source == 0x80) {
+                int m = file.mapping(i);
+                int mapping = m < 0 ? 0 : table.column(m)[r] & 0xFF;
+                if ((mapping & 0x80) != 0 && source == 0x80) {
                     said.add(r + ": effect " + i + " stops and sets its mapping column, and a"
                             + " stop leaves the mapping as it is");
-                } else if ((mapping & 0x7F) > transformations) {
+                } else if ((mapping & 0x80) != 0 && (mapping & 0x7F) > transformations) {
                     said.add(r + ": effect " + i + " maps through transformation "
                             + (mapping & 0x7F) + ", and the file has "
                             + Report.count(transformations, "transformation",
                             "transformations"));
+                }
+                boolean starts = (source & 0x80) != 0 && (source & 0x7F) >= 1
+                        && (source & 0x7F) <= sources;
+                if (starts) {
+                    last[i] = source & 0x7F;
+                }
+                int x = file.cut(i);
+                int cut = x < 0 ? 0 : table.column(x)[r] & 0xFF;
+                if ((cut & 0x80) != 0 && source == 0x80) {
+                    said.add(r + ": effect " + i + " stops and sets its cut column, and a stop"
+                            + " leaves the cut as it is");
+                } else if ((cut & 0x80) != 0 && (cut & 0x7F) > file.cuts().size()) {
+                    said.add(r + ": effect " + i + " runs under cut " + (cut & 0x7F)
+                            + ", and the file has " + Report.count(file.cuts().size(), "cut",
+                            "cuts"));
+                } else {
+                    if ((cut & 0x80) != 0) {
+                        kept[i] = cut & 0x7F;
+                    }
+                    boolean recuts = (source & 0x80) == 0 && (cut & 0x80) != 0;
+                    if ((starts || recuts) && kept[i] > 0 && last[i] > 0) {
+                        TuneFile.Cut under = file.cuts().get(kept[i] - 1);
+                        // copy from frame is a source of one row (3.1.7)
+                        int rows = last[i] > file.sources().size() ? 1
+                                : file.sources().get(last[i] - 1).rows();
+                        if (under.last() >= rows) {
+                            said.add(r + ": effect " + i + " runs source " + last[i] + " of "
+                                    + Report.count(rows, "row", "rows") + " under cut "
+                                    + kept[i] + ", rows " + under.first() + " to "
+                                    + under.last());
+                        }
+                    }
                 }
             }
         }

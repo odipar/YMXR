@@ -46,10 +46,34 @@ import (
 // Magic is the four bytes a tune file opens with.
 var Magic = []byte{'Y', 'M', 'X', 'R'}
 
-// Version is the highest supported version, written when a row selects
-// a transformation. Its table has Mapped columns and the file includes
-// transformation tables (SPEC.md 3.3.5).
+// Version is the version written when a row selects a transformation and
+// every cut is the whole table. Its table has Mapped columns and the file
+// includes transformation tables (SPEC.md 3.3.5).
 const Version = 0x000A
+
+// VersionCut is the version written when a row selects a cut 1 to 127:
+// four cut columns, after the mapping columns where bit 5 of the effects
+// used is set, and the cut index at the header's long at 20 (SPEC.md
+// 3.3.5).
+const VersionCut = 0x000B
+
+// VersionCopy is the version written where a row starts copy from frame
+// and syncs no voice: the header of version 11, the mapping and the cut
+// columns where bits 5 and 6 of the effects used are set, and index entry S
+// 0 (SPEC.md 3.1.7, 3.3.5).
+const VersionCopy = 0x000C
+
+// VersionSync is the version written where a row syncs a voice, at its frame
+// or through a target of a sync, and lists none among its even syncs: the
+// header of version 12, bit 7 of the effects used where a row starts copy
+// from frame, and bit 5 of each coarse column read on every row (SPEC.md
+// 1.12, 3.3.5).
+const VersionSync = 0x000D
+
+// VersionEven is the highest supported version, written where a row lists a
+// voice among its even syncs: version 13 with bit 4 of each coarse column
+// read on every row (SPEC.md 1.12, 3.3.5).
+const VersionEven = 0x000E
 
 // Unmapped is the writer version for identity-only tunes. It uses
 // thirty DTX3 columns without a transformation index. Deferred starts
@@ -65,11 +89,45 @@ const VersionDeferred = 0x0008
 const Oldest = 0x0007
 
 // Reads is the versions a reader reads, as its report names them.
-var Reads = fmt.Sprintf("%d, %d, %d or %d", Oldest, VersionDeferred, Unmapped, Version)
+var Reads = fmt.Sprintf("%d, %d, %d, %d, %d, %d, %d or %d", Oldest, VersionDeferred, Unmapped,
+	Version, VersionCut, VersionCopy, VersionSync, VersionEven)
 
 // ReadsVersion is whether a reader reads a file of that version.
 func ReadsVersion(version int) bool {
-	return version >= Oldest && version <= Version
+	return version >= Oldest && version <= VersionEven
+}
+
+// VersionOf is the version a writer writes for a table of those effects: 14
+// where a row lists a voice among its even syncs, 13 where a row syncs a
+// voice, 12 where it copies from frame, 11 where it cuts a source, 10 where
+// it maps a value and cuts none, and 9 otherwise (SPEC.md 3.3.5).
+func VersionOf(effects int) int {
+	switch {
+	case HasEvens(effects):
+		return VersionEven
+	case HasSyncs(effects):
+		return VersionSync
+	case HasCopies(effects):
+		return VersionCopy
+	case HasCuts(effects):
+		return VersionCut
+	case HasMapping(effects):
+		return Version
+	}
+	return Unmapped
+}
+
+// ColumnsOf is the column count of a table of that version and effects
+// byte: 34 in version 10, 34 or 38 in version 11 by bit 5, 30, 34 or 38 in
+// versions 12 and 13 by bits 5 and 6, and 30 in 7 to 9 (SPEC.md 3.3.3).
+func ColumnsOf(version, effects int) int {
+	switch version {
+	case VersionCut, VersionCopy, VersionSync, VersionEven:
+		return ColumnCount(effects)
+	case Version:
+		return Mapped
+	}
+	return C
 }
 
 // VersionDtx2 and VersionDtx2Last are the first and the last version whose
@@ -85,9 +143,13 @@ const (
 const Counted = 1 << 31
 
 // IndexAt returns the source-index offset: 16 in versions 7 to 9; 20 in
-// version 10, after the transformation-index pointer (SPEC.md 3.3).
+// version 10, after the transformation-index pointer; 24 in versions 11 to
+// 13, after the cut-index pointer (SPEC.md 3.3).
 func IndexAt(version int) int {
-	if version == Version {
+	switch version {
+	case VersionCut, VersionCopy, VersionSync, VersionEven:
+		return CutsAt + 4
+	case Version:
 		return TransformationsAt + 4
 	}
 	return HeaderLength
@@ -116,6 +178,10 @@ const (
 	// TransformationsAt is the header offset of the version 10
 	// transformation-index pointer.
 	TransformationsAt = 16
+
+	// CutsAt is the header offset of the version 11 cut-index pointer
+	// (SPEC.md 3.3, 3.5.2).
+	CutsAt = 20
 )
 
 // Choose, as a writer's ring, has the writer choose one of Rings (SPEC.md
@@ -372,22 +438,34 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 		sourceBytes += len(tables[i])
 	}
 	named := namedBytes(name)
-	version := Unmapped
-	if columnCount == Mapped {
-		version = Version
-	}
+	version := VersionOf(columns.Effects)
 	index := IndexAt(version)
-	after := index + 4*len(tables)
+	// Copy from frame is index entry S, after the tables (SPEC.md 3.1.7).
+	entries := len(tables)
+	if HasCopies(columns.Effects) {
+		entries++
+	}
+	after := index + 4*entries
 	nameAt := 0
 	if len(named) != 0 {
 		nameAt = after
 	}
 	here := Align(after + len(named))
+	// Place the transformations after the name, then the version 11 cut
+	// index, and the DTX3 table after both. The table then ends at source
+	// 1, as in version 9 (SPEC.md 3.4.3, 3.5.3).
+	maps := HasMapping(columns.Effects)
 	transformationsAt := here
 	var block []byte
-	if version == Version {
+	if maps {
 		block = transformationBlock(columns.Transformations)
 		here = Align(here + len(block))
+	}
+	cutsAt := here
+	var cuts []byte
+	if HasCuts(columns.Effects) {
+		cuts = CutIndex(columns.Cuts)
+		here = Align(here + len(cuts))
 	}
 	tableAt := here
 	here = Align(here + len(table))
@@ -401,12 +479,16 @@ func Pack(columns Columns, sources *Sources, frameRate, unit, ring int,
 	PutWord(file, 4, version)
 	PutWord(file, FrameRateAt, frameRate)
 	file[EffectsAt] = byte(columns.Effects)
-	file[CountAt] = byte(len(tables))
+	file[CountAt] = byte(entries)
 	PutWord(file, NameAt, nameAt)
 	PutLong(file, TableAt, tableAt)
-	if version == Version {
+	if maps {
 		PutLong(file, TransformationsAt, transformationsAt)
 		copy(file[transformationsAt:], block)
+	}
+	if HasCuts(columns.Effects) {
+		PutLong(file, CutsAt, cutsAt)
+		copy(file[cutsAt:], cuts)
 	}
 	copy(file[nameAt:], named)
 	for i := range tables {
@@ -446,6 +528,18 @@ func transformationBlock(tables [][]byte) []byte {
 		copy(block[at[n]+2:], table)
 	}
 	return block
+}
+
+// CutIndex is the cut index from offset 0: a word U, then each cut's first
+// row and last row, a long each (SPEC.md 3.5.2).
+func CutIndex(cuts []Cut) []byte {
+	index := make([]byte, 2+8*len(cuts))
+	PutWord(index, 0, len(cuts))
+	for n, one := range cuts {
+		PutLong(index, 2+8*n, one.First)
+		PutLong(index, 6+8*n, one.Last)
+	}
+	return index
 }
 
 // Candidates is the table packed with packer through each of rings, by
@@ -498,11 +592,14 @@ func sortedRings(plain map[int]Packed) []int {
 
 // WithTable is the tune file with table in place of its DTX3 table, every
 // other part as it is: the source tables after it move by what the table's
-// length moves them, and the index records where each now begins (SPEC.md
-// 3.3).
+// length moves them, and the index records where each now begins; the entry
+// of copy from frame stays 0 (SPEC.md 3.1.7, 3.3).
 func WithTable(file, table []byte) []byte {
 	tableAt := GetLong(file, TableAt)
 	count := int(file[CountAt])
+	if HasCopies(int(file[EffectsAt])) {
+		count--
+	}
 	index := IndexAt(GetWord(file, 4))
 	from := len(file)
 	if count > 0 {
@@ -658,6 +755,7 @@ func packed(said *report.Report, written Written, chose string) error {
 		return err
 	}
 	columns := header.Columns
+	effects := int(written.File[EffectsAt])
 	payload, err := dtx.ReadPayload3(table, header)
 	if err != nil {
 		return err
@@ -672,11 +770,12 @@ func packed(said *report.Report, written Written, chose string) error {
 		report.Count(payload.Live(), "live column", "live columns")))
 	for c := 0; c < columns; c++ {
 		if !payload.IsLive(c) {
-			said.Row(Name(c), fmt.Sprintf("%7d -> constant %d", frames, payload.Constants[c]))
+			said.Row(NameIn(c, effects), fmt.Sprintf("%7d -> constant %d", frames,
+				payload.Constants[c]))
 			continue
 		}
 		bytes := payload.Bytes(payload.Map[c], len(table)-dtx.HeaderLength)
-		said.Row(Name(c), fmt.Sprintf("%7d -> %6d bytes  (%5s%%)", frames, bytes,
+		said.Row(NameIn(c, effects), fmt.Sprintf("%7d -> %6d bytes  (%5s%%)", frames, bytes,
 			report.Fixed(100.0*float64(bytes)/float64(frames), 1)))
 	}
 	said.Say(fmt.Sprintf("the sources: %s of %s, %s",
@@ -735,7 +834,9 @@ func GetLong(b []byte, at int) int {
 
 // File contains decoded metadata, packed and unpacked DTX3 table,
 // sources and optional transformation entries. Versions below 10 have
-// an empty transformation list (SPEC.md 3.3, 3.4).
+// an empty transformation list (SPEC.md 3.3, 3.4). The sources are the
+// tables; in version 12 copy from frame is source S, after them, and has
+// none (3.1.7).
 type File struct {
 	Version         int
 	FrameRate       int
@@ -745,6 +846,33 @@ type File struct {
 	Sources         []*dtx.Table
 	Counted         []bool
 	Transformations [][]byte
+	Cuts            []Cut
+}
+
+// Copies is whether a row starts copy from frame, source S (SPEC.md 3.1.7).
+func (f File) Copies() bool {
+	return HasCopies(f.Effects)
+}
+
+// Count is S, the source count: the tables, and copy from frame where a row
+// starts it (SPEC.md 3.1.7, 3.3).
+func (f File) Count() int {
+	if f.Copies() {
+		return len(f.Sources) + 1
+	}
+	return len(f.Sources)
+}
+
+// Mapping is the table's mapping column of effect i, or -1 where it has
+// none.
+func (f File) Mapping(i int) int {
+	return MappingColumnOf(f.Effects, i)
+}
+
+// CutColumn is the table's cut column of effect i, or -1 where it has
+// none.
+func (f File) CutColumn(i int) int {
+	return CutColumnOf(f.Effects, i)
 }
 
 // Read is the tune file in those bytes.
@@ -764,9 +892,43 @@ func Read(file []byte) (File, error) {
 		return File{}, fmt.Errorf("version %d is not %s", version, Reads)
 	}
 	effects := int(file[EffectsAt])
-	transformations, err := readTransformations(file, version, effects)
-	if err != nil {
-		return File{}, err
+	// SPEC.md 3.3: bit 5 of the effects used is 1 in version 10, either in
+	// versions 11 to 13, and 0 in versions 7 to 9; bit 6 is 1 in version 11,
+	// either in versions 12 and 13, and 0 in every other version; bit 7 is 1
+	// in version 12, either in version 13, and 0 in every other version.
+	maps := HasMapping(effects)
+	if version == Version && !maps || version < Version && maps {
+		return File{}, fmt.Errorf("version %d with bit 5 of the effects used %s", version,
+			setOrClear(maps))
+	}
+	cutting := HasCuts(effects)
+	if version == VersionCut && !cutting || version < VersionCut && cutting {
+		return File{}, fmt.Errorf("version %d with bit 6 of the effects used %s", version,
+			setOrClear(cutting))
+	}
+	copies := HasCopies(effects)
+	if version == VersionCopy && !copies || version < VersionCopy && copies {
+		return File{}, fmt.Errorf("version %d with bit 7 of the effects used %s", version,
+			setOrClear(copies))
+	}
+	if version >= VersionCut && len(file) < CutsAt+4 {
+		return File{}, errors.New("not a YMXR file")
+	}
+	var transformations [][]byte
+	if maps {
+		read, err := readTransformations(file)
+		if err != nil {
+			return File{}, err
+		}
+		transformations = read
+	}
+	var cuts []Cut
+	if cutting {
+		read, err := readCuts(file)
+		if err != nil {
+			return File{}, err
+		}
+		cuts = read
 	}
 	index := IndexAt(version)
 	count := int(file[CountAt])
@@ -775,9 +937,25 @@ func Read(file []byte) (File, error) {
 	if index+4*count > len(file) {
 		return File{}, fmt.Errorf("the source index at %d is outside the file", index)
 	}
+	// SPEC.md 3.1.7: where bit 7 is set index entry S is copy from frame, 0,
+	// and every entry before it is the offset of a table.
+	if copies && (count == 0 || GetLong(file, index+4*(count-1)) != 0) {
+		return File{}, fmt.Errorf("version %d with source %d other than copy from frame",
+			version, count)
+	}
+	tables := count
+	if copies {
+		tables--
+		for i := 0; i < tables; i++ {
+			if GetLong(file, index+4*i) == 0 {
+				return File{}, fmt.Errorf("source %d is copy from frame, and copy from"+
+					" frame is source %d", i+1, count)
+			}
+		}
+	}
 	tableAt := GetLong(file, TableAt)
 	end := len(file)
-	if count != 0 {
+	if tables != 0 {
 		end = GetLong(file, index) &^ Counted
 	}
 	if tableAt < 0 || end > len(file) || tableAt > end {
@@ -800,10 +978,7 @@ func Read(file []byte) (File, error) {
 	if err != nil {
 		return File{}, err
 	}
-	columns := C
-	if version == Version {
-		columns = Mapped
-	}
+	columns := ColumnsOf(version, effects)
 	if shape.Columns != columns || shape.Width != 1 {
 		return File{}, fmt.Errorf("the table is %d columns of %d bytes, and a tune's"+
 			" table is %d of one (SPEC.md 3.3.3)", shape.Columns, shape.Width, columns)
@@ -814,12 +989,12 @@ func Read(file []byte) (File, error) {
 	}
 	var sources []*dtx.Table
 	var counted []bool
-	for i := 0; i < count; i++ {
+	for i := 0; i < tables; i++ {
 		entry := GetLong(file, index+4*i)
 		at := entry &^ Counted
 		counted = append(counted, entry&Counted != 0)
 		to := len(file)
-		if i+1 < count {
+		if i+1 < tables {
 			to = GetLong(file, index+4*(i+1)) &^ Counted
 		}
 		if at < 0 || to > len(file) || at > to {
@@ -842,30 +1017,61 @@ func Read(file []byte) (File, error) {
 		}
 		sources = append(sources, source)
 	}
+	// SPEC.md 3.3.5: version 13 is a tune that syncs a voice, and version
+	// 14 one that lists a voice among its even syncs, which the effects carry
+	// in the bits above their byte.
+	if version >= VersionSync {
+		effects |= Syncs
+	}
+	if version == VersionEven {
+		effects |= Evens
+	}
 	return File{Version: version, FrameRate: GetWord(file, FrameRateAt),
 		Effects: effects, Dtx3: dtx3, Table: table, Sources: sources,
-		Counted: counted, Transformations: transformations}, nil
+		Counted: counted, Transformations: transformations, Cuts: cuts}, nil
 }
 
-// readTransformations checks the version and effects flag, then reads
-// version 10 transformations in validation order: header offset, index
-// bounds and count, then each table's bounds and entry count in number
-// order (SPEC.md 3.3.4). Offsets are unsigned and checked before
-// reading entries. Earlier versions return an empty list.
-func readTransformations(file []byte, version, effects int) ([][]byte, error) {
-	// SPEC.md 3.3: bit 5 of the effects used is 1 in version 10 and 0 in
-	// every other, so a reader of the bit and a reader of the version read
-	// one table shape.
-	if maps := effects&Maps != 0; maps != (version == Version) {
-		bit := "clear"
-		if maps {
-			bit = "set"
+func setOrClear(set bool) string {
+	if set {
+		return "set"
+	}
+	return "clear"
+}
+
+// readCuts reads the version 11 cut index in validation order: the word
+// U, its count, the 8U bytes after it, then each cut's two rows in number
+// order (SPEC.md 3.3.4, 3.5).
+func readCuts(file []byte) ([]Cut, error) {
+	at := GetLong(file, CutsAt)
+	if at+2 > len(file) {
+		return nil, fmt.Errorf("the cut index at %d is outside the file", at)
+	}
+	count := GetWord(file, at)
+	if count < 1 || count > MostCuts {
+		return nil, fmt.Errorf("the file has %d cuts, and a version %d file has 1 to %d",
+			count, VersionCut, MostCuts)
+	}
+	if at+2+8*count > len(file) {
+		return nil, fmt.Errorf("the cut index at %d is outside the file", at)
+	}
+	cuts := make([]Cut, count)
+	for n := 1; n <= count; n++ {
+		first := GetLong(file, at+2+8*(n-1))
+		last := GetLong(file, at+6+8*(n-1))
+		if last < first {
+			return nil, fmt.Errorf("cut %d is rows %d to %d, and a cut ends at or after the"+
+				" row it begins at", n, first, last)
 		}
-		return nil, fmt.Errorf("version %d with bit 5 of the effects used %s", version, bit)
+		cuts[n-1] = Cut{First: first, Last: last}
 	}
-	if version != Version {
-		return nil, nil
-	}
+	return cuts, nil
+}
+
+// readTransformations reads the transformations of a file with mapping
+// columns in validation order: header offset, index bounds and count,
+// then each table's bounds and entry count in number order (SPEC.md
+// 3.3.4). Offsets are unsigned and checked before reading entries.
+func readTransformations(file []byte) ([][]byte, error) {
 	// the header of version 10 has the long at 16 before the source index
 	if len(file) < TransformationsAt+4 {
 		return nil, errors.New("not a YMXR file")

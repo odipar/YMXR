@@ -43,6 +43,10 @@
 YMXR_MAP        equ     0
                 .endif
 
+; The bounds of a piece, for the pieces of this code before the player's:
+; each effect's claim of its timer and its put-back (doc/LINKER.md).
+                .include "player/pieces.S"
+
 sndh_core:
                 bra.w   sndh_init
                 bra.w   sndh_exit
@@ -104,6 +108,66 @@ SAV_SIZE        equ     28
 .no\~:
                 .endm
 
+; Exit, play and the state come first, init and stop last: each effect's
+; claim and put-back are pieces of init and stop a link leaves out, and
+; the entries' branches and the state's offset in the descriptor refer
+; across none of them (doc/LINKER.md).
+
+; ------------------------------------------------------------------ exit
+
+sndh_exit:
+                movem.l d0-d7/a0-a6,-(sp)
+                lea     sndh_state(pc),a6
+                btst    #0,(a6)
+                beq.s   .done
+                bsr     sndh_stop
+.done:          movem.l (sp)+,d0-d7/a0-a6
+                rts
+
+; a1 the workspace: the patched offset from the core, rounded up to a
+; long. d0 clobbered.
+sndh_workspace:
+                lea     sndh_core(pc),a1
+                adda.l  sndh_work(pc),a1
+                move.l  a1,d0
+                addq.l  #3,d0
+                and.b   #$FC,d0
+                movea.l d0,a1
+                rts
+
+; ------------------------------------------------------------------ play
+
+; A host that calls play from its Timer C handler in software
+; end-of-interrupt mode leaves Timer C's in-service bit set until that
+; handler ends, and the MFP serves Timer D, which ranks below Timer C,
+; once the bit is clear. Play clears the bit first, so that Timer D ticks
+; through the row; $DF clears bit 5 of ISRB, and a 1 written to an
+; in-service bit leaves it as it is. A host that clears the bit after
+; play writes a bit already clear.
+sndh_play:
+                movem.l d0-d7/a0-a6,-(sp)
+                lea     sndh_state(pc),a6
+                btst    #0,(a6)
+                beq.s   .done
+                move.b  #$DF,$FFFFFA11.w
+                bsr     sndh_workspace
+                movea.l a1,a0
+                bsr     YMXR_play
+                tst.l   d0
+                bpl.s   .done
+                bset    #1,(a6)                 ; the last row has played
+.done:          movem.l (sp)+,d0-d7/a0-a6
+                rts
+
+; Exception 24, for as long as a tune plays: the acknowledge found no
+; vector, and the tick it belonged to is one the player already cancelled.
+sndh_spurious:  rte
+
+sndh_state:     dc.b    0
+sndh_claims:    dc.b    0
+                .even
+sndh_saved:     dcb.b   SAV_SIZE,0
+
 ; ------------------------------------------------------------------ init
 
 sndh_init:
@@ -153,14 +217,22 @@ sndh_init:
                 .endif
                 bsr     YMXR_init
                 tst.l   d0
-                bmi.s   .done
+                bmi.w   .done
 
 ; The timers the player claimed: effects 0 to 3 run Timers A, D, B, C.
                 moveq   #0,d2
+                PIECE   effect0_6
                 CLAIMS  0,0
+                ENDPIECE effect0_6
+                PIECE   effect1_6
                 CLAIMS  1,3
+                ENDPIECE effect1_6
+                PIECE   effect2_6
                 CLAIMS  2,1
+                ENDPIECE effect2_6
+                PIECE   effect3_6
                 CLAIMS  3,2
+                ENDPIECE effect3_6
                 move.b  d2,sndh_claims-sndh_state(a6)
 
 ; The vector at $60, the 68000's spurious interrupt. The MFP raises an
@@ -183,16 +255,7 @@ sndh_init:
 .done:          movem.l (sp)+,d0-d7/a0-a6
                 rts
 
-; ------------------------------------------------------------------ exit
-
-sndh_exit:
-                movem.l d0-d7/a0-a6,-(sp)
-                lea     sndh_state(pc),a6
-                btst    #0,(a6)
-                beq.s   .done
-                bsr     sndh_stop
-.done:          movem.l (sp)+,d0-d7/a0-a6
-                rts
+; ------------------------------------------------------------------ stop
 
 ; a6 the state byte: the player stopped, the claimed timers put back as
 ; they were kept.
@@ -207,48 +270,20 @@ sndh_stop:
                 move.b  sndh_claims-sndh_state(a6),d2
                 lea     sndh_saved(pc),a5
                 move.l  SAV_SPUR(a5),$60.w
+                PIECE   effect0_7
                 PUTBACK 0,$134,$FFFFFA19,$F0,0,$FFFFFA07,5,SAV_IER
+                ENDPIECE effect0_7
+                PIECE   effect2_7
                 PUTBACK 1,$120,$FFFFFA1B,$F0,1,$FFFFFA07,0,SAV_IER
+                ENDPIECE effect2_7
+                PIECE   effect3_7
                 PUTBACK 2,$114,$FFFFFA1D,$0F,2,$FFFFFA09,5,SAV_IER+1
+                ENDPIECE effect3_7
+                PIECE   effect1_7
                 PUTBACK 3,$110,$FFFFFA1D,$F0,2,$FFFFFA09,4,SAV_IER+1
+                ENDPIECE effect1_7
                 move.w  (sp)+,sr
                 rts
-
-; a1 the workspace: the patched offset from the core, rounded up to a
-; long. d0 clobbered.
-sndh_workspace:
-                lea     sndh_core(pc),a1
-                adda.l  sndh_work(pc),a1
-                move.l  a1,d0
-                addq.l  #3,d0
-                and.b   #$FC,d0
-                movea.l d0,a1
-                rts
-
-; ------------------------------------------------------------------ play
-
-sndh_play:
-                movem.l d0-d7/a0-a6,-(sp)
-                lea     sndh_state(pc),a6
-                btst    #0,(a6)
-                beq.s   .done
-                bsr     sndh_workspace
-                movea.l a1,a0
-                bsr     YMXR_play
-                tst.l   d0
-                bpl.s   .done
-                bset    #1,(a6)                 ; the last row has played
-.done:          movem.l (sp)+,d0-d7/a0-a6
-                rts
-
-; Exception 24, for as long as a tune plays: the acknowledge found no
-; vector, and the tick it belonged to is one the player already cancelled.
-sndh_spurious:  rte
-
-sndh_state:     dc.b    0
-sndh_claims:    dc.b    0
-                .even
-sndh_saved:     dcb.b   SAV_SIZE,0
 
 ; ---------------------------------------------------------------- player
 

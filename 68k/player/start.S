@@ -15,12 +15,14 @@
 ; lists an effect at the offsets RES_ below.
 ; An effect's record in ymxr_resets: the site of its place's reset, and
 ; the bytes from its head's end to the start of a source of one row, to
-; the remap's piece, to the deferred start's and to the rest.
+; the cut's piece, to the remap's, to the deferred start's and to the
+; rest.
 RES_ONE         equ     2
-RES_MAP         equ     4
-RES_DEFER       equ     4+(2*YMXR_MAP)
-RES_TAIL        equ     4+(2*YMXR_MAP)+(2*YMXR_DEFER)
-RES_SIZE        equ     6+(2*YMXR_MAP)+(2*YMXR_DEFER)
+RES_CUT         equ     4
+RES_MAP         equ     4+(2*YMXR_MAP)
+RES_DEFER       equ     4+(4*YMXR_MAP)
+RES_TAIL        equ     4+(4*YMXR_MAP)+(2*YMXR_DEFER)
+RES_SIZE        equ     6+(4*YMXR_MAP)+(2*YMXR_DEFER)
 PICK_AT         equ     ymxr_tick0_pick-ymxr_tick0_over+2
 PICK_SQ         equ     ymxr_e_effect0_1-ymxr_tick0_pick-2
 PICK_ONE        equ     ymxr_e_effect0_1-ymxr_tick0_pick-2      ; and the square's
@@ -38,6 +40,20 @@ PICK_BOTH       equ     ymxr_tick0_shaped-ymxr_tick0_pick-2
 ; blocks the shared control register and the select's shift add, so the
 ; table below names that site an effect.
 WIDE_AT         equ     ymxr_tick0_wide-ymxr_tick0_over+2
+; The displacement of the call of ymxr_widestart in the start of several
+; columns, which init aims at ymxr_copywide in a tune that copies from
+; frame (copy.S).
+WIDEN_CALL      equ     ymxr_tick0_widen-ymxr_tick0_over+4
+                .if     (ymxr_tick3_widen-ymxr_tick3_over+4)<>WIDEN_CALL
+                .error  "effect 3 lays its start of several columns out apart from effect 0"
+                .endif
+; The distance of the read at the head of the paths of a row that sets a
+; column of the effect, which init writes a bsr.w over in a tune that
+; copies from frame (copy.S, ymxr_csome).
+SOME_AT         equ     ymxr_tick0_some-ymxr_tick0_over
+                .if     (ymxr_tick3_some-ymxr_tick3_over)<>SOME_AT
+                .error  "effect 3 lays its head out apart from effect 0"
+                .endif
 WIDE_ONE        equ     ymxr_e_effect0_1-ymxr_tick0_wide-2      ; and the square's
 WIDE_WIDEN      equ     ymxr_tick0_widen-ymxr_tick0_wide-2
 RESET_DONE      equ     ymxr_tick0_done-ymxr_tick0_reset-2
@@ -74,6 +90,27 @@ RS_MAP          equ     ymxr_e_effect0_1-ymxr_tick0_rs-2+ymxr_tick0_rmk-ymxr_p_m
                 .if     (ymxr_e_effect3_1-ymxr_tick3_rs-2+ymxr_tick3_rmk-ymxr_p_map3_1)<>RS_MAP
                 .error  "effect 3 lays its remap's reset out apart from effect 0"
                 .endif
+; A tune of version 11 aims the start and the unset source at the paths
+; that read the cut column first, and, where the tune maps a value, the
+; head's branch on the set bits past the count at the or of the cut column
+; (init.S).
+NOW_X           equ     ymxr_e_effect0_1-ymxr_tick0_now-2+ymxr_tick0_xnow-ymxr_p_cut0_1         ; RES_CUT
+UNSET_X         equ     ymxr_e_effect0_1-ymxr_tick0_unset-2+ymxr_tick0_xunset-ymxr_p_cut0_1     ; RES_CUT
+HEAD_AT         equ     ymxr_tick0_head-ymxr_tick0_over
+HEAD_SOME       equ     $6B00|((ymxr_tick0_some-ymxr_tick0_head-2)&$FF)     ; bmi.s _some
+HEAD_X          equ     $6000|((ymxr_tick0_xhead-ymxr_tick0_head-2)&$FF)    ; bra.s _xhead
+                .if     (ymxr_e_effect3_1-ymxr_tick3_now-2+ymxr_tick3_xnow-ymxr_p_cut3_1)<>NOW_X
+                .error  "effect 3 lays its start of version 11 out apart from effect 0"
+                .endif
+                .if     (ymxr_e_effect3_1-ymxr_tick3_unset-2+ymxr_tick3_xunset-ymxr_p_cut3_1)<>UNSET_X
+                .error  "effect 3 lays its recut out apart from effect 0"
+                .endif
+                .if     ((ymxr_tick3_head-ymxr_tick3_over)<>HEAD_AT)|((ymxr_tick3_xhead-ymxr_tick3_head)<>(ymxr_tick0_xhead-ymxr_tick0_head))|((ymxr_tick3_some-ymxr_tick3_head)<>(ymxr_tick0_some-ymxr_tick0_head))
+                .error  "effect 3 lays its head out apart from effect 0"
+                .endif
+                .if     (((ymxr_tick0_some-ymxr_tick0_head-2+128)|(ymxr_tick0_xhead-ymxr_tick0_head-2+128))&$FFFFFF00)<>0
+                .error  "the head's branch is past a byte's displacement"
+                .endif
                 .endif
                 .if     YMXR_MAP&YMXR_DEFER
 ; Remap exit for an unset mapping column: displacements to ordinary rate
@@ -102,13 +139,25 @@ SET_DEFER       equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_check-ymxr_
                 .if     (ymxr_e_effect3_1-ymxr_tick3_set-2+ymxr_tick3_check-ymxr_p_defer3_1)<>SET_DEFER
                 .error  "effect 3 lays its pending paths out apart from effect 0"
                 .endif
+                .if     YMXR_MAP
+; For a tune of version 11 that defers a start, init aims the start and
+; the stop at the path that reads the cut column before the arming.
+SET_X           equ     ymxr_e_effect0_1-ymxr_tick0_set-2+ymxr_tick0_xcheck-ymxr_p_cut0_1       ; RES_CUT
+                .if     (ymxr_e_effect3_1-ymxr_tick3_set-2+ymxr_tick3_xcheck-ymxr_p_cut3_1)<>SET_X
+                .error  "effect 3 lays its deferred start of version 11 out apart from effect 0"
+                .endif
+                .endif
                 .endif
 RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .if     YMXR_MAP
+RESET_X         equ     ymxr_tick0_xrow-ymxr_tick0_reset-2
 ; Init branch bytes for the larger effect record used with lookup
 ; support.
-                .if     (((RESET_DONE+128)|(RESET_WIDE+128))&$FFFFFF00)<>0
+                .if     (((RESET_DONE+128)|(RESET_WIDE+128)|(RESET_X+128))&$FFFFFF00)<>0
                 .error  "a branch init writes is past a byte's displacement"
+                .endif
+                .if     (ymxr_tick3_xrow-ymxr_tick3_reset-2)<>RESET_X
+                .error  "effect 3 lays its reset of a cut out apart from effect 0"
                 .endif
                 .endif
 
@@ -165,6 +214,15 @@ RESET_WIDE      equ     ymxr_tick0_wrow-ymxr_tick0_reset-2
                 .endif
                 .endm
 
+; The last row's place of a counted handler at row 0, row R - 1 past its
+; first place, at TICK_PTR in every kind: the place's word and R - 1, in
+; d0. a3 the effect's record, a5 the handler.
+                .macro  WLAST
+                move.w  TICK_PTR+PLACE_LO(a5),d0
+                add.w   FX_ROWS+2(a3),d0
+                subq.w  #1,d0
+                .endm
+
                 PIECE   several_1
                 .if     YMXR_MAP
 ; Place reset for counted or multi-column handlers. Use the running
@@ -189,7 +247,7 @@ ymxr_widereset:
 .kind:          mulu    #KD_SIZE,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
-                move.w  KD_LEFT(a2),d5
+                move.w  KD_LASTP(a2),d5
                 move.w  KD_COLS(a2),d4
                 lea     FX_FIRST(a3),a1         ; a column's place at row 0
                 move.w  sr,-(sp)
@@ -206,9 +264,10 @@ ymxr_widereset:
                 .endif
                 addq.l  #4,a2
                 dbra    d4,.col
-                tst.w   d5                      ; R rows left
-                beq.s   .reset
-                move.w  FX_ROWS+2(a3),(a5,d5.w)
+                tst.w   d5                      ; counted: the last row's
+                beq.s   .reset                  ; place, row R - 1
+                WLAST
+                move.w  d0,(a5,d5.w)
 .reset:         move.w  (sp)+,sr
                 movem.l (sp)+,a1-a2
 .moves:         rts
@@ -236,15 +295,18 @@ ymxr_widereset:
                 beq.s   .countedthree
                 WPLACE  FX_FIRST2,TWC_PTR2      ; a counted source of two
                 WPLACE  FX_FIRST,TWC_PTR1       ; columns: both places, and
-                move.w  FX_ROWS+2(a3),TWC_LEFT(a5) ; R rows left
+                WLAST                           ; the last row's, R - 1
+                move.w  d0,TWC_LASTP(a5)
                 bra.w   .reset
 .countedthree:  WPLACE  FX_FIRST3,TWCT_PTR3
                 WPLACE  FX_FIRST2,TWCT_PTR2
                 WPLACE  FX_FIRST,TWCT_PTR1
-                move.w  FX_ROWS+2(a3),TWCT_LEFT(a5)
+                WLAST
+                move.w  d0,TWCT_LASTP(a5)
                 bra.s   .reset
 .counted:       WPLACE  FX_FIRST,TICKC_PTR      ; the counted handler: the
-                move.w  FX_ROWS+2(a3),TICKC_LEFT(a5) ; place and R rows left
+                WLAST                           ; place and the last row's
+                move.w  d0,TICKC_LASTP(a5)
                 bra.s   .reset
 .three:         WPLACE  FX_FIRST3,TW3_PTR3
                 WPLACE  FX_FIRST2,TW3_PTR2
@@ -297,6 +359,9 @@ ymxr_widestart:
 .two:           moveq   #2,d4
                 move.w  -4(a2,d1.w),d1
                 lea     ymxr_at_two(pc),a5
+; The handler of the kind a5's table names, which the start of a target
+; of a sync enters with its registers set as here (sync.S).
+ymxr_wstart_handler equ *
 .handler:       move.w  d6,d0                   ; this effect's handler, out
                 add.w   d0,d0                   ; of the kind's table
                 adda.w  (a5,d0.w),a5
@@ -363,18 +428,18 @@ ymxr_widestart:
                 lea     ymxr_wide(pc),a2        ; 2.1): eight bytes a target in
                 adda.w  d5,a2                   ; the map, two a column
                 cmp.w   #3,d4
-                beq.s   .slots
+                beq.w   .slots
                 WSLOT   TW2_SEL1,TW2_PTR1,TW2_CELLS,FX_FIRST,0
-                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+CELL_SIZE,FX_FIRST2,2
+                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+CELL_STRIDE,FX_FIRST2,2
+                tst.l   d0
+                LOOPHD  TW2_CELLS,TW2_ONCEW
                 move.b  #2,FX_SHAPE(a3)
-                .if     YMXR_PCREL
                 bra.w   .aimed
-                .else
-                bra.s   .aimed
-                .endif
 .slots:         WSLOT   TW3_SEL1,TW3_PTR1,TW3_CELLS,FX_FIRST,0
-                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+CELL_SIZE,FX_FIRST2,2
-                WSLOT   TW3_SEL3,TW3_PTR3,TW3_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
+                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+CELL_STRIDE,FX_FIRST2,2
+                WSLOT   TW3_SEL3,TW3_PTR3,2*CELL_STRIDE+TW3_CELLS,FX_FIRST3,4
+                tst.l   d0
+                LOOPHD  TW3_CELLS,TW3_ONCEW
                 move.b  #3,FX_SHAPE(a3)
 ; The vector, at level 7: a tick due in the window fires once it points
 ; at the new handler.
@@ -394,9 +459,9 @@ ymxr_widestart:
 .one:           rts                             ; Z where it is one row
 
 ; A start of a source whose one column fills its byte: the counted
-; handler aimed at its rows, its counter at the rows from the place to
-; the end and its reload at the rows of the loop, which init resolved
-; beside the source's loop cell.
+; handler aimed at its rows, and its last row's place R less 1 less the
+; place's row past the place, R the rows init resolved beside the
+; source's loop cell.
 .counted:       addq.l  #1,d0                   ; the tag of a counted source
                 bne.s   .env                    ; of several columns
                 moveq   #1,d4                   ; the shape this start leaves
@@ -419,8 +484,7 @@ ymxr_widestart:
 .countedaim:    lea     WS_WIDE(a0),a2
                 move.w  -4(a2,d1.w),d4          ; R, a pass through the source
                 sub.w   d3,d4                   ; the rows from the place on
-                move.w  -2(a2,d1.w),d5          ; R less RR, the rows of a pass
-                move.l  a4,d1                   ; through the loop
+                move.l  a4,d1
                 add.l   d3,d1                   ; the row the place is at
                 move.b  FX_TARGET(a3),TICKC_SEL(a5)
                 .if     YMXR_PCREL
@@ -430,8 +494,9 @@ ymxr_widestart:
                 .else
                 move.l  d1,TICKC_PTR(a5)
                 .endif
-                move.w  d4,TICKC_LEFT(a5)
-                move.w  d5,TICKC_RELD(a5)
+                add.w   d1,d4                   ; the last row's place
+                subq.w  #1,d4
+                move.w  d4,TICKC_LASTP(a5)
                 .if     YMXR_PCREL
                 tst.l   d0                      ; 0: the source plays once
                 beq.s   .celled
@@ -441,6 +506,7 @@ ymxr_widestart:
                 .else
                 move.l  d0,TICKC_CELL(a5)
                 .endif
+                LOOPHD  TICKC_CELL,TICKC_ONCEW
                 move.b  #4,FX_SHAPE(a3)
                 move.l  a4,FX_FIRST(a3)
                 bra.w   .aimed
@@ -457,17 +523,14 @@ ymxr_widestart:
                 lea     ymxr_wide(pc),a2
                 adda.w  d5,a2
                 WSLOT   TWC_SEL1,TWC_PTR1,TWC_CELLS,FX_FIRST,0
-                WSLOT   TWC_SEL2,TWC_PTR2,TWC_CELLS+CELL_SIZE,FX_FIRST2,2
+                WSLOT   TWC_SEL2,TWC_PTR2,TWC_CELLS+CELL_STRIDE,FX_FIRST2,2
+                tst.l   d0
+                LOOPHD  TWC_CELLS,TWC_ONCEW
                 move.w  2(sp),d4                ; R, under the level pushed
-                sub.w   d3,d4                   ; the rows from the place on
-                move.w  d4,TWC_LEFT(a5)
-                move.w  2(sp),d4                ; the rows of a pass through
-                tst.l   d0                      ; the loop, R where the source
-                beq.s   .envonce                ; plays once
-                move.l  d0,d5
-                sub.l   a4,d5                   ; the row the cell is at
-                sub.w   d5,d4
-.envonce:       move.w  d4,TWC_RELD(a5)
+                sub.w   d3,d4                   ; the rows from the place on,
+                subq.w  #1,d4                   ; past the place: the last
+                add.w   TWC_PTR1+PLACE_LO(a5),d4 ; row's place
+                move.w  d4,TWC_LASTP(a5)
                 move.b  #5,FX_SHAPE(a3)
                 move.w  (sp)+,(sp)              ; the level pushed, over R
                 bra.w   .aimed
@@ -478,18 +541,15 @@ ymxr_widestart:
                 lea     ymxr_wide(pc),a2
                 adda.w  d5,a2
                 WSLOT   TWCT_SEL1,TWCT_PTR1,TWCT_CELLS,FX_FIRST,0
-                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_SIZE,FX_FIRST2,2
-                WSLOT   TWCT_SEL3,TWCT_PTR3,TWCT_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
+                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_STRIDE,FX_FIRST2,2
+                WSLOT   TWCT_SEL3,TWCT_PTR3,2*CELL_STRIDE+TWCT_CELLS,FX_FIRST3,4
+                tst.l   d0
+                LOOPHD  TWCT_CELLS,TWCT_ONCEW
                 move.w  2(sp),d4                ; R, under the level pushed
-                sub.w   d3,d4                   ; the rows from the place on
-                move.w  d4,TWCT_LEFT(a5)
-                move.w  2(sp),d4                ; the rows of a pass through
-                tst.l   d0                      ; the loop, R where the source
-                beq.s   .cwideonce                ; plays once
-                move.l  d0,d5
-                sub.l   a4,d5                   ; the row the cell is at
-                sub.w   d5,d4
-.cwideonce:     move.w  d4,TWCT_RELD(a5)
+                sub.w   d3,d4                   ; the rows from the place on,
+                subq.w  #1,d4                   ; past the place: the last
+                add.w   TWCT_PTR1+PLACE_LO(a5),d4 ; row's place
+                move.w  d4,TWCT_LASTP(a5)
                 move.b  #6,FX_SHAPE(a3)
                 move.w  (sp)+,(sp)              ; the level pushed, over R
                 bra.w   .aimed
@@ -503,7 +563,9 @@ ymxr_widestart:
 ; high word over R and then its remainder above the low word; where R
 ; itself is past a word, subtractions of R shifted. The shifts stop at
 ; bit 31: a number of 2^31 or more would otherwise double R past 32 bits
-; and back below the number.
+; and back below the number. A piece of the block of the effects, since an
+; effect's start calls it.
+                PIECE   effects_8
 ymxr_rem:       cmp.l   d4,d3
                 bcs.s   .in
                 cmp.l   #$FFFF,d4
@@ -534,3 +596,4 @@ ymxr_rem:       cmp.l   d4,d3
                 sub.l   d5,d3
 .half:          lsr.l   #1,d5
                 bra.s   .down
+                ENDPIECE effects_8
