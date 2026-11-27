@@ -1,7 +1,26 @@
 # Ordinary tune failures
 
-Tested with YMXS 0.7.1 and YMXR 0.14.0. The inputs are valid tunes and
-ordinary file conversions. The proposed changes below are for follow-up.
+Tested with YMXS 0.7.1 and YMXR 0.14.0, and again with YMXS 0.11.0 and
+YMXR 0.20.0 on 2026-11-27. The inputs are valid tunes and ordinary file
+conversions. The proposed changes below are for follow-up.
+
+Each section describes a failure at 0.14.0 and ends with the result of
+the same reproduction at YMXR 0.20.0 and YMXS 0.11.0. The program shell,
+[YMXR_prg.S](../68k/YMXR_prg.S), is the same file at both releases.
+
+| failure | at 0.20.0 |
+|---|---|
+| [A counted sample stops after one tick](#a-counted-sample-stops-after-one-tick) | the converter reports it |
+| [A two-column source reads its first column twice](#a-two-column-source-reads-its-first-column-twice) | the converter reports it |
+| [A UTF-8 signature blocks ordinary file imports](#a-utf-8-signature-blocks-ordinary-file-imports) | fails |
+| [A PRG row limit restarts at each subtune](#a-prg-row-limit-restarts-at-each-subtune) | fails |
+| [A title can hide the subtune names](#a-title-can-hide-the-subtune-names) | fails |
+| [Automatic advance discards a digit](#automatic-advance-discards-a-digit) | fails |
+| [The number entry timeout depends on the tune rate](#the-number-entry-timeout-depends-on-the-tune-rate) | fails |
+| [A 50 Hz tune speeds up on a monochrome ST](#a-50-hz-tune-speeds-up-on-a-monochrome-st) | fails |
+| [Two fast tone effects can stall an 8 MHz ST](#two-fast-tone-effects-can-stall-an-8-mhz-st) | fails |
+| [The yellow raster bar undercounts wide effects](#the-yellow-raster-bar-undercounts-wide-effects) | fails |
+| [Shift can stay active after playback ends](#shift-can-stay-active-after-playback-ends) | fails |
 
 ## A counted sample stops after one tick
 
@@ -19,11 +38,15 @@ The count of 65,536 rolls through zero for a full pass, but the count of
 See the counted source setup in [init.S](../68k/player/init.S) and the
 counted lookup handlers in [lookup_ticks.S](../68k/player/lookup_ticks.S).
 
-**Proposed fix.** Check the remaining row count and repeat span before
-emitting a file. Report a source length the player cannot encode.
-For playback of longer samples, select a long counter only for sources
-that need it. Keep the existing timer code for shorter sources and test
-65,535, 65,536 and 65,537 rows for one-shot and repeating samples.
+**At 0.20.0.** Since 0.17.0 the converter reports the sample (SPEC.md
+8.8): `ymxs-to-sndh` exits 1 in Go and Java with `the source Sample
+fills its byte and has 65537 rows, and such a source is 65535 rows at
+most`. It exits 1 the same way on the 65,536-row sample, which 0.14.0
+played, and the 65,535-row sample starts with volume writes 8, 9, 10,
+11. The YMXS 0.11.0 checker accepts all three sizes.
+
+**Open.** Playback of a counted source of more than 65,535 rows.
+Chunked playback, below, is one way.
 
 ## A two-column source reads its first column twice
 
@@ -43,10 +66,15 @@ for the second column in [start.S](../68k/player/start.S). It also reads
 the marker from the wrong column. Hatari recorded one R1 write of
 200 in the linked PRG. The shorter control started with 4, 5, 6, 7.
 
-**Proposed fix.** Check the padded stride before exporting a wide
-source. To support longer sources, keep the full column offsets through
-init and the start routines. The absolute handlers already read from
-per-column addresses, so the wider offset can be resolved before ticks.
+**At 0.20.0.** Since 0.17.0 the converter reports the 65,535-row source
+(SPEC.md 8.8): `ymxs-to-sndh` exits 1 in Go and Java with `the source
+Sample has 2 columns and 65535 rows, and such a source is 65534 rows at
+most`. The 65,534-row source writes (200, 4), (201, 5), (202, 6),
+(203, 7). The YMXS 0.11.0 checker accepts both sizes.
+
+**Open.** Playback of a source of two or three columns of more than
+65,534 rows: keep the full column offsets through init and the start
+routines, or play the source in chunks.
 
 ## Chunked playback for long sources
 
@@ -70,9 +98,14 @@ byte order mark at the start of its CSV and both versions of
 same prefix on JSON causes `ymxs-check` and `ymxs-to-prg` to exit 1
 with a JSON syntax error. This is a file interoperability case.
 
+**At 0.20.0.** The same. Both versions of `ymxs-csv-to-json` exit 1
+with `a row before any table opens`, `ymxs-check` and `ymxs-to-prg`
+exit 1 with a JSON syntax error in Go and Java, and so do the Go
+`ymxs-to-sndh` and `ymxs-to-ymxr`.
+
 **Proposed fix.** Strip one leading U+FEFF when decoding UTF-8 CSV or
-JSON input. Keep U+FEFF inside fields and cover both forms in the
-Go and Java command tests.
+JSON input, in the YMXS and YMXR readers. Keep U+FEFF inside fields and
+cover both forms in the Go and Java command tests.
 
 ## A PRG row limit restarts at each subtune
 
@@ -88,6 +121,11 @@ which resets `rows_left` to the original limit. The limit therefore
 never reaches zero where every subtune ends before it. The tool
 documents `-rROWS` as the number of rows the program plays in
 [tools.md, section 13](tools.md#13-ymxr-prg).
+
+**At 0.20.0.** The same. In a 375-VBL run whose first row plays at
+VBL 239, the 50/50 Hz set writes 110 tune rows and the 50/60 Hz set
+120. With `-r3` and `-r4` both sets stop after the requested number of
+rows.
 
 **Proposed fix.** Initialize the row budget once per program run and
 preserve it when changing subtunes. Count only rows that the player
@@ -132,6 +170,10 @@ offset for `!#SN` and `HDNS`. The first title starts at offset 20, so the
 letters `HDNS` there end the search. The fallback uses the file title for
 every subtune.
 
+**At 0.20.0.** The same. The program lists `HDNS Intro` for both
+subtunes. With `XHDNS Intro` or `Intro` as the first title it lists
+`Outro` second. The first title starts at offset 20.
+
 **Proposed fix.** Read the tag block from one tag boundary to the next,
 using each field's length or terminator. Bound the search by the start
 of the core. Test titles containing `HDNS` and `!#SN` at both alignments.
@@ -148,6 +190,11 @@ In [YMXR_prg.S](../68k/YMXR_prg.S), automatic advance calls `start`,
 which clears both the digit and its timeout. The key loop therefore
 loses the digit before it can select the subtune.
 
+**At 0.20.0.** The same, with the keys sent through Hatari's command
+FIFO. In the set of one-shot cues the player advances from cue 2
+through cues 3 to 12, and the digit is lost. In the repeating set it
+selects cue 1 when the pause ends.
+
 **Proposed fix.** Preserve the digit and the time left on its timeout
 when a tune ends. Clear them when a manual selection starts a tune.
 Test both a single digit and a two-digit selection that spans a change
@@ -162,6 +209,9 @@ happens during one manual selection.
 
 The key loop in [YMXR_prg.S](../68k/YMXR_prg.S) waits 25 played rows
 after the first digit. This is 500 ms at 50 Hz and 125 ms at 200 Hz.
+
+**At 0.20.0.** The same: with cue 2 at 50 Hz the player selects cue
+12, and with cue 2 at 200 Hz cue 1 and then cue 2.
 
 **Proposed fix.** Measure the pause in elapsed time. Use the playback
 clock before it is divided down to the tune rate, with the timeout
@@ -179,6 +229,11 @@ the set of one-shot cues continues to advance.
 For the timeout, open `LOOP.PRG` and then `FAST.PRG`. In each, use Right
 to select cue 2, then type `1` and `2` about 180 ms apart. `LOOP.PRG`
 selects cue 12. `FAST.PRG` selects cue 1 and then cue 2.
+
+Headless, Hatari reads the keys from a command FIFO (`--cmd-fifo`):
+`hatari-event keydown 77` and `hatari-event keyup 77` press and release
+Right by its scancode, and `hatari-event keydown 1` the key of the
+character 1.
 
 ~~~sh
 work=$(mktemp -d)
@@ -234,6 +289,11 @@ The VBL handler in [YMXR_prg.S](../68k/YMXR_prg.S) plays one row at
 each display refresh. The 50 Hz assumption also affects an explicit
 `-vbl` export and a 50 Hz export with `-perf`.
 
+**At 0.20.0.** The same. The 40 rows play at 50.2 rows a second with
+the color monitor and 71.5 with the monochrome monitor, and the Timer C
+effect at 2,562 and 2,559 ticks a second. Without the effect the rows
+play at 50.0 rows a second on both.
+
 **Proposed fix.** Check the display refresh when the program selects
 the VBL. For fixed-rate playback on a display with a different
 refresh, use a free MFP timer when one is available. Report a rate
@@ -256,6 +316,11 @@ already require about 8.29 million cycles a second, before loop
 boundaries and frame processing. See [performance.md](performance.md).
 The default PRG export has no check for that combined load.
 
+**At 0.20.0.** The same. At 8 MHz `P32.PRG` writes tone periods
+throughout the run and never reaches its first R6 write, and `P40.PRG`
+writes all 20 markers; at 16 MHz `P32.PRG` writes all 20. The tick
+bands of the next section have the widths they had at 0.14.0.
+
 **Proposed fix.** Warn during PRG export when simultaneous effect
 rates exceed the stock ST's cycle budget. Estimate load from the
 chosen handler, source shape and timer rate, including interrupt
@@ -270,6 +335,9 @@ marker. The monitor adds 96 cycles per effect tick, so the two
 handlers and their interrupt overhead require about 9.58 million
 cycles a second at that rate. Include the raster build in the
 combined load warning.
+
+At 0.20.0 the `-perf` build of `P40.json` also never reaches its first
+R6 write at 8 MHz, and the `-vbl` build writes all 20 markers.
 
 ## Reproduce the timer issues
 
@@ -349,6 +417,11 @@ The wide handlers in [ticks.S](../68k/player/ticks.S) charge the same
 [lookup_ticks.S](../68k/player/lookup_ticks.S) do the same. The bar for
 a three-column source charges about half the plain handler's cost.
 
+**At 0.20.0.** The same. The green tick bands average 144, 216 and 280
+cycles, and the yellow bars 1,536, 1,521 and 1,521, measured with
+[ym/cost.sh](../ym/cost.sh). The handlers of two and three columns in
+both files still charge `PERF_ON`.
+
 **Proposed fix.** Set the raster count for each handler path from its
 measured cost, including source width, lookup and addressing mode.
 Compare the counter with measured instruction cycles for row writes,
@@ -360,6 +433,8 @@ tunes. Export with `-perf -r40` and trace `video_color` under Hatari.
 Compare the green and yellow spans after the first frame.
 
 ## The raster monitor's cost
+
+This section is information, measured at 0.14.0.
 
 Three songs from `ym/test` ran for 400 rows each in cycle-exact
 Hatari on a PAL 8 MHz ST. Both builds used the VBL. A test stub
@@ -394,6 +469,12 @@ the release byte `$AA`. The key loop in
 TOS keyboard interrupt masked. The press changes the BIOS modifier
 state and the release never reaches the BIOS handler.
 
+**At 0.20.0.** The same, in Hatari with TOS 2.06. TOS reads `$2A`, the
+program reads `$AA`, and the shift byte, at the address in the ROM
+header's `os_kbshift`, has bit 1 set after the program exits and two
+seconds later. Where the release comes before the program starts or
+after it exits, TOS clears the bit.
+
 **Proposed fix.** Keep the TOS keyboard interrupt active during
 playback and read selections through the BIOS keyboard queue.
 Test modifier keys pressed before entry and released during playback.
@@ -405,11 +486,19 @@ Read bit 1 again after `Pexec` returns. Repeat with the release after
 `Pexec` returns for the control. Hatari's `ikbd_acia` trace shows which
 program reads each scan code.
 
+Through Hatari's command FIFO, `hatari-event keydown 42` and
+`hatari-event keyup 42` press and release left Shift, and
+`hatari-debug m $10c9` reads the shift byte of TOS 2.06. A key event
+sent at once after a `hatari-debug` command is lost, so leave a pause
+between them.
+
 ## Reproduce the long sources
 
-Run from the YMXR root with the released YMXS and YMXR tools on the path.
-The probe uses the carried absolute core to compare the same timer
-handlers at each size. It requires rmac and Python with Unicorn.
+Run from the YMXR root with the released YMXS and YMXR tools on the
+path. The probe uses the carried absolute core to compare the same timer
+handlers at each size. It requires rmac and Python with Unicorn. At
+0.20.0 the converter reports three of the five tunes and writes the
+other two, which the probe plays.
 
 ~~~sh
 work=$(mktemp -d)
@@ -419,7 +508,7 @@ from pathlib import Path
 import sys
 
 root = Path(sys.argv[1])
-for wide, sizes in ((False, (65536, 65537)), (True, (65534, 65535))):
+for wide, sizes in ((False, (65535, 65536, 65537)), (True, (65534, 65535))):
     for size in sizes:
         start = dict(shape=0, source=1, target=14 if wide else 8,
                      prescaler=4, count=24, timerReset=1, placeReset=1,
@@ -438,7 +527,8 @@ for wide, sizes in ((False, (65536, 65537)), (True, (65534, 65535))):
 PY
 for file in "$work"/*.json; do
     ymxs-check -silent <"$file" >/dev/null
-    ymxs-to-sndh -silent -abs -carried <"$file" >"${file%.json}.sndh"
+    ymxs-to-sndh -silent -abs -carried <"$file" >"${file%.json}.sndh" ||
+        rm -f "${file%.json}.sndh"
 done
 
 ulimit -c 0
@@ -485,6 +575,8 @@ ymxs-to-prg -silent <"$work/bom.json" >/dev/null
 ~~~
 
 ## Other coverage
+
+At 0.14.0:
 
 - Both importers and the default YMXR PRG exporter completed on 544
   regular corpus files. The corpus sample is the `YM_CORPUS` collection
