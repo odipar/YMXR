@@ -189,6 +189,7 @@ q\{ct}:         bra.w   \{tick}_done
                 move.l  d1,TICK_PTR(a5)
                 move.l  d0,TICK_CELL(a5)
                 .endif
+                LOOPHD  TICK_CELL,TICK_ONCEW
                 move.l  a5,\vector.w            ; a tick due in the window
                 move.w  (sp)+,sr                ; runs the new handler
                 move.l  a4,\fx+FX_FIRST(a0)

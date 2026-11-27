@@ -75,7 +75,9 @@ final class PlayerTest {
         Map<String, Integer> switches = Map.of("YMXR_PCREL", 1, "YMXR_DEFER", defer ? 1 : 0,
                 "YMXR_MAP", map ? 1 : 0);
         Map<String, Integer> out = new HashMap<>();
-        Pattern equate = Pattern.compile("^(\\w+)\\s+equ\\s+(\\$?[0-9A-Fa-f]+)");
+        // a number alone: CELL_SIZE-2 opens with two hexadecimal digits
+        // and is an expression
+        Pattern equate = Pattern.compile("^(\\w+)\\s+equ\\s+(\\$[0-9A-Fa-f]+|\\d+)\\s*(;|$)");
         Pattern on = Pattern.compile("^\\.if\\s+(\\w+)(?:=(\\d+))?\\s*(?:;.*)?$");
         // a block a switch decides: whether the assembly reads its first
         // branch, empty for a block on another condition

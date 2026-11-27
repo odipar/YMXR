@@ -8,15 +8,15 @@ a few cycles more a call.
 ## The corpus
 
 The player of each of the 544 dumps links from the plain core. The
-floor, 1,336 bytes, is 86% of the 842,506 bytes of the 544 players. The
+floor, 1,336 bytes, is 86% of the 841,684 bytes of the 544 players. The
 link keeps one of four sets of blocks:
 
 | blocks kept | dumps | bytes |
 |---|---|---|
 | none | 461 | 1,336 |
-| effect1, effects | 69 | 2,682 |
-| square, square0, effect0, effects | 12 | 2,852 |
-| square, square0, square1, effect0, effect1, effects | 2 | 3,664 |
+| effect1, effects | 69 | 2,672 |
+| square, square0, effect0, effects | 12 | 2,842 |
+| square, square0, square1, effect0, effect1, effects | 2 | 3,658 |
 
 Before the block of the effects (LINKER.md, plan item 14) and one copy
 of steps 6 and 7, the floor was 2,752 bytes and the 544 players were
@@ -43,18 +43,18 @@ effect:
 | the SNDH core's put-back of the timer | `effectN_7` | 68 |
 | init's claim of the timer | `effectN_8` | 40 |
 | stop's release of the timer | `effectN_9` | 32 |
-| the loop that resolves the sources | `effects_1` | 162 |
+| the loop that resolves the sources | `effects_1` | 154 |
 | the check of a source's reach | `effects_2` | 76 |
 | the level's drop or its nops, and the links of the general handler | `effects_3` | 64 |
 | the second bank's pass and the effects' records cleared | `effects_4` | 42 |
 | the shape tests and the effects' heads | `effects_5` | 166 |
-| the routine that links a general handler | `effects_6` | 48 |
+| the routine that links a general handler | `effects_6` | 42 |
 | the tables of the heads and the resets | `effects_7` | 32 |
 | `ymxr_rem` | `effects_8` | 64 |
 | the timers' table | `effects_9` | 32 |
 
 The timer code of an effect is 150 bytes, and the block of the effects
-686 bytes. The pieces leave every instruction of the play call and the
+672 bytes. The pieces leave every instruction of the play call and the
 ticks as it is.
 
 ## One copy of steps 6 and 7
@@ -78,11 +78,11 @@ Two places have more bytes, each at a cost in cycles the rig has yet to
 count:
 
 - Each effect's block, its frame code, general handler and timer code,
-  is 642 to 662 bytes of the plain core, a copy an effect. One copy for
+  is 646 to 666 bytes of the plain core, a copy an effect. One copy for
   the four, its addresses read through a register, would save those
   bytes for each effect past the first, and cost each step of an effect
   the read through the register.
-- `several`, the start of a source of several columns, is 1,416 bytes. A
+- `several`, the start of a source of several columns, is 1,502 bytes. A
   start runs it at the frame, and a loop over the columns would cost each
   such start.
 
@@ -99,19 +99,19 @@ the second copy of steps 6 and 7:
 | Big - Samantha Fox Strip Poker 6 | none | 1,336 | 1,466 |
 | Chambers of Shaolin 5 - you blew it! | none | 1,336 | 1,466 |
 | Circus Attractions  2 | none | 1,336 | 1,466 |
-| DBA 2 | square, square0, effect0, effects | 2,852 | 2,982 |
-| DBA 5 | square, square0, effect0, effects | 2,852 | 2,982 |
-| Digidrum preempt, built | square, square0, effect0, effect1, effects | 3,512 | 3,642 |
-| Retrigger retune, built | one, one0, effect0, effects | 2,756 | 2,886 |
-| Synergy Credits | square, square0, square1, effect0, effect1, effects | 3,664 | 3,794 |
-| Turrican - world 4-3 | effect1, effects | 2,682 | 2,812 |
-| Turrican 2 - world completed 1 | effect1, effects | 2,682 | 2,812 |
+| DBA 2 | square, square0, effect0, effects | 2,842 | 2,972 |
+| DBA 5 | square, square0, effect0, effects | 2,842 | 2,972 |
+| Digidrum preempt, built | square, square0, effect0, effect1, effects | 3,506 | 3,636 |
+| Retrigger retune, built | one, one0, effect0, effects | 2,746 | 2,876 |
+| Synergy Credits | square, square0, square1, effect0, effect1, effects | 3,658 | 3,788 |
+| Turrican - world 4-3 | effect1, effects | 2,672 | 2,802 |
+| Turrican 2 - world completed 1 | effect1, effects | 2,672 | 2,802 |
 | capture | none | 1,336 | 1,466 |
 
 The floor of the plain core is 1,336 bytes, and 1,466 with the second
 copy of steps 6 and 7. The floor of the core with the deferred start in
-is 2,126 bytes, of the core with the lookup in 2,548, and of the core
-with the lookup and the deferred start in 3,968.
+is 2,142 bytes, of the core with the lookup in 2,468, and of the core
+with the lookup and the deferred start in 3,738.
 
 ## The cores with the lookup
 
@@ -119,11 +119,11 @@ A song that cuts a source and maps no value links from a core with the
 lookup in (LINKER.md). The lookup's routines and tables are the block
 `lookup`, which a link keeps where a tune is of version 10 or maps a
 value: the start through a transformation, the remap, the page routines,
-init's fill of the pages and the routines of the lookup kinds' loops. The
-block is 2,672 bytes of the core with the lookup in and 2,992 of the core
-with the deferred start in as well, and a song that cuts a source alone
-leaves it out: `cut.ymxr` links 7,336 bytes, against 10,008 with the
-block. The table of the kinds' descriptors, `ymxr_kindof` and
+init's fill of the pages and the routines of the lookup kinds' loops.
+The block is 2,710 bytes of the core with the lookup in and 3,034 of the
+core with the deferred start in as well, and a song that cuts a source
+alone leaves it out: `cut.ymxr` links 7,260 bytes, against 9,970 with
+the block. The table of the kinds' descriptors, `ymxr_kindof` and
 `ymxr_runrow` stay in the floor, as a start and a recut under a cut read
 them.
 

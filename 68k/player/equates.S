@@ -22,21 +22,21 @@ PERF_BEAM       equ     $FFFF8209       ; the video address counter's low
 ; of the five, and PlayerTest checks the five against those figures.
 ; Under YMXR_PCREL a row is read through a displacement rather than an
 ; absolute address: the read costs 4 cycles less, the step 8 and the
-; loop's test 4, so the three paths that read a row cost less and the two
-; that write a patched value cost what they cost.
+; loop's move of the loop cell 8, so the three paths that read a row cost
+; less and the two that write a patched value cost what they cost.
                 .if     YMXR_PCREL
 PERF_ON         equ     64      ; a row written, the place stepped
 PERF_SQ         equ     48      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     24      ; a source of one row, no place stepped
-PERF_LOOP       equ     98      ; the marker, the place to row RR
-PERF_STOP       equ     108     ; the marker, the timer stopped
+PERF_LOOP       equ     66      ; the marker, the place to row RR
+PERF_STOP       equ     92      ; the marker, the timer stopped
 PERF_SWITCH     equ     150     ; the marker, a pending start performed
                 .else
 PERF_ON         equ     76      ; a row written, the place stepped
 PERF_SQ         equ     48      ; a square's two rows, no place stepped
 PERF_ONEROW     equ     24      ; a source of one row, no place stepped
-PERF_LOOP       equ     114     ; the marker, the place to row RR
-PERF_STOP       equ     116     ; the marker, the timer stopped
+PERF_LOOP       equ     78      ; the marker, the place to row RR
+PERF_STOP       equ     96      ; the marker, the timer stopped
 PERF_SWITCH     equ     150     ; the marker, a pending start performed
                 .endif
 

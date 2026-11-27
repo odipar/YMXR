@@ -49,9 +49,9 @@ rest a gate reads the bit and finds the group set.
 
 ## What a sample's tick costs
 
-A square's tick is in place: 80 cycles of instructions against 96 and
-114, and 144 with the 68000's entry and the `rte` against 160 and 178.
-The rig measures it, and performance.md has the figure.
+A square's tick is in place: 80 cycles of instructions against 96 and 82,
+and 144 with the 68000's entry and the `rte` against 160 and 146. The rig
+measures it, and performance.md has the figure.
 
 A digidrum's source is many rows played once, so its tick is the row path
 every time, 160 cycles, and its place must step. Of the 96 its instructions
@@ -88,7 +88,7 @@ counts a gate that skips at 20 cycles and one that does not at 18
 
 | tune | rows with the volume unset | net a frame |
 |---|---|---|
-| Retrigger retune, built | 98% | -44 |
+| Retrigger retune, built | 98% | -45 |
 | Big - Samantha Fox Strip Poker 6 | 94% | -42 |
 | Digidrum preempt, built | 100% | -42 |
 | Chambers of Shaolin 5 - you blew it! | 86% | -37 |
@@ -146,7 +146,7 @@ player (sizes.md), and performance.md has the cost of a call now:
 | one branch over a run of effects | 19 | 30, 20 or 10 by the effects a tune runs |
 | an effect's head is its first read | 8 an effect | 16, 8 or 0 |
 | the shape's test dropped | 14 | 12 to 14, no tune more |
-| a separate tick for a square | 31 a tick | 80 against 96 and 114 |
+| a separate tick for a square | 31 a tick | 80 against 96 and 82 |
 | every source resolved at init | 52 a start | 21 to 38 a frame |
 | DTX's state block in a6 | 36 | 36 off the advance, 12 off the call |
 | a separate tick for a one-row source | 74 a tick | 506 a frame on the kit's retune |

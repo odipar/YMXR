@@ -159,7 +159,7 @@ ymxr_copystart:
                 cmp.w   #14,d5
                 bcc.w   .wide
 ; A target of one register: the counted handler at its frame value, the
-; place and the loop cell, one row left and one row a pass.
+; place, the loop cell and the last row's place, all one row.
                 move.w  d5,d4
                 mulu    #FV_STRIDE,d4
                 adda.w  d4,a4
@@ -175,12 +175,13 @@ ymxr_copystart:
                 sub.l   #TICKC_PTR,d1
                 move.w  d1,TICKC_PTR(a5)
                 move.w  d1,TICKC_CELL(a5)
+                move.w  d1,TICKC_LASTP(a5)
                 .else
                 move.l  a4,TICKC_PTR(a5)
                 move.l  a4,TICKC_CELL(a5)
+                move.w  a4,TICKC_LASTP(a5)
                 .endif
-                move.w  #1,TICKC_LEFT(a5)
-                move.w  #1,TICKC_RELD(a5)
+                move.w  #LOOPW,TICKC_LAST(a5)   ; the one row repeats
                 move.b  #4,FX_SHAPE(a3)
                 move.l  a4,FX_FIRST(a3)
                 bra.w   .aimed
@@ -202,10 +203,10 @@ ymxr_copystart:
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 WSLOT   TWCT_SEL1,TWCT_PTR1,TWCT_CELLS,FX_FIRST,0
-                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_SIZE,FX_FIRST2,2
-                WSLOT   TWCT_SEL3,TWCT_PTR3,TWCT_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
-                move.w  #1,TWCT_LEFT(a5)
-                move.w  #1,TWCT_RELD(a5)
+                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_STRIDE,FX_FIRST2,2
+                WSLOT   TWCT_SEL3,TWCT_PTR3,2*CELL_STRIDE+TWCT_CELLS,FX_FIRST3,4
+                move.w  TWCT_PTR1+PLACE_LO(a5),TWCT_LASTP(a5) ; one row,
+                move.w  #LOOPW,TWCT_LAST(a5)    ; repeating
                 move.b  #6,FX_SHAPE(a3)
                 bra.w   .aimed
 .two:           lea     ymxr_at_envelope(pc),a5 ; setTone, setNoise and
@@ -217,9 +218,9 @@ ymxr_copy_twoat equ *
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 WSLOT   TWC_SEL1,TWC_PTR1,TWC_CELLS,FX_FIRST,0
-                WSLOT   TWC_SEL2,TWC_PTR2,TWC_CELLS+CELL_SIZE,FX_FIRST2,2
-                move.w  #1,TWC_LEFT(a5)
-                move.w  #1,TWC_RELD(a5)
+                WSLOT   TWC_SEL2,TWC_PTR2,TWC_CELLS+CELL_STRIDE,FX_FIRST2,2
+                move.w  TWC_PTR1+PLACE_LO(a5),TWC_LASTP(a5) ; one row,
+                move.w  #LOOPW,TWC_LAST(a5)     ; repeating
                 move.b  #5,FX_SHAPE(a3)
 ; The vector, at level 7, as ymxr_widestart aims it.
 .aimed:

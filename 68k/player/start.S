@@ -214,6 +214,15 @@ RESET_X         equ     ymxr_tick0_xrow-ymxr_tick0_reset-2
                 .endif
                 .endm
 
+; The last row's place of a counted handler at row 0, row R - 1 past its
+; first place, at TICK_PTR in every kind: the place's word and R - 1, in
+; d0. a3 the effect's record, a5 the handler.
+                .macro  WLAST
+                move.w  TICK_PTR+PLACE_LO(a5),d0
+                add.w   FX_ROWS+2(a3),d0
+                subq.w  #1,d0
+                .endm
+
                 PIECE   several_1
                 .if     YMXR_MAP
 ; Place reset for counted or multi-column handlers. Use the running
@@ -238,7 +247,7 @@ ymxr_widereset:
 .kind:          mulu    #KD_SIZE,d0
                 lea     ymxr_kinds(pc),a2
                 adda.w  d0,a2
-                move.w  KD_LEFT(a2),d5
+                move.w  KD_LASTP(a2),d5
                 move.w  KD_COLS(a2),d4
                 lea     FX_FIRST(a3),a1         ; a column's place at row 0
                 move.w  sr,-(sp)
@@ -255,9 +264,10 @@ ymxr_widereset:
                 .endif
                 addq.l  #4,a2
                 dbra    d4,.col
-                tst.w   d5                      ; R rows left
-                beq.s   .reset
-                move.w  FX_ROWS+2(a3),(a5,d5.w)
+                tst.w   d5                      ; counted: the last row's
+                beq.s   .reset                  ; place, row R - 1
+                WLAST
+                move.w  d0,(a5,d5.w)
 .reset:         move.w  (sp)+,sr
                 movem.l (sp)+,a1-a2
 .moves:         rts
@@ -285,15 +295,18 @@ ymxr_widereset:
                 beq.s   .countedthree
                 WPLACE  FX_FIRST2,TWC_PTR2      ; a counted source of two
                 WPLACE  FX_FIRST,TWC_PTR1       ; columns: both places, and
-                move.w  FX_ROWS+2(a3),TWC_LEFT(a5) ; R rows left
+                WLAST                           ; the last row's, R - 1
+                move.w  d0,TWC_LASTP(a5)
                 bra.w   .reset
 .countedthree:  WPLACE  FX_FIRST3,TWCT_PTR3
                 WPLACE  FX_FIRST2,TWCT_PTR2
                 WPLACE  FX_FIRST,TWCT_PTR1
-                move.w  FX_ROWS+2(a3),TWCT_LEFT(a5)
+                WLAST
+                move.w  d0,TWCT_LASTP(a5)
                 bra.s   .reset
 .counted:       WPLACE  FX_FIRST,TICKC_PTR      ; the counted handler: the
-                move.w  FX_ROWS+2(a3),TICKC_LEFT(a5) ; place and R rows left
+                WLAST                           ; place and the last row's
+                move.w  d0,TICKC_LASTP(a5)
                 bra.s   .reset
 .three:         WPLACE  FX_FIRST3,TW3_PTR3
                 WPLACE  FX_FIRST2,TW3_PTR2
@@ -415,18 +428,18 @@ ymxr_wstart_handler equ *
                 lea     ymxr_wide(pc),a2        ; 2.1): eight bytes a target in
                 adda.w  d5,a2                   ; the map, two a column
                 cmp.w   #3,d4
-                beq.s   .slots
+                beq.w   .slots
                 WSLOT   TW2_SEL1,TW2_PTR1,TW2_CELLS,FX_FIRST,0
-                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+CELL_SIZE,FX_FIRST2,2
+                WSLOT   TW2_SEL2,TW2_PTR2,TW2_CELLS+CELL_STRIDE,FX_FIRST2,2
+                tst.l   d0
+                LOOPHD  TW2_CELLS,TW2_ONCEW
                 move.b  #2,FX_SHAPE(a3)
-                .if     YMXR_PCREL
                 bra.w   .aimed
-                .else
-                bra.s   .aimed
-                .endif
 .slots:         WSLOT   TW3_SEL1,TW3_PTR1,TW3_CELLS,FX_FIRST,0
-                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+CELL_SIZE,FX_FIRST2,2
-                WSLOT   TW3_SEL3,TW3_PTR3,TW3_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
+                WSLOT   TW3_SEL2,TW3_PTR2,TW3_CELLS+CELL_STRIDE,FX_FIRST2,2
+                WSLOT   TW3_SEL3,TW3_PTR3,2*CELL_STRIDE+TW3_CELLS,FX_FIRST3,4
+                tst.l   d0
+                LOOPHD  TW3_CELLS,TW3_ONCEW
                 move.b  #3,FX_SHAPE(a3)
 ; The vector, at level 7: a tick due in the window fires once it points
 ; at the new handler.
@@ -446,9 +459,9 @@ ymxr_wstart_handler equ *
 .one:           rts                             ; Z where it is one row
 
 ; A start of a source whose one column fills its byte: the counted
-; handler aimed at its rows, its counter at the rows from the place to
-; the end and its reload at the rows of the loop, which init resolved
-; beside the source's loop cell.
+; handler aimed at its rows, and its last row's place R less 1 less the
+; place's row past the place, R the rows init resolved beside the
+; source's loop cell.
 .counted:       addq.l  #1,d0                   ; the tag of a counted source
                 bne.s   .env                    ; of several columns
                 moveq   #1,d4                   ; the shape this start leaves
@@ -471,8 +484,7 @@ ymxr_wstart_handler equ *
 .countedaim:    lea     WS_WIDE(a0),a2
                 move.w  -4(a2,d1.w),d4          ; R, a pass through the source
                 sub.w   d3,d4                   ; the rows from the place on
-                move.w  -2(a2,d1.w),d5          ; R less RR, the rows of a pass
-                move.l  a4,d1                   ; through the loop
+                move.l  a4,d1
                 add.l   d3,d1                   ; the row the place is at
                 move.b  FX_TARGET(a3),TICKC_SEL(a5)
                 .if     YMXR_PCREL
@@ -482,8 +494,9 @@ ymxr_wstart_handler equ *
                 .else
                 move.l  d1,TICKC_PTR(a5)
                 .endif
-                move.w  d4,TICKC_LEFT(a5)
-                move.w  d5,TICKC_RELD(a5)
+                add.w   d1,d4                   ; the last row's place
+                subq.w  #1,d4
+                move.w  d4,TICKC_LASTP(a5)
                 .if     YMXR_PCREL
                 tst.l   d0                      ; 0: the source plays once
                 beq.s   .celled
@@ -493,6 +506,7 @@ ymxr_wstart_handler equ *
                 .else
                 move.l  d0,TICKC_CELL(a5)
                 .endif
+                LOOPHD  TICKC_CELL,TICKC_ONCEW
                 move.b  #4,FX_SHAPE(a3)
                 move.l  a4,FX_FIRST(a3)
                 bra.w   .aimed
@@ -509,17 +523,14 @@ ymxr_wstart_handler equ *
                 lea     ymxr_wide(pc),a2
                 adda.w  d5,a2
                 WSLOT   TWC_SEL1,TWC_PTR1,TWC_CELLS,FX_FIRST,0
-                WSLOT   TWC_SEL2,TWC_PTR2,TWC_CELLS+CELL_SIZE,FX_FIRST2,2
+                WSLOT   TWC_SEL2,TWC_PTR2,TWC_CELLS+CELL_STRIDE,FX_FIRST2,2
+                tst.l   d0
+                LOOPHD  TWC_CELLS,TWC_ONCEW
                 move.w  2(sp),d4                ; R, under the level pushed
-                sub.w   d3,d4                   ; the rows from the place on
-                move.w  d4,TWC_LEFT(a5)
-                move.w  2(sp),d4                ; the rows of a pass through
-                tst.l   d0                      ; the loop, R where the source
-                beq.s   .envonce                ; plays once
-                move.l  d0,d5
-                sub.l   a4,d5                   ; the row the cell is at
-                sub.w   d5,d4
-.envonce:       move.w  d4,TWC_RELD(a5)
+                sub.w   d3,d4                   ; the rows from the place on,
+                subq.w  #1,d4                   ; past the place: the last
+                add.w   TWC_PTR1+PLACE_LO(a5),d4 ; row's place
+                move.w  d4,TWC_LASTP(a5)
                 move.b  #5,FX_SHAPE(a3)
                 move.w  (sp)+,(sp)              ; the level pushed, over R
                 bra.w   .aimed
@@ -530,18 +541,15 @@ ymxr_wstart_handler equ *
                 lea     ymxr_wide(pc),a2
                 adda.w  d5,a2
                 WSLOT   TWCT_SEL1,TWCT_PTR1,TWCT_CELLS,FX_FIRST,0
-                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_SIZE,FX_FIRST2,2
-                WSLOT   TWCT_SEL3,TWCT_PTR3,TWCT_CELLS+CELL_SIZE+CELL_SIZE,FX_FIRST3,4
+                WSLOT   TWCT_SEL2,TWCT_PTR2,TWCT_CELLS+CELL_STRIDE,FX_FIRST2,2
+                WSLOT   TWCT_SEL3,TWCT_PTR3,2*CELL_STRIDE+TWCT_CELLS,FX_FIRST3,4
+                tst.l   d0
+                LOOPHD  TWCT_CELLS,TWCT_ONCEW
                 move.w  2(sp),d4                ; R, under the level pushed
-                sub.w   d3,d4                   ; the rows from the place on
-                move.w  d4,TWCT_LEFT(a5)
-                move.w  2(sp),d4                ; the rows of a pass through
-                tst.l   d0                      ; the loop, R where the source
-                beq.s   .cwideonce                ; plays once
-                move.l  d0,d5
-                sub.l   a4,d5                   ; the row the cell is at
-                sub.w   d5,d4
-.cwideonce:     move.w  d4,TWCT_RELD(a5)
+                sub.w   d3,d4                   ; the rows from the place on,
+                subq.w  #1,d4                   ; past the place: the last
+                add.w   TWCT_PTR1+PLACE_LO(a5),d4 ; row's place
+                move.w  d4,TWCT_LASTP(a5)
                 move.b  #6,FX_SHAPE(a3)
                 move.w  (sp)+,(sp)              ; the level pushed, over R
                 bra.w   .aimed
