@@ -47,12 +47,12 @@ player and of the player with the lookup in:
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
 | the lookup's routines | | 3,458 |
 | the cut's routines | | 2,674 |
-| copy from frame's routines and frame values | | 1,160 |
+| copy from frame's routines, handlers and frame values | | 1,818 |
 | the sync's register steps, frame values and init's work | 1,310 | 1,310 |
-| the register steps of a tune that syncs and copies from frame | | 1,234 |
+| the register steps of a tune that syncs and copies from frame | | 1,270 |
 | the handlers of a target of a sync, four effects, their start and their map's rows | 2,216 | 2,286 |
-| the lookup instances and the gaps before them, ten kinds | | 6,988 |
-| the player | 13,584 | 33,244 |
+| the lookup instances and the gaps before them, ten kinds | | 7,098 |
+| the player | 13,584 | 34,170 |
 
 The handlers are 3,112 bytes of the plain player. A song whose sources are
 general and square sources runs 432 of them.
@@ -446,19 +446,19 @@ measures it against the linked core.
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
 14,276 bytes, the core with the deferred start in, of 19,694 bytes, the
-core with the lookup in, of 33,954 bytes, or the core with the lookup
-and the deferred start in, of 49,330 bytes.
+core with the lookup in, of 34,880 bytes, or the core with the lookup
+and the deferred start in, of 49,744 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,336 |
 | `circus.ymxr` | plain | none | 1,336 |
-| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 9,346 |
-| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,028 |
-| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 13,650 |
+| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 10,126 |
+| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,844 |
+| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 14,474 |
 | `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 15,852 |
 | `sync-even.ymxr` | plain | synced, synced0, several, effect0, effects, sync | 6,654 |
-| `sync-heads.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,028 |
+| `sync-heads.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 14,844 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,738 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,336 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,458 |
@@ -480,12 +480,12 @@ A tune of general sources alone, with no effect, links 1,336 bytes, 9% of
 the core: the blocks are 12,940 bytes of it. `voices.ymxr` runs all four
 effects, keeps a handler of two or three columns on each and the start of
 several columns, and links 6,698. `mapped.ymxr` keeps 4 lookup instances
-of 3 kinds and links 15,470 bytes of 49,330: the 36 instances and the 7
-loops of init it leaves out are 14,242 bytes, and the gaps it keeps are
-758 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
-instances of 1 kind and links 15,852 bytes of 49,330: the 38 instances and
-the 9 loops of init it leaves out are 15,326 bytes, and the gaps it keeps
-are 256 bytes shorter than in the core.
+of 3 kinds and links 15,470 bytes of 49,744: the 36 instances and the 7
+loops of init it leaves out are 13,934 bytes, and the gaps it keeps are
+656 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
+instances of 1 kind and links 15,852 bytes of 49,744: the 38 instances and
+the 9 loops of init it leaves out are 15,018 bytes, and the gaps it keeps
+are 154 bytes shorter than in the core.
 
 ## The check
 

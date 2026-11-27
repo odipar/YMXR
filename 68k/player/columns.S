@@ -98,7 +98,8 @@ q\{col}:
 ; register, kept as its frame value masked to the register's width,
 ; FV_STRIDE bytes a register from a3, and written to the chip where the
 ; register's bit of d3, the registers the ticks of copy from frame write,
-; is 0 (SPEC.md 3.1.7, 4.4).
+; is 0, and to the register's immediate where the bit is 1 (SPEC.md
+; 3.1.7, 4.4).
                 .macro  KREAD   col
 k\{col}:
                 move.b  $7FFF(a1),d1
@@ -107,6 +108,13 @@ k\{col}:
 k\{col}:
                 move.b  $7FFF(a1),d2
                 .endm
+; The frame value of register \rn, in \dn, to the register's immediate
+; (copy.S, ymxr_cptr): the value of the move.l of the handler of copy from
+; frame that writes the register, or ymxr_cspare. a5 clobbered.
+                .macro  CPUT    rn,dn
+                movea.l \rn*4+ymxr_cptr(pc),a5
+                move.b  \dn,(a5)
+                .endm
                 .macro  KWRITE  col,select,rn,mask
                 KREAD   \col
                 bpl.s   .no\~
@@ -114,8 +122,10 @@ k\{col}:
                 and.b   #\mask,d0
                 move.b  d0,\rn*FV_STRIDE(a3)
                 btst    #\rn,d3
-                bne.s   .no\~
-                move.w  #\select,d0
+                beq.s   .ch\~
+                CPUT    \rn,d0
+                bra.s   .no\~
+.ch\~:          move.w  #\select,d0
                 move.b  d1,d0
                 movep.w d0,(a2)
 .no\~:
@@ -127,8 +137,10 @@ k\{col}:
                 beq.s   .no\~
 .go\~:          move.b  d1,\rn*FV_STRIDE(a3)
                 btst    #\rn,d3
-                bne.s   .no\~
-                move.w  #\select,d0
+                beq.s   .ch\~
+                CPUT    \rn,d1
+                bra.s   .no\~
+.ch\~:          move.w  #\select,d0
                 move.b  d1,d0
                 movep.w d0,(a2)
 .no\~:
@@ -143,8 +155,10 @@ k\{col}:
                 beq.s   .nf\~
 .go\~:          move.b  d1,\fn*FV_STRIDE(a3)
                 btst    #\fn,d3
-                bne.s   .nf\~
-                move.w  #\fsel,d0
+                beq.s   .cf\~
+                CPUT    \fn,d1
+                bra.s   .nf\~
+.cf\~:          move.w  #\fsel,d0
                 move.b  d1,d0
                 movep.w d0,(a2)
 .nf\~:          tst.b   d2
@@ -153,8 +167,10 @@ k\{col}:
                 and.b   #$0F,d0
                 move.b  d0,\cn*FV_STRIDE(a3)
                 btst    #\cn,d3
-                bne.s   .nc\~
-                move.w  #\csel,d1
+                beq.s   .cc\~
+                CPUT    \cn,d0
+                bra.s   .nc\~
+.cc\~:          move.w  #\csel,d1
                 move.b  d2,d1
                 movep.w d1,(a2)
 .nc\~:

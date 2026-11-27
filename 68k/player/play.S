@@ -195,6 +195,7 @@ ymxr_cread:     sf      WS_CDIRTY(a0)
                 subq.l  #8,a5
                 dbra    d4,.fx
                 move.w  d3,ymxr_cmask-ymxr_fv(a6)
+                move.b  #$8F,ymxr_xnew-ymxr_fv(a6)  ; the effects to test
 ymxr_csteps:    movea.l a6,a3                   ; the frame values
                 movea.l (sp)+,a6
                 KTONE   _0,_1,$0000,$0100,0,1
@@ -212,8 +213,10 @@ ymxr_cnoise:    KWRITE  _6,$0600,6,$1F
                 or.b    #YM_PORTS,d1
                 move.b  d1,7*FV_STRIDE(a3)
                 btst    #7,d3
-                bne.s   .no7
-                move.w  #$0700,d0
+                beq.s   .ch7
+                CPUT    7,d1
+                bra.s   .no7
+.ch7:           move.w  #$0700,d0
                 move.b  d1,d0
                 movep.w d0,(a2)
 .no7:           tst.b   d2
@@ -222,11 +225,14 @@ ymxr_cnoise:    KWRITE  _6,$0600,6,$1F
                 and.b   #$0F,d0
                 move.b  d0,13*FV_STRIDE(a3)
                 btst    #13,d3
-                bne.s   .played
-                move.w  #$0D00,d1
+                beq.s   .ch13
+                CPUT    13,d0
+                bra.s   .played
+.ch13:          move.w  #$0D00,d1
                 move.b  d2,d1
                 movep.w d1,(a2)
-.played:        bra.w   ymxr_played
+.played:        bsr.w   ymxr_cxon               ; the handlers of copy from
+                bra.w   ymxr_played             ; frame, after the frame values
 
 ; The read sites of ymxr_cregs, as the frame's are written (ymxr_col), and
 ; each effect's read at the head of the paths of a row that sets its
@@ -255,7 +261,7 @@ ymxr_copysites: movem.l d0-d4/a1/a3/a5,-(sp)
                 beq.s   .snext
                 lea     (a4,d4.w),a1
                 lea     SOME_AT(a1),a1          ; the read
-                move.l  (a1),4(a5)              ; after the stub's st
+                move.l  (a1),CSOME_READ(a5)     ; the stub's read, its last
                 btst    #7,WS_EFFECTS(a6)       ; copy from frame (3.1.7)
                 beq.s   .snext
                 move.w  #$6100,(a1)+            ; bsr.w
