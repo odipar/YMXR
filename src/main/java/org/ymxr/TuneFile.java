@@ -14,7 +14,9 @@ import org.dtx.Table;
  * cut columns an empty cut list (SPEC.md 3.3, 3.4, 3.5). The sources are
  * the tables; in version 12, and in version 13 where bit 7 of the effects
  * used is set, copy from frame is source S, after them, and has none
- * (3.1.7). In version 13 the effects carry {@link Columns#SYNCS} (3.3.5).
+ * (3.1.7). In versions 13 to 15 the effects carry {@link Columns#SYNCS},
+ * in version 14 {@link Columns#EVENS} and in version 15
+ * {@link Columns#LENGTHS} (3.3.5).
  */
 record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table table,
                 List<Table> sources, List<Boolean> counted, List<byte[]> transformations,
@@ -164,12 +166,15 @@ record TuneFile(int version, int frameRate, int effects, byte[] dtx3, Table tabl
             }
             sources.add(source);
         }
-        // SPEC.md 3.3.5: version 13 is a tune that syncs a voice, which the
-        // effects carry in the bit above their byte.
+        // SPEC.md 3.3.5: versions 13 to 15 are tunes that sync a voice, 14
+        // one whose bit 4 of a coarse column is a sync length and 15 one
+        // with the sync length columns, which the effects carry in the bits
+        // above their byte.
         return new TuneFile(version, Tune.getWord(file, Tune.FRAME_RATE_AT),
                 effects | (version >= Tune.SYNC ? Columns.SYNCS : 0)
-                        | (version == Tune.EVEN ? Columns.EVENS : 0), dtx3, table, sources,
-                counted, transformations, cutList);
+                        | (version == Tune.EVEN ? Columns.EVENS : 0)
+                        | (version == Tune.LENGTH ? Columns.LENGTHS : 0), dtx3, table,
+                sources, counted, transformations, cutList);
     }
 
     /**

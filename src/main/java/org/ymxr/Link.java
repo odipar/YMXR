@@ -97,8 +97,8 @@ final class Link {
      * sets the effect's cut column, needs its paths that read the column,
      * {@code cut0} for effect 0, the cut's routines, its remap, and the
      * counted kinds and {@code several} that {@link #counted} reads in its
-     * rows. A tune of version 13, which syncs a voice, needs {@code sync},
-     * and {@code copysync} where it copies from frame.
+     * rows. A tune of versions 13 to 15, which syncs a voice, needs
+     * {@code sync}, and {@code copysync} where it copies from frame.
      */
     static Set<String> blocks(List<TuneFile> tunes) {
         Set<String> needed = new LinkedHashSet<>();

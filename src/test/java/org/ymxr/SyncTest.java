@@ -90,7 +90,7 @@ class SyncTest {
         }
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < 16; r++) {
-            rows.add(new Row(registers.get(r), effects.get(r), syncs.get(r), Set.of()));
+            rows.add(new Row(registers.get(r), effects.get(r), syncs.get(r), Map.of()));
         }
         return new org.ymxs.YMXS.Tune("Syncs at frames", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
@@ -132,7 +132,7 @@ class SyncTest {
                 Set.of(Voice.C));
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < 8; r++) {
-            rows.add(new Row(registers.get(r), effects.get(r), syncs.get(r), Set.of()));
+            rows.add(new Row(registers.get(r), effects.get(r), syncs.get(r), Map.of()));
         }
         return new org.ymxs.YMXS.Tune("Sync squares", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
@@ -178,19 +178,27 @@ class SyncTest {
             Map<Register, Integer> registers = r == 0 ? first
                     : r == 6 ? Map.of(Register.R0, 180) : Map.of();
             Set<Voice> syncs = r == 0 || r == 8 ? Set.of(Voice.A) : Set.of();
-            rows.add(new Row(registers, effects.get(r), syncs, Set.of()));
+            rows.add(new Row(registers, effects.get(r), syncs, Map.of()));
         }
         return new org.ymxs.YMXS.Tune("Sync square under a mapped volume", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
     }
 
-    /** Odd and even syncs, for the kit: rows that sync each voice at their
-     *  frame, odd and even, to periods whose fine is 0 and other than 0,
-     *  rows 6 and 7 after a fine of 0; a square of four rows on syncToneA
-     *  on Timer A from row 8 to row 11, two of its rows a fine of 0, whose
-     *  syncs rows 9 and 10 make even; and row 14, which lists voice C among
-     *  its even syncs without a sync. */
-    static org.ymxs.YMXS.Tune evens() {
+    /** A row of the structure: its registers, its effects, the voices it
+     *  syncs and the sync length of each voice, 1 where {@code lengths} has
+     *  none (YMXS, SPEC.md 1.6). */
+    static Row row(Map<Register, Integer> registers, Map<Timer, Effect> effects,
+                   Set<Voice> syncs, Map<Voice, Integer> lengths) {
+        return new Row(registers, effects, syncs, lengths);
+    }
+
+    /** Sync lengths, for the kit: rows that sync each voice at their frame
+     *  with sync lengths 1 and above, to periods whose fine is 0 and other
+     *  than 0, rows 6 and 7 after a fine of 0; a square of four rows on
+     *  syncToneA on Timer A from row 8 to row 11, two of its rows a fine of
+     *  0, whose ticks rows 8 to 10 set lengths above 1 for; and row 14,
+     *  which sets the sync length of voice C without a sync. */
+    static org.ymxs.YMXS.Tune lengths() {
         Pair square = new Pair("fine zero", Tunes.repeating(List.of(new Two(0, 1),
                 new Two(150, 0), new Two(0, 2), new Two(90, 0)), 0));
         int count = 16;
@@ -210,9 +218,10 @@ class SyncTest {
                 6, Set.of(Voice.A), 7, Set.of(Voice.A), 9, Set.of(Voice.B),
                 10, Set.of(Voice.B));
         Map<Integer, Set<Voice>> more = Map.of(12, Set.of(Voice.C), 13, Set.of(Voice.C));
-        Map<Integer, Set<Voice>> evens = Map.of(2, Set.of(Voice.A), 3, Set.of(Voice.B),
-                7, Set.of(Voice.A), 9, Set.of(Voice.A), 10, Set.of(Voice.A, Voice.B),
-                13, Set.of(Voice.C), 14, Set.of(Voice.C));
+        Map<Integer, Map<Voice, Integer>> lengths = Map.of(2, Map.of(Voice.A, 2),
+                3, Map.of(Voice.B, 3), 7, Map.of(Voice.A, 8), 8, Map.of(Voice.A, 2),
+                9, Map.of(Voice.A, 3), 10, Map.of(Voice.A, 8, Voice.B, 8),
+                13, Map.of(Voice.C, 2), 14, Map.of(Voice.C, 3));
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < count; r++) {
             Map<Timer, Effect> effects = new EnumMap<>(Timer.class);
@@ -225,22 +234,19 @@ class SyncTest {
             }
             Set<Voice> synced = new java.util.HashSet<>(syncs.getOrDefault(r, Set.of()));
             synced.addAll(more.getOrDefault(r, Set.of()));
-            rows.add(new Row(registers.get(r), effects, synced,
-                    evens.getOrDefault(r, Set.of())));
+            rows.add(row(registers.get(r), effects, synced, lengths.getOrDefault(r, Map.of())));
         }
-        return new org.ymxs.YMXS.Tune("Odd and even syncs", "", "SyncTest", 50,
+        return new org.ymxs.YMXS.Tune("Sync lengths", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
     }
 
-    /** The heads the frame writes of the handlers of a target of a sync,
-     *  for the kit: copy from frame on syncToneA on Timer A from row 1 to
-     *  row 14 and on syncToneC on Timer C from row 3 to row 14, and a source
-     *  of four rows with no fine of 0 on syncToneB on Timer B from row 2
-     *  to row 13, each odd and even by the rows' even syncs. Row 8 sets
-     *  voice A's fine frame value to 0 and row 9 back, and row 10 voice
-     *  C's and row 11 back, so those frames and the frames after them run
-     *  the general head. */
-    static org.ymxs.YMXS.Tune heads() {
+    /** The ticks of a target of a sync, for the kit: copy from frame on
+     *  syncToneA on Timer A from row 1 to row 14 and on syncToneC on Timer
+     *  C from row 3 to row 14, and a source of four rows on syncToneB on
+     *  Timer B from row 2 to row 13, each with the sync lengths the rows
+     *  set. Row 8 sets voice A's fine frame value to 0 and row 9 back, and
+     *  row 10 voice C's and row 11 back. */
+    static org.ymxs.YMXS.Tune ticks() {
         Pair steps = new Pair("steps", Tunes.repeating(List.of(new Two(150, 0),
                 new Two(140, 0), new Two(130, 1), new Two(120, 0)), 0));
         int count = 16;
@@ -267,17 +273,17 @@ class SyncTest {
         registers.get(9).put(Register.R0, 160);
         registers.get(10).putAll(Map.of(Register.R4, 0, Register.R5, 1));
         registers.get(11).put(Register.R4, 70);
-        Map<Integer, Set<Voice>> evens = Map.of(3, Set.of(Voice.A), 4, Set.of(Voice.A, Voice.B),
-                5, Set.of(Voice.B), 6, Set.of(Voice.C), 7, Set.of(Voice.A, Voice.C),
-                8, Set.of(Voice.A), 10, Set.of(Voice.C), 11, Set.of(Voice.B),
-                12, Set.of(Voice.A, Voice.C));
+        Map<Integer, Map<Voice, Integer>> lengths = Map.of(3, Map.of(Voice.A, 2),
+                4, Map.of(Voice.A, 3, Voice.B, 2), 5, Map.of(Voice.B, 8), 6, Map.of(Voice.C, 2),
+                7, Map.of(Voice.A, 8, Voice.C, 3), 8, Map.of(Voice.A, 2), 10, Map.of(Voice.C, 8),
+                11, Map.of(Voice.B, 3), 12, Map.of(Voice.A, 3, Voice.C, 2));
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < count; r++) {
             Set<Voice> syncs = r == 0 ? Set.of(Voice.A, Voice.B, Voice.C) : Set.of();
-            rows.add(new Row(registers.get(r), effects.get(r), syncs,
-                    evens.getOrDefault(r, Set.of())));
+            rows.add(row(registers.get(r), effects.get(r), syncs,
+                    lengths.getOrDefault(r, Map.of())));
         }
-        return new org.ymxs.YMXS.Tune("Heads of a sync", "", "SyncTest", 50,
+        return new org.ymxs.YMXS.Tune("Ticks of a sync", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
     }
 
@@ -288,7 +294,7 @@ class SyncTest {
         Map<Timer, Effect> effects = new EnumMap<>(Timer.class);
         effects.putAll(rows.get(at).effects());
         effects.put(timer, effect);
-        rows.set(at, new Row(rows.get(at).registers(), effects, rows.get(at).syncs(), Set.of()));
+        rows.set(at, new Row(rows.get(at).registers(), effects, rows.get(at).syncs(), Map.of()));
         return new org.ymxs.YMXS.Tune("Sync squares", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
     }
@@ -351,10 +357,10 @@ class SyncTest {
      *  sets R3 at row 0 alone. */
     static org.ymxs.YMXS.Tune frames() {
         List<Row> rows = List.of(
-                new Row(Map.of(Register.R2, 100, Register.R3, 1), Map.of(), Set.of(Voice.B), Set.of()),
-                new Row(Map.of(Register.R2, 90), Map.of(), Set.of(), Set.of()),
-                new Row(Map.of(), Map.of(), Set.of(Voice.B), Set.of()),
-                new Row(Map.of(), Map.of(), Set.of(), Set.of()));
+                new Row(Map.of(Register.R2, 100, Register.R3, 1), Map.of(), Set.of(Voice.B), Map.of()),
+                new Row(Map.of(Register.R2, 90), Map.of(), Set.of(), Map.of()),
+                new Row(Map.of(), Map.of(), Set.of(Voice.B), Map.of()),
+                new Row(Map.of(), Map.of(), Set.of(), Map.of()));
         return new org.ymxs.YMXS.Tune("Sync at frames", "", "SyncTest", 50,
                 Tunes.repeating(rows, 0));
     }
@@ -416,35 +422,69 @@ class SyncTest {
         assertTrue(lines.get(6).contains("{\"0\":150},\"s\":[\"A\",\"C\"],"), lines.get(6));
     }
 
-    /** Version 14: bit 4 of the coarse column of each voice a row lists
-     *  among its even syncs, beside bit 5 of each voice it syncs, read on
-     *  every row, and the record's even after s (SPEC.md 1.12.2, 3.3.5,
-     *  7.3). */
+    /** Version 15: a sync length column for each voice after the columns
+     *  of version 13, the length less 1, read on every row, and the
+     *  record's lengths after s; a tune whose rows have none above 1 stays
+     *  version 13 (SPEC.md 1.12.2, 3.3.5, 7.3). */
     @Test
-    void aTuneOfEvenSyncsIsVersionFourteen() {
-        byte[] file = ConformanceTest.schema(evens()).file();
-        assertEquals(Tune.EVEN, Tune.getWord(file, 4));
+    void aTuneOfSyncLengthsIsVersionFifteen() {
+        byte[] file = ConformanceTest.schema(lengths()).file();
+        assertEquals(Tune.LENGTH, Tune.getWord(file, 4));
         TuneFile read = TuneFile.read(file);
-        assertEquals(Tune.EVEN, read.version());
-        assertTrue(Columns.syncs(read.effects()) && Columns.evens(read.effects()));
-        byte[] a = read.table().column(1);
-        byte[] b = read.table().column(3);
-        byte[] c = read.table().column(5);
-        assertEquals(0x80 | Columns.SYNC | 1, a[0] & 0xFF, "row 0 sets R1 to 1 and syncs A");
-        assertEquals(Columns.SYNC | Columns.EVEN, a[2] & 0xFF, "row 2 syncs A, even");
-        assertEquals(Columns.EVEN, a[9] & 0xFF, "row 9 lists A among its even syncs alone");
-        assertEquals(0x80 | 0x40 | Columns.SYNC | Columns.EVEN | 1, b[3] & 0xFF,
-                "row 3 sets R2 to 0, its bit 6, and R3 to 1, and syncs B, even");
-        assertEquals(Columns.EVEN, c[14] & 0xFF, "row 14 lists C without a sync");
-        assertEquals(0, a[1] & 0xFF, "row 1 leaves voice A as it is");
+        assertEquals(Tune.LENGTH, read.version());
+        assertTrue(Columns.syncs(read.effects()) && Columns.lengths(read.effects()));
+        assertEquals(Columns.C + 3, read.table().columns());
+        byte[] a = read.table().column(Columns.C);
+        byte[] b = read.table().column(Columns.C + 1);
+        byte[] c = read.table().column(Columns.C + 2);
+        assertEquals(1, a[2], "row 2 syncs A for 2 steps");
+        assertEquals(0, a[1], "row 1 has a sync length of 1");
+        assertEquals(2, b[3], "row 3 syncs B for 3 steps");
+        assertEquals(7, a[7], "row 7 syncs A for 8 steps");
+        assertEquals(2, c[14], "row 14 sets C's sync length without a sync");
+        assertEquals(Columns.SYNC, read.table().column(1)[2] & 0xFF,
+                "row 2 syncs A, bit 4 unassigned");
         List<String> lines = new String(Trace.record(file, 16), StandardCharsets.UTF_8)
                 .lines().toList();
-        assertTrue(lines.get(3).contains(",\"s\":[\"A\"],\"even\":[\"A\"],\"e\":"),
+        assertTrue(lines.get(3).contains(",\"s\":[\"A\"],\"lengths\":{\"A\":2},\"e\":"),
                 lines.get(3));
-        assertTrue(lines.get(15).contains("},\"even\":[\"C\"],\"e\":"), lines.get(15));
-        assertTrue(!lines.get(2).contains("\"even\""), "row 1 lists no voice: " + lines.get(2));
+        assertTrue(lines.get(15).contains("},\"lengths\":{\"C\":3},\"e\":"), lines.get(15));
+        assertTrue(lines.get(11).contains(",\"s\":[\"B\"],\"lengths\":{\"A\":8,\"B\":8},"),
+                lines.get(11));
+        assertTrue(!lines.get(2).contains("\"lengths\""), "row 1 has none: " + lines.get(2));
         assertEquals(Tune.SYNC, Tune.getWord(ConformanceTest.schema(tune()).file(), 4),
-                "a tune whose rows list no even sync stays version 13");
+                "a tune whose rows have no sync length above 1 stays version 13");
+    }
+
+    /** Version 14, which a reader reads and a writer writes as version 15:
+     *  bit 4 of a coarse column, a sync length of 2, and the record's even
+     *  after s (SPEC.md 1.12.2, 3.3.5, 7.3). */
+    @Test
+    void aFileOfVersionFourteenReadsBitFourAsASyncLengthOfTwo() {
+        Schema.Made made = Schema.of(tune());
+        Columns was = made.columns();
+        byte[][] column = new byte[was.count()][];
+        for (int i = 0; i < column.length; i++) {
+            column[i] = was.column[i].clone();
+        }
+        column[1][0] |= (byte) Columns.EVEN;
+        column[5][2] |= (byte) Columns.EVEN;
+        Columns even = new Columns(column, was.repeat, was.effects | Columns.EVENS,
+                was.transformations, was.cuts);
+        byte[] file = Tune.write(even, made.sources(), made.rate(), 1, Tune.CHOOSE,
+                new Report()).file();
+        TuneFile read = TuneFile.read(file);
+        assertEquals(Tune.EVEN, read.version());
+        Replay model = new Replay(read.table(), read.effects());
+        model.step();
+        assertEquals(List.of(2, 1, 1), List.of(model.lengths[0], model.lengths[1],
+                model.lengths[2]));
+        List<String> lines = new String(Trace.record(file, 4), StandardCharsets.UTF_8)
+                .lines().toList();
+        assertTrue(lines.get(1).contains(",\"s\":[\"A\",\"B\",\"C\"],\"even\":[\"A\"],\"e\":"),
+                lines.get(1));
+        assertTrue(lines.get(3).contains("\"even\":[\"C\"]"), lines.get(3));
+        assertTrue(!lines.get(1).contains("lengths"), lines.get(1));
     }
 
     /** Files of version 13 written wrong, each with the line a reader reports
@@ -456,8 +496,8 @@ class SyncTest {
         Tune.putLong(table, Tune.indexAt(Tune.SYNC) + 8, entry(file, 1));
         out.put("version 13 with source 3 other than copy from frame", table);
         byte[] later = file.clone();
-        Tune.putWord(later, 4, Tune.EVEN + 1);
-        out.put("version 15 is not " + Tune.READS, later);
+        Tune.putWord(later, 4, Tune.LENGTH + 1);
+        out.put("version 16 is not " + Tune.READS, later);
         byte[] eleven = CutTest.file();
         eleven[Tune.EFFECTS_AT] |= (byte) Columns.COPIES;
         out.put("version 11 with bit 7 of the effects used set", eleven);
@@ -491,5 +531,9 @@ class SyncTest {
         assertEquals(Bound.SYNC_MARK, frames[Bound.SYNC_AT] & Bound.SYNC_MARK);
         byte[] copies = Bound.of(CopyTest.file());
         assertEquals(0, copies[Bound.SYNC_AT] & Bound.SYNC_MARK, "a tune of version 12");
+        assertEquals(0, bound[Bound.SYNC_AT] & Bound.LENGTH_MARK, "a tune of version 13");
+        byte[] lengths = Bound.of(ConformanceTest.schema(lengths()).file());
+        assertEquals(Bound.SYNC_MARK | Bound.LENGTH_MARK, lengths[Bound.SYNC_AT] & 0xC0,
+                "a tune of version 15");
     }
 }

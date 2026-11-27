@@ -39,13 +39,17 @@ final class Replay {
     final int[] registers = new int[14];
     final int[] written = new int[14];
     /** The voices the last row syncs, bit 0 voice A to bit 2 voice C: bit
-     *  5 of each coarse column in version 13 and 14, read on every row
+     *  5 of each coarse column in versions 13 to 15, read on every row
      *  (SPEC.md 1.12). */
     int syncs;
-    /** The voices whose syncs during the last row are even, bit 0 voice A
-     *  to bit 2 voice C: bit 4 of each coarse column in version 14, read on
-     *  every row (SPEC.md 1.12). */
+    /** The voices whose bit 4 the last row sets, bit 0 voice A to bit 2
+     *  voice C, in version 14, a sync length of 2, read on every row
+     *  (SPEC.md 1.12.2). */
     int evens;
+    /** The sync length of each voice in the last row, A, B and C, 1 to 8:
+     *  the sync length column and 1 in version 15, 2 where bit 4 is set in
+     *  version 14, and 1 otherwise (SPEC.md 1.12.2). */
+    final int[] lengths = {1, 1, 1};
     final Effect[] effect = new Effect[4];
     boolean envelopeWritten;
     private final Table table;
@@ -77,6 +81,10 @@ final class Replay {
         for (int v = 0; Columns.syncs(effects) && v < 3; v++) {
             syncs |= (r[1 + 2 * v] & Columns.SYNC) != 0 ? 1 << v : 0;
             evens |= Columns.evens(effects) && (r[1 + 2 * v] & Columns.EVEN) != 0 ? 1 << v : 0;
+            // bits 2 to 0 of the sync length column, the length less 1; bits
+            // 7 to 3 are unassigned and left unread (SPEC.md 1.12.2)
+            lengths[v] = Columns.lengths(effects) ? (r[Columns.length(effects, v)] & 7) + 1
+                    : (evens & 1 << v) != 0 ? 2 : 1;
         }
         row++;
         if (row == table.rows()) {

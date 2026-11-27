@@ -6,9 +6,10 @@ import org.ymxs.YMXS.Cut;
 /**
  * Tune columns, one byte per column per frame, plus the repeat row,
  * effects used, optional transformations and cuts (SPEC.md 1). Version 9
- * has thirty columns; version 10 adds four mapping columns, and version 11
- * four cut columns after the mapping columns where the tune has them.
- * Mapping 0 uses source values unchanged, and cut 0 is the whole table.
+ * has thirty columns; version 10 adds four mapping columns, version 11
+ * four cut columns after the mapping columns where the tune has them, and
+ * version 15 three sync length columns after both. Mapping 0 uses source
+ * values unchanged, and cut 0 is the whole table.
  *
  * <p>{@link Schema} encodes a YMXS tune; {@link Ym} imports a dump into
  * that structure. Constants here define register columns, set bits,
@@ -36,6 +37,16 @@ final class Columns {
      *  3.3.5). Where the tune maps none, the cut columns are 30 to 33. */
     static final int CUT = 34;
     static final int ALL = 38;
+
+    /** The first sync length column in the layout of 41 a writer writes
+     *  the rows in, voice A's, before the groups a tune leaves unused are
+     *  dropped; and that layout's column count (SPEC.md 1.12.2). */
+    static final int LENGTH = 38;
+    static final int WHOLE = 41;
+
+    /** The most steps a sync keeps a voice's period at 0: a sync length
+     *  column is the length less 1 in three bits (SPEC.md 1.12.2). */
+    static final int MOST_SYNC_LENGTH = 8;
 
     /** The cut limit: cut numbers 1 to 127 select a cut of the index; 0 is
      *  the whole table (SPEC.md 1.11). */
@@ -89,14 +100,18 @@ final class Columns {
     /** Bit 5 of a coarse column, 1, 3 or 5, in version 13: the row syncs
      *  the voice, read on every row (SPEC.md 1.2.2, 1.12). */
     static final int SYNC = 0x20;
-    /** A bit above the effects byte, which the file leaves out: a row
-     *  lists a voice among its even syncs, which version 14 marks (SPEC.md
-     *  1.12, 3.3.5). */
+    /** A bit above the effects byte, which the file leaves out: a tune
+     *  file of version 14, whose bit 4 of a coarse column is a sync length
+     *  of 2, read on every row (SPEC.md 1.12.2, 3.3.5). */
     static final int EVENS = 0x200;
     /** Bit 4 of a coarse column, 1, 3 or 5, in version 14: the voice's
-     *  syncs during the row are even, read on every row (SPEC.md 1.2.2,
-     *  1.12). */
+     *  sync length in the row is 2, and 1 where the bit is 0 (SPEC.md
+     *  1.2.2, 1.12.2). */
     static final int EVEN = 0x10;
+    /** A bit above the effects byte, which the file leaves out: a row has
+     *  a sync length above 1, and the table has the three sync length
+     *  columns, which version 15 marks (SPEC.md 1.12.2, 3.3.5). */
+    static final int LENGTHS = 0x400;
     /** The first target of a sync, `syncToneA`; 26 and 27 are `syncToneB`
      *  and `syncToneC` (SPEC.md 2.1). */
     static final int SYNC_TARGET = 25;
@@ -197,7 +212,8 @@ final class Columns {
         this.cuts = List.copyOf(cuts);
     }
 
-    /** The column count, 30, 34 or 38, and a row's bytes. */
+    /** The column count, 30, 34 or 38, or 33, 37 or 41 in version 15, and
+     *  a row's bytes. */
     int count() {
         return column.length;
     }
@@ -223,17 +239,32 @@ final class Columns {
         return (effects & SYNCS) != 0;
     }
 
-    /** Whether a row lists a voice among its even syncs: the bit above the
-     *  effects byte that version 14 marks (SPEC.md 3.3.5). */
+    /** Whether the file is of version 14, whose bit 4 of a coarse column
+     *  is a sync length: the bit above the effects byte that version 14
+     *  marks (SPEC.md 3.3.5). */
     static boolean evens(int effects) {
         return (effects & EVENS) != 0;
     }
 
+    /** Whether the table has the sync length columns: the bit above the
+     *  effects byte that version 15 marks (SPEC.md 1.12.2, 3.3.5). */
+    static boolean lengths(int effects) {
+        return (effects & LENGTHS) != 0;
+    }
+
     /** The column count of a table of that effects byte: 30, with four
-     *  mapping columns where bit 5 is 1 and four cut columns where bit 6
-     *  is 1 (SPEC.md 3.3.5). */
+     *  mapping columns where bit 5 is 1, four cut columns where bit 6 is 1
+     *  and three sync length columns in version 15 (SPEC.md 3.3.5). */
     static int count(int effects) {
-        return C + (maps(effects) ? 4 : 0) + (cuts(effects) ? 4 : 0);
+        return C + (maps(effects) ? 4 : 0) + (cuts(effects) ? 4 : 0)
+                + (lengths(effects) ? 3 : 0);
+    }
+
+    /** Voice v's sync length column, after the mapping and the cut columns,
+     *  or -1 where the table has none (SPEC.md 1.12.2). */
+    static int length(int effects, int v) {
+        return lengths(effects) ? C + (maps(effects) ? 4 : 0) + (cuts(effects) ? 4 : 0) + v
+                : -1;
     }
 
     /** Effect i's mapping column, 30 + i, or -1 where the table has no

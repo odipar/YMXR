@@ -127,7 +127,7 @@ final class Schema {
                     + " transformations, and a mapping column numbers "
                     + Columns.MOST_TRANSFORMATIONS);
         }
-        byte[][] column = new byte[Columns.ALL][size];
+        byte[][] column = new byte[Columns.WHOLE][size];
         int used = 0;
         for (int f = 0; f < size; f++) {
             // The wrap preserves player state. Write targets again
@@ -138,34 +138,40 @@ final class Schema {
                 kept.wrap();
             }
             Row row = rows.get(f);
-            byte[] out = new byte[Columns.ALL];
+            byte[] out = new byte[Columns.WHOLE];
             registers(row, out);
             syncs(row, out);
+            lengths(row, out);
             for (Map.Entry<Timer, Effect> one : Tunes.effects(row).entrySet()) {
                 int i = effect(one.getKey());
                 used |= effect(out, i, one.getValue(), sources, kept, padded.frames()[f]);
             }
-            for (int c = 0; c < Columns.ALL; c++) {
+            for (int c = 0; c < Columns.WHOLE; c++) {
                 column[c][f] = out[c];
             }
         }
         // A table has a group of four columns where the tune uses it: the
         // mapping columns where a row selects a transformation, and the cut
         // columns where a row selects a cut 1 to 127, after the mapping
-        // columns (SPEC.md 3.3.5).
+        // columns; and the three sync length columns after both where a row
+        // has a sync length above 1 (SPEC.md 1.12.2, 3.3.5).
         boolean maps = selects(column, Columns.MAPPING);
         boolean cutting = selects(column, Columns.CUT);
-        byte[][] table = new byte[Columns.C + (maps ? 4 : 0) + (cutting ? 4 : 0)][];
+        boolean lengths = lengthy(column);
+        byte[][] table = new byte[Columns.C + (maps ? 4 : 0) + (cutting ? 4 : 0)
+                + (lengths ? 3 : 0)][];
         int at = 0;
-        for (int c = 0; c < Columns.ALL; c++) {
-            if (c < Columns.C || maps && c < Columns.CUT || cutting && c >= Columns.CUT) {
+        for (int c = 0; c < Columns.WHOLE; c++) {
+            if (c < Columns.C || maps && c >= Columns.MAPPING && c < Columns.CUT
+                    || cutting && c >= Columns.CUT && c < Columns.LENGTH
+                    || lengths && c >= Columns.LENGTH) {
                 table[at++] = column[c];
             }
         }
         Columns columns = new Columns(table, repeat,
                 used | (maps ? Columns.MAPS : 0) | (cutting ? Columns.CUTS : 0)
-                        | (syncs(rows) || evens(rows) ? Columns.SYNCS : 0)
-                        | (evens(rows) ? Columns.EVENS : 0),
+                        | (syncs(rows) || lengths ? Columns.SYNCS : 0)
+                        | (lengths ? Columns.LENGTHS : 0),
                 maps ? tables(list) : List.of(), cutting ? cuts : List.of());
         return new Made(columns, new Sources(sources(sources, markers(rows, sources))),
                 tune.rate());
@@ -523,24 +529,38 @@ final class Schema {
         }
     }
 
-    /** Bit 5 of the coarse column of each voice the row syncs, and bit 4
-     *  of each voice the row lists among its even syncs, which the row sets
-     *  or leaves unset as the structure has it (SPEC.md 1.2.2, 1.12). */
+    /** Bit 5 of the coarse column of each voice the row syncs, which the
+     *  row sets or leaves unset as the structure has it (SPEC.md 1.2.2,
+     *  1.12). */
     private static void syncs(Row row, byte[] out) {
         for (Voice voice : row.syncs()) {
             out[Chip.number(Chip.coarse(voice))] |= (byte) Columns.SYNC;
         }
-        for (Voice voice : row.evenSyncs()) {
-            out[Chip.number(Chip.coarse(voice))] |= (byte) Columns.EVEN;
+    }
+
+    /** The sync length less 1 of each voice, in the sync length columns of
+     *  the layout of 41 (SPEC.md 1.12.2). */
+    private static void lengths(Row row, byte[] out) {
+        for (Voice voice : Voice.values()) {
+            out[Columns.LENGTH + voice.ordinal()] = (byte) (length(row, voice) - 1);
         }
     }
 
-    /** Whether a row lists a voice among its even syncs (SPEC.md 1.12,
-     *  3.3.5). */
-    private static boolean evens(List<Row> rows) {
-        for (Row row : rows) {
-            if (!row.evenSyncs().isEmpty()) {
-                return true;
+    /** The sync length of a voice in a row, 1 to 8 steps: the row's
+     *  {@code syncSteps} of the voice, and 1 where it has none (SPEC.md
+     *  1.12.2; YMXS, SPEC.md 1.6). */
+    static int length(Row row, Voice voice) {
+        return Tunes.steps(row, voice);
+    }
+
+    /** Whether a row has a sync length above 1, a sync length column other
+     *  than 0 (SPEC.md 1.12.2, 3.3.5). */
+    private static boolean lengthy(byte[][] column) {
+        for (int c = Columns.LENGTH; c < Columns.WHOLE; c++) {
+            for (byte b : column[c]) {
+                if (b != 0) {
+                    return true;
+                }
             }
         }
         return false;

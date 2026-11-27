@@ -69,13 +69,11 @@ YMXR_MAP        equ     0
 YMXR_VERSION    equ     $000B           ; the descriptor's version:
                                         ; versions 7 to 11, including
                                         ; mapping and cut columns
-YMXR_COLUMNS    equ     38
                 .else
 YMXR_VERSION    equ     $0009           ; the version it reads, a bound tune
                                         ; whose table is DTX3 (SPEC.md 3.3.5),
                                         ; and 8, read as 9, and 7, whose
                                         ; control columns have bit 3 at 0
-YMXR_COLUMNS    equ     30
                 .endif
 ; A tick reads its row through the program counter: the place is a
 ; displacement in the instruction that reads it, so the read costs 4

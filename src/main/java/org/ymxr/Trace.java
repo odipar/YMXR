@@ -100,11 +100,15 @@ final class Trace {
                 }
             }
             line.append('}');
-            // SPEC.md 7.3: in version 13 and 14 the voices the row syncs,
-            // after w, where it syncs one, and in version 14 the voices of
-            // its even syncs, after them, where it lists one.
+            // SPEC.md 7.3: in versions 13 to 15 the voices the row syncs,
+            // after w, where it syncs one; after them, in version 14 the
+            // voices whose bit 4 the row sets, and in version 15 the sync
+            // length of each voice whose length is above 1.
             voices(line, "s", model.syncs);
             voices(line, "even", model.evens);
+            if (Columns.lengths(tune.effects())) {
+                lengths(line, model.lengths);
+            }
             line.append(",\"e\":{");
             first = true;
             for (int i = 0; i < 4; i++) {
@@ -187,6 +191,23 @@ final class Trace {
         }
         tool.report(Report.count(rows.length, "byte", "bytes") + " of rows");
         Out.write(tool, rows);
+    }
+
+    /** The sync lengths above 1 of the three voices, as {@code lengths}
+     *  and an object of each voice's letter and its length, where a voice
+     *  has one (SPEC.md 7.3). */
+    private static void lengths(StringBuilder line, int[] lengths) {
+        boolean first = true;
+        for (int v = 0; v < 3; v++) {
+            if (lengths[v] > 1) {
+                line.append(first ? ",\"lengths\":{" : ",").append('"')
+                        .append((char) ('A' + v)).append("\":").append(lengths[v]);
+                first = false;
+            }
+        }
+        if (!first) {
+            line.append('}');
+        }
     }
 
     /** The voices of {@code mask}, bit 0 voice A to bit 2 voice C, as the

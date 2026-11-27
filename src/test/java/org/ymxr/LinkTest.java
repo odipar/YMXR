@@ -259,8 +259,8 @@ final class LinkTest {
                 false, Tunes.mapping(new Transformation("half", half)), Tunes.whole(wave));
         Start cut = new Start(new OneConnection(Tunes.setting(Register.R8), fall), timing,
                 false, Tunes.NO_PARTS, new Cut(2, 5));
-        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, mapped), Set.of(), Set.of()),
-                Tunes.EMPTY, new Row(java.util.Map.of(), java.util.Map.of(Timer.A, cut), Set.of(), Set.of()),
+        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, mapped), Set.of(), java.util.Map.of()),
+                Tunes.EMPTY, new Row(java.util.Map.of(), java.util.Map.of(Timer.A, cut), Set.of(), java.util.Map.of()),
                 Tunes.EMPTY);
         org.ymxs.YMXS.Tune tune = new org.ymxs.YMXS.Tune("a cut alone", "", "LinkTest", 50,
                 Tunes.repeating(rows, 0));
@@ -287,9 +287,9 @@ final class LinkTest {
         Start start = new Start(new OneConnection(Tunes.setting(Register.R8), fall),
                 new Timing(Chip.prescaler(4), 100, true, true), false, Tunes.NO_PARTS,
                 new Cut(2, 5));
-        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, start), Set.of(), Set.of()),
+        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, start), Set.of(), java.util.Map.of()),
                 Tunes.EMPTY, new Row(java.util.Map.of(), java.util.Map.of(Timer.A,
-                        new Recut(new Cut(0, 7))), Set.of(), Set.of()), Tunes.EMPTY);
+                        new Recut(new Cut(0, 7))), Set.of(), java.util.Map.of()), Tunes.EMPTY);
         org.ymxs.YMXS.Tune tune = new org.ymxs.YMXS.Tune("a recut", "", "LinkTest", 50,
                 Tunes.repeating(rows, 0));
         Report report = new Report();
@@ -341,9 +341,9 @@ final class LinkTest {
                             Tunes.repeating(List.of(new org.ymxs.YMXS.Three(51, 3, 12)), 0)));
         };
         Start start = Tunes.start(connection, timing, false, Tunes.NO_PARTS);
-        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, start), Set.of(), Set.of()),
+        List<Row> rows = List.of(new Row(java.util.Map.of(), java.util.Map.of(Timer.A, start), Set.of(), java.util.Map.of()),
                 Tunes.EMPTY, new Row(java.util.Map.of(), java.util.Map.of(Timer.A,
-                        new Recut(new Cut(0, 0))), Set.of(), Set.of()), Tunes.EMPTY);
+                        new Recut(new Cut(0, 0))), Set.of(), java.util.Map.of()), Tunes.EMPTY);
         org.ymxs.YMXS.Tune tune = new org.ymxs.YMXS.Tune("a row recut", "", "LinkTest", 50,
                 Tunes.repeating(rows, 0));
         return ConformanceTest.schema(tune).file();
