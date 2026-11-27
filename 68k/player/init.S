@@ -455,6 +455,8 @@ YMXR_init:
                 move.l  a3,TWC_LOOP2W(a5)
                 lea     TWC_PTR1+PLACE_LO(a5),a3
                 move.l  a3,TWC_CNT(a5)          ; the first place, compared
+                lea     TWS_FIRST(a5),a3
+                move.l  a3,TWS_COPYA(a5)        ; the byte the tick writes
                 lea     TWS_SIZE(a5),a5
 .nolinksyn:     dbra    d2,.linksyn
 .linkedsyn:
@@ -815,16 +817,23 @@ ymxr_inreach:   move.l  DT_ROWS(a3),d0
 ; value is one byte past the value of each constant column before it.
 ; The opcode as it is defines the read, whichever the last init wrote: an
 ; or into d1, its bits 14 to 12 clear; a move into d2, bit 10 set; or a
-; move into d1, the head of an effect's bra.w being one. d0, d4, a1 and a5
-; clobbered.
+; move into d1, the head of an effect's bra.w being one. a6 the workspace;
+; d0, d4, a1 and a5 clobbered.
 ymxr_col:       lea     (a4,d4.w),a5            ; the operand
                 .if     YMXR_MAP
-                cmp.w   DT_COLUMNS-DT_PAYLOAD(a0),d0    ; a column at or past
-                bcs.s   .in                             ; the table's C, a
-                move.w  #$8000,d0                       ; mapping column of a
-                bra.s   .put                            ; version 9 tune: the
-.in:                                                    ; constant 0
+                move.w  DT_COLUMNS-DT_PAYLOAD(a0),d4    ; C, less the sync
+                movea.l WS_TUNE(a6),a1                  ; length columns of
+                btst    #6,TF_SYNC(a1)                  ; a tune of version
+                beq.s   .groups                         ; 15 (SPEC.md 1.12.2)
+                subq.w  #3,d4
+.groups:        cmp.w   d4,d0                   ; a column at or past those,
+                bcs.s   .in                     ; a mapping column of a
+                move.w  #$8000,d0               ; version 9 tune: the
+                bra.s   .put                    ; constant 0
+.in:
                 .endif
+; A sync length column's site enters here, a5 its operand (sync.S).
+ymxr_colsync    equ     *
                 moveq   #0,d4
                 move.b  8(a0,d0.w),d4           ; the column's byte of the map
                 cmp.b   #$FF,d4

@@ -1,29 +1,29 @@
 ; sync.S - the sync of a voice at a frame (SPEC.md 1.12, 4.4.1): the
 ; register steps of R0 to R5 of a tune that syncs a voice, the frame values
-; of those registers, and init's work for such a tune. Every part is a
-; piece of the block `sync`, which a link keeps for a song a tune of which
-; syncs a voice (doc/LINKER.md), and init aims a branch at it for such a
-; tune alone, so a tune that syncs no voice runs the frame it ran before.
+; of those registers, the sync lengths, and init's work for such a tune.
+; Every part is a piece of the block `sync`, which a link keeps for a song
+; a tune of which syncs a voice (doc/LINKER.md), and init aims a branch at
+; it for such a tune alone, so a tune that syncs no voice runs the frame it
+; ran before.
 
                 PIECE   sync_3
 ; The frame values of R0 to R5, a byte each: the value the rows last set,
 ; masked to the register's width, 0 before a row sets the column (SPEC.md
-; 3.1.7, 4.1 step 4); the row's bytes of columns 0 to 5, read once; and,
-; with the deferred start, the target each effect's running handler
-; writes, which step 4 of every frame keeps: the kept target, other than
-; while a deferred start is armed and no tick has performed it, when the
-; running handler writes the target it wrote before the row that armed
-; it, whose target column moves the kept target first (effect.S).
+; 3.1.7, 4.1 step 4); the row's bytes of columns 0 to 5, read once; with
+; the deferred start, the target each effect's running handler writes,
+; which step 4 of every frame keeps: the kept target, other than while a
+; deferred start is armed and no tick has performed it, when the running
+; handler writes the target it wrote before the row that armed it, whose
+; target column moves the kept target first (effect.S); the row's sync
+; length less 1 of each voice, A, B and C, at 10 from ymxr_srow; and at
+; 14 from it each voice's current one, which the frame's syncs and the
+; ticks read (SPEC.md 1.12.2, 4.4.1).
                 .even
 ymxr_sfv:       dc.b    0,0,0,0,0,0
 ymxr_srow:      dc.b    0,0,0,0,0,0
 ymxr_srun:      dc.b    0,0,0,0
-; The voices whose syncs during the row are even, bit 0 voice A, bit 2
-; voice B and bit 4 voice C, the number of the voice's fine register:
-; bit 4 of each coarse column, read on every row and written once a
-; frame, before its syncs, which the frame's and every tick's sync read
-; (SPEC.md 1.12).
-ymxr_seven:     dc.b    0,0
+ymxr_snew:      dc.b    0,0,0,0
+ymxr_slen:      dc.b    0,0,0,0
 ; The voices whose period a target writes, bit 0 voice A to bit 2 voice C,
 ; targets 0 to 27 (SPEC.md 2.1).
 ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
@@ -37,9 +37,11 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 ; column the row sets at a3, \fo and \fo + \stride, the coarse one masked
 ; to its four bits, and with \imm at 1 to the register's immediate as
 ; well (columns.S, CPUT); the voice's bit into d4 where bit 5 of the
-; coarse column is 1, and bit 8 + \ro of d4 where bit 4 is 1, read on
-; every row (1.12.1).
-                .macro  SVOICE  p,fine,coarse,v,ro,fo,stride,imm
+; coarse column is 1, read on every row (1.12.1); and the voice's sync
+; length less 1 into ymxr_snew, read on every row at the site \p\len,
+; whose mask follows it (ymxr_syncinit): the voice's sync length column in
+; a tune of version 15, and bit 4 of the coarse column otherwise (1.12.2).
+                .macro  SVOICE  p,fine,coarse,len,v,ro,fo,stride,imm
 \{p}\{coarse}:  move.b  $7FFF(a1),d2
 \{p}\{fine}:    move.b  $7FFF(a1),d1
                 bne.s   .fs\~
@@ -61,10 +63,10 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 .nc\~:          btst    #5,d2
                 beq.s   .ns\~
                 bset    #\v,d4
-.ns\~:          btst    #4,d2
-                beq.s   .ne\~
-                bset    #8+\ro,d4
-.ne\~:
+.ns\~:
+\{p}\{len}:     move.b  $7FFF(a1),d1
+\{p}\{len}m:    and.b   #7,d1                   ; +2: the mask
+                move.b  d1,10+\v(a4)            ; ymxr_snew
                 .endm
 
 ; With the deferred start, effect i's running target into ymxr_srun, at
@@ -105,21 +107,26 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 .no\~:
                 .endm
 
-; The running targets, and the sync of the voices of d4 an effect leaves
-; (1.12.3), one after another in the order A, B, C at level 7: each as
-; SYNC1 writes it, with the frame values at a3, \stride bytes apart. The
-; even bits of the row, bits 8 to 15 of d4, reach ymxr_seven first, at
-; 10 from a4, so the ticks of the frame read them.
-                .macro  SSYNC   stride
+; The row's sync lengths made current, ymxr_snew to ymxr_slen at a4 (1.12.2,
+; 4.4.1), the effects' first bytes before them (ymxr_sfirst), at level 7;
+; and with the deferred start, the running targets, the frame's part of
+; SBUSY. d0 clobbered.
+                .macro  SLEN
+                move.w  10(a4),14(a4)
+                move.b  12(a4),16(a4)
+                move.w  (sp)+,sr
                 .if     YMXR_DEFER
                 SKEEP   0,WS_FX,$134
                 SKEEP   1,WS_FX+FX_SIZE,$110
                 SKEEP   2,WS_FX+FX_SIZE+FX_SIZE,$120
                 SKEEP   3,WS_FX+FX_SIZE+FX_SIZE+FX_SIZE,$114
                 .endif
-                move.w  d4,d0
-                lsr.w   #8,d0
-                move.b  d0,10(a4)               ; ymxr_seven
+                .endm
+
+; The sync of the voices of d4 an effect leaves (1.12.3), one after
+; another in the order A, B, C at level 7: each as SYNC1 writes it, with
+; the frame values at a3, \stride bytes apart.
+                .macro  SSYNC   stride
                 tst.b   d4
                 beq.w   .done\~
                 lea     ymxr_svoice(pc),a5
@@ -138,53 +145,25 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 .done\~:
                 .endm
 
-; The sync of voice \v where bit \v of d4 is 1 (YMXS, SPEC.md 3.9): 0 to
-; its two registers, the coarse one first unless the chip's value of the
-; fine one is 0, then its frame values, fine then coarse, the steps between
-; of HOLD_F:
-; even where bit 2 * \v + 8 of d4 is 1, and those of the coarse write where
-; the fine is 0. a2 the select register; d0 to d2 clobbered.
+; The sync of voice \v where bit \v of d4 is 1 (1.12.3), with its current
+; sync length, to its frame values: the registers and the values in d0 to
+; d3 and a5 as ymxr_ssync reads them. a2 the select register; d0 to d2
+; and a5 clobbered.
                 .macro  SYNC1   v,stride
                 btst    #\v,d4
-                beq.w   .no\~
-                move.w  #(2*\v)<<8,d0
-                move.b  2*\v*\stride(a3),d0
-                move.w  #(2*\v+1)<<8,d1
-                move.b  (2*\v+1)*\stride(a3),d1
-                move.b  #2*\v,(a2)
-                move.b  (a2),d2
-                beq.s   .ff\~
-                move.b  #2*\v+1,(a2)
-                move.b  #0,2(a2)
-                move.b  #2*\v,(a2)
-                bra.s   .steps\~
-.ff\~:          move.b  #0,2(a2)
-                move.b  #2*\v+1,(a2)
-.steps\~:       tst.b   d0
-                beq.s   .z\~
-                btst    #2*\v+8,d4
-                bne.s   .e\~
-                move.b  #0,2(a2)
-                HOLD_F  1,0
-                movep.w d0,0(a2)
-                movep.w d1,0(a2)
-                bra.w   .no\~
-.e\~:           move.b  #0,2(a2)
-                HOLD_F  2,0
-                movep.w d0,0(a2)
-                movep.w d1,0(a2)
-                bra.w   .no\~
-.z\~:           btst    #2*\v+8,d4
-                bne.s   .ez\~
-                move.b  #0,2(a2)
-                HOLD_F  1,1
-                movep.w d0,0(a2)
-                movep.w d1,0(a2)
-                bra.s   .no\~
-.ez\~:          move.b  #0,2(a2)
-                HOLD_F  2,1
-                movep.w d0,0(a2)
-                movep.w d1,0(a2)
+                beq.s   .no\~
+                move.l  d3,-(sp)
+                move.l  #(2*\v+1)<<24,d3        ; the coarse register and 0
+                move.l  #(2*\v)<<24,d2          ; the fine register and 0
+                move.l  d3,d0
+                movep.w (2*\v+1)*\stride(a3),d0 ; the coarse, bits 15 to 8
+                moveq   #7,d1
+                sub.b   14+\v(a4),d1            ; the pads to leave out
+                lsl.w   #4,d1
+                movea.w d1,a5
+                move.b  2*\v*\stride(a3),d1     ; the fine
+                bsr.w   ymxr_ssync
+                move.l  (sp)+,d3
 .no\~:
                 .endm
 
@@ -229,33 +208,50 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
 ; select register; d0 to d4 and a3 to a5 clobbered.
 ymxr_sregs:     lea     ymxr_sfv(pc),a3
                 lea     ymxr_srow(pc),a4
+                moveq   #0,d4                   ; the voices the row syncs
+                SVOICE  s,_0,_1,_l0,0,0,0,1,0
+                SVOICE  s,_2,_3,_l1,1,2,2,1,0
+                SVOICE  s,_4,_5,_l2,2,4,4,1,0
+                move.w  sr,-(sp)
+                move.w  #$2700,sr
                 ENDPIECE sync_3
-; The general heads while the row's values change, and the heads the
-; frame writes after them, in a tune that starts a source on a target of a
-; sync (ymxr_sheads): pieces of that handler's block.
+; The first bytes of the handlers of a target of a sync, in a tune that
+; starts a source on one: a piece of that handler's block.
                 PIECE   synced_7
-                moveq   #0,d0
-                bsr.w   ymxr_sheads
+                bsr.w   ymxr_sfirst
                 ENDPIECE synced_7
                 PIECE   sync_8
-                moveq   #0,d4                   ; the voices the row syncs
-                SVOICE  s,_0,_1,0,0,0,1,0
-                SVOICE  s,_2,_3,1,2,2,1,0
-                SVOICE  s,_4,_5,2,4,4,1,0
+                SLEN
                 SSYNC   1
-                ENDPIECE sync_8
-                PIECE   synced_8
-                moveq   #1,d0
-                bsr.w   ymxr_sheads
-                ENDPIECE synced_8
-                PIECE   sync_9
                 STONE   0,0,$0000,$0100,0,1,0
                 STONE   1,2,$0200,$0300,2,3,0
                 STONE   2,4,$0400,$0500,4,5,0
                 bra.w   ymxr_noise
 
+; The sync of a voice (1.12.3), at level 7: 0 to the coarse register, d3,
+; and a step later 0 to the fine one, d2; then a5 bytes into the pads,
+; the sync length's, each a step, and the fine in d1 to the fine register;
+; a step later the coarse register and its value, d0. A step is 32 cycles,
+; and SSYNC_STEP1 to SSYNC_STEP3 are the nops that time the three gaps as
+; SYNC_STEP1 to SYNC_STEP3 time a tick's (ticks.S). a2 the select register.
+SSYNC_STEP1     equ     4
+SSYNC_STEP2     equ     0
+SSYNC_STEP3     equ     4
+ymxr_ssync:     move.l  d3,(a2)                 ; the coarse register's 0
+                NOPS    SSYNC_STEP1
+                move.l  d2,(a2)                 ; the fine register's 0
+                NOPS    SSYNC_STEP2
+                jmp     .pads(pc,a5.w)
+.pads:          .rept   7
+                NOPS    8                       ; a pad
+                .endr
+                move.b  d1,2(a2)                ; the fine
+                NOPS    SSYNC_STEP3
+                move.l  d0,(a2)                 ; the coarse register and value
+                rts
+
                 .if     YMXR_MAP
-                ENDPIECE sync_9
+                ENDPIECE sync_8
 ; The block copysync, which a link keeps for a song that copies from frame
 ; and syncs a voice (doc/LINKER.md): the register steps of R0 to R5 of a
 ; frame of a tune that syncs a voice and copies from frame (play.S,
@@ -265,33 +261,31 @@ ymxr_sregs:     lea     ymxr_sfv(pc),a3
 ; from frame write, which the frame leaves to them.
                 PIECE   copysync_1
 ymxr_skregs:    lea     ymxr_srow(pc),a4
+                moveq   #0,d4
+                SVOICE  t,_0,_1,_l0,0,0,0,FV_STRIDE,1
+                SVOICE  t,_2,_3,_l1,1,2,2*FV_STRIDE,FV_STRIDE,1
+                SVOICE  t,_4,_5,_l2,2,4,4*FV_STRIDE,FV_STRIDE,1
+                move.w  sr,-(sp)
+                move.w  #$2700,sr
                 ENDPIECE copysync_1
-; The heads as in ymxr_sregs.
+; The first bytes as in ymxr_sregs.
                 PIECE   synced_9
-                moveq   #0,d0
-                bsr.w   ymxr_sheads
+                bsr.w   ymxr_sfirst
                 ENDPIECE synced_9
                 PIECE   copysync_5
-                moveq   #0,d4
-                SVOICE  t,_0,_1,0,0,0,FV_STRIDE,1
-                SVOICE  t,_2,_3,1,2,2*FV_STRIDE,FV_STRIDE,1
-                SVOICE  t,_4,_5,2,4,4*FV_STRIDE,FV_STRIDE,1
+                SLEN
                 SSYNC   FV_STRIDE
-                ENDPIECE copysync_5
-                PIECE   synced_10
-                moveq   #1,d0
-                bsr.w   ymxr_sheads
-                ENDPIECE synced_10
-                PIECE   copysync_6
                 STONE   0,0,$0000,$0100,0,1,1
                 STONE   1,2,$0200,$0300,2,3,1
                 STONE   2,4,$0400,$0500,4,5,1
                 bra.w   ymxr_cnoise
 ; Its read sites, columns 0 to 5, as ymxr_kreads has those of the steps
-; of copy from frame.
+; of copy from frame, and its sites of the sync lengths and their masks.
 ymxr_treads:    dc.w    t_0-ymxr_frame+2,t_1-ymxr_frame+2,t_2-ymxr_frame+2
                 dc.w    t_3-ymxr_frame+2,t_4-ymxr_frame+2,t_5-ymxr_frame+2
-                ENDPIECE copysync_6
+ymxr_tlreads:   dc.w    t_l0-ymxr_frame+2,t_l1-ymxr_frame+2,t_l2-ymxr_frame+2
+                dc.w    t_l0m-ymxr_frame+2,t_l1m-ymxr_frame+2,t_l2m-ymxr_frame+2
+                ENDPIECE copysync_5
                 PIECE   sync_4
                 .endif
 
@@ -316,58 +310,29 @@ ymxr_syncfix:   move.l  a5,-(sp)
                 rts
 
 ; Init's work after the frame's read sites (SPEC.md 4.1 step 4): the frame
-; values of R0 to R5 and the running targets 0, and the block's read
-; sites, on every init, so each subtune of a set finds them as it finds
-; them alone; and for a tune that syncs a voice, bit 7 of byte 10 of the
-; bound tune (BINARIES.md 1.5), a branch over the first read of the
-; frame's register steps, or of those of copy from frame where the tune
-; copies from frame. a0 the table's payload, d3 N, a4 ymxr_frame, a6 the
-; workspace; every register kept.
+; values of R0 to R5, the running targets and the sync lengths 0, and the
+; block's read sites, on every init, so each subtune of a set finds them
+; as it finds them alone; and for a tune that syncs a voice, bit 7 of byte
+; 10 of the bound tune (BINARIES.md 1.5), a branch over the first read of
+; the frame's register steps, or of those of copy from frame where the
+; tune copies from frame. a0 the table's payload, d3 N, a4 ymxr_frame, a6
+; the workspace; every register kept.
 ymxr_syncinit:  movem.l d0-d4/a1/a3/a5,-(sp)
                 lea     ymxr_sfv(pc),a3
-                moveq   #18-1,d0
+                moveq   #24-1,d0
 .clear:         clr.b   (a3)+
                 dbra    d0,.clear
                 .if     YMXR_MAP
                 ENDPIECE sync_5
                 .else
-                ENDPIECE sync_9
+                ENDPIECE sync_8
                 .endif
 ; In a tune that starts a source on a target of a sync, each effect's
-; byte of ymxr_sfx 0, and the sources of two values none of whose rows has
-; a fine of 0, a bit each (ymxr_sclean), off each source's first column: a
-; piece of that handler's block.
+; voice and mark of a start 0 (ymxr_sv): a piece of that handler's block.
                 PIECE   synced_11
-                lea     ymxr_sfx(pc),a3
+                lea     ymxr_sv(pc),a3
+                clr.l   (a3)+
                 clr.l   (a3)
-                lea     ymxr_sclean(pc),a3
-                clr.l   (a3)
-                clr.l   4(a3)
-                clr.l   8(a3)
-                clr.l   12(a3)
-                movea.l WS_TUNE(a6),a1
-                moveq   #0,d1
-                move.b  TF_SOURCES(a1),d1       ; S
-                lea     WS_SOURCES(a6),a1
-                moveq   #0,d4                   ; the source
-.scan:          cmp.w   d1,d4
-                bcc.s   .scanned
-                movea.l (a1),a5                 ; its first row
-                cmp.w   #2,DT_COLUMNS-DT_PAYLOAD(a5)
-                bne.s   .nextsrc
-                move.l  DT_ROWS-DT_PAYLOAD(a5),d2   ; R
-                beq.s   .nextsrc
-.fine:          tst.b   (a5)+
-                beq.s   .nextsrc                ; a fine of 0
-                subq.l  #1,d2
-                bne.s   .fine
-                move.w  d4,d0
-                lsr.w   #3,d0
-                bset    d4,(a3,d0.w)            ; bit s mod 8
-.nextsrc:       addq.l  #8,a1
-                addq.w  #1,d4
-                bra.s   .scan
-.scanned:
                 ENDPIECE synced_11
                 PIECE   sync_10
                 lea     ymxr_sreads(pc),a3
@@ -402,7 +367,12 @@ ymxr_syncinit:  movem.l d0-d4/a1/a3/a5,-(sp)
 .done:          movem.l (sp)+,d0-d4/a1/a3/a5
                 rts
 ; Six read sites, columns 0 to 5, the offsets of their displacement words
-; at a3. d1, d2 and d4 clobbered.
+; at a3; then three of the sync lengths and their masks, the offsets after
+; them: in a tune of version 15, bit 6 of byte 10 of the bound tune
+; (BINARIES.md 1.2), each its voice's column, the last three of the table,
+; and the mask 7; otherwise a move of the coarse column and a shift that
+; brings its bit 4 to bit 0, and the mask 1 (SPEC.md 1.12.2). d0 to d2,
+; d4, a1 and a5 clobbered.
 .sites:         moveq   #0,d1
                 moveq   #6-1,d2
 .site:          move.w  (a3)+,d4
@@ -410,12 +380,33 @@ ymxr_syncinit:  movem.l d0-d4/a1/a3/a5,-(sp)
                 bsr     ymxr_col
                 addq.w  #1,d1
                 dbra    d2,.site
+                move.w  DT_COLUMNS-DT_PAYLOAD(a0),d1
+                subq.w  #3,d1                   ; voice A's sync length column
+                moveq   #3-1,d2
+.lsite:         move.w  (a3)+,d4
+                movea.l WS_TUNE(a6),a5
+                btst    #6,TF_SYNC(a5)
+                beq.s   .bit4
+                move.w  d1,d0
+                lea     (a4,d4.w),a5
+                bsr     ymxr_colsync
+                moveq   #7,d0
+                bra.s   .mask
+.bit4:          lea     (a4,d4.w),a5
+                move.l  #$1202E809,-2(a5)       ; move.b d2,d1 and lsr.b #4,d1
+                moveq   #1,d0
+.mask:          move.w  4(a3),d4
+                move.w  d0,(a4,d4.w)
+                addq.w  #1,d1
+                dbra    d2,.lsite
                 rts
 
 ; The read sites of the block, columns 0 to 5, as ymxr_reads has the
-; frame's.
+; frame's, and its sites of the sync lengths and their masks.
 ymxr_sreads:    dc.w    s_0-ymxr_frame+2,s_1-ymxr_frame+2,s_2-ymxr_frame+2
                 dc.w    s_3-ymxr_frame+2,s_4-ymxr_frame+2,s_5-ymxr_frame+2
+                dc.w    s_l0-ymxr_frame+2,s_l1-ymxr_frame+2,s_l2-ymxr_frame+2
+                dc.w    s_l0m-ymxr_frame+2,s_l1m-ymxr_frame+2,s_l2m-ymxr_frame+2
                 .if     YMXR_MAP
                 ENDPIECE sync_7
                 .else
@@ -436,7 +427,7 @@ ymxr_sreads:    dc.w    s_0-ymxr_frame+2,s_1-ymxr_frame+2,s_2-ymxr_frame+2
 ; two columns: copy from frame's frame values, or the source's rows, R out
 ; of its header. Every other start goes on to ymxr_widestart, or in a
 ; tune that copies from frame to ymxr_copywide. The registers are those
-; of ymxr_widestart; a3 and d5 clobbered before it.
+; of ymxr_widestart; a2, a3, d4 and d5 clobbered before it.
 ymxr_syncwide:  move.w  d4,d5
                 mulu    #FX_SIZE,d5
                 lea     WS_FX(a0),a3
@@ -456,55 +447,40 @@ ymxr_syncwide:  move.w  d4,d5
                 bra.w   ymxr_widestart
 .sync:          move.l  d6,-(sp)                ; the effect, as the two starts
                 move.w  d4,d6                   ; keep it
-; The handler's slot at the general head, which runs every source and
-; every chip right: a frame aims it at a head it has written (ymxr_sheads).
-; And ymxr_sfx's byte of the effect: 1 for a source whose bit of
-; ymxr_sclean is 1, 0 for any other and for copy from frame.
+; The handler's registers, immediates its head reads: the target's voice
+; v, its fine register 2v and coarse 2v + 1. Its two bytes of the sync
+; length, the voice's current one, and the effect's voice and its mark of
+; a start, which the frame reads and clears at its register steps
+; (ymxr_sfirst). At level 7, as a tick of the running handler reads them.
                 lea     ymxr_at_synced(pc),a5
                 move.w  d6,d5
                 add.w   d5,d5
                 adda.w  (a5,d5.w),a5
-                move.b  #TWS_TOGEN,TWS_SLOT(a5)
-; The general head's registers, immediates there: the target's voice v,
-; its fine register 2v and coarse 2v + 1. And its parity words by the
-; voice's bit of ymxr_seven, which the frame writes from then on
-; (ymxr_sheads). At level 7, as a tick of the running handler reads them.
                 move.w  sr,-(sp)
                 ori.w   #$0700,sr
                 moveq   #0,d5
                 move.b  FX_TARGET(a3),d5
-                sub.w   #25,d5
+                sub.w   #25,d5                  ; the voice
+                lea     ymxr_sv(pc),a2
+                move.b  d5,(a2,d6.w)
+                st      4(a2,d6.w)              ; ymxr_sfresh
+                lea     ymxr_slen(pc),a2
+                moveq   #0,d4
+                move.b  (a2,d5.w),d4            ; the current sync length less 1
+                lea     ymxr_sdisp(pc),a2
+                move.b  (a2,d4.w),d4
+                move.b  d4,TWS_FIRST(a5)
+                move.b  d4,TWS_ROWL(a5)
                 add.w   d5,d5                   ; the fine register
                 move.b  d5,TWS_F1(a5)
-                move.b  d5,TWS_F2(a5)
-                move.b  d5,TWS_F3(a5)
-                move.b  d5,TWS_F4(a5)
-                move.b  d5,TWS_F5(a5)
-                move.b  d5,TWS_F6(a5)
-                move.w  #TWS_ODDW,TWS_MPAR(a5)
-                move.w  #TWS_ODDW,TWS_FPAR(a5)
-                btst    d5,ymxr_seven(pc)
-                beq.s   .odd
-                move.w  #TWS_EVW,TWS_MPAR(a5)
-                move.w  #TWS_SEVW,TWS_FPAR(a5)
-.odd:           addq.b  #1,d5                   ; the coarse register
+                addq.b  #1,d5                   ; the coarse register
                 move.b  d5,TWS_C1(a5)
                 move.b  d5,TWS_C2(a5)
                 move.w  (sp)+,sr
-                lea     ymxr_sfx(pc),a5
-                clr.b   (a5,d6.w)
                 .if     YMXR_MAP
                 cmp.l   #-7,d0                  ; copy from frame
                 beq.s   .copy
                 .endif
-                move.w  d1,d4                   ; eight times the source's
-                lsr.w   #3,d4                   ; number, which is 1 for the
-                subq.w  #1,d4                   ; first: the source
-                move.w  d4,d0
-                lsr.w   #3,d0
-                lea     ymxr_sclean(pc),a2
-                btst    d4,(a2,d0.w)            ; bit s mod 8 of byte s / 8
-                sne     (a5,d6.w)
                 lea     WS_WIDE(a0),a2
                 move.l  -8(a2,d1.w),d5          ; the source's loop cell
                 moveq   #4,d4                   ; the counted shape of two
@@ -531,6 +507,70 @@ ymxr_syncwide:  move.w  d4,d5
                 lea     ymxr_at_synced(pc),a5
                 bra.w   ymxr_copy_twoat
                 .endif
+
+; The displacement of the branch into the pads of a handler of a target
+; of a sync, for each sync length less 1, 0 to 7 (ticks.S, TICKW): n - 1
+; pads before the fine's write.
+ymxr_sdisp:     dc.b    TWS_D1,TWS_D1-6,TWS_D1-12,TWS_D1-18
+                dc.b    TWS_D1-24,TWS_D1-30,TWS_D1-36,TWS_D1-42
+; Each effect's voice, 0 to 2, where its last start was on a target of a
+; sync, and 4 bytes on its mark of that start, set until the next frame's
+; register steps, whose first tick has the row's sync length (SPEC.md
+; 5.1).
+ymxr_sv:        dc.b    0,0,0,0
+ymxr_sfresh:    dc.b    0,0,0,0
+
+; The first bytes of the handlers of a target of a sync at a frame's
+; register steps, before the row's sync lengths become current (SPEC.md
+; 5.1): of each effect whose vector is its handler of a target of a sync,
+; the length of its first tick after them, the voice's current one, or the
+; row's where the start was since the frame before or a start is pending
+; on the timer; and the immediate the tick writes it from after that
+; tick, the row's. At level 7. a0 the workspace, a4 ymxr_srow; every
+; register kept.
+ymxr_sfirst:    movem.l d0-d2/a1/a3/a5-a6,-(sp)
+                lea     ymxr_timers(pc),a6
+                moveq   #0,d2                   ; the effect
+.each:          btst    d2,WS_EFFECTS(a0)
+                beq.s   .next
+                movea.w (a6),a5
+                movea.l (a5),a5                 ; the running handler
+                lea     ymxr_at_synced(pc),a3
+                move.w  d2,d0
+                add.w   d0,d0
+                adda.w  (a3,d0.w),a3            ; the effect's handler of a
+                cmpa.l  a3,a5                   ; target of a sync
+                bne.s   .next
+                lea     ymxr_sv(pc),a5
+                moveq   #0,d0
+                move.b  (a5,d2.w),d0            ; its voice
+                lea     ymxr_sdisp(pc),a1
+                moveq   #0,d1
+                move.b  10(a4,d0.w),d1          ; the row's length less 1
+                move.b  (a1,d1.w),TWS_ROWL(a3)
+                tst.b   4(a5,d2.w)              ; a start since the frame before:
+                sf      4(a5,d2.w)              ; the row's length, in d1
+                bne.s   .first
+                .if     YMXR_DEFER
+                move.w  d2,d1
+                mulu    #FX_SIZE,d1
+                lea     WS_FX(a0),a5
+                tst.b   FX_PENDING(a5,d1.w)     ; a start pending: the row's
+                beq.s   .cur
+                moveq   #0,d1
+                move.b  10(a4,d0.w),d1
+                bra.s   .first
+.cur:
+                .endif
+                moveq   #0,d1
+                move.b  14(a4,d0.w),d1          ; the current length less 1
+.first:         move.b  (a1,d1.w),TWS_FIRST(a3)
+.next:          addq.l  #8,a6
+                addq.w  #1,d2
+                cmp.w   #4,d2
+                bne.s   .each
+                movem.l (sp)+,d0-d2/a1/a3/a5-a6
+                rts
 
 ; Init's aim of each effect's call of ymxr_widestart that the link kept,
 ; and the arming's: ymxr_syncwide for a tune that syncs a voice, bit 7 of
@@ -568,233 +608,5 @@ ymxr_syncaim:   movem.l d1-d2/d4/a1-a4,-(sp)
                 move.w  d1,(a1)
                 .endif
                 movem.l (sp)+,d1-d2/d4/a1-a4
-                rts
-
-; Each effect's 1 where its start on a target of a sync was of a source
-; whose bit of ymxr_sclean is 1, and 0 otherwise (ymxr_syncwide).
-ymxr_sfx:       dc.b    0,0,0,0
-                .even
-; The sources of two values none of whose rows has a fine of 0, the first
-; value 0, a bit a source, bit s of byte s / 8 source s, which init writes
-; (ymxr_syncinit): the heads of a source's rows read no row (ymxr_sheads).
-ymxr_sclean:    dc.l    0,0,0,0
-; The end of a head of copy from frame: with the monitor in, a bra.w to
-; the handler's end (ticks.S, \{name}_htail), and otherwise the handler's
-; end of interrupt, which the frame copies, and the rte.
-                .macro  HEND    t
-                .if     YMXR_PERF
-\{t}_e:         bra.w   *
-                .else
-                .if     YMXR_AEOI=0
-\{t}_e:         move.b  #0,$FFFFFA0F.w
-                .endif
-                rte
-                .endif
-                .endm
-
-; A head copied into the handler of a5's room, a4 left at the room. a3
-; and d6 clobbered.
-                .macro  HCOPY   t
-                lea     \t(pc),a3
-                lea     TWS_REG(a5),a4
-                moveq   #(\{t}end-\t)/2-1,d6
-.c\~:           move.w  (a3)+,(a4)+
-                dbra    d6,.c\~
-                lea     TWS_REG(a5),a4
-                .endm
-
-; The registers and values of a head of copy from frame at a4: d1 the
-; fine register, d0 the fine frame value, a1 the frame values (copy.S,
-; ymxr_fv) at the fine's.
-                .macro  CPATCH  t
-                move.b  d1,10(a4)               ; the second 0's register
-                move.b  d1,\{t}_f-\t+2(a4)
-                move.b  d0,\{t}_f-\t+4(a4)
-                addq.b  #1,d1                   ; the coarse register
-                move.b  d1,2(a4)                ; the first 0's
-                move.b  d1,\{t}_c-\t+2(a4)
-                move.b  FV_STRIDE(a1),\{t}_c-\t+4(a4)
-                subq.b  #1,d1
-                .if     YMXR_PERF
-                move.w  #TWS_TAIL-TWS_REG-(\{t}_e-\t)-2,\{t}_e-\t+2(a4)
-                .else
-                .if     YMXR_AEOI=0
-                move.l  TWS_EOI+2(a5),\{t}_e-\t+2(a4)
-                .endif
-                .endif
-                .endm
-
-; The heads the frame copies into a handler's room (ticks.S, TICKW,
-; \{name}_hreg) and then writes the registers and values of: a source's
-; rows, odd and even, which go on to the handler's write of the row's
-; fine; and with the lookup in, copy from frame, odd and even, its frame
-; values as immediates. The chip's fine and the fine written are other
-; than 0, so the coarse 0 is first and the fine 0 second, the fine stays
-; selected, and the steps run from the fine 0 to the write of the fine:
-; one step odd, and even HOLD_FE's or HOLD_CE's nops more (ticks.S).
-; A bra.w reaches the handler, whose displacement the frame writes.
-                .even
-ymxr_hro:       move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register
-                move.b  #0,YM_SELECT.w          ; +3: the fine register
-                move.b  #0,YM_SELECT+2.w
-ymxr_hro_b:     bra.w   *                       ; the handler's first place
-ymxr_hroend:
-ymxr_hre:       move.l  #$01000000,YM_SELECT.w
-                move.b  #0,YM_SELECT.w
-                move.b  #0,YM_SELECT+2.w
-                .if     HOLD_FE>0
-                .rept   HOLD_FE
-                nop
-                .endr
-                .endif
-ymxr_hre_b:     bra.w   *
-ymxr_hreend:
-                .if     YMXR_MAP
-; Copy from frame: the four writes of the period, each a register and a
-; value. The second 0 has an absolute long address, whose 4 cycles more
-; make the time from it to the fine's write one step.
-ymxr_hco:       move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register
-                move.l  #$00000000,(YM_SELECT).l ; +2: the fine register
-ymxr_hco_f:     move.l  #$00000000,YM_SELECT.w ; +2: the fine register, +4: the fine
-ymxr_hco_c:     move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register, +4: the coarse
-                HEND    ymxr_hco
-ymxr_hcoend:
-ymxr_hce:       move.l  #$01000000,YM_SELECT.w
-                move.l  #$00000000,(YM_SELECT).l
-                .if     HOLD_CE>0
-                .rept   HOLD_CE
-                nop
-                .endr
-                .endif
-ymxr_hce_f:     move.l  #$00000000,YM_SELECT.w
-ymxr_hce_c:     move.l  #$01000000,YM_SELECT.w
-                HEND    ymxr_hce
-ymxr_hceend:
-                .endif
-                .if     (ymxr_hroend-ymxr_hro>HREG)|(ymxr_hreend-ymxr_hre>HREG)
-                .error  "a head of a source's rows is longer than a handler's room"
-                .endif
-                .if     YMXR_MAP
-                .if     (ymxr_hcoend-ymxr_hco>HREG)|(ymxr_hceend-ymxr_hce>HREG)
-                .error  "a head of copy from frame is longer than a handler's room"
-                .endif
-                .endif
-
-; The heads the frame writes of the handlers of a target of a sync
-; (ticks.S, TICKW), for each effect that runs one: with d0 other than 0,
-; after the row's values change, the general head's parity words by the
-; voice's bit of ymxr_seven, a start armed or not; and with no start
-; armed, with d0 0 each aimed at its general head, before the row's values
-; change, and otherwise each written and aimed at its even or its odd
-; head, by that bit, where the general head's reads would come out one
-; way until the next frame. A source's rows: where none has
-; a fine of 0 (ymxr_sfx) and the chip's fine is other than 0, the voice's
-; registers. Copy from frame: where the voice's fine frame value and the
-; chip's fine are other than 0, those and the voice's frame values
-; (copy.S, ymxr_fv). A tick runs the head the slot aims at and one byte
-; moves the slot, so the frame runs at its level. The target is read
-; before the table of those handlers, which a link keeps for a song that
-; starts a source on a target of a sync, and the tune's effects before
-; the frame values, which it keeps for a song that copies from frame. a0
-; the workspace, a2 the select register; every register kept.
-ymxr_sheads:    movem.l d0-d2/d5-d6/a1/a3-a6,-(sp)
-                move.b  d0,d2
-                lea     ymxr_timers(pc),a6
-                moveq   #0,d5                   ; the effect
-.each:          btst    d5,WS_EFFECTS(a0)
-                beq.w   .next
-                move.w  d5,d1
-                mulu    #FX_SIZE,d1
-                lea     WS_FX(a0),a1
-                adda.w  d1,a1                   ; the effect's record
-                moveq   #0,d1
-                move.b  FX_TARGET(a1),d1
-                sub.w   #25,d1                  ; a target of a sync, of voice
-                bcs.w   .next                   ; d1
-                cmp.w   #3,d1
-                bcc.w   .next
-                movea.w (a6),a5
-                movea.l (a5),a5                 ; the running handler
-                lea     ymxr_at_synced(pc),a4
-                move.w  d5,d0
-                add.w   d0,d0
-                adda.w  (a4,d0.w),a4            ; the effect's handler of a
-                cmpa.l  a4,a5                   ; target of a sync
-                bne.w   .next
-                add.w   d1,d1                   ; the fine register
-                tst.b   d2
-                beq.s   .parity
-                move.w  #TWS_ODDW,d0            ; the general head's parity
-                move.w  #TWS_ODDW,d6            ; words
-                btst    d1,ymxr_seven(pc)
-                beq.s   .podd
-                move.w  #TWS_EVW,d0
-                move.w  #TWS_SEVW,d6
-.podd:          move.w  d0,TWS_MPAR(a5)
-                move.w  d6,TWS_FPAR(a5)
-.parity:
-                .if     YMXR_DEFER
-                tst.b   FX_PENDING(a1)          ; a start armed, whose hook the
-                bne.w   .next                   ; general head's path reaches
-                .endif
-                movea.w 2(a6),a3                ; the timer's control register
-                move.b  (a3),d0
-                and.b   6(a6),d0                ; its select, 0 where stopped
-                beq.w   .next
-                .if     YMXR_MAP
-                tst.b   WS_EFFECTS(a0)          ; copy from frame
-                bpl.s   .rows
-                move.w  d1,d6
-                mulu    #FV_STRIDE,d6
-                lea     ymxr_fv(pc),a3
-                adda.w  d6,a3                   ; the fine's frame value, which
-                cmpa.l  FX_FIRST(a1),a3         ; copy from frame's place at
-                beq.w   .copy                   ; row 0 is
-                .endif
-.rows:          lea     ymxr_sfx(pc),a3
-                tst.b   (a3,d5.w)
-                beq.w   .next
-                tst.b   d2
-                beq.s   .gen
-                move.b  d1,(a2)                 ; the chip's fine
-                tst.b   (a2)
-                beq.w   .next
-                btst    d1,ymxr_seven(pc)
-                bne.s   .reven
-                HCOPY   ymxr_hro
-                move.w  #TWS_PTR1-TWS_REG-(ymxr_hro_b-ymxr_hro)-2,ymxr_hro_b-ymxr_hro+2(a4)
-                bra.s   .rregs
-.reven:         HCOPY   ymxr_hre
-                move.w  #TWS_PTR1-TWS_REG-(ymxr_hre_b-ymxr_hre)-2,ymxr_hre_b-ymxr_hre+2(a4)
-.rregs:         move.b  d1,11(a4)               ; the fine register
-                addq.b  #1,d1
-                move.b  d1,2(a4)                ; the coarse register
-                move.b  #TWS_TOREG,TWS_SLOT(a5)
-                bra.w   .next
-.gen:           move.b  #TWS_TOGEN,TWS_SLOT(a5)
-                bra.w   .next
-                .if     YMXR_MAP
-.copy:          tst.b   d2
-                beq.s   .gen
-                move.b  (a3),d0                 ; the fine frame value
-                beq.w   .next
-                move.b  d1,(a2)                 ; the chip's fine
-                tst.b   (a2)
-                beq.w   .next
-                movea.l a3,a1                   ; the frame values
-                btst    d1,ymxr_seven(pc)
-                bne.s   .ceven
-                HCOPY   ymxr_hco
-                CPATCH  ymxr_hco
-                bra.s   .caim
-.ceven:         HCOPY   ymxr_hce
-                CPATCH  ymxr_hce
-.caim:          move.b  #TWS_TOREG,TWS_SLOT(a5)
-                .endif
-.next:          addq.l  #8,a6
-                addq.w  #1,d5
-                cmp.w   #4,d5
-                bne.w   .each
-                movem.l (sp)+,d0-d2/d5-d6/a1/a3-a6
                 rts
                 ENDPIECE synced_4
