@@ -452,7 +452,7 @@ CX_ESTEP        equ     ymxr_cx0_e2-ymxr_cx0_e3
 ; the records marked the four (play.S, ymxr_cread), so a start costs no
 ; more. The frame aims the effect's vector at it where the effect runs
 ; copy from frame through the identity, on a target other than a target
-; of a sync (sync.S, ymxr_sheads), on a counted handler of one to three
+; of a sync (sync.S, ymxr_syncwide), on a counted handler of one to three
 ; columns, with its timer counting and no start armed, and where no other
 ; aimed effect's handler of copy from frame writes one of its registers:
 ; each column's register and frame value written into a slot, the slot's

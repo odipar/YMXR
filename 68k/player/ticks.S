@@ -210,204 +210,79 @@
 ; that order, and the places, the registers, the loop cells and the loop
 ; word are the immediates it patches, so this handler uses no register
 ; either. A tune whose sources are one column enters none of this.
-; The steps of a sync (YMXS, SPEC.md 3.9.2): a pad between the 0 that sets
-; a voice's period to 0 and the write that sets it other than 0, so the
-; instructions between them are a whole number of steps of the tone
-; generator, 32 cycles each on an ST. HOLD_T's pads are shifts of d0,
-; which the head saved and restores after them, named by path: 1 and 3
-; odd, 2 and 4 even, 1 and 2 where the fine register's 0 is the second and
-; 3 and 4 where the coarse one's is, then \fine; HOLD_L the count of lsl.l
-; #8, 24 cycles each, and HOLD_A and HOLD_B the k of a lsl.w #k of 6 + 2k
-; cycles where k is above 0. The odd path where the fine's 0 is the second
-; has no pad. HOLD_F's pads are nops: \steps 1 odd and 2 even. \fine is 1
-; where the fine is 0 and the coarse write ends the steps. HOLD_T times a
-; tick's sync (ticks.S) and HOLD_F a frame's (sync.S); HOLD_CE and HOLD_FE
-; are the nops of the even heads the frame writes, of copy from frame and
-; of a source's rows, whose odd heads keep the period at 0 for one step
-; with none (sync.S, ymxr_hro to ymxr_hce). The rig reads each sync's
-; steps under Hatari (68k/test/emu/test_ymxr.py).
-HOLD_CE         equ     8
-HOLD_FE         equ     8
-; The room a handler of a target of a sync has for the head the frame
-; writes (TICKW, sync.S): the longest head, copy from frame's even one
-; where the lookup is in, and a source's even one otherwise.
-                .if     YMXR_MAP
-HREG            equ     2*HOLD_CE+42
-                .else
-HREG            equ     2*HOLD_FE+24
-                .endif
-HOLD_L11        equ     0
-HOLD_A11        equ     1
-HOLD_B11        equ     0
-HOLD_L20        equ     0
-HOLD_A20        equ     7
-HOLD_B20        equ     0
-HOLD_L21        equ     1
-HOLD_A21        equ     5
-HOLD_B21        equ     0
-HOLD_L30        equ     1
-HOLD_A30        equ     1
-HOLD_B30        equ     0
-HOLD_L31        equ     1
-HOLD_A31        equ     7
-HOLD_B31        equ     1
-HOLD_L40        equ     0
-HOLD_A40        equ     0
-HOLD_B40        equ     0
-HOLD_L41        equ     0
-HOLD_A41        equ     7
-HOLD_B41        equ     0
-HOLD_F10        equ     3
-HOLD_F11        equ     14
-HOLD_F20        equ     11
-HOLD_F21        equ     6
-                .macro  HOLD_T  l,a,b
-                .if     \l>0
-                .rept   \l
-                lsl.l   #8,d0
-                .endr
-                .endif
-                .if     \a>0
-                lsl.w   #\a,d0
-                .endif
-                .if     \b>0
-                lsl.w   #\b,d0
-                .endif
-                .endm
-                .macro  HOLD_F  steps,fine
-                .if     \steps=1
-                .if     \fine=0
-                .rept   HOLD_F10
+; The sync of a tick of a target of a sync (SPEC.md 1.12.3, 5.1), timed
+; in steps of the tone generator, 32 cycles of an 8 MHz 68000: SYNC_STEP1
+; the nops from the write of the coarse register's 0 to that of the fine
+; one's, SYNC_STEP2 those after the fine one's before the branch into the
+; pads, and SYNC_STEP3 those from the write of the fine value to that of
+; the coarse; each pad is a step. Hatari stamps a write by the instruction
+; that makes it, and the rig reads each gap off its trace
+; (68k/test/emu/test_ymxr.py).
+SYNC_STEP1      equ     1
+SYNC_STEP2      equ     0
+SYNC_STEP3      equ     3
+                .macro  NOPS    n
+                .if     \n>0
+                .rept   \n
                 nop
                 .endr
-                .else
-                .rept   HOLD_F11
-                nop
-                .endr
-                .endif
-                .else
-                .if     \fine=0
-                .rept   HOLD_F20
-                nop
-                .endr
-                .else
-                .rept   HOLD_F21
-                nop
-                .endr
-                .endif
                 .endif
                 .endm
 
-; Whether the row's fine at the place of \name's first column is 0, in Z;
-; d0 clobbered (a0 kept where a row is read through an absolute address).
-                .macro  FINE0   name
+; The place of a column into a0, read off the operand of its read at \ptr:
+; through the displacement a tick steps, or the address.
+                .macro  PLACEA  ptr
                 .if     YMXR_PCREL
-                move.w  \{name}_ptr1+2(pc),d0
-                move.b  \{name}_ptr1+2(pc,d0.w),d0
-                .else
-                move.l  a0,-(sp)
-                movea.l \{name}_ptr1+2(pc),a0
-                tst.b   (a0)
-                movea.l (sp)+,a0
-                .endif
-                .endm
-
-; FINE0 from before the handler, beyond the reach of a byte's
-; displacement: the place and its distance from the read, through the
-; program counter.
-                .macro  FINE0N  name
-                .if     YMXR_PCREL
-                move.w  \{name}_ptr1+2(pc),d0
-                add.w   #\{name}_ptr1+2-.fn\~-2,d0
-.fn\~:          move.b  .fn\~+2(pc,d0.w),d0
-                .else
-                FINE0   \name
-                .endif
-                .endm
-
-; FINE0 from past the handler, beyond the reach of a byte's displacement.
-                .macro  FINE0F  name
-                move.l  a0,-(sp)
-                .if     YMXR_PCREL
-                lea     \{name}_ptr1+2(pc),a0
+                lea     \ptr+2(pc),a0
                 adda.w  (a0),a0
                 .else
-                movea.l \{name}_ptr1+2(pc),a0
+                movea.l \ptr+2(pc),a0
                 .endif
-                tst.b   (a0)
-                movea.l (sp)+,a0
                 .endm
 
                 .macro  TICKW   name,columns,counted,eoi,eoir,ctrl,keep,ier,bit,colour,inst,sync
+                .if     \sync
 ; With \sync, the handler of a target of a sync (SPEC.md 5.1): the head
 ; below, before the first byte, which the first select's slot branches
 ; to; the slot keeps the register at +3, where a start writes it and the
 ; remap and the recut read it. At the timer's level, which masks every
-; other timer, the head writes 0 to the voice's two registers, the coarse
-; one first unless the chip's value of the fine one is 0, and goes back to
-; the handler's write with the fine register selected, so the period is 0
-; from the second 0 to the handler's write of the row's fine, or of its
-; coarse where the fine is 0 (SPEC.md 1.12.3). HOLD_T times those steps.
-; The registers are immediates the start writes (sync.S, ymxr_syncwide).
-; Each path's parity word is the first word of its read of the row's
-; fine, which goes on to the odd steps, or a bra.s to the even ones: the
-; frame writes it from the voice's bit of ymxr_seven (sync.S, ymxr_sheads).
-; This general head reads the chip and the row at every tick; the frame
-; aims the slot instead at a head it has written, of a source's rows or of
-; copy from frame, odd or even, where those reads would come out one way
-; until the next frame.
-                .if     \sync
-\{name}_head:   move.l  d0,-(sp)
-\{name}_hf1:    move.b  #0,YM_SELECT.w          ; +3: the fine register
-                move.b  YM_SELECT.w,d0          ; its value
-                bne.s   \{name}_hmain
-; The fine register's value 0: its 0 first, then the coarse register's,
-; and the fine selected again after the steps.
-                move.b  #0,YM_SELECT+2.w
-\{name}_hc1:    move.b  #0,YM_SELECT.w          ; +3: the coarse register
-\{name}_fpar:   FINE0N  \name                   ; the parity word: odd
-                beq.w   \{name}_sodd0
-\{name}_sodd:   move.b  #0,YM_SELECT+2.w
-                HOLD_T  HOLD_L30,HOLD_A30,HOLD_B30
-                move.l  (sp)+,d0
-\{name}_sf1:    move.b  #0,YM_SELECT.w          ; +3: the fine register
-                bra.w   \{name}_ptr1
-\{name}_sev:    FINE0N  \name
-                beq.w   \{name}_seven0
-\{name}_seven:  move.b  #0,YM_SELECT+2.w
-                HOLD_T  HOLD_L40,HOLD_A40,HOLD_B40
-                move.l  (sp)+,d0
-\{name}_sf2:    move.b  #0,YM_SELECT.w          ; +3: the fine register
-                bra.w   \{name}_ptr1
-; The fine register's value other than 0: the coarse register's 0 first,
-; then the fine's, which stays selected for the handler's write.
-\{name}_hmain:
-\{name}_hc2:    move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register
-\{name}_hf2:    move.b  #0,YM_SELECT.w          ; +3: the fine register
-\{name}_mpar:   FINE0   \name                   ; the parity word: odd
-                beq.w   \{name}_odd0
-\{name}_odd:    move.l  (sp)+,d0
-                move.b  #0,YM_SELECT+2.w
-                bra.s   \{name}_ptr1
-\{name}_ev:     FINE0   \name
-                beq.w   \{name}_even0
-                bra.w   \{name}_even
-; The head the frame writes, of a source's rows or of copy from frame, odd
-; or even, which the slot branches to once the frame has written it
-; (sync.S, ymxr_sheads): HREG bytes, room for the longest of the heads it
-; copies in (sync.S, ymxr_hro to ymxr_hce).
-\{name}_hreg:
-                .rept   HREG
-                dc.b    0
+; other timer, the head writes the sync of SPEC.md 1.12.3 from the row at
+; the places: 0 to the voice's coarse register, 0 to its fine one a step
+; later, n steps later the row's fine and a step after it the row's
+; coarse; it then goes on to the handler's test of the last row. The
+; branch at \{name}_first runs n - 1 pads: its displacement is the sync
+; length, a byte the frame writes, and after the coarse the tick writes
+; it from the immediate at \{name}_rowl, the row's, which the frame
+; writes too (sync.S, ymxr_sfirst). The registers are immediates the
+; start writes (sync.S, ymxr_syncwide).
+\{name}_pads:
+                .rept   7
+                lsl.l   #8,d2                   ; a pad: 24 cycles and 8
+                nop
+                nop
                 .endr
-; The slot's way to the general head, which a bra.s does not reach past
-; that room.
-\{name}_gen:    bra.w   \{name}_head
+\{name}_w3:     move.b  (a0),YM_SELECT+2.w      ; the row's fine
+                NOPS    SYNC_STEP3
+                move.l  d0,YM_SELECT.w          ; the coarse register, the row's
+\{name}_rowl:   move.b  #0,($12345678).l        ; coarse; +3 the row's length, +4
+                movem.l (sp)+,d0/d2/a0          ; the first byte's address
+                bra.w   \{name}_cnt
+\{name}_head:   movem.l d0/d2/a0,-(sp)
+                PLACEA  \{name}_ptr2
+\{name}_c2:     move.l  #$01000000,d0           ; +2: the coarse register
+                movep.w 0(a0),d0                ; the row's coarse, bits 15 to 8
+                PLACEA  \{name}_ptr1
+\{name}_f1:     move.l  #$00000000,d2           ; +2: the fine register
+\{name}_c1:     move.l  #$01000000,YM_SELECT.w  ; +2: the coarse register, its 0
+                NOPS    SYNC_STEP1
+                move.l  d2,YM_SELECT.w          ; the fine register's 0
+                NOPS    SYNC_STEP2
+\{name}_first:  bra.s   \{name}_w3              ; +1: the sync length's
                 .endif
 \name:
                 MARK    \colour
                 .if     \sync
-\{name}_sel1:   bra.s   \{name}_gen
+\{name}_sel1:   bra.s   \{name}_head
                 dc.b    0,8                     ; +3: the first register
                 dc.w    0
                 .else
@@ -490,44 +365,8 @@ HOLD_F21        equ     6
 \{name}_hook:   bra.w   \inst                   ; a pending start, as above
                 .endif
                 .if     \sync
-; The ends of the head that the head reaches through a bra.w: the second
-; 0, then HOLD_T's steps, and where the row's fine is 0 those of the
-; coarse write. Where the fine register's 0 is the second it stays
-; selected for the handler's write; where the coarse one's is, the steps
-; select the fine register.
-\{name}_tails:
-\{name}_even:   move.b  #0,YM_SELECT+2.w
-                HOLD_T  HOLD_L20,HOLD_A20,HOLD_B20
-                move.l  (sp)+,d0
-                bra.w   \{name}_ptr1
-\{name}_odd0:   move.b  #0,YM_SELECT+2.w
-                HOLD_T  HOLD_L11,HOLD_A11,HOLD_B11
-                move.l  (sp)+,d0
-                bra.w   \{name}_ptr1
-\{name}_even0:  move.b  #0,YM_SELECT+2.w
-                HOLD_T  HOLD_L21,HOLD_A21,HOLD_B21
-                move.l  (sp)+,d0
-                bra.w   \{name}_ptr1
-\{name}_sodd0:  move.b  #0,YM_SELECT+2.w
-                HOLD_T  HOLD_L31,HOLD_A31,HOLD_B31
-                move.l  (sp)+,d0
-\{name}_sf3:    move.b  #0,YM_SELECT.w          ; +3: the fine register
-                bra.w   \{name}_ptr1
-\{name}_seven0: move.b  #0,YM_SELECT+2.w
-                HOLD_T  HOLD_L41,HOLD_A41,HOLD_B41
-                move.l  (sp)+,d0
-\{name}_sf4:    move.b  #0,YM_SELECT.w          ; +3: the fine register
-                bra.w   \{name}_ptr1
-                .if     YMXR_MAP&YMXR_PERF
-; The end of the heads of copy from frame the frame writes in a build with
-; the monitor, whose count reads its accumulator through the program
-; counter, so a copied head branches here (sync.S, ymxr_hco).
-\{name}_htail:  COUNT   PERF_LOOP,0
-                .if     YMXR_AEOI=0
-                move.b  #\eoi,\eoir.w
-                .endif
-                rte
-                .endif
+; The handler's end, where TWC's ends (handlers.S).
+\{name}_past:
                 .endif
                 .endm
 

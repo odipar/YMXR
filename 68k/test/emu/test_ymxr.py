@@ -941,9 +941,13 @@ class Model:
         self.fv_at = None
         self.fv_stride = None
         # the value of each register as the writes the model makes leave it,
-        # 0 before the first: a sync orders its writes by the values (YMXS,
-        # SPEC.md 3.9.1)
+        # 0 before the first
         self.chip = [0] * 14
+        # each voice's current sync length less 1, which a frame's register
+        # steps make the row's (SPEC.md 1.12.2, 4.4.1), and whether the
+        # frame being played has made them so
+        self.slen = [0, 0, 0]
+        self.lengths_due = False
 
     def apply(self, writes):
         """The chip after writes."""
@@ -952,11 +956,18 @@ class Model:
 
     def synced(self, fine, coarse, f, c):
         """The four writes of a sync of the voice of fine register f and
-        coarse register c to the period fine, coarse: 0 to the two, the
-        coarse one first unless the chip's value of the fine one is 0, then
-        the two values, fine then coarse (SPEC.md 1.12.3)."""
-        zeros = [(f, 0), (c, 0)] if self.chip[f] == 0 else [(c, 0), (f, 0)]
-        return zeros + [(f, fine), (c, coarse)]
+        coarse register c to the period fine, coarse: 0 to the coarse one,
+        0 to the fine one, the fine and the coarse, at every value of the
+        two (SPEC.md 1.12.3)."""
+        return [(c, 0), (f, 0), (f, fine), (c, coarse)]
+
+    def length_of(self, r, v):
+        """Voice v's sync length less 1 in row r: its sync length column
+        in a tune of version 15, and bit 4 of its coarse column otherwise
+        (SPEC.md 1.12.2)."""
+        if self.tune.length_at is not None:
+            return r[self.tune.length_at + v] & 7
+        return r[2 * v + 1] >> 4 & 1
 
     def copying(self, i):
         """Whether effect i's source is copy from frame."""
@@ -989,6 +1000,7 @@ class Model:
     def begin(self):
         """The row this frame plays, read and the next one placed."""
         self.playing = self.tune.rows[self.row]
+        self.lengths_due = True
         self.row += 1
         if self.row == self.tune.R:
             self.row = self.tune.RR
@@ -1118,6 +1130,14 @@ class Model:
                     if not F <= fx["place"] <= L:
                         fx["place"] = F
                 fx["using"] = fx["target"]
+                # A start on a target of a sync runs its handler, whose
+                # first tick until the frame's register steps has the
+                # voice's current sync length, and the first after them
+                # the row's (SPEC.md 5.1; 68k/player/sync.S, ymxr_syncwide)
+                fx["synced"] = fx["using"] >= SYNC_TARGET
+                if fx["synced"]:
+                    v = fx["using"] - SYNC_TARGET
+                    fx.update(voice=v, fresh=True, first=self.slen[v], rowl=self.slen[v])
                 # Use the explicit mapping or reuse kept when its column
                 # is unset (SPEC.md 1.10.2).
                 fx["run"] = fx["mapping"]
@@ -1159,6 +1179,20 @@ class Model:
         steps: the row's writes but those it leaves to the ticks of copy
         from frame."""
         writes = row_writes(self.playing)
+        if self.tune.syncs and self.lengths_due:
+            # the row's sync lengths current, and before them each effect's
+            # handler of a target of a sync has its first tick's: the
+            # current one, and the row's after a start since the frame
+            # before or with a start pending (SPEC.md 4.4.1, 5.1)
+            self.lengths_due = False
+            new = [self.length_of(self.playing, v) for v in range(3)]
+            for fx in self.fx:
+                if fx.get("synced"):
+                    v = fx["voice"]
+                    fx["first"] = new[v] if fx["fresh"] or fx["pending"] else self.slen[v]
+                    fx["rowl"] = new[v]
+                    fx["fresh"] = False
+            self.slen = new
         # Each register the row sets has the row's value as its frame
         # value, and the row leaves a register copy from frame runs on
         # after the steps to the ticks (SPEC.md 3.1.7, 4.4).
@@ -1200,6 +1234,11 @@ class Model:
         # runs out at; every other ends on the marker, bit 7 of the
         # column written last, the marker's column of the row (SPEC.md
         # 3.2, 5.1 step 3).
+        if fx.get("synced"):
+            # the tick's sync length, and the next tick's from the row's
+            # (SPEC.md 5.1)
+            fx["n"] = fx["first"] + 1
+            fx["first"] = fx["rowl"]
         F, L = self.rows_of(fx["crun"], R)
         if fx["crun"] or self.tune.counted[fx["source"]] or self.copying(i):
             last = fx["place"] == L
@@ -1220,7 +1259,7 @@ class Model:
                           place=place if F2 <= place <= L2 else F2,
                           select=pending["select"], count=pending["count"], running=True,
                           pending=None, run=pending["mapping"], crun=pending["cut"],
-                          counting=pending["cut"] != 0, switched=True)
+                          counting=pending["cut"] != 0, switched=True, synced=False)
                 return write, "switch"
             if RR < R:
                 fx["place"] = self.loop_row(i)
@@ -4510,6 +4549,15 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             # and whether the tick runs the handler of copy from frame
             copy = copy_kind(model, i, deferred=False)
             moved = copy and aimed(m, symbols, i)
+            if fx.get("synced"):
+                # the byte the frame writes, the branch into the pads of
+                # n - 1 steps (68k/player/ticks.S, TICKW)
+                first = symbols["ymxr_syn%d_first" % i]
+                one = symbols["ymxr_syn%d_w3" % i] - first - 2
+                assert m.byte(CODE + first + 1) == (one - 6 * fx["first"]) & 0xFF, \
+                    "frame %d: a tick of effect %d syncs for %d steps, not %d" % (
+                        f, i, (one - (m.byte(CODE + first + 1) - 256)) // 6 + 1,
+                        fx["first"] + 1)
             want, then = model.tick(i)
             if cycles:
                 cycles._settle(None)
@@ -6764,7 +6812,7 @@ def hatari(ym, code, symbols, perf=False):
     if "ymxr_skregs" in symbols:
         synced.append((base + symbols["ymxr_skregs"], base + symbols["ymxr_treads"]))
     syn = symbols["ymxr_syn1"] - symbols["ymxr_syn0"]
-    syns = [(base + symbols["ymxr_syn%d_head" % i], base + symbols["ymxr_syn%d_head" % i] + syn)
+    syns = [(base + symbols["ymxr_syn%d_pads" % i], base + symbols["ymxr_syn%d_pads" % i] + syn)
             for i in range(4)]
     # each effect's handler of copy from frame, in a core with the lookup
     # (68k/player/copy.S)
@@ -7104,7 +7152,7 @@ def hatari(ym, code, symbols, perf=False):
                 want = []
         assert masked(writes) == masked(want), "frame %d writes %s, not %s" % (f, writes, want)
 
-    row_evens = []
+    row_lengths = []
     synced_at = []                      # the voices each frame syncs
     for f, (events, clocks, stops, installed) in enumerate(frames[first:first + STUB_FRAMES]):
         if model.row == tune.R:
@@ -7117,9 +7165,8 @@ def hatari(ym, code, symbols, perf=False):
         was = list(counted)
         replay(events, f)
         synced_at.append(set(getattr(model, "synced_now", [])))
-        # bit 4 of each coarse column of the row, the voices whose syncs
-        # during it are even (SPEC.md 1.12)
-        row_evens.append(sum(1 << v for v in range(3) if model.playing[2 * v + 1] & 0x10))
+        # each voice's sync length less 1 in the row (SPEC.md 1.12.2)
+        row_lengths.append([model.length_of(model.playing, v) for v in range(3)])
         played += 1
         timers.apply([(reg, value) for kind, reg, value in events if kind == "mfp"])
         for i in range(4):
@@ -7162,55 +7209,63 @@ def hatari(ym, code, symbols, perf=False):
     stopped = [(reg, value) for events, _, _, _ in frames[first + STUB_FRAMES - 1:first + STUB_FRAMES + 3]
                for kind, reg, value in events if kind == "stop"]
     assert masked(stopped) == masked(HUSHED), "the stop wrote %s" % stopped
-    # Each sync, at a frame or at a tick: the time a voice's period is 0,
-    # from the write that sets the second of its registers to 0, a write of
-    # 0 to the first just before it, to the write that sets one of them
-    # other than 0, is a whole number n of steps of the tone generator, 32
-    # cycles each, n odd or even as bit 4 of the voice's coarse column of
-    # the row says, that of the frame's row or of the row before, which
-    # the ticks of the frame read until its register steps (YMXS, SPEC.md
-    # 3.9.2; SPEC.md 1.12). Hatari's ST counts video cycles at the CPU's
-    # clock. A sync is the frame's where the model's frame syncs the voice,
-    # and a tick's where a handler of a target of a sync writes the zeros:
-    # a row that sets a period of 0 keeps it there for the music, as a
-    # dump of version 9 does.
+    # Each sync, at a frame or at a tick, the four writes of SPEC.md 1.12.3
+    # in a row, one owner's: 0 to the coarse register, 0 to the fine one 32
+    # cycles later, the fine value 32n cycles after that and the coarse
+    # value 32 after it, a step of the tone generator 32 cycles of the ST's
+    # CPU, which Hatari counts at the CPU's clock and stamps a write by the
+    # instruction that makes it. n is the voice's sync length in the frame's
+    # row at a frame; at a tick it is the row's or the row before's, and
+    # once one tick of an effect in a frame has the row's, every later one
+    # has (5.1): the unicorn run reads which tick has which off the
+    # handler's first byte. A sync is the frame's where the model's frame
+    # syncs the voice, and a tick's where a handler of a target of a sync
+    # writes it.
     waits = []
-    regs = {}
-    since = {}
-    def zero(v):
-        return regs.get(2 * v, 1) == 0 and regs.get(2 * v + 1, 1) & 0x0F == 0
+    rows_of_ticks = set()               # (frame, effect) of a tick at the row's length
+
+    def gap(a, b):
+        # a gap across the start of a video frame, where the trace's video
+        # cycles start again at 0
+        return b - a if b >= a else b - a + VIDEO_FRAME
+    past = 0                            # the write after the last sync read
     for k, (owner, reg, value, at, by_sync) in enumerate(stamped):
-        if reg > 5:
+        if k < past or reg > 5 or reg % 2 == 0 or value != 0 or at is None:
             continue
         v = reg // 2
-        was = zero(v)
-        regs[reg] = value
-        if at is None:
-            since.pop(v, None)
-            continue
-        prior = stamped[k - 1] if k > 0 else None
         f = stamped_frame[k] - first
         syncing = by_sync or (owner == "frame" and 0 <= f < len(synced_at)
                               and v in synced_at[f])
-        if syncing and zero(v) and not was and prior and prior[0] == owner \
-                and prior[2] == 0 and prior[1] == (reg ^ 1):
-            since[v] = (at, f)
-        elif was and not zero(v) and v in since:
-            start, f = since.pop(v)
-            # a span across the start of a video frame, where the trace's
-            # video cycles start again at 0
-            span = at - start if at >= start else at - start + VIDEO_FRAME
-            waits.append(span)
-            assert span >= 32 and span % 32 == 0, \
-                "frame %d: a sync keeps voice %s's period at 0 for %d cycles, not a whole" \
-                " number of steps of 32" % (f, "ABC"[v], span)
-            if 0 <= f < len(row_evens):
-                said = {bool(row_evens[f] >> v & 1)} | (
-                    {bool(row_evens[f - 1] >> v & 1)} if f > 0 else set())
-                even = span // 32 % 2 == 0
-                assert even in said, "frame %d: a sync of voice %s is %d steps, %s where the" \
-                    " row says %s" % (f, "ABC"[v], span // 32, "even" if even else "odd",
-                                      "even" if True in said else "odd")
+        if not syncing:
+            continue
+        four = stamped[k:k + 4]
+        assert [(o, r) for o, r, _, _, _ in four] == [(owner, 2 * v + 1), (owner, 2 * v),
+                                                       (owner, 2 * v), (owner, 2 * v + 1)] \
+            and four[1][2] == 0 and None not in [w[3] for w in four], \
+            "frame %d: a sync of voice %s by %s writes %s" % (
+                f, "ABC"[v], owner, [(r, x) for _, r, x, _, _ in four])
+        past = k + 4
+        spans = [gap(four[j][3], four[j + 1][3]) for j in range(3)]
+        waits.append(spans[1])
+        assert spans[0] == 32 and spans[2] == 32 and spans[1] >= 32 and spans[1] % 32 == 0, \
+            "frame %d: a sync of voice %s by %s has gaps of %s cycles, not 32, 32n and 32" % (
+                f, "ABC"[v], owner, spans)
+        n = spans[1] // 32
+        if 0 <= f < len(row_lengths):
+            row = row_lengths[f][v] + 1
+            if owner == "frame":
+                assert n == row, "frame %d: the frame syncs voice %s for %d steps, and the" \
+                    " row's sync length is %d" % (f, "ABC"[v], n, row)
+            else:
+                before = row_lengths[f - 1][v] + 1 if f > 0 else 1
+                assert n in (row, before), "frame %d: a tick of effect %s syncs voice %s for %d" \
+                    " steps, and the sync lengths are %d and %d before" % (
+                        f, owner, "ABC"[v], n, row, before)
+                if n == row != before:
+                    rows_of_ticks.add((f, owner))
+                assert not (n == before != row and (f, owner) in rows_of_ticks), \
+                    "frame %d: a tick of effect %s has the row before's sync length after one" \
+                    " with the row's" % (f, owner)
     if tune.syncs:
         assert waits, "a tune that syncs a voice has no sync on Hatari"
     return played, sum(counted), waits
@@ -8695,6 +8750,9 @@ def main():
                                          "copy-from-frame.ymxr", "sync.ymxr",
                                          "sync-targets.ymxr", "sync-volume.ymxr",
                                          "sync-even.ymxr", "sync-heads.ymxr")]
+            # and a hard sync whose period changes every four rows and
+            # whose timer's rate changes with it (ym/square-sync)
+            tunes.append(os.path.join(ROOT, "ym", "square-sync", "square-sync.ymxr"))
     defines = ["-dYMXR_PERF=1"] if perf else []
     if not PCREL:
         defines += ["-dYMXR_PCREL=0"]
