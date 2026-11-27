@@ -32,10 +32,27 @@ writes today fails the build.
 
 A player pins a version of this format: a tune file is 9, 10 where a row
 maps a value, 11 where a row cuts a source, 12 where a row starts copy from
-frame, 13 where a row syncs a voice and 14 where a row lists a voice among
-its even syncs (SPEC.md 3.3.5), and a bound tune the version of the tune
-file bound (BINARIES.md 1), and a release's number names the tools rather
-than either.
+frame, 13 where a row syncs a voice and 15 where a row has a sync length
+above 1, and a reader reads 14, which 0.20.0 wrote where a row listed a
+voice among its even syncs (SPEC.md 3.3.5), and a bound tune the version of
+the tune file bound (BINARIES.md 1), and a release's number names the tools
+rather than either.
+
+## Unreleased
+
+A sync keeps a voice's period at 0 for 1 to 8 steps, the row's sync length,
+and the player has one sequence for every sync (#412).
+
+- **Version 15.** Three sync length columns follow the mapping and the cut
+  columns, one a voice, each the length less 1 (SPEC.md 1.12.2). Bit 4 of a
+  coarse column is unassigned again, and a reader reads version 14 with a
+  sync length of 2 where that bit is 1 and of 1 where it is 0.
+  `wrong-version` is version $0010.
+- **The sync.** 0 to the coarse register, 0 to the fine one a step later,
+  the fine value n steps after that and the coarse value a step after it, at
+  every value of the two registers (SPEC.md 1.12.3). The first tick after a
+  frame's register steps syncs with the sync length of the row before, other
+  than at the frame of a start and with a start pending (5.1).
 
 ## Published
 

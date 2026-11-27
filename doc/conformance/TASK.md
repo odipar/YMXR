@@ -25,11 +25,11 @@ pending-start snapshots are outside this reader's record (SPEC.md 7).
 It prints at most `<lines>` lines of the record `SPEC.md` 7 defines: the
 first line, the tune's fixed values, then one line of JSON a frame. A
 frame reporting -1 is one line, and the record ends with it. `<lines>`
-counts the lines, the first line among them, so the program reads at
-most `<lines>` - 1 frames, and fewer where the record ends first; it is
-not the F of `SPEC.md` 7.4, which counts frames alone. For a file whose
-version word is other than $0007, $0008, $0009, $000A, $000B and $000C
-(`SPEC.md` 3.3.5), the record is empty and the program's output is empty.
+counts the lines, the first line among them, so the program reads at most
+`<lines>` - 1 frames, and fewer where the record ends first; it is not the
+F of `SPEC.md` 7.4, which counts frames alone. For a file whose version
+word is other than $0007 to $000F (`SPEC.md` 3.3.5), the record is empty
+and the program's output is empty.
 
 The output is compared with the reference byte for byte: each line free
 of spaces, integers in decimal, names in the order `SPEC.md` 7 defines,
@@ -40,8 +40,9 @@ over dicts filled in that order, `sort_keys` left at its default.
 **3. The rows file.** `<file.rows>` is the tune's table: a 16-byte header,
 then row 0 to `R` - 1, each its `C` columns in order, one byte a column,
 the rows adjoining: 30 columns in a tune file of versions 7 to 9, and 34
-in one of version 10 (`SPEC.md` 1), and 34 or 38 in one of version 11 by
-bit 5 of the effects used (`SPEC.md` 3.3.5).
+in one of version 10 (`SPEC.md` 1), 34 or 38 in one of version 11 by bit 5
+of the effects used, 30, 34 or 38 in one of versions 12 to 14 by bits 5
+and 6, and 33, 37 or 41 in one of version 15 (`SPEC.md` 3.3.5).
 
 | offset | bytes | what it is |
 |---|---|---|

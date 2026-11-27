@@ -19,7 +19,7 @@ tests a reader; the rig (7) tests the player against the same record.
 |---|---|
 | `TASK.md` | the task an implementer receives, with the line count of each tune |
 | `tunes/X.ymxr` | the tune file of tune `X` |
-| `tunes/X.rows` | the tune's table as DTX0 (DTX, SPEC.md 2.1): a 16-byte header, `R` at bytes 4 to 7, `C` at 8 and 9, 30 for a tune of version 9, 34 for one of version 10, and 34 or 38 for one of version 11, `RR` at 10 to 13 and `W` = 1 at 14, then `R` rows of `C` bytes; empty for `wrong-version` |
+| `tunes/X.rows` | the tune's table as DTX0 (DTX, SPEC.md 2.1): a 16-byte header, `R` at bytes 4 to 7, `C` at 8 and 9, 30 for a tune of version 9, 34 for one of version 10, 34 or 38 for one of version 11, and 33 for one of version 15, `RR` at 10 to 13 and `W` = 1 at 14, then `R` rows of `C` bytes; empty for `wrong-version` |
 | `X.jsonl` | the reference record of tune `X`, outside the kit: `MANIFEST.txt` records its sha256 and bytes |
 | `MANIFEST.txt` | `# sha256  bytes  file`, then a line each for `tunes/X.ymxr`, `tunes/X.rows` and `X.jsonl` of every tune |
 | `SOURCES.md` | a row a tune: its name, the dump or builder it comes from, the dump's title and author, the converter's flags, its bytes, the first 16 hexadecimal digits of its sha256, and what it reaches |
@@ -35,8 +35,8 @@ version 10, and `cut` and `cuts` as YMXS structures it writes at version
 kit's `cuts.json`; `sync`, `sync-targets` and `sync-volume` as YMXS
 structures it writes at version 13, the second the YMXS kit's `sync.json`
 under the identity with Timers A and C at a prescaler of 10, and
-`sync-even` and `sync-heads` as ones it writes at version 14;
-`wrong-version` is `chambers` with the version word $000F. The published
+`sync-even` and `sync-heads` as ones it writes at version 15;
+`wrong-version` is `chambers` with the version word $0010. The published
 music belongs to its composers, and the repository's LICENSE excludes it:
 a copy of the kit has the tunes for the exercise alone.
 
@@ -418,8 +418,8 @@ Two places changed for entries that left output as it is:
 | `sync` | version 13 at 50 Hz; bit 5 of each coarse column, the voices a row syncs, read on every row, a row that syncs a voice and leaves its period unset among them, and the record's `s` (SPEC.md 1.12, 7.3); copy from frame and a source on the periods of two voices, whose syncs the frame leaves to them, and a deferred start pending across rows that sync (4.4.1) |
 | `sync-targets` | version 13 at 50 Hz; `syncToneA`, `syncToneB` and `syncToneC`, targets 25 to 27, each tick a sync of its voice (SPEC.md 5.1): copy from frame on two of them and a source of two rows on the third, beside rows that sync at their frame |
 | `sync-volume` | version 13 at 50 Hz; a square on `syncToneA` under the identity, each tick a sync of voice A (SPEC.md 5.1), beside a sample on `setR8`, the volume of that voice, through a transformation, and a deferred start of the sample on `setR10` through another (SPEC.md 1.10): a target of a sync among effects that map a value, rule 2(k) |
-| `sync-even` | version 14 at 50 Hz; bit 4 of each coarse column, the voices whose syncs during the row are even, read on every row, and the record's `even` (SPEC.md 1.12, 7.3): rows that sync each voice at their frame, odd and even, to periods whose fine is 0 and other than 0, a square of four rows on `syncToneA` whose syncs two rows make even, and a row that lists a voice without a sync |
-| `sync-heads` | version 14 at 50 Hz; copy from frame on `syncToneA` and on `syncToneC` and a source of four rows with no fine of 0 on `syncToneB`, each tick a sync of its voice (SPEC.md 5.1), odd and even by the rows' bit 4, beside rows that set the fine of voice A and then of voice C to 0 and back |
+| `sync-even` | version 15 at 50 Hz; the sync length columns, read on every row, and the record's `lengths` (SPEC.md 1.12.2, 7.3): rows that sync each voice at their frame with sync lengths 1, 2, 3 and 8, to periods whose fine is 0 and other than 0, a square of four rows on `syncToneA` whose syncs rows set to lengths 2, 3 and 8, and a row that sets a voice's sync length without a sync |
+| `sync-heads` | version 15 at 50 Hz; copy from frame on `syncToneA` and on `syncToneC` and a source of four rows on `syncToneB`, each tick a sync of its voice (SPEC.md 5.1) with the sync length of the row or of the row before, 1, 2, 3 or 8, beside rows that set the fine of voice A and then of voice C to 0 and back |
 | `wrong-version` | the version word $000F: a reader produces an empty record |
 
 `SOURCES.md` records where each tune comes from and what it reaches in
