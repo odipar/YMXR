@@ -193,8 +193,8 @@ class SyncTest {
     }
 
     /** Sync lengths, for the kit: rows that sync each voice at their frame
-     *  with sync lengths 1 and above, to periods whose fine is 0 and other
-     *  than 0, rows 6 and 7 after a fine of 0; a square of four rows on
+     *  with sync lengths 1 to 16, to periods whose fine is 0 and other than
+     *  0, rows 6 and 7 after a fine of 0; a square of four rows on
      *  syncToneA on Timer A from row 8 to row 11, two of its rows a fine of
      *  0, whose ticks rows 8 to 10 set lengths above 1 for; and row 14,
      *  which sets the sync length of voice C without a sync. */
@@ -218,10 +218,12 @@ class SyncTest {
                 6, Set.of(Voice.A), 7, Set.of(Voice.A), 9, Set.of(Voice.B),
                 10, Set.of(Voice.B));
         Map<Integer, Set<Voice>> more = Map.of(12, Set.of(Voice.C), 13, Set.of(Voice.C));
-        Map<Integer, Map<Voice, Integer>> lengths = Map.of(2, Map.of(Voice.A, 2),
-                3, Map.of(Voice.B, 3), 7, Map.of(Voice.A, 8), 8, Map.of(Voice.A, 2),
-                9, Map.of(Voice.A, 3), 10, Map.of(Voice.A, 8, Voice.B, 8),
-                13, Map.of(Voice.C, 2), 14, Map.of(Voice.C, 3));
+        Map<Integer, Map<Voice, Integer>> lengths = Map.ofEntries(
+                Map.entry(2, Map.of(Voice.A, 2)), Map.entry(3, Map.of(Voice.B, 3)),
+                Map.entry(4, Map.of(Voice.B, 16)), Map.entry(5, Map.of(Voice.C, 11)),
+                Map.entry(7, Map.of(Voice.A, 8)), Map.entry(8, Map.of(Voice.A, 2)),
+                Map.entry(9, Map.of(Voice.A, 3)), Map.entry(10, Map.of(Voice.A, 16, Voice.B, 8)),
+                Map.entry(13, Map.of(Voice.C, 2)), Map.entry(14, Map.of(Voice.C, 3)));
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < count; r++) {
             Map<Timer, Effect> effects = new EnumMap<>(Timer.class);
@@ -243,9 +245,9 @@ class SyncTest {
     /** The ticks of a target of a sync, for the kit: copy from frame on
      *  syncToneA on Timer A from row 1 to row 14 and on syncToneC on Timer
      *  C from row 3 to row 14, and a source of four rows on syncToneB on
-     *  Timer B from row 2 to row 13, each with the sync lengths the rows
-     *  set. Row 8 sets voice A's fine frame value to 0 and row 9 back, and
-     *  row 10 voice C's and row 11 back. */
+     *  Timer B from row 2 to row 13, each with the sync lengths 1 to 16 the
+     *  rows set. Row 8 sets voice A's fine frame value to 0 and row 9 back,
+     *  and row 10 voice C's and row 11 back. */
     static org.ymxs.YMXS.Tune ticks() {
         Pair steps = new Pair("steps", Tunes.repeating(List.of(new Two(150, 0),
                 new Two(140, 0), new Two(130, 1), new Two(120, 0)), 0));
@@ -273,10 +275,13 @@ class SyncTest {
         registers.get(9).put(Register.R0, 160);
         registers.get(10).putAll(Map.of(Register.R4, 0, Register.R5, 1));
         registers.get(11).put(Register.R4, 70);
-        Map<Integer, Map<Voice, Integer>> lengths = Map.of(3, Map.of(Voice.A, 2),
-                4, Map.of(Voice.A, 3, Voice.B, 2), 5, Map.of(Voice.B, 8), 6, Map.of(Voice.C, 2),
-                7, Map.of(Voice.A, 8, Voice.C, 3), 8, Map.of(Voice.A, 2), 10, Map.of(Voice.C, 8),
-                11, Map.of(Voice.B, 3), 12, Map.of(Voice.A, 3, Voice.C, 2));
+        Map<Integer, Map<Voice, Integer>> lengths = Map.ofEntries(
+                Map.entry(3, Map.of(Voice.A, 2)), Map.entry(4, Map.of(Voice.A, 3, Voice.B, 2)),
+                Map.entry(5, Map.of(Voice.B, 16)), Map.entry(6, Map.of(Voice.C, 2)),
+                Map.entry(7, Map.of(Voice.A, 8, Voice.C, 3)), Map.entry(8, Map.of(Voice.A, 2)),
+                Map.entry(9, Map.of(Voice.A, 16, Voice.B, 9)), Map.entry(10, Map.of(Voice.C, 8)),
+                Map.entry(11, Map.of(Voice.B, 3)), Map.entry(12, Map.of(Voice.A, 3, Voice.C, 2)),
+                Map.entry(13, Map.of(Voice.C, 16)));
         List<Row> rows = new ArrayList<>();
         for (int r = 0; r < count; r++) {
             Set<Voice> syncs = r == 0 ? Set.of(Voice.A, Voice.B, Voice.C) : Set.of();
@@ -441,6 +446,8 @@ class SyncTest {
         assertEquals(0, a[1], "row 1 has a sync length of 1");
         assertEquals(2, b[3], "row 3 syncs B for 3 steps");
         assertEquals(7, a[7], "row 7 syncs A for 8 steps");
+        assertEquals(15, b[4], "row 4 syncs B for 16 steps");
+        assertEquals(10, c[5], "row 5 syncs C for 11 steps");
         assertEquals(2, c[14], "row 14 sets C's sync length without a sync");
         assertEquals(Columns.SYNC, read.table().column(1)[2] & 0xFF,
                 "row 2 syncs A, bit 4 unassigned");
@@ -449,8 +456,10 @@ class SyncTest {
         assertTrue(lines.get(3).contains(",\"s\":[\"A\"],\"lengths\":{\"A\":2},\"e\":"),
                 lines.get(3));
         assertTrue(lines.get(15).contains("},\"lengths\":{\"C\":3},\"e\":"), lines.get(15));
-        assertTrue(lines.get(11).contains(",\"s\":[\"B\"],\"lengths\":{\"A\":8,\"B\":8},"),
+        assertTrue(lines.get(11).contains(",\"s\":[\"B\"],\"lengths\":{\"A\":16,\"B\":8},"),
                 lines.get(11));
+        assertTrue(lines.get(5).contains(",\"s\":[\"B\"],\"lengths\":{\"B\":16},"),
+                lines.get(5));
         assertTrue(!lines.get(2).contains("\"lengths\""), "row 1 has none: " + lines.get(2));
         assertEquals(Tune.SYNC, Tune.getWord(ConformanceTest.schema(tune()).file(), 4),
                 "a tune whose rows have no sync length above 1 stays version 13");

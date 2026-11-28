@@ -546,7 +546,7 @@ final class Schema {
         }
     }
 
-    /** The sync length of a voice in a row, 1 to 8 steps: the row's
+    /** The sync length of a voice in a row, 1 to 16 steps: the row's
      *  {@code syncSteps} of the voice, and 1 where it has none (SPEC.md
      *  1.12.2; YMXS, SPEC.md 1.6). */
     static int length(Row row, Voice voice) {

@@ -456,7 +456,7 @@ YMXR_init:
                 lea     TWC_PTR1+PLACE_LO(a5),a3
                 move.l  a3,TWC_CNT(a5)          ; the first place, compared
                 lea     TWS_FIRST(a5),a3
-                move.l  a3,TWS_COPYA(a5)        ; the byte the tick writes
+                move.l  a3,TWS_COPYA(a5)        ; the word the tick writes
                 lea     TWS_SIZE(a5),a5
 .nolinksyn:     dbra    d2,.linksyn
 .linkedsyn:

@@ -201,6 +201,8 @@ EVEN = 14
 LENGTH = 15
 # The first target of a sync, syncToneA (SPEC.md 2.1).
 SYNC_TARGET = 25
+# The bytes of a pad of a sync, each a step (68k/player/ticks.S, PAD).
+SYNC_PAD = 4
 
 # Bit 31 of a source's index entry: the source's rows are whole bytes and
 # a player counts them (SPEC.md 3.1).
@@ -740,8 +742,8 @@ def entry(model, writes):
             out["even"] = even
     if model.tune.written == LENGTH:
         # in version 15 the voices whose sync length is above 1, each with
-        # its length, bits 2 to 0 of its column and 1 (SPEC.md 1.12.2, 7.3)
-        lengths = {"ABC"[v]: (model.playing[model.tune.length_at + v] & 7) + 1
+        # its length, bits 3 to 0 of its column and 1 (SPEC.md 1.12.2, 7.3)
+        lengths = {"ABC"[v]: (model.playing[model.tune.length_at + v] & 15) + 1
                    for v in range(3)}
         lengths = {voice: n for voice, n in lengths.items() if n > 1}
         if lengths:
@@ -976,7 +978,7 @@ class Model:
         in a tune of version 15, and bit 4 of its coarse column otherwise
         (SPEC.md 1.12.2)."""
         if self.tune.length_at is not None:
-            return r[self.tune.length_at + v] & 7
+            return r[self.tune.length_at + v] & 15
         return r[2 * v + 1] >> 4 & 1
 
     def copying(self, i):
@@ -4565,13 +4567,14 @@ def check(ym, code, symbols, cycles=None, kit=False, perf=False, parts=False,
             copy = copy_kind(model, i, deferred=False)
             moved = copy and aimed(m, symbols, i)
             if fx.get("synced"):
-                # the byte the frame writes, the branch into the pads of
-                # n - 1 steps (68k/player/ticks.S, TICKW)
+                # the word the frame writes, the displacement of the bra.w
+                # into the pads of n - 1 steps, SYNC_PAD bytes a pad
+                # (68k/player/ticks.S, TICKW)
                 first = symbols["ymxr_syn%d_first" % i]
                 one = symbols["ymxr_syn%d_w3" % i] - first - 2
-                assert m.byte(CODE + first + 1) == (one - 6 * fx["first"]) & 0xFF, \
+                assert m.word(CODE + first + 2) == (one - SYNC_PAD * fx["first"]) & 0xFFFF, \
                     "frame %d: a tick of effect %d syncs for %d steps, not %d" % (
-                        f, i, (one - (m.byte(CODE + first + 1) - 256)) // 6 + 1,
+                        f, i, (one - (m.word(CODE + first + 2) - 0x10000)) // SYNC_PAD + 1,
                         fx["first"] + 1)
             want, then = model.tick(i)
             if cycles:

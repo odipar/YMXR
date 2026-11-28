@@ -1276,23 +1276,20 @@ TWS_SIZE        equ     ymxr_e_synced0_1-ymxr_p_synced0_1
                 .endif
 ; The head's registers, which a start writes (sync.S, ymxr_syncwide): the
 ; fine register in the long of its 0, and the coarse in that of its 0 and
-; in the long the coarse goes into; its two bytes of the sync length,
-; which the frame writes (ymxr_sfirst): the displacement of the branch
+; in the long the coarse goes into; its two words of the sync length,
+; which the frame writes (ymxr_sfirst): the displacement of the bra.w
 ; into the pads and the immediate the tick writes it from; that
 ; displacement's address, which the link writes into the immediate's
-; move; and the displacement of a sync length of 1, 6 bytes a pad.
+; move; and the displacement of a sync length of 1, PAD bytes a pad.
 TWS_F1          equ     ymxr_syn0_f1-ymxr_syn0+2
 TWS_C1          equ     ymxr_syn0_c1-ymxr_syn0+2
 TWS_C2          equ     ymxr_syn0_c2-ymxr_syn0+2
-TWS_FIRST       equ     ymxr_syn0_first-ymxr_syn0+1
-TWS_ROWL        equ     ymxr_syn0_rowl-ymxr_syn0+3
+TWS_FIRST       equ     ymxr_syn0_first-ymxr_syn0+2
+TWS_ROWL        equ     ymxr_syn0_rowl-ymxr_syn0+2
 TWS_COPYA       equ     ymxr_syn0_rowl-ymxr_syn0+4
 TWS_D1          equ     ymxr_syn0_w3-ymxr_syn0_first-2
-                .if     (ymxr_syn0_w3-ymxr_syn0_pads)<>42
-                .error  "the pads of a handler of a target of a sync are not 6 bytes each"
-                .endif
-                .if     (TWS_D1+86)<0
-                .error  "the pads of a handler of a target of a sync are past a bra.s"
+                .if     (ymxr_syn0_w3-ymxr_syn0_pads)<>(PADS*PAD)
+                .error  "the pads of a handler of a target of a sync are not PAD bytes each"
                 .endif
 
                 .if     YMXR_DEFER

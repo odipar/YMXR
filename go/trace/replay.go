@@ -53,7 +53,7 @@ type Replay struct {
 	// (SPEC.md 1.12.2).
 	Evens int
 	// Lengths is the sync length of each voice in the last row, A, B and C,
-	// 1 to 8: the sync length column and 1 in version 15, 2 where bit 4 is
+	// 1 to 16: the sync length column and 1 in version 15, 2 where bit 4 is
 	// set in version 14, and 1 otherwise (SPEC.md 1.12.2).
 	Lengths [3]int
 
@@ -100,11 +100,11 @@ func (m *Replay) Step() {
 		if ymxr.HasEvens(m.effects) && r[1+2*v]&ymxr.Even != 0 {
 			m.Evens |= 1 << v
 		}
-		// bits 2 to 0 of the sync length column, the length less 1; bits 7
-		// to 3 are unassigned and left unread (SPEC.md 1.12.2)
+		// bits 3 to 0 of the sync length column, the length less 1; bits 7
+		// to 4 are unassigned and left unread (SPEC.md 1.12.2)
 		switch {
 		case ymxr.HasLengths(m.effects):
-			m.Lengths[v] = int(r[ymxr.LengthColumnOf(m.effects, v)]&7) + 1
+			m.Lengths[v] = int(r[ymxr.LengthColumnOf(m.effects, v)]&15) + 1
 		case m.Evens&(1<<v) != 0:
 			m.Lengths[v] = 2
 		default:

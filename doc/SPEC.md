@@ -459,17 +459,17 @@ sync a voice and leave both columns of its period unset. A writer sets the
 bit of each voice the row's `syncs` lists (YMXS, SPEC.md 1.1), and sets
 the two columns where the row sets the registers.
 
-**1.12.2** A row has a *sync length* for each voice, 1 to 8 steps (1.12.3;
-YMXS, SPEC.md 1.6, 3.9). In version 15 a *sync length column* for each
-voice follows the mapping and the cut columns the tune uses (3.3.5): voice
-A's at column K, voice B's at K + 1 and voice C's at K + 2, K 30 and 4
-more for each of those two groups. Bits 2 to 0 of the column are the sync
-length less 1, 0 to 7, and bits 7 to 3 are unassigned; the column has no
-set bit, and a player reads it on every row. In version 14 the sync length
-is 2 where bit 4 of the voice's coarse column is 1 and 1 where it is 0, a
-bit a player reads on every row (1.1.4); in version 13 every sync length
-is 1. A writer writes the row's `syncSteps` of each voice (YMXS, SPEC.md
-1.6), and 1 for a voice the row leaves out.
+**1.12.2** A row has a *sync length* for each voice, 1 to 16 steps
+(1.12.3; YMXS, SPEC.md 1.6, 3.9). In version 15 a *sync length column* for
+each voice follows the mapping and the cut columns the tune uses (3.3.5):
+voice A's at column K, voice B's at K + 1 and voice C's at K + 2, K 30 and
+4 more for each of those two groups. Bits 3 to 0 of the column are the
+sync length less 1, 0 to 15, and bits 7 to 4 are unassigned; the column
+has no set bit, and a player reads it on every row. In version 14 the sync
+length is 2 where bit 4 of the voice's coarse column is 1 and 1 where it
+is 0, a bit a player reads on every row (1.1.4); in version 13 every sync
+length is 1. A writer writes the row's `syncSteps` of each voice (YMXS,
+SPEC.md 1.6), and 1 for a voice the row leaves out.
 
 **1.12.3** A *sync* of a voice with sync length n writes the two registers
 of its period, R0 and R1 for voice A, R2 and R3 for voice B, R4 and R5 for
@@ -1870,7 +1870,7 @@ For a frame that reads a row, `{"result":0,"w":{...},"e":{...}}`, and
   row sets none.
 - `lengths`, in version 15, after `s`, is the voices whose sync length in
   the row is above 1 (1.12.2), in the order A, B, C, each keyed by its
-  letter as in `s` with the sync length, 2 to 8, and is absent where the
+  letter as in `s` with the sync length, 2 to 16, and is absent where the
   row has none.
 - `e` is the effects whose target, source, control or count column, or in
   versions 10 to 13 mapping column, or in versions 11 to 13 cut column,
@@ -1974,7 +1974,7 @@ R.
 
 **8.5** The unassigned bits and values: select 0 of a control column
 (1.9.2), bit 4 of a coarse column in a version other than 14, and bit 5 in
-a version before 13 (1.2.2), bits 7 to 3 of a sync length column (1.12.2),
+a version before 13 (1.2.2), bits 7 to 4 of a sync length column (1.12.2),
 bits 6 and 5 of columns 6, 8, 9 and 10, bit 6 of column 7, bit 4 of column
 13, bit 7 of the effects used in a version before 12 and a source column
 above S (3.3), a mapping column above T (3.4), a cut column above U (3.5),
