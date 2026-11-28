@@ -84,13 +84,13 @@ and the player has one sequence for every sync (#412).
   bytes read the row's period with the row before's sync length. In a tune
   that syncs a voice, copy from frame on R0 to R5 runs its counted handler.
   The frame costs more at its level: `sync-heads` plays 4,844 cycles a call
-  on average and 7,254 at most, against 4,074 and 6,424. Under Hatari,
-  #412's export of `square-sync` restarts voice A's square at another level
-  at row 384, where the timer restarts, and at row 702, where a tick runs 4
-  steps late after the frame's code, against rows 32, 559, 563, 577, 718,
-  756 and 765 besides. The rig's Hatari pass reads each tick against the row
-  before and the row, and fails `sync-heads` and `square-sync` on the player
-  before.
+  on average and 7,254 at most, past R4.5's 6,656, against 4,074 and 6,424.
+  Under Hatari, #412's export of `square-sync`, at up to 5 steps of margin
+  (YMXS, SPEC.md 3.9.4), restarts voice A's square at another level at row
+  384, where the timer restarts, and on the player before at rows 32, 559,
+  563, 577, 718, 756 and 765 besides. The rig's Hatari pass reads each tick
+  against the row before and the row, and fails `sync-heads` and
+  `square-sync` on the player before.
 
 ## Published
 
