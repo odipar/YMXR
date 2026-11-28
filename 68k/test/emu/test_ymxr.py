@@ -948,6 +948,16 @@ class Model:
         # frame being played has made them so
         self.slen = [0, 0, 0]
         self.lengths_due = False
+        # What the Hatari pass reads each tick of a target of a sync against
+        # (hatari): the effects the frame's row starts on one, each with the
+        # current sync length less 1 the start writes; and as the row's
+        # sync lengths become current, each effect on one with the sync
+        # length less 1 of its first tick after that and of the ticks after
+        # it, its voice and whether it copies from frame, and the frame
+        # values after the row (SPEC.md 4.4.1, 5.1).
+        self.started = {}
+        self.point = {}
+        self.point_fv = list(self.fv)
 
     def apply(self, writes):
         """The chip after writes."""
@@ -1001,6 +1011,7 @@ class Model:
         """The row this frame plays, read and the next one placed."""
         self.playing = self.tune.rows[self.row]
         self.lengths_due = True
+        self.started = {}
         self.row += 1
         if self.row == self.tune.R:
             self.row = self.tune.RR
@@ -1138,6 +1149,7 @@ class Model:
                 if fx["synced"]:
                     v = fx["using"] - SYNC_TARGET
                     fx.update(voice=v, fresh=True, first=self.slen[v], rowl=self.slen[v])
+                    self.started[i] = self.slen[v]
                 # Use the explicit mapping or reuse kept when its column
                 # is unset (SPEC.md 1.10.2).
                 fx["run"] = fx["mapping"]
@@ -1186,12 +1198,14 @@ class Model:
             # before or with a start pending (SPEC.md 4.4.1, 5.1)
             self.lengths_due = False
             new = [self.length_of(self.playing, v) for v in range(3)]
-            for fx in self.fx:
+            self.point = {}
+            for i, fx in enumerate(self.fx):
                 if fx.get("synced"):
                     v = fx["voice"]
                     fx["first"] = new[v] if fx["fresh"] or fx["pending"] else self.slen[v]
                     fx["rowl"] = new[v]
                     fx["fresh"] = False
+                    self.point[i] = (fx["first"], fx["rowl"], v, self.copying(i))
             self.slen = new
         # Each register the row sets has the row's value as its frame
         # value, and the row leaves a register copy from frame runs on
@@ -1199,6 +1213,7 @@ class Model:
         self.row_writes = writes
         for register, value in writes:
             self.fv[register] = value
+        self.point_fv = list(self.fv)
         copied = {register for i in range(4) if self.fx[i]["running"] and self.copying(i)
                   for register, _ in TARGETS[self.fx[i]["using"]]}
         left = [(register, value) for register, value in writes if register not in copied]
@@ -7177,6 +7192,9 @@ def hatari(ym, code, symbols, perf=False):
 
     row_lengths = []
     synced_at = []                      # the voices each frame syncs
+    # each frame's frame values before it, and the row made current at a
+    # target of a sync (Model.point), which each tick is read against below
+    rows_made = []
     for f, (events, clocks, stops, installed) in enumerate(frames[first:first + STUB_FRAMES]):
         if model.row == tune.R:
             # past the last row of a tune that plays once the call reports the
@@ -7186,8 +7204,11 @@ def hatari(ym, code, symbols, perf=False):
                 "frame %d: the call after the last row writes %s" % (f, events)
             break
         was = list(counted)
+        fv_before = list(model.fv)
         replay(events, f)
         synced_at.append(set(getattr(model, "synced_now", [])))
+        rows_made.append((fv_before, dict(model.point), list(model.point_fv),
+                           dict(model.started)))
         # each voice's sync length less 1 in the row (SPEC.md 1.12.2)
         row_lengths.append([model.length_of(model.playing, v) for v in range(3)])
         played += 1
@@ -7246,6 +7267,8 @@ def hatari(ym, code, symbols, perf=False):
     # writes it.
     waits = []
     rows_of_ticks = set()               # (frame, effect) of a tick at the row's length
+    tick_syncs = []                     # each tick's sync: (frame, effect, voice,
+                                        # steps, fine, coarse)
 
     def gap(a, b):
         # a gap across the start of a video frame, where the trace's video
@@ -7274,6 +7297,8 @@ def hatari(ym, code, symbols, perf=False):
             "frame %d: a sync of voice %s by %s has gaps of %s cycles, not 32, 32n and 32" % (
                 f, "ABC"[v], owner, spans)
         n = spans[1] // 32
+        if owner != "frame" and 0 <= f < len(rows_made):
+            tick_syncs.append((f, owner, v, n, four[2][2], four[3][2]))
         if 0 <= f < len(row_lengths):
             row = row_lengths[f][v] + 1
             if owner == "frame":
@@ -7291,7 +7316,92 @@ def hatari(ym, code, symbols, perf=False):
                     " with the row's" % (f, owner)
     if tune.syncs:
         assert waits, "a tune that syncs a voice has no sync on Hatari"
+    one_state(tick_syncs, rows_made)
     return played, sum(counted), waits
+
+
+def one_state(tick_syncs, rows_made):
+    """Each tick of a target of a sync against one side of the row made
+    current at the targets of a sync (SPEC.md 4.4.1, 5.1): a tick before
+    it syncs at the length the row before left and, copying from frame,
+    to the frame values before the row; a tick after it at the length the
+    row sets and to the frame values after the row. The first tick after
+    a start or after the row is made current has its first tick's length,
+    and every tick after it the length of the next ticks. tick_syncs is
+    each tick's sync in the trace's order, (frame, effect, voice, steps,
+    fine, coarse); rows_made each frame's frame values before it and the
+    model's records of its row (Model.point). The trace has no write of
+    the operation, so the check reads it at each place among the frame's
+    ticks: it keeps each place the ticks agree with, and fails a tick that
+    agrees with none."""
+    def frozen(state):
+        return tuple(sorted(state.items()))
+
+    def current(state, begun, started, point):
+        # the starts of the frame first, then the row made current
+        state = dict(state)
+        for i, length in started.items():
+            if i not in begun:
+                state[i] = (length, length)
+        for i, (first, rowl, _, _) in point.items():
+            state[i] = (first, rowl)
+        return state
+
+    by_frame = {}
+    for one in tick_syncs:
+        by_frame.setdefault(one[0], []).append(one)
+    carried = {frozen({})}
+    for f, (before, point, after, started) in enumerate(rows_made):
+        # (made current, the effects started, each effect's sync length
+        # less 1 at its next tick and at the ticks after it)
+        live = {(False, frozenset(), state) for state in carried}
+        for _, i, v, n, fine, coarse in by_frame.get(f, []):
+            ways = set()
+            for made, begun, state in live:
+                state = dict(state)
+                if made:
+                    ways.add((True, begun, frozen(state)))
+                    continue
+                ways.add((False, begun, frozen(state)))
+                if i in started and i not in begun:
+                    # the tick after the effect's start at the frame
+                    ways.add((False, begun | {i},
+                              frozen({**state, i: (started[i], started[i])})))
+                ways.add((True, frozenset(started),
+                          frozen(current(state, begun, started, point))))
+            kept, seen = set(), []
+            for made, begun, state in ways:
+                state = dict(state)
+                if i not in state:
+                    # an effect the frame starts on a target of a sync,
+                    # and no start on one before: its tick is after the start
+                    if i not in started:
+                        kept.add((made, begun, frozen(state)))
+                    continue
+                first, rowl = state[i]
+                copying = point.get(i, (0, 0, 0, False))[3]
+                values = after if made else before
+                # the coarse register's four bits (SPEC.md 4.4)
+                period = (values[2 * v], values[2 * v + 1] & 0x0F)
+                seen.append(("the row's" if made else "the row before's", first + 1,
+                             period if copying else None))
+                if first + 1 != n:
+                    continue
+                if copying and (fine, coarse & 0x0F) != period:
+                    continue
+                state[i] = (rowl, rowl)
+                kept.add((made, begun, frozen(state)))
+            assert kept, \
+                "frame %d: a tick of effect %d syncs voice %s to %d, %d for %d steps, against" \
+                " %s" % (
+                    f, i, "ABC"[v], fine, coarse, n,
+                    "; ".join("%s %d steps%s" % (side, steps, "" if period is None
+                                                 else " to %d, %d" % period)
+                              for side, steps, period in sorted(set(seen))))
+            live = kept
+        # the row made current after the frame's last tick
+        carried = {frozen(dict(state) if made else current(dict(state), begun, started, point))
+                   for made, begun, state in live}
 
 
 # The vector the 68000 runs where an interrupt acknowledge finds no
