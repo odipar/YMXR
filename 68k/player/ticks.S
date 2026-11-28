@@ -231,6 +231,18 @@ SYNC_STEP3      equ     3
                 .endif
                 .endm
 
+; The pads of a sync, each a step, 32 cycles in PAD bytes: the shift 24
+; cycles and the add 8, one prefetch each. A sync length of n runs n - 1
+; of the 15. d2 clobbered.
+PAD             equ     4
+PADS            equ     15
+                .macro  SPADS
+                .rept   PADS
+                lsl.l   #8,d2                   ; a pad
+                addq.l  #1,d2
+                .endr
+                .endm
+
 ; The place of a column into a0, read off the operand of its read at \ptr:
 ; through the displacement a tick steps, or the address.
                 .macro  PLACEA  ptr
@@ -253,21 +265,18 @@ SYNC_STEP3      equ     3
 ; later, n steps later the row's fine and a step after it the row's
 ; coarse; it then goes on to the handler's test of the last row. The
 ; branch at \{name}_first runs n - 1 pads: its displacement is the sync
-; length, a byte the frame writes, and after the coarse the tick writes
+; length, a word the frame writes, and after the coarse the tick writes
 ; it from the immediate at \{name}_rowl, the row's, which the frame
-; writes too (sync.S, ymxr_sfirst). The registers are immediates the
-; start writes (sync.S, ymxr_syncwide).
+; writes too (sync.S, ymxr_sfirst). The bra.w is 10 cycles, as a bra.s
+; is, and reaches the 15 pads. The registers are immediates the start
+; writes (sync.S, ymxr_syncwide).
 \{name}_pads:
-                .rept   7
-                lsl.l   #8,d2                   ; a pad: 24 cycles and 8
-                nop
-                nop
-                .endr
+                SPADS
 \{name}_w3:     move.b  (a0),YM_SELECT+2.w      ; the row's fine
                 NOPS    SYNC_STEP3
                 move.l  d0,YM_SELECT.w          ; the coarse register, the row's
-\{name}_rowl:   move.b  #0,($12345678).l        ; coarse; +3 the row's length, +4
-                movem.l (sp)+,d0/d2/a0          ; the first byte's address
+\{name}_rowl:   move.w  #0,($12345678).l        ; coarse; +2 the row's length, +4
+                movem.l (sp)+,d0/d2/a0          ; the first word's address
                 bra.w   \{name}_cnt
 \{name}_head:   movem.l d0/d2/a0,-(sp)
                 PLACEA  \{name}_ptr2
@@ -279,7 +288,7 @@ SYNC_STEP3      equ     3
                 NOPS    SYNC_STEP1
                 move.l  d2,YM_SELECT.w          ; the fine register's 0
                 NOPS    SYNC_STEP2
-\{name}_first:  bra.s   \{name}_w3              ; +1: the sync length's
+\{name}_first:  bra.w   \{name}_w3              ; +2: the sync length's
                 .endif
 \name:
                 MARK    \colour

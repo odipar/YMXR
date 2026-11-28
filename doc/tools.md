@@ -916,7 +916,7 @@ from the tunes that played wrong. The rig binds each tune through
 against a model of SPEC.md 4 and 5 built from the tune's tables: every
 frame's chip writes in order, each timer's programming, each handler's
 place, every tick's write, and before each tick of a target of a sync the
-byte of its handler that sets the tick's sync length (SPEC.md 5.1). The
+word of its handler that sets the tick's sync length (SPEC.md 5.1). The
 rig fires each tick at the time the model computes, in place of the
 interrupt the emulator lacks. It fires two ticks the tune's timers do not:
 a tick of a timer no row has started, which writes `$80` to R0 and stops

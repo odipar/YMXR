@@ -67,7 +67,7 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 bset    #\v,d4
 .ns\~:
 \{p}\{len}:     move.b  $7FFF(a1),d1
-\{p}\{len}m:    and.b   #7,d1                   ; +2: the mask
+\{p}\{len}m:    and.b   #15,d1                  ; +2: the mask
                 move.b  d1,10+\v(a4)            ; ymxr_snew
                 .endm
 
@@ -110,7 +110,7 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 .endm
 
 ; The row's sync lengths made current for the frame's syncs, ymxr_snew to
-; ymxr_slen at a4 (1.12.2, 4.4.1), after the first bytes (ymxr_sfirst),
+; ymxr_slen at a4 (1.12.2, 4.4.1), after the first words (ymxr_sfirst),
 ; which read the lengths before them; and with the deferred start, the
 ; running targets, the frame's part of SBUSY. A tick reads neither. d0
 ; clobbered.
@@ -159,9 +159,9 @@ ymxr_svoice:    dc.b    1,1,2,2,4,4,0,0,0,0,0,0,0,0     ; setR0 to setR13
                 move.l  #(2*\v)<<24,d2          ; the fine register and 0
                 move.l  d3,d0
                 movep.w (2*\v+1)*\stride(a3),d0 ; the coarse, bits 15 to 8
-                moveq   #7,d1
+                moveq   #PADS,d1
                 sub.b   14+\v(a4),d1            ; the pads to leave out
-                lsl.w   #4,d1
+                lsl.w   #2,d1                   ; 4 bytes a pad, PAD
                 movea.w d1,a5
                 move.b  2*\v*\stride(a3),d1     ; the fine
                 bsr.w   ymxr_ssync
@@ -253,22 +253,24 @@ ymxr_sregs:     lea     ymxr_sfv(pc),a3
                 bra.w   ymxr_noise
 
 ; The sync of a voice (1.12.3), at level 7: 0 to the coarse register, d3,
-; and a step later 0 to the fine one, d2; then a5 bytes into the pads,
-; the sync length's, each a step, and the fine in d1 to the fine register;
-; a step later the coarse register and its value, d0. A step is 32 cycles,
-; and SSYNC_STEP1 to SSYNC_STEP3 are the nops that time the three gaps as
-; SYNC_STEP1 to SYNC_STEP3 time a tick's (ticks.S). a2 the select register.
+; and a step later 0 to the fine one, d2; then a5 bytes into the pads of
+; a tick's sync (ticks.S, SPADS), the sync length's, each a step, and the
+; fine in d1 to the fine register; a step later the coarse register and
+; its value, d0. A step is 32 cycles, and SSYNC_STEP1 to SSYNC_STEP3 are
+; the nops that time the three gaps as SYNC_STEP1 to SYNC_STEP3 time a
+; tick's (ticks.S). a2 the select register; d2 clobbered.
 SSYNC_STEP1     equ     4
 SSYNC_STEP2     equ     0
 SSYNC_STEP3     equ     4
+                .if     PAD<>4
+                .error  "SYNC1 counts 4 bytes a pad"
+                .endif
 ymxr_ssync:     move.l  d3,(a2)                 ; the coarse register's 0
                 NOPS    SSYNC_STEP1
                 move.l  d2,(a2)                 ; the fine register's 0
                 NOPS    SSYNC_STEP2
                 jmp     .pads(pc,a5.w)
-.pads:          .rept   7
-                NOPS    8                       ; a pad
-                .endr
+.pads:          SPADS
                 move.b  d1,2(a2)                ; the fine
                 NOPS    SSYNC_STEP3
                 move.l  d0,(a2)                 ; the coarse register and value
@@ -284,7 +286,7 @@ ymxr_ssync:     move.l  d3,(a2)                 ; the coarse register's 0
 ; from frame write, which the frame leaves to them. A tick of copy from
 ; frame reads the frame values of ymxr_fv (copy.S): those of the voice
 ; of a handler of a target of a sync become the row's with its first
-; bytes (ymxr_sfirst), and the rest at step 1 (SPEC.md 4.4, 4.4.1).
+; words (ymxr_sfirst), and the rest at step 1 (SPEC.md 4.4, 4.4.1).
                 PIECE   copysync_1
 ymxr_skregs:    lea     ymxr_sfv(pc),a3
                 lea     ymxr_srow(pc),a4
@@ -398,7 +400,7 @@ ymxr_syncinit:  movem.l d0-d4/a1/a3/a5,-(sp)
 ; at a3; then three of the sync lengths and their masks, the offsets after
 ; them: in a tune of version 15, bit 6 of byte 10 of the bound tune
 ; (BINARIES.md 1.2), each its voice's column, the last three of the table,
-; and the mask 7; otherwise a move of the coarse column and a shift that
+; and the mask 15; otherwise a move of the coarse column and a shift that
 ; brings its bit 4 to bit 0, and the mask 1 (SPEC.md 1.12.2). d0 to d2,
 ; d4, a1 and a5 clobbered.
 .sites:         moveq   #0,d1
@@ -418,7 +420,7 @@ ymxr_syncinit:  movem.l d0-d4/a1/a3/a5,-(sp)
                 move.w  d1,d0
                 lea     (a4,d4.w),a5
                 bsr     ymxr_colsync
-                moveq   #7,d0
+                moveq   #15,d0
                 bra.s   .mask
 .bit4:          lea     (a4,d4.w),a5
                 move.l  #$1202E809,-2(a5)       ; move.b d2,d1 and lsr.b #4,d1
@@ -476,7 +478,7 @@ ymxr_syncwide:  move.w  d4,d5
 .sync:          move.l  d6,-(sp)                ; the effect, as the two starts
                 move.w  d4,d6                   ; keep it
 ; The handler's registers, immediates its head reads: the target's voice
-; v, its fine register 2v and coarse 2v + 1. Its two bytes of the sync
+; v, its fine register 2v and coarse 2v + 1. Its two words of the sync
 ; length, the voice's current one, and the effect's voice and its mark of
 ; a start, which the frame reads and clears at its register steps
 ; (ymxr_sfirst). At level 7, as a tick of the running handler reads them.
@@ -496,9 +498,10 @@ ymxr_syncwide:  move.w  d4,d5
                 moveq   #0,d4
                 move.b  (a2,d5.w),d4            ; the current sync length less 1
                 lea     ymxr_sdisp(pc),a2
-                move.b  (a2,d4.w),d4
-                move.b  d4,TWS_FIRST(a5)
-                move.b  d4,TWS_ROWL(a5)
+                add.w   d4,d4
+                move.w  (a2,d4.w),d4
+                move.w  d4,TWS_FIRST(a5)
+                move.w  d4,TWS_ROWL(a5)
                 add.w   d5,d5                   ; the fine register
                 move.b  d5,TWS_F1(a5)
                 addq.b  #1,d5                   ; the coarse register
@@ -536,42 +539,49 @@ ymxr_syncwide:  move.w  d4,d5
                 bra.w   ymxr_copy_twoat
                 .endif
 
-; The displacement of the branch into the pads of a handler of a target
-; of a sync, for each sync length less 1, 0 to 7 (ticks.S, TICKW): n - 1
-; pads before the fine's write; 8 bytes on, each effect's voice, 0 to 2,
-; where its last start was on a target of a sync; and 12 bytes on, each
-; effect's mark of that start, set until the next frame makes its row
-; current, whose first tick has the row's sync length (SPEC.md 5.1).
-ymxr_sdisp:     dc.b    TWS_D1,TWS_D1-6,TWS_D1-12,TWS_D1-18
-                dc.b    TWS_D1-24,TWS_D1-30,TWS_D1-36,TWS_D1-42
+; The displacement word of the bra.w into the pads of a handler of a
+; target of a sync, for each sync length less 1, 0 to 15 (ticks.S,
+; TICKW): n - 1 pads before the fine's write; 32 bytes on, each effect's
+; voice, 0 to 2, where its last start was on a target of a sync; and 36
+; bytes on, each effect's mark of that start, set until the next frame
+; makes its row current, whose first tick has the row's sync length
+; (SPEC.md 5.1).
+                .even
+ymxr_sdisp:     dc.w    TWS_D1,TWS_D1-(1*PAD),TWS_D1-(2*PAD),TWS_D1-(3*PAD)
+                dc.w    TWS_D1-(4*PAD),TWS_D1-(5*PAD),TWS_D1-(6*PAD),TWS_D1-(7*PAD)
+                dc.w    TWS_D1-(8*PAD),TWS_D1-(9*PAD),TWS_D1-(10*PAD),TWS_D1-(11*PAD)
+                dc.w    TWS_D1-(12*PAD),TWS_D1-(13*PAD),TWS_D1-(14*PAD),TWS_D1-(15*PAD)
 ymxr_sv:        dc.b    0,0,0,0
 ymxr_sfresh:    dc.b    0,0,0,0
                 .if     YMXR_MAP
-; 16 bytes on, each voice's offset of its fine frame value in ymxr_fv.
+; 40 bytes on, each voice's offset of its fine frame value in ymxr_fv.
 ymxr_sfvat:     dc.b    0,2*FV_STRIDE,4*FV_STRIDE,0
-                .if     (ymxr_sfvat-ymxr_sdisp)<>16
+                .if     (ymxr_sfvat-ymxr_sdisp)<>40
                 .error  "ymxr_sfvat is apart from ymxr_sdisp"
                 .endif
                 .endif
-                .if     ((ymxr_sv-ymxr_sdisp)<>8)|((ymxr_sfresh-ymxr_sdisp)<>12)
+                .if     ((ymxr_sv-ymxr_sdisp)<>32)|((ymxr_sfresh-ymxr_sdisp)<>36)
                 .error  "ymxr_sv and ymxr_sfresh are apart from ymxr_sdisp"
+                .endif
+                .if     PADS<>15
+                .error  "ymxr_sdisp has 16 sync lengths, 15 pads"
                 .endif
 ; A slot for each handler of a target of a sync that runs, filled at the
 ; frame's level and written out at level 7 (ymxr_sfirst): the address of
-; the handler's first byte; the first byte, and the immediate the tick
+; the handler's first word; the first word, and the immediate the tick
 ; writes it from after that tick; and in a core with the lookup, the
 ; address of the voice's fine frame value in ymxr_fv, and the fine and
 ; coarse frame values after the row.
 SLOT_FIRST      equ     0
 SLOT_F          equ     4
-SLOT_R          equ     5
+SLOT_R          equ     6
                 .if     YMXR_MAP
-SLOT_FV         equ     6
-SLOT_FINE       equ     10
-SLOT_COARSE     equ     11
-SLOT            equ     12
+SLOT_FV         equ     8
+SLOT_FINE       equ     12
+SLOT_COARSE     equ     13
+SLOT            equ     14
                 .else
-SLOT            equ     6
+SLOT            equ     8
                 .endif
                 .even
 ymxr_slots:     ds.b    4*SLOT
@@ -580,7 +590,7 @@ ymxr_slots:     ds.b    4*SLOT
 ; 4.4.1, 5.1), before the row's sync lengths become current for the
 ; frame's syncs (SLEN), in one stretch at level 7 against a tick. Of each
 ; effect whose vector is its handler of a target of a sync: the first
-; byte, the sync length of its first tick after the stretch, the voice's
+; word, the sync length of its first tick after the stretch, the voice's
 ; current one, or the row's where the start was since the frame before
 ; or a start is pending on the timer; the immediate the tick writes it
 ; from after that tick, the row's; and in a tune that copies from frame,
@@ -595,7 +605,7 @@ ymxr_sfirst:    movem.l d6-d7/a1/a6,-(sp)
                 lea     ymxr_slots(pc),a1
                 moveq   #0,d2                   ; the effect
 .each:          btst    d2,WS_EFFECTS(a0)
-                beq.s   .next
+                beq.w   .next
                 movea.w (a6),a5
                 movea.l (a5),a5                 ; the running handler
                 lea     ymxr_at_synced(pc),a3
@@ -608,12 +618,13 @@ ymxr_sfirst:    movem.l d6-d7/a1/a6,-(sp)
                 move.l  a3,(a1)+                ; SLOT_FIRST
                 lea     ymxr_sdisp(pc),a5
                 moveq   #0,d0
-                move.b  8(a5,d2.w),d0           ; its voice
+                move.b  32(a5,d2.w),d0          ; its voice
                 moveq   #0,d1
                 move.b  10(a4,d0.w),d1          ; the row's length less 1
-                move.b  (a5,d1.w),d6            ; its displacement
-                tst.b   12(a5,d2.w)             ; a start since the frame before:
-                sf      12(a5,d2.w)             ; the row's length, in d1
+                add.w   d1,d1
+                move.w  (a5,d1.w),d6            ; its displacement
+                tst.b   36(a5,d2.w)             ; a start since the frame before:
+                sf      36(a5,d2.w)             ; the row's length, in d1
                 bne.s   .first
                 .if     YMXR_DEFER
                 move.w  d2,d5
@@ -623,14 +634,15 @@ ymxr_sfirst:    movem.l d6-d7/a1/a6,-(sp)
                 bne.s   .first
                 .endif
                 move.b  14(a4,d0.w),d1          ; the current length less 1
-.first:         move.b  (a5,d1.w),(a1)+         ; SLOT_F
-                move.b  d6,(a1)+                ; SLOT_R
+                add.w   d1,d1
+.first:         move.w  (a5,d1.w),(a1)+         ; SLOT_F
+                move.w  d6,(a1)+                ; SLOT_R
                 .if     YMXR_MAP
 ; The voice's frame values, in a tune that copies from frame.
                 tst.b   WS_EFFECTS(a0)          ; copy from frame
                 bpl.s   .nofv
                 moveq   #0,d5
-                move.b  16(a5,d0.w),d5          ; ymxr_sfvat
+                move.b  40(a5,d0.w),d5          ; ymxr_sfvat
                 lea     ymxr_fv(pc),a3
                 adda.w  d5,a3
                 move.l  a3,(a1)+                ; SLOT_FV
@@ -654,9 +666,9 @@ ymxr_sfirst:    movem.l d6-d7/a1/a6,-(sp)
                 lea     ymxr_slots(pc),a1
                 sub.l   a1,d7                   ; the slots' bytes
                 beq.w   .done
-                movea.l (a1)+,a3                ; the first slot's first byte
-                move.b  (a1)+,d0
-                move.b  (a1)+,d1
+                movea.l (a1)+,a3                ; the first slot's first word
+                move.w  (a1)+,d0
+                move.w  (a1)+,d1
                 .if     YMXR_MAP
                 movea.l (a1)+,a5                ; its fine frame value
                 move.b  (a1)+,d2
@@ -672,14 +684,14 @@ ymxr_sfirst:    movem.l d6-d7/a1/a6,-(sp)
                 bmi.s   .copy
                 .endif
                 move.w  d7,sr
-                move.b  d0,(a3)
-                move.b  d1,TWS_ROWL-TWS_FIRST(a3)
+                move.w  d0,(a3)
+                move.w  d1,TWS_ROWL-TWS_FIRST(a3)
                 move.w  d6,sr
                 bra.s   .done
                 .if     YMXR_MAP
 .copy:          move.w  d7,sr
-                move.b  d0,(a3)
-                move.b  d1,TWS_ROWL-TWS_FIRST(a3)
+                move.w  d0,(a3)
+                move.w  d1,TWS_ROWL-TWS_FIRST(a3)
                 move.b  d2,(a5)
                 move.b  d5,FV_STRIDE(a5)
                 move.w  d6,sr
@@ -693,11 +705,11 @@ ymxr_sfirst:    movem.l d6-d7/a1/a6,-(sp)
                 bmi.s   .copies
                 .endif
                 ori.w   #$0700,sr
-                move.b  d0,(a3)
-                move.b  d1,TWS_ROWL-TWS_FIRST(a3)
+                move.w  d0,(a3)
+                move.w  d1,TWS_ROWL-TWS_FIRST(a3)
 .slot:          movea.l (a1)+,a3
-                move.b  (a1)+,(a3)
-                move.b  (a1)+,TWS_ROWL-TWS_FIRST(a3)
+                move.w  (a1)+,(a3)
+                move.w  (a1)+,TWS_ROWL-TWS_FIRST(a3)
                 .if     YMXR_MAP
                 addq.l  #SLOT-SLOT_FV,a1
                 .endif
@@ -707,13 +719,13 @@ ymxr_sfirst:    movem.l d6-d7/a1/a6,-(sp)
                 bra.s   .done
                 .if     YMXR_MAP
 .copies:        ori.w   #$0700,sr
-                move.b  d0,(a3)
-                move.b  d1,TWS_ROWL-TWS_FIRST(a3)
+                move.w  d0,(a3)
+                move.w  d1,TWS_ROWL-TWS_FIRST(a3)
                 move.b  d2,(a5)
                 move.b  d5,FV_STRIDE(a5)
 .cslot:         movea.l (a1)+,a3
-                move.b  (a1)+,(a3)
-                move.b  (a1)+,TWS_ROWL-TWS_FIRST(a3)
+                move.w  (a1)+,(a3)
+                move.w  (a1)+,TWS_ROWL-TWS_FIRST(a3)
                 movea.l (a1)+,a3
                 move.b  (a1)+,(a3)
                 move.b  (a1)+,FV_STRIDE(a3)

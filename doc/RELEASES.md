@@ -40,14 +40,14 @@ rather than either.
 
 ## Unreleased
 
-A sync keeps a voice's period at 0 for 1 to 8 steps, the row's sync length,
-and the player has one sequence for every sync (#412).
+A sync keeps a voice's period at 0 for 1 to 16 steps, the row's sync
+length, and the player has one sequence for every sync (#412).
 
 - **Version 15.** Three sync length columns follow the mapping and the cut
-  columns, one a voice, each the length less 1 (SPEC.md 1.12.2). Bit 4 of a
-  coarse column is unassigned again, and a reader reads version 14 with a
-  sync length of 2 where that bit is 1 and of 1 where it is 0.
-  `wrong-version` is version $0010.
+  columns, one a voice, each the length less 1 in bits 3 to 0 (SPEC.md
+  1.12.2). Bit 4 of a coarse column is unassigned again, and a reader reads
+  version 14 with a sync length of 2 where that bit is 1 and of 1 where it
+  is 0. `wrong-version` is version $0010.
 - **The sync.** 0 to the coarse register, 0 to the fine one a step later,
   the fine value n steps after that and the coarse value a step after it, at
   every value of the two registers (SPEC.md 1.12.3). The first tick after
@@ -55,11 +55,12 @@ and the player has one sequence for every sync (#412).
   length of the row before, other than at the frame of a start and with a
   start pending (5.1).
 - **One sync path in the player.** A tick of a target of a sync runs one
-  head, its pads 32 cycles each and its sync length a byte the frame
-  writes, and the frame's sync makes the same four writes; the heads the
-  frame wrote, the general head and the paths for a fine of 0 are gone. A
-  tick of a source's row is 394 cycles at a sync length of 1 and 32 more a
-  step, against 232 to 406 in 0.20.0, and the plain player is 11,288 bytes
+  head, its 15 pads 32 cycles each and its sync length the displacement
+  of a `bra.w`, a word the frame writes, and the frame's sync makes the
+  same four writes; the heads the frame wrote, the general head and the
+  paths for a fine of 0 are gone. A tick of a source's row is 394 cycles
+  at a sync length of 1 and 32 more a step, 618 at 8 and 874 at 16,
+  against 232 to 406 in 0.20.0, and the plain player is 11,356 bytes
   against 12,406.
 - **A sync timed on the bus.** The rig times each gap of a sync from one
   write's bus access to the next: the cycle of Hatari's trace stamp plus
@@ -75,16 +76,16 @@ and the player has one sequence for every sync (#412).
   the level dropped, part way through a frame (BINARIES.md 4.7).
 - **The row made current at one point.** A tick of a target of a sync plays
   the row before or the row whole (SPEC.md 4.4.1, 5.1). The frame finds the
-  first bytes of each handler of a target of a sync and, in a tune that
+  first words of each handler of a target of a sync and, in a tune that
   copies from frame, the frame values of its voice at its level, and writes
   them alone at level 7: 64 cycles where one effect syncs a voice in a tune
   that copies from frame and 44 in one that does not, against 676 on
   `square-sync` before, where a tick due in the stretch ran up to 22 steps
   late. A tick of copy from frame between the frame values and the first
-  bytes read the row's period with the row before's sync length. In a tune
+  words read the row's period with the row before's sync length. In a tune
   that syncs a voice, copy from frame on R0 to R5 runs its counted handler.
-  The frame costs more at its level: `sync-heads` plays 4,844 cycles a call
-  on average and 7,254 at most, past R4.5's 6,656, against 4,074 and 6,424.
+  The frame costs more at its level: `sync-heads` plays 4,878 cycles a call
+  on average and 7,290 at most, past R4.5's 6,656, against 4,074 and 6,424.
   Under Hatari, #412's export of `square-sync`, at up to 5 steps of margin
   (YMXS, SPEC.md 3.9.4), restarts voice A's square at another level at row
   384, where the timer restarts, and on the player before at rows 32, 559,

@@ -70,8 +70,8 @@ const (
 )
 
 // MostSyncLength is the most steps a sync keeps a voice's period at 0: a
-// sync length column is the length less 1 in three bits (SPEC.md 1.12.2).
-const MostSyncLength = 8
+// sync length column is the length less 1 in four bits (SPEC.md 1.12.2).
+const MostSyncLength = 16
 
 // MostCuts is the cut limit: cut numbers 1 to 127 select a cut of the
 // index; 0 is the whole table (SPEC.md 1.11).

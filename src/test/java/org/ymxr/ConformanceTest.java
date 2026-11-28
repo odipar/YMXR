@@ -190,16 +190,16 @@ final class ConformanceTest {
                     + " frame, one while Timer A runs on it"),
             Fixture.built("sync-even", "`SyncTest.lengths`", () -> schema(SyncTest.lengths()),
                     "version 15 at 50 Hz: rows that sync each voice at their frame with sync"
-                    + " lengths 1, 2, 3 and 8, to periods whose fine is 0 and other than 0; a"
-                    + " square of four rows on `syncToneA` on Timer A, two of its rows a fine"
-                    + " of 0, whose syncs rows set to lengths 2, 3 and 8; and a row that sets"
-                    + " the sync length of voice C without a sync"),
+                    + " lengths 1, 2, 3, 8, 11 and 16, to periods whose fine is 0 and other than"
+                    + " 0; a square of four rows on `syncToneA` on Timer A, two of its rows a"
+                    + " fine of 0, whose syncs rows set to lengths 2, 3 and 16; and a row that"
+                    + " sets the sync length of voice C without a sync"),
             Fixture.built("sync-heads", "`SyncTest.ticks`", () -> schema(SyncTest.ticks()),
                     "version 15 at 50 Hz: copy from frame on `syncToneA` on Timer A and on"
                     + " `syncToneC` on Timer C, and a source of four rows on `syncToneB` on"
-                    + " Timer B, each synced with the sync lengths 1, 2, 3 and 8 of the rows;"
-                    + " rows that set the fine frame value of voice A and then of voice C to"
-                    + " 0 and back"),
+                    + " Timer B, each synced with the sync lengths 1, 2, 3, 8, 9 and 16 of the"
+                    + " rows; rows that set the fine frame value of voice A and then of voice C"
+                    + " to 0 and back"),
             Fixture.built("wrong-version", "`ConformanceTest.wrongVersion`", () -> wrongVersion(),
                     String.format(Locale.ROOT, "chambers with the version word $%04X: a reader"
                             + " produces an empty record of it", WRONG_VERSION)));
