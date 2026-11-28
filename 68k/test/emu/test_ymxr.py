@@ -4651,6 +4651,12 @@ VBLA = re.compile(r"^VBL=(\d+) clock=(\d+)")
 VBLV = re.compile(r"^VBL \d+ video_cyc=(\d+) pending_cyc=(\d+)")
 VIDEO_CYC = re.compile(r"video_cyc=(\d+)")
 CYCLE = re.compile(r"video_cyc=(\d+)")
+# The cycles of a chip write's instruction by the 68000's table, the
+# line's last field. video_cyc is the cycle the instruction starts at.
+# Between two writes of the player's syncs, the gap of video_cyc plus
+# these cycles is the gap of their bus accesses on Hatari's sound clock,
+# and the rig times a sync there.
+ACCESS = re.compile(r"instr_cycle (\d+)")
 
 # A video frame of the ST under Hatari, at 50 Hz: 313 lines of 512 cycles,
 # the cycles a write's video_cyc counts to before it starts again at 0.
@@ -6861,9 +6867,9 @@ def hatari(ym, code, symbols, perf=False):
     wrapped = False                     # a video frame began in this frame
     frame_cycles = 0
     stamped = []                        # every chip write, with its owner,
-                                        # its video cycle and whether a
-                                        # handler of a target of a sync
-                                        # wrote it
+                                        # the video cycle of its bus
+                                        # access and whether a handler of
+                                        # a target of a sync wrote it
     stamped_frame = []                  # the frame each write is in
 
     def since(video_cyc):
@@ -6899,9 +6905,10 @@ def hatari(ym, code, symbols, perf=False):
             pc = int(w.group(3), 16)
             if pc < ROM:
                 current.append((where(pc), int(w.group(1), 16), int(w.group(2), 16)))
-                cyc = CYCLE.search(line)
+                cyc, access = CYCLE.search(line), ACCESS.search(line)
                 stamped.append((where(pc), int(w.group(1), 16), int(w.group(2), 16),
-                                int(cyc.group(1)) if cyc else None,
+                                int(cyc.group(1)) + int(access.group(1))
+                                if cyc and access else None,
                                 any(lo <= pc < hi for lo, hi in syns)))
                 stamped_frame.append(len(frames))
             continue
@@ -7229,8 +7236,8 @@ def hatari(ym, code, symbols, perf=False):
     # in a row, one owner's: 0 to the coarse register, 0 to the fine one 32
     # cycles later, the fine value 32n cycles after that and the coarse
     # value 32 after it, a step of the tone generator 32 cycles of the ST's
-    # CPU, which Hatari counts at the CPU's clock and stamps a write by the
-    # instruction that makes it. n is the voice's sync length in the frame's
+    # CPU, which Hatari counts at the CPU's clock; each write is timed at
+    # its bus access (ACCESS). n is the voice's sync length in the frame's
     # row at a frame; at a tick it is the row's or the row before's, and
     # once one tick of an effect in a frame has the row's, every later one
     # has (5.1): the unicorn run reads which tick has which off the

@@ -723,9 +723,9 @@ value, a period 32,768 more than the row's, which the kit's `envelope`
 tune does on its first source's last two rows, 800 and then 33,696, its
 928 with the marker.
 
-The player is 11,172 bytes, 1,224 of them the counted shapes' twelve
+The player is 11,188 bytes, 1,224 of them the counted shapes' twelve
 instances, four each of one, two and three columns. Where a tick reads an
-absolute address, 10,832 bytes and 1,320, instances of 110 bytes against
+absolute address, 10,848 bytes and 1,320, instances of 110 bytes against
 the marked shape's 102 for two columns.
 
 ## A tick through an absolute address
@@ -792,7 +792,7 @@ reports -1 for one further off (BINARIES.md 1.5), and the layouts put a
 tune's DTX1 tables before its image and a set's subtunes before the
 images, so the rows of the tune a host loads are beside the player at any
 length of image. A host that places them further off assembles this build,
-which is 10,832 bytes against 11,172. Two figures move against each other:
+which is 10,848 bytes against 11,188. Two figures move against each other:
 a place is a word where it was a long, which shortens a timer's handlers
 by 48 bytes, and a start does the arithmetic that turns a row's address
 into a displacement, 38 bytes more of the timer's frame code. The init and
@@ -874,15 +874,15 @@ target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
 The second bank, the installers, the stubs and the stop's write-back make
-the player 16,054 bytes against 11,172, and 15,894 against 10,832 where a
+the player 16,070 bytes against 11,188, and 15,910 against 10,848 where a
 tick reads an absolute address. Each handler gains a stub: an instance of
 the wide handler is 106 bytes against 102, and of the marked shape of two
 columns 98 against 94.
 
-The lookup in, `YMXR_MAP=1`, makes the player 29,764 bytes against 11,172,
-and 29,270 against 10,832 where a tick reads an absolute address. With the
-deferred start in as well, 42,692 against 16,054, and 42,188 against
-15,894.
+The lookup in, `YMXR_MAP=1`, makes the player 29,764 bytes against 11,188,
+and 29,270 against 10,848 where a tick reads an absolute address. With the
+deferred start in as well, 42,692 against 16,070, and 42,188 against
+15,910.
 
 ## A cut
 
@@ -992,7 +992,7 @@ are 3,740 of the 6,784. The blocks of copy from frame, which a link keeps
 only for a song that copies from frame, are 2,780 bytes of the rest, and
 2,890 with the deferred start in (Copy from frame). The blocks of the sync
 and of the handler of its targets, which a link keeps only for a song that
-syncs a voice, are 3,286 bytes, and 3,586 with the deferred start in
+syncs a voice, are 3,302 bytes, and 3,602 with the deferred start in
 (LINKER.md).
 
 ## Copy from frame
