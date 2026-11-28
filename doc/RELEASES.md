@@ -33,68 +33,84 @@ writes today fails the build.
 A player pins a version of this format: a tune file is 9, 10 where a row
 maps a value, 11 where a row cuts a source, 12 where a row starts copy from
 frame, 13 where a row syncs a voice and 15 where a row has a sync length
-above 1, and a reader reads 14, which 0.20.0 wrote where a row listed a
-voice among its even syncs (SPEC.md 3.3.5), and a bound tune the version of
-the tune file bound (BINARIES.md 1), and a release's number names the tools
-rather than either.
-
-## Unreleased
-
-A sync keeps a voice's period at 0 for 1 to 16 steps, the row's sync
-length, and the player has one sequence for every sync (#412).
-
-- **Version 15.** Three sync length columns follow the mapping and the cut
-  columns, one a voice, each the length less 1 in bits 3 to 0 (SPEC.md
-  1.12.2). Bit 4 of a coarse column is unassigned again, and a reader reads
-  version 14 with a sync length of 2 where that bit is 1 and of 1 where it
-  is 0. `wrong-version` is version $0010.
-- **The sync.** 0 to the coarse register, 0 to the fine one a step later,
-  the fine value n steps after that and the coarse value a step after it, at
-  every value of the two registers (SPEC.md 1.12.3). The first tick after
-  the row becomes current at the targets of a sync syncs with the sync
-  length of the row before, other than at the frame of a start and with a
-  start pending (5.1).
-- **One sync path in the player.** A tick of a target of a sync runs one
-  head, its 15 pads 32 cycles each and its sync length the displacement
-  of a `bra.w`, a word the frame writes, and the frame's sync makes the
-  same four writes; the heads the frame wrote, the general head and the
-  paths for a fine of 0 are gone. A tick of a source's row is 394 cycles
-  at a sync length of 1 and 32 more a step, 618 at 8 and 874 at 16,
-  against 232 to 406 in 0.20.0, and the plain player is 11,356 bytes
-  against 12,406.
-- **A sync timed on the bus.** The rig times each gap of a sync from one
-  write's bus access to the next: the cycle of Hatari's trace stamp plus
-  the cycles of the instruction. In a tick the coarse register's 0
-  reaches the chip 24 cycles into its instruction and the fine one's 16
-  cycles into its instruction, so the first gap was 24 cycles where the
-  stamps read 32. Two more nops make it 32, and a tick of a target of a
-  sync is 8 cycles longer. The frame's sync is 32, 32n and 32 cycles on
-  both counts.
-- **The program's first frame.** A program that plays from the VBL plays
-  the first row at the second VBL after a start, at the start of a frame:
-  the 68000 acknowledged a VBL that came while a start ran at level 7 as
-  the level dropped, part way through a frame (BINARIES.md 4.7).
-- **The row made current at one point.** A tick of a target of a sync plays
-  the row before or the row whole (SPEC.md 4.4.1, 5.1). The frame finds the
-  first words of each handler of a target of a sync and, in a tune that
-  copies from frame, the frame values of its voice at its level, and writes
-  them alone at level 7: 64 cycles where one effect syncs a voice in a tune
-  that copies from frame and 44 in one that does not, against 676 on
-  `square-sync` before, where a tick due in the stretch ran up to 22 steps
-  late. A tick of copy from frame between the frame values and the first
-  words read the row's period with the row before's sync length. In a tune
-  that syncs a voice, copy from frame on R0 to R5 runs its counted handler.
-  The frame costs more at its level: `sync-heads` plays 4,878 cycles a call
-  on average and 7,290 at most, past R4.5's 6,656, against 4,074 and 6,424.
-  Under Hatari, #412's export of `square-sync`, at up to 5 steps of margin
-  (YMXS, SPEC.md 3.9.4) and lengths of 1 to 16, restarts voice A's square at
-  another level at rows 192 and 384, where the timer restarts, at 1, 2 and 4
-  MB. With lengths of 1 to 8 it does at row 384, and on the player before at
-  rows 32, 559, 563, 577, 718, 756 and 765 besides. The rig's Hatari pass
-  reads each tick against the row before and the row, and fails `sync-heads`
-  and `square-sync` on the player before.
+above 1, and a reader reads 14, which 0.19.0 and 0.20.0 wrote where a row
+listed a voice among its even syncs (SPEC.md 3.3.5), and a bound tune the
+version of the tune file bound (BINARIES.md 1), and a release's number names
+the tools rather than either.
 
 ## Published
+
+### 0.21.0, 2026-11-28
+
+<https://github.com/odipar/YMXR/releases/tag/v0.21.0>, built from the commit
+tagged `v0.21.0`.
+
+A sync keeps a voice's period at 0 for 1 to 16 steps, the row's sync length,
+and a tune with a sync length above 1 converts to a tune file of version 15:
+YMXS 0.12.0's sync lengths (SPEC.md 1.12, 3.3.5). YMXR requires YMXS 0.12.0.
+The player makes each sync, at a frame and at a tick, with one sequence of
+four writes (#413).
+
+- **Version 15.** Three sync length columns follow the mapping and the cut
+  columns the tune uses, one a voice, each the length less 1 in bits 3 to 0
+  (SPEC.md 1.12.2). Bit 4 of a coarse column is unassigned again, and a
+  reader reads version 14 with a sync length of 2 where that bit is 1 and of
+  1 where it is 0. `wrong-version` is version $0010.
+- **The sync.** A sync of a voice with sync length n writes 0 to the coarse
+  register, 0 to the fine one a step later, the fine value n steps after
+  that and the coarse value a step after it, at every value of the two
+  registers (SPEC.md 1.12.3). The first tick after the row becomes current
+  at the targets of a sync syncs with the sync length of the row before,
+  unless the frame's row starts the effect or a start is pending on its
+  timer (5.1).
+- **One sync path in the player.** A tick of a target of a sync runs one
+  head, its 15 pads 32 cycles each and its sync length the displacement of a
+  `bra.w`, a word the frame writes, and the frame's sync makes the same four
+  writes; the heads the frame wrote, the general head and the paths for a
+  fine of 0 are gone. A tick of a source's row is 394 cycles at a sync
+  length of 1 and 32 more a step, 618 at 8 and 874 at 16, against 232 to 406
+  in 0.20.0.
+- **A sync timed on the bus.** The rig times each gap of a sync from one
+  write's bus access to the next: the cycle of Hatari's trace stamp plus the
+  cycles of the instruction. Under Hatari each sync of the kit's tunes and
+  of `ym/square-sync`, at a frame and at a tick, is 32, 32n and 32 cycles on
+  the bus.
+- **The program's first frame.** A program that plays from the VBL plays the
+  first row at the second VBL after a start, at the start of a frame, where
+  0.20.0 played it part way through a frame: the 68000 acknowledges a VBL
+  that comes while a start runs at level 7 as the level drops (BINARIES.md
+  4.7).
+- **The row made current at one point.** A tick of a target of a sync plays
+  the row before or the row whole (SPEC.md 4.4.1, 5.1). At its level the
+  frame finds the first words of each handler of a target of a sync and, in
+  a tune that copies from frame, the frame values of its voice, and writes
+  them alone at level 7: 64 cycles where one effect syncs a voice in a tune
+  that copies from frame and 44 in one that does not. In a tune that syncs a
+  voice, copy from frame on R0 to R5 runs its counted handler, where 0.20.0
+  ran its handler of `move.l` immediates. Under Hatari, #412's export of
+  `square-sync`, at up to 5 steps of margin (YMXS, SPEC.md 3.9.4) and
+  lengths of 1 to 16, restarts voice A's square at another level only at
+  rows 192 and 384, where the timer restarts, at 1, 2 and 4 MB. The rig's
+  Hatari pass reads each tick of a target of a sync against the row before
+  and the row.
+
+The player is 11,356 bytes against 12,406 in 0.20.0, 30,306 with the lookup
+in against 31,842, and 16,230 with the deferred start in against 17,272. A
+play call of each sync tune of the kit costs fewer cycles than in 0.20.0:
+`sync-targets` 5,750 on average and 7,178 at most, against 7,694 and 10,618,
+past R4.5's 6,656 in both.
+
+Against 0.20.0's Go tools, the eleven dumps of `ym/test` convert to the same
+tune files and link SNDH files 4 bytes longer on the plain core, `-lean`,
+`-abs` and `-perf -lean -abs`: init of a core without the lookup reads the
+column count off a table's header. The kit's tunes of versions 9 to 13 check
+the same, and 0.20.0's tools report an error for `sync-even` and
+`sync-heads`, of version 15. A tune of the kit that syncs no voice links an
+SNDH file 4 bytes longer on a core without the lookup and 16 on one with it,
+where init reads the mark of version 15 off the bound tune, and
+`copy-from-frame` 52, 36 of them the test in the block `copy` for a tune
+that syncs a voice. A tune that syncs a voice links this release's player,
+668 to 1,456 bytes shorter. `bin/suite`: 387 tests, 0 skipped.
 
 ### 0.20.0, 2026-11-27
 
