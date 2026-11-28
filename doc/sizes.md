@@ -110,8 +110,8 @@ the second copy of steps 6 and 7:
 
 The floor of the plain core is 1,340 bytes, and 1,470 with the second
 copy of steps 6 and 7. The floor of the core with the deferred start in
-is 2,146 bytes, of the core with the lookup in 2,468, and of the core
-with the lookup and the deferred start in 3,738.
+is 2,146 bytes, of the core with the lookup in 2,484, and of the core
+with the lookup and the deferred start in 3,754.
 
 ## The cores with the lookup
 
@@ -122,7 +122,7 @@ value: the start through a transformation, the remap, the page routines,
 init's fill of the pages and the routines of the lookup kinds' loops.
 The block is 2,710 bytes of the core with the lookup in and 3,034 of the
 core with the deferred start in as well, and a song that cuts a source
-alone leaves it out: `cut.ymxr` links 7,260 bytes, against 9,970 with
+alone leaves it out: `cut.ymxr` links 7,276 bytes, against 9,986 with
 the block. The table of the kinds' descriptors, `ymxr_kindof` and
 `ymxr_runrow` stay in the floor, as a start and a recut under a cut read
 them.

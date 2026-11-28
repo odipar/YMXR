@@ -53,6 +53,13 @@ and the player has one sequence for every sync (#412).
   every value of the two registers (SPEC.md 1.12.3). The first tick after a
   frame's register steps syncs with the sync length of the row before, other
   than at the frame of a start and with a start pending (5.1).
+- **One sync path in the player.** A tick of a target of a sync runs one
+  head, its pads 32 cycles each and its sync length a byte the frame
+  writes, and the frame's sync makes the same four writes; the heads the
+  frame wrote, the general head and the paths for a fine of 0 are gone. A
+  tick of a source's row is 386 cycles at a sync length of 1 and 32 more a
+  step, against 232 to 406 in 0.20.0, and the plain player is 11,172 bytes
+  against 12,406.
 
 ## Published
 
