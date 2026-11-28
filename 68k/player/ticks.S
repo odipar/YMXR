@@ -215,10 +215,12 @@
 ; the nops from the write of the coarse register's 0 to that of the fine
 ; one's, SYNC_STEP2 those after the fine one's before the branch into the
 ; pads, and SYNC_STEP3 those from the write of the fine value to that of
-; the coarse; each pad is a step. Hatari stamps a write by the instruction
-; that makes it, and the rig reads each gap off its trace
-; (68k/test/emu/test_ymxr.py).
-SYNC_STEP1      equ     1
+; the coarse; each pad is a step. A gap runs from one write's bus access
+; to the next one's: under Hatari the coarse register's 0 reaches the
+; chip 24 cycles into its move of an immediate, and the fine one's 16
+; cycles into a move of a register. The rig reads each gap off Hatari's
+; trace (68k/test/emu/test_ymxr.py).
+SYNC_STEP1      equ     3
 SYNC_STEP2      equ     0
 SYNC_STEP3      equ     3
                 .macro  NOPS    n
