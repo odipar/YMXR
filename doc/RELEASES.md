@@ -87,11 +87,12 @@ length, and the player has one sequence for every sync (#412).
   The frame costs more at its level: `sync-heads` plays 4,878 cycles a call
   on average and 7,290 at most, past R4.5's 6,656, against 4,074 and 6,424.
   Under Hatari, #412's export of `square-sync`, at up to 5 steps of margin
-  (YMXS, SPEC.md 3.9.4), restarts voice A's square at another level at row
-  384, where the timer restarts, and on the player before at rows 32, 559,
-  563, 577, 718, 756 and 765 besides. The rig's Hatari pass reads each tick
-  against the row before and the row, and fails `sync-heads` and
-  `square-sync` on the player before.
+  (YMXS, SPEC.md 3.9.4) and lengths of 1 to 16, restarts voice A's square at
+  another level at rows 192 and 384, where the timer restarts, at 1, 2 and 4
+  MB. With lengths of 1 to 8 it does at row 384, and on the player before at
+  rows 32, 559, 563, 577, 718, 756 and 765 besides. The rig's Hatari pass
+  reads each tick against the row before and the row, and fails `sync-heads`
+  and `square-sync` on the player before.
 
 ## Published
 
