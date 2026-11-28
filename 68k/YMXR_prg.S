@@ -564,7 +564,7 @@ start:
                 move.l  rows(pc),rows_left-done(a0)
                 btst    #1,flags+1(pc)
                 beq.s   .timer
-                lea     vbl(pc),a0
+                lea     vbl_first(pc),a0
                 move.l  a0,VBL.w
                 rts
 .timer:         lea     timer_c(pc),a0          ; Timer C at 200 Hz, and the
@@ -580,6 +580,17 @@ start:
                 bset    #5,$FFFFFA09.w
                 bset    #5,$FFFFFA15.w
                 rts
+
+; The first VBL after a start: the vector aimed at vbl, and a return. The
+; 68000 acknowledges a VBL that comes while a start runs at level 7 as
+; the level drops, part way through a frame, so the first row plays at
+; the VBL after this one, at the start of a frame (doc/BINARIES.md 4.7).
+vbl_first:
+                move.l  a0,-(sp)
+                lea     vbl(pc),a0
+                move.l  a0,VBL.w
+                movea.l (sp)+,a0
+                rte
 
 ; The VBL: one row a frame.
 vbl:

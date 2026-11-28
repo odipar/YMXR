@@ -687,8 +687,9 @@ at 16.
 2. Call the core's exit, then its init with `d0.w` = `s`; the program
    leaves init's result unread.
 3. *Done* (4.8) is 0, and the rows left are `rows`.
-4. Where bit 1 of the flags is set: write the VBL vector with the handler
-   of 4.8, and stop.
+4. Where bit 1 of the flags is set: write the VBL vector with a handler
+   that writes the VBL vector with the handler of 4.8 and returns, and
+   stop.
 5. Otherwise: write the Timer C vector with the handler of 4.8; write 0
    to the accumulator (4.8); write the field at 26 to Timer C's data
    register; write bits 7 to 4 of TCDCR as the field at 24, bits 3 to 0
@@ -698,6 +699,11 @@ Where init reports -1 (2.7 step 5), the clock is armed as above, each
 tick's play returns at once (2.9), and the program runs until a key or
 `rows`.
 
+Note: the 68000 acknowledges a VBL that comes while a start runs at
+level 7 as the level drops, part way through a frame. The handler of step
+4 runs at the first VBL after a start, and the first tick at the next, at
+the start of a frame.
+
 Note: the two fields make the ticks the field at 28 reads, 2,457,600
 divided by the prescaler's divisor and by the count; the operating
 system's clock, which 4.10 falls back to, is $5 and 192, the divisor 64
@@ -705,8 +711,8 @@ and 200 ticks a second.
 
 **4.8 A tick.** Terms: the *accumulator* is a word; the *busy flag* is a
 byte, 0 at load; *over* and *done* are two marks, 0 at start (4.7);
-`ticks` is the field at 28. From the VBL, one tick a frame. From Timer
-C, in order:
+`ticks` is the field at 28. From the VBL, one tick a frame from the
+second VBL after a start (4.7 step 4). From Timer C, in order:
 
 1. Clear bit 5 of ISRB.
 2. Add `rate` to the accumulator.

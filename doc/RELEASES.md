@@ -60,6 +60,10 @@ and the player has one sequence for every sync (#412).
   tick of a source's row is 386 cycles at a sync length of 1 and 32 more a
   step, against 232 to 406 in 0.20.0, and the plain player is 11,172 bytes
   against 12,406.
+- **The program's first frame.** A program that plays from the VBL plays
+  the first row at the second VBL after a start, at the start of a frame:
+  the 68000 acknowledged a VBL that came while a start ran at level 7 as
+  the level dropped, part way through a frame (BINARIES.md 4.7).
 
 ## Published
 
