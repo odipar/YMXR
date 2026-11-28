@@ -61,13 +61,13 @@ and the player has one sequence for every sync (#412).
   step, against 232 to 406 in 0.20.0, and the plain player is 11,188 bytes
   against 12,406.
 - **A sync timed on the bus.** The rig times each gap of a sync from one
-  write's bus access to the next, the cycle Hatari's trace stamps the
-  instruction at and the instruction's cycles. The coarse register's 0 of
-  a tick reaches the chip 24 cycles into its instruction and the fine
-  one's 16 into its instruction, so the first gap was 24 cycles where the
-  stamps read 32; two nops more make it 32, and a tick of a target of a
-  sync 8 cycles longer. The frame's sync is 32, 32n and 32 cycles on both
-  counts.
+  write's bus access to the next: the cycle of Hatari's trace stamp plus
+  the cycles of the instruction. In a tick the coarse register's 0
+  reaches the chip 24 cycles into its instruction and the fine one's 16
+  cycles into its instruction, so the first gap was 24 cycles where the
+  stamps read 32. Two more nops make it 32, and a tick of a target of a
+  sync is 8 cycles longer. The frame's sync is 32, 32n and 32 cycles on
+  both counts.
 - **The program's first frame.** A program that plays from the VBL plays
   the first row at the second VBL after a start, at the start of a frame:
   the 68000 acknowledged a VBL that came while a start ran at level 7 as
