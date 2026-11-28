@@ -723,9 +723,9 @@ value, a period 32,768 more than the row's, which the kit's `envelope`
 tune does on its first source's last two rows, 800 and then 33,696, its
 928 with the marker.
 
-The player is 11,188 bytes, 1,224 of them the counted shapes' twelve
+The player is 11,288 bytes, 1,224 of them the counted shapes' twelve
 instances, four each of one, two and three columns. Where a tick reads an
-absolute address, 10,848 bytes and 1,320, instances of 110 bytes against
+absolute address, 10,948 bytes and 1,320, instances of 110 bytes against
 the marked shape's 102 for two columns.
 
 ## A tick through an absolute address
@@ -792,7 +792,7 @@ reports -1 for one further off (BINARIES.md 1.5), and the layouts put a
 tune's DTX1 tables before its image and a set's subtunes before the
 images, so the rows of the tune a host loads are beside the player at any
 length of image. A host that places them further off assembles this build,
-which is 10,848 bytes against 11,188. Two figures move against each other:
+which is 10,948 bytes against 11,288. Two figures move against each other:
 a place is a word where it was a long, which shortens a timer's handlers
 by 48 bytes, and a start does the arithmetic that turns a row's address
 into a displacement, 38 bytes more of the timer's frame code. The init and
@@ -874,15 +874,15 @@ target, source or control column through a test of the pending start,
 about 50 cycles a start and 22 a stop or a retune.
 
 The second bank, the installers, the stubs and the stop's write-back make
-the player 16,070 bytes against 11,188, and 15,910 against 10,848 where a
+the player 16,162 bytes against 11,288, and 16,002 against 10,948 where a
 tick reads an absolute address. Each handler gains a stub: an instance of
 the wide handler is 106 bytes against 102, and of the marked shape of two
 columns 98 against 94.
 
-The lookup in, `YMXR_MAP=1`, makes the player 29,764 bytes against 11,188,
-and 29,270 against 10,848 where a tick reads an absolute address. With the
-deferred start in as well, 42,692 against 16,070, and 42,188 against
-15,910.
+The lookup in, `YMXR_MAP=1`, makes the player 30,062 bytes against 11,288,
+and 29,824 against 10,948 where a tick reads an absolute address. With the
+deferred start in as well, 42,982 against 16,162, and 42,478 against
+16,002.
 
 ## A cut
 
@@ -981,18 +981,18 @@ which starts four sources: 9,772 cycles, four through a transformation,
 two of them under a cut, and 9,562, four of two and three columns under a
 cut.
 
-The player with the lookup in is 29,764 bytes against 21,966 in release
-0.15.0, before the cut, and 29,270 against 23,256 where a tick reads an
-absolute address; with the deferred start in as well, 42,692 against
-35,908, and 42,188 against 37,954. Of the 7,798 bytes it is longer than in
+The player with the lookup in is 30,062 bytes against 21,966 in release
+0.15.0, before the cut, and 29,824 against 23,256 where a tick reads an
+absolute address; with the deferred start in as well, 42,982 against
+35,908, and 42,478 against 37,954. Of the 8,096 bytes it is longer than in
 that release, 3,264 are the cut's blocks, which a link leaves out of the
 player of a song that cuts no source (LINKER.md): 2,744 of routines and
 130 of each effect's frame code. With the deferred start in, the blocks
-are 3,740 of the 6,784. The blocks of copy from frame, which a link keeps
-only for a song that copies from frame, are 2,780 bytes of the rest, and
-2,890 with the deferred start in (Copy from frame). The blocks of the sync
+are 3,740 of the 7,074. The blocks of copy from frame, which a link keeps
+only for a song that copies from frame, are 2,816 bytes of the rest, and
+2,926 with the deferred start in (Copy from frame). The blocks of the sync
 and of the handler of its targets, which a link keeps only for a song that
-syncs a voice, are 3,302 bytes, and 3,602 with the deferred start in
+syncs a voice, are 3,600 bytes, and 3,892 with the deferred start in
 (LINKER.md).
 
 ## Copy from frame
@@ -1003,21 +1003,25 @@ aims the counted handler of its target's columns at their frame values, a
 source of one row with one row a pass, whose ticks run the counted
 handler's path at the end of a pass (A tick, A counted tick of two
 columns), and through a transformation the counted lookup instance's.
-Through the identity, on a target other than a target of a sync, the frame
-then aims the timer's vector at the timer's handler of copy from frame: a
-`move.l` a column, whose immediates are the column's register and its
-frame value. The register steps write each frame value to its immediate as
-well. The vector goes back to the counted handler at the head of the paths
-of a row that sets a column of the effect, the paths that read the handler
-through the vector (copy.S, ymxr_cxon, ymxr_csome). A frame of such a tune
-runs the register steps of the block `copy` in place of the frame's
-(LINKER.md): they find the registers copy from frame runs on (below), keep
-each value they read, masked to its register's width, as its frame value,
-and write the chip where the register is outside those. Init aims the
-frame, the starts and the head of each effect's paths at the block only
-for a tune that copies from frame, so every other tune runs the frame and
-the ticks it ran in the release before, at the same cycles, and a song of
-such tunes links the same player as in that release.
+Through the identity, on a target other than a target of a sync, and in a
+tune that syncs a voice on a target of registers other than R0 to R5, the
+frame then aims the timer's vector at the timer's handler of copy from
+frame: a `move.l` a column, whose immediates are the column's register and
+its frame value. The register steps write each frame value to its
+immediate as well; in a tune that syncs a voice the block `copysync`
+writes the frame values of R0 to R5 (LINKER.md, SPEC.md 4.4.1), and no
+immediate with them. The vector goes back to the counted handler at the
+head of the paths of a row that sets a column of the effect, the paths
+that read the handler through the vector (copy.S, ymxr_cxon, ymxr_csome).
+A frame of such a tune runs the register steps of the block `copy` in
+place of the frame's (LINKER.md): they find the registers copy from frame
+runs on (below), keep each value they read, masked to its register's
+width, as its frame value, and write the chip where the register is
+outside those. Init aims the frame, the starts and the head of each
+effect's paths at the block only for a tune that copies from frame, so
+every other tune runs the frame and the ticks it ran in the release
+before, at the same cycles, and a song of such tunes links the same player
+as in that release.
 
 The rig counts the figures below on the five tunes of its check of copy
 from frame, on the player as it is with the lookup in, and with the

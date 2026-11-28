@@ -47,12 +47,12 @@ player and of the player with the lookup in:
 | the timers' table, the tables of instances and the parked place | 162 | 162 |
 | the lookup's routines | | 3,496 |
 | the cut's routines | | 2,730 |
-| copy from frame's routines, handlers and frame values | | 1,816 |
+| copy from frame's routines, handlers and frame values | | 1,852 |
 | the sync's register steps, frame values, sync lengths and init's work | 1,068 | 1,068 |
-| the register steps of a tune that syncs and copies from frame | | 814 |
-| the handlers of a target of a sync, four effects, their start, their map's rows, the frame's writes of their sync lengths and init's loop | 1,338 | 1,412 |
+| the register steps of a tune that syncs and copies from frame | | 864 |
+| the handlers of a target of a sync, four effects, their start, their map's rows, the frame's writes of their sync lengths and frame values and init's loop | 1,446 | 1,668 |
 | the lookup instances and the gaps before them, ten kinds | | 5,998 |
-| the player | 11,188 | 29,764 |
+| the player | 11,288 | 30,062 |
 
 The handlers are 2,544 bytes of the plain player. A song whose sources are
 general and square sources runs 384 of them.
@@ -121,7 +121,9 @@ A block is the code and data a player runs for one part of a song:
   the three targets, the start of several columns init aims each effect's
   call at for a tune that syncs a voice, which sends such a start to the
   handler and every other start on to the start it ran before, and the
-  frame's writes of each handler's sync length (SPEC.md 5.1);
+  frame's writes of each handler's sync lengths and, in a tune that copies
+  from frame, of its voice's frame values, at level 7 (SPEC.md 4.4.1,
+  5.1);
 - `several` is the start of a source of several columns and the routines
   it calls, which a song needs where a start is of a counted source or of
   one of several columns;
@@ -446,20 +448,20 @@ measures it against the linked core.
 
 The blocks of its core each tune of the conformance kit keeps, the core
 it links, and the bytes of that core linked for it: the plain core, of
-11,880 bytes, the core with the deferred start in, of 16,762 bytes, the
-core with the lookup in, of 30,474 bytes, or the core with the lookup
-and the deferred start in, of 43,402 bytes.
+11,980 bytes, the core with the deferred start in, of 16,854 bytes, the
+core with the lookup in, of 30,772 bytes, or the core with the lookup
+and the deferred start in, of 43,692 bytes.
 
 | tune | the core | the blocks kept | bytes |
 |---|---|---|---|
 | `chambers.ymxr` | plain | none | 1,340 |
 | `circus.ymxr` | plain | none | 1,340 |
-| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 10,014 |
-| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 12,550 |
-| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 13,510 |
-| `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 14,596 |
-| `sync-even.ymxr` | plain | synced, synced0, several, effect0, effects, sync | 5,896 |
-| `sync-heads.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 12,550 |
+| `copy-from-frame.ymxr` | the lookup | square, square2, counted, counted0, countedthree, countedthree1, several, effect0, effect1, effect2, effects, copy | 10,050 |
+| `sync-targets.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 12,884 |
+| `sync.ymxr` | the lookup and the deferred start | two, two2, envelope, envelope0, several, effect0, effect2, effects, defer2, copy, sync, copysync, align | 13,588 |
+| `sync-volume.ymxr` | the lookup and the deferred start | synced, synced0, several, effect0, effect1, effect2, effects, map1, map2, defer1, lookup, lk, lk1, lk2, sync, align | 14,836 |
+| `sync-even.ymxr` | plain | synced, synced0, several, effect0, effects, sync | 5,996 |
+| `sync-heads.ymxr` | the lookup | synced, synced0, synced2, synced3, several, effect0, effect2, effect3, effects, copy, sync, copysync | 12,884 |
 | `counted.ymxr` | plain | square, square1, counted, counted0, counted1, counted2, counted3, several, effect0, effect1, effect2, effect3, effects | 6,710 |
 | `cut.ymxr` | the lookup | counted, counted0, effect0, effects, map0, cut, cut0 | 7,276 |
 | `cuts.ymxr` | the lookup and the deferred start | counted, counted0, effect0, effect2, effects, map0, defer0, cut, cut0, align | 10,510 |
@@ -478,15 +480,15 @@ and the deferred start in, of 43,402 bytes.
 | `voices.ymxr` | plain | two, two1, two3, three, three0, three2, several, effect0, effect1, effect2, effect3, effects | 6,672 |
 
 A tune of general sources alone, with no effect, links 1,340 bytes, 11% of
-the core: the blocks are 10,540 bytes of it. `voices.ymxr` runs all four
+the core: the blocks are 10,640 bytes of it. `voices.ymxr` runs all four
 effects, keeps a handler of two or three columns on each and the start of
 several columns, and links 6,672. `mapped.ymxr` keeps 4 lookup instances
-of 3 kinds and links 15,172 bytes of 43,402: the 36 instances and the 7
-loops of init it leaves out are 11,780 bytes, and the gaps it keeps are
-402 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
-instances of 1 kind and links 14,596 bytes of 43,402: the 38 instances and
-the 9 loops of init it leaves out are 12,428 bytes, and the gaps it keeps
-are 304 bytes shorter than in the core.
+of 3 kinds and links 15,172 bytes of 43,692: the 36 instances and the 7
+loops of init it leaves out are 11,708 bytes, and the gaps it keeps are
+438 bytes shorter than in the core. `sync-volume.ymxr` keeps 2 lookup
+instances of 1 kind and links 14,836 bytes of 43,692: the 38 instances and
+the 9 loops of init it leaves out are 12,356 bytes, and the gaps it keeps
+are 340 bytes shorter than in the core.
 
 ## The check
 

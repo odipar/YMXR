@@ -452,14 +452,15 @@ CX_ESTEP        equ     ymxr_cx0_e2-ymxr_cx0_e3
 ; the records marked the four (play.S, ymxr_cread), so a start costs no
 ; more. The frame aims the effect's vector at it where the effect runs
 ; copy from frame through the identity, on a target other than a target
-; of a sync (sync.S, ymxr_syncwide), on a counted handler of one to three
-; columns, with its timer counting and no start armed, and where no other
-; aimed effect's handler of copy from frame writes one of its registers:
-; each column's register and frame value written into a slot, the slot's
-; value the register's immediate (ymxr_cptr) and the effect its owner
-; (ymxr_cown), the record's handler kept in ymxr_xback, and the vector at
-; the entry, written last. A frame value's register is the byte after it
-; (FVROW). a0 the workspace; d0 to d5 and a1 to a5 clobbered.
+; of a sync (sync.S, ymxr_syncwide), and in a tune that syncs a voice on
+; a target of registers other than R0 to R5, on a counted handler of one
+; to three columns, with its timer counting and no start armed, and where
+; no other aimed effect's handler of copy from frame writes one of its
+; registers: each column's register and frame value written into a slot,
+; the slot's value the register's immediate (ymxr_cptr) and the effect
+; its owner (ymxr_cown), the record's handler kept in ymxr_xback, and the
+; vector at the entry, written last. A frame value's register is the byte
+; after it (FVROW). a0 the workspace; d0 to d5 and a1 to a5 clobbered.
 ymxr_cxon:      move.b  ymxr_xnew(pc),d0        ; the effects to test
                 bne.s   .some
                 rts
@@ -490,6 +491,21 @@ ymxr_cxon:      move.b  ymxr_xnew(pc),d0        ; the effects to test
                 adda.w  d1,a1                   ; the effect's record
                 cmp.b   #25,FX_TARGET(a1)       ; a target of a sync
                 bcc.w   .out
+; In a tune that syncs a voice the frame values of R0 to R5 become the
+; row's out of ymxr_sfv (sync.S), and no register's immediate is written
+; with them, so a target on one of them, setR0 to setR5 and setToneA to
+; setVoiceC, runs its counted handler.
+                movea.l WS_TUNE(a0),a3
+                tst.b   TF_SYNC(a3)
+                bpl.s   .tone
+                move.b  FX_TARGET(a1),d0
+                cmp.b   #6,d0
+                bcs.w   .out
+                cmp.b   #14,d0
+                bcs.s   .tone
+                cmp.b   #20,d0
+                bcs.w   .out
+.tone:
                 .if     YMXR_DEFER
                 tst.b   FX_PENDING(a1)          ; a start armed, whose hook the
                 bne.w   .out                    ; counted handler's path reaches

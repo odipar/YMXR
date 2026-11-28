@@ -1108,13 +1108,13 @@ steps of 4.2, between two steps of 4.3, between 4.3 and 4.4, and between
 two register writes of 4.4. A tick between two operations uses the updated
 effects before it and the previous values of those after it. Six
 operations run whole against a tick: the two bytes of a register write
-(4.4), the sync lengths of a row becoming current (4.4.1), the write of
-the target, the place, the loop row, in versions 10 and 11 the mapping and
-in version 11 the cut at a start (4.3 step 3), the write of the mapping at
-a remap (4.3.1), the write of the cut and the place at a recut (4.3.2),
-and the write of a select (4.3 step 5), which on a control register two
-timers share is a read, a change and a write back. A stop is two writes
-(2.3.3), and a tick latched before the stop falls between them.
+(4.4), a row becoming current at the targets of a sync (4.4.1), the write
+of the target, the place, the loop row, in versions 10 and 11 the mapping
+and in version 11 the cut at a start (4.3 step 3), the write of the
+mapping at a remap (4.3.1), the write of the cut and the place at a recut
+(4.3.2), and the write of a select (4.3 step 5), which on a control
+register two timers share is a read, a change and a write back. A stop is
+two writes (2.3.3), and a tick latched before the stop falls between them.
 
 Note: a player that reads the row of the next frame at the end of a
 call, after step 4, leaves the writes of every frame at one offset from
@@ -1233,22 +1233,32 @@ column; rule 1 leaves such a column unset. A register copy from frame runs
 on at this step is left to the ticks: the row sets its frame value
 (3.1.7), the register keeps its value, and the next tick writes the frame
 value (5.1). Each register whose column the row sets has the row's value
-as its frame value from its step (YMXS, SPEC.md 3.8.3).
+as its frame value from its step, or from the operation of 4.4.1 where
+that operation sets it (YMXS, SPEC.md 3.8.3).
 
 Note: on a 68000 the two bytes of a write are one `movep.w`.
 
-**4.4.1 The sync.** In versions 13 to 15, before step 1, the row's sync
-lengths become the *current* sync lengths of the voices (1.12.2, 5.1), and
-then the player syncs each voice whose bit 5 the row sets (1.12.1) and on
-a register of whose period no effect runs at this step, one after another
-in the order A, B, C, each with its current sync length to its frame
-values after this row (3.1.7): the row's value where the row sets the
-column, and the frame value before it otherwise (1.12.3). Step 1 then
-leaves those registers as they are. An effect runs on a register at this
-step where its timer counts and a tick of it writes the register (5.1),
-copy from frame among them; its ticks sync the voice where its target is a
-target of a sync (YMXS, SPEC.md 3.9.3). A tick due during the syncs occurs
-after them (4.2.1).
+**4.4.1 The sync.** In versions 13 to 15, before step 1, the row becomes
+current at the targets of a sync, in one operation against a tick (4.2.1):
+the row's sync lengths become the *current* sync lengths of the voices
+(1.12.2, 5.1), and each register of the period of a voice that a target of
+a sync runs on has the row's value as its frame value where the row sets
+its column (3.1.7). A target of a sync runs on its voice where the last
+start a frame or a tick performed on an effect's timer is on that target
+(4.3 step 3, 4.8). Then the player syncs each voice whose bit 5 the row
+sets (1.12.1) and on a register of whose period no effect runs at this
+step, one after another in the order A, B, C, each with its current sync
+length to its frame values after this row (3.1.7): the row's value where
+the row sets the column, and the frame value before it otherwise (1.12.3).
+Step 1 then leaves those registers as they are. An effect runs on a
+register at this step where its timer counts and a tick of it writes the
+register (5.1), copy from frame among them; its ticks sync the voice where
+its target is a target of a sync (YMXS, SPEC.md 3.9.3). A tick due during
+the syncs occurs after them (4.2.1).
+
+Note: on a 68000 the operation is its writes alone at interrupt level 7: a
+player reads the row and finds each value before it raises the level, so
+a tick due during the operation waits for those writes and no longer.
 
 ### 4.5 The wrap
 
@@ -1382,11 +1392,14 @@ A tick of a target of a sync, 25 to 27 (2.1), syncs its voice (1.12.3):
 writes 1 and 2 come before step 1, step 1 writes the fine column as write
 3, and step 2 the coarse nibble, the marker's column, as write 4. Its sync
 length is the voice's current one (4.4.1), other than at the first tick
-after a frame's register steps, whose sync length is the one current
-before them, unless the frame's row starts the effect or a start is
-pending on the timer at those steps (4.8). From write 1 to write 4 the
-tick runs at its timer's interrupt level, which masks every other timer,
-so a tick of another timer due then is served after it (5.1.2).
+after the row becomes current at the targets of a sync (4.4.1), whose
+sync length is the one current before that, unless the frame's row starts
+the effect or a start is pending on the timer then (4.8). A tick of copy
+from frame before that operation syncs to the frame values before the
+row, and one after it to the frame values after the row (3.1.7). From
+write 1 to write 4 the tick runs at its timer's interrupt level, which
+masks every other timer, so a tick of another timer due then is served
+after it (5.1.2).
 
 **5.1.1** A player runs the MFP in the mode the host leaves it, bit 3 of
 `$FFFA17` at 1, and performs step 6. A player that clears bit 3 at 4.1,

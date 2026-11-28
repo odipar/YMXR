@@ -50,15 +50,16 @@ and the player has one sequence for every sync (#412).
   `wrong-version` is version $0010.
 - **The sync.** 0 to the coarse register, 0 to the fine one a step later,
   the fine value n steps after that and the coarse value a step after it, at
-  every value of the two registers (SPEC.md 1.12.3). The first tick after a
-  frame's register steps syncs with the sync length of the row before, other
-  than at the frame of a start and with a start pending (5.1).
+  every value of the two registers (SPEC.md 1.12.3). The first tick after
+  the row becomes current at the targets of a sync syncs with the sync
+  length of the row before, other than at the frame of a start and with a
+  start pending (5.1).
 - **One sync path in the player.** A tick of a target of a sync runs one
   head, its pads 32 cycles each and its sync length a byte the frame
   writes, and the frame's sync makes the same four writes; the heads the
   frame wrote, the general head and the paths for a fine of 0 are gone. A
   tick of a source's row is 394 cycles at a sync length of 1 and 32 more a
-  step, against 232 to 406 in 0.20.0, and the plain player is 11,188 bytes
+  step, against 232 to 406 in 0.20.0, and the plain player is 11,288 bytes
   against 12,406.
 - **A sync timed on the bus.** The rig times each gap of a sync from one
   write's bus access to the next: the cycle of Hatari's trace stamp plus
@@ -72,6 +73,24 @@ and the player has one sequence for every sync (#412).
   the first row at the second VBL after a start, at the start of a frame:
   the 68000 acknowledged a VBL that came while a start ran at level 7 as
   the level dropped, part way through a frame (BINARIES.md 4.7).
+- **The row made current at one point.** A tick of a target of a sync plays
+  the row before or the row whole (SPEC.md 4.4.1, 5.1). The frame finds the
+  first bytes of each handler of a target of a sync and, in a tune that
+  copies from frame, the frame values of its voice at its level, and writes
+  them alone at level 7: 64 cycles where one effect syncs a voice in a tune
+  that copies from frame and 44 in one that does not, against 676 on
+  `square-sync` before, where a tick due in the stretch ran up to 22 steps
+  late. A tick of copy from frame between the frame values and the first
+  bytes read the row's period with the row before's sync length. In a tune
+  that syncs a voice, copy from frame on R0 to R5 runs its counted handler.
+  The frame costs more at its level: `sync-heads` plays 4,844 cycles a call
+  on average and 7,254 at most, against 4,074 and 6,424. Under Hatari,
+  #412's export of `square-sync` restarts voice A's square at another level
+  at row 384, where the timer restarts, and at row 702, where a tick runs 4
+  steps late after the frame's code, against rows 32, 559, 563, 577, 718,
+  756 and 765 besides. The rig's Hatari pass reads each tick against the row
+  before and the row, and fails `sync-heads` and `square-sync` on the player
+  before.
 
 ## Published
 
