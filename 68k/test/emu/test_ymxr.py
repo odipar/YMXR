@@ -7022,6 +7022,21 @@ def hatari(ym, code, symbols, perf=False):
                     return True
             return False
 
+        def latched(at, kind):
+            """Whether the tick of effect `kind` at event `at` is between
+            the two writes of its step's stop: after the frame's write of
+            0 to the timer's select, and before the frame's clear of its
+            pending bit."""
+            timer = TIMER[kind]
+            for one in reversed(events[:at]):
+                if one[0] != "mfp":
+                    continue
+                if one[1] == timer["ier"] + 4 and not one[2] >> timer["bit"] & 1:
+                    return False
+                if one[1] == timer["ctrl"]:
+                    return (one[2] >> timer["shift"]) & 0x0F == 0
+            return False
+
         # A step that leaves the timer's registers alone, a recut or a remap,
         # has no place in the trace among the ticks, and the replay steps it
         # at the first tick that disagrees. Where that tick is later than the
@@ -7061,11 +7076,12 @@ def hatari(ym, code, symbols, perf=False):
                 if not stepped[kind]:
                     marks.append((at, kind, snapshot()))
                 fx = model.fx[kind]
-                if stepped[kind] and not fx["running"] and prestep.get(kind, {}).get("running"):
+                if stepped[kind] and prestep.get(kind, {}).get("running") \
+                        and (not fx["running"] or latched(at, kind)):
                     # a tick latched before the step's stop runs between its
                     # two writes, the timer's stop and its pending bit's
                     # clear, and reads the source the step stopped (SPEC.md
-                    # 2.3.3, 4.2.1)
+                    # 2.3.3, 4.2.1), at a stop and at a timer's reset
                     stopped = model.fx[kind]
                     model.fx[kind] = copy.deepcopy(prestep[kind])
                     w, then = model.tick(kind)
